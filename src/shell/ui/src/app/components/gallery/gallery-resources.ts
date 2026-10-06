@@ -55,7 +55,7 @@ export class GalleryResources {
     selectOptions: [
       { value: "one", title: "First option" },
       { value: "two", title: "Second option" },
-      { value: "long", title: "An option whose title is far too long to fit the width its select gives it" }
+      { value: "long", title: "An option whose title is far too long to fit the width its select gives it, and longer still than the narrowest window can show on one line" }
     ],
     progress: "Progress",
     determinate: "Half done",

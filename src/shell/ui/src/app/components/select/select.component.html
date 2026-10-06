@@ -15,7 +15,9 @@ LICENSE file in the root directory of this source tree.
   <div class="tr-select-list" cdkListbox [cdkListboxValue]="marked()" [attr.aria-label]="label()" [style.min-width.px]="button.offsetWidth"
     (cdkListboxValueChange)="choose($event, button)" (keydown)="chooseAgain($event, button)">
     @for (option of options(); track option.value) {
-      <div class="tr-select-option" [cdkOption]="option.value" [attr.data-value]="option.value" (click)="closeOnCurrent(option.value, button)">{{ option.title }}</div>
+      <div class="tr-select-option" [cdkOption]="option.value" [attr.data-value]="option.value" [trTooltip]="option.title"
+        [trTooltipSide]="optionTooltipSide" [trTooltipBeside]="resources.selectListSelector" [trTooltipTruncated]="true"
+        (click)="closeOnCurrent(option.value, button)"><span class="tr-select-option-title" data-truncates>{{ option.title }}</span></div>
     }
   </div>
 </ng-template>

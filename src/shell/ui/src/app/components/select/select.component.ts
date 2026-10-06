@@ -19,11 +19,12 @@ import { OverlayAnchoring } from "../../models/overlay-anchoring";
 import { OverlaySide } from "../../models/overlay-side";
 import type { SelectOption } from "../../models/select-option";
 import { AnchoredOverlay } from "../../services/anchored-overlay";
+import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { Resources } from "../../../resources";
 
 @Component({
   selector: "tr-select",
-  imports: [CdkListbox, CdkOption],
+  imports: [CdkListbox, CdkOption, TooltipDirective],
   templateUrl: "./select.component.html",
   styleUrl: "./select.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -39,6 +40,7 @@ export class SelectComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly isOpen: WritableSignal<boolean> = signal(false);
+  protected readonly optionTooltipSide: OverlaySide = OverlaySide.below;
 
   public readonly isExpanded: Signal<boolean> = this.isOpen.asReadonly();
 

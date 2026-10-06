@@ -63,6 +63,7 @@
   box-sizing: border-box;
   max-width: calc(100vw - var(--tr-space-4));
   padding: var(--tr-dropdown-padding);
+  overflow-x: hidden;
   overflow-y: auto;
   border: var(--tr-border-width) solid var(--tr-dropdown-border);
   border-radius: var(--tr-radius-small);
@@ -82,7 +83,6 @@
   padding: 0 var(--tr-dropdown-row-padding);
   border-radius: var(--tr-radius-small);
   color: var(--tr-input-text);
-  white-space: nowrap;
   cursor: pointer;
 }
 

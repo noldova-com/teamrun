@@ -313,6 +313,7 @@ export class Resources {
   public static readonly keydownEvent: "keydown" = "keydown";
   public static readonly checkedGlyph: string = "check";
   public static readonly selectGlyph: string = "expand_more";
+  public static readonly selectListSelector: string = ".tr-select-list";
   public static readonly menuItemRole: string = "menuitem";
   public static readonly menuItemRadioRole: string = "menuitemradio";
   public static readonly menuItemCheckboxRole: string = "menuitemcheckbox";
