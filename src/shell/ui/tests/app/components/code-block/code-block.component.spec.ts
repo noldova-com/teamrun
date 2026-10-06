@@ -389,6 +389,31 @@ describe("CodeBlockComponent", () => {
     expect(tokens()).toEqual([["let", "keyword"], ["next", "variable"]]);
   });
 
+  it("keeps a selection in its code when the code's tokens arrive", async () => {
+    const answers: ((tokens: readonly CodeToken[]) => void)[] = [];
+    vi.spyOn(TestBed.inject(CodeHighlighter), "tokensAsync").mockImplementation(code => code === "let selected;"
+      ? new Promise(resolve => answers.push(resolve))
+      : Promise.resolve([]));
+    await renderAsync();
+    host.code.set("let selected;");
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(answers.length).toBe(1);
+    });
+    const code = find(".tr-code-block-body > code");
+    const text = code.firstChild ?? code;
+    getSelection()?.setBaseAndExtent(text, 4, text, 12);
+
+    answers[0]?.([new CodeToken(0, "let", CodeTokenKind.Keyword)]);
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(tokens()).toEqual([["let", "keyword"]]);
+    });
+
+    expect(getSelection()?.toString()).toBe("selected");
+    getSelection()?.removeAllRanges();
+  });
+
   it("shows changed code at once, plain until its tokens arrive, and never with the tokens of the code before it", async () => {
     await renderAsync();
     const colored = tokens().length;

@@ -356,6 +356,7 @@ export class Resources {
   public static readonly codePlainMarker: string = "plain";
   public static readonly codeLengthLimit: number = 100_000;
   public static readonly codeLineLengthLimit: number = 2000;
+  public static readonly codeLoadFailureHold: number = 10_000;
   public static readonly codeHighlightPrefix: string = "tr-code-";
   public static readonly codePlainScopes: readonly string[] = ["keyword.operator", "punctuation"];
   public static readonly codeTokenScopes: Readonly<Record<CodeTokenKind, readonly string[]>> = {

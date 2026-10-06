@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { DestroyRef, Injectable, inject } from "@angular/core";
+import { DestroyRef, ErrorHandler, Injectable, inject } from "@angular/core";
 import type { ShikiPrimitive } from "@shikijs/primitive";
 import type { ThemeRegistrationRaw } from "@shikijs/primitive/types";
 
@@ -33,8 +33,9 @@ export class CodeHighlighter {
     ]
   };
 
-  private readonly shiki: LoadOnce<readonly [typeof import("@shikijs/primitive"), ShikiPrimitive]> = new LoadOnce();
+  private readonly shiki: LoadOnce<readonly [typeof import("@shikijs/primitive"), ShikiPrimitive]> = new LoadOnce(Resources.codeLoadFailureHold);
   private readonly languages: Map<string, LoadOnce<void>> = new Map();
+  private readonly errors: ErrorHandler = inject(ErrorHandler);
   private isDisposed: boolean = false;
 
   public constructor() {
@@ -47,13 +48,11 @@ export class CodeHighlighter {
   public async tokensAsync(code: string, language: CodeLanguage, signal: AbortSignal): Promise<readonly CodeToken[]> {
     if (code.length > Resources.codeLengthLimit)
       return [];
-    const [shiki, primitive] = await this.shiki.getAsync(() => CodeHighlighter.startAsync());
-    if (this.isDisposed)
+    const loaded = await this.loadAsync(language).catch(() => null);
+    if (Object.isNull(loaded) || signal.aborted || this.isDisposed)
       return [];
-    await this.loadAsync(primitive, language);
-    if (signal.aborted || this.isDisposed)
-      return [];
-    const options = { lang: language.id, theme: Resources.codeThemeName, tokenizeMaxLineLength: Resources.codeLineLengthLimit };
+    const [shiki, primitive] = loaded;
+    const options = { lang: language.id, theme: Resources.codeThemeName, tokenizeMaxLineLength: Resources.codeLineLengthLimit + 1 };
     return shiki.codeToTokensBase(primitive, code, options).flat().flatMap(t => {
       const kind = CodeHighlighter.kindsByMarker.get(t.color);
       return Object.isUndefined(kind) ? [] : [new CodeToken(t.offset, t.content, kind)];
@@ -69,9 +68,17 @@ export class CodeHighlighter {
     return kind.toLowerCase();
   }
 
-  private loadAsync(primitive: ShikiPrimitive, language: CodeLanguage): Promise<void> {
-    const loading = this.languages.get(language.id) ?? new LoadOnce<void>();
+  private async loadAsync(language: CodeLanguage): Promise<readonly [typeof import("@shikijs/primitive"), ShikiPrimitive]> {
+    const loaded = await this.shiki.getAsync(() => this.reportAsync(CodeHighlighter.startAsync()));
+    const loading = this.languages.get(language.id) ?? new LoadOnce<void>(Resources.codeLoadFailureHold);
     this.languages.set(language.id, loading);
-    return loading.getAsync(() => primitive.loadLanguage(language.load));
+    if (!this.isDisposed)
+      await loading.getAsync(() => this.reportAsync(loaded[1].loadLanguage(language.load)));
+    return loaded;
+  }
+
+  private reportAsync<T>(loading: Promise<T>): Promise<T> {
+    void loading.catch((error: unknown) => this.errors.handleError(error));
+    return loading;
   }
 }

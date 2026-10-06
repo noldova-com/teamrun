@@ -6,11 +6,28 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
+import type { ShikiPrimitive } from "@shikijs/primitive";
 
 import { CodeTokenKind } from "../../../src/app/enums/code-token-kind";
 import { CodeLanguage } from "../../../src/app/models/code-language";
 import { CodeHighlighter } from "../../../src/app/services/code-highlighter";
+import { Resources } from "../../../src/resources";
+
+const primitives = vi.hoisted((): ShikiPrimitive[] => []);
+
+vi.mock("@shikijs/primitive", async importOriginal => {
+  const shiki = await importOriginal<typeof import("@shikijs/primitive")>();
+  return {
+    ...shiki,
+    createShikiPrimitive: (...options: Parameters<typeof shiki.createShikiPrimitive>): ShikiPrimitive => {
+      const primitive = shiki.createShikiPrimitive(...options);
+      primitives.push(primitive);
+      return primitive;
+    }
+  };
+});
 
 describe("CodeHighlighter", () => {
   const signal = new AbortController().signal;
@@ -83,14 +100,27 @@ describe("CodeHighlighter", () => {
     await expect(tokens).resolves.toEqual([]);
   });
 
-  it("forgets a grammar that failed to load, so the next call loads it again", async () => {
-    const highlighter = TestBed.inject(CodeHighlighter);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reports a grammar that failed to load once, leaves code plain while the failure is held, then loads the grammar again", async () => {
+    const errors: unknown[] = [];
     const failure = new Error("The grammar's chunk did not load.");
-    const failing = Object.create(typescript, { load: { value: (): Promise<never> => Promise.reject(failure) } }) as CodeLanguage;
+    TestBed.overrideProvider(ErrorHandler, { useValue: { handleError: (error: unknown) => errors.push(error) } });
+    const highlighter = TestBed.inject(CodeHighlighter);
+    await highlighter.tokensAsync("echo hi", CodeLanguage.named("sh") as CodeLanguage, signal);
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    const loadLanguage = vi.spyOn(primitives.at(-1) as ShikiPrimitive, "loadLanguage").mockRejectedValueOnce(failure);
 
-    await expect(highlighter.tokensAsync("let a;", failing, signal)).rejects.toBe(failure);
+    const held: unknown[] = [];
+    for (const code of ["let", "let a", "let a;"])
+      held.push(await highlighter.tokensAsync(code, typescript, signal));
+    vi.advanceTimersByTime(Resources.codeLoadFailureHold);
+    const loaded = await highlighter.tokensAsync("let a;", typescript, signal);
 
-    expect((await highlighter.tokensAsync("let a;", typescript, signal)).map(t => t.text)).toEqual(["let", "a"]);
+    expect([held, errors, loadLanguage.mock.calls.length]).toEqual([[[], [], []], [failure], 2]);
+    expect(loaded.map(t => t.text)).toEqual(["let", "a"]);
   });
 
   it("tokenizes nothing once its call is aborted", async () => {
@@ -100,15 +130,15 @@ describe("CodeHighlighter", () => {
     await expect(TestBed.inject(CodeHighlighter).tokensAsync("let a;", typescript, controller.signal)).resolves.toEqual([]);
   });
 
-  it("leaves code longer than its limit plain, and a line longer than its limit plain among colored ones", async () => {
+  it("colors code as long as its limit and leaves longer code plain, and colors a line as long as its limit and leaves a longer line plain among colored ones", async () => {
     const highlighter = TestBed.inject(CodeHighlighter);
-    const longLine = `let b = 1;${" ".repeat(2000)}`;
+    const texts = async (code: string): Promise<readonly string[]> => (await highlighter.tokensAsync(code, typescript, signal)).map(t => t.text);
+    const code = (length: number): string => `let a;${"\n".repeat(length - 6)}`;
+    const line = (length: number): string => `let a;\nlet b = 1;${" ".repeat(length - 10)}\nlet c;`;
 
-    const long = await highlighter.tokensAsync(`let a;${" ".repeat(100_000)}`, typescript, signal);
-    const mixed = await highlighter.tokensAsync(`let a;\n${longLine}\nlet c;`, typescript, signal);
+    const results = [await texts(code(100_000)), await texts(code(100_001)), await texts(line(2000)), await texts(line(2001))];
 
-    expect(long).toEqual([]);
-    expect(mixed.map(t => t.text)).toEqual(["let", "a", "let", "c"]);
+    expect(results).toEqual([["let", "a"], [], ["let", "a", "let", "b", "1", "let", "c"], ["let", "a", "let", "c"]]);
   });
 
   it("gives each colored token its kind and place, across line breaks, and leaves plain text out", async () => {

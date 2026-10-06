@@ -75,7 +75,8 @@ export class CodeBlockComponent {
       const element = this.text().nativeElement;
       if (this.codeText.parentNode !== element)
         element.append(this.codeText);
-      this.codeText.data = this.code();
+      if (this.codeText.data !== this.code())
+        this.codeText.data = this.code();
       if (this.tokens.hasValue())
         onCleanup(this.highlights.add(this.codeText, this.tokens.value()));
     });

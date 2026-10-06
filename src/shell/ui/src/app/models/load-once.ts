@@ -9,15 +9,20 @@
 import "@noldova/teamrun-foundation-core";
 
 export class LoadOnce<T> {
+  private readonly failureHold: number;
   private loading: Promise<T> | null = null;
+
+  public constructor(failureHold: number) {
+    this.failureHold = failureHold;
+  }
 
   public getAsync(load: () => Promise<T>): Promise<T> {
     if (Object.isNull(this.loading)) {
       const loading = load();
       this.loading = loading;
-      void loading.catch(() => {
+      void loading.catch(() => setTimeout(() => {
         this.loading = null;
-      });
+      }, this.failureHold));
     }
     return this.loading;
   }
