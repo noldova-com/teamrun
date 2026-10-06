@@ -1,0 +1,21 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--tr-space-3);
+  border: var(--tr-border-width) solid var(--tr-card-border);
+  border-radius: var(--tr-radius-medium);
+  background-color: var(--tr-raised);
+  color: var(--tr-text);
+  font-size: var(--tr-text-message);
+  line-height: var(--tr-line-message);
+  overflow-wrap: anywhere;
+}

@@ -144,22 +144,24 @@ class ScriptTestCheckTests {
 
       assert.deepEqual(recorded, [true, ""]);
       assert.deepEqual(totals, {
-        version: 2,
+        version: 3,
         runner: "script",
         title: "Script tests",
+        shard: null,
         discovered: 4,
         executed: 3,
         passed: 2,
         failed: 1,
+        rerunPassed: 0,
         skipped: 1,
         unselected: 0,
         unreached: 0,
         skips: [{ test: "scripts/tests/alpha.test.ts › outer › later", reason: "To do." }],
         files: ScriptTestCheckTests.FILES,
+        expected: ScriptTestCheckTests.FILES,
         coverage: { unit: "files", covered: 3, total: 4 },
         duplicates: [],
-        empty: [],
-        missing: []
+        empty: []
       });
       assert.deepEqual(unmeasured, [true, ""]);
       assert.equal(unmeasuredTotals.coverage, null);

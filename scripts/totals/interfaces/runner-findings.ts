@@ -9,5 +9,4 @@
 export default interface IRunnerFindings {
   readonly duplicates: readonly string[];
   readonly empty: readonly string[];
-  readonly missing: readonly string[];
 }

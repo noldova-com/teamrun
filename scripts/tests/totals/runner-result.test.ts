@@ -25,7 +25,7 @@ class RunnerResultTests {
   };
 
   public static register(): void {
-    test("a runner's result becomes its totals, naming each skipped and duplicate test by its file and names, and each expected file without a result", () => {
+    test("a runner's result becomes its totals, naming each skipped and duplicate test by its file and names, and each expected file without a result unless it is a shard's", () => {
       const result = RunnerResult.parse(JSON.stringify({
         ...RunnerResultTests.OUTCOMES,
         discovered: 9,
@@ -34,26 +34,31 @@ class RunnerResultTests {
         empty: ["@noldova/teamrun-foundation-alpha/empty.test.js"]
       }), "result.json");
 
-      const totals = result.toTotals("package", "Package tests", { unit: "blocks", covered: 1, total: 2 }, ["@noldova/teamrun-foundation-alpha/alpha.test.js", "@noldova/teamrun-foundation-alpha/beta.test.js"]);
+      const totals = result.toTotals("package", "Package tests", { unit: "blocks", covered: 1, total: 2 }, ["@noldova/teamrun-foundation-alpha/alpha.test.js", "@noldova/teamrun-foundation-alpha/beta.test.js"], null);
+      const shard = result.toTotals("ui", "UI workflows", null, ["@noldova/teamrun-foundation-alpha/beta.test.js"], "1/2");
 
       assert.deepEqual(JSON.parse(totals.toJson()), {
-        version: 2,
+        version: 3,
         runner: "package",
         title: "Package tests",
+        shard: null,
         discovered: 9,
         executed: 4,
         passed: 3,
         failed: 1,
+        rerunPassed: 0,
         skipped: 1,
         unselected: 3,
         unreached: 1,
         skips: [{ test: "@noldova/teamrun-foundation-alpha/alpha.test.js › AlphaTests.waits", reason: "Waits for the shell." }],
         files: ["@noldova/teamrun-foundation-alpha/alpha.test.js"],
+        expected: ["@noldova/teamrun-foundation-alpha/alpha.test.js", "@noldova/teamrun-foundation-alpha/beta.test.js"],
         coverage: { unit: "blocks", covered: 1, total: 2 },
         duplicates: ["@noldova/teamrun-foundation-alpha/alpha.test.js › AlphaTests › twice"],
-        empty: ["@noldova/teamrun-foundation-alpha/empty.test.js"],
-        missing: ["@noldova/teamrun-foundation-alpha/beta.test.js"]
+        empty: ["@noldova/teamrun-foundation-alpha/empty.test.js"]
       });
+      assert.deepEqual(totals.missing, ["@noldova/teamrun-foundation-alpha/beta.test.js"]);
+      assert.deepEqual([shard.shard, shard.expected, shard.missing], ["1/2", ["@noldova/teamrun-foundation-alpha/beta.test.js"], []]);
       assert.deepEqual([result.discovered, result.selected], [9, 6]);
     });
 
@@ -62,7 +67,7 @@ class RunnerResultTests {
 
       assert.deepEqual([result.discovered, result.selected], [6, 6]);
       assert.deepEqual([result.duplicates, result.empty], [[], []]);
-      assert.deepEqual(result.toTotals("script", "Script tests", null, result.files).problems, []);
+      assert.deepEqual(result.toTotals("script", "Script tests", null, result.files, null).problems, []);
     });
 
     test("a result is read from its file, and a missing or malformed one is refused with its path", async t => {

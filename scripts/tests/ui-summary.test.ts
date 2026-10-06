@@ -25,6 +25,7 @@ class UiSummaryTests {
   private static readonly WORKFLOWS: string = "src/shell/desktop/tests/e2e";
   private static readonly PASSED: object = { expectedStatus: "passed", status: "expected", results: [{ status: "passed" }] };
   private static readonly LISTED: object = { expectedStatus: "passed", results: [] };
+  private static readonly LIST_ARGUMENTS: readonly string[] = ["test", "--config", "src/shell/desktop/tests/e2e/playwright.config.ts", "--list", "--reporter=json"];
   private static readonly SPEC_FILES: Readonly<Record<string, string>> = { "src/shell/desktop/tests/e2e/a.spec.ts": "", "src/shell/desktop/tests/e2e/b.spec.ts": "" };
 
   public static register(): void {
@@ -34,7 +35,7 @@ class UiSummaryTests {
       const log = new TextOutputFixture();
       const runner = UiSummaryTests.listing(repository);
 
-      const exitCode = await new UiSummary(repository.directory, log, runner).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Windows x64", SCREENSHOT_URL: "https://example.com/a" });
+      const exitCode = await new UiSummary(repository.directory, log, runner).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Windows x64", UI_SHARD: "1/2", SCREENSHOT_URL: "https://example.com/a" });
 
       assert.equal(exitCode, 0);
       const summary = await readFile(summaryPath, "utf8");
@@ -45,6 +46,31 @@ class UiSummaryTests {
       assert.deepEqual(runner.captured, [[process.execPath, repository.directory, path.join(repository.directory, "node_modules", "playwright", "cli.js"), "test", "--config", `${UiSummaryTests.WORKFLOWS}/playwright.config.ts`, "--list", "--reporter=json"]]);
       const record = JSON.parse(await readFile(path.join(repository.directory, "_build", "totals", "ui.json"), "utf8"));
       assert.deepEqual([record.runner, record.title, record.discovered, record.executed, record.unselected, record.files], ["ui", "UI workflows", 2, 1, 1, [`${UiSummaryTests.WORKFLOWS}/a.spec.ts`]]);
+      assert.deepEqual([record.shard, record.expected, record.rerunPassed], ["1/2", [`${UiSummaryTests.WORKFLOWS}/a.spec.ts`, `${UiSummaryTests.WORKFLOWS}/b.spec.ts`], 0]);
+    });
+
+    test("a shard of a grep run lists the workflows again with the grep, so the totals expect only the files it selects", async t => {
+      const repository = await UiSummaryTests.createRepositoryAsync(t, UiSummaryTests.SPEC_FILES);
+      const selected = UiSummaryTests.report(repository, [{ title: "a.spec.ts", specs: [UiSummaryTests.spec("a.spec.ts", "docks", UiSummaryTests.LISTED)] }]);
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, UiSummaryTests.list(repository), ""), new ProcessResult(0, selected, "")]);
+
+      const exitCode = await new UiSummary(repository.directory, new TextOutputFixture(), runner).runAsync({ GITHUB_STEP_SUMMARY: path.join(repository.directory, "summary.md"), UI_TARGET: "Windows x64", UI_SHARD: "1/1", GREP: "@smoke" });
+
+      assert.equal(exitCode, 0);
+      assert.deepEqual(runner.captured.map(t => t.slice(3)), [UiSummaryTests.LIST_ARGUMENTS, [...UiSummaryTests.LIST_ARGUMENTS, "--grep", "@smoke"]]);
+      const record = JSON.parse(await readFile(path.join(repository.directory, "_build", "totals", "ui.json"), "utf8"));
+      assert.deepEqual([record.shard, record.discovered, record.expected], ["1/1", 2, [`${UiSummaryTests.WORKFLOWS}/a.spec.ts`]]);
+    });
+
+    test("a run of every workflow without shards fails for each listed file it has no result for", async t => {
+      const repository = await UiSummaryTests.createRepositoryAsync(t, UiSummaryTests.SPEC_FILES);
+      const log = new TextOutputFixture();
+
+      const exitCode = await new UiSummary(repository.directory, log, UiSummaryTests.listing(repository)).runAsync({ GITHUB_STEP_SUMMARY: path.join(repository.directory, "summary.md"), UI_TARGET: "Linux x64" });
+
+      assert.equal(exitCode, 1);
+      assert.ok(log.text.endsWith(`\nUI workflows have no result for these files:\n  ${UiSummaryTests.WORKFLOWS}/b.spec.ts\n`), log.text);
+      assert.equal(JSON.parse(await readFile(path.join(repository.directory, "_build", "totals", "ui.json"), "utf8")).shard, null);
     });
 
     test("the tests that passed only on retry count as failed, with a note, and go to the flaky test record, the log and the step summary", async t => {
@@ -54,8 +80,9 @@ class UiSummaryTests {
       const summaryPath = path.join(repository.directory, "summary.md");
       const log = new TextOutputFixture();
 
-      assert.equal(await new UiSummary(repository.directory, log, UiSummaryTests.listing(repository)).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Linux x64" }), 0);
+      assert.equal(await new UiSummary(repository.directory, log, UiSummaryTests.listing(repository)).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Linux x64", UI_SHARD: "2/2" }), 0);
 
+      assert.equal(JSON.parse(await readFile(path.join(repository.directory, "_build", "totals", "ui.json"), "utf8")).rerunPassed, 1);
       assert.deepEqual(FlakyRecord.parse(await readFile(path.join(repository.directory, "_build", "flaky-tests.json"), "utf8")),
         [new FlakyTest("UI workflows", `${UiSummaryTests.WORKFLOWS}/a.spec.ts`, "a.spec.ts › docks", "Error: first")]);
       assert.ok(log.text.endsWith(`Flaky, passed when run again: a.spec.ts › docks (${UiSummaryTests.WORKFLOWS}/a.spec.ts)\n`));
@@ -83,7 +110,7 @@ class UiSummaryTests {
       const summaryPath = path.join(repository.directory, "summary.md");
 
       const exitCode = await new UiSummary(repository.directory, new TextOutputFixture(), UiSummaryTests.listing(repository)).runAsync({
-        GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "macOS x64", SCREENSHOT_URL: "", SCREENSHOT_UPLOAD_FAILED: "true"
+        GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "macOS x64", UI_SHARD: "1/3", SCREENSHOT_URL: "", SCREENSHOT_UPLOAD_FAILED: "true"
       });
 
       assert.equal(exitCode, 0);
@@ -95,7 +122,7 @@ class UiSummaryTests {
       const summaryPath = path.join(repository.directory, "summary.md");
       const log = new TextOutputFixture();
 
-      assert.equal(await new UiSummary(repository.directory, log, UiSummaryTests.listing(repository)).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Linux x64" }), 1);
+      assert.equal(await new UiSummary(repository.directory, log, UiSummaryTests.listing(repository)).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Linux x64", UI_SHARD: "1/5" }), 1);
 
       assert.ok(log.text.endsWith(`\nUI workflows found no tests in these files:\n  ${UiSummaryTests.WORKFLOWS}/empty.spec.ts\n`));
       assert.ok((await readFile(summaryPath, "utf8")).startsWith("### UI workflows: Linux x64\n\n| Tests |"));
@@ -148,7 +175,7 @@ class UiSummaryTests {
 
       const result = spawnSync(process.execPath, [SourceTreeFixture.locateScript("ui-summary.ts")], {
         cwd: repository.directory,
-        env: { ...process.env, GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "macOS x64", SCREENSHOT_URL: "" },
+        env: { ...process.env, GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "macOS x64", UI_SHARD: "1/3", GREP: "", SCREENSHOT_URL: "" },
         encoding: "utf8",
         timeout: 30_000
       });

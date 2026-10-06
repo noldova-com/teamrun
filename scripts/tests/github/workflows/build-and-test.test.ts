@@ -41,11 +41,15 @@ class BuildAndTestTests {
   private static readonly BUILD_UPLOAD_SETTINGS: readonly string[] = [BuildAndTestTests.BUILD_ARTIFACT, "path: build.tar", "retention-days: 3", "if-no-files-found: error", "overwrite: true"];
   private static readonly PACKED: string = "_build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/variants _build/window _build/ui-builds.record " +
     "node_modules/.package-lock.json node_modules/@noldova src/generated";
-  private static readonly WORKFLOW_NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js to install"];
+  private static readonly WORKFLOW_NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js to install", "Set up Node.js to add up the totals"];
   private static readonly ACTION_NODE_SETUP: string = "Set up Node.js";
   private static readonly NODE_ACTION: string = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0";
   private static readonly FLAKY_STEPS: readonly string[] = ["Keep the flaky test record", "Keep the flaky test record again", "Keep the flaky test record a last time"];
   private static readonly FLAKY_WARNING: string = "Warn that the flaky test record was not kept";
+  private static readonly TOTALS_UPLOADS: readonly (readonly [string, string, string, string, string, string])[] = [
+    [BuildAndTestTests.TARGET_WORKFLOW, "Test", "Test", "test totals", "totals-${{ inputs.runner }}-${{ inputs.architecture }}-${{ matrix.part || 'all' }}", "_build/totals/"],
+    [BuildAndTestTests.UI_WORKFLOW, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP, "UI workflow totals", "totals-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}", "_build/totals/ui.json"]
+  ];
   private static readonly FLAKY_UPLOADS: readonly (readonly [string, string, string, string])[] = [
     [BuildAndTestTests.TARGET_WORKFLOW, "Test", "flaky-tests-${{ inputs.runner }}-${{ inputs.architecture }}-${{ matrix.part || 'all' }}-${{ github.run_attempt }}", "job"],
     [BuildAndTestTests.UI_WORKFLOW, BuildAndTestTests.UI_STEP, "flaky-tests-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}", "shard"]
@@ -110,34 +114,40 @@ class BuildAndTestTests {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW)).readStepScript(BuildAndTestTests.RESULT_STEP);
       const all = BuildAndTestTests.ALL_UI_TARGETS;
       const pullRequest = BuildAndTestTests.PULL_REQUEST_UI_TARGETS;
-      const cases: readonly (readonly [string, string, string, string, string, number, RegExp])[] = [
-        ["success", "false", "false", "skipped", pullRequest, 0, /^Only Markdown documentation changed/],
-        ["success", "true", "false", "success", pullRequest, 0, /^Only documentation, CI and test tooling or repository configuration changed: .* The UI workflows were not required\.\n$/],
-        ["success", "true", "true", "success", pullRequest, 0, /^The document checks passed, and the build, tests and UI workflows passed on every target\.\n$/],
-        ["success", "true", "true", "success", all, 0, /^The document checks passed, and the build, tests and UI workflows passed on every target\.\n$/],
-        ["success", "true", "true", "success", "", 1, /^$/],
-        ["success", "true", "true", "failure", pullRequest, 1, /^$/],
-        ["success", "true", "true", "cancelled", pullRequest, 1, /^$/],
-        ["success", "true", "true", "skipped", pullRequest, 1, /^$/],
-        ["success", "false", "true", "skipped", pullRequest, 1, /^$/],
-        ["success", "true", "false", "failure", pullRequest, 1, /^$/],
-        ["success", "true", "false", "skipped", pullRequest, 1, /^$/],
-        ["success", "false", "false", "success", pullRequest, 1, /^$/],
-        ["failure", "", "", "skipped", "", 1, /^$/],
-        ["cancelled", "", "", "skipped", "", 1, /^$/],
-        ["skipped", "", "", "skipped", "", 1, /^$/]
+      const cases: readonly (readonly [string, string, string, string, string, string, number, RegExp])[] = [
+        ["success", "false", "false", "skipped", "skipped", pullRequest, 0, /^Only Markdown documentation changed/],
+        ["success", "true", "false", "success", "success", pullRequest, 0, /^Only documentation, CI and test tooling or repository configuration changed: .* The UI workflows were not required\.\n$/],
+        ["success", "true", "true", "success", "success", pullRequest, 0, /^The document checks passed, and the build, tests and UI workflows passed on every target\.\n$/],
+        ["success", "true", "true", "success", "success", all, 0, /^The document checks passed, and the build, tests and UI workflows passed on every target\.\n$/],
+        ["success", "true", "true", "success", "success", "", 1, /^$/],
+        ["success", "true", "true", "success", "failure", pullRequest, 1, /^$/],
+        ["success", "true", "true", "success", "cancelled", pullRequest, 1, /^$/],
+        ["success", "true", "true", "success", "skipped", pullRequest, 1, /^$/],
+        ["success", "true", "false", "success", "failure", pullRequest, 1, /^$/],
+        ["success", "true", "false", "success", "skipped", pullRequest, 1, /^$/],
+        ["success", "false", "false", "skipped", "success", pullRequest, 1, /^$/],
+        ["success", "true", "true", "failure", "success", pullRequest, 1, /^$/],
+        ["success", "true", "true", "cancelled", "skipped", pullRequest, 1, /^$/],
+        ["success", "true", "true", "skipped", "success", pullRequest, 1, /^$/],
+        ["success", "false", "true", "skipped", "skipped", pullRequest, 1, /^$/],
+        ["success", "true", "false", "failure", "success", pullRequest, 1, /^$/],
+        ["success", "true", "false", "skipped", "success", pullRequest, 1, /^$/],
+        ["success", "false", "false", "success", "skipped", pullRequest, 1, /^$/],
+        ["failure", "", "", "skipped", "skipped", "", 1, /^$/],
+        ["cancelled", "", "", "skipped", "skipped", "", 1, /^$/],
+        ["skipped", "", "", "skipped", "skipped", "", 1, /^$/]
       ];
-      await Promise.all(cases.map(async ([changes, runCode, runUi, validation, uiTargets, status, summary]) => {
+      await Promise.all(cases.map(async ([changes, runCode, runUi, validation, totals, uiTargets, status, summary]) => {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         await writeFile(path.join(doubles.directory, "summary.md"), "");
 
         const result = await doubles.runAsync(script, {
-          CHANGES_RESULT: changes, RUN_CODE: runCode, RUN_UI: runUi, VALIDATION_RESULT: validation, UI_TARGETS: uiTargets, DEFERRED: "", UI_DEFERRED: "",
+          CHANGES_RESULT: changes, RUN_CODE: runCode, RUN_UI: runUi, VALIDATION_RESULT: validation, TOTALS_RESULT: totals, UI_TARGETS: uiTargets, DEFERRED: "", UI_DEFERRED: "",
           GITHUB_STEP_SUMMARY: "summary.md"
         });
 
-        const label = [changes, runCode, runUi, validation, uiTargets].join(":");
+        const label = [changes, runCode, runUi, validation, totals, uiTargets].join(":");
         assert.equal(result.status, status, `${label}: ${result.stderr}`);
         assert.match(await doubles.readFileAsync("summary.md"), summary, label);
         if (status !== 0)
@@ -157,7 +167,7 @@ class BuildAndTestTests {
         await writeFile(path.join(doubles.directory, "summary.md"), "");
 
         const result = await doubles.runAsync(script, {
-          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: runUi, VALIDATION_RESULT: "success", UI_TARGETS: BuildAndTestTests.PULL_REQUEST_UI_TARGETS, DEFERRED: "Windows ARM64, macOS x64", UI_DEFERRED: "",
+          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: runUi, VALIDATION_RESULT: "success", TOTALS_RESULT: "success", UI_TARGETS: BuildAndTestTests.PULL_REQUEST_UI_TARGETS, DEFERRED: "Windows ARM64, macOS x64", UI_DEFERRED: "",
           GITHUB_STEP_SUMMARY: "summary.md"
         });
 
@@ -178,7 +188,7 @@ class BuildAndTestTests {
         await writeFile(path.join(doubles.directory, "summary.md"), "");
 
         const result = await doubles.runAsync(script, {
-          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: "true", VALIDATION_RESULT: validation, UI_TARGETS: uiTargets, DEFERRED: "", UI_DEFERRED: "macOS x64",
+          CHANGES_RESULT: "success", RUN_CODE: "true", RUN_UI: "true", VALIDATION_RESULT: validation, TOTALS_RESULT: "success", UI_TARGETS: uiTargets, DEFERRED: "", UI_DEFERRED: "macOS x64",
           GITHUB_STEP_SUMMARY: "summary.md"
         });
 
@@ -220,7 +230,8 @@ class BuildAndTestTests {
         "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n" +
         "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.changes.outputs.targets) }}\n" +
         "    uses: ./.github/workflows/build-and-test-target.yml\n    with:\n      runner: ${{ matrix.runner }}\n      architecture: ${{ matrix.architecture }}\n      jobs: ${{ toJSON(matrix.jobs) }}\n      ui: ${{ needs.changes.outputs.run-ui == 'true' && toJSON(matrix.ui) || 'null' }}\n\n"));
-      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [changes, validate]\n    if: always()\n"));
+      assert.ok(text.includes("    name: Build and test (all targets)\n    needs: [changes, validate, totals]\n    if: always()\n"));
+      assert.ok(text.includes("          TOTALS_RESULT: ${{ needs.totals.result }}\n"));
       assert.doesNotMatch(text, /UI_RESULTS|ui-plan/);
       assert.ok(text.includes("          UI_TARGETS: ${{ needs.changes.outputs.ui-targets }}\n"));
       assert.ok(text.includes("          UI_DEFERRED: ${{ needs.changes.outputs.ui-deferred }}\n"));
@@ -303,7 +314,7 @@ class BuildAndTestTests {
       assert.ok(text.includes("    name: Remove outdated dependency caches\n    needs: [cache-plan, cache]\n" +
         "    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.cache-plan.result == 'success' && " +
         "(needs.cache.result == 'success' || needs.cache.result == 'skipped') }}\n"));
-      assert.equal(text.match(/persist-credentials: false/g)?.length, 4);
+      assert.equal(text.match(/persist-credentials: false/g)?.length, 5);
       assert.ok(text.includes("cancel-in-progress: ${{ github.event_name == 'pull_request' }}"));
       for (const trigger of ["  pull_request:\n    branches: [main]", "  merge_group:\n    types: [checks_requested]\n", "  push:\n    branches: [main]", "  workflow_dispatch:"])
         assert.ok(text.includes(trigger), trigger);
@@ -462,7 +473,8 @@ class BuildAndTestTests {
       assert.ok(text.includes("      - name: Fetch the builds\n        id: fetch\n        if: matrix.prebuilt\n"));
       assert.ok(text.includes("      - name: Unpack the builds\n        if: matrix.prebuilt\n"));
       assert.equal(workflow.readStepScript(BuildAndTestTests.SUMMARY_STEP), "node scripts/ui-summary.ts\n");
-      assert.ok(text.includes("          UI_TARGET: ${{ matrix.target }}, ${{ matrix.shard }} of ${{ matrix.shards }}\n" +
+      assert.ok(text.includes("      - name: Summarize the UI workflows\n        id: summary\n        if: always() && steps.ui.outcome != 'skipped'\n        env:\n" +
+        "          UI_TARGET: ${{ matrix.target }}, ${{ matrix.shard }} of ${{ matrix.shards }}\n          UI_SHARD: ${{ matrix.shard }}/${{ matrix.shards }}\n          GREP: ${{ matrix.grep }}\n" +
         "          SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}\n"));
       assert.ok(text.includes("          SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}\n"));
     });
@@ -532,6 +544,54 @@ class BuildAndTestTests {
         assert.deepEqual([retried.ran, retried.isJobFailed], [[first, `${pause} again`, again], false], first);
         assert.deepEqual([failed.ran, failed.isJobFailed], [[first, `${pause} again`, again, `${pause} a last time`, last], true], first);
       }
+    });
+
+    test("each test job and UI shard keeps its test totals whenever its tests ran, tried three times with a pause, and fails the job only when the last attempt fails", async () => {
+      for (const [name, first, recording, record, artifact, totalsPath] of BuildAndTestTests.TOTALS_UPLOADS) {
+        const workflow = await WorkflowFileFixture.readAsync(name);
+        const keep = `Keep the ${record}`;
+        const [again, last] = [`${keep} again`, `${keep} a last time`];
+        const [pause, lastPause] = [`Wait before keeping the ${record} again`, `Wait before keeping the ${record} a last time`];
+        const simulation = new WorkflowSimulation(workflow.text, first, last);
+        const attempts = [keep, again, last].map(t => simulation.find(t));
+        const matrix = { angular: "false" };
+        const totals = (result: { readonly ran: readonly string[] }): readonly string[] => result.ran.filter(t => t.includes(record));
+
+        const passed = simulation.run(matrix, {});
+        const testsFailed = simulation.run(matrix, { [recording]: "failure" });
+        const notRun = simulation.run(matrix, { [first]: "skipped" });
+        const retried = simulation.run(matrix, { [keep]: "failure" });
+        const failed = simulation.run(matrix, { [keep]: "failure", [again]: "failure", [last]: "failure" });
+
+        assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[BuildAndTestTests.UPLOAD_ACTION, true], [BuildAndTestTests.UPLOAD_ACTION, true], [BuildAndTestTests.UPLOAD_ACTION, false]], name);
+        assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes([`name: ${artifact}`, `path: ${totalsPath}`, "retention-days: 3", "if-no-files-found: error", "overwrite: true"]), name);
+        assert.deepEqual([workflow.readStepScript(pause), workflow.readStepScript(lastPause)], ["sleep 15\n", "sleep 15\n"], name);
+        assert.deepEqual([totals(passed), passed.isJobFailed], [[keep], false], name);
+        assert.deepEqual([totals(testsFailed), testsFailed.isJobFailed], [[keep], true], name);
+        assert.deepEqual(totals(notRun), [], name);
+        assert.deepEqual([totals(retried), retried.isJobFailed], [[keep, pause, again], false], name);
+        assert.deepEqual([totals(failed), failed.isJobFailed], [[keep, pause, again, lastPause, last], true], name);
+      }
+    });
+
+    test("the test totals job adds up every target's records after the targets finish, and does nothing in a cancelled or documentation-only run", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTests.WORKFLOW);
+      const text = workflow.text;
+      const job = text.slice(text.indexOf("  totals:\n"), text.indexOf("  result:\n"));
+      const simulation = new WorkflowSimulation(text, "Fetch the totals records", "Fetch the totals records a last time");
+      const attempts = ["Fetch the totals records", "Fetch the totals records again", "Fetch the totals records a last time"].map(t => simulation.find(t));
+      const failed = simulation.run({}, Object.fromEntries(attempts.map(t => [t.name, "failure"])));
+
+      assert.ok(job.startsWith("  totals:\n    name: Test totals\n    needs: [changes, validate]\n" +
+        "    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}\n    runs-on: ubuntu-24.04\n"));
+      assert.deepEqual(attempts.map(t => [t.uses, t.continueOnError]), [[BuildAndTestTests.DOWNLOAD_ACTION, true], [BuildAndTestTests.DOWNLOAD_ACTION, true], [BuildAndTestTests.DOWNLOAD_ACTION, false]]);
+      assert.deepEqual(attempts.map(t => t.settings), BuildAndTestTests.threeTimes(["pattern: totals-*", "path: _build/run-totals"]));
+      assert.deepEqual([workflow.readStepScript("Wait before fetching the totals records again"), workflow.readStepScript("Wait before fetching the totals records a last time")], ["sleep 15\n", "sleep 15\n"]);
+      assert.equal(failed.isJobFailed, true);
+      assert.equal(workflow.readStepScript("Add up the totals"), "node scripts/run-totals.ts\n");
+      assert.ok(job.includes("          TARGETS: ${{ needs.changes.outputs.targets }}\n          RUN_UI: ${{ needs.changes.outputs.run-ui }}\n" +
+        "          VALIDATION_RESULT: ${{ needs.validate.result }}\n"));
+      assert.doesNotMatch(job, /actions\/cache|Prepare the job/);
     });
 
     test("each test job and UI shard keeps its flaky test record whatever happened, tried three times with a pause, and only warns when every upload fails", async t => {
