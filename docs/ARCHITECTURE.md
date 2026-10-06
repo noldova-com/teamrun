@@ -1059,7 +1059,8 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The build decides, never a setting, a variable or an argument.
   `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
-  A test build, and a package made for a native update check, name instead a local feed and a test publisher given to the build when it is made; `release:assets` refuses a package whose product file names any feed but the production one.
+  A test build, and a package made for a native update check, name instead a local feed given to the build when it is made; `release:assets` refuses a package whose product file names any feed but the production one.
+  The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
 - **Versions.**
   Only a version higher than the installed one is offered.
   The same version, a lower one or a version with a prerelease suffix leaves TeamRun up to date.
@@ -1070,7 +1071,7 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
 - **Validation.**
   Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
   After downloading, it checks the file's size and SHA-512 against it.
-  On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, or the test build's test publisher.
+  On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, and no other.
   A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher.
   Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
 - **The person decides.**
