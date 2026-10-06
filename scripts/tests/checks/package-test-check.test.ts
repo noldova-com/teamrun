@@ -94,6 +94,37 @@ class PackageTestCheckTests {
       assert.deepEqual(runner.environments[1], { KEPT: "yes" });
     });
 
+    test("a package selection runs only the selected packages' tests and measures only their coverage", async t => {
+      const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
+      const runner = new ProcessRunnerFixture([0, 0]);
+      const output = new TextOutputFixture();
+      const check = new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {}, ["@noldova/teamrun-foundation-alpha", "@noldova/teamrun-foundation-alpha"]);
+
+      assert.equal(await check.runAsync(output), true);
+      assert.equal(output.text, "Testing 1 of 2 packages, with their coverage: @noldova/teamrun-foundation-alpha.\n");
+      assert.deepEqual(runner.runs[0]?.slice(4), ["@noldova/teamrun-foundation-alpha", path.join(repository.directory, "_build", "tests", "foundation-alpha")]);
+      assert.deepEqual(runner.runs[1]?.slice(5), [
+        "@noldova/teamrun-foundation-alpha",
+        path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-alpha"),
+        path.join(repository.directory, "src", "foundation", "alpha", "src"),
+        "[]",
+        "[]"
+      ]);
+    });
+
+    test("a package selection naming no package fails with the packages there are, before running anything", async t => {
+      const tested = await PackageTestCheckTests.createRepositoryAsync(t, true);
+      const empty = await PackageTestCheckTests.createRepositoryAsync(t, false);
+      const runner = new ProcessRunnerFixture();
+      const output = new TextOutputFixture();
+
+      assert.equal(await new PackageTestCheck(tested.directory, new PackageBuildFixture(tested.directory), runner, {}, ["foundation-alpha", "@noldova/teamrun-foundation-alpha"]).runAsync(output), false);
+      assert.equal(await new PackageTestCheck(empty.directory, new PackageBuildFixture(empty.directory), runner, {}, ["alpha"]).runAsync(output), false);
+
+      assert.equal(output.text, "No package is named foundation-alpha. The packages are @noldova/teamrun-foundation-testing, @noldova/teamrun-foundation-alpha.\nNo package is named alpha. The packages are none.\n");
+      assert.equal(runner.runs.length, 0);
+    });
+
     test("a filtered run passes its filters to the test framework, measures no coverage and reports what it selected", async t => {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
       const runner = new SelectionRunnerFixture([0], JSON.stringify({ discovered: 10, selected: 3 }));

@@ -21,6 +21,10 @@ on:
         description: The target's test jobs, as the classification plans them.
         type: string
         required: true
+      ui:
+        description: The target's UI workflow shards, as the classification plans them, or null when its UI workflows don't run.
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -53,10 +57,22 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Pack the build
-        run: tar -cf build.tar _build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/window node_modules/.package-lock.json node_modules/@noldova src/generated
+      - name: Build the test build and its variants for the UI workflows
+        id: ui-builds
+        if: inputs.ui != 'null' && fromJSON(inputs.ui).shared
+        run: npm run test:ui -- --list
 
-      - name: Keep the build for the test parts
+      - name: Pack the build
+        env:
+          UI_BUILDS: ${{ steps.ui-builds.outcome == 'success' }}
+        run: |
+          set -- _build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/window node_modules/.package-lock.json node_modules/@noldova src/generated
+          if [ "$UI_BUILDS" = true ]; then
+            set -- "$@" _build/variants _build/ui-builds.record
+          fi
+          tar -cf build.tar "$@"
+
+      - name: Keep the build
         id: keep
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -71,7 +87,7 @@ jobs:
         if: steps.keep.outcome == 'failure'
         run: sleep 15
 
-      - name: Keep the build for the test parts again
+      - name: Keep the build again
         id: keep-again
         if: steps.keep.outcome == 'failure'
         continue-on-error: true
@@ -87,7 +103,7 @@ jobs:
         if: steps.keep-again.outcome == 'failure'
         run: sleep 15
 
-      - name: Keep the build for the test parts a last time
+      - name: Keep the build a last time
         if: steps.keep-again.outcome == 'failure'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -225,3 +241,18 @@ jobs:
         if: always() && matrix.angular && steps.test.outcome == 'failure' && steps.angular-last.outcome == 'failure'
         run: |
           echo "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached."
+
+  shared-ui:
+    name: UI workflows
+    needs: build
+    if: ${{ inputs.ui != 'null' && fromJSON(inputs.ui).shared }}
+    uses: ./.github/workflows/ui-workflows.yml
+    with:
+      plan: ${{ inputs.ui }}
+
+  ui:
+    name: UI workflows
+    if: ${{ inputs.ui != 'null' && !fromJSON(inputs.ui).shared }}
+    uses: ./.github/workflows/ui-workflows.yml
+    with:
+      plan: ${{ inputs.ui }}

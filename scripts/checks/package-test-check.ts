@@ -17,6 +17,7 @@ import BuildLayout from "../packages/build-layout.ts";
 import type PackageBuild from "../packages/package-build.ts";
 import PackageCatalog from "../packages/package-catalog.ts";
 import PackageException from "../packages/package.exception.ts";
+import type PackageManifest from "../packages/package-manifest.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
 import CheckSelection from "./check-selection.ts";
@@ -43,14 +44,17 @@ export default class PackageTestCheck implements ISelectableCheck {
   private readonly build: PackageBuild;
   private readonly runner: ProcessRunner;
   private readonly environment: NodeJS.ProcessEnv;
+  private readonly selected?: readonly string[];
 
   public readonly title: string = "Package tests and coverage";
 
-  public constructor(root: string, build: PackageBuild, runner: ProcessRunner, environment: NodeJS.ProcessEnv) {
+  public constructor(root: string, build: PackageBuild, runner: ProcessRunner, environment: NodeJS.ProcessEnv, selected?: readonly string[]) {
     this.root = root;
     this.build = build;
     this.runner = runner;
     this.environment = environment;
+    if (selected !== undefined)
+      this.selected = selected;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
@@ -67,13 +71,14 @@ export default class PackageTestCheck implements ISelectableCheck {
       if (!await this.build.isCurrentReportedAsync(BuildVariant.REGULAR, output))
         return new CheckSelection(false, PackageTestCheck.UNIT, 0, 0);
       const layout = new BuildLayout(this.root);
-      const packages = await new PackageCatalog(this.root).listPackagesAsync(false);
+      const all = await new PackageCatalog(this.root).listPackagesAsync(false);
+      const packages = this.select(all, output);
       const tested = packages.filter(t => existsSync(layout.locateTestOutput(t)));
       if (tested.length === 0) {
         output.write(PackageTestCheck.NO_TESTS);
         return new CheckSelection(true, PackageTestCheck.UNIT, 0, 0);
       }
-      if (!packages.some(t => t.name === PackageTestCheck.TESTING_PACKAGE)) {
+      if (!all.some(t => t.name === PackageTestCheck.TESTING_PACKAGE)) {
         output.write(PackageTestCheck.NO_FRAMEWORK);
         return new CheckSelection(false, PackageTestCheck.UNIT, 0, 0);
       }
@@ -104,6 +109,18 @@ export default class PackageTestCheck implements ISelectableCheck {
       output.write(`${error.message}\n`);
       return new CheckSelection(false, PackageTestCheck.UNIT, 0, 0);
     }
+  }
+
+  private select(packages: readonly PackageManifest[], output: Writable): readonly PackageManifest[] {
+    const names = this.selected;
+    if (names === undefined)
+      return packages;
+    const unknown = names.filter(t => !packages.some(p => p.name === t));
+    if (unknown.length > 0)
+      throw new PackageException(`No package is named ${unknown.join(", ")}. The packages are ${packages.map(t => t.name).join(", ") || "none"}.`);
+    const selected = packages.filter(t => names.includes(t.name));
+    output.write(`Testing ${selected.length} of ${packages.length} packages, with their coverage: ${selected.map(t => t.name).join(", ")}.\n`);
+    return selected;
   }
 
   private async readSelectionAsync(file: string, testsPassed: boolean, output: Writable): Promise<CheckSelection> {

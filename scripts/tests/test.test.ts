@@ -57,6 +57,31 @@ class TestTests {
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
     });
 
+    test("a selected run runs every check other than the tests and only the selected tests, and says it is not the complete gate", async t => {
+      const repository = await TestTests.createRepositoryAsync(t);
+      await repository.writeAsync({ ".gitignore": "_build/\n" });
+      const runner = new AngularReportRunnerFixture(TestTests.REPORT, [0, 0]);
+      const checksOnly = new TextOutputFixture();
+      const selected = new TextOutputFixture();
+      const results = (text: string): readonly string[] => [...text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`);
+      const before = ["Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages"]
+        .map(t => `${t}: passed`);
+      const after = ["Script types", "API declarations", "API documentation", "API examples"].map(t => `${t}: passed`);
+
+      const checksOnlyExitCode = await new Test(repository.directory, runner, checksOnly, {}).runAsync(["--checks-only"]);
+      const selectedExitCode = await new Test(repository.directory, runner, selected, {}).runAsync(["--package", "@noldova/teamrun-foundation-missing", "--script-tests"]);
+
+      assert.equal(checksOnlyExitCode, 0, checksOnly.text);
+      assert.ok(checksOnly.text.startsWith("Selected run: every check other than the tests, and no tests. A selected run is not the complete gate.\n"), checksOnly.text);
+      assert.deepEqual(results(checksOnly.text), [...before, ...after, "Packaged build leaves out the Gallery: passed"]);
+      assert.ok(checksOnly.text.endsWith("\n19 of 19 checks passed.\n"));
+      assert.equal(selectedExitCode, 1);
+      assert.ok(selected.text.startsWith("Selected run: every check other than the tests, and the package tests of @noldova/teamrun-foundation-missing and the script tests. A selected run is not the complete gate.\n"), selected.text);
+      assert.ok(selected.text.includes("\nNo package is named @noldova/teamrun-foundation-missing. The packages are none.\n"), selected.text);
+      assert.deepEqual(results(selected.text), [...before, "Package tests and coverage: failed", ...after, "Script tests and coverage: passed", "Packaged build leaves out the Gallery: passed"]);
+      assert.ok(selected.text.endsWith("\n20 of 21 checks passed.\n"));
+    });
+
     test("each part runs only its own checks, in the complete gate's order, and says that only all parts together are the complete gate", async t => {
       const repository = await TestTests.createRepositoryAsync(t);
       const parts = ["packages", "scripts", "angular-and-checks"];
@@ -78,6 +103,18 @@ class TestTests {
       assert.ok(order.length > separate.length + 1, whole.text);
       for (const [index, output] of outputs.entries())
         assert.ok(output.text.startsWith(`Part run: ${parts[index]}. Only all 3 parts together are the complete gate.\n`), output.text);
+    });
+
+    test("a part run with a selection runs the selected tests of that part and says both", async t => {
+      const repository = await TestTests.createRepositoryAsync(t);
+      const output = new TextOutputFixture();
+
+      const exitCode = await new Test(repository.directory, new AngularReportRunnerFixture(TestTests.REPORT, [0, 0]), output, {}).runAsync(["--part", "angular-and-checks", "--checks-only"]);
+
+      assert.equal(exitCode, 0, output.text);
+      assert.ok(output.text.startsWith("Part run: angular-and-checks. Only all 3 parts together are the complete gate.\nSelected run: every check other than the tests, and no tests. A selected run is not the complete gate.\n"), output.text);
+      assert.ok(!output.text.includes("Angular tests and coverage: "), output.text);
+      assert.ok(output.text.endsWith("\n19 of 19 checks passed.\n"), output.text);
     });
 
     test("a failing check fails the gate after the remaining checks have run", async t => {
@@ -235,7 +272,7 @@ class TestTests {
         const output = new TextOutputFixture();
 
         assert.equal(await new Test("unused", new ProcessRunnerFixture(), output, {}).runAsync(selection), 2);
-        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | --part <part> [--repeat <count>]]\n`);
+        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] | [--part <part>] --checks-only [--repeat <count>]]\n`);
       }
     });
 
