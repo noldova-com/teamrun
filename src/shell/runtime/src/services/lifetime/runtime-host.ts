@@ -192,7 +192,7 @@ export class RuntimeHost implements IIdleParticipant {
     let database: ShellDatabase | null = null;
     try {
       log = await RuntimeLog.openAsync(lock, options.startLogName);
-      await RuntimeHost.joinInstallationAsync(options, lock, platform, environment);
+      await RuntimeHost.joinInstallationAsync(options, lock, platform);
       await AppImageCopyCleanup.removeAsync(lock.dataDirectory, log.diagnostics);
       const inspection = await DataDirectoryInspector.inspectAsync(options.dataDirectory);
       if (inspection.state !== DataDirectoryState.PreShell)
@@ -233,10 +233,10 @@ export class RuntimeHost implements IIdleParticipant {
     this.idle.check();
   }
 
-  private static async joinInstallationAsync(options: RuntimeOptions, lock: OwnershipLock, platform: string, environment: NodeJS.ProcessEnv): Promise<void> {
+  private static async joinInstallationAsync(options: RuntimeOptions, lock: OwnershipLock, platform: string): Promise<void> {
     if (Object.isNull(options.installationFolder))
       return;
-    const presence = ProcessPresence.create(platform, new SystemCommand(), environment);
+    const presence = ProcessPresence.create(platform, new SystemCommand());
     const installation = new Installation(options.installationFolder, t => presence.isRunningAsync(t));
     await installation.recordAsync(lock.dataDirectory.root);
     const status = await installation.checkAsync(RuntimeBuild.identity.productVersion);
@@ -289,12 +289,12 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async activateModulesAsync(database: ShellDatabase, settings: SettingsService): Promise<void> {
-    const processes = new ProcessSupervisor(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
+    const processes = ProcessSupervisor.create(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
     this.processes = processes;
     processes.onChanged(() => this.programsEvent.publish(processes.status.toJson()));
     this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));
     const preparation = new UpdatePreparation(
-      this.server, ProcessPresence.create(this.platform, new SystemCommand(), this.environment), processes, this.updating, this.updateEnded,
+      this.server, ProcessPresence.create(this.platform, new SystemCommand()), processes, this.updating, this.updateEnded,
       this.serverSettings.updateSaveWait, this.serverSettings.updateBarrierInterval, this.installationFolder);
     this.preparation = preparation;
     this.methods.register(ShellMethods.update, new UpdateMethod(preparation));

@@ -108,7 +108,7 @@ export class ProcessSupervisorTests {
     using lock = OwnershipLock.acquire(new DataDirectory(folder.path));
     const database = await ShellDatabase.openAsync(lock, ShellMigrations.all);
     database.close();
-    const processes = new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), new TextOutputFixture());
+    const processes = ProcessSupervisor.create(database, process.platform, process.env, new SystemCommand(), new TextOutputFixture());
 
     const failure = await Assert.throwsAsync(() => processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT])), Error);
 

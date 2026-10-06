@@ -180,7 +180,7 @@ export class DesktopApplication {
       RuntimeEntry.entryPath,
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
-    const presence = ProcessPresence.create(process.platform, new SystemCommand(), process.env);
+    const presence = ProcessPresence.create(process.platform, new SystemCommand());
     const installation = new Installation(
       Installation.locate(DesktopApplication.locateDeviceFolder(process), AppImageSource.locateProgram(process.env, process.execPath), process.platform), t => presence.isRunningAsync(t));
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);

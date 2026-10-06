@@ -238,7 +238,7 @@ export class CliFailureTests {
   }
 
   private static async holdBarrierAsync(folder: string): Promise<void> {
-    const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), process.env).stampAsync([[process.pid, "desktop"]]);
+    const [holder] = await ProcessPresence.create(process.platform, new SystemCommand()).stampAsync([[process.pid, "desktop"]]);
     Assert.isDefined(holder);
     await mkdir(folder, { recursive: true });
     await writeFile(path.join(folder, "barrier.json"), JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));

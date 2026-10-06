@@ -25,6 +25,7 @@ class LicenseHeaderCheckTests {
       await repository.writeAsync({
         "scripts/build.ts": `${LicenseHeader.BLOCK}\nexport {};\n`,
         "src/shell/ui/src/styles/theme.scss": `${LicenseHeader.BLOCK}\n:root {}\n`,
+        "src/shell/runtime/src/native/windows-process.c": `${LicenseHeader.BLOCK}\nstatic int a;\n`,
         "src/shell/ui/src/app/button.component.html": `${LicenseHeader.MARKUP}\n<button></button>\n`,
         ".github/workflows/build.yml": `${LicenseHeader.YAML}\nname: Build\n`,
         "README.md": "# TeamRun\n",
@@ -35,7 +36,7 @@ class LicenseHeaderCheckTests {
       const check = LicenseHeaderCheckTests.createCheck(repository);
 
       assert.equal(await check.runAsync(output), true);
-      assert.equal(output.text, "Checked the license headers of 4 files.\n");
+      assert.equal(output.text, "Checked the license headers of 5 files.\n");
       assert.equal(check.title, "License headers");
     });
 
@@ -46,6 +47,7 @@ class LicenseHeaderCheckTests {
         "scripts/missing.mjs": "export {};\n",
         "scripts/altered.ts": LicenseHeader.BLOCK.replace("Noldova", "Someone"),
         "src/late.css": `:root {}\n${LicenseHeader.BLOCK}`,
+        "src/native/missing.c": "static int a;\n",
         "src/template.html": `${LicenseHeader.BLOCK}<p></p>\n`,
         ".github/config.yaml": "name: Config\n"
       });
@@ -58,8 +60,9 @@ class LicenseHeaderCheckTests {
         `scripts/altered.ts${rule}`,
         `scripts/missing.mjs${rule}`,
         `src/late.css${rule}`,
+        `src/native/missing.c${rule}`,
         `src/template.html${rule}`,
-        "Checked the license headers of 5 files.",
+        "Checked the license headers of 6 files.",
         ""
       ].join("\n"));
     });

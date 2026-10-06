@@ -17,7 +17,7 @@ import {
 import type { RawConnectionFixture } from "./raw-connection.fixture.js";
 
 export class UpdateBarrierFixture {
-  public static readonly PRESENCE: ProcessPresence = ProcessPresence.create(process.platform, new SystemCommand(), process.env);
+  public static readonly PRESENCE: ProcessPresence = ProcessPresence.create(process.platform, new SystemCommand());
 
   public static open(folder: string): Installation {
     return new Installation(path.join(folder, "installation"), t => UpdateBarrierFixture.PRESENCE.isRunningAsync(t));

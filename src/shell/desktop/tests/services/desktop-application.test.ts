@@ -461,7 +461,7 @@ export class DesktopApplicationTests {
         new FakeElectron(), new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), undefined, undefined, undefined, undefined, installations);
       const [installation] = installations;
       Assert.isDefined(installation);
-      const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), environment).stampAsync([[process.pid, "desktop"]]);
+      const [holder] = await ProcessPresence.create(process.platform, new SystemCommand()).stampAsync([[process.pid, "desktop"]]);
       Assert.isDefined(holder);
       await mkdir(installation.folder, { recursive: true });
       await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
@@ -488,7 +488,7 @@ export class DesktopApplicationTests {
       DesktopStartFixture.start(electron, new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), launcher, undefined, undefined, undefined, installations);
       const [installation] = installations;
       Assert.isDefined(installation);
-      const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), environment).stampAsync([[process.pid, "desktop"]]);
+      const [holder] = await ProcessPresence.create(process.platform, new SystemCommand()).stampAsync([[process.pid, "desktop"]]);
       Assert.isDefined(holder);
       await mkdir(installation.folder, { recursive: true });
       await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));

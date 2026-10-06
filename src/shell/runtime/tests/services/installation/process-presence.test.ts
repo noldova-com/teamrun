@@ -12,6 +12,7 @@ import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
 import { ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
 
 import { SystemCommandFixture } from "../../fixtures/system-command.fixture.js";
+import { WindowsProcessApiFixture } from "../../fixtures/windows-process-api.fixture.js";
 
 @TestClass
 export class ProcessPresenceTests {
@@ -19,7 +20,7 @@ export class ProcessPresenceTests {
 
   @TestMethod
   public async findsTheRunningTestProcess(): Promise<void> {
-    const presence = ProcessPresence.create(process.platform, new SystemCommand(), process.env);
+    const presence = ProcessPresence.create(process.platform, new SystemCommand());
 
     const [stamp] = await presence.stampAsync([[process.pid, "cli"]]);
 
@@ -30,19 +31,20 @@ export class ProcessPresenceTests {
 
   @TestMethod
   public async stampsTheProcessesTheTableListsWithTheRangeTheirStartFallsIn(): Promise<void> {
-    const command = new SystemCommandFixture([ProcessPresenceTests.WINDOWS_TABLE]);
-    const presence = ProcessPresence.create("win32", command, { SystemRoot: "C:/Windows" });
+    const windows = new WindowsProcessApiFixture([ProcessPresenceTests.WINDOWS_TABLE]);
+    const presence = ProcessPresence.create("win32", new SystemCommandFixture([]), windows);
 
     const stamps = await presence.stampAsync([[4188, "program"], [4999, "cli"], [4120, "desktop"]]);
 
     Assert.areEqual("4188 1599950 1600050 program|4120 1499950 1500050 desktop", stamps.map(t => `${t.processId} ${t.earliest} ${t.latest} ${t.role}`).join("|"));
-    Assert.areEqual(1, command.calls.length);
+    Assert.areEqual(1, windows.listings);
+    Assert.areEqual(0, windows.openHandles);
   }
 
   @TestMethod
   public async readsNoTableToStampNoProcesses(): Promise<void> {
     const command = new SystemCommandFixture([]);
-    const presence = ProcessPresence.create("darwin", command, {});
+    const presence = ProcessPresence.create("darwin", command);
 
     Assert.areEqual(0, (await presence.stampAsync([])).length);
     Assert.areEqual(0, command.calls.length);
@@ -51,18 +53,20 @@ export class ProcessPresenceTests {
   @TestMethod
   public async readsNothingOfAnyPlatformUntilItChecksAProcess(): Promise<void> {
     const command = new SystemCommandFixture([]);
-    const presences = ["linux", "darwin", "win32"].map(t => ProcessPresence.create(t, command, {}));
+    const windows = new WindowsProcessApiFixture();
+    const presences = ["linux", "darwin", "win32"].map(t => ProcessPresence.create(t, command, windows));
 
     const stamps = await Promise.all(presences.map(t => t.stampAsync([])));
 
     Assert.areEqual("0 0 0", stamps.map(t => t.length).join(" "));
     Assert.areEqual(0, command.calls.length);
+    Assert.areEqual(0, windows.listings);
   }
 
   @TestMethod
   public async findsAProcessOnlyWhenItsIdIsListedWithAStartThatCanFallInItsRange(): Promise<void> {
     const table = ProcessPresenceTests.WINDOWS_TABLE;
-    const presence = ProcessPresence.create("win32", new SystemCommandFixture([table, table, table, table]), { SystemRoot: "C:/Windows" });
+    const presence = ProcessPresence.create("win32", new SystemCommandFixture([]), new WindowsProcessApiFixture([table, table, table, table]));
 
     const results = [
       await presence.isRunningAsync(new UpdateProcess(4120, 1500050, 1500100, "desktop")),
@@ -77,7 +81,7 @@ export class ProcessPresenceTests {
   @TestMethod
   public async readsThePosixTableWithPs(): Promise<void> {
     const command = new SystemCommandFixture(["  4120     1  4120   01:00\n", "  4120     1  4120   01:00\n"]);
-    const presence = ProcessPresence.create("darwin", command, {});
+    const presence = ProcessPresence.create("darwin", command);
 
     const [stamp] = await presence.stampAsync([[4120, "desktop"]]);
 

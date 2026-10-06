@@ -17,6 +17,7 @@ import { ProgramStatusList, UpdateProcess } from "@noldova/teamrun-shell-protoco
 
 import { ProcessStartException } from "../../exceptions/process-start.exception.js";
 import type { IProcessEnder } from "../../interfaces/i-process-ender.js";
+import type { IWindowsProcessApi } from "../../interfaces/i-windows-process-api.js";
 import { KeptProgram } from "../../models/kept-program.js";
 import { OwnedProcess } from "../../models/owned-process.js";
 import type { ProcessEnding } from "../../models/process-ending.js";
@@ -37,6 +38,7 @@ import { ProcessEnderFactory } from "./process-ender-factory.js";
 import { ProcessEnvironment } from "./process-environment.js";
 import { ProcessRecordStore } from "./process-record-store.js";
 import { ProgramLocator } from "./program-locator.js";
+import { WindowsProcessApi } from "./windows-process-api.js";
 
 export class ProcessSupervisor {
   private readonly platform: string;
@@ -64,6 +66,7 @@ export class ProcessSupervisor {
     environment: NodeJS.ProcessEnv,
     command: SystemCommand,
     diagnostics: Writable,
+    windows: IWindowsProcessApi,
     settings: ProcessSettings = new ProcessSettings(),
     clock: ProcessClock = ProcessClock.create(process.platform)) {
     this.platform = platform;
@@ -71,9 +74,20 @@ export class ProcessSupervisor {
     this.records = new ProcessRecordStore(database);
     this.locator = new ProgramLocator(platform);
     this.clock = clock;
-    this.ender = ProcessEnderFactory.create(platform, command, environment, settings, clock);
+    this.ender = ProcessEnderFactory.create(platform, command, windows, settings, clock);
     this.diagnostics = diagnostics;
     this.seenMilliseconds = settings.seenMilliseconds;
+  }
+
+  public static create(
+    database: ShellDatabase,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    command: SystemCommand,
+    diagnostics: Writable,
+    settings: ProcessSettings = new ProcessSettings(),
+    clock: ProcessClock = ProcessClock.create(process.platform)): ProcessSupervisor {
+    return new ProcessSupervisor(database, platform, environment, command, diagnostics, new WindowsProcessApi(), settings, clock);
   }
 
   public get programs(): readonly RunningProgram[] {

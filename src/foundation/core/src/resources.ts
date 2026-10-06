@@ -9,6 +9,7 @@
 export class Resources {
   public static readonly emptyString: string = "";
   public static readonly nameofArgumentInvalid: string = "The value must be a string member name or a selector that returns exactly one selected string member.";
+  public static readonly typeofBigInt: string = "bigint";
   public static readonly typeofBoolean: string = "boolean";
   public static readonly typeofFunction: string = "function";
   public static readonly typeofNumber: string = "number";

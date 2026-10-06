@@ -10,12 +10,13 @@ import "@noldova/teamrun-foundation-core";
 import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
 
 import type { IProcessTableReader } from "../../interfaces/i-process-table.reader.js";
+import type { IWindowsProcessApi } from "../../interfaces/i-windows-process-api.js";
 import type { ProcessTable } from "../../models/process-table.js";
 import { Resources } from "../../resources.js";
 import type { SystemCommand } from "../commands/system-command.js";
 import { PosixProcessTableReader } from "../process/posix-process-table.reader.js";
 import { ProcessClock } from "../process/process-clock.js";
-import { WindowsPowerShell } from "../process/windows-power-shell.js";
+import { WindowsProcessApi } from "../process/windows-process-api.js";
 import { WindowsProcessTableReader } from "../process/windows-process-table.reader.js";
 
 export class ProcessPresence {
@@ -26,9 +27,9 @@ export class ProcessPresence {
     this.createReader = createReader;
   }
 
-  public static create(platform: string, command: SystemCommand, environment: NodeJS.ProcessEnv): ProcessPresence {
+  public static create(platform: string, command: SystemCommand, windows: IWindowsProcessApi = new WindowsProcessApi()): ProcessPresence {
     return new ProcessPresence(() => platform === Resources.windowsPlatform
-      ? new WindowsProcessTableReader(new WindowsPowerShell(command, environment))
+      ? new WindowsProcessTableReader(windows, ProcessClock.create(platform))
       : new PosixProcessTableReader(command, ProcessClock.create(platform)));
   }
 
