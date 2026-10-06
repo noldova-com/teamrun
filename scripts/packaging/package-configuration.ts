@@ -40,6 +40,7 @@ export default class PackageConfiguration {
   private static readonly MAC_RESOURCES_VARIABLE: string = "$resources";
   private static readonly MAC_PROGRAM_SEGMENTS: readonly string[] = ["..", "MacOS"];
   private static readonly EXECUTABLE_MODE: number = 0o755;
+  private static readonly SIGNING_HASH: string = "sha256";
   private static readonly FUSES: Readonly<Record<string, boolean>> = {
     runAsNode: true,
     enableCookieEncryption: false,
@@ -58,8 +59,10 @@ export default class PackageConfiguration {
   private readonly output: string;
   private readonly electronDistribution: string;
   private readonly electronVersion: string;
+  private readonly signHook: string | null;
 
-  public constructor(root: string, manifest: RootManifest, target: PackageTarget, stage: string, output: string, electronDistribution: string, electronVersion: string) {
+  public constructor(root: string, manifest: RootManifest, target: PackageTarget, stage: string, output: string, electronDistribution: string, electronVersion: string,
+    signHook: string | null) {
     this.root = root;
     this.manifest = manifest;
     this.target = target;
@@ -67,6 +70,7 @@ export default class PackageConfiguration {
     this.output = output;
     this.electronDistribution = electronDistribution;
     this.electronVersion = electronVersion;
+    this.signHook = signHook;
   }
 
   public get fileNames(): readonly string[] {
@@ -102,6 +106,7 @@ export default class PackageConfiguration {
       electronFuses: this.target.platform === PackageTarget.MACOS ? { ...PackageConfiguration.FUSES, resetAdHocDarwinSignature: true } : PackageConfiguration.FUSES,
       extraResources: this.listLicenses(),
       publish: null,
+      ...(this.signHook === null ? {} : { forceCodeSigning: true }),
       ...this.describePlatform()
     };
   }
@@ -131,7 +136,11 @@ export default class PackageConfiguration {
             target,
             icon: path.join(icons, ProductIdentity.WINDOWS_ICON_FILE),
             artifactName,
-            extraFiles: [{ from: this.windowsCommand, to: `${PackageConfiguration.COMMAND_FOLDER}/${this.windowsCommandName}` }]
+            extraFiles: [{ from: this.windowsCommand, to: `${PackageConfiguration.COMMAND_FOLDER}/${this.windowsCommandName}` }],
+            ...(this.signHook === null ? {} : {
+              signtoolOptions: { sign: this.signHook, signingHashAlgorithms: [PackageConfiguration.SIGNING_HASH], publisherName: product.windowsPublisher },
+              signExts: [WindowsAddonBuilder.ADDON_EXTENSION]
+            })
           },
           nsis: {
             oneClick: true,

@@ -780,7 +780,7 @@ The window's own layout is the exception: a failed save of the layout is logged 
 - Exact external dependency versions and lockfiles describe the install inputs.
 - The root manifest declares the product version and, separately, the protocol version.
   The build stamps each module part package's manifest with its module's version and every other package's manifest with the product version ([Modules and versions](#modules-and-versions)).
-- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder and release repository.
+- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder, release repository and the distinguished name its Windows signatures carry.
   Windows' app user model ID, the macOS bundle ID and the Linux desktop name (`<id>.desktop`) derive from the application IDs.
   A packaged build uses the application ID.
   A development build uses `<development application ID>.<checkout hash>`, where the hash is the first eight hexadecimal digits of the SHA-256 of the checkout's absolute path.
@@ -916,8 +916,16 @@ Each target is packaged on its own platform and processor.
   | CookieEncryption | off | TeamRun keeps no cookies: the window loads from `file://` and signs in nowhere. With the fuse on, the cookie key would live in the macOS Keychain or the Linux keyring, which can ask the person for access, and again after each update of an unsigned build. It turns on when TeamRun shows web content or signs in. |
   | LoadBrowserProcessSpecificV8Snapshot | off | The program has no snapshot of its own. |
 - **Tools.** electron-builder downloads its packaging tools into `_build/package/tool-cache` and checks each against the SHA-256 it pins.
-  Packages are unsigned; the separate signing step that [#326](https://github.com/noldova-com/teamrun/issues/326) adds will sign the Windows addons along with the program.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
+- **Signing (Windows).**
+  `npm run package` makes unsigned packages; `npm run package -- --signed` signs a Windows package and refuses any other target.
+  It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing account `noldova-signing` and its certificate profile `TeamRun`, and checks them before anything is built.
+  Only electron-builder receives them, and only with `--signed`.
+  - It downloads Microsoft's TrustedSigning PowerShell module 0.5.8 from the PowerShell Gallery, checks the package against the SHA-512 the gallery published for it before expanding anything, and loads it from `_build/package/signing` by path, asserting its version.
+  - electron-builder signs through `scripts/packaging/windows-sign-hook.ts`, which signs each file with SHA-256 digests and an RFC 3161 timestamp.
+    Besides the program and the installer, it signs the native addons in `app.asar.unpacked`.
+  - Afterwards PowerShell 7 reads the Authenticode signatures of the installer, the unpacked program and every addon.
+    Packaging fails unless each is valid, timestamped and signed by a subject that has every field of `teamrun.product.windowsPublisher`.
 
 ### Publication
 

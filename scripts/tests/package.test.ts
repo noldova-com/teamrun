@@ -16,11 +16,15 @@ import { after, before, test, type TestContext } from "node:test";
 import AngularProject from "../angular/angular-project.ts";
 import GalleryFile from "../angular/gallery-file.ts";
 import Package from "../package.ts";
+import type ModulePackage from "../packaging/module-package.ts";
 import PackageStage from "../packaging/package-stage.ts";
 import PackagedBuild from "../packaging/packaged-build.ts";
+import TrustedSigningModule from "../packaging/trusted-signing-module.ts";
+import ProcessResult from "../processes/process-result.ts";
 import ProcessRunner from "../processes/process-runner.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import PackageArchivesFixture from "./fixtures/package-archives.fixture.ts";
+import ModuleGalleryFixture from "./fixtures/module-gallery.fixture.ts";
 import PackagedBuildFixture from "./fixtures/packaged-build.fixture.ts";
 import ProcessRunnerFixture from "./fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
@@ -31,8 +35,8 @@ class BuilderFixture extends ProcessRunnerFixture {
   private readonly made: readonly string[];
   private readonly failure: Error | null;
 
-  public constructor(made: readonly string[], exitCodes: readonly number[] = [], failure: Error | null = null) {
-    super(exitCodes);
+  public constructor(made: readonly string[], exitCodes: readonly number[] = [], failure: Error | null = null, captures: readonly ProcessResult[] = []) {
+    super(exitCodes, captures);
 
     this.made = made;
     this.failure = failure;
@@ -43,15 +47,23 @@ class BuilderFixture extends ProcessRunnerFixture {
       throw this.failure;
     const configuration = JSON.parse(await readFile(String(commandArguments.at(-1)), "utf8")) as { readonly directories: { readonly output: string } };
     await mkdir(configuration.directories.output, { recursive: true });
-    for (const file of this.made)
+    for (const file of this.made) {
+      await mkdir(path.dirname(path.join(configuration.directories.output, file)), { recursive: true });
       await writeFile(path.join(configuration.directories.output, file), "package\n");
+    }
     return super.runAsync(command, commandArguments, directory, environment);
   }
 }
 
 class PackageTests {
   private static readonly TIMEOUT: number = 120_000;
-  private static readonly USAGE: string = "Usage: npm run package\n";
+  private static readonly USAGE: string = "Usage: npm run package [-- --signed]\n";
+  private static readonly GALLERY: ModulePackage = TrustedSigningModule.GALLERY_PACKAGE;
+  private static readonly CREDENTIALS: Readonly<Record<string, string>> = {
+    AZURE_TENANT_ID: "fixture-tenant",
+    AZURE_CLIENT_ID: "fixture-client",
+    AZURE_CLIENT_SECRET: "fixture-secret"
+  };
   private static readonly APP_IMAGE: string = "Fixture Studio-linux-x64.AppImage";
   private static readonly STAGED: string = "The packaged window holds no Gallery.\nPackages in the stage: @noldova/teamrun-foundation-beta, "
     + "@noldova/teamrun-foundation-alpha, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\n";
@@ -87,7 +99,7 @@ class PackageTests {
           CSC_IDENTITY_AUTO_DISCOVERY: "true"
         };
 
-        const exitCode = await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, environment, output).runAsync([]);
+        const exitCode = await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, environment, output, PackageTests.GALLERY).runAsync([]);
 
         const file = path.join(repository.directory, "_build", "package", "electron-builder.json");
         assert.equal(exitCode, 0, output.text);
@@ -125,7 +137,7 @@ class PackageTests {
           const builder = new BuilderFixture(made);
           const output = new TextOutputFixture();
           const exitCode = await new Package(repository.directory, platform, architecture, PackageTests.createStage(repository), builder,
-            { ELECTRON_BUILDER_7Z_FILTER: "ARM64" }, output).runAsync([]);
+            { ELECTRON_BUILDER_7Z_FILTER: "ARM64" }, output, PackageTests.GALLERY).runAsync([]);
           assert.equal(exitCode, 0, output.text);
           filters.push(builder.environments[0]?.["ELECTRON_BUILDER_7Z_FILTER"]);
         }
@@ -138,8 +150,8 @@ class PackageTests {
       const failed = new TextOutputFixture();
       const unmade = new TextOutputFixture();
 
-      assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), new BuilderFixture([], [3]), {}, failed).runAsync([]), 1);
-      assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), new BuilderFixture([]), {}, unmade).runAsync([]), 1);
+      assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), new BuilderFixture([], [3]), {}, failed, PackageTests.GALLERY).runAsync([]), 1);
+      assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), new BuilderFixture([]), {}, unmade, PackageTests.GALLERY).runAsync([]), 1);
 
       assert.equal(failed.text, `${PackageTests.STAGED}electron-builder failed with exit code 3.\n`);
       assert.equal(unmade.text, `${PackageTests.STAGED}electron-builder finished without making ${path.join(repository.directory, "_build", "package", "out", PackageTests.APP_IMAGE)}.\n`);
@@ -153,9 +165,9 @@ class PackageTests {
       const staged = new TextOutputFixture();
       const modules = new TextOutputFixture();
 
-      assert.equal(await new Package(repository.directory, "freebsd", "x64", PackageTests.createStage(repository), builder, {}, host).runAsync([]), 1);
-      assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository, [2]), builder, {}, staged).runAsync([]), 1);
-      assert.equal(await new Package(unlisted.directory, "linux", "x64", PackageTests.createStage(unlisted), builder, {}, modules).runAsync([]), 1);
+      assert.equal(await new Package(repository.directory, "freebsd", "x64", PackageTests.createStage(repository), builder, {}, host, PackageTests.GALLERY).runAsync([]), 1);
+      assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository, [2]), builder, {}, staged, PackageTests.GALLERY).runAsync([]), 1);
+      assert.equal(await new Package(unlisted.directory, "linux", "x64", PackageTests.createStage(unlisted), builder, {}, modules, PackageTests.GALLERY).runAsync([]), 1);
 
       assert.equal(host.text, "Packages are made for windows, macos and linux on x64 and arm64, not for freebsd on x64.\n");
       assert.equal(staged.text, "The packaged build failed with exit code 2.\n");
@@ -163,11 +175,84 @@ class PackageTests {
       assert.deepEqual(builder.runs, []);
     });
 
+    test("--signed signs a Windows package through the hook with the pinned module and the Azure credentials, then checks the installer's, the program's and the addons' signatures",
+      { timeout: PackageTests.TIMEOUT }, async t => {
+        const repository = await PackageTests.createAsync(t);
+        const gallery = await ModuleGalleryFixture.createAsync();
+        t.after(() => gallery.disposeAsync());
+        const addon = path.join("win-unpacked", "resources", "app.asar.unpacked", "node_modules", "@noldova", "teamrun-shell-runtime", "addon", "windows.node");
+        const made = ["Fixture Studio-windows-x64.exe", path.join("win-unpacked", "Fixture Studio.exe"), addon];
+        const builder = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(0, "Every file is signed.\r\n", "")]);
+        const output = new TextOutputFixture();
+
+        const exitCode = await new Package(repository.directory, "win32", "x64", PackageTests.createStage(repository), builder, { PATH: "fixture-path", ...PackageTests.CREDENTIALS },
+          output, gallery.package).runAsync(["--signed"]);
+
+        const folder = path.join(repository.directory, "_build", "package");
+        const files = made.map(t => path.join(folder, "out", t));
+        const configuration = JSON.parse(await readFile(path.join(folder, "electron-builder.json"), "utf8")) as { readonly forceCodeSigning: boolean; readonly win: Readonly<Record<string, unknown>> };
+        assert.equal(exitCode, 0, output.text);
+        assert.deepEqual(gallery.requests, ["/package"]);
+        assert.deepEqual(builder.environments, [{
+          PATH: "fixture-path",
+          ELECTRON_BUILDER_CACHE: path.join(folder, "tool-cache"),
+          CSC_IDENTITY_AUTO_DISCOVERY: "false",
+          ...PackageTests.CREDENTIALS,
+          TEAMRUN_SIGNING_FOLDER: path.join(folder, "signing")
+        }]);
+        assert.equal(configuration.forceCodeSigning, true);
+        assert.deepEqual(configuration.win["signtoolOptions"], {
+          sign: path.join(repository.directory, "scripts", "packaging", "windows-sign-hook.ts"),
+          signingHashAlgorithms: ["sha256"],
+          publisherName: "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US"
+        });
+        assert.deepEqual(builder.captured.map(t => [t[0], t[1]]), [["pwsh", folder], ["pwsh", repository.directory]]);
+        assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], files.join("\n"));
+        assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_WINDOWS_PUBLISHER"], "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US");
+        assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n  ${files[0]}\nSignatures:\nEvery file is signed.\n`);
+      });
+
+    test("--signed is refused for other platforms and without every Azure credential before anything is staged, and an ARM64 package without addons checks its installer and program",
+      { timeout: PackageTests.TIMEOUT }, async t => {
+        const repository = await PackageTests.createAsync(t);
+        const gallery = await ModuleGalleryFixture.createAsync();
+        t.after(() => gallery.disposeAsync());
+        const made = ["Fixture Studio-windows-arm64.exe", path.join("win-arm64-unpacked", "Fixture Studio.exe")];
+        const signed = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(0, "Signed.", "")]);
+        const unchecked = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(1, "Not signed.", "")]);
+        const programless = new BuilderFixture([made[0] ?? ""], [], null, [new ProcessResult(0, "", "")]);
+        const [linux, uncredentialed, twice, arm64, unverified, missing] = [1, 2, 3, 4, 5, 6].map(() => new TextOutputFixture());
+        const runAsync = (platform: string, architecture: string, builder: BuilderFixture, environment: NodeJS.ProcessEnv, output: TextOutputFixture, options: readonly string[] = ["--signed"]): Promise<number> =>
+          new Package(repository.directory, platform, architecture, PackageTests.createStage(repository), builder, environment, output, gallery.package).runAsync(options);
+        assert.ok(linux !== undefined && uncredentialed !== undefined && twice !== undefined && arm64 !== undefined && unverified !== undefined && missing !== undefined);
+
+        const exitCodes = [
+          await runAsync("linux", "x64", new BuilderFixture([]), PackageTests.CREDENTIALS, linux),
+          await runAsync("win32", "x64", new BuilderFixture([]), { AZURE_TENANT_ID: "fixture-tenant" }, uncredentialed),
+          await runAsync("win32", "x64", new BuilderFixture([]), PackageTests.CREDENTIALS, twice, ["--signed", "--signed"]),
+          await runAsync("win32", "arm64", signed, PackageTests.CREDENTIALS, arm64),
+          await runAsync("win32", "arm64", unchecked, PackageTests.CREDENTIALS, unverified),
+          await runAsync("win32", "arm64", programless, PackageTests.CREDENTIALS, missing)
+        ];
+
+        const out = path.join(repository.directory, "_build", "package", "out");
+        assert.deepEqual(exitCodes, [1, 1, 2, 0, 1, 1]);
+        assert.equal(linux.text, "--signed signs Windows packages only, so it cannot sign the linux-x64 package.\n");
+        assert.equal(uncredentialed.text, "Signing Windows packages needs AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with noldova-signing.\n");
+        assert.equal(twice.text, PackageTests.USAGE);
+        assert.equal(signed.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], made.map(t => path.join(out, t)).join("\n"));
+        assert.equal(arm64.text, `${PackageTests.STAGED}Packages made:\n  ${path.join(out, made[0] ?? "")}\nSignatures:\nSigned.\n`);
+        assert.ok(unverified.text.endsWith(
+          "Not every file is signed by CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US with a valid, timestamped signature; pwsh exited with 1:\nNot signed.\n"));
+        assert.ok(missing.text.endsWith(
+          `electron-builder finished without the unpacked program ${path.join(out, "win-arm64-unpacked", "Fixture Studio.exe")}, whose signature the check reads.\n`));
+      });
+
     test("an unexpected error reaches the caller", { timeout: PackageTests.TIMEOUT }, async t => {
       const repository = await PackageTests.createAsync(t);
       const builder = new BuilderFixture([], [], new RangeError("The fixture broke."));
 
-      await assert.rejects(() => new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, {}, new TextOutputFixture()).runAsync([]),
+      await assert.rejects(() => new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, {}, new TextOutputFixture(), PackageTests.GALLERY).runAsync([]),
         new RangeError("The fixture broke."));
     });
 
@@ -176,7 +261,7 @@ class PackageTests {
       const output = new TextOutputFixture();
       const builder = new BuilderFixture([]);
 
-      const exitCode = await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, {}, output).runAsync(["--target", "linux"]);
+      const exitCode = await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, {}, output, PackageTests.GALLERY).runAsync(["--target", "linux"]);
       const command = spawnSync(process.execPath, [SourceTreeFixture.locateScript("package.ts"), "--help"], { cwd: repository.directory, encoding: "utf8", timeout: 10_000 });
 
       assert.equal(exitCode, 2);
