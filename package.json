@@ -18,7 +18,8 @@
       },
       "dataDirectoryVariable": "TEAMRUN_DATA_DIR",
       "icons": "assets/icons",
-      "releaseRepository": "noldova-com/teamrun"
+      "releaseRepository": "noldova-com/teamrun",
+      "windowsPublisher": "CN=Rostislav Rotaru, O=Rostislav Rotaru, C=US"
     },
     "supportedTargets": []
   },
