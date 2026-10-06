@@ -217,6 +217,7 @@ export default class Test {
     const { default: ConceptFileCheck } = await import("./checks/concept-file-check.ts");
     const { default: ConceptFolderCheck } = await import("./checks/concept-folder-check.ts");
     const { default: EnumValueCheck } = await import("./checks/enum-value-check.ts");
+    const { default: ExceptionNameCheck } = await import("./checks/exception-name-check.ts");
     const { default: FoundationValueCheck } = await import("./checks/foundation-value-check.ts");
     const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
@@ -237,6 +238,7 @@ export default class Test {
       new AngularFileCheck(files, syntax),
       new FoundationValueCheck(files, new PackageCatalog(this.root), syntax),
       new EnumValueCheck(files, syntax),
+      new ExceptionNameCheck(files, syntax),
       new ConceptFileCheck(this.root, files, syntax),
       new ConceptFolderCheck(files, syntax),
       new GitHubConfigurationCheck(this.root, files),

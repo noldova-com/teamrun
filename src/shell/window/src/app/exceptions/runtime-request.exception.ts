@@ -10,6 +10,7 @@ import { Exception } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 
 export class RuntimeRequestException extends Exception {
+  public override readonly name: string = "RuntimeRequestException";
   public readonly code: string;
   public readonly details?: JsonObject;
 

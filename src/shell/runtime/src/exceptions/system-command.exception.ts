@@ -9,6 +9,8 @@
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 export class SystemCommandException extends Exception {
+  public override readonly name: string = "SystemCommandException";
+
   public constructor(message: string, options?: ExceptionOptions) {
     super(message, options);
   }

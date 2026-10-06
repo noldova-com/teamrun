@@ -265,6 +265,12 @@ export declare enum SettingLocality {
  */
 export declare class ProtocolException extends Exception {
   /**
+   * The exception's name, `"ProtocolException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Why the protocol was broken.
    */
   public readonly code: FailureCode;
