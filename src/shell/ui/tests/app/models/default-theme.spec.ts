@@ -110,7 +110,7 @@ describe("DefaultTheme contrast", () => {
     ...on("removed", [["panel"], ["code"]], textRatio),
     ...on("added", [["panel"], ["code"]], textRatio),
     ...on("icon-color", [["window"], ["panel"], ["menu"], ["window", "hover"], ["window", "selected"], ["window", "toolbar-hover"], ["panel", "toolbar-hover"]], partRatio),
-    ...on("accent", [["window"], ["panel"], ["raised"], ["dialog"], ["menu"], ["quick-input"], ["input"], ["window", "selected"]], partRatio),
+    ...on("accent", [["window"], ["panel"], ["raised"], ["dialog"], ["menu"], ["quick-input"], ["input"], ["dropdown-list"], ["window", "selected"], ["panel", "selected"], ["menu", "selected"], ["quick-input", "selected"], ["dropdown-list", "list-active"]], partRatio),
     ...on("sash-active", [["window"]], partRatio),
     ...on("progress", [["window"], ["panel"]], partRatio),
     ...on("button", [["window"], ["panel"], ["dialog"]], partRatio),
@@ -132,11 +132,6 @@ describe("DefaultTheme contrast", () => {
     ["scrollbar", "Scrollbar thumb, kept as a standard scrollbar by decision; the wheel, the keys and touch scroll without it."],
     ["scrollbar-active", "Scrollbar thumb while dragged, kept as a standard scrollbar by decision; the wheel, the keys and touch scroll without it."]
   ]);
-  const pendingCues: readonly (readonly [string, string, string])[] = [
-    ["selected", "window", "#222: the selection cue waits on the maintainer's choice of a second cue."],
-    ["selected", "panel", "#222: the selection cue waits on the maintainer's choice of a second cue."],
-    ["list-active", "dropdown-list", "#222: the keyboard-active option's cue waits on the same choice as selection."]
-  ];
 
   function channels(theme: Theme, mode: ThemeMode, name: string): readonly number[] {
     const token = Resources.colorTokens.find(t => t.variable === `--tr-${name}`);
@@ -177,19 +172,10 @@ describe("DefaultTheme contrast", () => {
 
   it("checks or exempts every color of the theme, each exemption with its reason", () => {
     const checked = new Set(pairs.flatMap(([foreground, grounds]) => [foreground, ...grounds]));
-    const pending = new Set(pendingCues.map(([color]) => color));
-    const unaccounted = Resources.colorTokens.map(t => t.variable.slice("--tr-".length)).filter(t => !checked.has(t) && !exempt.has(t) && !pending.has(t));
+    const unaccounted = Resources.colorTokens.map(t => t.variable.slice("--tr-".length)).filter(t => !checked.has(t) && !exempt.has(t));
 
     expect(unaccounted).toEqual([]);
     expect([...exempt.keys()].filter(t => checked.has(t))).toEqual([]);
-    expect([...exempt.values(), ...pendingCues.map(([, , reason]) => reason)].every(t => t.length > 0)).toBe(true);
-  });
-
-  it("keeps the state cues still waiting on their decision in #222 listed while they stay under 3:1", () => {
-    const passing = themes.flatMap(theme => modes.flatMap(mode => pendingCues
-      .filter(([cue, surface]) => ratio(theme, mode, cue, [surface]) >= partRatio)
-      .map(([cue, surface]) => `${theme.id} ${mode}: ${cue} on ${surface}`)));
-
-    expect(passing).toEqual([]);
+    expect([...exempt.values()].every(t => t.length > 0)).toBe(true);
   });
 });

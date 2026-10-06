@@ -8,7 +8,25 @@
 
 @use "forced-colors" as *;
 
-@mixin selected-surface($part: null, $text: var(--tr-text)) {
+@mixin selection-cue($part: null, $edge: start) {
+  @media (forced-colors: none) {
+    @if $edge == top {
+      &#{$part} {
+        box-shadow: inset 0 calc(var(--tr-border-width) * 2) 0 var(--tr-accent);
+      }
+    } @else {
+      &#{$part} {
+        box-shadow: inset calc(var(--tr-border-width) * 2) 0 0 var(--tr-accent);
+      }
+
+      &:dir(rtl)#{$part} {
+        box-shadow: inset calc(var(--tr-border-width) * -2) 0 0 var(--tr-accent);
+      }
+    }
+  }
+}
+
+@mixin selected-surface($part: null, $text: var(--tr-text), $edge: start) {
   --tr-text-muted: #{$text};
 
   @if $part {
@@ -19,5 +37,6 @@
     background-color: var(--tr-selected);
   }
 
+  @include selection-cue($part, $edge);
   @include forced-selected($part);
 }

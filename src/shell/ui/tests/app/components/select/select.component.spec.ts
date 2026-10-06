@@ -239,6 +239,7 @@ describe("SelectComponent", () => {
         expect(surface.boxShadow).toBe(`${resolve("--tr-widget-shadow")} 0px 2px 8px 0px`);
         AppearanceFixture.expectLook(surface.paddingTop, theme, "dropdown-padding", "padding-top");
         expect([chosen.backgroundColor, chosen.color]).toEqual([AppearanceFixture.readColor(theme, mode, "list.activeSelectionBackground"), AppearanceFixture.readColor(theme, mode, "list.activeSelectionForeground")]);
+        expect([chosen.boxShadow, other.boxShadow]).toEqual([`${resolve("--tr-accent")} 2px 0px 0px 0px inset`, "none"]);
         expect(other.backgroundColor).toBe("rgba(0, 0, 0, 0)");
         expect([surface.color, other.color]).toEqual([AppearanceFixture.readColor(theme, mode, "foreground"), AppearanceFixture.readColor(theme, mode, "input.foreground")]);
         AppearanceFixture.expectLook(other.minHeight, theme, "dropdown-row-height", "min-height");

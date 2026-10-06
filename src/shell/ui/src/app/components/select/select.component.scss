@@ -7,6 +7,7 @@
  */
 
 @use "forced-colors" as *;
+@use "selected-surface" as *;
 @use "states";
 
 :host {
@@ -100,5 +101,6 @@
   background-color: var(--tr-list-active);
   color: var(--tr-list-active-text);
 
+  @include selection-cue;
   @include forced-selected;
 }

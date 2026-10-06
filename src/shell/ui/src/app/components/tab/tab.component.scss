@@ -52,7 +52,7 @@
 }
 
 [data-tr-tab-shape="pill"] .tr-tab.tr-tab-selected .tr-tab-pill {
-  @include selected-surface;
+  @include selected-surface($edge: top);
 }
 
 .tr-tab.tr-tab-selected .tr-tab-pill {
