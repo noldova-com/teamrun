@@ -59,7 +59,6 @@ describe("SettingsComponent", () => {
   let settings: FakeSettingsService;
   let errors: unknown[];
   let gallery: Type<unknown> | null;
-  let bridge: DesktopBridgeFixture;
 
   function render(mode: ThemeMode = ThemeMode.Light, height: string = String.empty): HTMLElement {
     AppearanceFixture.apply(DefaultTheme.theme, mode);
