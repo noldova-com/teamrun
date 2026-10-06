@@ -13,12 +13,14 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { FailureCode, Request, ShellEvents, ShellMethods, type UpdateProcess, UpdateReady, UpdateRequest, UpdateSaved } from "@noldova/teamrun-shell-protocol";
-import { RuntimeBuild, ServerSettings, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+import { FailureCode, Request, ShellEvents, ShellMethods, UpdateReady, UpdateRequest, UpdateSaved } from "@noldova/teamrun-shell-protocol";
+import { ProcessPresence, RuntimeBuild, ServerSettings, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
+import { SystemCommandFixture } from "../../fixtures/system-command.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
 import { UpdateBarrierFixture } from "../../fixtures/update-barrier.fixture.js";
+import { WindowsProcessApiFixture } from "../../fixtures/windows-process-api.fixture.js";
 
 @TestClass
 export class UpdatePreparationTests {
@@ -75,26 +77,21 @@ export class UpdatePreparationTests {
     return RuntimeHostFixture.runAsync(async fixture => {
       await using folder = await TemporaryFolderFixture.createAsync();
       const installation = UpdateBarrierFixture.open(folder.path);
-      let isUnknown = false;
-      const presence = {
-        stampAsync: (t: readonly (readonly [number, string])[]): Promise<readonly UpdateProcess[]> => UpdateBarrierFixture.PRESENCE.stampAsync(t),
-        isRunningAsync: (t: UpdateProcess): Promise<boolean> => isUnknown
-          ? Promise.reject(new Error("The process table could not be read."))
-          : UpdateBarrierFixture.PRESENCE.isRunningAsync(t)
-      };
+      const windows = new WindowsProcessApiFixture();
+      const holderRow = `900501\t1\t${Date.now() - 1_000}\tC:\\TeamRun\\TeamRun.exe`;
+      windows.rest = () => holderRow;
+      const presence = new ProcessPresence("win32", new SystemCommandFixture([]), windows);
       await fixture.startAsync(30_000, undefined, undefined, process.env, new ServerSettings(undefined, undefined, undefined, undefined, 5_000, 20), installation.folder, presence);
       const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
-      const holder = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000);"], { stdio: "ignore" });
-      await once(holder, "spawn");
-      await UpdateBarrierFixture.holdAsync(installation, Number(holder.pid), UpdateBarrierState.Preparing);
+      await UpdateBarrierFixture.holdAsync(installation, 900_501, UpdateBarrierState.Preparing, presence);
       desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
       await RuntimeHostFixture.readMessagesAsync(desktop, 2);
-      isUnknown = true;
-      holder.kill();
-      await once(holder, "exit");
+      windows.rest = () => {
+        throw new Error("The process table could not be read.");
+      };
       await delay(200);
       const [, whileUnknown] = await fixture.handshakeAsync("unknown", RuntimeBuild.identity);
-      isUnknown = false;
+      windows.rest = () => "";
       await UpdateBarrierFixture.readEventAsync(desktop, ShellEvents.updateEnded);
       const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
 

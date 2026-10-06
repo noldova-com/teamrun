@@ -15,7 +15,8 @@ import { Wait } from "@noldova/teamrun-foundation-testing";
 import { Cli, CliContext } from "@noldova/teamrun-shell-cli";
 import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
 import {
-  DataDirectory, DeviceFolder, DiscoveryReader, type IProcessStarter, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions, ServerSettings
+  DataDirectory, DeviceFolder, DiscoveryReader, type IProcessStarter, OwnershipLock, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions,
+  ServerSettings, SystemCommand
 } from "@noldova/teamrun-shell-runtime";
 
 import { FakeDesktopOpenerFixture } from "./fake-desktop-opener.fixture.js";
@@ -86,7 +87,7 @@ export class CliFixture implements AsyncDisposable {
 
   public async startHostAsync(declarationsFile: string, installationFolder: string | null = null): Promise<RuntimeHost> {
     const options = new RuntimeOptions(new DataDirectory(this.dataDirectory), 30_000, new ServerSettings(), declarationsFile, null, undefined, installationFolder);
-    const host = await RuntimeHost.startAsync(options, process.platform, process.env);
+    const host = await RuntimeHost.startAsync(options, process.platform, process.env, ProcessPresence.create(process.platform, new SystemCommand()));
     this.hosts.push(host);
     return host;
   }
