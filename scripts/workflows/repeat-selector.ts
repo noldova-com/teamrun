@@ -77,7 +77,7 @@ export default class RepeatSelector {
     for (const file of files) {
       const text = await readFile(path.join(this.root, file), "utf8");
       for (const match of text.matchAll(RepeatSelector.IMPORT_PATTERN)) {
-        const target = path.posix.join(path.posix.dirname(file), match[1] ?? "");
+        const target = path.posix.join(path.posix.dirname(file), ...match.slice(1));
         const imported = RepeatSelector.RESOLVED_SUFFIXES.map(t => `${target}${t}`).find(t => listed.has(t));
         if (imported !== undefined)
           importers.set(imported, [...importers.get(imported) ?? [], file]);

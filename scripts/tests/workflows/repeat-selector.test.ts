@@ -36,6 +36,7 @@ class RepeatSelectorTests {
     "src/shell/desktop/tests/e2e/quit.spec.ts": "export {};\n",
     "src/shell/desktop/tests/e2e/fixtures/desktop.fixture.ts": "export { park } from \"./pointer\";\n",
     "src/shell/desktop/tests/e2e/fixtures/pointer/index.ts": "export const park = 1;\n",
+    "src/shell/desktop/tests/e2e/fixtures/unused.fixture.ts": "export {};\n",
     "docs/guide.md": "# Guide\n"
   };
 
@@ -51,11 +52,11 @@ class RepeatSelectorTests {
       assert.deepEqual([selection.tests, selection.workflows], [["scripts/tests/desktop/electron-binary.test.ts", "src/shell/window/tests/app/bar.component.spec.ts"], []]);
     });
 
-    test("a changed test selects itself, and a changed support file selects every test that imports it, directly or through other support files", async t => {
+    test("a changed test selects itself, and a changed support file selects every test that imports it, directly or through other support files, and a support file nothing imports selects nothing", async t => {
       const selector = await RepeatSelectorTests.createAsync(t);
 
       const scripts = await selector.selectAsync(["scripts/tests/fixtures/base.fixture.ts", "src/foundation/core/tests/words.test.ts"], []);
-      const workflows = await selector.selectAsync(["src/shell/desktop/tests/e2e/fixtures/pointer/index.ts"], []);
+      const workflows = await selector.selectAsync(["src/shell/desktop/tests/e2e/fixtures/pointer/index.ts", "src/shell/desktop/tests/e2e/fixtures/unused.fixture.ts"], []);
 
       assert.deepEqual([scripts.tests, scripts.workflows], [["scripts/tests/desktop/electron-binary.test.ts", "scripts/tests/other.test.ts", "src/foundation/core/tests/words.test.ts"], []]);
       assert.deepEqual([workflows.tests, workflows.workflows], [[], ["src/shell/desktop/tests/e2e/menus.spec.ts", "src/shell/desktop/tests/e2e/settings.spec.ts"]]);

@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
@@ -19,6 +20,7 @@ import RepeatMatrix from "../workflows/repeat-matrix.ts";
 import type RepeatSelection from "../workflows/repeat-selection.ts";
 import RepeatSelector from "../workflows/repeat-selector.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
+import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 class BrokenSelectorFixture extends RepeatSelector {
@@ -80,6 +82,7 @@ class RepeatPlanTests {
       const spaced = new TextOutputFixture();
 
       assert.equal(await plan(outputs).runAsync({ BASE_SHA: base, HEAD_SHA: head }), 1);
+      assert.deepEqual(await RepeatPlanTests.runAsync(repository, revisions, {}, 1), [""]);
       assert.deepEqual(await RepeatPlanTests.runAsync(repository, revisions, { BASE_SHA: "main", HEAD_SHA: head }, 1), [""]);
       assert.deepEqual(await RepeatPlanTests.runAsync(repository, missing, { BASE_SHA: base, HEAD_SHA: "0".repeat(40) }, 1), [""]);
       assert.deepEqual(await RepeatPlanTests.runAsync(repository, unknown, { BASE_SHA: base, HEAD_SHA: head, PR_BODY: "Repeat: quit.spec.ts, docs/guide.md\n" }, 1), [""]);
@@ -88,11 +91,25 @@ class RepeatPlanTests {
       const revisionsRequired = "BASE_SHA and HEAD_SHA must name the pull request's base and head commits.\n";
       assert.deepEqual([outputs.text, revisions.text, missing.text, unknown.text, spaced.text], [
         "GITHUB_OUTPUT and GITHUB_STEP_SUMMARY must name the step's output and summary files.\n",
-        revisionsRequired,
+        revisionsRequired.repeat(2),
         revisionsRequired,
         "The Repeat line names files that are not test or UI workflow files of this revision: quit.spec.ts, docs/guide.md. It names files by their path from the repository's root.\n",
         "The repeats pass file paths as words, so a path with whitespace can't be repeated: scripts/tests/desktop/new case.test.ts.\n"
       ]);
+    });
+
+    test("the command plans the working directory's repository from its environment and terminates", async t => {
+      const repository = await RepeatPlanTests.createAsync(t);
+      const base = await repository.commitAsync(RepeatPlanTests.BASE);
+      const head = await repository.commitAsync({ "scripts/tests/desktop/electron-binary.test.ts": "export const changed = true;\n" });
+      const outputPath = path.join(repository.directory, "output.txt");
+      const environment = { ...process.env, GITHUB_OUTPUT: outputPath, GITHUB_STEP_SUMMARY: path.join(repository.directory, "summary.md"), BASE_SHA: base, HEAD_SHA: head };
+
+      const planned = spawnSync(process.execPath, [SourceTreeFixture.locateScript("repeat-plan.ts")], { cwd: repository.directory, env: environment, encoding: "utf8", timeout: 10_000 });
+
+      assert.equal(planned.status, 0, planned.stderr);
+      assert.equal(planned.stdout, "Repeated test files:\n- scripts/tests/desktop/electron-binary.test.ts\n");
+      assert.ok((await readFile(outputPath, "utf8")).includes("test-arguments=--filter scripts/tests/desktop/electron-binary.test.ts\n"));
     });
 
     test("an unexpected selection error reaches the caller", async t => {

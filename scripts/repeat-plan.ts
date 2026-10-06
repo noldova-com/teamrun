@@ -57,7 +57,7 @@ export default class RepeatPlan {
     const mergeBase = (await this.git.readOutputAsync(["merge-base", base, head])).trim();
     const changed = (await this.git.readOutputAsync(["diff", "--no-renames", "--name-only", "-z", mergeBase, head, "--"])).split("\0").filter(t => t.length > 0);
     const named = [...(environment[RepeatPlan.BODY_VARIABLE] ?? "").matchAll(RepeatPlan.REPEAT_LINE)]
-      .flatMap(t => (t[1] ?? "").split(RepeatPlan.NAME_SEPARATOR)).filter(t => t.length > 0);
+      .flatMap(t => t.slice(1).flatMap(u => u.split(RepeatPlan.NAME_SEPARATOR))).filter(t => t.length > 0);
     let selection: RepeatSelection;
     try {
       selection = await this.selector.selectAsync(changed, named);
