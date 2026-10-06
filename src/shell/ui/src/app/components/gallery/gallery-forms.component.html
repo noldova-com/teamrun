@@ -41,8 +41,8 @@ LICENSE file in the root directory of this source tree.
   <tr-gallery-cell [caption]="text.focus"><input type="text" tr-text-field trGalleryFocus [placeholder]="text.placeholder" [attr.aria-label]="text.focus" /></tr-gallery-cell>
   <tr-gallery-cell [caption]="text.error">
     <span class="tr-gallery-invalid">
-      <input type="text" tr-text-field [value]="text.invalidField" [attr.aria-label]="text.error" aria-invalid="true" />
-      <span class="tr-gallery-error">{{ text.validationText }}</span>
+      <input type="text" tr-text-field [value]="text.invalidField" [attr.aria-label]="text.error" aria-invalid="true" [attr.aria-describedby]="messageId" />
+      <tr-field-message [id]="messageId">{{ text.validationText }}</tr-field-message>
     </span>
   </tr-gallery-cell>
   <tr-gallery-cell long [caption]="text.longCaption">
