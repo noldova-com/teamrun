@@ -23,8 +23,12 @@ export default class PackageInstaller {
   private static readonly LOCAL_APP_DATA: string = "LOCALAPPDATA";
   private static readonly PROGRAMS_FOLDER: string = "Programs";
   private static readonly WINDOWS_PROGRAM_EXTENSION: string = ".exe";
+  private static readonly WINDOWS_LIBRARY_EXTENSION: string = ".dll";
   private static readonly RESOURCES_FOLDER: string = "resources";
   private static readonly SILENT_INSTALL: readonly string[] = ["/S"];
+  private static readonly MODULE_PATH: string = "PSModulePath";
+  private static readonly SYSTEM_ROOT: string = "SystemRoot";
+  private static readonly WINDOWS_POWERSHELL_MODULES: readonly string[] = ["System32", "WindowsPowerShell", "v1.0", "Modules"];
   private static readonly DISK_IMAGES: string = "hdiutil";
   private static readonly ATTACH: string = "attach";
   private static readonly ATTACH_OPTIONS: readonly string[] = ["-nobrowse", "-readonly", "-mountpoint"];
@@ -74,9 +78,29 @@ export default class PackageInstaller {
     return [`${installFolder} held ${files.length} files when the installer was stopped:`, ...lines].join("\n");
   }
 
-  private static requireFile(file: string): void {
-    if (!existsSync(file))
-      throw new PackagingException(`The installed package has no ${file}.`);
+  private static requireFiles(files: readonly string[]): void {
+    const missing = files.filter(t => !existsSync(t));
+    if (missing.length > 0)
+      throw new PackagingException(`The installed package has no ${missing.join(", ")}.`);
+  }
+
+  private static isNamed(variable: string, name: string): boolean {
+    return variable.toUpperCase() === name.toUpperCase();
+  }
+
+  private findVariable(name: string): string | undefined {
+    return Object.entries(this.environment).find(([variable]) => PackageInstaller.isNamed(variable, name))?.[1];
+  }
+
+  private createInstallerEnvironment(): NodeJS.ProcessEnv {
+    const systemRoot = this.findVariable(PackageInstaller.SYSTEM_ROOT) ?? "";
+    if (systemRoot.length === 0)
+      throw new PackagingException(`${PackageInstaller.SYSTEM_ROOT} must name the Windows folder, whose PowerShell modules the installer's checks search first.`);
+    const modules = [path.win32.join(systemRoot, ...PackageInstaller.WINDOWS_POWERSHELL_MODULES), this.findVariable(PackageInstaller.MODULE_PATH) ?? ""]
+      .filter(t => t.length > 0)
+      .join(path.win32.delimiter);
+    const others = Object.entries(this.environment).filter(([variable]) => !PackageInstaller.isNamed(variable, PackageInstaller.MODULE_PATH));
+    return { ...Object.fromEntries(others), [PackageInstaller.MODULE_PATH]: modules };
   }
 
   private async installWindowsAsync(installer: string, product: ProductIdentity, folder: string): Promise<InstalledPackage> {
@@ -84,8 +108,9 @@ export default class PackageInstaller {
     if (localAppData.length === 0)
       throw new PackagingException(`${PackageInstaller.LOCAL_APP_DATA} must name the folder the installer installs into for the user.`);
     const installFolder = path.join(localAppData, PackageInstaller.PROGRAMS_FOLDER, product.slug);
+    const environment = this.createInstallerEnvironment();
     try {
-      await this.requireAsync(installer, PackageInstaller.SILENT_INSTALL, folder);
+      await this.runner.requireAsync(installer, PackageInstaller.SILENT_INSTALL, folder, PackageInstaller.LIMIT, environment);
     }
     catch (error) {
       if (!(error instanceof ProcessTimeoutException))
@@ -93,7 +118,10 @@ export default class PackageInstaller {
       throw new PackagingException(`${error.message}\n${await PackageInstaller.describeAsync(installFolder)}`, { cause: error });
     }
     const program = path.join(installFolder, `${product.name}${PackageInstaller.WINDOWS_PROGRAM_EXTENSION}`);
-    PackageInstaller.requireFile(program);
+    const libraries = (await readdir(new PackageLayout(this.root).electron))
+      .filter(t => path.extname(t).toLowerCase() === PackageInstaller.WINDOWS_LIBRARY_EXTENSION)
+      .map(t => path.join(installFolder, t));
+    PackageInstaller.requireFiles([program, ...libraries]);
     return new InstalledPackage(program, program, path.join(path.dirname(program), PackageInstaller.RESOURCES_FOLDER));
   }
 
@@ -116,7 +144,7 @@ export default class PackageInstaller {
     }
     await this.requireAsync(PackageInstaller.DISK_IMAGES, [...PackageInstaller.DETACH, mount], folder);
     const program = path.join(application, ...PackageInstaller.BUNDLE_SEGMENTS, product.name);
-    PackageInstaller.requireFile(program);
+    PackageInstaller.requireFiles([program]);
     return new InstalledPackage(program, program, path.join(application, ...PackageInstaller.BUNDLE_RESOURCES_SEGMENTS));
   }
 
@@ -125,7 +153,7 @@ export default class PackageInstaller {
     await this.requireAsync(file, PackageInstaller.EXTRACT, folder);
     const extracted = path.join(folder, PackageInstaller.EXTRACTED_FOLDER);
     const program = path.join(extracted, product.slug);
-    PackageInstaller.requireFile(program);
+    PackageInstaller.requireFiles([program]);
     return new InstalledPackage(file, program, path.join(extracted, PackageInstaller.RESOURCES_FOLDER));
   }
 

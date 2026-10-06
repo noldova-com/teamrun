@@ -110,6 +110,29 @@ class PackageTests {
         assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n  ${path.join(folder, PackageTests.APP_IMAGE)}\n`);
       });
 
+    test("electron-builder compresses a Windows ARM64 package with the x86 filter that the installer's extractor reads, and leaves every other target's filter alone",
+      { timeout: PackageTests.TIMEOUT }, async t => {
+        const repository = await PackageTests.createAsync(t);
+        const targets: readonly (readonly [string, string, readonly string[]])[] = [
+          ["win32", "arm64", ["Fixture Studio-windows-arm64.exe"]],
+          ["win32", "x64", ["Fixture Studio-windows-x64.exe"]],
+          ["darwin", "arm64", ["Fixture Studio-macos-arm64.dmg", "Fixture Studio-macos-arm64.zip"]],
+          ["linux", "arm64", ["Fixture Studio-linux-arm64.AppImage"]]
+        ];
+        const filters: (string | undefined)[] = [];
+
+        for (const [platform, architecture, made] of targets) {
+          const builder = new BuilderFixture(made);
+          const output = new TextOutputFixture();
+          const exitCode = await new Package(repository.directory, platform, architecture, PackageTests.createStage(repository), builder,
+            { ELECTRON_BUILDER_7Z_FILTER: "ARM64" }, output).runAsync([]);
+          assert.equal(exitCode, 0, output.text);
+          filters.push(builder.environments[0]?.["ELECTRON_BUILDER_7Z_FILTER"]);
+        }
+
+        assert.deepEqual(filters, ["BCJ", undefined, undefined, undefined]);
+      });
+
     test("a failed electron-builder run or one that leaves a package unmade fails packaging", { timeout: PackageTests.TIMEOUT }, async t => {
       const repository = await PackageTests.createAsync(t);
       const failed = new TextOutputFixture();
