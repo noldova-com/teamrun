@@ -186,7 +186,7 @@ export class RuntimeLauncher {
       String(this.settings.idleGraceMilliseconds),
       Resources.startLogArgument,
       startLogName
-    ]);
+    ], this.settings.environment);
     await mkdir(directory.logsFolder, { recursive: true });
     const startLog = path.join(directory.logsFolder, startLogName);
     const processId = await this.starter.startAsync(command.executable, command.arguments, this.settings.environment, startLog);

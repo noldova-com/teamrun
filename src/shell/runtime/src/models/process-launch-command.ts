@@ -12,20 +12,28 @@ import { ArgumentException, ExceptionOptions } from "@noldova/teamrun-foundation
 
 import { LaunchException } from "../exceptions/launch.exception.js";
 import { Resources } from "../resources.js";
+import { AppImageSource } from "./app-image-source.js";
 import { ProductInfo } from "./product-info.js";
 
 export class ProcessLaunchCommand {
   public readonly executable: string;
   public readonly arguments: readonly string[];
 
-  public constructor(platform: string, executablePath: string, launchArguments: readonly string[]) {
+  public constructor(platform: string, executablePath: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv = {}) {
     ArgumentException.throwIfNullOrWhitespace(executablePath, Resources.executablePathParameterName);
-    const isLinux = platform === Resources.linuxPlatform;
-    if (isLinux)
-      ProcessLaunchCommand.requireLinuxPrerequisites();
-
-    this.executable = isLinux ? Resources.launchShell : executablePath;
-    this.arguments = isLinux ? [...Resources.launchShellArguments, `${ProductInfo.current.slug}${Resources.launchNameSuffix}`, executablePath, ...launchArguments] : [...launchArguments];
+    if (platform !== Resources.linuxPlatform) {
+      this.executable = executablePath;
+      this.arguments = [...launchArguments];
+      return;
+    }
+    ProcessLaunchCommand.requireLinuxPrerequisites();
+    const name = `${ProductInfo.current.slug}${Resources.launchNameSuffix}`;
+    const source = AppImageSource.find(environment, executablePath);
+    this.executable = Resources.launchShell;
+    this.arguments = Object.isNull(source)
+      ? [...Resources.launchShellArguments, name, executablePath, ...launchArguments]
+      : [...Resources.launchCopyShellArguments, name, source.file, source.folder, source.isMounted ? Resources.appImageMountMode : Resources.appImageExtractMode,
+        executablePath, ...launchArguments];
   }
 
   private static requireLinuxPrerequisites(): void {

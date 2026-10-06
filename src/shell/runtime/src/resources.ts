@@ -337,7 +337,84 @@ export class Resources {
     "-c",
     "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\""
   ];
+  public static readonly launchCopyShellArguments: readonly string[] = [
+    "--noprofile",
+    "--norc",
+    "-p",
+    "-c",
+    [
+      "shopt -s failglob",
+      "for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done",
+      "shopt -u failglob",
+      "image=$1 root=$2 mode=$3",
+      "shift 3",
+      "copy= mounter= extraction= status=1",
+      "if [[ $mode == mount ]]; then",
+      "  listing=$(mktemp) || exit 1",
+      "  \"$image\" --appimage-mount > \"$listing\" &",
+      "  mounter=$!",
+      "  for (( attempt = 0; attempt < 100; attempt++ )); do",
+      "    if IFS= read -r copy < \"$listing\"; then break; fi",
+      "    copy=",
+      "    kill -0 \"$mounter\" 2> /dev/null || break",
+      "    sleep 0.1",
+      "  done",
+      "  rm -f -- \"$listing\"",
+      "  if [[ -n $copy ]]; then",
+      "    echo \"teamrun-copy mount $$ $mounter $image\" >&2",
+      "  else",
+      "    kill \"$mounter\" 2> /dev/null",
+      "    wait \"$mounter\" 2> /dev/null",
+      "    mounter=",
+      "    echo \"$image could not be mounted, so the runtime starts from an extraction of it.\" >&2",
+      "  fi",
+      "fi",
+      "if [[ -z $copy ]]; then",
+      "  extraction=$(mktemp -d \"${TMPDIR:-/tmp}/teamrun-runtime-XXXXXX\") || exit 1",
+      "  echo \"teamrun-copy extraction $$ $extraction\" >&2",
+      "  if ( cd -- \"$extraction\" && \"$image\" --appimage-extract > /dev/null ); then",
+      "    copy=$extraction/squashfs-root",
+      "  else",
+      "    rm -rf -- \"$extraction\"",
+      "    echo \"$image could be neither mounted nor extracted, so the runtime cannot start.\" >&2",
+      "    exit 1",
+      "  fi",
+      "fi",
+      "command=()",
+      "for argument; do",
+      "  if [[ $argument == \"$root\"/* ]]; then argument=$copy${argument#\"$root\"}; fi",
+      "  command+=(\"$argument\")",
+      "done",
+      "export APPDIR=$copy",
+      "\"${command[@]}\" &",
+      "runtime=$!",
+      "forward() { kill -TERM \"$runtime\" 2> /dev/null; }",
+      "trap forward TERM INT HUP",
+      "while kill -0 \"$runtime\" 2> /dev/null; do wait \"$runtime\"; status=$?; done",
+      "if [[ -n $mounter ]]; then kill -TERM \"$mounter\" 2> /dev/null; wait \"$mounter\" 2> /dev/null; fi",
+      "if [[ -n $extraction ]]; then rm -rf -- \"$extraction\"; fi",
+      "exit \"$status\""
+    ].join("\n")
+  ];
   public static readonly launchNameSuffix: string = "-launch";
+  public static readonly appImageVariable: string = "APPIMAGE";
+  public static readonly appImageFolderVariable: string = "APPDIR";
+  public static readonly appImageMountMode: string = "mount";
+  public static readonly appImageExtractMode: string = "extract";
+  public static readonly appImageMountOption: string = "--appimage-mount";
+  public static readonly trailingSlashes: RegExp = /\/+$/;
+  public static readonly parentFolder: string = "..";
+  public static readonly mountTableFile: string = "/proc/self/mountinfo";
+  public static readonly mountPointField: number = 4;
+  public static readonly mountTableEscape: RegExp = /\\([0-7]{3})/g;
+  public static readonly octalRadix: number = 8;
+  public static readonly processFolder: string = "/proc";
+  public static readonly commandLineFile: string = "cmdline";
+  public static readonly commandLineSeparator: string = "\0";
+  public static readonly copyMountRecord: RegExp = /^teamrun-copy mount (\d+) (\d+) (.+)$/;
+  public static readonly copyExtractionRecord: RegExp = /^teamrun-copy extraction (\d+) (.+)$/;
+  public static readonly copyExtractionName: RegExp = /^teamrun-runtime-[A-Za-z0-9]{6}$/;
+  public static readonly copyEndSignal: NodeJS.Signals = "SIGTERM";
   public static readonly stoppedByIdle: string = "idle";
   public static readonly stoppedByRequest: string = "request";
   public static readonly stoppedBySignal: string = "signal";
