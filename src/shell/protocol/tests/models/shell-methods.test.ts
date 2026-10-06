@@ -50,7 +50,7 @@ export class ShellMethodsTests {
 
   @TestMethod
   public namesTheSettingsMethods(): void {
-    Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", [ShellMethods.settings, ShellMethods.setSetting, ShellMethods.resetSetting].map(t => t.text).join(","));
+    Assert.areEqual("shell.settings,shell.readSetting,shell.setSetting,shell.resetSetting", [ShellMethods.settings, ShellMethods.readSetting, ShellMethods.setSetting, ShellMethods.resetSetting].map(t => t.text).join(","));
   }
 
   @TestMethod

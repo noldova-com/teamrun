@@ -13,6 +13,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   QualifiedName,
   SettingChange,
+  SettingEntry,
   SettingKey,
   SettingValue,
   SettingsQuery,
@@ -77,6 +78,10 @@ export class SettingsService {
 
   public read(name: string): JsonValue | undefined {
     return this.valueMap().get(name);
+  }
+
+  public async readAsync(name: string, scope: SettingScope | null): Promise<SettingEntry> {
+    return SettingEntry.fromJson(await this.bridge.requestAsync(ShellMethods.readSetting.text, new SettingKey(QualifiedName.parse(name), scope).toJson()));
   }
 
   public async setAsync(name: string, value: JsonValue, scope: SettingScope | null = null): Promise<void> {

@@ -14,4 +14,8 @@ export class Resources {
   public static readonly manyTabsMarker: string = "many-tabs";
   public static readonly longCountMarker: string = "long-count";
   public static readonly holdFirstOptionsMarker: string = "hold-first-options";
+  public static readonly folderScope: string = "notes.folder";
+  public static readonly noteScope: string = "notes.entry";
+  public static readonly inbox: string = "inbox";
+  public static readonly inboxNotes: readonly string[] = ["1", "2"];
 }
