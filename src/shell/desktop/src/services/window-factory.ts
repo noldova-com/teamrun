@@ -8,6 +8,7 @@
 
 import type { BrowserWindowConstructorOptions } from "electron";
 
+import "@noldova/teamrun-foundation-core";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 
 import type { IDesktopWindow } from "../interfaces/i-desktop-window.js";
