@@ -9,7 +9,7 @@
 import type GitHubApi from "../repository/github-api.ts";
 import GitHubException from "../repository/github.exception.ts";
 import GitHubJson from "../repository/github-json.ts";
-import type IOpenIssue from "./interfaces/open-issue.ts";
+import type IOpenIssue from "./interfaces/i-open-issue.ts";
 import NightlyFilingException from "./nightly-filing.exception.ts";
 import type NightlyFinding from "./nightly-finding.ts";
 

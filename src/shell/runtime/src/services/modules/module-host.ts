@@ -12,8 +12,8 @@ import { inspect } from "node:util";
 import "@noldova/teamrun-foundation-core";
 import { ModuleState, ModuleStatus, ModuleStatusList, type SettingDefinition } from "@noldova/teamrun-shell-protocol";
 
-import type { IRuntimePart } from "../../interfaces/runtime-part.js";
-import type { IRuntimePartLoader } from "../../interfaces/runtime-part-loader.js";
+import type { IRuntimePart } from "../../interfaces/i-runtime-part.js";
+import type { IRuntimePartLoader } from "../../interfaces/i-runtime-part-loader.js";
 import { UnknownSchemaException } from "../../exceptions/unknown-schema.exception.js";
 import { ModuleActivation } from "../../models/module-activation.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
@@ -28,7 +28,7 @@ import { ModuleDatabase } from "../database/module-database.js";
 import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
 import { ServiceRegistry } from "../registry/service-registry.js";
-import type { SettingsService } from "../settings/settings-service.js";
+import type { SettingsService } from "../settings/settings.service.js";
 import type { WorkTracker } from "../work/work-tracker.js";
 import { ModuleContext } from "./module-context.js";
 

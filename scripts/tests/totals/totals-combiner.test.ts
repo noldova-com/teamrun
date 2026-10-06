@@ -9,8 +9,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type ICoverageCount from "../../totals/interfaces/coverage-count.ts";
-import type IRunnerCounts from "../../totals/interfaces/runner-counts.ts";
+import type ICoverageCount from "../../totals/interfaces/i-coverage-count.ts";
+import type IRunnerCounts from "../../totals/interfaces/i-runner-counts.ts";
 import RunnerTotals from "../../totals/runner-totals.ts";
 import TotalsCombiner from "../../totals/totals-combiner.ts";
 

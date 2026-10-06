@@ -10,7 +10,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Event, type QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { RegistrationException } from "../../exceptions/registration.exception.js";
-import type { IEventSink } from "../../interfaces/event-sink.js";
+import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import { EventChannel } from "../../models/event-channel.js";
 import { Resources } from "../../resources.js";
 

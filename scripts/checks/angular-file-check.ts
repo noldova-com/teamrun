@@ -16,7 +16,7 @@ import ApiException from "../api/api.exception.ts";
 import type RepositoryFiles from "../repository/repository-files.ts";
 import SourceTree from "../structure/source-tree.ts";
 import type SyntaxTreeReader from "../structure/syntax-tree.reader.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class AngularFileCheck implements ICheck {
   private static readonly APP_FILE: RegExp = /^src\/(?:[^/]+\/)+src\/app\/.+\.ts$/;

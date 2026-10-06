@@ -15,7 +15,7 @@ import ApiDeclarationSession from "../api/api-declaration-session.ts";
 import type ApiPackage from "../api/api-package.ts";
 import ApiSurfaceReader from "../api/api-surface.reader.ts";
 import ApiException from "../api/api.exception.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class ApiDeclarationCheck implements ICheck {
   private static readonly PURPOSE: string = "api-declarations";

@@ -6,10 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type IVitestLogger from "./vitest-logger.ts";
+import type { IRuntimePart } from "./i-runtime-part.js";
 
-export default interface IVitestRun {
-  readonly logger: IVitestLogger;
-
-  onClose(listener: () => void): void;
+export interface IRuntimePartLoader {
+  loadAsync(packageName: string): Promise<IRuntimePart>;
 }

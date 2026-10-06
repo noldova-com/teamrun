@@ -11,10 +11,10 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { QualifiedName, type SettingChange, SettingKey, SettingValue, type SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { RegistrationException } from "../../exceptions/registration.exception.js";
-import type { IModuleSettings } from "../../interfaces/module-settings.js";
+import type { IModuleSettings } from "../../interfaces/i-module-settings.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Resources } from "../../resources.js";
-import type { SettingsService } from "./settings-service.js";
+import type { SettingsService } from "./settings.service.js";
 
 export class ModuleSettings implements IModuleSettings {
   private readonly declaration: ModuleDeclaration;

@@ -8,8 +8,8 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import type { IProcessEnder } from "../../interfaces/process-ender.js";
-import type { IProcessTableReader } from "../../interfaces/process-table-reader.js";
+import type { IProcessEnder } from "../../interfaces/i-process-ender.js";
+import type { IProcessTableReader } from "../../interfaces/i-process-table.reader.js";
 import { KeptProgram } from "../../models/kept-program.js";
 import { ProcessEnding } from "../../models/process-ending.js";
 import type { ProcessExit } from "../../models/process-exit.js";

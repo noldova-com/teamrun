@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type ITestName from "./interfaces/test-name.ts";
+import type ITestName from "./interfaces/i-test-name.ts";
 import TestIdentity from "./test-identity.ts";
 
 export default class TestNames {

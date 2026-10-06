@@ -12,7 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import { FrameReader, FrameWriter, type WireMessage, WireDecoder } from "@noldova/teamrun-shell-protocol";
 
 import { SessionState } from "../../enums/session-state.js";
-import type { ISessionListener } from "../../interfaces/session-listener.js";
+import type { ISessionListener } from "../../interfaces/i-session-listener.js";
 import { Resources } from "../../resources.js";
 
 export class ClientSession {

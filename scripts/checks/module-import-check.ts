@@ -14,7 +14,7 @@ import type SourceFile from "../structure/source-file.ts";
 import type SourceLiteral from "../structure/source-literal.ts";
 import SourceScanner from "../structure/source-scanner.ts";
 import SourceTree from "../structure/source-tree.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class ModuleImportCheck implements ICheck {
   private static readonly RELATIVE_PREFIX: string = ".";

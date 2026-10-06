@@ -13,7 +13,7 @@ import { SectionHeaderComponent } from "../../../../src/app/components/section-h
 import { TreeComponent } from "../../../../src/app/components/tree/tree.component";
 import type { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import type { Theme } from "../../../../src/app/models/theme";
-import { TreeNode } from "../../../../src/app/models/tree-node";
+import { TreeNode } from "../../../../src/app/models/tree.node";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({
