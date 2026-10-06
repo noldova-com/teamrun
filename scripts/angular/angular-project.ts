@@ -14,6 +14,7 @@ import type { Writable } from "node:stream";
 import ContentHash from "../packages/content-hash.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
+import RetriedDownload from "../processes/retried-download.ts";
 import type NpmCommand from "../toolchain/npm-command.ts";
 import AngularTestRun from "./angular-test-run.ts";
 import RetriedTest from "./retried-test.ts";
@@ -49,6 +50,7 @@ export default class AngularProject {
   private static readonly NO_PROJECT: string = "No Angular project under src/; there is nothing to prepare.\n";
   private static readonly INSTALLING: string = "Installing the Angular project in src/...\n";
   private static readonly INSTALLING_BROWSER: string = "Installing the browser for the Angular tests...\n";
+  private static readonly BROWSER_SUBJECT: string = "The browser for the Angular tests";
   private static readonly BUILDING: string = "Building the window...\n";
 
   private readonly root: string;
@@ -85,9 +87,10 @@ export default class AngularProject {
     }
 
     output.write(AngularProject.INSTALLING_BROWSER);
-    const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.directory, AngularProject.PLAYWRIGHT_CLI), ...AngularProject.BROWSER_ARGUMENTS], this.directory);
-    if (exitCode !== 0)
-      throw new ProcessException(`Installing the browser for the Angular tests failed with exit code ${exitCode}.`);
+    await RetriedDownload.runAsync(AngularProject.BROWSER_SUBJECT, output, async () => {
+      const result = await this.runner.captureAsync(process.execPath, [path.join(this.directory, AngularProject.PLAYWRIGHT_CLI), ...AngularProject.BROWSER_ARGUMENTS], this.directory, RetriedDownload.ATTEMPT_TIMEOUT);
+      return result.isSuccessful ? null : `exit code ${result.exitCode}: ${result.errorOutput.trim()}`;
+    });
   }
 
   public async buildAsync(output: Writable, outputPath: string | null): Promise<void> {

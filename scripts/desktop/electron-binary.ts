@@ -9,19 +9,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Writable } from "node:stream";
-import timers from "node:timers/promises";
 
 import type ProcessRunner from "../processes/process-runner.ts";
-import ProcessException from "../processes/process.exception.ts";
+import RetriedDownload from "../processes/retried-download.ts";
 
 export default class ElectronBinary {
   private static readonly PACKAGE_SEGMENTS: readonly string[] = ["node_modules", "electron"];
   private static readonly INSTALLER_FILE: string = "install.js";
   private static readonly PATH_FILE: string = "path.txt";
   private static readonly DISTRIBUTION_FOLDER: string = "dist";
-  private static readonly ATTEMPTS: number = 4;
-  private static readonly ATTEMPT_TIMEOUT: number = 600_000;
-  private static readonly PAUSE: number = 15_000;
+  private static readonly SUBJECT: string = "Electron's binary";
   private static readonly INSTALLING: string = "Installing Electron's binary...\n";
 
   private readonly directory: string;
@@ -45,17 +42,11 @@ export default class ElectronBinary {
       return;
 
     output.write(ElectronBinary.INSTALLING);
-    let failure = "";
-    for (let attempt = 1; attempt <= ElectronBinary.ATTEMPTS; attempt++) {
-      const result = await this.runner.captureAsync(process.execPath, [installer], this.root, ElectronBinary.ATTEMPT_TIMEOUT);
+    await RetriedDownload.runAsync(ElectronBinary.SUBJECT, output, async () => {
+      const result = await this.runner.captureAsync(process.execPath, [installer], this.root, RetriedDownload.ATTEMPT_TIMEOUT);
       if (result.isSuccessful && this.isInstalled())
-        return;
-      failure = result.isSuccessful ? "it reported success, but the binary is still missing" : `exit code ${result.exitCode}: ${result.errorOutput.trim()}`;
-      if (attempt < ElectronBinary.ATTEMPTS) {
-        output.write(`Electron's binary could not be installed (attempt ${attempt} of ${ElectronBinary.ATTEMPTS}); trying again in ${ElectronBinary.PAUSE / 1000} seconds.\n`);
-        await timers.setTimeout(ElectronBinary.PAUSE);
-      }
-    }
-    throw new ProcessException(`Electron's binary could not be installed in ${ElectronBinary.ATTEMPTS} attempts; the last failed with ${failure}.`);
+        return null;
+      return result.isSuccessful ? "it reported success, but the binary is still missing" : `exit code ${result.exitCode}: ${result.errorOutput.trim()}`;
+    });
   }
 }
