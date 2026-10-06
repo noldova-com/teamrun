@@ -13,7 +13,7 @@ import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
-import { ProgramStatusList } from "@noldova/teamrun-shell-protocol";
+import { ProgramStatusList, UpdateProcess } from "@noldova/teamrun-shell-protocol";
 
 import { ProcessStartException } from "../../exceptions/process-start.exception.js";
 import type { IProcessEnder } from "../../interfaces/i-process-ender.js";
@@ -57,6 +57,7 @@ export class ProcessSupervisor {
   private readonly listeners: Set<() => void> = new Set();
   private isStopping: boolean = false;
   private sequence: number = 0;
+  private isPaused: boolean = false;
   private seeing: NodeJS.Timeout | undefined;
 
   public constructor(
@@ -106,6 +107,18 @@ export class ProcessSupervisor {
     return new Registration(() => this.listeners.delete(entry));
   }
 
+  public get updateProcesses(): readonly UpdateProcess[] {
+    return [...this.running.values(), ...this.kept.keys()].map(t => new UpdateProcess(t.record.processId, t.record.requested, t.record.started, Resources.programRole));
+  }
+
+  public pause(): void {
+    this.isPaused = true;
+  }
+
+  public resume(): void {
+    this.isPaused = false;
+  }
+
   public startAsync(moduleId: string, request: ProcessRequest): Promise<OwnedProcess> {
     const starting = this.launchAsync(moduleId, request);
     this.track(moduleId, starting.then(() => undefined, () => undefined));
@@ -151,6 +164,8 @@ export class ProcessSupervisor {
   private async launchAsync(moduleId: string, request: ProcessRequest): Promise<OwnedProcess> {
     if (this.isStopping || this.stopping.has(moduleId))
       throw new ProcessStartException(Resources.formatModuleStopping(moduleId, request.program));
+    if (this.isPaused)
+      throw new ProcessStartException(Resources.formatUpdatePreparing(moduleId, request.program));
     request.signal?.throwIfAborted();
     const environment = ProcessEnvironment.create(this.platform, this.environment, request);
     const program = this.locator.locate(request.program, environment);

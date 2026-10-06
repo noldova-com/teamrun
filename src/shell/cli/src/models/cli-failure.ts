@@ -16,6 +16,7 @@ import {
   NoRuntimeException,
   PreShellDataFoundException,
   RuntimeHandoverException,
+  UpdateInProgressException,
   WorkInProgressException
 } from "@noldova/teamrun-shell-runtime";
 
@@ -37,6 +38,8 @@ export class CliFailure {
   }
 
   public static fromFailure(failure: Failure): CliFailure {
+    if (failure.code === FailureCode.Updating)
+      return new CliFailure(ExitCode.Updating, failure.code, failure.message);
     if (failure.code === FailureCode.Unauthorized)
       return new CliFailure(ExitCode.DataDirectoryUnusable, failure.code, Resources.formatDataDirectoryUnusable(failure.message));
     const isStopped = failure.code === FailureCode.Cancelled || failure.code === FailureCode.DeadlineExceeded;
@@ -52,6 +55,8 @@ export class CliFailure {
       return new CliFailure(ExitCode.BuildMismatch, Resources.buildMismatchCode, error.message, error.handover.toJson());
     if (error instanceof WorkInProgressException)
       return new CliFailure(ExitCode.BuildMismatch, FailureCode.Conflict, error.message, error.work.toJson());
+    if (error instanceof UpdateInProgressException)
+      return new CliFailure(ExitCode.Updating, FailureCode.Updating, error.message);
     if (error instanceof PreShellDataFoundException)
       return new CliFailure(ExitCode.DataDirectoryUnusable, FailureCode.PreShellData, error.message, error.data.toJson());
     if (error instanceof ConnectionException)

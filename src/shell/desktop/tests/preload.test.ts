@@ -17,7 +17,7 @@ export class PreloadTests {
     const api = FakePreloadElectron.load("{\"background\":\"#181818\"}").api("teamrun");
 
     Assert.areEqual([
-      "platform", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "readStartup", "onStartup", "actOnStartup", "readLayout",
+      "platform", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "onUpdateSaveRequest", "answerUpdateSave", "readStartup", "onStartup", "actOnStartup", "readLayout",
       "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "keepAppearance", "readSpelling", "keepSpelling", "onFieldMenu", "replaceMisspelling", "edit", "setMenuBar", "onMenuCommand",
       "onNotificationOpened", "onQuitQuestion", "answerQuit", "logModule", "logError"
     ].join(","), Object.keys(api).join(","));
@@ -63,6 +63,7 @@ export class PreloadTests {
 
     const replies = await Promise.all([
       PreloadTests.invoke(api["answerClose"], "request", true),
+      PreloadTests.invoke(api["answerUpdateSave"], "request", ["Notes couldn't save"]),
       PreloadTests.invoke(api["readStartup"]),
       PreloadTests.invoke(api["actOnStartup"], "retry"),
       PreloadTests.invoke(api["readLayout"]),
@@ -81,6 +82,7 @@ export class PreloadTests {
 
     Assert.areEqual(JSON.stringify([
       ["teamrun:closeAnswer", "request", true],
+      ["teamrun:updateSaveAnswer", "request", ["Notes couldn't save"]],
       ["teamrun:readStartup"],
       ["teamrun:startupAction", "retry"],
       ["teamrun:readLayout"],
@@ -101,6 +103,7 @@ export class PreloadTests {
 
   @TestMethod
   @TestData("onCloseRequest", "teamrun:closeRequest", 1)
+  @TestData("onUpdateSaveRequest", "teamrun:updateSaveRequest", 1)
   @TestData("onStartup", "teamrun:startupState", 1)
   @TestData("onEvent", "teamrun:runtimeEvent", 2)
   @TestData("onMenuCommand", "teamrun:menuCommand", 1)

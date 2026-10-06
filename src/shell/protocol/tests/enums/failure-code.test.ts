@@ -14,7 +14,7 @@ export class FailureCodeTests {
   @TestMethod
   public namesEveryCodeByItsMember(): void {
     Assert.areEqual(
-      "InvalidMessage,FrameTooLarge,UnsupportedVersion,BuildMismatch,PreShellData,Unauthorized,UnknownMethod,InvalidParams,NotFound,Conflict,Cancelled,DeadlineExceeded,Unavailable,Disconnected,Internal",
+      "InvalidMessage,FrameTooLarge,UnsupportedVersion,BuildMismatch,PreShellData,Unauthorized,UnknownMethod,InvalidParams,NotFound,Conflict,Cancelled,DeadlineExceeded,Unavailable,Disconnected,Updating,Internal",
       Object.values(FailureCode).join(","));
   }
 }
