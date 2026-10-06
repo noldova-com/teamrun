@@ -31,6 +31,7 @@
             ],
             "providersFile": "shell/ui/tests/test-providers.ts",
             "setupFiles": [
+              "shell/ui/tests/browser-matchers.setup.ts",
               "shell/ui/tests/kit-stylesheet.setup.ts"
             ],
             "watch": false,
