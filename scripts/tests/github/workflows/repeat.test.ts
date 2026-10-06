@@ -53,40 +53,60 @@ class RepeatWorkflowTests {
       const text = (await WorkflowFileFixture.readAsync(RepeatWorkflowTests.WORKFLOW)).text;
 
       assert.ok(text.includes("  repeat:\n    name: Repeat (${{ matrix.name }})\n    needs: plan\n    if: ${{ needs.plan.outputs.legs != '[]' }}\n" +
-        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.plan.outputs.legs) }}\n    runs-on: ${{ matrix.runner }}\n"));
-      assert.ok(text.includes("    steps:\n      - name: Stop Spotlight indexing\n        if: runner.os == 'macOS'\n        run: sudo mdutil -i off /System/Volumes/Data\n\n" +
+        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.plan.outputs.legs) }}\n    runs-on: ${{ matrix.runner }}\n" +
+        "    timeout-minutes: 60\n    env:\n      TIME_LIMIT_MINUTES: 60\n      STOP_MARGIN_SECONDS: 480\n"));
+      assert.ok(text.includes("    steps:\n      - name: Note when the job started\n        run: echo \"JOB_STARTED=$(date +%s)\" >> \"$GITHUB_ENV\"\n\n" +
+        "      - name: Stop Spotlight indexing\n        if: runner.os == 'macOS'\n        run: sudo mdutil -i off /System/Volumes/Data\n\n" +
         "      - name: Check out the revision\n"));
       assert.ok(text.includes("      - name: Prepare the job\n        uses: ./.github/actions/prepare\n        with:\n          architecture: ${{ matrix.architecture }}\n"));
-      assert.ok(text.includes("      - name: Build\n        if: needs.plan.outputs.test-arguments != ''\n        run: npm run build\n"));
+      assert.ok(text.includes("      - name: Build\n        if: needs.plan.outputs.test-arguments != '' && matrix.hasTests\n        run: npm run build\n"));
+      assert.ok(text.includes("      - name: Repeat the tests\n        if: needs.plan.outputs.test-arguments != '' && matrix.hasTests\n"));
       assert.ok(text.includes("      - name: Let Electron's sandbox start on Linux\n        if: runner.os == 'Linux' && needs.plan.outputs.workflow-arguments != ''\n"));
     });
 
-    test("a job runs the selected tests and the selected UI workflows its number of times, without retries and under Xvfb on Linux", { timeout: RepeatWorkflowTests.SCRIPT_TIMEOUT }, async t => {
+    test("a job runs the selected tests and its shard of the selected UI workflows its number of times, without retries, under Xvfb on Linux and stopped before the job's limit",
+      { timeout: RepeatWorkflowTests.SCRIPT_TIMEOUT }, async t => {
+        const workflow = await WorkflowFileFixture.readAsync(RepeatWorkflowTests.WORKFLOW);
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        const specs = "src/shell/desktop/tests/e2e/menus.spec.ts src/shell/desktop/tests/e2e/quit.spec.ts";
+        const timing = { JOB_STARTED: "400", TIME_LIMIT_MINUTES: "60", STOP_MARGIN_SECONDS: "480" };
+        const budget = "node scripts/workflows/repeat-budget.ts 400 60 480";
+        const run = (repeats: number): string => `run test:ui -- ${specs} --repeat-each ${repeats} --retries 0 --global-timeout 2520000`;
+        doubles.respond("node", "scripts/workflows/repeat-budget.ts 400 60 480", "2520000\n");
+        doubles.respond("npm", "test -- --filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts --repeat 1", "");
+        doubles.respond("xvfb-run", `--auto-servernum --server-args=-screen 0 1920x1080x24 npm ${run(5)}`, "");
+        doubles.respond("npm", `${run(5)} --shard 2/2`, "");
+        doubles.respond("npm", run(1), "", 1);
+
+        const tests = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.TESTS_STEP),
+          { TEST_ARGUMENTS: "--filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts", REPEATS: "1" });
+        const linux = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { ...timing, RUNNER_OS: "Linux", WORKFLOW_ARGUMENTS: specs, REPEATS: "5", SHARD: "" });
+        const macos = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { ...timing, RUNNER_OS: "macOS", WORKFLOW_ARGUMENTS: specs, REPEATS: "5", SHARD: "2/2" });
+        const failed = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { ...timing, RUNNER_OS: "Windows", WORKFLOW_ARGUMENTS: specs, REPEATS: "1", SHARD: "" });
+
+        assert.deepEqual([tests.status, linux.status, macos.status, failed.status], [0, 0, 0, 1], tests.stderr + linux.stderr + macos.stderr + failed.stderr);
+        assert.deepEqual(await doubles.readCallsAsync(), [
+          "npm test -- --filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts --repeat 1",
+          budget, `xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm ${run(5)}`,
+          budget, `npm ${run(5)} --shard 2/2`,
+          budget, `npm ${run(1)}`
+        ]);
+        assert.ok(workflow.text.includes("          TEST_ARGUMENTS: ${{ needs.plan.outputs.test-arguments }}\n          REPEATS: ${{ matrix.repeats }}\n"));
+        assert.ok(workflow.text.includes("          WORKFLOW_ARGUMENTS: ${{ needs.plan.outputs.workflow-arguments }}\n          REPEATS: ${{ matrix.repeats }}\n          SHARD: ${{ matrix.shard }}\n"));
+      });
+
+    test("a job notes when it started, and summarizes its UI workflows whenever they ran", { timeout: RepeatWorkflowTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(RepeatWorkflowTests.WORKFLOW);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      const specs = "src/shell/desktop/tests/e2e/menus.spec.ts src/shell/desktop/tests/e2e/quit.spec.ts";
-      const run = `run test:ui -- ${specs} --repeat-each 5 --retries 0`;
-      doubles.respond("npm", "test -- --filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts --repeat 1", "");
-      doubles.respond("xvfb-run", `--auto-servernum --server-args=-screen 0 1920x1080x24 npm ${run}`, "");
-      doubles.respond("npm", run, "");
-      doubles.respond("npm", `run test:ui -- ${specs} --repeat-each 1 --retries 0`, "", 1);
+      const noted = await doubles.runAsync(workflow.readStepScript("Note when the job started"), { GITHUB_ENV: `${doubles.directory}/environment` });
 
-      const tests = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.TESTS_STEP),
-        { TEST_ARGUMENTS: "--filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts", REPEATS: "1" });
-      const linux = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { RUNNER_OS: "Linux", WORKFLOW_ARGUMENTS: specs, REPEATS: "5" });
-      const macos = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { RUNNER_OS: "macOS", WORKFLOW_ARGUMENTS: specs, REPEATS: "5" });
-      const failed = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { RUNNER_OS: "Windows", WORKFLOW_ARGUMENTS: specs, REPEATS: "1" });
-
-      assert.deepEqual([tests.status, linux.status, macos.status, failed.status], [0, 0, 0, 1], tests.stderr + linux.stderr + macos.stderr);
-      assert.deepEqual(await doubles.readCallsAsync(), [
-        "npm test -- --filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts --repeat 1",
-        `xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm ${run}`,
-        `npm ${run}`,
-        `npm run test:ui -- ${specs} --repeat-each 1 --retries 0`
-      ]);
-      assert.ok(workflow.text.includes("          TEST_ARGUMENTS: ${{ needs.plan.outputs.test-arguments }}\n          REPEATS: ${{ matrix.repeats }}\n"));
-      assert.ok(workflow.text.includes("          WORKFLOW_ARGUMENTS: ${{ needs.plan.outputs.workflow-arguments }}\n          REPEATS: ${{ matrix.repeats }}\n"));
+      assert.equal(noted.status, 0, noted.stderr);
+      assert.match(await doubles.readFileAsync("environment"), /^JOB_STARTED=\d+\n$/);
+      assert.equal(workflow.readStepScript("Summarize the UI workflows"), "node scripts/repeat-summary.ts\n");
+      assert.ok(workflow.text.includes("      - name: Summarize the UI workflows\n        if: always() && steps.ui.outcome != 'skipped'\n        env:\n          REPEAT_LEG: ${{ matrix.name }}\n"));
+      assert.ok(workflow.text.includes("      - name: Repeat the UI workflows\n        id: ui\n"));
     });
 
     test("a failed job keeps what its failures left, tried three times with a pause and the same settings, and a passing job keeps nothing", async () => {
@@ -116,8 +136,8 @@ class RepeatWorkflowTests {
         [{ LABELLED: "false", PLAN_RESULT: "skipped", LEGS: "", REPEAT_RESULT: "skipped" }, 0, "Nothing is repeated: only a pull request with the repeat label repeats its tests."],
         [{ ...labelled, REPEAT_RESULT: "success" }, 0, "Every repeat passed on every target."],
         [{ ...labelled, LEGS: "[]", REPEAT_RESULT: "skipped" }, 0, "Nothing is repeated: the change affects no test or UI workflow file."],
-        [{ ...labelled, REPEAT_RESULT: "failure" }, 1, "::error title=A repeat did not pass::The repeat jobs ended with the result failure."],
-        [{ ...labelled, REPEAT_RESULT: "cancelled" }, 1, "::error title=A repeat did not pass::The repeat jobs ended with the result cancelled."],
+        [{ ...labelled, REPEAT_RESULT: "failure" }, 1, "::error title=A repeat did not pass::The repeat jobs ended with the result failure. Each repeat job's summary says whether its UI tests failed or it ran out of time."],
+        [{ ...labelled, REPEAT_RESULT: "cancelled" }, 1, "::error title=A repeat did not pass::The repeat jobs ended with the result cancelled. Each repeat job's summary says whether its UI tests failed or it ran out of time."],
         [{ ...labelled, PLAN_RESULT: "failure", LEGS: "", REPEAT_RESULT: "skipped" }, 1, "::error title=The repeats were not selected::Selecting the repeats ended with the result failure."]
       ] as const;
 

@@ -74,7 +74,7 @@ export default class RepeatPlan {
       return 1;
     }
 
-    const legs = selection.isEmpty ? [] : RepeatMatrix.plan();
+    const legs = selection.isEmpty ? [] : RepeatMatrix.plan(selection.workflowTests);
     await appendFile(outputPath, `legs=${JSON.stringify(legs)}\ntest-arguments=${selection.testArguments.join(" ")}\nworkflow-arguments=${selection.workflows.join(" ")}\n`);
     await appendFile(summaryPath, `${selection.summary}\n`);
     this.output.write(`${selection.summary}\n`);
