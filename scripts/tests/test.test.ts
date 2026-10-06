@@ -225,6 +225,17 @@ class TestTests {
       assert.ok(!single.text.includes("runs passed"));
     });
 
+    test("a run that reruns failed tests starts with an empty flaky test record and lets the test checks retry", async t => {
+      const repository = await TestTests.createFilteredRepositoryAsync(t);
+      await repository.writeAsync({ "_build/flaky-tests.json": "[]\n" });
+      const runner = new AngularReportRunnerFixture(TestTests.specReport(repository), [0, 0]);
+
+      assert.equal(await new Test(repository.directory, runner, new TextOutputFixture(), {}).runAsync(["--filter", "alpha", "--filter", "a.spec", "--rerun-failed"]), 0);
+
+      assert.equal(existsSync(path.join(repository.directory, "_build", "flaky-tests.json")), false);
+      assert.equal(runner.environments.at(-1)?.["TEAMRUN_TEST_RETRY"], "1");
+    });
+
     test("a repeat without filters repeats the complete gate", async t => {
       const repository = await TestTests.createRepositoryAsync(t);
       await repository.writeAsync({ ".gitignore": "_build/\n" });
@@ -272,7 +283,7 @@ class TestTests {
         const output = new TextOutputFixture();
 
         assert.equal(await new Test("unused", new ProcessRunnerFixture(), output, {}).runAsync(selection), 2);
-        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] | [--part <part>] --checks-only [--repeat <count>]]\n`);
+        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] [--rerun-failed] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] [--rerun-failed] | [--part <part>] --checks-only [--repeat <count>]]\n`);
       }
     });
 

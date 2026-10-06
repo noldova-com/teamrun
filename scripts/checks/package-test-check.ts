@@ -22,6 +22,8 @@ import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
 import CheckSelection from "./check-selection.ts";
 import CoverageRun from "./coverage-run.ts";
+import type FlakyRecord from "./flaky-record.ts";
+import FlakyTest from "./flaky-test.ts";
 import type ISelectableCheck from "./interfaces/selectable-check.ts";
 
 export default class PackageTestCheck implements ISelectableCheck {
@@ -33,6 +35,10 @@ export default class PackageTestCheck implements ISelectableCheck {
   private static readonly FILTERS_VARIABLE: string = "TEAMRUN_TEST_FILTERS";
   private static readonly SELECTION_VARIABLE: string = "TEAMRUN_TEST_SELECTION_FILE";
   private static readonly SELECTION_SEGMENTS: readonly string[] = ["_build", "test-selection.json"];
+  private static readonly RESULTS_VARIABLE: string = "TEAMRUN_TEST_RESULTS_FILE";
+  private static readonly RESULTS_SEGMENTS: readonly string[] = ["_build", "package-test-results.json"];
+  private static readonly RUNNER: string = "Package tests";
+  private static readonly RERUNNING: string = "Running the failed package tests once more.\n";
   private static readonly SELECTION_ENCODING: BufferEncoding = "utf8";
   private static readonly UNIT: string = "package tests";
   private static readonly ALL_TESTS: readonly string[] = [];
@@ -44,15 +50,17 @@ export default class PackageTestCheck implements ISelectableCheck {
   private readonly build: PackageBuild;
   private readonly runner: ProcessRunner;
   private readonly environment: NodeJS.ProcessEnv;
+  private readonly flaky: FlakyRecord | null;
   private readonly selected?: readonly string[];
 
   public readonly title: string = "Package tests and coverage";
 
-  public constructor(root: string, build: PackageBuild, runner: ProcessRunner, environment: NodeJS.ProcessEnv, selected?: readonly string[]) {
+  public constructor(root: string, build: PackageBuild, runner: ProcessRunner, environment: NodeJS.ProcessEnv, flaky: FlakyRecord | null, selected?: readonly string[]) {
     this.root = root;
     this.build = build;
     this.runner = runner;
     this.environment = environment;
+    this.flaky = flaky;
     if (selected !== undefined)
       this.selected = selected;
   }
@@ -96,9 +104,12 @@ export default class PackageTestCheck implements ISelectableCheck {
         await mkdir(coverage, { recursive: true });
         environment = CoverageRun.recordingIn(environment, coverage);
       }
-      const testsPassed = await this.runner.runAsync(process.execPath, [PackageTestCheck.SOURCE_MAPS_OPTION, new CoverageRun(this.root, this.runner).locateService(...PackageTestCheck.TEST_ENTRY_SEGMENTS), ...tests], this.root, environment) === 0;
+      const commandArguments = [PackageTestCheck.SOURCE_MAPS_OPTION, new CoverageRun(this.root, this.runner).locateService(...PackageTestCheck.TEST_ENTRY_SEGMENTS), ...tests];
       if (isFiltered)
-        return await this.readSelectionAsync(selectionFile, testsPassed, output);
+        return await this.readSelectionAsync(selectionFile, await this.runner.runAsync(process.execPath, commandArguments, this.root, environment) === 0, output);
+      const testsPassed = this.flaky === null
+        ? await this.runner.runAsync(process.execPath, commandArguments, this.root, environment) === 0
+        : await this.runRerunningFailedAsync(commandArguments, environment, this.flaky, output);
       const projects = packages.flatMap(t => CoverageRun.formatProjectArguments(t.name, layout.locateInstalled(t), layout.locateSource(t, PackageTestCheck.SOURCE_FOLDER), t.coverageExclusions, CoverageRun.NO_TEST_FOLDERS));
       const coverageComplete = await new CoverageRun(this.root, this.runner).measureAsync(coverage, projects, this.environment);
       return new CheckSelection(testsPassed && coverageComplete, PackageTestCheck.UNIT, 0, 0);
@@ -121,6 +132,43 @@ export default class PackageTestCheck implements ISelectableCheck {
     const selected = packages.filter(t => names.includes(t.name));
     output.write(`Testing ${selected.length} of ${packages.length} packages, with their coverage: ${selected.map(t => t.name).join(", ")}.\n`);
     return selected;
+  }
+
+  private async runRerunningFailedAsync(commandArguments: readonly string[], environment: NodeJS.ProcessEnv, flaky: FlakyRecord, output: Writable): Promise<boolean> {
+    const results = path.join(this.root, ...PackageTestCheck.RESULTS_SEGMENTS);
+    const recording = { ...environment, [PackageTestCheck.RESULTS_VARIABLE]: results };
+    await rm(results, { force: true });
+    if (await this.runner.runAsync(process.execPath, commandArguments, this.root, recording) === 0)
+      return true;
+    const first = await this.readResultsAsync(results);
+    if (first === null || !first.isComplete || first.failed.length === 0)
+      return false;
+    output.write(PackageTestCheck.RERUNNING);
+    await rm(results, { force: true });
+    const selection = path.join(this.root, ...PackageTestCheck.SELECTION_SEGMENTS);
+    const rerun = { ...recording, [PackageTestCheck.FILTERS_VARIABLE]: JSON.stringify(first.failed.map(t => t.identity)), [PackageTestCheck.SELECTION_VARIABLE]: selection };
+    const isPassing = await this.runner.runAsync(process.execPath, commandArguments, this.root, rerun) === 0;
+    const second = await this.readResultsAsync(results);
+    if (second === null || !second.isComplete)
+      return false;
+    const failedAgain = new Set(second.failed.map(t => t.identity));
+    await flaky.addAsync(first.failed.filter(t => !failedAgain.has(t.identity)).map(t => new FlakyTest(PackageTestCheck.RUNNER, t.file, t.identity, t.failure)), output);
+    return isPassing && failedAgain.size === 0;
+  }
+
+  private async readResultsAsync(file: string): Promise<{ isComplete: boolean; failed: readonly { identity: string; file: string; failure: string }[] } | null> {
+    let results: unknown;
+    try {
+      results = JSON.parse(await readFile(file, PackageTestCheck.SELECTION_ENCODING));
+    }
+    catch {
+      return null;
+    }
+    const fields = typeof results === "object" && results !== null ? results as Record<string, unknown> : {};
+    const failed = fields["failed"];
+    if (typeof fields["isComplete"] !== "boolean" || !Array.isArray(failed) || failed.some(t => typeof t !== "object" || t === null || ["identity", "file", "failure"].some(u => typeof (t as Record<string, unknown>)[u] !== "string")))
+      return null;
+    return { isComplete: fields["isComplete"], failed: failed as { identity: string; file: string; failure: string }[] };
   }
 
   private async readSelectionAsync(file: string, testsPassed: boolean, output: Writable): Promise<CheckSelection> {
