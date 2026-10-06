@@ -145,6 +145,28 @@ export class Resources {
   public static readonly appearanceLimit: number = 4096;
   public static readonly appearanceTooLarge: string = "The appearance preferences are larger than 4096 characters.";
   public static readonly keepAppearanceChannel: string = "teamrun:keepAppearance";
+  public static readonly readSpellingChannel: string = "teamrun:readSpelling";
+  public static readonly spellingChannel: string = "teamrun:spelling";
+  public static readonly fieldMenuChannel: string = "teamrun:fieldMenu";
+  public static readonly replaceMisspellingChannel: string = "teamrun:replaceMisspelling";
+  public static readonly dictionaryFolderSegments: readonly string[] = ["assets", "dictionaries"];
+  public static readonly dictionariesFile: string = "dictionaries.json";
+  public static readonly dictionariesFolder: string = "Dictionaries";
+  public static readonly dictionariesField: string = "dictionaries";
+  public static readonly languageField: string = "language";
+  public static readonly fileField: string = "file";
+  public static readonly languagesField: string = "languages";
+  public static readonly fallbackField: string = "fallback";
+  public static readonly isKeyboardField: string = "isKeyboard";
+  public static readonly wordField: string = "word";
+  public static readonly suggestionsField: string = "suggestions";
+  public static readonly keyboardMenuSource: string = "keyboard";
+  public static readonly spellingTextLimit: number = 100;
+  public static readonly languageTagPattern: RegExp = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
+  public static readonly dictionaryFilePattern: RegExp = /^[A-Za-z0-9-]+\.bdic$/;
+  public static readonly urlSeparator: string = "/";
+  public static readonly listSeparator: string = ", ";
+  public static readonly spellingInvalid: string = "The spelling preferences must be whether to check and a list of language tags.";
   public static readonly uuidPattern: RegExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   public static readonly hashPrefix: string = "#";
   public static readonly queryPrefix: string = "?";
@@ -174,6 +196,8 @@ export class Resources {
   public static readonly closedEvent: "closed" = "closed";
   public static readonly clickEvent: "click" = "click";
   public static readonly failedEvent: "failed" = "failed";
+  public static readonly dataEvent: "data" = "data";
+  public static readonly errorEvent: "error" = "error";
   public static readonly secondInstanceEvent: "second-instance" = "second-instance";
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
@@ -193,6 +217,7 @@ export class Resources {
   public static readonly rendererEndLimit: number = 5_000;
   public static readonly renderProcessGoneEvent: "render-process-gone" = "render-process-gone";
   public static readonly didStartLoadingEvent: "did-start-loading" = "did-start-loading";
+  public static readonly contextMenuEvent: "context-menu" = "context-menu";
   public static readonly unresponsiveEvent: "unresponsive" = "unresponsive";
   public static readonly responsiveEvent: "responsive" = "responsive";
   public static readonly cleanExitReason: string = "clean-exit";
@@ -286,6 +311,18 @@ export class Resources {
   public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
   public static readonly workQueryTimeout: number = 2000;
+  public static readonly programTimeout: number = 5000;
+  public static readonly programOutputLimit: number = 65536;
+  public static readonly gdbusPath: string = "/usr/bin/gdbus";
+  public static readonly trayHostQueryArguments: readonly string[] = [
+    "call", "--session", "--dest", "org.kde.StatusNotifierWatcher", "--object-path", "/StatusNotifierWatcher",
+    "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierWatcher", "IsStatusNotifierHostRegistered"
+  ];
+  public static readonly trayHostMonitorArguments: readonly string[] = ["monitor", "--session", "--dest", "org.kde.StatusNotifierWatcher"];
+  public static readonly trayHostRegisteredAnswer: string = "(<true>,)";
+  public static readonly trayMonitorFirstDelay: number = 1000;
+  public static readonly trayMonitorLongestDelay: number = 60_000;
+  public static readonly trayMonitorDelayGrowth: number = 2;
   public static readonly windowLogLimit: number = 65536;
   public static readonly windowErrorBurst: number = 10;
   public static readonly windowErrorPeriod: number = 60000;
@@ -436,6 +473,10 @@ export class Resources {
     return `The ${Resources.commandName} command could not be linked at ${link}: ${reason}`;
   }
 
+  public static formatProgramFailed(file: string, reason: string): string {
+    return `${file} failed: ${reason}`;
+  }
+
   public static formatSystemNotificationFailed(reason: string): string {
     return `The operating system did not show a notification: ${reason}`;
   }
@@ -454,6 +495,26 @@ export class Resources {
 
   public static formatRuntimeNotStarted(reason: string): string {
     return `The runtime could not be started or reached, so the window offers to try again: ${reason}`;
+  }
+
+  public static formatDictionariesUnread(reason: string): string {
+    return `The list of shipped dictionaries could not be read, so no spelling language is offered: ${reason}`;
+  }
+
+  public static formatDictionaryUncopied(reason: string): string {
+    return `A shipped dictionary could not be put in the profile, so its language is not offered: ${reason}`;
+  }
+
+  public static formatDictionaryFieldInvalid(value: string): string {
+    return `"${value}" is not a language tag or a dictionary file name.`;
+  }
+
+  public static formatSpellingLanguagesRefused(languages: string, reason: string): string {
+    return `The spell checker refused the languages ${languages}: ${reason}`;
+  }
+
+  public static formatSpellingRejected(reason: string): string {
+    return `The window's spelling preferences were rejected: ${reason}`;
   }
 
   public static formatAppearanceUnread(reason: string): string {

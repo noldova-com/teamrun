@@ -23,6 +23,7 @@ import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { ModuleStatusService } from "../../services/module-status.service";
 import { SettingsService } from "../../services/settings.service";
+import { SpellingService } from "../../services/spelling.service";
 import { SettingRowComponent } from "../setting-row/setting-row.component";
 import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
 
@@ -55,6 +56,7 @@ export class SettingsComponent {
   private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
 
   protected readonly gallery: Type<unknown> | null = inject(GalleryTokens.component);
+  protected readonly spelling: SpellingService = inject(SpellingService);
 
   protected readonly modules: Signal<readonly SelectOption[]> = computed(() => this.statuses.modules().map(t => new SelectOption(t.id, t.displayName)));
   protected readonly notifyingModules: Signal<readonly SelectOption[]> = computed(() =>

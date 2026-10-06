@@ -57,6 +57,7 @@ describe("SettingsComponent", () => {
   let settings: FakeSettingsService;
   let errors: unknown[];
   let gallery: Type<unknown> | null;
+  let bridge: DesktopBridgeFixture;
 
   function render(mode: ThemeMode = ThemeMode.Light, height: string = String.empty): HTMLElement {
     AppearanceFixture.apply(DefaultTheme.theme, mode);
@@ -92,7 +93,7 @@ describe("SettingsComponent", () => {
   }
 
   beforeEach(() => {
-    DesktopBridgeFixture.install("linux");
+    bridge = DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
     errors = [];
     gallery = null;
@@ -468,6 +469,18 @@ describe("SettingsComponent", () => {
     expect(empty).toEqual(["No settings match your search."]);
     expect(current).toEqual([]);
     expect([(element().querySelector(".tr-settings-search-field") as HTMLInputElement).value, texts(".tr-settings-result-title")]).toEqual(["", []]);
+  });
+
+  it("offers the desktop's spelling languages on the Spelling languages row and says which one checks words when none of the device's languages is offered", async () => {
+    bridge.spelling = Promise.resolve({ languages: ["en-US"], fallback: "en-US" });
+    settings.definitions.set([...SettingsFixture.all, SettingsFixture.spellCheckLanguages]);
+    render();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const row = element().querySelector("[data-setting='shell.spellCheckLanguages']") as HTMLElement;
+
+    expect([...row.querySelectorAll(".tr-checkbox-text")].map(t => t.textContent?.trim())).toEqual(["English (United States)"]);
+    expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("None of this device's languages has a dictionary here, so words are checked in English (United States).");
   });
 
   it("runs an action's command from its row, stores nothing, and finds the row by its label", async () => {

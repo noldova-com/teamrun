@@ -226,6 +226,13 @@ export class Resources {
   public static readonly appearancePage: string = "Appearance";
   public static readonly themeSetting: string = "shell.theme";
   public static readonly modeSetting: string = "shell.mode";
+  public static readonly spellCheckSetting: string = "shell.spellCheck";
+  public static readonly spellCheckLanguagesSetting: string = "shell.spellCheckLanguages";
+  public static readonly languagesField: string = "languages";
+  public static readonly fallbackField: string = "fallback";
+  public static readonly xField: string = "x";
+  public static readonly yField: string = "y";
+  public static readonly isKeyboardField: string = "isKeyboard";
   public static readonly interfaceFontSetting: string = "shell.interfaceFont";
   public static readonly codeFontSetting: string = "shell.codeFont";
   public static readonly panelSizeSetting: string = "shell.panelSize";
@@ -252,7 +259,14 @@ export class Resources {
   public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
   public static readonly noLanguagesNote: string = "No spelling languages are offered on this device.";
+  public static readonly macSpellingNote: string = "On macOS the system chooses the spelling languages.";
+
+  public static formatSpellingFallback(language: string): string {
+    return `None of this device's languages has a dictionary here, so words are checked in ${language}.`;
+  }
+
   public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
+  public static readonly settingDescriptionIdPrefix: string = "tr-setting-description-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";
@@ -507,6 +521,7 @@ export class Resources {
   public static readonly windowRowMinimumDragRem: number = 6;
   public static readonly altKey: string = "Alt";
   public static readonly functionKey: string = "F10";
+  public static readonly contextMenuKey: string = "ContextMenu";
   public static readonly ariaExpandedAttribute: string = "aria-expanded";
   public static readonly trueValue: string = "true";
   public static readonly fileMenu: string = "shell.file";
@@ -525,6 +540,16 @@ export class Resources {
   public static readonly fieldMenuTitle: string = "Text field";
   public static readonly fieldEditingGroup: string = "shell.fieldEditing";
   public static readonly fieldEditActions: readonly EditAction[] = [EditAction.Cut, EditAction.Copy, EditAction.Paste, EditAction.SelectAll];
+  public static readonly fieldSpellingGroup: string = "shell.fieldSpelling";
+  public static readonly replaceMisspellingCommand: string = "shell.replaceMisspelling";
+  public static readonly replaceMisspellingTitle: string = "Replace the misspelled word";
+  public static readonly noSuggestionsLabel: string = "No suggestions";
+  public static readonly textArgument: string = "text";
+  public static readonly wordArgument: string = "word";
+  public static readonly suggestionsArgument: string = "suggestions";
+  public static readonly suggestionLimit: number = 5;
+  public static readonly fieldMenuWait: number = 300;
+  public static readonly fieldMenuSlack: number = 1;
   public static readonly closeGroup: string = "shell.close";
   public static readonly tabMoveToMenu: string = "shell.tabMoveTo";
   public static readonly tabSplitMenu: string = "shell.tabSplit";
