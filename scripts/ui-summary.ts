@@ -11,6 +11,7 @@ import { appendFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import FlakyRecord from "./checks/flaky-record.ts";
 import UiReport from "./workflows/ui-report.ts";
 import UiReportException from "./workflows/ui-report.exception.ts";
 
@@ -44,9 +45,11 @@ export default class UiSummary {
     if (!existsSync(reportPath))
       return await this.failAsync(summaryPath, target, UiSummary.NO_REPORT);
     try {
-      const summary = UiReport.parse(await readFile(reportPath, "utf8")).formatSummary(target, environment[UiSummary.SCREENSHOT_VARIABLE], environment[UiSummary.UPLOAD_FAILED_VARIABLE] === UiSummary.TRUE);
+      const report = UiReport.parse(await readFile(reportPath, "utf8"));
+      const summary = report.formatSummary(target, environment[UiSummary.SCREENSHOT_VARIABLE], environment[UiSummary.UPLOAD_FAILED_VARIABLE] === UiSummary.TRUE);
       await appendFile(summaryPath, summary);
       this.output.write(summary);
+      await new FlakyRecord(this.root, environment).addAsync(report.flakyTests, this.output);
       return 0;
     }
     catch (error) {

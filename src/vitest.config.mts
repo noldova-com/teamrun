@@ -23,6 +23,7 @@ export default defineConfig({
   test: {
     coverage: {
       reportsDirectory: fileURLToPath(new URL("../_build/angular-coverage", import.meta.url))
-    }
+    },
+    retry: process.env["TEAMRUN_TEST_RETRY"] === "1" ? 1 : 0
   }
 });

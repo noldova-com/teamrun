@@ -8,16 +8,19 @@
 
 import type ICoverageCount from "../totals/interfaces/coverage-count.ts";
 import type RunnerResult from "../totals/runner-result.ts";
+import type RetriedTest from "./retried-test.ts";
 
 export default class AngularTestRun {
   public readonly exitCode: number | null;
   public readonly result: RunnerResult | null;
   public readonly coverage: ICoverageCount | null;
+  public readonly retried: readonly RetriedTest[];
 
-  public constructor(exitCode: number | null, result: RunnerResult | null, coverage: ICoverageCount | null) {
+  public constructor(exitCode: number | null, result: RunnerResult | null, coverage: ICoverageCount | null, retried: readonly RetriedTest[]) {
     this.exitCode = exitCode;
     this.result = result;
     this.coverage = coverage;
+    this.retried = retried;
   }
 
   public get isSuccessful(): boolean {

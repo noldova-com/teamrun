@@ -16,6 +16,7 @@ export class Resources {
   public static readonly filtersVariable: string = "TEAMRUN_TEST_FILTERS";
   public static readonly resultFileVariable: string = "TEAMRUN_TEST_RESULT_FILE";
   public static readonly coverageResultFileVariable: string = "TEAMRUN_COVERAGE_RESULT_FILE";
+  public static readonly resultsFileVariable: string = "TEAMRUN_TEST_RESULTS_FILE";
   public static readonly skipTestDetailsVariable: string = "TEAMRUN_SKIP_TEST_DETAILS";
   public static readonly timeoutVariable: string = "TEAMRUN_TEST_TIMEOUT_MILLISECONDS";
   public static readonly temporaryRootVariable: string = "TEAMRUN_TEMPORARY_ROOT";

@@ -61,6 +61,9 @@ export class TestRunEntry {
       }
       if (!ownsEmptySelection)
         writeFileSync(resultFile, JSON.stringify(this.describe(result)));
+      const resultsFile = process.env[Resources.resultsFileVariable];
+      if (!Object.isUndefined(resultsFile))
+        writeFileSync(resultsFile, JSON.stringify(this.describeResults(result)));
       interrupted = result.isInterrupted;
       process.exitCode = Math.min(result.failed + result.unreached + Number(ownsEmptySelection && result.total === 0), 1);
     }
@@ -104,6 +107,13 @@ export class TestRunEntry {
         .filter(u => u.outcome === TestOutcome.Skipped)
         .map(u => ({ file: `${t.packageName}/${t.filePath}`, names: [u.displayName], reason: String(u.skipReason) }))),
       files: [...new Set(result.classResults.map(t => `${t.packageName}/${t.filePath}`))]
+    };
+  }
+
+  private describeResults(result: TestRunResult): { isComplete: boolean; failed: { identity: string; file: string; failure: string }[] } {
+    return {
+      isComplete: !result.isInterrupted && result.unreached === 0,
+      failed: result.classResults.flatMap(t => t.methodResults.filter(u => u.outcome === TestOutcome.Failed).map(u => ({ identity: u.displayName, file: `${t.packageName}/${t.filePath}`, failure: String(u.failure) })))
     };
   }
 

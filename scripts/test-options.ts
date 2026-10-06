@@ -15,6 +15,7 @@ export default class TestOptions {
   private static readonly FILTER: string = "--filter";
   private static readonly REPEAT: string = "--repeat";
   private static readonly PART: string = "--part";
+  private static readonly RERUN_FAILED: string = "--rerun-failed";
   private static readonly OPTION_PREFIX: string = "--";
   private static readonly COUNT: RegExp = /^[1-9]\d*$/;
   private static readonly DOCUMENTS_ALONE: string = "documents takes no other option.";
@@ -25,6 +26,7 @@ export default class TestOptions {
   private static readonly PART_VALUE: string = `--part takes one of ${TestPart.ALL.join(", ")}.`;
   private static readonly PART_ONCE: string = "--part may be given only once.";
   private static readonly PART_OR_FILTER: string = "--part runs a whole part, so it takes no --filter.";
+  private static readonly RERUN_FAILED_ONCE: string = "--rerun-failed may be given only once.";
   private static readonly FILTER_OR_SELECTION: string = "--filter selects tests by name and takes no --package, --angular-tests, --script-tests or --checks-only.";
   private static readonly CHECKS_ONLY_ALONE: string = "--checks-only runs no tests, so it takes no --package, --angular-tests or --script-tests.";
 
@@ -32,13 +34,15 @@ export default class TestOptions {
   public readonly filters: readonly string[];
   public readonly repeat: number;
   public readonly part: string | null;
+  public readonly isRerunningFailed: boolean;
   public readonly selection?: SelectedTests;
 
-  private constructor(isDocuments: boolean, filters: readonly string[], repeat: number, part: string | null, selection?: SelectedTests) {
+  private constructor(isDocuments: boolean, filters: readonly string[], repeat: number, part: string | null, isRerunningFailed: boolean, selection?: SelectedTests) {
     this.isDocuments = isDocuments;
     this.filters = filters;
     this.repeat = repeat;
     this.part = part;
+    this.isRerunningFailed = isRerunningFailed;
     if (selection !== undefined)
       this.selection = selection;
   }
@@ -47,7 +51,7 @@ export default class TestOptions {
     if (args[0] === TestOptions.DOCUMENTS) {
       if (args.length !== 1)
         throw new TestOptionsException(TestOptions.DOCUMENTS_ALONE);
-      return new TestOptions(true, [], 1, null);
+      return new TestOptions(true, [], 1, null, false);
     }
 
     const filters: string[] = [];
@@ -57,6 +61,7 @@ export default class TestOptions {
     let runsAngularTests = false;
     let runsScriptTests = false;
     let isChecksOnly = false;
+    let isRerunningFailed = false;
     for (let index = 0; index < args.length; index++) {
       const option = args[index];
       if (option === SelectedTests.ANGULAR_OPTION)
@@ -65,6 +70,11 @@ export default class TestOptions {
         runsScriptTests = true;
       else if (option === SelectedTests.CHECKS_ONLY_OPTION)
         isChecksOnly = true;
+      else if (option === TestOptions.RERUN_FAILED) {
+        if (isRerunningFailed)
+          throw new TestOptionsException(TestOptions.RERUN_FAILED_ONCE);
+        isRerunningFailed = true;
+      }
       else if (option === TestOptions.FILTER)
         filters.push(TestOptions.readText(args[++index], TestOptions.FILTER_VALUE));
       else if (option === SelectedTests.PACKAGE_OPTION)
@@ -97,11 +107,11 @@ export default class TestOptions {
     if (isChecksOnly && isSelected)
       throw new TestOptionsException(TestOptions.CHECKS_ONLY_ALONE);
     if (!isSelected && !isChecksOnly)
-      return new TestOptions(false, filters, repeat ?? 1, part);
+      return new TestOptions(false, filters, repeat ?? 1, part, isRerunningFailed);
     const selection = new SelectedTests(packages, runsAngularTests, runsScriptTests);
     if (part !== null && !TestOptions.selectsPart(part, selection))
       throw new TestOptionsException(`--part ${part} runs none of the selected tests.`);
-    return new TestOptions(false, [], repeat ?? 1, part, selection);
+    return new TestOptions(false, [], repeat ?? 1, part, isRerunningFailed, selection);
   }
 
   private static readText(value: string | undefined, reason: string): string {
