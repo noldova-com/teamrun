@@ -1594,6 +1594,34 @@ export declare class LaunchException extends Exception {
 }
 
 /**
+ * The exception thrown when the runtime cannot load one of its addons, or loads
+ * one that lacks the functions the runtime calls.
+ */
+export declare class AddonLoadException extends Exception {
+  /**
+   * The exception's name, `"AddonLoadException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message Which addon failed to load, and from where.
+   * @param options The error that loading it raised, if any.
+   * @example
+   * ```ts
+   * import { AddonLoadException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(file: string): never {
+   *   throw new AddonLoadException(`The runtime could not load its Windows addon from ${file}.`);
+   * }
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
  * The exception thrown when a module's program is not found or cannot be started.
  */
 export declare class ProcessStartException extends Exception {
@@ -6273,7 +6301,9 @@ export declare class ProcessSupervisor {
    * {@link ProcessClock.create} for the platform this process runs on by
    * default.
    * @param windows Reads the process table and ends processes on Windows.
-   * Defaults to the system's own functions.
+   * Defaults to the system's own functions, called through the runtime's
+   * Windows addon, which loads at its first use and throws an
+   * {@link AddonLoadException} when it cannot.
    * @example
    * ```ts
    * import { ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";

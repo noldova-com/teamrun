@@ -32,6 +32,7 @@ TeamRun targets Windows, macOS and Linux on x64 and ARM64.
 ## Build from source
 
 You need Git, Node.js 26.7.0 or a later 26.x release, and npm 11.19.0.
+On Windows you also need the "Desktop development with C++" workload of Visual Studio or the Visual Studio Build Tools, 2022 or later, because the build compiles the runtime's Windows addon.
 In a clone of the repository, run:
 
 ```bash

@@ -9,6 +9,7 @@
 export { BuildRelation } from "../enums/build-relation.js";
 export { DataDirectoryState } from "../enums/data-directory-state.js";
 export { EndpointKind } from "../enums/endpoint-kind.js";
+export { AddonLoadException } from "../exceptions/addon-load.exception.js";
 export { BackupVerificationException } from "../exceptions/backup-verification.exception.js";
 export { BuildMismatchException } from "../exceptions/build-mismatch.exception.js";
 export { ConnectionException } from "../exceptions/connection.exception.js";

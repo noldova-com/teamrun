@@ -17,6 +17,7 @@ import ModuleCatalog from "../modules/module-catalog.ts";
 import ModuleException from "../modules/module.exception.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
+import NodeGyp from "../toolchain/node-gyp.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import BuildLayout from "./build-layout.ts";
 import BuildProduct from "./build-product.ts";
@@ -28,6 +29,7 @@ import type PackageManifest from "./package-manifest.ts";
 import PackageVersions from "./package-versions.ts";
 import PackageException from "./package.exception.ts";
 import RootManifest from "./root-manifest.ts";
+import WindowsAddonBuilder from "./windows-addon-builder.ts";
 
 export default class PackageBuild {
   private static readonly ROOT_INPUTS: readonly string[] = ["package.json", "package-lock.json", "tsconfig.base.json"];
@@ -63,7 +65,8 @@ export default class PackageBuild {
     const versions = await PackageVersions.readAsync(this.modules, rootManifest.productVersion, packages);
     const archives = packages.map(t => this.layout.locateArchive(t, versions.of(t.name)));
     const common = await this.hashCommonInputsAsync();
-    const builder = new PackageBuilder(this.layout, rootManifest, versions, this.runner, new NpmCommand(this.runner, this.environment));
+    const addons = new WindowsAddonBuilder(this.layout, new NodeGyp(this.runner, this.environment), process.platform);
+    const builder = new PackageBuilder(this.layout, rootManifest, versions, this.runner, new NpmCommand(this.runner, this.environment), addons);
     const archiveHashes = new Map<string, string>();
     for (const manifest of packages) {
       const inputs = await this.hashSourceInputsAsync(manifest, packages, common, archiveHashes, versions);

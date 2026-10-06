@@ -13,10 +13,13 @@
     "@noldova/teamrun-shell-protocol": "__VERSION__"
   },
   "teamrun": {
+    "windowsAddons": [
+      "windows-process"
+    ],
     "coverageExclusions": [
       {
         "file": "services/process/windows-process-api.ts",
-        "reason": "Calls the Windows functions that read the process table and end processes, which exist only on Windows; the process tests run it natively there."
+        "reason": "Loads the Windows addon, which only a Windows build contains; the process tests run it natively there."
       }
     ]
   }

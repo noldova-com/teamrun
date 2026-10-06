@@ -20,13 +20,15 @@ export default class PackageManifest {
   private static readonly FIXTURE_PREFIX: string = `${ModuleCatalog.FIXTURE_FOLDER}/`;
   private static readonly VERSION_PLACEHOLDER: string = "__VERSION__";
   private static readonly NO_EXCLUSIONS: string = "[]";
+  private static readonly ADDON_NAME: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
   public readonly directory: string;
   public readonly name: string;
   public readonly dependencies: readonly string[];
   public readonly coverageExclusions: string;
+  public readonly windowsAddons: readonly string[];
 
-  public constructor(directory: string, name: string, dependencies: readonly string[], coverageExclusions: string = PackageManifest.NO_EXCLUSIONS) {
+  public constructor(directory: string, name: string, dependencies: readonly string[], coverageExclusions: string = PackageManifest.NO_EXCLUSIONS, windowsAddons: readonly string[] = []) {
     const expected = PackageManifest.formatName(directory);
     if (name !== expected)
       throw new PackageException(PackageManifest.isFixtureDirectory(directory)
@@ -37,6 +39,7 @@ export default class PackageManifest {
     this.name = name;
     this.dependencies = [...dependencies].sort();
     this.coverageExclusions = coverageExclusions;
+    this.windowsAddons = windowsAddons;
   }
 
   public static async readAsync(root: string, directory: string): Promise<PackageManifest> {
@@ -67,7 +70,10 @@ export default class PackageManifest {
     const exclusions = "coverageExclusions" in settings ? settings.coverageExclusions : [];
     if (!Array.isArray(exclusions))
       throw new PackageException(`${file} must list its coverage exclusions in an array.`);
-    return new PackageManifest(directory, manifest.name, own.map(([name]) => name), JSON.stringify(exclusions));
+    const addons: unknown = "windowsAddons" in settings ? settings.windowsAddons : [];
+    if (!Array.isArray(addons) || !addons.every(t => typeof t === "string" && PackageManifest.ADDON_NAME.test(t)))
+      throw new PackageException(`${file} must list its Windows addons in an array of kebab-case names.`);
+    return new PackageManifest(directory, manifest.name, own.map(([name]) => name), JSON.stringify(exclusions), addons);
   }
 
   public get id(): string {
