@@ -10,7 +10,9 @@ import { FocusTrapFactory } from "@angular/cdk/a11y";
 import { ChangeDetectionStrategy, Component, type Signal, afterRenderEffect, inject, viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { DialogComponent, DialogSize } from "@noldova/teamrun-shell-ui";
+import { DialogComponent, DialogSize, IconButtonComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
+
+import { Resources } from "../../../resources";
 
 import { TabLabelService } from "../../services/tab-label.service";
 import { ViewDialogService } from "../../services/view-dialog.service";
@@ -18,7 +20,7 @@ import { TabSlotComponent } from "../tab-slot/tab-slot.component";
 
 @Component({
   selector: "tr-view-dialog",
-  imports: [DialogComponent, TabSlotComponent],
+  imports: [DialogComponent, IconButtonComponent, TabSlotComponent, TooltipDirective],
   templateUrl: "./view-dialog.component.html",
   styleUrl: "./view-dialog.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -27,6 +29,7 @@ export class ViewDialogComponent {
   private readonly focusTraps: FocusTrapFactory = inject(FocusTrapFactory);
   private readonly slot: Signal<TabSlotComponent> = viewChild.required(TabSlotComponent);
 
+  protected readonly resources: typeof Resources = Resources;
   protected readonly large: DialogSize = DialogSize.Large;
   protected readonly dialogs: ViewDialogService = inject(ViewDialogService);
   protected readonly labels: TabLabelService = inject(TabLabelService);

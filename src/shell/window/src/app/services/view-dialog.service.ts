@@ -36,7 +36,7 @@ export class ViewDialogService {
   private dialog: DialogRef<unknown, ViewDialogComponent> | null = null;
   private wasOpen: boolean = false;
   private shownAfter: number = 0;
-  private revealedDocument: Tab | null = null;
+  private focusedAfter: Tab | null = null;
 
   public readonly shown: Signal<Tab | null> = this.shownValue.asReadonly();
 
@@ -69,17 +69,19 @@ export class ViewDialogService {
     this.wasOpen = this.layout.layout().isOpen(tab);
     this.shownAfter = this.layout.revealed()?.sequence ?? 0;
     this.shownValue.set(tab);
+    this.layout.hide(tab);
     const dialog = this.dialogs.open(ViewDialogComponent);
     this.dialog = dialog;
     return new Promise(resolve => dialog.closed.subscribe(() => {
       this.dialog = null;
       this.shownValue.set(null);
-      const revealed = this.revealedDocument;
-      this.revealedDocument = null;
-      if (Object.isNull(revealed))
+      this.layout.hide(null);
+      const focused = this.focusedAfter;
+      this.focusedAfter = null;
+      if (Object.isNull(focused))
         this.tabFocus.focusIfLost(tab);
       else
-        this.tabFocus.focus(revealed);
+        this.tabFocus.focus(focused);
       resolve();
     }));
   }
@@ -96,11 +98,20 @@ export class ViewDialogService {
     this.dialog?.close();
   }
 
+  public openInMainWindow(tab: Tab): void {
+    if (this.layout.layout().isOpen(tab))
+      this.layout.activate(tab);
+    else
+      this.layout.openInCurrentGroup(tab);
+    this.focusedAfter = tab;
+    this.close();
+  }
+
   private leaveFor(reveal: TabReveal): void {
     if (Object.isNull(this.dialog) || reveal.sequence <= this.shownAfter || !(reveal.tab instanceof DocumentTab) || reveal.tab.equals(this.shownValue())
       || !this.layout.layout().isOpen(reveal.tab))
       return;
-    this.revealedDocument = reveal.tab;
+    this.focusedAfter = reveal.tab;
     this.close();
   }
 

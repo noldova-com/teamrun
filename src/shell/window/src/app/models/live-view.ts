@@ -19,6 +19,7 @@ export class LiveView {
   private readonly offsets: Map<Element, ScrollOffset> = new Map();
   private focused: HTMLElement | null = null;
   private slotValue: HTMLElement | null = null;
+  private isInPlace: boolean = true;
 
   public readonly tab: Tab;
   public readonly ref: ComponentRef<TabContentComponent>;
@@ -42,6 +43,7 @@ export class LiveView {
     this.focused = active instanceof HTMLElement && this.element.contains(active) ? active : null;
     this.element.remove();
     this.slotValue = null;
+    this.isInPlace = false;
   }
 
   public enter(slot: HTMLElement): void {
@@ -50,6 +52,7 @@ export class LiveView {
   }
 
   public restore(): void {
+    this.isInPlace = true;
     for (const [element, offset] of this.offsets)
       if (this.element.contains(element))
         offset.restore();
@@ -63,7 +66,7 @@ export class LiveView {
   }
 
   private keep(event: Event): void {
-    if (event.target instanceof Element)
+    if (this.isInPlace && this.element.isConnected && event.target instanceof Element)
       this.offsets.set(event.target, ScrollOffset.of(event.target));
   }
 }
