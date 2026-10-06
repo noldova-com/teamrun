@@ -9,6 +9,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class DesktopBridgeException extends Exception {
+  public override readonly name: string = "DesktopBridgeException";
+
   public constructor(message: string) {
     super(message);
   }
