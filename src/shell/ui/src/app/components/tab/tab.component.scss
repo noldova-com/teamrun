@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "selected-surface" as *;
 @use "states";
 
@@ -46,13 +47,23 @@
   background-color: var(--tr-hover);
 }
 
+.tr-tab#{states.$hover} .tr-tab-pill {
+  @include forced-hover;
+}
+
 [data-tr-tab-shape="pill"] .tr-tab.tr-tab-selected .tr-tab-pill {
   @include selected-surface;
+}
+
+.tr-tab.tr-tab-selected .tr-tab-pill {
+  @include forced-selected;
 }
 
 .tr-tab#{states.$focus-visible} .tr-tab-pill {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
+
+  @include forced-focus;
 }
 
 .tr-tab-icon {
@@ -113,6 +124,8 @@
 
 .tr-tab-close#{states.$hover}::before {
   background-color: var(--tr-toolbar-hover);
+
+  @include forced-hover;
 }
 
 .tr-tab.tr-tab-selected .tr-tab-close,

@@ -16,7 +16,7 @@ export class ApplicationMenuTests {
   public async setsTheStandardMenuOnlyOnMacOSLeavingCommandWToTheWindow(): Promise<void> {
     const windows = await DesktopStartFixture.startReadyAsync("win32");
     const mac = await DesktopStartFixture.startReadyAsync("darwin");
-    const [app] = mac.menu.templates.at(-1) ?? [];
+    const [app] = mac.menu.templates.find(t => t === mac.menu.menu) ?? [];
 
     Assert.isNull(windows.menu.menu);
     Assert.areEqual(JSON.stringify([

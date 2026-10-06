@@ -213,7 +213,7 @@ export class GalleryResources {
     cardLong: "A card wraps a name too long for its width, such as shell.notifications.fromModules.notesReminderSchedule, inside it.",
     codeBlock: "Code block",
     codeLanguage: "TypeScript",
-    codeSample: "export function greet(name: string): string {\n  const message = \"Hello, \" + name + \". This line runs past the block's edge, so it scrolls sideways until Word wrap is on.\";\n  return message;\n}",
+    codeSample: "export function greet(name: string): string {\n  const message = \"Hello, \" + name + \". This line runs past the block's edge at any width the Gallery shows, so it scrolls sideways until Word wrap is on, and then it wraps onto the lines below.\";\n  return message;\n}",
     codeWrappedCaption: "Word wrap on",
     codeNoLanguageCaption: "No language",
     codeRefusedCaption: "Copy refused",

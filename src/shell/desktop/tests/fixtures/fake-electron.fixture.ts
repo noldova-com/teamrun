@@ -20,6 +20,7 @@ import { FakeMenuHost } from "./fake-menu-host.fixture.js";
 import { FakeNotificationHost } from "./fake-notification-host.fixture.js";
 import { FakeSession } from "./fake-session.fixture.js";
 import { FakeShellHost } from "./fake-shell-host.fixture.js";
+import { FakeTrayHost } from "./fake-tray-host.fixture.js";
 
 export class FakeElectron implements IElectron {
   public readonly app: FakeApplicationHost;
@@ -32,6 +33,7 @@ export class FakeElectron implements IElectron {
   public readonly shell: FakeShellHost = new FakeShellHost();
   public readonly dialog: FakeDialogHost = new FakeDialogHost();
   public readonly notifications: FakeNotificationHost = new FakeNotificationHost();
+  public readonly tray: FakeTrayHost = new FakeTrayHost();
   public readonly windows: FakeDesktopWindow[] = [];
 
   public constructor(hasLock: boolean = true, isPackaged: boolean = false) {

@@ -220,7 +220,8 @@ The coverage and configuration requirements are:
 
 | Scope | Requirement |
 |---|---|
-| Foundation packages, including Testing itself, plus the shell's `protocol`, `runtime` and `cli` | 100% of executable production code; CLI verification includes arguments, failure paths and process exit |
+| Foundation packages, including Testing itself, plus the shell's `protocol` and `cli` | 100% of executable production code; CLI verification includes arguments, failure paths and process exit |
+| `src/shell/runtime` | 100% of executable production code, except `services/process/windows-process-api.ts`, which loads the Windows addon that reads the process table and ends processes; it runs only on Windows, where the process tests drive it and the addon natively. Package tests drive the Windows process table and ending through a fake of its interface. The package's manifest declares that exclusion with its reason under `teamrun.coverageExclusions`. No coverage is measured for the addon's C source |
 | Repository-owned executable automation, including build, test, packaging and release logic | 100% executable-code coverage, with behavior and process-boundary checks appropriate to the operation |
 | YAML and other non-executable configuration | Applicable schema/configuration validation and workflow checks; no executable-code coverage percentage |
 | A module's `protocol`, `runtime` and `cli` | 100% of executable production code. Where a part drives an external tool, doubles cover parsing, routing and lifecycle; behavior only the real tool can exercise needs separately authorized live verification and explicit accounting of uncovered lines |

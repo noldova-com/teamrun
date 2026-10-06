@@ -425,10 +425,11 @@ The shell owns notifications.
 A module decides when something deserves one; muting, for example for one conversation, is a setting at that object's scope, applied by the module.
 The shell shows a notification without taking focus.
 Opening it brings TeamRun's window forward and runs the notification's command.
-Settings' Notifications page holds two settings.
+Settings' Notifications page holds three settings.
 Do not disturb, `shell.doNotDisturb`, is a device setting: on that device it stops the window's toasts and the operating system's notifications and shows the silenced bell.
 Notifications from modules, `shell.mutedModules`, lists the modules turned off on every device, choosing among the modules that declare notification kinds, whatever their parts, as `shell.modules` reports them: their notifications still enter the list, without a toast, an operating system notification or a place in the unread count.
 Either way each notification stays in the list.
+Showing TeamRun's icon in the tray, `shell.trayIcon`, is a device setting whose title depends on the platform, described in [Tray](#tray).
 
 A module declares its notification kinds in `contributes.notifications`.
 A part posts a notification of one of them through its context and gets a handle that updates or dismisses it.
@@ -558,7 +559,7 @@ The runtime owns the process and ends it; the part does not.
 - **Identity.**
   A process is a record's when its id matches and its start can fall between the request and the return of the call that started it.
   Start times are compared on the clock the process table uses: on Linux, time since boot; on macOS and Windows, the wall clock.
-  They are compared with the table's precision: on Windows the table gives each process's creation time to the millisecond, compared within 50 ms; on macOS and Linux `ps` gives whole seconds, so a start is known only within a second on each side, widened by the time `ps` takes.
+  They are compared with the table's precision: on Windows the table gives each process's creation time to the millisecond, compared within 50 ms, and leaves out a process created more than 50 ms after it read its clock, since a clock of coarser resolution can lag the creation time; on macOS and Linux `ps` gives whole seconds, so a start is known only within a second on each side, widened by the time `ps` takes.
   On Windows, which reuses process ids quickly, a process an earlier runtime left must also run the recorded executable.
   Any other process is left alone.
   The boot is the kernel's boot id on Linux and the system's start time elsewhere.
@@ -566,7 +567,9 @@ The runtime owns the process and ends it; the part does not.
   On macOS and Linux each program leads its own process group, and stopping it sends the group SIGTERM; on Windows stopping closes the program's standard input.
   Whatever still runs after the grace period of 3 seconds is killed.
   On macOS and Linux the whole group is killed at once.
-  On Windows the program and the descendants that started after it, found in the process table, are killed from the top down; each is opened, checked against the start time the table showed and killed through that handle, so a process that took the id since is left alone.
+  On Windows the runtime reads the process table and ends processes through the system's own functions, which its Windows addon calls, and starts no other program.
+  It loads the addon at its first use; when the addon cannot be loaded, the ending fails, the record stays for the next start and the runtime's log names the addon.
+  The program and the descendants that started after it, found in the process table, are killed from the top down; each is opened, checked against the start time the table showed and killed through that handle, so a process that took the id since is left alone.
   The same call then reads the table again, which finds the children that the killed processes started before they ended, and waits on the handles; a further call kills those children the same way.
   A process or group that cannot be signalled does not stop the others: on macOS and Linux its record stays and the error is logged; on Windows it counts as still running.
   The runtime's log names what had to be killed and what still ran 5 seconds later.
@@ -750,6 +753,24 @@ Persisted tabs and layout restore the person's saved workspace without opening u
 The saved layout also keeps the arrangement of the toolbars, as [toolbars](#toolbars) describe, and whether the bottom dock spans the window or stays between the side docks; a new or reset layout, and one saved without it, spans the window.
 It keeps the middle width the person left by dragging a side dock when that is under the middle's preferred width; a new or reset layout, and one saved without it, has none.
 
+### Tray
+
+The desktop shows TeamRun's icon in the Windows notification area, the macOS menu bar or the Linux tray while the device setting `shell.trayIcon` is on.
+The runtime declares the setting with its own platform's title and default: "Show TeamRun in the notification area", on by default, on Windows; "in the menu bar", off by default, on macOS; and "in the tray", on by default, elsewhere.
+Both follow the runtime's platform, not the desktop's, so a desktop attached to a runtime on another system would show that system's title and default.
+The desktop reads the setting for its device once the runtime is ready, follows its changes for that device, and until it has read it uses its platform's default.
+On Linux the icon shows only while a StatusNotifierItem host is registered: the desktop asks the session bus through `/usr/bin/gdbus` whether `org.kde.StatusNotifierWatcher` reports `IsStatusNotifierHostRegistered`, and keeps `gdbus monitor` on that name to ask again when its owner changes or a host registers or leaves.
+A missing `gdbus`, no watcher or a failed answer means no host; when the monitor ends, the desktop asks once and starts it again after a wait that begins at a second and doubles up to a minute.
+Windows and macOS always have a place for the icon.
+When the operating system cannot show the icon, the desktop logs it once and shows none.
+
+The icon has four images: idle, work running, unread notifications, and both.
+Running work is the runtime's newest `shell.work` report; unread notifications are counted as the bell counts them, leaving out those read and those of modules turned off.
+The desktop reads both once the runtime is ready, follows their events, and shows the idle image while the runtime is not ready.
+Its tooltip names the counts that are not zero.
+Its menu lists Open TeamRun; the titles of up to five pieces of running work and "and N more", or No work running; the three newest unread notifications, each opening TeamRun and running the notification's command as an operating system notification does; Do not disturb for this device, as a checkbox; and Quit TeamRun.
+On Windows and Linux a click on the icon brings a window forward, opening one when none is open, and the host shows the menu; on macOS a click opens the menu.
+
 ## 9. Active work, closing and shutdown
 
 A runtime part reports the work it has in progress, such as a running reply or command, through its context, and ends it when the work is done; stopping the work aborts it, and the part's work ends when the part deactivates.
@@ -778,7 +799,7 @@ The window's own layout is the exception: a failed save of the layout is logged 
 - Exact external dependency versions and lockfiles describe the install inputs.
 - The root manifest declares the product version and, separately, the protocol version.
   The build stamps each module part package's manifest with its module's version and every other package's manifest with the product version ([Modules and versions](#modules-and-versions)).
-- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable and icons folder.
+- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder and release repository.
   Windows' app user model ID, the macOS bundle ID and the Linux desktop name (`<id>.desktop`) derive from the application IDs.
   A packaged build uses the application ID.
   A development build uses `<development application ID>.<checkout hash>`, where the hash is the first eight hexadecimal digits of the SHA-256 of the checkout's absolute path.
@@ -796,6 +817,13 @@ The window's own layout is the exception: a failed save of the layout is logged 
   [Packaging](#packaging) describes the packaged layout.
 - Compile, package and install through one reproducible path.
   Tests and the window consume fresh installed artifacts, detecting stale inputs.
+  The platform and the processor are inputs too, because a package's archive can differ by both.
+- On Windows, `npm run build` compiles each Windows addon a package's manifest lists, with the node-gyp that npm bundles, for the machine's own processor, and puts it in the package's archive as `native/<name>.node`; other platforms build none.
+  node-gyp downloads the headers of the Node.js that runs the build once into `_build/node-gyp` and checks them against Node.js's published checksums.
+  The build turns off the link-time optimization that Node.js's own release build records, which node-gyp would otherwise pass on to Visual Studio's compiler and linker, and which they reject.
+  An addon uses only Node-API, whose interface stays the same across Node.js and Electron versions, and node-gyp's delay-load hook binds it to the program that loads it, so the same file runs under Node.js in the tests and under TeamRun's program.
+  The build needs Visual Studio's "Desktop development with C++" workload, with its C++ ARM64 build tools on an ARM64 machine, and stops with a message naming them when node-gyp finds no Visual Studio with them.
+  The [coding standards](CODING-STANDARDS.md#package-organization) own an addon's source.
   The coding standards own public declarations and documentation.
 - The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires.
   The build installs it from its lockfile, separately from the packages, and the Angular CLI builds and tests the Angular parts.
@@ -829,6 +857,7 @@ Module directories, compatibility ranges and separate module updates remain [def
 
 - The target matrix is Windows, Linux and macOS, each on x64 and ARM64.
   Declare support for a target only after its build and native acceptance are verified.
+  The root manifest's `teamrun.supportedTargets` declares them by id, such as `windows-x64`, and lists no target before its native acceptance.
 - Formats: Windows NSIS, macOS DMG plus the ZIP its updater downloads, and Linux AppImage.
 - Release downloads are named `TeamRun-<platform>-<arch>.<ext>` and each target's update information `latest-<platform>-<arch>.yml`.
   No file name contains the version, so an AppImage update replaces the installed file in place and keeps its location and launchers.
@@ -848,7 +877,9 @@ Each target is packaged on its own platform and processor.
     The packaging checks the window again for the Gallery.
   - The identity's icons, `LICENSE` and `assets/dictionaries`.
 
-  The stage becomes `resources/app.asar`, and nothing is unpacked: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
+  The stage becomes `resources/app.asar`: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
+  Only the Windows addons are unpacked, into `resources/app.asar.unpacked`, because Windows loads a library only from a file of its own; code loads an addon by its path inside `app.asar`, and Electron reads it from the unpacked copy.
+  The program's check of `app.asar` does not cover that copy, which lies in the same per-user install folder as `TeamRun.exe` and can be changed by the same user.
 - **Program.**
   The program is a copy of the installed Electron's distribution without its default app and `version` file, which electron-builder also leaves out of an Electron it downloads.
   It is named and labelled from the product identity: Windows' `TeamRun.exe` with its icon and version information, the macOS bundle with the application ID, and the Linux executable named after the slug, with its desktop file named `<application ID>.desktop`.
@@ -868,6 +899,9 @@ Each target is packaged on its own platform and processor.
   On macOS the system's spell checker chooses the languages, and the desktop copies and offers none.
 - **Installation.**
   The Windows installer installs for the current user without elevation and keeps the data directory when TeamRun is uninstalled.
+  Uninstalling tries for up to 30 seconds to remove the program's files, since another program, such as a virus scanner reading a freshly updated file, can hold one for a moment.
+  A file still held after that stays, and the uninstall says so: an interactive uninstall shows which files are left in which folder, and a silent one, run with `/S`, shows no message.
+  Without elevation the uninstaller cannot have Windows remove a file at the next restart.
 - **Command on the PATH (Windows).**
   The install folder holds `bin\teamrun.cmd`, named after the slug.
   It runs the installed program in Node mode with the command line's entry, waits for it and returns its exit code, so `teamrun` works from cmd and PowerShell.
@@ -877,7 +911,7 @@ Each target is packaged on its own platform and processor.
   Uninstalling removes exactly that entry, and the value itself when nothing else is left.
   A `Path` that cannot be read, or is too long for the installer's strings, is left unchanged.
   The [command line's document](../src/shell/cli/README.md#5-installed-teamrun) says what cmd does to its arguments.
-  The installer's include is `assets/installer/command-path.nsh`.
+  The installer's include is `assets/installer/installer.nsh`.
 - **Command on the PATH (macOS).**
   The bundle holds `Contents/Resources/bin/teamrun`, named after the slug.
   The script follows the links to itself back to the bundle and runs the bundle's program in Node mode with the command line's entry.
@@ -904,7 +938,7 @@ Each target is packaged on its own platform and processor.
   | CookieEncryption | off | TeamRun keeps no cookies: the window loads from `file://` and signs in nowhere. With the fuse on, the cookie key would live in the macOS Keychain or the Linux keyring, which can ask the person for access, and again after each update of an unsigned build. It turns on when TeamRun shows web content or signs in. |
   | LoadBrowserProcessSpecificV8Snapshot | off | The program has no snapshot of its own. |
 - **Tools.** electron-builder downloads its packaging tools into `_build/package/tool-cache` and checks each against the SHA-256 it pins.
-  Packages are unsigned; signing is a separate step.
+  Packages are unsigned; the separate signing step that [#326](https://github.com/noldova-com/teamrun/issues/326) adds will sign the Windows addons along with the program.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
 
 ### Publication
@@ -929,16 +963,21 @@ Each target is packaged on its own platform and processor.
     Two releases with the tag, a tag without a release or a draft for another revision fails with the reason.
   - A run that fails after creating the tag leaves the tag on the revision beside the draft.
     Running `release:publish` again continues the draft, and `release:check` refuses a new request for that version.
-- The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder and the release notes from `RELEASE_FOLDER` and `RELEASE_NOTES`.
+- The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder from `RELEASE_FOLDER` and the address of the run that built the release from `RELEASE_RUN_URL`.
+- `release:publish` writes the release notes.
+  They name the supported targets and the targets a CI run alone accepted, say whether the packages are signed, and link the run whose install checks the packages passed.
+- `teamrun.product.releaseRepository` names the repository whose releases are the update feed.
+  Like GitHub, the release scripts compare repository names without regard to case.
+  A release published to any other repository is an unsigned test release: its notes open by saying so and that an installed TeamRun never updates from it.
+  It follows every other rule here, including the versions and becoming that repository's latest release.
 - The **Release** workflow, `.github/workflows/release.yml`, releases its own repository.
   It runs only by hand, from `main`, with a version and a revision, and one release per repository runs at a time:
   - Its check job runs `release:check`.
-    Until TeamRun's packages are signed, it refuses to release `noldova-com/teamrun`, so a trial runs the workflow in a test repository.
+    Until TeamRun's packages are signed, `release:check` refuses a release to `releaseRepository`, so a trial runs the workflow in a test repository.
   - Each target then builds on its own runner, runs `npm test`, makes its packages, installs, starts and quits them as the Package workflow does, and writes its release files with `release:assets`.
     It keeps them as an artifact of the run, with three tries.
   - The publish job alone may write to the repository, behind the `publish` environment.
-    It takes every target's files from this run's artifacts, also when only it runs again, and runs `release:publish`.
-    The release notes say that each target's package passed its install check on its own runner, and link the run.
+    It takes every target's files from this run's artifacts, also when only it runs again, and runs `release:publish` with the run's address.
 - Releases use numbered versions such as `0.0.1` and `0.0.2`, without prerelease suffixes or build metadata, and matching `v`-prefixed tags.
   Each successful publication becomes the latest release.
 - Published application updates must use a version newer than the installed version.
@@ -946,7 +985,7 @@ Each target is packaged on its own platform and processor.
 
 ### Updates
 
-- The installed updater checks an approved release feed for its platform and CPU.
+- The installed updater checks the releases of `teamrun.product.releaseRepository` for its platform and CPU, and no other repository's.
   Every packaged target updates itself: Windows through its installer, macOS through Squirrel.Mac and a Linux AppImage by replacing the file.
 - A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced; an installation that cannot update itself explains why.
 - The GitHub release route is anonymous HTTPS; a private repository is not made reachable by injecting repository or provider credentials.

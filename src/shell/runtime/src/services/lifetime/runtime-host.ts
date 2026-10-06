@@ -260,7 +260,7 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async activateModulesAsync(database: ShellDatabase, settings: SettingsService): Promise<void> {
-    const processes = new ProcessSupervisor(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
+    const processes = ProcessSupervisor.create(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
     this.processes = processes;
     processes.onChanged(() => this.programsEvent.publish(processes.status.toJson()));
     this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));
@@ -270,7 +270,7 @@ export class RuntimeHost implements IIdleParticipant {
 
   private registerShellFacilities(database: ShellDatabase): SettingsService {
     const store = new WindowStateStore(database);
-    const settings = new SettingsService(database, [...ShellSettings.all, ...this.modules.settingDefinitions], this.log.diagnostics);
+    const settings = new SettingsService(database, [...ShellSettings.definitionsFor(this.platform), ...this.modules.settingDefinitions], this.log.diagnostics);
     const changed = this.events.declare(ShellEvents.settingsChanged);
     this.notificationSettings = new NotificationSettings(settings);
     settings.onChanged(t => {

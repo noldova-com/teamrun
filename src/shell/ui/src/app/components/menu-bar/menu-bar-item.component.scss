@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "states";
 
 :host {
@@ -40,11 +41,15 @@
 
 :host(:not([aria-disabled="true"]):is(#{states.$hover}, [aria-expanded="true"]))::before {
   background-color: var(--tr-toolbar-hover);
+
+  @include forced-hover;
 }
 
 :host(#{states.$focus-visible})::before {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
+
+  @include forced-focus;
 }
 
 :host([aria-disabled="true"]) {

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "states";
 
 :host {
@@ -45,6 +46,8 @@
 .tr-checkbox-box#{states.$focus-visible} {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: var(--tr-border-width);
+
+  @include forced-focus;
 }
 
 .tr-checkbox-box:disabled {

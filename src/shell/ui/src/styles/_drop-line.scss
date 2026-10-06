@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 :where(.tr-drop-line-before, .tr-drop-line-after) {
   position: relative;
 }
@@ -20,6 +22,10 @@
   height: var(--tr-drop-line-length);
   background-color: var(--tr-accent);
   pointer-events: none;
+
+  @include forced-colors {
+    background-color: Highlight;
+  }
 }
 
 .tr-drop-line {

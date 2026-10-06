@@ -15,6 +15,7 @@ import { SettingsFixture } from "../fixtures/settings.fixture.js";
 import { SimulatedProcessesFixture } from "../fixtures/simulated-processes.fixture.js";
 import { SystemCommandFixture } from "../fixtures/system-command.fixture.js";
 import { TemporaryFolderFixture } from "../fixtures/temporary-folder.fixture.js";
+import { WindowsProcessApiFixture } from "../fixtures/windows-process-api.fixture.js";
 
 @TestClass
 export class ProcessEndingTests {
@@ -53,8 +54,11 @@ export class ProcessEndingTests {
     await using folder = await TemporaryFolderFixture.createAsync();
     const program = await ProgramFixture.locateWindowsProgramAsync(folder.path);
     let leader = 0;
-    const command = new SystemCommandFixture([() => Promise.resolve(`900841\t${leader}\t${ProcessSupervisorFixture.readStarted(settings) + 1}\tC:\\child.exe`), "900841 nonsense"]);
-    const processes = ProcessSupervisorFixture.createWindows(settings, { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, command);
+    const windows = new WindowsProcessApiFixture([
+      () => `900841\t${leader}\t${ProcessSupervisorFixture.readStarted(settings) + 1}\tC:\\child.exe`,
+      new Error("The process snapshot failed with Windows error 8.")
+    ]);
+    const processes = ProcessSupervisorFixture.createWindows(settings, windows);
     const owned = await processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT], undefined, program));
     leader = owned.processId;
     await ProgramFixture.readLineAsync(owned);
@@ -64,7 +68,7 @@ export class ProcessEndingTests {
     const text = settings.diagnostics.text;
     Assert.isTrue(exit.isClean);
     Assert.isTrue(text.startsWith(ProcessSupervisorFixture.line(owned, "").trimEnd()), text);
-    Assert.isTrue(text.includes("The process table has a row that could not be read: 900841 nonsense"), text);
+    Assert.isTrue(text.includes("The process snapshot failed with Windows error 8."), text);
     Assert.areEqual(String(leader), settings.database.readAll(ProcessSupervisorFixture.RECORDS).map(t => t["process_id"]).join(","));
   }
 }
