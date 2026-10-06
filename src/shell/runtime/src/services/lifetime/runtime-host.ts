@@ -97,6 +97,7 @@ export class RuntimeHost implements IIdleParticipant {
   private readonly idle: IdleMonitor;
   private readonly stopped: PromiseWithResolvers<string> = Promise.withResolvers<string>();
   private readonly platform: string;
+  private readonly presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">;
   private readonly environment: NodeJS.ProcessEnv;
   private database: ShellDatabase | null;
   private settings: SettingsService | null = null;
@@ -126,12 +127,14 @@ export class RuntimeHost implements IIdleParticipant {
     options: RuntimeOptions,
     platform: string,
     environment: NodeJS.ProcessEnv,
+    presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
     lock: OwnershipLock,
     log: RuntimeLog,
     database: ShellDatabase | null,
     declarations: readonly ModuleDeclaration[]) {
     this.lock = lock;
     this.platform = platform;
+    this.presence = presence;
     this.environment = environment;
     this.log = log;
     this.database = database;
@@ -185,14 +188,15 @@ export class RuntimeHost implements IIdleParticipant {
     return this.server.sessionCount === 0 && this.work.isEmpty;
   }
 
-  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost> {
+  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv,
+    presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync"> = ProcessPresence.create(platform, new SystemCommand())): Promise<RuntimeHost> {
     const declarations = await ModuleDeclarationReader.readAsync(options.declarationsFile);
     const lock = await RuntimeHost.acquireAsync(options);
     let log: RuntimeLog | null = null;
     let database: ShellDatabase | null = null;
     try {
       log = await RuntimeLog.openAsync(lock, options.startLogName);
-      await RuntimeHost.joinInstallationAsync(options, lock, platform);
+      await RuntimeHost.joinInstallationAsync(options, lock, presence);
       await AppImageCopyCleanup.removeAsync(lock.dataDirectory, log.diagnostics);
       const inspection = await DataDirectoryInspector.inspectAsync(options.dataDirectory);
       if (inspection.state !== DataDirectoryState.PreShell)
@@ -204,7 +208,7 @@ export class RuntimeHost implements IIdleParticipant {
       throw error;
     }
 
-    const host = new RuntimeHost(options, platform, environment, lock, log, database, declarations);
+    const host = new RuntimeHost(options, platform, environment, presence, lock, log, database, declarations);
     try {
       await host.openAsync(platform);
     }
@@ -233,10 +237,9 @@ export class RuntimeHost implements IIdleParticipant {
     this.idle.check();
   }
 
-  private static async joinInstallationAsync(options: RuntimeOptions, lock: OwnershipLock, platform: string): Promise<void> {
+  private static async joinInstallationAsync(options: RuntimeOptions, lock: OwnershipLock, presence: Pick<ProcessPresence, "isRunningAsync">): Promise<void> {
     if (Object.isNull(options.installationFolder))
       return;
-    const presence = ProcessPresence.create(platform, new SystemCommand());
     const installation = new Installation(options.installationFolder, t => presence.isRunningAsync(t));
     await installation.recordAsync(lock.dataDirectory.root);
     const status = await installation.checkAsync(RuntimeBuild.identity.productVersion);
@@ -294,7 +297,7 @@ export class RuntimeHost implements IIdleParticipant {
     processes.onChanged(() => this.programsEvent.publish(processes.status.toJson()));
     this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));
     const preparation = new UpdatePreparation(
-      this.server, ProcessPresence.create(this.platform, new SystemCommand()), processes, this.updating, this.updateEnded,
+      this.server, this.presence, processes, this.updating, this.updateEnded,
       this.serverSettings.updateSaveWait, this.serverSettings.updateBarrierInterval, this.installationFolder);
     this.preparation = preparation;
     this.methods.register(ShellMethods.update, new UpdateMethod(preparation));

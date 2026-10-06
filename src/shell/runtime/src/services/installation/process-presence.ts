@@ -23,14 +23,14 @@ export class ProcessPresence {
   private readonly createReader: () => IProcessTableReader;
   private reader: IProcessTableReader | null = null;
 
-  private constructor(createReader: () => IProcessTableReader) {
-    this.createReader = createReader;
+  public constructor(platform: string, command: SystemCommand, windows: IWindowsProcessApi) {
+    this.createReader = () => platform === Resources.windowsPlatform
+      ? new WindowsProcessTableReader(windows, ProcessClock.create(platform))
+      : new PosixProcessTableReader(command, ProcessClock.create(platform));
   }
 
-  public static create(platform: string, command: SystemCommand, windows: IWindowsProcessApi = new WindowsProcessApi()): ProcessPresence {
-    return new ProcessPresence(() => platform === Resources.windowsPlatform
-      ? new WindowsProcessTableReader(windows, ProcessClock.create(platform))
-      : new PosixProcessTableReader(command, ProcessClock.create(platform)));
+  public static create(platform: string, command: SystemCommand): ProcessPresence {
+    return new ProcessPresence(platform, command, new WindowsProcessApi());
   }
 
   public async stampAsync(processes: readonly (readonly [number, string])[]): Promise<readonly UpdateProcess[]> {
