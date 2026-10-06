@@ -41,6 +41,8 @@ export class DesktopApiTests {
         "ScreenArea",
         "SenderInfo",
         "SenderPolicy",
+        "SpellChecker",
+        "SpellingDictionaries",
         "StartupState",
         "StartupStateKind",
         "SystemNotifier",

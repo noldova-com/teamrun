@@ -827,6 +827,21 @@ export interface IApplicationHost {
   requestSingleInstanceLock(): boolean;
 
   /**
+   * Lists the operating system's preferred languages, most preferred first.
+   *
+   * @returns Language tags such as `en-US` or `de`.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function firstLanguage(app: IApplicationHost): string | undefined {
+   *   return app.getPreferredSystemLanguages()[0];
+   * }
+   * ```
+   */
+  getPreferredSystemLanguages(): string[];
+
+  /**
    * Runs every renderer in the sandbox.
    *
    * @example
@@ -1001,13 +1016,63 @@ export interface IPermissionHost {
 }
 
 /**
+ * Turns spell checking on and off and chooses its dictionaries, as an Electron session provides it.
+ */
+export interface ISpellCheckHost {
+  /**
+   * Turns spell checking on or off for every window of the session.
+   *
+   * @param isEnabled Whether misspelled words are marked.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stopChecking(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerEnabled(false);
+   * }
+   * ```
+   */
+  setSpellCheckerEnabled(isEnabled: boolean): void;
+
+  /**
+   * Chooses the languages words are checked in. macOS ignores it, because its system checker chooses.
+   *
+   * @param languages Language tags whose dictionaries the session has, such as `en-US`.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkInEnglish(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerLanguages(["en-US"]);
+   * }
+   * ```
+   */
+  setSpellCheckerLanguages(languages: string[]): void;
+
+  /**
+   * Sets the address a dictionary that is not in the profile's `Dictionaries` folder would be downloaded from.
+   *
+   * @param url The address, ending in `/`.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function downloadNothing(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerDictionaryDownloadURL("file:///home/ada/.teamrun/desktop/Dictionaries/");
+   * }
+   * ```
+   */
+  setSpellCheckerDictionaryDownloadURL(url: string): void;
+}
+
+/**
  * Electron's `session` module, as far as the desktop uses it.
  */
 export interface ISessionHost {
   /**
    * The session the window's web contents use.
    */
-  readonly defaultSession: IPermissionHost;
+  readonly defaultSession: IPermissionHost & ISpellCheckHost;
 }
 
 /**
@@ -1105,6 +1170,36 @@ export interface IShellHost {
 }
 
 /**
+ * What Electron reports about a right click or a context menu key in a page, as far as the desktop uses it.
+ */
+export interface IContextMenuParams {
+  /**
+   * The horizontal position of the menu in the page, in CSS pixels.
+   */
+  readonly x: number;
+
+  /**
+   * The vertical position of the menu in the page, in CSS pixels.
+   */
+  readonly y: number;
+
+  /**
+   * The misspelled word under the menu, or empty when there is none.
+   */
+  readonly misspelledWord: string;
+
+  /**
+   * The spell checker's suggestions for the misspelled word, best first.
+   */
+  readonly dictionarySuggestions: string[];
+
+  /**
+   * What asked for the menu, such as `mouse` or `keyboard`.
+   */
+  readonly menuSourceType: string;
+}
+
+/**
  * A window's web contents, as Electron's `WebContents` provides them.
  */
 export interface IWindowContents {
@@ -1184,6 +1279,24 @@ export interface IWindowContents {
    * ```
    */
   on(event: "did-start-loading", listener: () => void): unknown;
+
+  /**
+   * Listens for the page asking for a context menu, which Electron reports only when the page did not cancel the
+   * request.
+   *
+   * @param event The event's name.
+   * @param listener Receives Electron's event and what it reports about the menu.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function follow(contents: IWindowContents, words: string[]): void {
+   *   contents.on("context-menu", (_event, params) => words.push(params.misspelledWord));
+   * }
+   * ```
+   */
+  on(event: "context-menu", listener: (event: unknown, params: IContextMenuParams) => void): unknown;
 
   /**
    * Decides what happens when the page asks to open a window.
@@ -1358,6 +1471,21 @@ export interface IWindowContents {
    * ```
    */
   selectAll(): void;
+
+  /**
+   * Replaces the misspelled word around the page's selection, as one step that Undo reverts.
+   *
+   * @param text The replacement.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function correct(contents: IWindowContents): void {
+   *   contents.replaceMisspelling("world");
+   * }
+   * ```
+   */
+  replaceMisspelling(text: string): void;
 
   /**
    * Returns the operating system's id of the page's renderer process.
@@ -3104,6 +3232,127 @@ export interface IAppearanceStore {
    * ```
    */
   writeAsync(preferences: JsonObject): Promise<void>;
+}
+
+/**
+ * Puts the dictionaries that ship with the desktop where Electron's spell checker finds them.
+ */
+export declare class SpellingDictionaries {
+  /**
+   * Puts each dictionary the folder's `dictionaries.json` lists into the profile's `Dictionaries` folder, where
+   * Electron's spell checker finds it, unless it is already there. It runs before the application is ready, because
+   * Electron reads that folder as it becomes ready. A dictionary whose entry is not valid or whose file cannot be copied
+   * is left out and logged.
+   *
+   * @param sourceFolder The folder of the shipped dictionaries.
+   * @param profileFolder The profile folder, Electron's `userData`.
+   * @param log Receives each line to log.
+   * @returns The languages of the dictionaries in the profile, in the list's order; none when the list cannot be read.
+   * @example
+   * ```ts
+   * import { SpellingDictionaries } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function install(profile: string): readonly string[] {
+   *   return SpellingDictionaries.install("/opt/teamrun/assets/dictionaries", profile, line => console.error(line));
+   * }
+   * ```
+   */
+  public static install(sourceFolder: string, profileFolder: string, log: (text: string) => void): readonly string[];
+
+  /**
+   * Gives the profile's `Dictionaries` folder as a `file:` URL ending in a slash, the address the spell checker gives
+   * Chromium for downloads. Chromium cannot download from a `file:` URL, so a missing dictionary fails at once without
+   * a connection, and no local process can answer in its place as one listening on a loopback port could.
+   *
+   * @param profileFolder The profile folder, Electron's `userData`.
+   * @returns The folder's `file:` URL with a trailing slash.
+   * @example
+   * ```ts
+   * import { SpellingDictionaries } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function addressOf(profile: string): string {
+   *   return SpellingDictionaries.addressOf(profile);
+   * }
+   * ```
+   */
+  public static addressOf(profileFolder: string): string;
+}
+
+/**
+ * Applies the spelling settings to the window's session. On Windows and Linux it checks only in shipped languages and
+ * points the dictionary download address at the profile's own dictionary folder as a `file:` URL, from which Chromium
+ * cannot download, so a dictionary is never downloaded; on macOS the system checker chooses the languages and only
+ * checking on or off applies.
+ */
+export declare class SpellChecker {
+  /**
+   * Creates the spell checker.
+   *
+   * @param host Gives the session once the application is ready.
+   * @param languages The shipped languages in the profile, in their order.
+   * @param address The dictionary download address, the profile's own dictionary folder as a `file:` URL, which Chromium cannot download from.
+   * @param platform The operating system, as `process.platform` names it.
+   * @param readSystemLanguages Lists the operating system's preferred languages.
+   * @param log Receives each line to log.
+   * @example
+   * ```ts
+   * import { type ISpellCheckHost, SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(session: ISpellCheckHost): SpellChecker {
+   *   return new SpellChecker(() => session, ["en-US"], "file:///home/ada/.teamrun/desktop/Dictionaries/", "linux", () => ["en-US"], line => console.error(line));
+   * }
+   * ```
+   */
+  public constructor(host: () => ISpellCheckHost, languages: readonly string[], address: string, platform: string, readSystemLanguages: () => readonly string[], log: (text: string) => void);
+
+  /**
+   * Points the dictionary download at the profile's own dictionary folder and checks in the languages an empty choice means, before any window opens.
+   *
+   * @example
+   * ```ts
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function start(checker: SpellChecker): void {
+   *   checker.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Turns checking on or off and checks in the chosen languages that ship, in their shipped order. With none of them,
+   * it checks in the operating system's languages that ship, or else in the first shipped language. A language list
+   * the session refuses is logged.
+   *
+   * @param isChecking Whether misspelled words are marked.
+   * @param chosen The chosen language tags.
+   * @example
+   * ```ts
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkInEnglish(checker: SpellChecker): void {
+   *   checker.apply(true, ["en-US"]);
+   * }
+   * ```
+   */
+  public apply(isChecking: boolean, chosen: readonly string[]): void;
+
+  /**
+   * Describes what the window may offer.
+   *
+   * @returns `languages`, the shipped languages, none on macOS; and `fallback`, the language an empty choice checks in
+   * when none of the operating system's languages ships, or `null`.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(checker: SpellChecker): JsonObject {
+   *   return checker.toJson();
+   * }
+   * ```
+   */
+  public toJson(): JsonObject;
 }
 
 /**
