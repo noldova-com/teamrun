@@ -30,5 +30,6 @@ test.describe("links", () => {
     await expect.poll(() => desktop.application.evaluate(() => Reflect.get(globalThis, "openedLinks")))
       .toEqual(["https://example.com/notes", "https://example.com/notes", "https://example.com/help"]);
     expect([window.url(), desktop.application.windows().length]).toEqual([page, 1]);
+    await desktop.checkpointAsync("links-opened");
   });
 });
