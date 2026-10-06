@@ -19,5 +19,8 @@ export default defineConfig({
   plugins: [new ClassMetadataCoverage()],
   resolve: {
     alias: Object.fromEntries(Object.entries(compilerOptions.paths).map(([name, targets]) => [name, fileURLToPath(new URL(String(targets[0]), import.meta.url))]))
+  },
+  test: {
+    retry: process.env["TEAMRUN_TEST_RETRY"] === "1" ? 1 : 0
   }
 });

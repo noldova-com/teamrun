@@ -44,6 +44,12 @@ class BuildAndTestTests {
   private static readonly WORKFLOW_NODE_SETUPS: readonly string[] = ["Set up Node.js to classify", "Set up Node.js to install"];
   private static readonly ACTION_NODE_SETUP: string = "Set up Node.js";
   private static readonly NODE_ACTION: string = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0";
+  private static readonly FLAKY_STEPS: readonly string[] = ["Keep the flaky test record", "Keep the flaky test record again", "Keep the flaky test record a last time"];
+  private static readonly FLAKY_WARNING: string = "Warn that the flaky test record was not kept";
+  private static readonly FLAKY_UPLOADS: readonly (readonly [string, string, string, string])[] = [
+    [BuildAndTestTests.TARGET_WORKFLOW, "Test", "flaky-tests-${{ inputs.runner }}-${{ inputs.architecture }}-${{ matrix.part || 'all' }}-${{ github.run_attempt }}", "job"],
+    [BuildAndTestTests.UI_WORKFLOW, BuildAndTestTests.UI_STEP, "flaky-tests-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}", "shard"]
+  ];
   private static readonly CACHE_LIST: string = "api --paginate repos/noldova-com/teamrun/actions/caches?key=dependencies-&ref=refs/heads/main&per_page=100 --jq .actions_caches[].key";
   private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing while saving"];
   private static readonly UI_SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing before building", "Stop Spotlight indexing before the UI workflows"];
@@ -435,10 +441,10 @@ class BuildAndTestTests {
       const script = workflow.readStepScript(BuildAndTestTests.UI_STEP);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3", "");
-      doubles.respond("npm", "run test:ui -- --require-current --shard 2/3", "");
+      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3 --retries 1", "");
+      doubles.respond("npm", "run test:ui -- --require-current --shard 2/3 --retries 1", "");
 
-      doubles.respond("npm", "run test:ui -- --shard 1/1 --grep @smoke", "");
+      doubles.respond("npm", "run test:ui -- --shard 1/1 --retries 1 --grep @smoke", "");
       const shard = { SHARD: "2/3", REQUIRE_CURRENT: "--require-current", GREP: "" };
 
       const linux = await doubles.runAsync(script, { RUNNER_OS: "Linux", ...shard });
@@ -448,8 +454,8 @@ class BuildAndTestTests {
 
       assert.deepEqual([linux.status, windows.status, macos.status, smoke.status], [0, 0, 0, 0], linux.stderr + windows.stderr + macos.stderr + smoke.stderr);
       assert.deepEqual(await doubles.readCallsAsync(), [
-        "xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3", "npm run test:ui -- --require-current --shard 2/3", "npm run test:ui -- --require-current --shard 2/3",
-        "npm run test:ui -- --shard 1/1 --grep @smoke"
+        "xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3 --retries 1", "npm run test:ui -- --require-current --shard 2/3 --retries 1",
+        "npm run test:ui -- --require-current --shard 2/3 --retries 1", "npm run test:ui -- --shard 1/1 --retries 1 --grep @smoke"
       ]);
       assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        env:\n          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}\n" +
         "          REQUIRE_CURRENT: ${{ matrix.prebuilt && '--require-current' || '' }}\n          GREP: ${{ matrix.grep }}\n"));
@@ -528,6 +534,35 @@ class BuildAndTestTests {
       }
     });
 
+    test("each test job and UI shard keeps its flaky test record whatever happened, tried three times with a pause, and only warns when every upload fails", async t => {
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+
+      for (const [name, first, artifact, scope] of BuildAndTestTests.FLAKY_UPLOADS) {
+        const workflow = await WorkflowFileFixture.readAsync(name);
+        const simulation = new WorkflowSimulation(workflow.text, first, BuildAndTestTests.FLAKY_WARNING);
+        const attempts = BuildAndTestTests.FLAKY_STEPS.map(t => simulation.find(t));
+        const passed = simulation.run({ angular: "false" }, {});
+        const failed = simulation.run({ angular: "false" }, { [first]: "failure" });
+        const unkept = simulation.run({ angular: "false" }, Object.fromEntries([first, ...BuildAndTestTests.FLAKY_STEPS].map(t => [t, "failure"])));
+        const warning = await doubles.runAsync(workflow.readStepScript(BuildAndTestTests.FLAKY_WARNING));
+        const flaky = (result: { readonly ran: readonly string[] }): readonly string[] => result.ran.filter(u => u.includes("flaky test record"));
+
+        assert.deepEqual([flaky(passed), passed.isJobFailed], [["Keep the flaky test record"], false]);
+        assert.deepEqual([flaky(failed), failed.isJobFailed], [["Keep the flaky test record"], true]);
+        assert.deepEqual([flaky(unkept), unkept.isJobFailed], [[
+          "Keep the flaky test record", "Wait before keeping the flaky test record again", "Keep the flaky test record again",
+          "Wait before keeping the flaky test record a last time", "Keep the flaky test record a last time", BuildAndTestTests.FLAKY_WARNING
+        ], true]);
+        assert.deepEqual(attempts.map(u => [u.uses, u.continueOnError]), attempts.map(() => [BuildAndTestTests.UPLOAD_ACTION, true]));
+        assert.deepEqual(attempts.map(u => u.settings), BuildAndTestTests.threeTimes([`name: ${artifact}`, "path: _build/flaky-tests.json", "retention-days: 14", "if-no-files-found: ignore", "overwrite: true"]));
+        assert.equal(workflow.readStepScript("Wait before keeping the flaky test record again"), "sleep 15\n");
+        assert.equal(workflow.readStepScript("Wait before keeping the flaky test record a last time"), "sleep 15\n");
+        assert.deepEqual([warning.status, warning.stdout],
+          [0, `::warning title=The flaky test record was not kept::The upload failed three times, so no issue is recorded for this ${scope}'s flaky tests. The tests are not affected.\n`]);
+      }
+    });
+
     test("an upload that fails and then succeeds is tried again once and keeps the job green", async () => {
       const simulation = new WorkflowSimulation((await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);
 
@@ -591,8 +626,8 @@ class BuildAndTestTests {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).readStepScript(BuildAndTestTests.UI_STEP);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 1/3", "", 1);
-      doubles.respond("npm", "run test:ui -- --require-current --shard 1/3", "", 1);
+      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 1/3 --retries 1", "", 1);
+      doubles.respond("npm", "run test:ui -- --require-current --shard 1/3 --retries 1", "", 1);
 
       assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Linux", SHARD: "1/3", REQUIRE_CURRENT: "--require-current", GREP: "" })).status, 1);
       assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Windows", SHARD: "1/3", REQUIRE_CURRENT: "--require-current", GREP: "" })).status, 1);

@@ -14,8 +14,10 @@ import { join } from "node:path";
 
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
+import { TestOutcome } from "../../enums/test-outcome.js";
 import { TestingException } from "../../exceptions/testing.exception.js";
 import { TestProject } from "../../models/discovery/test-project.js";
+import type { TestRunResult } from "../../models/results/test-run-result.js";
 import { Resources } from "../../resources.js";
 import { TestDiscovery } from "../discovery/test-discovery.js";
 import { GitHubSummaryWriter } from "../reporting/git-hub-summary-writer.js";
@@ -59,6 +61,9 @@ export class TestRunEntry {
       }
       if (!ownsEmptySelection)
         writeFileSync(selectionFile, JSON.stringify({ discovered: result.selection.discovered, selected: result.selection.selected }));
+      const resultsFile = process.env[Resources.resultsFileVariable];
+      if (!Object.isUndefined(resultsFile))
+        writeFileSync(resultsFile, JSON.stringify(this.describeResults(result)));
       interrupted = result.isInterrupted;
       process.exitCode = Math.min(result.failed + result.unreached + Number(ownsEmptySelection && result.total === 0), 1);
     }
@@ -88,6 +93,13 @@ export class TestRunEntry {
       summary.writeFailure(failure);
       process.exit(Resources.failedExitCode);
     }, Resources.testShutdownGraceMilliseconds).unref();
+  }
+
+  private describeResults(result: TestRunResult): { isComplete: boolean; failed: { identity: string; file: string; failure: string }[] } {
+    return {
+      isComplete: !result.isInterrupted && result.unreached === 0,
+      failed: result.classResults.flatMap(t => t.methodResults.filter(u => u.outcome === TestOutcome.Failed).map(u => ({ identity: u.displayName, file: `${t.packageName}/${t.filePath}`, failure: String(u.failure) })))
+    };
   }
 
   private keepCoverageFromChildren(): void {

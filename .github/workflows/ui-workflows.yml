@@ -162,7 +162,7 @@ jobs:
           REQUIRE_CURRENT: ${{ matrix.prebuilt && '--require-current' || '' }}
           GREP: ${{ matrix.grep }}
         run: |
-          set -- $REQUIRE_CURRENT --shard "$SHARD" ${GREP:+--grep "$GREP"}
+          set -- $REQUIRE_CURRENT --shard "$SHARD" --retries 1 ${GREP:+--grep "$GREP"}
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- "$@"
           else
@@ -274,3 +274,52 @@ jobs:
           SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}
           SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}
         run: node scripts/ui-summary.ts
+
+      - name: Keep the flaky test record
+        id: flaky
+        if: always() && steps.ui.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flaky-tests-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: _build/flaky-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the flaky test record again
+        if: always() && steps.ui.outcome != 'skipped' && steps.flaky.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the flaky test record again
+        id: flaky-again
+        if: always() && steps.ui.outcome != 'skipped' && steps.flaky.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flaky-tests-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: _build/flaky-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the flaky test record a last time
+        if: always() && steps.ui.outcome != 'skipped' && steps.flaky-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the flaky test record a last time
+        id: flaky-last
+        if: always() && steps.ui.outcome != 'skipped' && steps.flaky-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flaky-tests-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: _build/flaky-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Warn that the flaky test record was not kept
+        if: always() && steps.ui.outcome != 'skipped' && steps.flaky-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The flaky test record was not kept::The upload failed three times, so no issue is recorded for this shard's flaky tests. The tests are not affected."

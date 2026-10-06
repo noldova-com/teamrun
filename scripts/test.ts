@@ -17,6 +17,7 @@ import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
 import DependencyPinCheck from "./checks/dependency-pin-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
 import FieldOrderCheck from "./checks/field-order-check.ts";
+import FlakyRecord from "./checks/flaky-record.ts";
 import GitHubConfigurationCheck from "./checks/github-configuration-check.ts";
 import LicenseHeaderCheck from "./checks/license-header-check.ts";
 import type ICheck from "./checks/interfaces/check.ts";
@@ -52,7 +53,7 @@ import TestPart from "./test-part.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Test {
-  private static readonly USAGE: string = "Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] | [--part <part>] --checks-only [--repeat <count>]]\n";
+  private static readonly USAGE: string = "Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] [--rerun-failed] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] [--rerun-failed] | [--part <part>] --checks-only [--repeat <count>]]\n";
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly SUMMARY_HEADER: string = "| Check | Result |\n|---|---|\n";
   private static readonly FILTERED_SUMMARY_HEADER: string = "| Check | Result | Unit | Discovered | Selected | Unselected |\n|---|---|---|---|---|---|\n";
@@ -88,12 +89,15 @@ export default class Test {
     if (options.isDocuments)
       return await this.runChecksAsync(this.createDocumentChecks(), Test.DOCUMENTS_NOTICE);
 
+    const flaky = options.isRerunningFailed ? new FlakyRecord(this.root, this.environment) : null;
+    await flaky?.clearAsync();
+
     for (let run = 1; run <= options.repeat; run++) {
       if (options.repeat > 1)
         this.output.write(`\nRun ${run} of ${options.repeat}\n`);
       const exitCode = options.filters.length === 0
-        ? await this.runChecksAsync(await this.createChecksAsync(options.part, options.selection), Test.formatNotice(options))
-        : await this.runFilteredAsync(options.filters);
+        ? await this.runChecksAsync(await this.createChecksAsync(options.part, flaky, options.selection), Test.formatNotice(options))
+        : await this.runFilteredAsync(options.filters, flaky);
       if (exitCode !== 0) {
         if (options.repeat > 1)
           this.output.write(`\nRun ${run} of ${options.repeat} failed; the repeats stop there.\n`);
@@ -131,14 +135,14 @@ export default class Test {
       await appendFile(summaryPath, summary);
   }
 
-  private async runFilteredAsync(filters: readonly string[]): Promise<number> {
+  private async runFilteredAsync(filters: readonly string[], flaky: FlakyRecord | null): Promise<number> {
     this.output.write(`Filtered run: ${filters.map(t => JSON.stringify(t)).join(", ")}. A filtered run is not the complete gate.\n`);
     const build = new PackageBuild(this.root, this.runner, this.environment);
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const checks: readonly ISelectableCheck[] = [
-      new PackageTestCheck(this.root, build, this.runner, this.environment),
-      new ScriptTestCheck(this.root, build, this.runner, this.environment),
-      new AngularTestCheck(angular)
+      new PackageTestCheck(this.root, build, this.runner, this.environment, flaky),
+      new ScriptTestCheck(this.root, build, this.runner, this.environment, flaky),
+      new AngularTestCheck(angular, flaky)
     ];
 
     let summary = `Filters: ${filters.map(t => Test.formatSummaryFilter(t)).join(" ")}\n\n${Test.FILTERED_SUMMARY_HEADER}`;
@@ -179,7 +183,7 @@ export default class Test {
     return [new DocumentCheck(this.root, new RepositoryFiles(this.root, new Git(this.root, this.runner)))];
   }
 
-  private async createChecksAsync(part: string | null, selection?: SelectedTests): Promise<readonly ICheck[]> {
+  private async createChecksAsync(part: string | null, flaky: FlakyRecord | null, selection?: SelectedTests): Promise<readonly ICheck[]> {
     const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
     const documents = new DocumentCheck(this.root, files);
     const { default: ApiCatalog } = await import("./api/api-catalog.ts");
@@ -212,13 +216,13 @@ export default class Test {
       new DependencyPinCheck(this.root, files),
       new PackageLayoutCheck(this.root, new PackageCatalog(this.root)),
       new PackageCheck(build),
-      ...selection === undefined || selection.packages.length > 0 ? [new PackageTestCheck(this.root, build, this.runner, this.environment, selection?.packages)] : [],
+      ...selection === undefined || selection.packages.length > 0 ? [new PackageTestCheck(this.root, build, this.runner, this.environment, flaky, selection?.packages)] : [],
       new TypeCheck(this.root, this.runner),
       new ApiDeclarationCheck(this.root, apis, server, Test.API_TIMEOUT),
       new ApiDocumentationCheck(this.root, apis, server, Test.API_TIMEOUT),
       new ApiExampleCheck(this.root, apis, this.runner, server, Test.API_TIMEOUT),
-      ...selection === undefined || selection.runsScriptTests ? [new ScriptTestCheck(this.root, build, this.runner, this.environment)] : [],
-      ...selection === undefined || selection.runsAngularTests ? [new AngularTestCheck(angular)] : [],
+      ...selection === undefined || selection.runsScriptTests ? [new ScriptTestCheck(this.root, build, this.runner, this.environment, flaky)] : [],
+      ...selection === undefined || selection.runsAngularTests ? [new AngularTestCheck(angular, flaky)] : [],
       new PackagedBuildCheck(this.root, new PackagedBuild(this.root, this.runner, new GalleryFile(this.root), angular), angular)
     ];
     return checks.filter(t => part === null || partOf(t) === part);
