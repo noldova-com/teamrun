@@ -20,7 +20,8 @@ import { type BuildIdentity, Failure, FailureCode, NotificationBroadcast, PreShe
 import { DataDirectoryState } from "../../enums/data-directory-state.js";
 import { WindowStateKind } from "../../enums/window-state-kind.js";
 import { DataDirectoryOwnedException } from "../../exceptions/data-directory-owned.exception.js";
-import type { IIdleParticipant } from "../../interfaces/idle-participant.js";
+import type { IIdleParticipant } from "../../interfaces/i-idle-participant.js";
+import { AppImageSource } from "../../models/app-image-source.js";
 import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
 import type { EventChannel } from "../../models/event-channel.js";
@@ -56,22 +57,25 @@ import { UpdateNotificationMethod } from "../notifications/update-notification-m
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { ProcessSupervisor } from "../process/process-supervisor.js";
+import { ProgramsMethod } from "../process/programs-method.js";
 import { RecentCommandsMethod } from "../recent-commands/recent-commands-method.js";
 import { RecentCommandsStore } from "../recent-commands/recent-commands-store.js";
 import { RecordCommandMethod } from "../recent-commands/record-command-method.js";
 import { CommandRegistry } from "../registry/command-registry.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
+import { SettingReadMethod } from "../settings/setting-read-method.js";
 import { SettingResetMethod } from "../settings/setting-reset-method.js";
 import { SettingWriteMethod } from "../settings/setting-write-method.js";
 import { SettingsReadMethod } from "../settings/settings-read-method.js";
-import { SettingsService } from "../settings/settings-service.js";
+import { SettingsService } from "../settings/settings.service.js";
 import { ShellSettings } from "../settings/shell-settings.js";
 import { WindowStateReadMethod } from "../window-state/window-state-read-method.js";
 import { WindowStateStore } from "../window-state/window-state-store.js";
 import { WindowStateWriteMethod } from "../window-state/window-state-write-method.js";
 import { WorkMethod } from "../work/work-method.js";
 import { WorkTracker } from "../work/work-tracker.js";
+import { AppImageCopyCleanup } from "./app-image-copy-cleanup.js";
 import { IdleMonitor } from "./idle-monitor.js";
 import { MoveAsideMethod } from "./move-aside-method.js";
 import { RuntimeLog } from "./runtime-log.js";
@@ -94,6 +98,7 @@ export class RuntimeHost implements IIdleParticipant {
   private isStopping: boolean = false;
   private notificationSettings: NotificationSettings = new NotificationSettings(null);
   private readonly workEvent: EventChannel;
+  private readonly programsEvent: EventChannel;
 
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
@@ -122,7 +127,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.server = new RuntimeServer(
       this.identity,
       this.token,
-      new RuntimeHandover(this.identity, process.execPath),
+      new RuntimeHandover(this.identity, AppImageSource.locateProgram(environment, process.execPath)),
       this.methods,
       options.serverSettings,
       () => this.idle.check(),
@@ -132,6 +137,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
     this.workEvent = this.events.declare(ShellEvents.work);
     const commandsChanged = this.events.declare(ShellEvents.commandsChanged);
+    this.programsEvent = this.events.declare(ShellEvents.programsChanged);
     this.commands = new CommandRegistry(t => commandsChanged.publish(t.toJson()));
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
@@ -169,6 +175,7 @@ export class RuntimeHost implements IIdleParticipant {
     let database: ShellDatabase | null = null;
     try {
       log = await RuntimeLog.openAsync(lock, options.startLogName);
+      await AppImageCopyCleanup.removeAsync(lock.dataDirectory, log.diagnostics);
       const inspection = await DataDirectoryInspector.inspectAsync(options.dataDirectory);
       if (inspection.state !== DataDirectoryState.PreShell)
         database = await ShellDatabase.openAsync(lock, ShellMigrations.all);
@@ -231,7 +238,7 @@ export class RuntimeHost implements IIdleParticipant {
       endpoint.toString(),
       this.token.value,
       process.pid,
-      process.execPath,
+      AppImageSource.locateProgram(this.environment, process.execPath),
       this.identity.productVersion,
       this.identity.protocolVersion,
       this.identity.fingerprint);
@@ -255,6 +262,8 @@ export class RuntimeHost implements IIdleParticipant {
   private async activateModulesAsync(database: ShellDatabase, settings: SettingsService): Promise<void> {
     const processes = new ProcessSupervisor(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
     this.processes = processes;
+    processes.onChanged(() => this.programsEvent.publish(processes.status.toJson()));
+    this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));
     await processes.cleanUpAsync();
     await this.modules.activateAsync(settings, processes);
   }
@@ -270,6 +279,7 @@ export class RuntimeHost implements IIdleParticipant {
         this.notifications.republish();
     });
     this.methods.register(ShellMethods.settings, new SettingsReadMethod(settings));
+    this.methods.register(ShellMethods.readSetting, new SettingReadMethod(settings));
     this.methods.register(ShellMethods.setSetting, new SettingWriteMethod(settings));
     this.methods.register(ShellMethods.resetSetting, new SettingResetMethod(settings));
     this.settings = settings;

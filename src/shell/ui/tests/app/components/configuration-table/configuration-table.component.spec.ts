@@ -37,6 +37,14 @@ describe("ConfigurationTableComponent", () => {
     range.selectNodeContents(cell);
     return range.getClientRects().length;
   };
+  const baseline = (host: Element): number => {
+    const probe = document.createElement("span");
+    probe.style.display = "inline-block";
+    host.prepend(probe);
+    const bottom = probe.getBoundingClientRect().bottom;
+    probe.remove();
+    return bottom;
+  };
 
   afterEach(() => AppearanceFixture.reset());
 
@@ -79,6 +87,35 @@ describe("ConfigurationTableComponent", () => {
     await changeAsync(t => t.hasAction.set(false));
 
     expect([find(".tr-configuration-table-header"), box("table").top]).toEqual([null, box("tr-configuration-table").top]);
+  });
+
+  it("puts its explanation without a heading at the start of the actions' row, its first line level with their labels, and the actions under it once it would be narrower than a text field", async () => {
+    await renderAsync();
+    await changeAsync(t => {
+      t.heading.set("");
+      t.label.set("Environment variables");
+      t.explanation.set("Each variable is set for the programs the shell starts, after the system's own, and a project's variables come after these.");
+    });
+    const explanation = find(".tr-configuration-table-explanation");
+    const host = box("tr-configuration-table");
+    const add = box(".add");
+    const gap = AppearanceFixture.measureLook("space-4");
+
+    expect([fixture.nativeElement.querySelectorAll(".tr-configuration-table-explanation").length, explanation.parentElement]).toEqual([1, find(".tr-configuration-table-header")]);
+    expect([explanation.getBoundingClientRect().left, add.right]).toEqual([host.left, host.right]);
+    AppearanceFixture.expectPixels(add.left - explanation.getBoundingClientRect().right, gap);
+    expect(lines(explanation)).toBeGreaterThan(1);
+    expect(Math.round(baseline(explanation) - baseline(find(".add [data-truncates]")))).toBe(0);
+    AppearanceFixture.expectPixels(box("table").top - Math.max(explanation.getBoundingClientRect().bottom, add.bottom), AppearanceFixture.measureLook("space-3"));
+
+    await changeAsync(t => t.width.set(`calc(var(--tr-text-field-width) + ${gap + add.width + 1}px)`));
+
+    expect(box(".add").top).toBeLessThan(explanation.getBoundingClientRect().bottom);
+
+    await changeAsync(t => t.width.set(`calc(var(--tr-text-field-width) + ${gap + add.width - 1}px)`));
+
+    expect(box(".add").top).toBeGreaterThanOrEqual(explanation.getBoundingClientRect().bottom);
+    expect([explanation.getBoundingClientRect().left, explanation.getBoundingClientRect().right]).toEqual([box("tr-configuration-table").left, box("tr-configuration-table").right]);
   });
 
   for (const mode of AppearanceFixture.modes)
@@ -129,14 +166,6 @@ describe("ConfigurationTableComponent", () => {
 
   it("lines each cell's first line up with the label of the button in its row", async () => {
     await renderAsync();
-    const baseline = (host: Element): number => {
-      const probe = document.createElement("span");
-      probe.style.display = "inline-block";
-      host.prepend(probe);
-      const bottom = probe.getBoundingClientRect().bottom;
-      probe.remove();
-      return bottom;
-    };
     const label = baseline(find(".remove [data-truncates]"));
 
     expect([...fixture.nativeElement.querySelectorAll(".short td:not(:last-child)")].map(t => Math.round(baseline(t) - label))).toEqual([0, 0, 0]);

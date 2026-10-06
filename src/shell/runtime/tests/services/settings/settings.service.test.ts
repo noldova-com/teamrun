@@ -1,0 +1,266 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import {
+  FailureCode,
+  QualifiedName,
+  type SettingChange,
+  SettingDefinition,
+  SettingKey,
+  SettingLocality,
+  SettingOption,
+  SettingScope,
+  SettingType,
+  SettingValue
+} from "@noldova/teamrun-shell-protocol";
+import { SettingException, SettingsService } from "@noldova/teamrun-shell-runtime";
+
+import { SettingsFixture } from "../../fixtures/settings.fixture.js";
+
+@TestClass
+export class SettingsServiceTests {
+  private static readonly SEND: QualifiedName = QualifiedName.parse("chat.sendWithEnter");
+  private static readonly QUIET: QualifiedName = QualifiedName.parse("chat.quiet");
+  private static readonly CONVERSATION: QualifiedName = QualifiedName.parse("chat.conversation");
+  private static readonly PROJECT: QualifiedName = QualifiedName.parse("projects.project");
+  private static readonly DEFINITIONS: readonly SettingDefinition[] = [
+    new SettingDefinition(SettingsServiceTests.SEND, "Send with Enter", "Sends on Enter.", SettingType.boolean(), true, SettingLocality.Shared,
+      [SettingsServiceTests.CONVERSATION, SettingsServiceTests.PROJECT], "Chat", "Composer"),
+    new SettingDefinition(SettingsServiceTests.QUIET, "Quiet", "Holds back sounds.", SettingType.boolean(), false, SettingLocality.Device, [], "Chat", "Sounds")
+  ];
+  private static readonly KINDS: readonly (readonly [SettingDefinition, JsonValue, JsonValue])[] = [
+    [new SettingDefinition(QualifiedName.parse("chat.mode"), "Mode", "Picks the mode.", SettingType.choice([new SettingOption("system", "System"), new SettingOption("dark", "Dark")]), "system",
+      SettingLocality.Shared, [], "Chat", "Look"), "dark", "system"],
+    [new SettingDefinition(QualifiedName.parse("chat.sounds"), "Sounds", "Plays sounds.", SettingType.boolean(), true, SettingLocality.Shared, [], "Chat", "Look"), false, true],
+    [new SettingDefinition(QualifiedName.parse("chat.volume"), "Volume", "Sets the volume.", SettingType.number(0, 10, 1), 5, SettingLocality.Shared, [], "Chat", "Look"), 7, 5],
+    [new SettingDefinition(QualifiedName.parse("chat.nickname"), "Nickname", "Names you.", SettingType.text(20), "guest", SettingLocality.Shared, [], "Chat", "Look"), "ana", "guest"],
+    [new SettingDefinition(QualifiedName.parse("chat.muted"), "Muted", "Lists modules.", SettingType.modules(), ["chat", "mail"], SettingLocality.Shared, [], "Chat", "Look"), ["chat"], ["chat", "mail"]],
+    [new SettingDefinition(QualifiedName.parse("chat.keys"), "Keys", "Binds keys.", SettingType.keyBindings(), {}, SettingLocality.Shared, [], "Chat", "Look"),
+      { "chat.send": "Mod+Enter", "shell.closeTab": null }, {}]
+  ];
+
+  @TestMethod
+  public async readsTheDefaultUntilAValueIsSetAndAgainAfterAReset(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const key = new SettingKey(SettingsServiceTests.SEND);
+    const changes: string[] = [];
+    settings.service.onChanged(t => changes.push(JSON.stringify(t.toJson())));
+
+    const before = settings.service.read(key);
+    settings.service.write(new SettingValue(key, false));
+    const set = settings.service.read(key);
+    const entry = settings.service.snapshot(null).entries.find(t => t.name.text === SettingsServiceTests.SEND.text);
+    settings.service.reset(key);
+
+    Assert.areEqual("true,false,true", [before, set, settings.service.read(key)].join(","));
+    Assert.areEqual("false,true", [entry?.value, entry?.isSet].join(","));
+    Assert.areEqual(JSON.stringify(["{\"name\":\"chat.sendWithEnter\",\"value\":false,\"isSet\":true}", "{\"name\":\"chat.sendWithEnter\",\"value\":true,\"isSet\":false}"]), JSON.stringify(changes));
+    Assert.isFalse(settings.service.snapshot(null).entries.some(t => t.isSet));
+  }
+
+  @TestMethod
+  public async treatsSettingTheDefaultAsAResetForEveryKindOfValue(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.KINDS.map(([definition]) => definition));
+    const changes: string[] = [];
+    settings.service.onChanged(t => changes.push(JSON.stringify(t.toJson())));
+    const stored = (definition: SettingDefinition): boolean => settings.service.snapshot(null).entries.find(t => t.name.text === definition.name.text)?.isSet ?? false;
+
+    for (const [definition, other, standard] of SettingsServiceTests.KINDS) {
+      const key = new SettingKey(definition.name);
+      settings.service.write(new SettingValue(key, other));
+      Assert.isTrue(stored(definition));
+      settings.service.write(new SettingValue(key, JSON.parse(JSON.stringify(standard)) as JsonValue));
+
+      Assert.isFalse(stored(definition));
+      Assert.areEqual(JSON.stringify(standard), JSON.stringify(settings.service.read(key)));
+      Assert.areEqual(JSON.stringify({ name: definition.name.text, value: standard, isSet: false }), changes.at(-1));
+    }
+    Assert.isFalse(settings.service.snapshot(null).entries.some(t => t.isSet));
+    Assert.areEqual(0, settings.database.readAll("SELECT name FROM setting_values").length);
+    Assert.areEqual(12, changes.length);
+
+    const mode = SettingsServiceTests.KINDS[0]?.[0];
+    if (mode === undefined)
+      throw new Error("No setting.");
+    const later = new SettingsService(settings.database, [new SettingDefinition(mode.name, mode.title, mode.description, mode.type, "dark", mode.locality, [], mode.page, mode.group)], settings.diagnostics);
+    Assert.areEqual("dark", later.read(new SettingKey(mode.name)));
+  }
+
+  @TestMethod
+  public async keepsADefaultWrittenToAScopeWhoseEnclosingScopeHoldsAnotherValue(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const conversation = new SettingScope(SettingsServiceTests.CONVERSATION, "c1");
+    const project = new SettingScope(SettingsServiceTests.PROJECT, "p1");
+    const key = new SettingKey(SettingsServiceTests.SEND, conversation);
+    const changes: SettingChange[] = [];
+    settings.service.setScopeParent(conversation, project);
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND, project), false));
+    settings.service.onChanged(t => changes.push(t));
+
+    settings.service.write(new SettingValue(key, true));
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND, project), true));
+    settings.service.write(new SettingValue(key, true));
+
+    Assert.areEqual("true,true", [settings.service.read(key), changes[0]?.isSet].join(","));
+    Assert.areEqual("false", String(changes.at(-1)?.isSet));
+  }
+
+  @TestMethod
+  public async keepsADeviceSettingForEachDeviceAndAsksForOne(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const quiet = (device: string | null): SettingKey => new SettingKey(SettingsServiceTests.QUIET, null, device);
+
+    settings.service.write(new SettingValue(quiet("d1"), true));
+    settings.service.write(new SettingValue(quiet("d2"), true));
+    settings.service.write(new SettingValue(quiet("d3"), true));
+    settings.service.write(new SettingValue(quiet("d3"), false));
+    const missing = Assert.throws(() => settings.service.write(new SettingValue(quiet(null), true)), SettingException);
+    const scoped = Assert.throws(() => settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.QUIET, new SettingScope(SettingsServiceTests.CONVERSATION, "c1"), "d1"), true)),
+      SettingException);
+
+    Assert.areEqual("true,true,false,false", [quiet("d1"), quiet("d2"), quiet("d3"), quiet(null)].map(t => settings.service.read(t)).join(","));
+    Assert.areEqual("d1=true,d2=true", [...settings.service.readDevices(SettingsServiceTests.QUIET)].map(([device, value]) => `${device}=${String(value)}`).join(","));
+    Assert.areEqual("true,false", [settings.service.snapshot("d1"), settings.service.snapshot(null)].map(t => t.entries.find(u => u.name.text === SettingsServiceTests.QUIET.text)?.value).join(","));
+    Assert.areEqual(`${FailureCode.InvalidParams},${FailureCode.InvalidParams}`, [missing.failure.code, scoped.failure.code].join(","));
+  }
+
+  @TestMethod
+  public async keepsOneSharedValueWhateverDeviceAWriteNames(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const changes: SettingChange[] = [];
+    settings.service.onChanged(t => changes.push(t));
+
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND, null, "d1"), false));
+
+    Assert.areEqual(false, settings.service.read(new SettingKey(SettingsServiceTests.SEND, null, "d2")));
+    Assert.isNull(changes[0]?.key.device);
+  }
+
+  @TestMethod
+  public async resolvesAScopeThroughItsEnclosingScopesThenTheApplication(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const conversation = new SettingScope(SettingsServiceTests.CONVERSATION, "c1");
+    const project = new SettingScope(SettingsServiceTests.PROJECT, "p1");
+    const read = (): string => String(settings.service.read(new SettingKey(SettingsServiceTests.SEND, conversation)));
+    const results: string[] = [read()];
+
+    settings.service.setScopeParent(conversation, project);
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND, project), false));
+    results.push(read());
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND, conversation), true));
+    results.push(read());
+    settings.service.removeScope(conversation);
+    results.push(read());
+    settings.service.setScopeParent(conversation, null);
+    results.push(read());
+
+    Assert.areEqual("true,false,true,true,true", results.join(","));
+  }
+
+  @TestMethod
+  public async readsTheEntryForAKeyThroughItsEnclosingScopesAndSaysWhetherTheKeyItselfHoldsIt(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const conversation = new SettingScope(SettingsServiceTests.CONVERSATION, "c1");
+    const project = new SettingScope(SettingsServiceTests.PROJECT, "p1");
+    const read = (key: SettingKey): string => {
+      const entry = settings.service.readEntry(key);
+      return `${entry.name.text}=${String(entry.value)}/${String(entry.isSet)}`;
+    };
+    const send = new SettingKey(SettingsServiceTests.SEND, conversation);
+    settings.service.setScopeParent(conversation, project);
+    const results: string[] = [read(send)];
+
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND), false));
+    results.push(read(send), read(new SettingKey(SettingsServiceTests.SEND)));
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND, project), true));
+    results.push(read(send));
+    settings.service.write(new SettingValue(send, false));
+    results.push(read(send));
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.QUIET, null, "d1"), true));
+    results.push(read(new SettingKey(SettingsServiceTests.QUIET, null, "d1")), read(new SettingKey(SettingsServiceTests.QUIET, null, "d2")));
+
+    Assert.areEqual([
+      "chat.sendWithEnter=true/false", "chat.sendWithEnter=false/false", "chat.sendWithEnter=false/true", "chat.sendWithEnter=true/false",
+      "chat.sendWithEnter=false/true", "chat.quiet=true/true", "chat.quiet=false/false"
+    ].join(","), results.join(","));
+    Assert.areEqual("NotFound,InvalidParams,InvalidParams", [
+      Assert.throws(() => settings.service.readEntry(new SettingKey(QualifiedName.parse("chat.speed"))), SettingException),
+      Assert.throws(() => settings.service.readEntry(new SettingKey(SettingsServiceTests.SEND, new SettingScope(QualifiedName.parse("chat.thread"), "t1"))), SettingException),
+      Assert.throws(() => settings.service.readEntry(new SettingKey(SettingsServiceTests.QUIET)), SettingException)
+    ].map(t => t.failure.code).join(","));
+  }
+
+  @TestMethod
+  public async stopsAtAScopeCycleAndSkipsScopesASettingDoesNotList(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const conversation = new SettingScope(SettingsServiceTests.CONVERSATION, "c1");
+    const thread = new SettingScope(QualifiedName.parse("chat.thread"), "t1");
+    settings.service.setScopeParent(conversation, thread);
+    settings.service.setScopeParent(thread, conversation);
+    settings.database.run("INSERT INTO setting_values (name, scope_name, scope_id, device, value) VALUES (?, ?, ?, ?, ?)", SettingsServiceTests.SEND.text, "chat.thread", "t1", "", "false");
+
+    Assert.areEqual(true, settings.service.read(new SettingKey(SettingsServiceTests.SEND, conversation)));
+  }
+
+  @TestMethod
+  public async refusesAnUnknownSettingAValueItsTypeRefusesAndAScopeItDoesNotList(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const unknown = QualifiedName.parse("chat.speed");
+    const thread = new SettingScope(QualifiedName.parse("chat.thread"), "t1");
+
+    const failures = [
+      Assert.throws(() => settings.service.read(new SettingKey(unknown)), SettingException),
+      Assert.throws(() => settings.service.readDevices(unknown), SettingException),
+      Assert.throws(() => settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND), "yes")), SettingException),
+      Assert.throws(() => settings.service.reset(new SettingKey(SettingsServiceTests.SEND, thread)), SettingException),
+      Assert.throws(() => settings.service.read(new SettingKey(SettingsServiceTests.SEND, thread)), SettingException),
+      Assert.throws(() => settings.service.read(new SettingKey(SettingsServiceTests.QUIET, thread, "d1")), SettingException)
+    ];
+
+    Assert.areEqual("NotFound,NotFound,InvalidParams,InvalidParams,InvalidParams,InvalidParams", failures.map(t => t.failure.code).join(","));
+    Assert.areEqual("No setting named chat.speed is declared.", failures[0]?.message);
+    Assert.areEqual("The setting chat.sendWithEnter does not list the scope chat.thread.", failures[4]?.message);
+    Assert.areEqual("The setting chat.quiet does not list the scope chat.thread.", failures[5]?.message);
+  }
+
+  @TestMethod
+  public async ignoresAndReportsOnceAStoredValueThatNoLongerFits(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const insert = (name: QualifiedName, device: string, value: string): void => {
+      settings.database.run("INSERT INTO setting_values (name, scope_name, scope_id, device, value) VALUES (?, '', '', ?, ?)", name.text, device, value);
+    };
+    insert(SettingsServiceTests.SEND, "", "\"yes\"");
+    insert(SettingsServiceTests.QUIET, "d1", "{not json");
+    insert(SettingsServiceTests.QUIET, "d2", "true");
+
+    const shared = settings.service.read(new SettingKey(SettingsServiceTests.SEND));
+    settings.service.read(new SettingKey(SettingsServiceTests.SEND));
+    const devices = [...settings.service.readDevices(SettingsServiceTests.QUIET).keys()];
+
+    Assert.areEqual(true, shared);
+    Assert.areEqual("d2", devices.join(","));
+    Assert.areEqual(2, settings.diagnostics.text.split("\n").filter(t => t.length > 0).length);
+    Assert.isTrue(settings.diagnostics.text.includes("The stored value of the setting chat.sendWithEnter for the scope \"\" and device \"\" no longer fits"));
+  }
+
+  @TestMethod
+  public async stopsTellingAListenerOnceItIsDisposed(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const changes: SettingChange[] = [];
+    const listening = settings.service.onChanged(t => changes.push(t));
+
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND), false));
+    listening[Symbol.dispose]();
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND), true));
+
+    Assert.areEqual(1, changes.length);
+    Assert.areEqual("chat.sendWithEnter", settings.service.define(SettingsServiceTests.SEND).name.text);
+  }
+}

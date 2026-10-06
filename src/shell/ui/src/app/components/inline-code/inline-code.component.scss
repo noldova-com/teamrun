@@ -1,0 +1,19 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  padding-inline: var(--tr-space-1);
+  border-radius: var(--tr-radius-small);
+  background-color: var(--tr-inline-code);
+  color: inherit;
+  font-family: var(--tr-font-mono);
+  font-size: inherit;
+  line-height: 1;
+  overflow-wrap: anywhere;
+  box-decoration-break: clone;
+}

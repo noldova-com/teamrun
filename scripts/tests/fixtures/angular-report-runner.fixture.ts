@@ -19,6 +19,9 @@ export default class AngularReportRunnerFixture extends ProcessRunnerFixture {
 
   private static readonly REPORTER_DESTINATION: string = "--test-reporter-destination=";
   private static readonly SCRIPT_TEST_SUFFIX: string = ".test.ts";
+  private static readonly JSON_SUFFIX: string = ".json";
+  private static readonly RESULT_VARIABLE: string = "TEAMRUN_TEST_RESULT_FILE";
+  private static readonly EMPTY_RESULT: string = `${JSON.stringify({ passed: 0, failed: 0, skipped: 0, unreached: 0, skips: [], files: [] })}\n`;
 
   private readonly report: string;
 
@@ -33,8 +36,13 @@ export default class AngularReportRunnerFixture extends ProcessRunnerFixture {
     if (commandArguments.includes(AngularReportRunnerFixture.OUTPUT_FILE_OPTION) && file !== undefined)
       await writeFile(file, this.report);
     const destination = commandArguments.find(t => t.startsWith(AngularReportRunnerFixture.REPORTER_DESTINATION) && !t.endsWith("=stdout"));
-    if (destination !== undefined)
-      await writeFile(destination.slice(AngularReportRunnerFixture.REPORTER_DESTINATION.length), AngularReportRunnerFixture.formatUnmatchedReport(commandArguments));
+    if (destination !== undefined) {
+      const report = destination.slice(AngularReportRunnerFixture.REPORTER_DESTINATION.length);
+      await writeFile(report, report.endsWith(AngularReportRunnerFixture.JSON_SUFFIX) ? AngularReportRunnerFixture.EMPTY_RESULT : AngularReportRunnerFixture.formatUnmatchedReport(commandArguments));
+    }
+    const result = environment?.[AngularReportRunnerFixture.RESULT_VARIABLE];
+    if (result !== undefined)
+      await writeFile(result, AngularReportRunnerFixture.EMPTY_RESULT);
     if (commandArguments.includes(AngularReportRunnerFixture.PACKAGED_OPTION)) {
       await new GalleryFile(directory).writeAsync(true);
       const output = commandArguments[commandArguments.indexOf(AngularReportRunnerFixture.OUTPUT_OPTION) + 1];

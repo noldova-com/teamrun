@@ -14,6 +14,7 @@ export class ShellMethods {
   public static readonly moveAside: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.moveAsideMember);
   public static readonly modules: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.modulesMember);
   public static readonly work: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.workMember);
+  public static readonly programs: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.programsMember);
   public static readonly commands: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.commandsMember);
   public static readonly runCommand: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.runCommandMember);
   public static readonly notifications: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.notificationsMember);
@@ -27,6 +28,7 @@ export class ShellMethods {
   public static readonly readWindowLayout: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.readWindowLayoutMember);
   public static readonly writeWindowLayout: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.writeWindowLayoutMember);
   public static readonly settings: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.settingsMember);
+  public static readonly readSetting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.readSettingMember);
   public static readonly setSetting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.setSettingMember);
   public static readonly resetSetting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.resetSettingMember);
   public static readonly recentCommands: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.recentCommandsMember);

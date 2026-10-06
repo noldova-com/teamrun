@@ -7,7 +7,7 @@
  */
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost, SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
+import type { NotificationPost, SettingChange, SettingEntry, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import type { MenuItem } from "../models/menu-item";
 import type { ViewBadge } from "../models/view-badge";
@@ -25,6 +25,8 @@ export interface IWindowPartHost {
 
   log(moduleId: string, message: string): void;
 
+  openLinkAsync(url: string): Promise<void>;
+
   isCommandRegistered(name: string): boolean;
 
   declaresDynamicMenuGroup(moduleId: string, group: string): boolean;
@@ -41,6 +43,8 @@ export interface IWindowPartHost {
 
   readSetting(name: string): JsonValue | undefined;
 
+  readSettingAsync(name: string, scope: SettingScope | null): Promise<SettingEntry>;
+
   writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void>;
 
   resetSettingAsync(name: string, scope: SettingScope | null): Promise<void>;
@@ -48,6 +52,8 @@ export interface IWindowPartHost {
   onSettingChanged(listener: (change: SettingChange) => void): () => void;
 
   setViewBadge(view: string, badge: ViewBadge | null): void;
+
+  setTabWorking(tabKey: string, isWorking: boolean): void;
 
   refresh(): void;
 }

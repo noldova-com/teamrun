@@ -8,14 +8,17 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { writeFileSync } from "node:fs";
+
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 import { TestingException } from "../../exceptions/testing.exception.js";
 import { CoverageExclusion } from "../../models/coverage/coverage-exclusion.js";
 import { CoverageProject } from "../../models/coverage/coverage-project.js";
+import type { CoverageResult } from "../../models/coverage/coverage-result.js";
 import { Resources } from "../../resources.js";
 import { CoverageReportWriter } from "../reporting/coverage-report-writer.js";
-import { GitHubSummaryWriter } from "../reporting/git-hub-summary-writer.js";
+import { GitHubSummaryWriter } from "../reporting/github-summary-writer.js";
 import { CoverageAnalyzer } from "./coverage-analyzer.js";
 
 export class CoverageRunEntry {
@@ -44,6 +47,9 @@ export class CoverageRunEntry {
       for (const line of new CoverageReportWriter().formatLines(result, !Object.isUndefined(process.env[Resources.skipTestDetailsVariable])))
         console.log(line);
       summary.writeCoverage(result);
+      const resultFile = process.env[Resources.coverageResultFileVariable];
+      if (!Object.isUndefined(resultFile))
+        writeFileSync(resultFile, JSON.stringify(this.countFiles(result)));
       process.exitCode = result.isComplete ? 0 : Resources.failedExitCode;
     }
     catch (error) {
@@ -51,6 +57,11 @@ export class CoverageRunEntry {
       summary.writeFailure(String(error));
       process.exitCode = Resources.failedExitCode;
     }
+  }
+
+  private countFiles(result: CoverageResult): object {
+    const measured = result.executableFileCoverages.filter(t => !t.isExcluded).length;
+    return { covered: measured - result.incompleteFileCoverages.length, total: measured };
   }
 
   private parseTestFolders(text: string): string[] {

@@ -68,6 +68,7 @@ export class NotesWindowPart implements IWindowPart {
       () => import("./components/notes-outline/notes-outline.component").then(t => t.NotesOutlineComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution("notes.note",
       () => import("./components/note/note.component").then(t => t.NoteComponent)));
+    context.registerSave(() => NotesWindowPart.saveAsync());
     context.openDocument("notes.note", "1", "Note 1");
     context.openDocument("notes.note", "2", "Note 2");
     let count = 2;
@@ -124,6 +125,17 @@ export class NotesWindowPart implements IWindowPart {
   }
 
   public async deactivateAsync(): Promise<void> {
+  }
+
+  private static saveAsync(): Promise<void> {
+    switch (NotesState.saving()) {
+      case "fails":
+        return Promise.reject(new Error("The disk is full."));
+      case "hangs":
+        return new Promise<void>(() => undefined);
+      default:
+        return Promise.resolve();
+    }
   }
 
   private static async readOptionsAsync(context: IWindowPartContext, counter: StatusBarItem): Promise<JsonReader> {

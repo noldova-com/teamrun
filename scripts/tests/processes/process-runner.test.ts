@@ -7,8 +7,9 @@
  */
 
 import assert from "node:assert/strict";
-import { realpathSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import fs, { realpathSync } from "node:fs";
+import { readFile, rm } from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -90,13 +91,17 @@ class ProcessRunnerTests {
       assert.ok(["passedfailed", "failedpassed"].includes(await readFile(log, "utf8")));
     });
 
-    test("running passes the given environment instead of the process's own", async () => {
+    test("running passes the given environment instead of the process's own", async t => {
       const script = "process.exitCode = process.env.TEAMRUN_FIXTURE_VALUE === \"given\" ? 0 : 3";
 
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", script], tmpdir(), { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" }), 0);
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", script], tmpdir()), 3);
       assert.equal((await new ProcessRunner().captureAsync(process.execPath, ["-e", script], tmpdir(), ProcessRunnerTests.TIMEOUT, { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" })).exitCode, 0);
       assert.equal((await new ProcessRunner().captureAsync(process.execPath, ["-e", script], tmpdir(), ProcessRunnerTests.TIMEOUT)).exitCode, 3);
+      const log = path.join(tmpdir(), `teamrun-environment-${process.pid}.log`);
+      t.after(() => rm(log, { force: true }));
+      assert.equal(await new ProcessRunner().runLoggedAsync(process.execPath, ["-e", script], tmpdir(), log, new TextOutputFixture(), new TextOutputFixture(), { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" }), 0);
+      assert.equal(await new ProcessRunner().runLoggedAsync(process.execPath, ["-e", script], tmpdir(), log, new TextOutputFixture(), new TextOutputFixture()), 3);
     });
 
     test("starting returns the running process at once, with both output streams going to the log", async t => {
@@ -149,6 +154,49 @@ class ProcessRunnerTests {
       assert.equal(runner.isRunning(started.id), false);
       runner.kill(started.id);
       assert.throws(() => runner.kill(Number.NaN), TypeError);
+    });
+
+    test("ending asks a running process to end, and a process that has already ended is left alone", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const runner = new ProcessRunner();
+      const started = await runner.startAsync(process.execPath, ["-e", "setInterval(() => {}, 1000)"], tmpdir(), path.join(repository.directory, "ended.log"));
+      t.after(() => {
+        if (!started.hasExited)
+          started.signal("SIGKILL");
+      });
+
+      runner.end(started.id);
+
+      assert.equal(await started.waitAsync(ProcessRunnerTests.TIMEOUT), true);
+      runner.end(started.id);
+    });
+
+    test("the children of a process are read from its task's children file", t => {
+      const children = (file: unknown): string => {
+        if (file !== "/proc/4242/task/4242/children")
+          throw new Error(`ENOENT: no such file or directory, open '${String(file)}'`);
+        return "4243 4250 ";
+      };
+      const reading = t.mock.method(fs, "readFileSync", children);
+      syncBuiltinESMExports();
+      try {
+        assert.deepEqual(new ProcessRunner().listChildren(4242), [4243, 4250]);
+      }
+      finally {
+        reading.mock.restore();
+        syncBuiltinESMExports();
+      }
+    });
+
+    test("the children of a process include one it started", { skip: process.platform === "linux" ? false : "Only Linux lists children in /proc." }, async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const runner = new ProcessRunner();
+      const started = await runner.startAsync(process.execPath, ["-e", "setInterval(() => {}, 1000)"], tmpdir(), path.join(repository.directory, "child.log"));
+      t.after(() => started.signal("SIGKILL"));
+
+      assert.equal(runner.listChildren(process.pid).includes(started.id), true);
     });
   }
 }

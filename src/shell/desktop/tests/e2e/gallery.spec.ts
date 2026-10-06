@@ -337,7 +337,7 @@ test.describe("gallery", () => {
     }
   });
 
-  test("a configuration table shows its heading and Add above its explanation and separated rows, grows a row for long text and scrolls sideways only when narrow, in light and in dark", async ({ desktop }) => {
+  test("a configuration table shows its heading and Add above its explanation and separated rows, or without a heading its explanation beside Add, grows a row for long text and scrolls sideways only when narrow, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
 
@@ -352,13 +352,14 @@ test.describe("gallery", () => {
       await expect(table.getByRole("columnheader")).toHaveText(["Name", "Value", "Scope", ""]);
       await expect(table.getByRole("columnheader").last()).toHaveAttribute("aria-label", "Actions");
       await expect(table.getByRole("button", { name: "Remove NOTES_HOME" })).toBeVisible();
-      await expect(areas).toHaveCount(2);
+      await expect(areas).toHaveCount(3);
       await expect(narrow.getByRole("row")).toHaveCount(3);
-      const [wide, small] = [areas.first(), areas.last()];
+      const [wide, small] = [areas.first(), areas.filter({ has: window.getByRole("table", { name: "Narrow environment variables" }) })];
+      const unheaded = specimen.locator("tr-configuration-table").filter({ has: window.getByRole("table", { name: "Global environment variables" }) });
       const [heading, add, explanation, grid] = await Promise.all([
         specimen.locator(".tr-configuration-table-heading").boundingBox(),
-        specimen.locator(".tr-configuration-table-actions button").boundingBox(),
-        specimen.locator(".tr-configuration-table-explanation").boundingBox(),
+        specimen.locator(".tr-configuration-table-actions button").first().boundingBox(),
+        specimen.locator(".tr-configuration-table-explanation").first().boundingBox(),
         table.boundingBox()
       ]);
       const measured = await wide.evaluate((t: HTMLElement) => {
@@ -400,6 +401,25 @@ test.describe("gallery", () => {
         token.selectNodeContents(cell);
         return { tokenLines: token.getClientRects().length, overflow: t.scrollWidth - t.clientWidth };
       });
+      await expect(unheaded.getByRole("table", { name: "Global environment variables" })).toBeVisible();
+      await expect(unheaded.locator(".tr-configuration-table-header .tr-configuration-table-explanation")).toHaveText("These apply to every project, before the project's own variables.");
+      const leading = await unheaded.evaluate((t: HTMLElement) => {
+        const text = t.querySelector<HTMLElement>(".tr-configuration-table-explanation");
+        const button = t.querySelector<HTMLElement>(".tr-configuration-table-actions button");
+        const label = button === null ? null : button.querySelector<HTMLElement>("[data-truncates]");
+        if (text === null || button === null || label === null)
+          throw new Error("The configuration table without a heading has no explanation or Add.");
+        const baseline = (host: Element): number => {
+          const probe = document.createElement("span");
+          probe.style.display = "inline-block";
+          host.prepend(probe);
+          const bottom = probe.getBoundingClientRect().bottom;
+          probe.remove();
+          return bottom;
+        };
+        return { isBeside: text.getBoundingClientRect().right < button.getBoundingClientRect().left, baseline: Math.round(baseline(text) - baseline(label)) };
+      });
+      expect(leading).toEqual({ isBeside: true, baseline: 0 });
       if (heading === null || add === null || explanation === null || grid === null)
         throw new Error("The configuration table's heading, Add, explanation or table is not shown.");
 
@@ -425,6 +445,59 @@ test.describe("gallery", () => {
       await ScrollAreaFixture.revealThumbColorAsync(window, small);
       await desktop.checkpointAsync(`configuration-table-${mode.toLowerCase()}`);
       await window.mouse.move(0, 0);
+    }
+  });
+
+  test("a code block's Word wrap is pressed by keyboard and wraps its lines, its long line never widens the Settings document, its text keeps equal space over and under it and its end padding when scrolled to the end, and Copy puts its code on the system clipboard, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator(".tr-settings-content");
+    await SettingsFixture.openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const block = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Code block\"] tr-gallery-cell[aria-label=\"Default\"] tr-code-block");
+      const body = block.locator(".tr-code-block-body");
+      const wrap = block.getByRole("button", { name: "Word wrap" });
+      const overflowAsync = (area: Locator): Promise<number> => area.evaluate(t => t.scrollWidth - t.clientWidth);
+      const edgesAsync = (): Promise<{ top: number; bottom: number; start: number; end: number }> => body.evaluate((t: HTMLElement) => {
+        const range = document.createRange();
+        range.selectNodeContents(t.querySelector("code") as Element);
+        const area = t.getBoundingClientRect();
+        const lines = [...range.getClientRects()];
+        const start = (lines[0] as DOMRect).left - area.left;
+        const scroll = t.scrollLeft;
+        t.scrollLeft = t.scrollWidth;
+        const end = area.right - Math.max(...[...range.getClientRects()].map(u => u.right));
+        t.scrollLeft = scroll;
+        return { top: Math.round((lines[0] as DOMRect).top - area.top), bottom: Math.round(area.bottom - (lines.at(-1) as DOMRect).bottom), start: Math.round(start), end: Math.round(end) };
+      });
+      await block.scrollIntoViewIfNeeded();
+
+      await expect(block.getByRole("toolbar", { name: "Code block actions" }).getByRole("button")).toHaveText(["wrap_text", "content_copy"]);
+      await expect(wrap).toHaveAttribute("aria-pressed", "false");
+      expect(await overflowAsync(body)).toBeGreaterThan(0);
+      expect(await overflowAsync(content)).toBeLessThanOrEqual(0);
+      const scrolling = await edgesAsync();
+      expect([scrolling.bottom, scrolling.end]).toEqual([scrolling.top, scrolling.start]);
+
+      await wrap.focus();
+      await window.keyboard.press("Enter");
+      await expect(wrap).toHaveAttribute("aria-pressed", "true");
+      expect(await overflowAsync(body)).toBeLessThanOrEqual(0);
+      await expect.poll(async () => {
+        const wrapped = await edgesAsync();
+        return [wrapped.top, wrapped.bottom];
+      }).toEqual([scrolling.top, scrolling.top]);
+      await desktop.checkpointAsync(`code-block-wrapped-${mode.toLowerCase()}`);
+      await window.keyboard.press("Space");
+      await expect(wrap).toHaveAttribute("aria-pressed", "false");
+      expect(await overflowAsync(body)).toBeGreaterThan(0);
+
+      await window.keyboard.press("ArrowRight");
+      await window.keyboard.press("Enter");
+      await expect(block.getByRole("button", { name: "Copied" })).toBeFocused();
+      expect(await desktop.application.evaluate(({ clipboard }) => clipboard.readText())).toBe(await block.locator("code").textContent());
+      await desktop.checkpointAsync(`code-block-copied-${mode.toLowerCase()}`);
+      await expect(block.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 5000 });
     }
   });
 });

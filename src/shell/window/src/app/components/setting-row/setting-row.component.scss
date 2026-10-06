@@ -60,10 +60,14 @@
   margin-top: var(--tr-settings-item-control-gap);
 }
 
-.tr-setting-row-modules {
+.tr-setting-row-list {
   display: flex;
   flex-direction: column;
   gap: var(--tr-space-2);
+}
+
+.tr-setting-row-note {
+  color: var(--tr-text-muted);
 }
 
 .tr-setting-row-number {

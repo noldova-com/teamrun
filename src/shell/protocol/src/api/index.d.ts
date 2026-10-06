@@ -227,6 +227,15 @@ export declare enum SettingKind {
   KeyBindings = "KeyBindings",
 
   /**
+   * A list of distinct spelling language tags, such as `en-US`, each two or
+   * three lowercase letters followed by any number of hyphenated parts of
+   * up to eight letters or digits. The window offers the languages whose
+   * dictionaries ship with the desktop. Only the shell's
+   * `shell.spellCheckLanguages` has this kind.
+   */
+  Languages = "Languages",
+
+  /**
    * A button that runs a command, such as one that opens a module's own
    * document. It holds no value: its default and only accepted value is
    * `null`, so nothing is stored.
@@ -1380,10 +1389,48 @@ export declare class ShellEvents {
   public static readonly commandsChanged: QualifiedName;
 
   /**
+   * `shell.programsChanged`: a program a module runs started or exited, or
+   * the process group an exited program left ended; its payload is the whole
+   * `ProgramStatusList`, with a sequence greater than any list before it.
+   */
+  public static readonly programsChanged: QualifiedName;
+
+  /**
    * `shell.recentCommandsChanged`: a device ran a command from command search; its payload is that device's
    * `RecentCommands`.
    */
   public static readonly recentCommandsChanged: QualifiedName;
+}
+
+/**
+ * The notification kinds the shell posts itself. They belong to no module,
+ * so turning modules' notifications off never mutes them.
+ */
+export declare class ShellNotifications {
+  /**
+   * `shell.saveFailed`: a window part's save failed while TeamRun was
+   * closing, so TeamRun stayed open; an error naming the module.
+   */
+  public static readonly saveFailed: QualifiedName;
+
+  /**
+   * `shell.saveUnfinished`: a window part did not finish saving within its
+   * time while TeamRun was closing, and TeamRun closed without it; a
+   * warning naming the module.
+   */
+  public static readonly saveUnfinished: QualifiedName;
+
+  /**
+   * Every kind above, in this order.
+   *
+   * @example
+   * ```ts
+   * import { ShellNotifications } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isShellKind: boolean = ShellNotifications.all.some(t => t.text === "shell.saveFailed");
+   * ```
+   */
+  public static readonly all: readonly QualifiedName[];
 }
 
 /**
@@ -1415,6 +1462,12 @@ export declare class ShellMethods {
    * stopping anything; it answers with a `WorkReport`.
    */
   public static readonly work: QualifiedName;
+
+  /**
+   * `shell.programs`: asks the runtime for the programs its modules run; it
+   * answers with a `ProgramStatusList`.
+   */
+  public static readonly programs: QualifiedName;
 
   /**
    * `shell.commands`: asks the runtime for the commands its active modules'
@@ -1495,6 +1548,14 @@ export declare class ShellMethods {
    * `SettingsSnapshot`.
    */
   public static readonly settings: QualifiedName;
+
+  /**
+   * `shell.readSetting`: asks for a setting's value in effect for a key,
+   * resolved through the key's scope object, its enclosing scope objects,
+   * the application and the default; its payload is a `SettingKey` and its
+   * answer a `SettingEntry`. It fails as `shell.setSetting` does.
+   */
+  public static readonly readSetting: QualifiedName;
 
   /**
    * `shell.setSetting`: sets a setting's value; its payload is a
@@ -1768,6 +1829,20 @@ export declare class SettingType {
    * ```
    */
   public static keyBindings(): SettingType;
+
+  /**
+   * Creates the type of the setting that holds the spelling languages.
+   *
+   * @returns The languages type.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.languages();
+   * ```
+   */
+  public static languages(): SettingType;
 
   /**
    * Creates the type of a setting whose row is a button that runs a
@@ -2280,8 +2355,8 @@ export declare class SettingValue {
 }
 
 /**
- * A setting's value in effect for the application, and whether it is set
- * or the default.
+ * A setting's value in effect for the application or for a key, and whether
+ * a value is stored for it. The answer of `shell.readSetting`.
  */
 export declare class SettingEntry {
   /**
@@ -2295,7 +2370,8 @@ export declare class SettingEntry {
   public readonly value: JsonValue;
 
   /**
-   * Whether a value is set; `false` when the default is in effect.
+   * Whether a value is stored for the application or the key; `false` when
+   * the value comes from an enclosing scope or the default.
    */
   public readonly isSet: boolean;
 
@@ -2945,6 +3021,160 @@ export declare class CommandList {
    * import { CommandList } from "@noldova/teamrun-shell-protocol";
    *
    * export const json: JsonObject = new CommandList([], 0).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A program the runtime runs for a module, as the window shows it. Its
+ * arguments and environment are never part of it.
+ */
+export declare class ProgramStatus {
+  /**
+   * The module the program runs for.
+   */
+  public readonly moduleId: string;
+
+  /**
+   * The program's path.
+   */
+  public readonly program: string;
+
+  /**
+   * The program's process id, or on macOS and Linux, once the program has
+   * exited, the id of the process group it led.
+   */
+  public readonly processId: number;
+
+  /**
+   * When the program started.
+   */
+  public readonly started: Date;
+
+  /**
+   * Whether the program has exited cleanly on macOS or Linux while the
+   * process group it led still runs.
+   */
+  public readonly hasExited: boolean;
+
+  /**
+   * Creates the status.
+   *
+   * @param moduleId The module's id; not blank.
+   * @param program The program's path; not blank.
+   * @param processId The process id; a whole number from 1.
+   * @param started When it started, copied; a valid date.
+   * @param hasExited Whether only its process group still runs.
+   * @throws ArgumentException synchronously when a value is invalid.
+   *
+   * @example
+   * ```ts
+   * import { ProgramStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const git: ProgramStatus = new ProgramStatus("git", "/usr/bin/git", 4_210, new Date("2026-10-06T08:00:00Z"), false);
+   * ```
+   */
+  public constructor(moduleId: string, program: string, processId: number, started: Date, hasExited: boolean);
+
+  /**
+   * Reads the status from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The status.
+   * @throws JsonException synchronously when a field is missing, invalid or
+   * unknown; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { ProgramStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const git: ProgramStatus = ProgramStatus.fromJson({ module: "git", program: "/usr/bin/git", processId: 4210, startedAt: "2026-10-06T08:00:00.000Z", hasExited: false });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): ProgramStatus;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `module`, `program`, `processId`, `startedAt` and
+   * `hasExited` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { ProgramStatus } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new ProgramStatus("git", "/usr/bin/git", 4_210, new Date(), false).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The programs the runtime runs for its modules: the answer to
+ * `shell.programs` and the payload of `shell.programsChanged`.
+ */
+export declare class ProgramStatusList {
+  /**
+   * The programs, in the order they started, those that have exited last.
+   */
+  public readonly programs: readonly ProgramStatus[];
+
+  /**
+   * The runtime's count of program changes when the list was taken; a list
+   * with a greater sequence is newer.
+   */
+  public readonly sequence: number;
+
+  /**
+   * Creates the list.
+   *
+   * @param programs The programs, copied.
+   * @param sequence The count of changes; a whole number from 0.
+   * @throws ArgumentException synchronously when the sequence is not a whole
+   * number from 0.
+   *
+   * @example
+   * ```ts
+   * import { ProgramStatusList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const list: ProgramStatusList = new ProgramStatusList([], 0);
+   * ```
+   */
+  public constructor(programs: readonly ProgramStatus[], sequence: number);
+
+  /**
+   * Reads the list from its wire form, which accepts no unknown fields.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The list.
+   * @throws JsonException synchronously when `programs` or `sequence` is
+   * missing or invalid, a field is unknown, or an entry is invalid; its path
+   * names the field or the entry.
+   *
+   * @example
+   * ```ts
+   * import { ProgramStatusList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const list: ProgramStatusList = ProgramStatusList.fromJson({ programs: [], sequence: 3 });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): ProgramStatusList;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `programs` and `sequence` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { ProgramStatusList } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new ProgramStatusList([], 0).toJson();
    * ```
    */
   public toJson(): JsonObject;

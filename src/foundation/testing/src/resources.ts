@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
+
 export class Resources {
   public static readonly standardErrorDescriptor: number = 2;
   public static readonly failedExitCode: number = 1;
@@ -14,7 +16,9 @@ export class Resources {
   public static readonly waitIntervalMilliseconds: number = 25;
   public static readonly gitHubSummaryVariable: string = "GITHUB_STEP_SUMMARY";
   public static readonly filtersVariable: string = "TEAMRUN_TEST_FILTERS";
-  public static readonly selectionFileVariable: string = "TEAMRUN_TEST_SELECTION_FILE";
+  public static readonly resultFileVariable: string = "TEAMRUN_TEST_RESULT_FILE";
+  public static readonly coverageResultFileVariable: string = "TEAMRUN_COVERAGE_RESULT_FILE";
+  public static readonly resultsFileVariable: string = "TEAMRUN_TEST_RESULTS_FILE";
   public static readonly skipTestDetailsVariable: string = "TEAMRUN_SKIP_TEST_DETAILS";
   public static readonly timeoutVariable: string = "TEAMRUN_TEST_TIMEOUT_MILLISECONDS";
   public static readonly temporaryRootVariable: string = "TEAMRUN_TEMPORARY_ROOT";
@@ -235,7 +239,7 @@ export class Resources {
   }
 
   public static formatSummaryDetails(escaped: string, truncated: boolean): string {
-    return `\n<details><summary>Details (full output in the step log)</summary>\n\n<pre>${escaped}</pre>\n${truncated ? "\nAdditional output omitted.\n" : ""}\n</details>\n`;
+    return `\n<details><summary>Details (full output in the step log)</summary>\n\n<pre>${escaped}</pre>\n${truncated ? "\nAdditional output omitted.\n" : String.empty}\n</details>\n`;
   }
 
   public static formatArrayRequired(location: string): string {

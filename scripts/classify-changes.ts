@@ -9,6 +9,7 @@
 import { appendFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
 
+import PackageCatalog from "./packages/package-catalog.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import BuildMatrix from "./workflows/build-matrix.ts";
@@ -26,6 +27,7 @@ export default class ClassifyChanges {
   private static readonly CELL_SEPARATOR: string = "|";
   private static readonly ROW_SEPARATOR: string = ";";
   private static readonly KEY_SEPARATOR: string = " ";
+  private static readonly NOT_APPLIED: string = "This run does not narrow its jobs to the selection yet.";
   private static readonly OUTPUTS_REQUIRED: string = "GITHUB_OUTPUT and GITHUB_STEP_SUMMARY must name the step's output and summary files.\n";
 
   private readonly classifier: ChangeClassifier;
@@ -54,8 +56,9 @@ export default class ClassifyChanges {
     const uiDeferred = matrix.uiDeferred.map(t => t.name).join(ClassifyChanges.TARGET_SEPARATOR);
     await appendFile(outputPath,
       `run-code=${scope.runCode}\nrun-ui=${scope.runUi}\ntargets=${targets}\ntarget-table=${table}\nui-targets=${uiTargets}\ndeferred=${deferred}\nui-deferred=${uiDeferred}\n`);
-    await appendFile(summaryPath, `${scope.summary}\n`);
-    this.output.write(`${scope.summary}\n`);
+    const summary = `${scope.summary}\n${scope.selection.summary} ${ClassifyChanges.NOT_APPLIED}\n`;
+    await appendFile(summaryPath, summary);
+    this.output.write(summary);
     return 0;
   }
 
@@ -75,4 +78,4 @@ export default class ClassifyChanges {
 }
 
 if (import.meta.main)
-  process.exitCode = await new ClassifyChanges(new ChangeClassifier(new Git(process.cwd(), new ProcessRunner())), process.stdout).runAsync(process.env);
+  process.exitCode = await new ClassifyChanges(new ChangeClassifier(new Git(process.cwd(), new ProcessRunner()), new PackageCatalog(process.cwd())), process.stdout).runAsync(process.env);

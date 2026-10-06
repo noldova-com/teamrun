@@ -7,7 +7,7 @@
  */
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost, SettingScope } from "@noldova/teamrun-shell-protocol";
+import type { NotificationPost, SettingEntry, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import type { CommandContribution } from "../models/command-contribution";
 import type { DocumentContribution } from "../models/document-contribution";
@@ -28,8 +28,10 @@ export interface IWindowPartContext {
   registerCommand(command: CommandContribution): void;
   registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem;
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
+  registerSave(save: () => Promise<void>): () => void;
   provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void;
   setViewBadge(view: string, badge: ViewBadge | null): void;
+  markWorking(name: string, instance?: string): () => void;
   isAllowed(name: string): boolean;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;
@@ -37,10 +39,12 @@ export interface IWindowPartContext {
   keepDocument(name: string, instance: string): void;
   showInDialogAsync(name: string, options?: IViewDialogOptions): Promise<void>;
   log(message: string): void;
+  openLinkAsync(url: string): Promise<void>;
   requestAsync(method: string, parameters: JsonValue): Promise<JsonValue>;
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
   readSetting(name: string): JsonValue | undefined;
+  readSettingAsync(name: string, scope?: SettingScope | null): Promise<SettingEntry>;
   writeSettingAsync(name: string, value: JsonValue, scope?: SettingScope | null): Promise<void>;
   resetSettingAsync(name: string, scope?: SettingScope | null): Promise<void>;
-  onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null) => void): () => void;
+  onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null, isSet: boolean) => void): () => void;
 }

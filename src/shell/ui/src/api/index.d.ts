@@ -505,6 +505,15 @@ export declare class AppearanceService {
   public readonly mode: Signal<ThemeMode>;
 
   /**
+   * How many times the service has painted the document: 0 until its first
+   * paint, then one more each time it paints the theme and mode or the
+   * typography. Code that reads painted values, such as a look's size in
+   * pixels, reads this signal so it runs again after each paint, and never
+   * before the paint it depends on.
+   */
+  public readonly painted: Signal<number>;
+
+  /**
    * Creates the service, which Angular does the first time it is injected.
    * It paints the appearance at once and erases it when the application is
    * destroyed; the window injects it as it starts.
@@ -615,6 +624,28 @@ export declare class ButtonComponent {
    * secondary for the others; primary when not bound.
    */
   public readonly variant: InputSignal<ButtonVariant>;
+}
+
+/**
+ * A card, `tr-card`: content on the raised surface inside a 1px card border
+ * with the medium radius and padding, in the message text, as tall as its
+ * content. Long words wrap inside it rather than widen it.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { CardComponent } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-sync-paused-card",
+ *   imports: [CardComponent],
+ *   template: "<tr-card><strong>Sync is paused</strong><p>Changes stay on this computer until you resume.</p></tr-card>"
+ * })
+ * export class SyncPausedCardComponent {
+ * }
+ * ```
+ */
+export declare class CardComponent {
 }
 
 /**
@@ -744,6 +775,101 @@ export declare class ChoicePillsComponent {
 }
 
 /**
+ * Writes text to the system clipboard for the kit's controls that copy, such
+ * as a {@link CodeBlockComponent}. The window provides it through the
+ * desktop's clipboard; a test provides a double.
+ */
+export declare abstract class ClipboardWriter {
+  /**
+   * Replaces the clipboard's content with text.
+   *
+   * @param text The text to write, exactly as given.
+   * @returns Whether the clipboard took the text.
+   *
+   * @example
+   * ```ts
+   * import { ClipboardWriter } from "@noldova/teamrun-shell-ui";
+   *
+   * export class RecordingClipboard extends ClipboardWriter {
+   *   public readonly texts: string[] = [];
+   *
+   *   public writeTextAsync(text: string): Promise<boolean> {
+   *     this.texts.push(text);
+   *     return Promise.resolve(true);
+   *   }
+   * }
+   * ```
+   */
+  public abstract writeTextAsync(text: string): Promise<boolean>;
+}
+
+/**
+ * A block of code, `tr-code-block`: a header with the code's language and a
+ * toolbar named Code block actions, then the code in the code text role,
+ * without highlighting.
+ *
+ * Long lines scroll sideways inside the block and never widen its container,
+ * until the toolbar's Word wrap button, a toggle that starts off, wraps them
+ * or the owner binds {@link CodeBlockComponent.wrapped}.
+ * Copy writes the code, exactly as bound, through the {@link ClipboardWriter}
+ * the window provides. For two seconds it then shows a check glyph and is
+ * named Copied, or, when the clipboard refused the text, is named Couldn't
+ * copy; either is announced politely. The block is as tall as its code.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { CodeBlockComponent } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-install-step",
+ *   imports: [CodeBlockComponent],
+ *   template: "<tr-code-block language=\"bash\" code=\"npm install --save-exact @noldova/teamrun-shell-ui\" />"
+ * })
+ * export class InstallStepComponent {
+ * }
+ * ```
+ */
+export declare class CodeBlockComponent {
+  /**
+   * Creates the block, which Angular does for each `tr-code-block` element.
+   *
+   * @example
+   * ```ts
+   * import { Component } from "@angular/core";
+   * import { CodeBlockComponent } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-config-example",
+   *   imports: [CodeBlockComponent],
+   *   template: "<tr-code-block language=\"JSON\" [code]=\"example\" [wrapped]=\"true\" />"
+   * })
+   * export class ConfigExampleComponent {
+   *   protected readonly example: string = "{ \"shell.theme\": \"shell.default\" }";
+   * }
+   * ```
+   */
+  public constructor();
+
+  /**
+   * The code the block shows and copies, with its own line breaks.
+   */
+  public readonly code: InputSignal<string>;
+
+  /**
+   * The language named at the start of the header, such as `TypeScript`, or
+   * null for none, which is the default.
+   */
+  public readonly language: InputSignal<string | null>;
+
+  /**
+   * Whether long lines wrap, which the Word wrap button toggles; false, so
+   * code keeps its own shape, until it is pressed or bound.
+   */
+  public readonly wrapped: ModelSignal<boolean>;
+}
+
+/**
  * A color the kit paints: a CSS custom property of the element a theme is
  * painted on, the document's root in the window, and the theme color key it
  * takes, with a key of the same theme to fall back to.
@@ -835,8 +961,12 @@ export declare class ConfigurationTableActionDirective {
  * {@link ConfigurationTableActionDirective} at the end of the heading's row,
  * then an optional explanation, then the owner's own native table, marked
  * {@link ConfigurationTableDirective}, with its column headers and its row
- * actions. The heading's row, the explanation and the table stand 0.75rem
- * apart, and a part that is missing leaves no gap. Cells line up on their
+ * actions. A table with actions but no heading puts its explanation at the
+ * start of the actions' row instead: the explanation takes the rest of the
+ * row and wraps, its first line level with the actions' labels, and the
+ * actions wrap under it once it would be narrower than a text field. The
+ * heading's row, the explanation and the table stand 0.75rem apart, and a
+ * part that is missing leaves no gap. Cells line up on their
  * first line's baseline and have 0.5rem padding, except on the outer side of
  * each row's first and last cells, and a line runs under the header and
  * every row. Every column keeps to one line except the one marked with
@@ -885,8 +1015,9 @@ export declare class ConfigurationTableComponent {
   public readonly level: InputSignal<number>;
 
   /**
-   * The text between the heading's row and the table, its `explanation`
-   * input; none when empty, the default.
+   * The text between the heading's row and the table, or at the start of
+   * the actions' row when there is no heading, its `explanation` input;
+   * none when empty, the default.
    */
   public readonly explanation: InputSignal<string>;
 }
@@ -960,7 +1091,11 @@ export declare class ConfigurationTableFillDirective {
  * ends the press that opened the menu, and when the host is hidden or
  * scrolled away. Focus
  * returns to the host when a chosen row, Escape or Tab closes the last menu.
- * It extends the CDK's menu trigger base, from which it inherits
+ * One trigger can also serve as the context menu of other elements, such as
+ * every text field under it, through
+ * {@link ContextMenuTriggerDirective.openAtPointer} and
+ * {@link ContextMenuTriggerDirective.openFromKeyboard} with a target, which
+ * then takes the host's place. It extends the CDK's menu trigger base, from which it inherits
  * `menuTemplateRef`, `menuData`, `isOpen()`, `opened` and `closed`.
  */
 export declare class ContextMenuTriggerDirective extends CdkMenuTriggerBase {
@@ -1038,6 +1173,82 @@ export declare class ContextMenuTriggerDirective extends CdkMenuTriggerBase {
    * ```
    */
   public open(point: DOMRect, origin: FocusOrigin): void;
+
+  /**
+   * Opens the menu at a right click's pointer as the context menu of a
+   * target, as the host's own right click does: the menu follows the target,
+   * closes when it is hidden or scrolled away, and returns focus to it. The
+   * event's default and propagation stop, and the click that ends the press
+   * leaves the menu open. Nothing opens while no template is bound.
+   *
+   * @param event The `contextmenu` event; one from the keyboard, whose button
+   * is not the secondary one, focuses the first row as a key does.
+   * @param target The element the menu belongs to, the host by default.
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ContextMenuTriggerDirective, MenuComponent, MenuItemComponent } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-field-actions",
+   *   imports: [ContextMenuTriggerDirective, MenuComponent, MenuItemComponent],
+   *   host: { "(document:contextmenu)": "openForField($event)" },
+   *   template: `
+   *     <span [trContextMenuTriggerFor]="actions"></span>
+   *     <ng-template #actions>
+   *       <tr-menu>
+   *         <button tr-menu-item label="Clear"></button>
+   *       </tr-menu>
+   *     </ng-template>`
+   * })
+   * export class FieldActionsComponent {
+   *   private readonly trigger: Signal<ContextMenuTriggerDirective> = viewChild.required(ContextMenuTriggerDirective);
+   *
+   *   protected openForField(event: MouseEvent): void {
+   *     if (event.target instanceof HTMLInputElement)
+   *       this.trigger().openAtPointer(event, event.target);
+   *   }
+   * }
+   * ```
+   */
+  public openAtPointer(event: MouseEvent, target?: HTMLElement): void;
+
+  /**
+   * Opens the menu below a target's start as its context menu when the key
+   * is the ContextMenu key or Shift+F10, preventing the key's default, as
+   * the host's own keys do; other keys do nothing. The menu follows the
+   * target and returns focus to it, and its first row takes focus.
+   *
+   * @param event The `keydown` event.
+   * @param target The element the menu belongs to, the host by default.
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ContextMenuTriggerDirective, MenuComponent, MenuItemComponent } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-field-keys",
+   *   imports: [ContextMenuTriggerDirective, MenuComponent, MenuItemComponent],
+   *   host: { "(document:keydown)": "openForField($event)" },
+   *   template: `
+   *     <span [trContextMenuTriggerFor]="actions"></span>
+   *     <ng-template #actions>
+   *       <tr-menu>
+   *         <button tr-menu-item label="Clear"></button>
+   *       </tr-menu>
+   *     </ng-template>`
+   * })
+   * export class FieldKeysComponent {
+   *   private readonly trigger: Signal<ContextMenuTriggerDirective> = viewChild.required(ContextMenuTriggerDirective);
+   *
+   *   protected openForField(event: KeyboardEvent): void {
+   *     if (event.target instanceof HTMLInputElement)
+   *       this.trigger().openFromKeyboard(event, event.target);
+   *   }
+   * }
+   * ```
+   */
+  public openFromKeyboard(event: KeyboardEvent, target?: HTMLElement): void;
 
   /**
    * Closes the menu and its submenus. Nothing happens while it is closed.
@@ -1387,6 +1598,29 @@ export declare class IconButtonComponent {
    * toggle, which is the default.
    */
   public readonly pressed: InputSignal<boolean | undefined>;
+}
+
+/**
+ * Code inside running text, `code[tr-inline-code]`: the code font on the
+ * inline-code background with the small radius, at the size and line height
+ * of the text around it, so it never makes a line taller. Its text stays
+ * fully opaque, and a long name wraps anywhere rather than widen its line.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { InlineCodeComponent } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-editor-hint",
+ *   imports: [InlineCodeComponent],
+ *   template: "<p>Set <code tr-inline-code>EDITOR</code> to choose the editor.</p>"
+ * })
+ * export class EditorHintComponent {
+ * }
+ * ```
+ */
+export declare class InlineCodeComponent {
 }
 
 /**

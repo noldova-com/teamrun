@@ -31,6 +31,19 @@ export class CoverageRunEntryTests {
   }
 
   @TestMethod
+  public async writesTheFullyCoveredAndMeasuredFilesToTheResultFileItIsGiven(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const resultPath = join(directory.path, "coverage-result.json");
+
+    await this.runPackageAsync(false, async run => {
+      Assert.areEqual(1, run.exitCode, run.errorOutput);
+      const counts: { covered: number; total: number } = JSON.parse(await readFile(resultPath, "utf8"));
+      Assert.areEqual(JSON.stringify(["covered", "total"]), JSON.stringify(Object.keys(counts)));
+      Assert.isTrue(Number.isInteger(counts.covered) && counts.covered >= 0 && counts.covered < counts.total, JSON.stringify(counts));
+    }, "[]", String.empty, { TEAMRUN_COVERAGE_RESULT_FILE: resultPath });
+  }
+
+  @TestMethod
   public failsAPackageBelowFullCoverage(): Promise<void> {
     return this.runPackageAsync(false, async (run, summary) => {
       Assert.areEqual(1, run.exitCode, run.errorOutput);
@@ -115,7 +128,12 @@ export class CoverageRunEntryTests {
     Assert.isTrue((await readFile(summaryPath, "utf8")).includes(message));
   }
 
-  private async runPackageAsync(isComplete: boolean, verify: (run: EntryRun, summary: string) => Promise<void>, exclusions: string = "[]", orphanFolder: string = String.empty): Promise<void> {
+  private async runPackageAsync(
+    isComplete: boolean,
+    verify: (run: EntryRun, summary: string) => Promise<void>,
+    exclusions: string = "[]",
+    orphanFolder: string = String.empty,
+    variables: Readonly<Record<string, string>> = {}): Promise<void> {
     using directory = new TemporaryDirectory();
     const production = join(directory.path, "production");
     const coverage = join(directory.path, "coverage");
@@ -132,17 +150,19 @@ export class CoverageRunEntryTests {
     await writeFile(join(coverage, "coverage-1.json"), JSON.stringify(report));
     const summaryPath = join(directory.path, "summary.md");
 
-    const run = await this.runEntryAsync([coverage, "Sample", production, production, exclusions, JSON.stringify(orphanFolder === String.empty ? [] : [orphanFolder])], summaryPath);
+    const run = await this.runEntryAsync([coverage, "Sample", production, production, exclusions, JSON.stringify(orphanFolder === String.empty ? [] : [orphanFolder])], summaryPath, variables);
 
     await verify(run, await readFile(summaryPath, "utf8"));
   }
 
-  private async runEntryAsync(entryArguments: readonly string[], summaryPath?: string): Promise<EntryRun> {
+  private async runEntryAsync(entryArguments: readonly string[], summaryPath?: string, variables: Readonly<Record<string, string>> = {}): Promise<EntryRun> {
     using directory = new TemporaryDirectory();
     const environment = CoverageEnvironment.forChild(process.env);
     delete environment["GITHUB_STEP_SUMMARY"];
+    delete environment["TEAMRUN_COVERAGE_RESULT_FILE"];
     if (!Object.isUndefined(summaryPath))
       environment["GITHUB_STEP_SUMMARY"] = summaryPath;
+    Object.assign(environment, variables);
     const errorPath = join(directory.path, "stderr.log");
     const errorFile = openSync(errorPath, "w");
     try {

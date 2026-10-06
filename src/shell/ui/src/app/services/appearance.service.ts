@@ -13,7 +13,7 @@ import { ModePreference } from "../enums/mode-preference";
 import { ThemeMode } from "../enums/theme-mode";
 import type { Theme } from "../models/theme";
 import { Typography } from "../models/typography";
-import { DefaultTheme } from "../themes/default-theme";
+import { DefaultTheme } from "../models/default-theme";
 import { Resources } from "../../resources";
 import { ScrollRevealService } from "./scroll-reveal.service";
 import { ThemePainter } from "./theme-painter";
@@ -28,11 +28,13 @@ export class AppearanceService {
   private readonly themeState: WritableSignal<Theme> = signal(DefaultTheme.theme);
   private readonly preferenceState: WritableSignal<ModePreference> = signal(ModePreference.System);
   private readonly typographyState: WritableSignal<Typography> = signal(new Typography());
+  private readonly paintedState: WritableSignal<number> = signal(0);
 
   public readonly theme: Signal<Theme> = this.themeState.asReadonly();
   public readonly modePreference: Signal<ModePreference> = this.preferenceState.asReadonly();
   public readonly typography: Signal<Typography> = this.typographyState.asReadonly();
   public readonly mode: Signal<ThemeMode> = computed(() => this.resolveMode(this.preferenceState(), this.isSystemDark()));
+  public readonly painted: Signal<number> = this.paintedState.asReadonly();
 
   public constructor() {
     inject(ScrollRevealService);
@@ -43,8 +45,14 @@ export class AppearanceService {
       this.painter.erase(this.root);
       TypographyPainter.erase(this.root);
     });
-    effect(() => this.painter.paint(this.root, this.themeState(), this.mode()));
-    effect(() => TypographyPainter.paint(this.root, this.typographyState()));
+    effect(() => {
+      this.painter.paint(this.root, this.themeState(), this.mode());
+      this.paintedState.update(t => t + 1);
+    });
+    effect(() => {
+      TypographyPainter.paint(this.root, this.typographyState());
+      this.paintedState.update(t => t + 1);
+    });
   }
 
   public setTheme(theme: Theme): void {

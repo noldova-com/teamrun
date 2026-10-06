@@ -11,6 +11,7 @@ import type { AriaLivePoliteness, FocusOrigin } from "@angular/cdk/a11y";
 
 import "@noldova/teamrun-foundation-core";
 
+import { CopyState } from "./app/enums/copy-state";
 import { DockingDirection } from "./app/enums/docking-direction";
 import { OverlayAlignment } from "./app/enums/overlay-alignment";
 import { SashOrientation } from "./app/enums/sash-orientation";
@@ -96,6 +97,15 @@ export class Resources {
     "shadow-xlarge",
     "backdrop",
     "panel-card-gap",
+    "panel-card-margin",
+    "dock-left-width",
+    "dock-right-width",
+    "dock-bottom-height",
+    "dock-min-size",
+    "dock-strip-size",
+    "document-min-size",
+    "group-min-width",
+    "group-min-height",
     "tab-height",
     "tab-pill",
     "tab-inset",
@@ -179,7 +189,8 @@ export class Resources {
     "settings-item-description-gap",
     "settings-item-control-gap",
     "settings-heading-space",
-    "settings-content-inset"
+    "settings-content-inset",
+    "code-header-height"
   ];
   public static readonly shapes: ReadonlyMap<string, readonly string[]> = new Map([["tab", ["pill"]]]);
   public static readonly defaultThemeId: string = "shell.default";
@@ -312,6 +323,20 @@ export class Resources {
   public static readonly escapeKey: string = "Escape";
   public static readonly keydownEvent: "keydown" = "keydown";
   public static readonly checkedGlyph: string = "check";
+  public static readonly wordWrapGlyph: string = "wrap_text";
+  public static readonly wordWrapLabel: string = "Word wrap";
+  public static readonly codeBlockActionsLabel: string = "Code block actions";
+  public static readonly copyGlyphs: Readonly<Record<CopyState, string>> = {
+    [CopyState.Ready]: "content_copy",
+    [CopyState.Copied]: "check",
+    [CopyState.Failed]: "content_copy"
+  };
+  public static readonly copyLabels: Readonly<Record<CopyState, string>> = {
+    [CopyState.Ready]: "Copy",
+    [CopyState.Copied]: "Copied",
+    [CopyState.Failed]: "Couldn't copy"
+  };
+  public static readonly copyFeedbackDuration: number = 2000;
   public static readonly selectGlyph: string = "expand_more";
   public static readonly selectListSelector: string = ".tr-select-list";
   public static readonly menuItemRole: string = "menuitem";

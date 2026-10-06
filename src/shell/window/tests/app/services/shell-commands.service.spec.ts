@@ -71,7 +71,7 @@ describe("ShellCommandsService", () => {
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
       "shell.dockTabBottom", "shell.moveTabToGroup", "shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
-      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.openModules", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft",
+      "shell.copy", "shell.paste", "shell.selectAll", "shell.showCommands", "shell.openSettings", "shell.installCommand", "shell.openModules", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft",
       "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
       "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
@@ -104,6 +104,17 @@ describe("ShellCommandsService", () => {
     expect([opened.active?.key, opened.preview?.key]).toEqual([modules.key, settings.key]);
     expect(opened.tabs.filter(t => t.equals(modules)).length).toBe(1);
     expect(command("shell.openModules").title).toBe("Modules…");
+  });
+
+  it("installs the command in PATH through the desktop, offered and enabled only on macOS", async () => {
+    const offered = [command("shell.installCommand").isApplicable(null), enabled("shell.installCommand")];
+    bridge.platform = "darwin";
+
+    const isInstalled = await command("shell.installCommand").runAsync(null);
+
+    expect(offered).toEqual([false, false]);
+    expect([command("shell.installCommand").isApplicable(null), enabled("shell.installCommand"), isInstalled, bridge.commandInstalls]).toEqual([true, true, true, 1]);
+    expect(command("shell.installCommand").title).toBe("Install command in PATH");
   });
 
   it("shows a registered view or document named by its tab key in a dialog, and is enabled only for one while no dialog is shown", async () => {
@@ -148,7 +159,7 @@ describe("ShellCommandsService", () => {
     expect(disabledBefore).toBe(false);
     expect(enabledInMenu).toEqual([true, true, true, true, true, true]);
     expect(restored).toEqual([true, 0, 7]);
-    expect(bridge.edits).toEqual(["copy"]);
+    expect(bridge.edits).toEqual(["Copy"]);
   });
 
   it("acts on the current tab without arguments: the active tab of the group last focused or activated, else the documents' active tab", async () => {

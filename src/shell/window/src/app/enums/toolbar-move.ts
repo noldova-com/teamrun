@@ -7,8 +7,8 @@
  */
 
 export enum ToolbarMove {
-  Left = "left",
-  Right = "right",
-  Up = "up",
-  Down = "down"
+  Left = "Left",
+  Right = "Right",
+  Up = "Up",
+  Down = "Down"
 }

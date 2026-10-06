@@ -32,8 +32,8 @@ import {
 import { SessionState } from "../../enums/session-state.js";
 import { ConnectionException } from "../../exceptions/connection.exception.js";
 import { MethodFailureException } from "../../exceptions/method-failure.exception.js";
-import type { IEventSink } from "../../interfaces/event-sink.js";
-import type { ISessionListener } from "../../interfaces/session-listener.js";
+import type { IEventSink } from "../../interfaces/i-event-sink.js";
+import type { ISessionListener } from "../../interfaces/i-session-listener.js";
 import type { CapabilityToken } from "../../models/capability-token.js";
 import { Endpoint } from "../../models/endpoint.js";
 import { ProductInfo } from "../../models/product-info.js";

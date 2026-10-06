@@ -39,7 +39,7 @@ LICENSE file in the root directory of this source tree.
   @if (!isCollapsed()) {
     @let box = sash();
     <tr-sash class="tr-dock-sash" [orientation]="orientation()" [label]="resources.resizeDockLabels[side()]" [value]="pixels(size())"
-      [minimum]="pixels(dock().minimumSize)" [maximum]="pixels(layout.geometry().maximumSize(side()))" (resize)="resize($event)"
+      [minimum]="pixels(minimumSize())" [maximum]="pixels(layout.geometry().maximumSize(side()))" (resize)="resize($event)"
       [style.left.rem]="box.x" [style.top.rem]="box.y" [style.width.rem]="box.width" [style.height.rem]="box.height" />
   }
 }

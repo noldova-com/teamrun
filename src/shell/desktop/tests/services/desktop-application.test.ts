@@ -18,7 +18,7 @@ import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, DataDirectoryLocator, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
-import { DeviceIdentity, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
+import { DeviceIdentity, type IIpcEvent, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
@@ -27,6 +27,7 @@ import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js"
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDeviceIdentity } from "../fixtures/fake-device-identity.fixture.js";
 import { FakeElectron } from "../fixtures/fake-electron.fixture.js";
+import { FakePathCommand } from "../fixtures/fake-path-command.fixture.js";
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
 import { FakeRuntimeLauncher } from "../fixtures/fake-runtime-launcher.fixture.js";
 
@@ -113,7 +114,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("darwin");
     const window = DesktopStartFixture.firstWindow(electron);
     electron.ipcMain.send("teamrun:menuBar", DesktopStartFixture.trustedEvent("darwin"),
-      { menus: [{ place: "shell.file", title: "File", rows: [{ type: "command", id: "shell.file/shell.close/0", label: "Close the tab", key: null, enabled: true, check: "None", checked: false }] }] });
+      { menus: [{ place: "shell.file", title: "File", rows: [{ type: "Command", id: "shell.file/shell.close/0", label: "Close the tab", key: null, enabled: true, check: "None", checked: false }] }] });
     const file = electron.menu.templates.at(-1)?.[1]?.submenu;
 
     window.destroy();
@@ -798,21 +799,23 @@ export class DesktopApplicationTests {
   @TestMethod
   public async addsThisDeviceToItsWindowsSettingsRequests(): Promise<void> {
     const connection = new FakeRuntimeConnection();
-    for (const name of ["shell.settings", "shell.setSetting", "shell.resetSetting"])
+    for (const name of ["shell.settings", "shell.readSetting", "shell.setSetting", "shell.resetSetting"])
       connection.answers.set(name, Response.success("r", name));
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopStartFixture.trustedEvent("linux");
 
     const answers = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", {}),
+      await DesktopApplicationTests.requestAsync(electron, event, "shell.readSetting", { name: "notes.wrapLines", scope: { name: "notes.project", id: "p1" } }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", { name: "shell.panelSize", value: 15 }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.resetSetting", { name: "shell.panelSize", device: "another" })
     ];
     const sent = connection.calls.flatMap((t, index) => t.includes("Setting") || t === "shell.settings" ? [connection.payloads[index]] : []);
 
-    Assert.areEqual("shell.settings,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
+    Assert.areEqual("shell.settings,shell.readSetting,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
     Assert.areEqual(JSON.stringify([
       { device: FakeDeviceIdentity.ID },
+      { name: "notes.wrapLines", scope: { name: "notes.project", id: "p1" }, device: FakeDeviceIdentity.ID },
       { name: "shell.panelSize", value: 15, device: FakeDeviceIdentity.ID },
       { name: "shell.panelSize", device: FakeDeviceIdentity.ID }
     ]), JSON.stringify(sent));
@@ -1371,15 +1374,54 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async opensOnlyAllowedLinksFromItsOwnWindowAndLogsTheOnesItDoesNotOpen(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+    const open = (url: unknown, event: IIpcEvent = trusted): Promise<boolean> => electron.ipcMain.invoke("teamrun:openLink", event, url) as Promise<boolean>;
+
+    const answers = [
+      await open("https://example.com/docs?page=2#top"),
+      await open("HTTP://Example.com"),
+      await open("mailto:support@example.com?subject=TeamRun"),
+      await open(`https://example.com/${"x".repeat(32748)}`),
+      await open(`https://example.com/${"x".repeat(32749)}`),
+      await open("file:///etc/passwd"),
+      await open("javascript:alert(1)"),
+      await open("teamrun://open"),
+      await open("https://user:secret@example.com/"),
+      await open("not a link"),
+      await open(5),
+      await open("https://example.com/", { sender: { id: 1 }, senderFrame: null })
+    ];
+    electron.shell.linkFailure = new Error("No browser is installed.");
+    answers.push(await open("https://example.com/"));
+
+    Assert.areEqual(JSON.stringify([true, true, true, true, false, false, false, false, false, false, false, false, false]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify([
+      "https://example.com/docs?page=2#top",
+      "http://example.com/",
+      "mailto:support@example.com?subject=TeamRun",
+      `https://example.com/${"x".repeat(32748)}`,
+      "https://example.com/"
+    ]), JSON.stringify(electron.shell.links));
+    const lines = process.errors.split("\n").filter(t => t.includes("link")).map(t => t.slice(t.indexOf(" ") + 1));
+    Assert.areEqual(JSON.stringify([
+      ...Array.from({ length: 7 }, () => "A link was not opened: only well-formed http, https and mailto links without credentials open."),
+      "A link could not be opened: Error: No browser is installed."
+    ]), JSON.stringify(lines));
+  }
+
+  @TestMethod
   public async editsItsOwnWindowWithTheSixEditActionsOnly(): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
     const trusted = DesktopStartFixture.trustedEvent("linux");
     const window = DesktopStartFixture.firstWindow(electron);
 
-    const answers = ["undo", "redo", "cut", "copy", "paste", "selectAll", "reload", 5].map(t => electron.ipcMain.invoke("teamrun:edit", trusted, t));
-    const refused = electron.ipcMain.invoke("teamrun:edit", { sender: { id: 1 }, senderFrame: null }, "copy");
+    const answers = ["Undo", "Redo", "Cut", "Copy", "Paste", "SelectAll", "undo", "reload", 5].map(t => electron.ipcMain.invoke("teamrun:edit", trusted, t));
+    const refused = electron.ipcMain.invoke("teamrun:edit", { sender: { id: 1 }, senderFrame: null }, "Copy");
 
-    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false, false]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false, false, false]), JSON.stringify(answers));
     Assert.areEqual(false, refused);
     Assert.areEqual(JSON.stringify(["undo", "redo", "cut", "copy", "paste", "selectAll"]), JSON.stringify(window.webContents.calls));
   }
@@ -1448,6 +1490,56 @@ export class DesktopApplicationTests {
     finally {
       await rm(data, { recursive: true, force: true });
     }
+  }
+
+  @TestMethod
+  public async installsTheCommandOnMacosForItsOwnWindowAndShowsWhatHappened(): Promise<void> {
+    const electron = new FakeElectron();
+    const pathCommand = new FakePathCommand();
+    DesktopStartFixture.start(electron, new FakeDesktopProcess("darwin"), new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeAppearanceStore(), pathCommand);
+    await electron.app.becomeReadyAsync();
+    electron.dialog.answers.push(0, 0, 0, 0);
+    const answers = [await (electron.ipcMain.invoke("teamrun:installCommand", { sender: { id: 1 }, senderFrame: null }) as Promise<boolean>)];
+
+    for (const outcome of [PathCommandOutcome.Installed, PathCommandOutcome.AlreadyInstalled, PathCommandOutcome.Occupied, PathCommandOutcome.Missing, PathCommandOutcome.Cancelled]) {
+      pathCommand.outcome = outcome;
+      answers.push(await (electron.ipcMain.invoke("teamrun:installCommand", DesktopStartFixture.trustedEvent("darwin")) as Promise<boolean>));
+    }
+
+    Assert.areEqual(JSON.stringify([false, true, true, false, false, false]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify(["/electron/electron", "/electron/electron", "/electron/electron", "/electron/electron", "/electron/electron"]), JSON.stringify(pathCommand.executablePaths));
+    Assert.areEqual(JSON.stringify([
+      [1, "info", "The teamrun command is installed.", "/usr/local/bin/teamrun links to the command inside TeamRun. Terminals opened from now on run it as teamrun."],
+      [1, "info", "The teamrun command is already installed.", "/usr/local/bin/teamrun already links to the command inside this TeamRun."],
+      [1, "warning", "The teamrun command was not installed.", "/usr/local/bin/teamrun is a file that is not a link, so TeamRun leaves it alone. Move or remove it, then install the command again."],
+      [1, "warning", "The teamrun command was not installed.", "This build of TeamRun has no command to link; an installed TeamRun has one."]
+    ]), JSON.stringify(electron.dialog.boxes.map(t => [t.windowId, t.options.type, t.options.message, t.options.detail])));
+  }
+
+  @TestMethod
+  public async refusesTheCommandOffMacosAndShowsAndLogsAFailureToInstallIt(): Promise<void> {
+    const linux = new FakeElectron();
+    const mac = new FakeElectron();
+    const process = new FakeDesktopProcess("darwin");
+    const pathCommand = new FakePathCommand();
+    DesktopStartFixture.start(linux, new FakeDesktopProcess("linux"));
+    DesktopStartFixture.start(mac, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeAppearanceStore(), pathCommand);
+    await linux.app.becomeReadyAsync();
+    await mac.app.becomeReadyAsync();
+    mac.dialog.answers.push(0);
+    pathCommand.failure = new PathCommandException("The teamrun command could not be linked at /usr/local/bin/teamrun: Error: Command failed: /usr/bin/osascript");
+
+    const refused = await (linux.ipcMain.invoke("teamrun:installCommand", DesktopStartFixture.trustedEvent("linux")) as Promise<boolean>);
+    const failed = await (mac.ipcMain.invoke("teamrun:installCommand", DesktopStartFixture.trustedEvent("darwin")) as Promise<boolean>);
+    pathCommand.failure = new RangeError("The fixture broke.");
+    const unexpected = await (mac.ipcMain.invoke("teamrun:installCommand", DesktopStartFixture.trustedEvent("darwin")) as Promise<boolean>).then(() => null, (t: unknown) => t);
+
+    Assert.areEqual(JSON.stringify([false, false]), JSON.stringify([refused, failed]));
+    Assert.areEqual(0, linux.dialog.boxes.length);
+    Assert.areEqual(JSON.stringify([[1, "warning", "The teamrun command was not installed.", "The teamrun command could not be linked at /usr/local/bin/teamrun: Error: Command failed: /usr/bin/osascript"]]),
+      JSON.stringify(mac.dialog.boxes.map(t => [t.windowId, t.options.type, t.options.message, t.options.detail])));
+    Assert.isTrue(process.errors.includes("The teamrun command could not be linked at /usr/local/bin/teamrun: Error: Command failed: /usr/bin/osascript"), process.errors);
+    Assert.isTrue(unexpected instanceof RangeError);
   }
 
   @TestMethod

@@ -7,7 +7,7 @@
  */
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost, SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
+import { type NotificationPost, QualifiedName, type SettingChange, SettingEntry, type SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import type { IWindowPartHost } from "../../src/app/interfaces/i-window-part-host";
 import type { MenuItem } from "../../src/app/models/menu-item";
@@ -42,6 +42,11 @@ export class WindowPartContextHostFixture implements IWindowPartHost {
 
   public log(moduleId: string, message: string): void {
     this.calls.push(`log ${moduleId} ${message}`);
+  }
+
+  public openLinkAsync(url: string): Promise<void> {
+    this.calls.push(`openLink ${url}`);
+    return Promise.resolve();
   }
 
   public showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void> {
@@ -85,6 +90,11 @@ export class WindowPartContextHostFixture implements IWindowPartHost {
     return name === "notes.missing" ? undefined : `${name} value`;
   }
 
+  public readSettingAsync(name: string, scope: SettingScope | null): Promise<SettingEntry> {
+    this.calls.push(`read ${name} ${scope?.id ?? "app"}`);
+    return Promise.resolve(new SettingEntry(QualifiedName.parse(name), `${name} at ${scope?.id ?? "app"}`, scope !== null));
+  }
+
   public writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void> {
     this.calls.push(`write ${name} ${JSON.stringify(value)} ${scope?.id ?? "app"}`);
     return Promise.resolve();
@@ -107,6 +117,10 @@ export class WindowPartContextHostFixture implements IWindowPartHost {
 
   public setViewBadge(view: string, badge: ViewBadge | null): void {
     this.calls.push(`badge ${view} ${badge?.count ?? "dot"} ${badge?.description ?? "none"}`);
+  }
+
+  public setTabWorking(tabKey: string, isWorking: boolean): void {
+    this.calls.push(`working ${tabKey} ${isWorking}`);
   }
 
   public refresh(): void {

@@ -13,4 +13,5 @@ export class NotesState {
   public static readonly wrapsLines: WritableSignal<boolean> = signal(false);
   public static readonly runtime: WritableSignal<string> = signal("");
   public static readonly continued: WritableSignal<number> = signal(0);
+  public static readonly saving: WritableSignal<"saves" | "fails" | "hangs"> = signal("saves");
 }

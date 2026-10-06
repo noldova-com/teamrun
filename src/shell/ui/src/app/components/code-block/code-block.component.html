@@ -1,0 +1,20 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="tr-code-block-header">
+  @if (language(); as language) {
+    <span class="tr-code-block-language" data-truncates>{{ language }}</span>
+  }
+  <div class="tr-code-block-actions" trToolbar [trToolbarLabel]="resources.codeBlockActionsLabel">
+    <button type="button" tr-icon-button trToolbarItem class="tr-code-block-wrap" [icon]="resources.wordWrapGlyph" [label]="resources.wordWrapLabel" [pressed]="wrapped()"
+      [trTooltip]="resources.wordWrapLabel" (click)="toggleWrap()"></button>
+    <button type="button" tr-icon-button trToolbarItem class="tr-code-block-copy" [class.tr-code-block-copied]="isCopied()" [icon]="copyGlyph()" [label]="copyLabel()"
+      [trTooltip]="copyLabel()" (click)="copy()"></button>
+  </div>
+</div>
+<pre class="tr-code-block-body"><code>{{ code() }}</code></pre>

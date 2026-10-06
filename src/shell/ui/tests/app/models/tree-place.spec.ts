@@ -8,7 +8,7 @@
 
 import { TreeMoveException } from "../../../src/app/exceptions/tree-move.exception";
 import { TreeMove } from "../../../src/app/models/tree-move";
-import { TreeNode } from "../../../src/app/models/tree-node";
+import { TreeNode } from "../../../src/app/models/tree.node";
 
 describe("TreePlace", () => {
   const nodes: readonly TreeNode[] = [

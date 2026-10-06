@@ -11,8 +11,10 @@ import { NgTemplateOutlet } from "@angular/common";
 import { ChangeDetectionStrategy, Component, Injector, type Signal, computed, inject, input } from "@angular/core";
 
 import { ThemeMode } from "../../enums/theme-mode";
+import type { IGalleryScope } from "../../interfaces/i-gallery-scope";
 import type { Theme } from "../../models/theme";
-import { DefaultTheme } from "../../themes/default-theme";
+import { DefaultTheme } from "../../models/default-theme";
+import { GalleryContentComponent } from "./gallery-content.component";
 import { GalleryFormsComponent } from "./gallery-forms.component";
 import { GalleryNavigationComponent } from "./gallery-navigation.component";
 import { GalleryOverlayContainer } from "./gallery-overlay-container";
@@ -20,16 +22,9 @@ import { GalleryOverlaysComponent } from "./gallery-overlays.component";
 import { GalleryResources } from "./gallery-resources";
 import { GalleryScopeDirective } from "./gallery-scope.directive";
 
-interface GalleryScope {
-  readonly id: string;
-  readonly label: string;
-  readonly theme: Theme;
-  readonly mode: ThemeMode;
-}
-
 @Component({
   selector: "tr-gallery",
-  imports: [GalleryFormsComponent, GalleryNavigationComponent, GalleryOverlaysComponent, GalleryScopeDirective, NgTemplateOutlet],
+  imports: [GalleryContentComponent, GalleryFormsComponent, GalleryNavigationComponent, GalleryOverlaysComponent, GalleryScopeDirective, NgTemplateOutlet],
   templateUrl: "./gallery.component.html",
   styleUrl: "./gallery.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -39,7 +34,7 @@ export class GalleryComponent {
   private readonly injectors: WeakMap<HTMLElement, Injector> = new WeakMap<HTMLElement, Injector>();
 
   public readonly themes = input<readonly Theme[]>([DefaultTheme.theme]);
-  public readonly scopes: Signal<readonly GalleryScope[]> = computed(() => this.themes().flatMap(theme => [ThemeMode.Light, ThemeMode.Dark].map(mode => ({
+  public readonly scopes: Signal<readonly IGalleryScope[]> = computed(() => this.themes().flatMap(theme => [ThemeMode.Light, ThemeMode.Dark].map(mode => ({
     id: `${theme.id}-${mode}`,
     label: GalleryResources.formatScope(theme.name, mode),
     theme,

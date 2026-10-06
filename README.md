@@ -34,6 +34,7 @@ npm test
 To run TeamRun from your build, run `npm start`. It starts a copy of Electron's program that carries TeamRun's name and icon, in `_build/development-app`, and prepares the copy again when Electron, the version or the icons change.
 
 To use the `teamrun` command line from your build, run `npm run teamrun -- <command>`, for example `npm run teamrun -- status`. [The command line's document](src/shell/cli/README.md) describes its commands, options and exit codes.
+On Windows the installer also puts `teamrun` on your `Path`, so a terminal opened after the install runs `teamrun status` directly. On macOS, TeamRun > Install command in PATH does the same.
 
 Some Linux systems restrict unprivileged user namespaces, as Ubuntu does since 23.10. There, Chromium's sandbox needs its helper owned by root with the setuid bit, and `npm start` stops and prints the commands instead of starting. Run them once, and again after the copy is prepared again:
 

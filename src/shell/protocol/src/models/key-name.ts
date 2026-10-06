@@ -8,7 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import type { IKeyStroke } from "../interfaces/key-stroke.js";
+import type { IKeyStroke } from "../interfaces/i-key-stroke.js";
 import { Resources } from "../resources.js";
 
 export class KeyName {

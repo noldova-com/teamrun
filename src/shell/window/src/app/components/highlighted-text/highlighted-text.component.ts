@@ -15,7 +15,7 @@ import { WordBreaks } from "../../models/settings/word-breaks";
 @Component({
   selector: "tr-highlighted-text",
   imports: [NgTemplateOutlet],
-  template: `<ng-template #pieces let-part>@for (piece of part.pieces; track $index) {@if (!$first) {<wbr>}{{ piece }}}</ng-template>@for (part of parts(); track $index) {@if (part.breaksBefore) {<wbr>}@if (part.isMatch) {<mark class="tr-highlighted-text-match"><ng-container *ngTemplateOutlet="pieces; context: { $implicit: part }" /></mark>} @else {<ng-container *ngTemplateOutlet="pieces; context: { $implicit: part }" />}}`,
+  templateUrl: "./highlighted-text.component.html",
   styleUrl: "./highlighted-text.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
 })

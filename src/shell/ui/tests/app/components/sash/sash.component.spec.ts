@@ -14,7 +14,7 @@ import { SashComponent } from "../../../../src/app/components/sash/sash.componen
 import { SashOrientation } from "../../../../src/app/enums/sash-orientation";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { Theme } from "../../../../src/app/models/theme";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

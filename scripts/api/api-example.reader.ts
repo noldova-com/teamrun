@@ -12,7 +12,7 @@ import type { Node } from "typescript/unstable/ast";
 import ApiDocComment from "./api-doc-comment.ts";
 import ApiExample from "./api-example.ts";
 import ApiExamples from "./api-examples.ts";
-import ApiSymbolWalker from "./api-symbol.walker.ts";
+import ApiSymbolWalker from "./api-symbol-walker.ts";
 import type ApiVisibility from "./api-visibility.ts";
 
 export default class ApiExampleReader {

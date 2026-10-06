@@ -12,6 +12,7 @@ import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
 import { DockSide } from "../../enums/dock-side";
 import type { GroupFrame } from "../../models/layout/group-frame";
+import { LayoutMetrics } from "../../models/layout/layout-metrics";
 import { LayoutService } from "../../services/layout.service";
 import { StartupService } from "../../services/startup.service";
 import { TabFocusService } from "../../services/tab-focus.service";
@@ -21,13 +22,13 @@ import { DockComponent } from "../dock/dock.component";
 import { DockingGuidesComponent } from "../docking-guides/docking-guides.component";
 import { EmptyWindowComponent } from "../empty-window/empty-window.component";
 import { SplitSashComponent } from "../split-sash/split-sash.component";
-import { TabContentComponent } from "../tab-content/tab-content.component";
 import { TabGroupComponent } from "../tab-group/tab-group.component";
+import { TabSlotComponent } from "../tab-slot/tab-slot.component";
 import { Resources } from "../../../resources";
 
 @Component({
   selector: "tr-workspace",
-  imports: [DockComponent, DockingGuidesComponent, EmptyWindowComponent, SplitSashComponent, TabContentComponent, TabGroupComponent],
+  imports: [DockComponent, DockingGuidesComponent, EmptyWindowComponent, SplitSashComponent, TabGroupComponent, TabSlotComponent],
   templateUrl: "./workspace.component.html",
   styleUrl: "./workspace.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -61,6 +62,10 @@ export class WorkspaceComponent {
     observer.observe(this.element);
     inject(DestroyRef).onDestroy(() => observer.disconnect());
     effect(() => {
+      if (appearance.painted() > 0)
+        this.layout.setMetrics(this.measure(untracked(() => appearance.typography().rootSize)));
+    });
+    effect(() => {
       const rem = appearance.typography().rootSize;
       this.layout.setViewport(this.width() / rem, this.height() / rem);
     });
@@ -86,6 +91,14 @@ export class WorkspaceComponent {
 
   protected isEmptyDocuments(frame: GroupFrame): boolean {
     return frame.group.isDocuments && this.layout.registry().views.length === 0;
+  }
+
+  private measure(rootSize: number): LayoutMetrics {
+    const probe = this.element.ownerDocument.createElement(Resources.lookProbeElement);
+    this.element.append(probe);
+    const metrics = LayoutMetrics.measure(probe, rootSize);
+    probe.remove();
+    return metrics;
   }
 
   private restoreFocus(): void {

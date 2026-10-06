@@ -11,11 +11,12 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import DocumentLinkValidator from "../documents/document-link.validator.ts";
+import GitAttributesValidator from "../documents/git-attributes.validator.ts";
 import MarkdownDocument from "../documents/markdown-document.ts";
 import SentenceBreaker from "../documents/sentence-breaker.ts";
 import TextFormatValidator from "../documents/text-format.validator.ts";
 import type RepositoryFiles from "../repository/repository-files.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class DocumentCheck implements ICheck {
   private static readonly MARKDOWN_EXTENSION: string = ".md";
@@ -36,9 +37,12 @@ export default class DocumentCheck implements ICheck {
     const breaker = new SentenceBreaker();
     const findings: string[] = [];
     const documents: MarkdownDocument[] = [];
+    let attributes: string | null = null;
     for (const file of files) {
       const content = await readFile(path.join(this.root, file));
       findings.push(...formatValidator.validate(file, content));
+      if (file === GitAttributesValidator.FILE)
+        attributes = content.toString("utf8");
       if (file.endsWith(DocumentCheck.MARKDOWN_EXTENSION)) {
         const text = content.toString("utf8");
         documents.push(new MarkdownDocument(file, text));
@@ -46,6 +50,7 @@ export default class DocumentCheck implements ICheck {
       }
     }
 
+    findings.push(...new GitAttributesValidator().validate(attributes));
     const linkValidator = new DocumentLinkValidator(files, documents);
     for (const document of documents)
       findings.push(...linkValidator.validate(document));

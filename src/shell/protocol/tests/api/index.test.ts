@@ -15,9 +15,9 @@ export class ProtocolApiTests {
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
       "BuildIdentity", "Cancel", "CommandInfo", "CommandList", "CommandRun", "Event", "Failure", "FailureCode", "FrameReader", "FrameWriter", "Handshake", "KeyChord", "KeyName", "ModuleState", "ModuleStatus", "ModuleStatusList", "Notification", "NotificationAction", "NotificationBroadcast",
-      "NotificationList", "NotificationPost", "NotificationReference", "NotificationState", "NotificationSeverity", "NotificationUpdate", "NotificationsQuery", "PreShellData",
+      "NotificationList", "NotificationPost", "NotificationReference", "NotificationState", "NotificationSeverity", "NotificationUpdate", "NotificationsQuery", "PreShellData", "ProgramStatus", "ProgramStatusList",
       "ProtocolException", "QualifiedName", "RecentCommandUse", "RecentCommands", "RecentCommandsQuery", "Request", "Response", "RunningWork", "RuntimeHandover", "SettingChange", "SettingDefinition", "SettingEntry", "SettingKey", "SettingKind", "SettingLocality", "SettingOption",
-      "SettingScope", "SettingType", "SettingValue", "SettingsQuery", "SettingsSnapshot", "ShellEvents", "ShellMethods", "StopPolicy", "StopRequest", "WindowStateKey", "WindowStateValue", "WindowStateWrite", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind", "WorkReport"
+      "SettingScope", "SettingType", "SettingValue", "SettingsQuery", "SettingsSnapshot", "ShellEvents", "ShellMethods", "ShellNotifications", "StopPolicy", "StopRequest", "WindowStateKey", "WindowStateValue", "WindowStateWrite", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind", "WorkReport"
     ];
 
     Assert.areEqual(exportNames.sort().join(","), Object.keys(api).sort().join(","));

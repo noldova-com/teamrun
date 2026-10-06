@@ -14,6 +14,8 @@ export class RuntimeApiTests {
   @TestMethod
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
+      "AppImageCopyCleanup",
+      "AppImageSource",
       "AttachOptions",
       "BackupVerificationException",
       "BuildComparer",

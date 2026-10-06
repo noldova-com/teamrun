@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import { ShellMethods } from "@noldova/teamrun-shell-protocol";
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
@@ -50,12 +51,17 @@ export class Resources {
   public static readonly readBuildChannel: string = "teamrun:readBuild";
   public static readonly copyTextChannel: string = "teamrun:copyText";
   public static readonly openLogFolderChannel: string = "teamrun:openLogFolder";
+  public static readonly openLinkChannel: string = "teamrun:openLink";
+  public static readonly installCommandChannel: string = "teamrun:installCommand";
   public static readonly notificationOpenedChannel: string = "teamrun:notificationOpened";
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
   public static readonly windowErrorChannel: string = "teamrun:windowError";
   public static readonly copyTextLimit: number = 65536;
+  public static readonly linkLimit: number = 32768;
+  public static readonly linkProtocols: readonly string[] = ["http:", "https:", "mailto:"];
+  public static readonly linkRefused: string = "A link was not opened: only well-formed http, https and mailto links without credentials open.";
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
   public static readonly windowShellMethods: readonly string[] = [
@@ -69,6 +75,7 @@ export class Resources {
     ShellMethods.markNotificationsRead.text,
     ShellMethods.clearNotifications.text,
     ShellMethods.settings.text,
+    ShellMethods.readSetting.text,
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text,
     ShellMethods.recentCommands.text,
@@ -76,6 +83,7 @@ export class Resources {
   ];
   public static readonly deviceMethods: readonly string[] = [
     ShellMethods.settings.text,
+    ShellMethods.readSetting.text,
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text,
     ShellMethods.recentCommands.text,
@@ -188,6 +196,40 @@ export class Resources {
   public static readonly responsiveEvent: "responsive" = "responsive";
   public static readonly cleanExitReason: string = "clean-exit";
   public static readonly warningBoxType: "warning" = "warning";
+  public static readonly infoBoxType: "info" = "info";
+  public static get commandName(): string {
+    return ProductInfo.current.slug;
+  }
+
+  public static readonly bundleCommandSegments: readonly string[] = ["..", "Resources", "bin"];
+  public static readonly pathCommandFolder: string = "/usr/local/bin";
+  public static readonly scriptRunner: string = "/usr/bin/osascript";
+  public static readonly administratorScript: readonly string[] = [
+    "-e", "on run argv",
+    "-e", "set commandLink to quoted form of (item 3 of argv)",
+    "-e", "do shell script \"[ -e \" & commandLink & \" ] && [ ! -L \" & commandLink & \" ] && exit 3; /bin/mkdir -p \" & quoted form of (item 2 of argv) & \" && /bin/ln -sfh \" & quoted form of (item 1 of argv) & \" \" & commandLink with prompt (item 4 of argv) with administrator privileges",
+    "-e", "end run"
+  ];
+  public static readonly userCancelledCode: string = "(-128)";
+  public static readonly occupiedExitCode: string = "(3)";
+  public static readonly missingErrorCode: string = "ENOENT";
+  public static readonly errorCodeField: "code" = "code";
+  public static readonly deniedErrorCodes: readonly string[] = ["EACCES", "EPERM"];
+  public static get commandInstalled(): string {
+    return `The ${Resources.commandName} command is installed.`;
+  }
+
+  public static get commandAlreadyInstalled(): string {
+    return `The ${Resources.commandName} command is already installed.`;
+  }
+
+  public static get commandNotInstalled(): string {
+    return `The ${Resources.commandName} command was not installed.`;
+  }
+
+  public static get commandMissingDetail(): string {
+    return `This build of ${Resources.applicationName} has no command to link; an installed ${Resources.applicationName} has one.`;
+  }
   public static get windowStopped(): string {
     return `${Resources.applicationName}'s window stopped unexpectedly.`;
   }
@@ -367,6 +409,30 @@ export class Resources {
 
   public static formatLogFolderNotOpened(reason: string): string {
     return `The log folder could not be opened: ${reason}`;
+  }
+
+  public static formatLinkNotOpened(reason: string): string {
+    return `A link could not be opened: ${reason}`;
+  }
+
+  public static formatAdministratorPrompt(link: string): string {
+    return `${Resources.applicationName} wants to link ${link} to its ${Resources.commandName} command, so that terminals can run it.`;
+  }
+
+  public static formatCommandInstalledDetail(link: string): string {
+    return `${link} links to the command inside ${Resources.applicationName}. Terminals opened from now on run it as ${Resources.commandName}.`;
+  }
+
+  public static formatCommandAlreadyInstalledDetail(link: string): string {
+    return `${link} already links to the command inside this ${Resources.applicationName}.`;
+  }
+
+  public static formatCommandOccupiedDetail(link: string): string {
+    return `${link} is a file that is not a link, so ${Resources.applicationName} leaves it alone. Move or remove it, then install the command again.`;
+  }
+
+  public static formatPathCommandFailed(link: string, reason: string): string {
+    return `The ${Resources.commandName} command could not be linked at ${link}: ${reason}`;
   }
 
   public static formatSystemNotificationFailed(reason: string): string {

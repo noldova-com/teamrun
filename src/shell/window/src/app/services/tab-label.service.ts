@@ -20,6 +20,7 @@ export class TabLabelService {
   private readonly labels: WritableSignal<ReadonlyMap<string, TabLabel>> = signal(new Map());
   private readonly titles: WritableSignal<ReadonlyMap<string, string>> = signal(new Map());
   private readonly badges: WritableSignal<ReadonlyMap<string, ViewBadge>> = signal(new Map());
+  private readonly working: WritableSignal<ReadonlySet<string>> = signal(new Set());
 
   public register(name: string, label: TabLabel): void {
     this.labels.update(t => new Map([...t, [name, label]]));
@@ -31,6 +32,14 @@ export class TabLabelService {
 
   public badgeOf(tab: Tab): ViewBadge | null {
     return tab.isMovable ? this.badges().get(tab.name) ?? null : null;
+  }
+
+  public setWorking(tabKey: string, isWorking: boolean): void {
+    this.working.update(t => new Set([...t].filter(u => u !== tabKey).concat(isWorking ? [tabKey] : [])));
+  }
+
+  public isWorking(tab: Tab): boolean {
+    return this.working().has(tab.key);
   }
 
   public setTitle(tab: Tab, title: string): void {

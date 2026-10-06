@@ -7,7 +7,7 @@
  */
 
 export { ExitCode } from "../enums/exit-code.js";
-export type { IDesktopOpener } from "../interfaces/desktop-opener.js";
+export type { IDesktopOpener } from "../interfaces/i-desktop-opener.js";
 export { CliContext } from "../models/cli-context.js";
 export { Cli } from "../services/cli.js";
 export { CliEntry } from "../services/cli-entry.js";

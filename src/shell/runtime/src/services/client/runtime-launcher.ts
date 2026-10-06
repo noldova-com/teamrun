@@ -23,8 +23,8 @@ import { NoRuntimeException } from "../../exceptions/no-runtime.exception.js";
 import { PreShellDataFoundException } from "../../exceptions/pre-shell-data-found.exception.js";
 import { RuntimeHandoverException } from "../../exceptions/runtime-handover.exception.js";
 import { WorkInProgressException } from "../../exceptions/work-in-progress.exception.js";
-import type { IProcessStarter } from "../../interfaces/process-starter.js";
-import type { IRuntimeClientListener } from "../../interfaces/runtime-client-listener.js";
+import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
+import type { IRuntimeClientListener } from "../../interfaces/i-runtime-client-listener.js";
 import { AttachOptions } from "../../models/attach-options.js";
 import { Endpoint } from "../../models/endpoint.js";
 import type { LaunchSettings } from "../../models/launch-settings.js";
@@ -33,7 +33,7 @@ import type { RuntimeDiscovery } from "../../models/runtime-discovery.js";
 import { StartedRuntime } from "../../models/started-runtime.js";
 import { Resources } from "../../resources.js";
 import { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
-import { DiscoveryReader } from "../discovery/discovery-reader.js";
+import { DiscoveryReader } from "../discovery/discovery.reader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { ChildProcessStarter } from "../process/child-process-starter.js";
 import { BuildComparer } from "./build-comparer.js";
@@ -177,7 +177,8 @@ export class RuntimeLauncher {
 
   private async startAsync(): Promise<StartedRuntime> {
     const directory = this.settings.dataDirectory;
-    const startLogName = Resources.formatStartLogName(randomUUID());
+    const unique = randomUUID();
+    const startLogName = Resources.formatStartLogName(unique);
     const command = new ProcessLaunchCommand(this.settings.platform, this.settings.executablePath, [
       this.settings.entryPath,
       Resources.dataDirectoryArgument,
@@ -186,7 +187,7 @@ export class RuntimeLauncher {
       String(this.settings.idleGraceMilliseconds),
       Resources.startLogArgument,
       startLogName
-    ]);
+    ], this.settings.environment, path.join(directory.logsFolder, Resources.formatCopyRecordName(unique)));
     await mkdir(directory.logsFolder, { recursive: true });
     const startLog = path.join(directory.logsFolder, startLogName);
     const processId = await this.starter.startAsync(command.executable, command.arguments, this.settings.environment, startLog);

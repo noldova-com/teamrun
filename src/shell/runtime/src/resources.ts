@@ -8,6 +8,8 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { WindowStateKind } from "./enums/window-state-kind.js";
+
 export class Resources {
   public static readonly folderSeparator: string = "/";
   public static readonly rootParameterName: string = "root";
@@ -38,6 +40,7 @@ export class Resources {
   public static readonly previousDesktopLogFileName: string = "desktop.previous.log";
   public static readonly startLogPrefix: string = "start-";
   public static readonly startLogExtension: string = ".log";
+  public static readonly copyRecordPrefix: string = "copy-";
   public static readonly discoveryFileName: string = "runtime.json";
   public static readonly backupsFolderName: string = "backups";
   public static readonly profileFolderName: string = "desktop";
@@ -66,7 +69,7 @@ export class Resources {
   public static readonly commitStatement: string = "COMMIT";
   public static readonly writeAheadLogStatement: string = "PRAGMA journal_mode = WAL";
   public static readonly rollbackJournalStatement: string = "PRAGMA journal_mode = DELETE";
-  public static readonly databaseFileSuffixes: readonly string[] = ["", "-wal", "-shm", "-journal"];
+  public static readonly databaseFileSuffixes: readonly string[] = [String.empty, "-wal", "-shm", "-journal"];
   public static readonly historyTableName: string = "migration_history";
   public static readonly createHistoryStatement: string = "CREATE TABLE migration_history (position INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE) STRICT";
   public static readonly readHistoryStatement: string = "SELECT position, id FROM migration_history ORDER BY position";
@@ -106,10 +109,14 @@ export class Resources {
   public static readonly deviceColumn: string = "device";
   public static readonly parentNameColumn: string = "parent_name";
   public static readonly parentIdColumn: string = "parent_id";
-  public static readonly applicationScope: string = "";
-  public static readonly sharedDevice: string = "";
+  public static readonly applicationScope: string = String.empty;
+  public static readonly sharedDevice: string = String.empty;
   public static readonly createWindowStatesStatement: string =
     "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
+  public static readonly windowStateColumns: Readonly<Record<WindowStateKind, string>> = {
+    [WindowStateKind.Bounds]: "bounds",
+    [WindowStateKind.Layout]: "layout"
+  };
   public static readonly errorCodeField: "errcode" = "errcode";
   public static readonly busyErrorCode: number = 5;
   public static readonly fileErrorCodeField: "code" = "code";
@@ -216,6 +223,8 @@ export class Resources {
   public static readonly mutedModulesSetting: string = "mutedModules";
   public static readonly keyBindingsSetting: string = "keyBindings";
   public static readonly recentCommandCountSetting: string = "recentCommandCount";
+  public static readonly spellCheckSetting: string = "spellCheck";
+  public static readonly spellCheckLanguagesSetting: string = "spellCheckLanguages";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
@@ -223,6 +232,7 @@ export class Resources {
   public static readonly textGroup: string = "Text";
   public static readonly layoutGroup: string = "Layout";
   public static readonly commandSearchGroup: string = "Command search";
+  public static readonly spellingGroup: string = "Spelling";
   public static readonly notificationsGroup: string = "Notifications";
   public static readonly shortcutsGroup: string = "Keys";
   public static readonly defaultThemeId: string = "shell.default";
@@ -272,6 +282,10 @@ export class Resources {
   public static readonly mutedModulesDescription: string = "A module turned off still adds its notifications to the list, without toasts or operating system notifications.";
   public static readonly keyBindingsTitle: string = "Keyboard shortcuts";
   public static readonly keyBindingsDescription: string = "The keys you chose for commands, in place of their default keys, on every device.";
+  public static readonly spellCheckTitle: string = "Check spelling";
+  public static readonly spellCheckDescription: string = "Underline misspelled words in the text you type and offer corrections in the text field's menu. Code is never checked.";
+  public static readonly spellCheckLanguagesTitle: string = "Spelling languages";
+  public static readonly spellCheckLanguagesDescription: string = "The languages words are checked in on this device. With none chosen, the operating system's languages that have a dictionary are used, or else the first language offered. On macOS the system chooses the languages.";
   public static readonly recentCommandCountTitle: string = "Recent commands";
   public static readonly recentCommandCountDescription: string = "How many commands you recently ran from command search are listed first. 0 lists none.";
   public static readonly maximumRecentCommands: number = 20;
@@ -337,7 +351,85 @@ export class Resources {
     "-c",
     "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\""
   ];
+  public static readonly launchCopyShellArguments: readonly string[] = [
+    "--noprofile",
+    "--norc",
+    "-p",
+    "-c",
+    [
+      "shopt -s failglob",
+      "for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done",
+      "shopt -u failglob",
+      "image=$1 root=$2 mode=$3 record=$4",
+      "shift 4",
+      "copy= mounter= extraction= status=1",
+      "if [[ $mode == mount ]]; then",
+      "  listing=$(mktemp) || exit 1",
+      "  \"$image\" --appimage-mount > \"$listing\" &",
+      "  mounter=$!",
+      "  for (( attempt = 0; attempt < 100; attempt++ )); do",
+      "    if IFS= read -r copy < \"$listing\"; then break; fi",
+      "    copy=",
+      "    kill -0 \"$mounter\" 2> /dev/null || break",
+      "    sleep 0.1",
+      "  done",
+      "  rm -f -- \"$listing\"",
+      "  if [[ -n $copy ]]; then",
+      "    echo \"teamrun-copy mount $$ $mounter $image\" >> \"$record\"",
+      "  else",
+      "    kill \"$mounter\" 2> /dev/null",
+      "    wait \"$mounter\" 2> /dev/null",
+      "    mounter=",
+      "    echo \"$image could not be mounted, so the runtime starts from an extraction of it.\" >&2",
+      "  fi",
+      "fi",
+      "if [[ -z $copy ]]; then",
+      "  extraction=$(mktemp -d \"${TMPDIR:-/tmp}/teamrun-runtime-XXXXXX\") || exit 1",
+      "  echo \"teamrun-copy extraction $$ $extraction\" >> \"$record\"",
+      "  if ( cd -- \"$extraction\" && \"$image\" --appimage-extract > /dev/null ); then",
+      "    copy=$extraction/squashfs-root",
+      "  else",
+      "    rm -rf -- \"$extraction\" \"$record\"",
+      "    echo \"$image could be neither mounted nor extracted, so the runtime cannot start.\" >&2",
+      "    exit 1",
+      "  fi",
+      "fi",
+      "command=()",
+      "for argument; do",
+      "  if [[ $argument == \"$root\"/* ]]; then argument=$copy${argument#\"$root\"}; fi",
+      "  command+=(\"$argument\")",
+      "done",
+      "export APPDIR=$copy",
+      "\"${command[@]}\" &",
+      "runtime=$!",
+      "forward() { kill -TERM \"$runtime\" 2> /dev/null; }",
+      "trap forward TERM INT HUP",
+      "while kill -0 \"$runtime\" 2> /dev/null; do wait \"$runtime\"; status=$?; done",
+      "if [[ -n $mounter ]]; then kill -TERM \"$mounter\" 2> /dev/null; wait \"$mounter\" 2> /dev/null; fi",
+      "if [[ -n $extraction ]]; then rm -rf -- \"$extraction\"; fi",
+      "rm -f -- \"$record\"",
+      "exit \"$status\""
+    ].join("\n")
+  ];
   public static readonly launchNameSuffix: string = "-launch";
+  public static readonly appImageVariable: string = "APPIMAGE";
+  public static readonly appImageFolderVariable: string = "APPDIR";
+  public static readonly appImageMountMode: string = "mount";
+  public static readonly appImageExtractMode: string = "extract";
+  public static readonly appImageMountOption: string = "--appimage-mount";
+  public static readonly trailingSlashes: RegExp = /\/+$/;
+  public static readonly parentFolder: string = "..";
+  public static readonly mountTableFile: string = "/proc/self/mountinfo";
+  public static readonly mountPointField: number = 4;
+  public static readonly mountTableEscape: RegExp = /\\([0-7]{3})/g;
+  public static readonly octalRadix: number = 8;
+  public static readonly processFolder: string = "/proc";
+  public static readonly commandLineFile: string = "cmdline";
+  public static readonly processArgumentSeparator: string = "\0";
+  public static readonly copyMountRecord: RegExp = /^teamrun-copy mount (\d+) (\d+) (.+)$/;
+  public static readonly copyExtractionRecord: RegExp = /^teamrun-copy extraction (\d+) (.+)$/;
+  public static readonly copyExtractionName: RegExp = /^teamrun-runtime-[A-Za-z0-9]{6}$/;
+  public static readonly copyEndSignal: NodeJS.Signals = "SIGTERM";
   public static readonly stoppedByIdle: string = "idle";
   public static readonly stoppedByRequest: string = "request";
   public static readonly stoppedBySignal: string = "signal";
@@ -386,6 +478,7 @@ export class Resources {
   public static readonly runtimeExitedWithoutReason: string = "The runtime exited while starting and left no reason.";
   public static readonly startLogArgument: string = "--start-log";
   public static readonly startLogNamePattern: RegExp = /^start-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.log$/;
+  public static readonly copyRecordNamePattern: RegExp = /^copy-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.log$/;
   public static readonly startLogTailLength: number = 4096;
   public static readonly homeAbbreviation: string = "~";
   public static readonly redactedValue: string = "[redacted]";
@@ -618,6 +711,14 @@ export class Resources {
     return `The module ${moduleId} may not offer the command ${command} in a notification; it must be its own or a dependency's.`;
   }
 
+  public static formatShellNotificationUnknown(kind: string): string {
+    return `The shell posts no notification of the kind ${kind}.`;
+  }
+
+  public static formatShellNotificationCommand(kind: string): string {
+    return `The shell's notification kind ${kind} offers no command.`;
+  }
+
   public static formatNotificationNotFound(id: string): string {
     return `Notification ${id} is gone; it was dismissed or its module stopped.`;
   }
@@ -655,11 +756,11 @@ export class Resources {
   }
 
   public static formatSettingNeedsDevice(name: string): string {
-    return `The setting ${name} is kept per device and needs a device, without a scope.`;
+    return `The setting ${name} is kept per device and needs a device.`;
   }
 
   public static formatSettingScopeNotAllowed(name: string, scope: string): string {
-    return `The setting ${name} cannot be set for the scope ${scope}.`;
+    return `The setting ${name} does not list the scope ${scope}.`;
   }
 
   public static formatSettingNotReadable(moduleId: string, name: string): string {
@@ -786,6 +887,14 @@ export class Resources {
     return `The runtime's log could not be written, so it is no longer written to: ${reason}`;
   }
 
+  public static formatCopyNotEnded(record: string, reason: string): string {
+    return `The runtime could not end the AppImage copy recorded in ${record}, so the record is left: ${reason}\n`;
+  }
+
+  public static formatCopyRecordName(unique: string): string {
+    return `${Resources.copyRecordPrefix}${unique}${Resources.startLogExtension}`;
+  }
+
   public static formatStartLogName(unique: string): string {
     return `${Resources.startLogPrefix}${unique}${Resources.startLogExtension}`;
   }
@@ -859,7 +968,7 @@ export class Resources {
       "if ($started -ne $targets[$i + 1]) { \"$id`tother\"; continue }; " +
       "try { $p.Kill(); \"$id`tkilled\" } catch { \"$id`tfailed\" }; " +
       "$held.Add($p) }; " +
-      (lists ? `${Resources.windowsProcessTableScript}; ` : "") +
+      (lists ? `${Resources.windowsProcessTableScript}; ` : String.empty) +
       "foreach ($p in $held) { $left = [int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds); " +
       "if ($p.WaitForExit($left)) { \"$($p.Id)`tended\" } else { \"$($p.Id)`trunning\" } }";
   }
@@ -872,11 +981,13 @@ export class Resources {
     return `The module ${moduleId}'s program ${program} (process ${processId}): ${text}\n`;
   }
 
-  public static formatReadWindowState(column: string): string {
+  public static formatReadWindowState(kind: WindowStateKind): string {
+    const column = Resources.windowStateColumns[kind];
     return `SELECT ${column} AS value FROM window_states WHERE device = ? AND window = ?`;
   }
 
-  public static formatWriteWindowState(column: string): string {
+  public static formatWriteWindowState(kind: WindowStateKind): string {
+    const column = Resources.windowStateColumns[kind];
     return `INSERT INTO window_states (device, window, ${column}) VALUES (?, ?, ?) ON CONFLICT (device, window) DO UPDATE SET ${column} = excluded.${column}`;
   }
 }

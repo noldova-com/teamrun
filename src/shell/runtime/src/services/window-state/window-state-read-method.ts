@@ -10,7 +10,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { WindowStateKey, WindowStateValue } from "@noldova/teamrun-shell-protocol";
 
 import type { WindowStateKind } from "../../enums/window-state-kind.js";
-import type { IMethodHandler } from "../../interfaces/method-handler.js";
+import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
 import type { WindowStateStore } from "./window-state-store.js";
 

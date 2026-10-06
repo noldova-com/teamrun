@@ -8,7 +8,7 @@
 
 import TestPart from "../test-part.ts";
 import type BuildTarget from "./build-target.ts";
-import type ITestJob from "./interfaces/test-job.ts";
+import type ITestJob from "./interfaces/i-test-job.ts";
 
 export default class TestJobPlan {
   private static readonly WHOLE: ITestJob = { part: "", name: "Build and test", prebuilt: false, build: true, angular: true };

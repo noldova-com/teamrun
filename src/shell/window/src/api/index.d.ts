@@ -8,7 +8,7 @@
 
 import type { InjectionToken, InputSignal, Signal, Type } from "@angular/core";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { KeyChord, NotificationPost, SettingScope } from "@noldova/teamrun-shell-protocol";
+import type { KeyChord, NotificationPost, SettingEntry, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 /**
  * Whether the shell pads the page a view or document shows. The shell pads
@@ -431,6 +431,29 @@ export interface IWindowPartContext {
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
 
   /**
+   * Registers a step that saves the part's unsaved state when TeamRun
+   * closes, quits for a newer build or restarts. The window runs every
+   * part's steps and its own layout save together and closes only once they
+   * settle. A step that rejects keeps TeamRun open: the window logs the
+   * error and shows it as a notification naming the module, and the person
+   * closes again once it is fixed. A part whose steps have not settled after
+   * 4 seconds does not hold closing back: TeamRun closes, and the window
+   * logs it and posts a warning naming the module.
+   *
+   * @param save The step; it resolves once the state is saved.
+   * @returns A function that removes the step; deactivation removes it too.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function saveDraftsOnClose(context: IWindowPartContext, saveDraftsAsync: () => Promise<void>): () => void {
+   *   return context.registerSave(saveDraftsAsync);
+   * }
+   * ```
+   */
+  registerSave(save: () => Promise<void>): () => void;
+
+  /**
    * Supplies the rows of one of the module's dynamic menu groups. The window
    * asks again whenever it builds the menu or toolbar, and leaves out a row
    * whose command belongs to neither the module nor a dependency, and a group
@@ -473,6 +496,36 @@ export interface IWindowPartContext {
    * ```
    */
   setViewBadge(view: string, badge: ViewBadge | null): void;
+
+  /**
+   * Marks the tab of one of the module's views or documents as working. The
+   * tab shows a spinner in place of its close glyph, reveals Close when hovered
+   * or focused, and is marked busy for assistive technology, until every mark
+   * on it is cleared or the part is withdrawn. Real work that should hold up
+   * quitting is reported by the module's runtime part, not by this mark.
+   *
+   * @param name The view's or document's name, which the module declares in
+   * `contributes.views` or `contributes.documents`.
+   * @param instance The tab's instance, if it has one.
+   * @returns A function that clears this mark; calling it again does nothing.
+   * @throws Error synchronously when the name belongs to another module, the
+   * module declares no such view or document, or the instance is not valid.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export async function syncNoteAsync(context: IWindowPartContext, note: string, sync: () => Promise<void>): Promise<void> {
+   *   const clear = context.markWorking("notes.note", note);
+   *   try {
+   *     await sync();
+   *   }
+   *   finally {
+   *     clear();
+   *   }
+   * }
+   * ```
+   */
+  markWorking(name: string, instance?: string): () => void;
 
   /**
    * Tells whether a name belongs to the module or one of its dependencies,
@@ -613,6 +666,27 @@ export interface IWindowPartContext {
   log(message: string): void;
 
   /**
+   * Opens a link in the system's own application, such as a web page in the
+   * person's browser or a new message in their mail app. TeamRun opens only
+   * well-formed http, https and mailto links without credentials, and never
+   * asks first. A click on such a link in the window's content opens it the
+   * same way, unless the part handled the click itself.
+   *
+   * @param url The link to open.
+   * @returns A promise that settles once the system has taken the link; it
+   * rejects when TeamRun refuses the link or the system cannot open it.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function openHelp(context: IWindowPartContext): Promise<void> {
+   *   return context.openLinkAsync("https://example.com/help");
+   * }
+   * ```
+   */
+  openLinkAsync(url: string): Promise<void>;
+
+  /**
    * Calls a method of the module's runtime part or a dependency's.
    *
    * @param method The method's name.
@@ -652,8 +726,8 @@ export interface IWindowPartContext {
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
 
   /**
-   * Reads the value in effect of a setting of the module, a dependency or
-   * the shell.
+   * Reads the application's value in effect of a setting of the module, a
+   * dependency or the shell. `readSettingAsync` reads it for a scope object.
    *
    * @param name The setting's name.
    * @returns The value, or undefined while the window has not loaded the
@@ -669,6 +743,34 @@ export interface IWindowPartContext {
    * ```
    */
   readSetting(name: string): JsonValue | undefined;
+
+  /**
+   * Asks the runtime for the value in effect of a setting of the module, a
+   * dependency or the shell at a scope object: the value set for the
+   * object, else for each enclosing object, else for the application, else
+   * the default. A change at an enclosing scope or the application reaches
+   * `onSettingChanged` with that scope, not with the object's, so a part
+   * that shows the object reads it again.
+   *
+   * @param name The setting's name.
+   * @param scope The scope object; the application when left out or null.
+   * @returns A promise of the setting's name, the value in effect and
+   * whether a value is stored for the object itself; it rejects when the
+   * setting belongs to another module that is not a dependency, or the
+   * runtime refuses the request, such as for a scope the setting does not
+   * list.
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export async function isWrappedInProject(context: IWindowPartContext, project: string): Promise<boolean> {
+   *   const entry = await context.readSettingAsync("notes.wrapLines", new SettingScope(QualifiedName.parse("notes.project"), project));
+   *   return entry.value === true;
+   * }
+   * ```
+   */
+  readSettingAsync(name: string, scope?: SettingScope | null): Promise<SettingEntry>;
 
   /**
    * Changes a setting of the module. A value equal to the setting's default
@@ -719,8 +821,9 @@ export interface IWindowPartContext {
    * shell, in any scope.
    *
    * @param name The setting's name.
-   * @param listener Called with the value now in effect and the scope it
-   * changed in, null for the application scope.
+   * @param listener Called with the value now in effect, the scope it
+   * changed in, null for the application scope, and whether a value is
+   * stored for that scope, false after a reset.
    * @returns A function that stops listening; deactivation stops it too.
    * @throws Error synchronously when the setting belongs to another module.
    * @example
@@ -735,7 +838,7 @@ export interface IWindowPartContext {
    * }
    * ```
    */
-  onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null) => void): () => void;
+  onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null, isSet: boolean) => void): () => void;
 }
 
 /**
@@ -1463,6 +1566,15 @@ export declare class WindowPartTokens {
    * The {@link ContentPaddingRef} of the page the component is shown on.
    */
   public static readonly contentPadding: InjectionToken<ContentPaddingRef>;
+
+  /**
+   * Whether the page the component is shown on is in view.
+   * @remarks The window keeps a tab's page while the tab is open. A hidden
+   * page is taken out of the document and gets no change detection until it
+   * shows again, so a component reads this signal to pause work of its own,
+   * such as timers, while it is hidden.
+   */
+  public static readonly shown: InjectionToken<Signal<boolean>>;
 }
 
 /**

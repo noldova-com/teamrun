@@ -29,6 +29,7 @@ export class GalleryResources {
     delayed: "Delayed",
     triggerCaption: "Trigger",
     openCaption: "Open",
+    noHeadingCaption: "No heading",
     sample: "Sample",
     primary: "Primary",
     secondary: "Secondary",
@@ -97,6 +98,7 @@ export class GalleryResources {
     configurationRemove: "Remove",
     configurationWideTable: { heading: "Environment variables", label: "Environment variables", explanation: "Each variable is set for the programs the shell starts, after the system's own.", rowCount: 3, isNarrow: false, hasAdd: true },
     configurationNarrowTable: { heading: String.empty, label: "Narrow environment variables", explanation: String.empty, rowCount: 2, isNarrow: true, hasAdd: false },
+    configurationUnheadedTable: { heading: String.empty, label: "Global environment variables", explanation: "These apply to every project, before the project's own variables.", rowCount: 2, isNarrow: false, hasAdd: true },
     configurationRows: [
       { name: "EDITOR", value: "code --wait", scope: "Every project", edit: "Edit EDITOR", remove: "Remove EDITOR" },
       { name: "LANG", value: "en_GB.UTF-8", scope: "Every project", edit: "Edit LANG", remove: "Remove LANG" },
@@ -203,7 +205,28 @@ export class GalleryResources {
     dockingPlate: "A plate with the center chosen",
     dockingGuideCaption: "Guide",
     dockingChosenCaption: "Chosen guide",
-    dockingPlateCaption: "Plate, center chosen"
+    dockingPlateCaption: "Plate, center chosen",
+    card: "Card",
+    cardTitle: "Sync is paused",
+    cardBody: "Changes stay on this computer until you resume.",
+    cardLong: "A card wraps a name too long for its width, such as shell.notifications.fromModules.notesReminderSchedule, inside it.",
+    codeBlock: "Code block",
+    codeLanguage: "TypeScript",
+    codeSample: "export function greet(name: string): string {\n  const message = \"Hello, \" + name + \". This line runs past the block's edge, so it scrolls sideways until Word wrap is on.\";\n  return message;\n}",
+    codeWrappedCaption: "Word wrap on",
+    codeNoLanguageCaption: "No language",
+    codeRefusedCaption: "Copy refused",
+    codeShell: "Shell",
+    codeCommand: "npm install --save-exact @noldova/teamrun-shell-ui",
+    codeLongLanguage: "A language name far too long to fit the header",
+    codeLongLine: "https://example.com/teamrun/modules/notes/settings/reminders/schedule/weekly/monday",
+    inlineCode: "Inline code",
+    inlinePanelCaption: "Panel text",
+    inlineMessageCaption: "Message text",
+    inlineBefore: "Set ",
+    inlineName: "EDITOR",
+    inlineAfter: " to choose the editor.",
+    inlineLongName: "shell.notifications.fromModules.notesReminderSchedule"
   } as const;
 
   public static formatMissingPart(part: string): string {

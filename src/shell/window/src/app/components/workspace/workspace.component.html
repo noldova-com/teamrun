@@ -6,22 +6,24 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-@let geometry = layout.geometry();
-@for (side of sides; track side) {
-  <tr-dock [side]="side" />
-}
-@for (frame of geometry.frames; track frame.group.id) {
-  <tr-tab-group [frame]="frame">
-    @if (frame.group.active; as active) {
-      @if (!active.equals(dialogs.shown())) {
-        <tr-tab-content [tab]="active" [isDocked]="frame.side !== null" />
+@if (layout.isMeasured()) {
+  @let geometry = layout.geometry();
+  @for (side of sides; track side) {
+    <tr-dock [side]="side" />
+  }
+  @for (frame of geometry.frames; track frame.group.id) {
+    <tr-tab-group [frame]="frame">
+      @if (frame.group.active; as active) {
+        @if (!active.equals(dialogs.shown())) {
+          <tr-tab-slot [tab]="active" [isDocked]="frame.side !== null" />
+        }
+      } @else if (isEmptyDocuments(frame)) {
+        <tr-empty-window />
       }
-    } @else if (isEmptyDocuments(frame)) {
-      <tr-empty-window />
-    }
-  </tr-tab-group>
+    </tr-tab-group>
+  }
+  @for (handle of geometry.handles; track handle.split.id + "/" + handle.index) {
+    <tr-split-sash [handle]="handle" />
+  }
+  <tr-docking-guides />
 }
-@for (handle of geometry.handles; track handle.split.id + "/" + handle.index) {
-  <tr-split-sash [handle]="handle" />
-}
-<tr-docking-guides />

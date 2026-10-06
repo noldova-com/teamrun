@@ -9,6 +9,7 @@
 import { Component, type Type } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingChange, SettingKey, SettingScope } from "@noldova/teamrun-shell-protocol";
 
@@ -81,6 +82,25 @@ describe("WindowPartContext", () => {
     ]);
   });
 
+  it("keeps its save steps in order until it removes one or is withdrawn, and removing a step twice changes nothing", () => {
+    const first = (): Promise<void> => Promise.resolve();
+    const second = (): Promise<void> => Promise.resolve();
+    const third = (): Promise<void> => Promise.resolve();
+
+    const removeFirst = context.registerSave(first);
+    context.registerSave(second);
+    context.registerSave(third);
+    const registered = [...context.saves];
+    removeFirst();
+    removeFirst();
+    const remaining = [...context.saves];
+    context.withdraw();
+
+    expect(registered).toEqual([first, second, third]);
+    expect(remaining).toEqual([second, third]);
+    expect(context.saves).toEqual([]);
+  });
+
   it("refuses a notification of another module, an undeclared kind or another module's command, before and on update", async () => {
     const posted = await context.postNotificationAsync(notification("notes.saved", "Saved", null));
 
@@ -96,22 +116,26 @@ describe("WindowPartContext", () => {
   it("reads its own, its dependencies' and the shell's settings, changes only its own, and hears their changes until withdrawn", async () => {
     const folder = new SettingScope(QualifiedName.parse("notes.folder"), "f1");
     const heard: string[] = [];
-    context.onSettingChanged("tasks.size", (value, scope) => heard.push(`${String(value)} ${scope?.id ?? "app"}`));
+    context.onSettingChanged("tasks.size", (value, scope, isSet) => heard.push(`${String(value)} ${scope?.id ?? "app"} ${String(isSet)}`));
 
     const read = ["notes.sortBy", "tasks.size", "shell.mode", "notes.missing"].map(t => context.readSetting(t));
+    const entries = await Promise.all([context.readSettingAsync("notes.sortBy", folder), context.readSettingAsync("tasks.size", folder), context.readSettingAsync("shell.mode")]);
     await context.writeSettingAsync("notes.sortBy", "date");
     await context.writeSettingAsync("notes.sortBy", "title", folder);
     await context.resetSettingAsync("notes.sortBy");
     await context.resetSettingAsync("notes.sortBy", folder);
     host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("shell.mode")), "Dark", true));
     host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size"), folder), 2, true));
+    host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size"), folder), 1, false));
     context.withdraw();
     host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size")), 3, true));
 
     expect(read).toEqual(["notes.sortBy value", "tasks.size value", "shell.mode value", undefined]);
-    expect(host.calls).toEqual(["write notes.sortBy \"date\" app", "write notes.sortBy \"title\" f1", "reset notes.sortBy app", "reset notes.sortBy f1", "refresh"]);
-    expect(heard).toEqual(["2 f1"]);
+    expect(entries.map(t => `${t.name.text}=${String(t.value)} ${String(t.isSet)}`)).toEqual(["notes.sortBy=notes.sortBy at f1 true", "tasks.size=tasks.size at f1 true", "shell.mode=shell.mode at app false"]);
+    expect(host.calls).toEqual(["read notes.sortBy f1", "read tasks.size f1", "read shell.mode app", "write notes.sortBy \"date\" app", "write notes.sortBy \"title\" f1", "reset notes.sortBy app", "reset notes.sortBy f1", "refresh"]);
+    expect(heard).toEqual(["2 f1 true", "1 f1 false"]);
     expect(() => context.readSetting("clock.speed")).toThrowError(WindowPartAccessException);
+    await expect(context.readSettingAsync("clock.speed", folder)).rejects.toThrowError(WindowPartAccessException);
     expect(() => context.onSettingChanged("clock.speed", () => undefined)).toThrowError(WindowPartAccessException);
     await expect(context.writeSettingAsync("tasks.size", 1)).rejects.toThrowError(WindowPartAccessException);
     await expect(context.resetSettingAsync("shell.mode")).rejects.toThrowError(WindowPartAccessException);
@@ -224,6 +248,12 @@ describe("WindowPartContext", () => {
     expect(host.calls).toEqual(["log notes Opened the list"]);
   });
 
+  it("opens a link through the host", async () => {
+    await context.openLinkAsync("https://example.com/help");
+
+    expect(host.calls).toEqual(["openLink https://example.com/help"]);
+  });
+
   it("calls its own module's and its dependencies' methods and refuses others", async () => {
     expect(await context.requestAsync("notes.read", { id: 1 })).toEqual({ method: "notes.read", payload: { id: 1 } });
     expect(await context.requestAsync("tasks.list", null)).toEqual({ method: "tasks.list", payload: null });
@@ -272,6 +302,41 @@ describe("WindowPartContext", () => {
     context.withdraw();
     context.withdraw();
     expect(host.calls).toEqual(["badge notes.list 3 3 unread", "badge notes.list dot none", "badge notes.list dot Changed", "badge notes.list dot none", "refresh", "refresh"]);
+  });
+
+  it("marks its own declared views' and documents' tabs as working until every mark on a tab is cleared, and clears the rest when withdrawn", () => {
+    const list = context.markWorking("notes.list");
+    const first = context.markWorking("notes.note", "1");
+    const second = context.markWorking("notes.note", "1");
+    context.markWorking("notes.note", "2");
+    first();
+    first();
+    list();
+    const before = [...host.calls];
+    second();
+    const late = context.markWorking("notes.list");
+    context.withdraw();
+    late();
+
+    expect(() => context.markWorking("tasks.list")).toThrowError(WindowPartAccessException);
+    expect(() => context.markWorking("notes.outline")).toThrowError(new WindowPartAccessException("The module notes does not declare the view or document notes.outline."));
+    expect(() => context.markWorking("notes.note", "")).toThrowError(ArgumentException);
+    expect(before).toEqual(["working view/notes.list true", "working document/notes.note/1 true", "working document/notes.note/2 true", "working view/notes.list false"]);
+    expect(host.calls.slice(before.length)).toEqual([
+      "working document/notes.note/1 false", "working view/notes.list true", "working document/notes.note/2 false", "working view/notes.list false", "refresh"
+    ]);
+  });
+
+  it("keeps a tab marked after a withdraw working when a mark from before the withdraw is cleared", () => {
+    const old = context.markWorking("notes.note", "1");
+    context.withdraw();
+    const current = context.markWorking("notes.note", "1");
+    old();
+    const before = [...host.calls];
+    current();
+
+    expect(before).toEqual(["working document/notes.note/1 true", "working document/notes.note/1 false", "refresh", "working document/notes.note/1 true"]);
+    expect(host.calls.slice(before.length)).toEqual(["working document/notes.note/1 false"]);
   });
 
   it("withdraws its contributions and listeners and has the host refresh", () => {

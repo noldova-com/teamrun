@@ -18,6 +18,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
+import { PlatformFixture } from "../../fixtures/platform.fixture.js";
 import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 
@@ -76,6 +77,23 @@ export class RuntimeHostTests {
         refused);
       Assert.areEqual("{\"kind\":\"Response\",\"id\":\"other:3\",\"payload\":null}", stopped);
       Assert.isTrue(work.signal.aborted);
+      Assert.areEqual("request", await host.waitForStopAsync());
+    });
+  }
+
+  @PlatformFixture.posixOnly()
+  @TestMethod
+  public namesTheAppImageItRunsFromAsItsProgram(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      const environment = { ...process.env, APPIMAGE: "/home/ada/TeamRun.AppImage", APPDIR: path.dirname(process.execPath) };
+      const host = await fixture.startAsync(30_000, undefined, undefined, environment);
+      const discovery = await fixture.readDiscoveryAsync();
+
+      const [connection, answer] = await fixture.handshakeAsync("other", RuntimeHostTests.OTHER);
+      connection.send("{\"kind\":\"Request\",\"id\":\"other:1\",\"method\":\"shell.stop\",\"payload\":{\"policy\":\"IfIdle\"}}\n");
+
+      Assert.areEqual("/home/ada/TeamRun.AppImage", discovery.executablePath);
+      Assert.isTrue(answer.toText().includes("\"executablePath\":\"/home/ada/TeamRun.AppImage\""), answer.toText());
       Assert.areEqual("request", await host.waitForStopAsync());
     });
   }
@@ -233,6 +251,22 @@ export class RuntimeHostTests {
       await host.waitForStopAsync();
 
       Assert.isTrue(/^\S+Z The module notes failed\.\n$/.test(await readFile(fixture.dataDirectory.runtimeLog, "utf8")));
+    });
+  }
+
+  @TestMethod
+  public startsAndLogsALeftoverAppImageCopyItCannotEnd(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      const record = path.join(fixture.dataDirectory.logsFolder, "copy-11111111-2222-4333-8444-555555555555.log");
+      await mkdir(record, { recursive: true });
+
+      const host = await fixture.startAsync();
+      host.requestStop("test");
+      await host.waitForStopAsync();
+
+      const log = await readFile(fixture.dataDirectory.runtimeLog, "utf8");
+      Assert.isTrue(/The runtime could not end the AppImage copy recorded in .+, so the record is left: Error: EISDIR/.test(log), log);
+      Assert.isTrue(existsSync(record), "the record is left");
     });
   }
 

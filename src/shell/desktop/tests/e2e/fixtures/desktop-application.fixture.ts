@@ -15,7 +15,7 @@ import path from "node:path";
 import { type ElectronApplication, type Page, type TestInfo, _electron, expect } from "@playwright/test";
 
 import { Wait } from "@noldova/teamrun-foundation-testing";
-import { StopPolicy } from "@noldova/teamrun-shell-protocol";
+import { SettingsSnapshot, StopPolicy } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, OwnershipLock, RuntimeBuild, RuntimeClient, type RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
 
 import CleanupSteps from "./cleanup-steps.ts";
@@ -75,6 +75,10 @@ export default class DesktopApplicationFixture {
   private static readonly THREADS_TIMEOUT: number = 20_000;
   private static readonly PAGE_UNREACHABLE: string = "The page did not answer the silence report's request, which reaches it through the main process, so the test did not wait for it.";
   private static readonly MAIN_WINDOW: string = "main-window";
+  private static readonly CHECKPOINT_ANNOTATION: string = "checkpoint";
+  private static readonly SETTINGS_METHOD: string = "shell.settings";
+  private static readonly APPEARANCE_SETTINGS: readonly string[] = ["theme", "mode", "interfaceFont", "codeFont", "panelSize", "messageSize", "codeSize"];
+  private static readonly SETTINGS_TIMEOUT: number = 5_000;
   private static readonly QUIT_ACTION: string = "quit";
   private static readonly QUIT_QUESTION: string = "tr-quit-dialog";
   private static readonly NO_ANSWER: unique symbol = Symbol("no answer");
@@ -211,10 +215,12 @@ export default class DesktopApplicationFixture {
   }
 
   public async checkpointAsync(name: string): Promise<Buffer> {
-    const image = await this.window.screenshot({ scale: "css" });
+    const zoom = await this.readZoomAsync();
+    const image = zoom === 1 ? await this.window.screenshot({ scale: "css" }) : await this.captureZoomedAsync();
     if (this.viewport !== null)
       expect([image.readUInt32BE(16), image.readUInt32BE(20)]).toEqual([this.viewport.width, this.viewport.height]);
     await this.testInfo.attach(name, { body: image, contentType: "image/png" });
+    this.testInfo.annotations.push({ type: DesktopApplicationFixture.CHECKPOINT_ANNOTATION, description: JSON.stringify({ name, ...await this.readAppearanceAsync(zoom) }) });
     return image;
   }
 
@@ -421,6 +427,45 @@ export default class DesktopApplicationFixture {
       `The window's request to it, teamrun.readBuild(), ${described}.`,
       this.placement
     ].join("\n");
+  }
+
+  private async readZoomAsync(): Promise<number> {
+    return await this.answerAsync("report its zoom", this.application.browserWindow(this.window).then(t => t.evaluate(u => u.webContents.getZoomFactor())));
+  }
+
+  private async captureZoomedAsync(): Promise<Buffer> {
+    const session = await this.window.context().newCDPSession(this.window);
+    try {
+      return Buffer.from((await session.send("Page.captureScreenshot", { format: "png" })).data, "base64");
+    }
+    finally {
+      await session.detach();
+    }
+  }
+
+  private async readAppearanceAsync(zoom: number): Promise<object> {
+    const settings = await this.readSettingsAsync();
+    const page = await this.window.evaluate(() => ({ colorScheme: getComputedStyle(document.documentElement).colorScheme, viewport: { width: innerWidth, height: innerHeight }, pixelRatio: devicePixelRatio }));
+    return { ...settings, colorScheme: page.colorScheme, zoom, viewport: page.viewport, pixelRatio: page.pixelRatio };
+  }
+
+  private async readSettingsAsync(): Promise<object> {
+    const request = this.window.evaluate(method => (Reflect.get(globalThis, "teamrun") as { request(name: string, payload: unknown): Promise<unknown> }).request(method, {}), DesktopApplicationFixture.SETTINGS_METHOD);
+    try {
+      const answer = await DesktopApplicationFixture.withinAsync(request, DesktopApplicationFixture.SETTINGS_TIMEOUT);
+      if (answer === DesktopApplicationFixture.NO_ANSWER)
+        return { settings: null, settingsProblem: `${DesktopApplicationFixture.SETTINGS_METHOD} had no answer within ${DesktopApplicationFixture.SETTINGS_TIMEOUT} ms.` };
+      if (typeof answer !== "object" || answer === null || !("payload" in answer))
+        return { settings: null, settingsProblem: `${DesktopApplicationFixture.SETTINGS_METHOD} answered ${JSON.stringify(answer)}.` };
+      const values = new Map(SettingsSnapshot.fromJson(answer.payload).entries.map(t => [t.name.text, t.value]));
+      const missing = DesktopApplicationFixture.APPEARANCE_SETTINGS.filter(t => !values.has(`shell.${t}`));
+      if (missing.length > 0)
+        return { settings: null, settingsProblem: `${DesktopApplicationFixture.SETTINGS_METHOD} had no value for ${missing.map(t => `shell.${t}`).join(", ")}.` };
+      return { settings: Object.fromEntries(DesktopApplicationFixture.APPEARANCE_SETTINGS.map(t => [t, values.get(`shell.${t}`)])) };
+    }
+    catch (error) {
+      return { settings: null, settingsProblem: `${DesktopApplicationFixture.SETTINGS_METHOD} failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
   }
 
   private async answerAsync<T>(action: string, evaluation: Promise<T>, limit: number = DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT): Promise<T> {

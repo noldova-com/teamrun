@@ -10,7 +10,9 @@ import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, type Sign
 
 import "@noldova/teamrun-foundation-core";
 import { KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
-import { ButtonComponent, ButtonVariant, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import {
+  ButtonComponent, ButtonVariant, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective, TooltipDirective
+} from "@noldova/teamrun-shell-ui";
 
 import { KeyBindings } from "../../models/key-bindings";
 import { ShortcutNotice } from "../../models/settings/shortcut-notice";
@@ -23,7 +25,7 @@ import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.c
 
 @Component({
   selector: "tr-shortcuts",
-  imports: [ButtonComponent, HighlightedTextComponent, TooltipDirective],
+  imports: [ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective, HighlightedTextComponent, TooltipDirective],
   templateUrl: "./shortcuts.component.html",
   styleUrl: "./shortcuts.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,

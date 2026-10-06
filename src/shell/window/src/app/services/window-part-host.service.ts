@@ -12,7 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type CommandInfo, CommandList, CommandRun, FailureCode, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate,
-  type SettingScope, type SettingChange, ShellEvents, ShellMethods
+  type SettingChange, type SettingEntry, type SettingScope, ShellEvents, ShellMethods
 } from "@noldova/teamrun-shell-protocol";
 
 import { ContentPadding } from "../enums/content-padding";
@@ -48,6 +48,8 @@ import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
 import { LayoutService } from "./layout.service";
+import { LinkService } from "./link.service";
+import { LiveViewService } from "./live-view.service";
 import { MenuService } from "./menu.service";
 import { ModuleStatusService } from "./module-status.service";
 import { SettingsService } from "./settings.service";
@@ -57,7 +59,9 @@ import { ViewDialogService } from "./view-dialog.service";
 @Injectable({ providedIn: "root" })
 export class WindowPartHostService implements IWindowPartHost {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
+  private readonly links: LinkService = inject(LinkService);
   private readonly layout: LayoutService = inject(LayoutService);
+  private readonly liveViews: LiveViewService = inject(LiveViewService);
   private readonly opener: DocumentOpenerService = inject(DocumentOpenerService);
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly commands: CommandService = inject(CommandService);
@@ -132,6 +136,10 @@ export class WindowPartHostService implements IWindowPartHost {
     return this.settings.read(name);
   }
 
+  public readSettingAsync(name: string, scope: SettingScope | null): Promise<SettingEntry> {
+    return this.settings.readAsync(name, scope);
+  }
+
   public writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void> {
     return this.settings.setAsync(name, value, scope);
   }
@@ -151,8 +159,16 @@ export class WindowPartHostService implements IWindowPartHost {
       this.opener.open(moduleId, name, instance, title, isPreview);
   }
 
+  public listSaves(): ReadonlyMap<string, readonly (() => Promise<void>)[]> {
+    return new Map(this.activations.filter(t => t.context.saves.length > 0).map(t => [t.context.moduleId, [...t.context.saves]]));
+  }
+
   public log(moduleId: string, message: string): void {
     this.bridge.logModule(moduleId, message);
+  }
+
+  public openLinkAsync(url: string): Promise<void> {
+    return this.links.openAsync(url);
   }
 
   public keepDocument(moduleId: string, name: string, instance: string): void {
@@ -212,6 +228,10 @@ export class WindowPartHostService implements IWindowPartHost {
 
   public setViewBadge(view: string, badge: ViewBadge | null): void {
     this.labels.setBadge(view, badge);
+  }
+
+  public setTabWorking(tabKey: string, isWorking: boolean): void {
+    this.labels.setWorking(tabKey, isWorking);
   }
 
   public refresh(): void {
@@ -465,6 +485,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private async deactivateAsync(activations: readonly WindowPartActivation[]): Promise<void> {
     for (const activation of [...activations].reverse()) {
+      this.liveViews.destroy(t => WindowPartHostService.owns(activation.context, t));
       this.activations.splice(this.activations.indexOf(activation), 1);
       this.changedModules.add(activation.context.moduleId);
       try {
@@ -477,6 +498,11 @@ export class WindowPartHostService implements IWindowPartHost {
         activation.context.withdraw();
       }
     }
+  }
+
+  private static owns(context: WindowPartContext, tab: Tab): boolean {
+    const contributions = tab instanceof DocumentTab ? context.documents : context.views;
+    return contributions.some(t => t.name === tab.name);
   }
 
   private static match(contribution: ViewContribution | DocumentContribution, context: WindowPartContext | null, modulePadding?: ContentPadding): ContributionMatch {
