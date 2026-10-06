@@ -22,7 +22,7 @@ export interface IDesktopProcess {
   readonly processId: number;
   readonly programs: IProgramHost;
 
-  startDetached(executablePath: string, args: readonly string[]): void;
+  startDetached(executablePath: string, args: readonly string[], onFailure: (error: Error) => void): void;
   endProcess(processId: number): void;
   onUncaughtException(listener: (error: unknown) => void): void;
   onUnhandledRejection(listener: (reason: unknown) => void): void;
