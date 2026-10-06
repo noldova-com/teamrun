@@ -1,0 +1,173 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Flaky tests
+
+on:
+  workflow_run:
+    workflows: [Build and test]
+    types: [completed]
+  schedule:
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  record:
+    name: Record the flaky tests
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'merge_group' || github.event.workflow_run.event == 'pull_request' ||
+      (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    concurrency:
+      group: ${{ github.workflow }}-record
+      cancel-in-progress: false
+    steps:
+      - name: Check out the reporting scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js to record
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to record again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to record again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to record a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to record a last time
+        if: steps.node-again.outcome == 'failure'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Gather the flaky test records
+        id: gather
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: flaky-tests-*
+          path: _build/flaky
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Wait before gathering the flaky test records again
+        if: steps.gather.outcome == 'failure'
+        run: sleep 30
+
+      - name: Gather the flaky test records again
+        id: gather-again
+        if: steps.gather.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: flaky-tests-*
+          path: _build/flaky
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Wait before gathering the flaky test records a last time
+        if: steps.gather-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Gather the flaky test records a last time
+        if: steps.gather-again.outcome == 'failure'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: flaky-tests-*
+          path: _build/flaky
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Open or update a bug for each flaky test
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FLAKY_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          FLAKY_RECORDS: _build/flaky
+        run: node scripts/flaky-report.ts
+
+  week:
+    name: Count the week's flaky tests
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - name: Check out the reporting scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js to count
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to count again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to count again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to count a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to count a last time
+        if: steps.node-again.outcome == 'failure'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Count the flaky tests of the last seven days
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/flaky-week-summary.ts
