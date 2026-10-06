@@ -33,7 +33,7 @@ export class WindowsProcessTableReader implements IProcessTableReader {
     const listed = this.api.listProcesses();
     return new ProcessTable(listed.flatMap(([processId, parentId]) => {
       const entry = this.read(processId, parentId);
-      return Object.isNull(entry) || entry.started > taken ? [] : [entry];
+      return Object.isNull(entry) || entry.earliest > taken ? [] : [entry];
     }));
   }
 

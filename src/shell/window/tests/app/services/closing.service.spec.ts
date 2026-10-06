@@ -176,4 +176,26 @@ describe("ClosingService", () => {
     expect(errors[0]).toBe(layoutFailure);
     expect((errors[1] as Error).message).toBe("TeamRun is not connected to its runtime.");
   });
+  it("names each part that failed or did not finish saving for an update, logging them without posting notifications", async () => {
+    vi.useFakeTimers();
+    const full = new Error("The disk is full.");
+    saves.set("notes", [() => Promise.reject(full)]);
+    saves.set("tasks", [() => new Promise<void>(() => undefined)]);
+    saves.set("clock", [() => Promise.resolve()]);
+
+    const saving = TestBed.inject(ClosingService).saveForUpdateAsync();
+    await vi.advanceTimersByTimeAsync(4000);
+
+    expect(await saving).toEqual(["Notes couldn't save", "Tasks didn't finish saving"]);
+    expect(errors.map(t => t instanceof WindowPartFailureException ? [t.moduleId, t.message, t.cause] : t))
+      .toEqual([["notes", "Its window part failed to save while TeamRun was preparing to install an update.", full]]);
+    expect(bridge.errorsLogged).toEqual([["tasks", "Its window part did not finish saving within 4 seconds while TeamRun was preparing to install an update; the update stopped."]]);
+    expect(posts()).toEqual([]);
+  });
+
+  it("names nothing for an update when every part saved", async () => {
+    saves.set("notes", [() => Promise.resolve()]);
+
+    expect(await TestBed.inject(ClosingService).saveForUpdateAsync()).toEqual([]);
+  });
 });

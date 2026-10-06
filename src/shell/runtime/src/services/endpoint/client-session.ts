@@ -25,8 +25,11 @@ export class ClientSession {
   private currentState: SessionState = SessionState.AwaitingHandshake;
   private clientName: string = String.empty;
 
-  public constructor(socket: Socket, maximumFrameLength: number, listener: ISessionListener) {
+  public readonly connection: number;
+
+  public constructor(socket: Socket, connection: number, maximumFrameLength: number, listener: ISessionListener) {
     this.socket = socket;
+    this.connection = connection;
     this.listener = listener;
     this.reader = new FrameReader(maximumFrameLength);
     this.writer = new FrameWriter(maximumFrameLength);

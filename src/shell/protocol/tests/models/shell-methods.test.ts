@@ -32,6 +32,11 @@ export class ShellMethodsTests {
   }
 
   @TestMethod
+  public namesTheUpdateMethods(): void {
+    Assert.areEqual("shell.update|shell.updateSaved", [ShellMethods.update.text, ShellMethods.updateSaved.text].join("|"));
+  }
+
+  @TestMethod
   public namesTheCommandMethods(): void {
     Assert.areEqual("shell.commands", ShellMethods.commands.text);
     Assert.areEqual("shell.runCommand", ShellMethods.runCommand.text);

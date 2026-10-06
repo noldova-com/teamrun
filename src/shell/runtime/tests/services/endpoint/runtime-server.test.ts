@@ -81,7 +81,7 @@ export class RuntimeServerTests {
 
       Assert.areEqual(FailureCode.BuildMismatch, other.failure?.code);
       Assert.areEqual(2, counted.payload);
-      Assert.areEqual(3, fixture.server.countOtherClients(new RequestContext("desktop", null, new AbortController().signal)));
+      Assert.areEqual(3, fixture.server.countOtherClients(new RequestContext("desktop", null, new AbortController().signal, 1)));
     });
   }
 

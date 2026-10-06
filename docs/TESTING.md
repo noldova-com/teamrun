@@ -167,8 +167,10 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 | `scripts/tests/fixtures/repository.fixture.ts` | Between bounded attempts to remove a fixture repository that Windows still holds open. |
 | `src/foundation/testing/tests/fixtures/execution/entry-lifetime.fixture.ts` | One fixture test outlasts its time limit on purpose, so the runner's time limit is tested. |
 | `src/shell/desktop/tests/e2e/teardown.spec.ts` | Three workflows block the main process on purpose. Two test the harness's handling of a main process that stops answering. The third makes it fail first, so a request's failure is tested to carry the main-process failure the desktop log holds. A fourth leaves work running, so a quit that stops at the question about it is reported as that question, with its window and text, and not as a silent main process. |
+| `src/shell/desktop/tests/services/update-barrier-watch.test.ts` | A started watch checks the barrier every millisecond, and the test waits 20 ms once the watch has quit the desktop, and again once it is stopped, so the watch is tested to check no more. |
 | `src/shell/runtime/tests/services/client/runtime-launcher.test.ts` | A runtime publishes itself 600 ms after the launcher starts, so the launcher's wait past its own timeout is tested. |
 | `src/shell/runtime/tests/services/lifetime/runtime-host.test.ts` | Another holder releases the data directory, or publishes discovery, 200 ms after the runtime starts, so the runtime's wait for either is tested. |
+| `src/shell/runtime/tests/services/lifetime/update-preparation.test.ts` | An update's barrier stays unreadable, unparsable, handed off by a process that has exited, or held by one that cannot be looked up, for 200 ms, ten times the interval at which the runtime reads it, so the runtime is tested to keep updating until the barrier is gone. |
 
 ## 4. Results and reporting
 
