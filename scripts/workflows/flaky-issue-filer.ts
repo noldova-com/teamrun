@@ -113,7 +113,7 @@ export default class FlakyIssueFiler {
 
   private async fileOneAsync(open: readonly { number: number; title: string; body: string }[], milestone: number | null, occurrence: FlakyOccurrence): Promise<string> {
     const key = `${FlakyIssueFiler.KEY_MARKER}${FlakyIssueFiler.keyOf(occurrence.test)}${FlakyIssueFiler.MARKER_END}`;
-    const existing = open.find(t => t.body.includes(key)) ?? open.find(t => FlakyIssueFiler.names(t.title, occurrence.test.name) || FlakyIssueFiler.names(t.body, occurrence.test.name));
+    const existing = open.find(t => t.body.includes(key)) ?? open.find(t => FlakyIssueFiler.names(t.title, occurrence.test.name));
     return existing === undefined
       ? await this.openAsync(FlakyIssueFiler.titleOf(occurrence.test.name), this.describe(key, occurrence), milestone)
       : await this.commentAsync(existing.number, this.describeAgain(occurrence));

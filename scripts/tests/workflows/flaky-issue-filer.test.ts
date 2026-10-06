@@ -68,7 +68,7 @@ class FlakyIssueFilerTests {
       ].join("\n"));
     });
 
-    test("a flaky test comments on the open bug whose body holds its key, or else on one that names it exactly, and never on a partial match", async () => {
+    test("a flaky test comments on the open bug whose body holds its key, or else on one whose title names it exactly, and never on a partial match", async () => {
       const keyed = new FlakyTest("Package tests", "@noldova/a/a.test.js", "ATests.fails", "first");
       const named = new FlakyTest("Angular tests", "shell/b.spec.ts", "B shows", "second");
       const partial = new FlakyTest("UI workflows", "src/shell/desktop/tests/e2e/c.spec.ts", "c.spec.ts › docks", "third");
@@ -96,6 +96,22 @@ class FlakyIssueFilerTests {
       ].join("\n"));
     });
 
+    test("a short name in an unrelated bug's body finds nothing, and the key wins over a title that names the test", async () => {
+      const short = new FlakyTest("Script tests", "scripts/tests/a.test.ts", "opens", "first");
+      const keyed = new FlakyTest("Script tests", "scripts/tests/b.test.ts", "closes", "second");
+      const fixture = FlakyIssueFilerTests.createFixture([
+        { number: 50, title: "Settings is slow", body: "The tab opens slowly." },
+        { number: 51, title: "Flaky: closes", body: "" },
+        { number: 52, title: "Something else", body: `<!-- flaky-test: ${FlakyIssueFiler.keyOf(keyed)} -->` }
+      ]);
+      fixture.answer("/issues", { number: 53 });
+
+      const lines = await FlakyIssueFilerTests.create(fixture).fileAsync([new FlakyOccurrence(short, ["job"]), new FlakyOccurrence(keyed, ["job"])]);
+
+      assert.deepEqual(lines, ["- opens: opened #53", "- closes: commented on #52"]);
+      assert.deepEqual(fixture.writes, ["POST /issues", "POST /issues/52/comments"]);
+    });
+
     test("a name is found only where it stands on its own, at either end of the text or between other characters", () => {
       assert.deepEqual(
         ["a > b", "x a > b.", "(a > b)", "a > bc", "za > b", "a > b_", "a > ba > b"].map(t => FlakyIssueFiler.names(t, "a > b")),
@@ -104,7 +120,7 @@ class FlakyIssueFilerTests {
       assert.equal(FlakyIssueFiler.names("éa > b", "a > b"), false);
     });
 
-    test("a title longer than GitHub allows is cut with an ellipsis, while the body keeps the full name to match", () => {
+    test("a title longer than GitHub allows is cut with an ellipsis, and the key in the body still finds its bug", () => {
       const name = "n".repeat(300);
 
       assert.equal(FlakyIssueFiler.titleOf(name), `Flaky: ${"n".repeat(248)}…`);
