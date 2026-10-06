@@ -56,7 +56,7 @@ export default class ScriptTestReporter extends Transform {
 
   private count(event: TestEvent & { type: "test:pass" | "test:fail" }, file: string): void {
     const data = event.data;
-    if (event.type === "test:pass" && data.nesting === 0 && data.name === file)
+    if (event.type === "test:pass" && data.nesting === 0 && this.relate(path.resolve(this.root, data.name)) === file)
       return;
     const names = [...(this.names.get(file) ?? []).slice(0, data.nesting), data.name];
     this.tests.add(file, names);
