@@ -21,15 +21,16 @@ class CoverageExclusionCheckTests {
     "| Scope | Requirement |",
     "|---|---|",
     "| Foundation packages | 100% of executable production code, with no `exclusion.ts` granted |",
-    "| `src/shell/desktop` | 100%, except `main.ts` and `utility-entry.ts`, which run only inside Electron; a cell may hold `a \\| b` |",
+    "| `src/shell/desktop` | 100%, except `main.ts`, which runs only inside Electron; a cell may hold `a \\| b` |",
     "| `src/shell/runtime` | 100% of executable production code |",
+    "| `src/shell/desktop` | A second row for the same package adds `utility-entry.ts` to its grants |",
     "",
     "Only this table grants an exclusion."
   ];
   private static readonly UNREADABLE: string = "docs/TESTING.md: section 5's coverage table, headed \"| Scope | Requirement |\", could not be read, so no coverage exclusion can be granted.\n";
 
   public static register(): void {
-    test("exclusions that section 5's table grants to their package pass, and packages without exclusions need no grant", async t => {
+    test("exclusions that section 5's table grants to their package pass, across every row for that package, and packages without exclusions need no grant", async t => {
       const repository = await CoverageExclusionCheckTests.createRepositoryAsync(t, CoverageExclusionCheckTests.TABLE.join("\n"), {
         "src/shell/desktop": [{ file: "main.ts", reason: "Electron only." }, { file: "utility-entry.ts", reason: "Electron only." }],
         "src/shell/runtime": [],

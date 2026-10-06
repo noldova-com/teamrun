@@ -97,7 +97,7 @@ export default class CoverageExclusionCheck implements ICheck {
       const scope = CoverageExclusionCheck.SCOPE.exec(line.slice(CoverageExclusionCheck.ROW_START.length, separator))?.[1];
       const requirement = line.slice(separator + CoverageExclusionCheck.CELL_SEPARATOR.length, -CoverageExclusionCheck.ROW_END.length);
       if (scope !== undefined)
-        grants.set(scope, new Set([...requirement.matchAll(CoverageExclusionCheck.CODE_SPAN)].map(t => t[0].slice(1, -1))));
+        grants.set(scope, new Set([...grants.get(scope) ?? [], ...[...requirement.matchAll(CoverageExclusionCheck.CODE_SPAN)].map(t => t[0].slice(1, -1))]));
     }
     return rows === 0 ? null : grants;
   }
