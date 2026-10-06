@@ -18,7 +18,7 @@ export class SettingTypeTests {
 
   @TestMethod
   public pinsTheWireFormOfEachKind(): void {
-    const types = [SettingType.boolean(), SettingTypeTests.MODES, SettingType.number(12, 18, 1), SettingType.text(200), SettingType.modules(), SettingType.keyBindings(), SettingTypeTests.TEMPLATES];
+    const types = [SettingType.boolean(), SettingTypeTests.MODES, SettingType.number(12, 18, 1), SettingType.text(200), SettingType.modules(), SettingType.keyBindings(), SettingType.languages(), SettingTypeTests.TEMPLATES];
     const texts = types.map(t => JSON.stringify(t.toJson()));
 
     Assert.areEqual(JSON.stringify([
@@ -28,6 +28,7 @@ export class SettingTypeTests {
       "{\"kind\":\"Text\",\"maxLength\":200}",
       "{\"kind\":\"Modules\"}",
       "{\"kind\":\"KeyBindings\"}",
+      "{\"kind\":\"Languages\"}",
       "{\"kind\":\"Action\",\"command\":\"notes.openTemplates\",\"label\":\"Open templates\"}"
     ]), JSON.stringify(texts));
     Assert.areEqual(JSON.stringify(texts), JSON.stringify(texts.map(t => JSON.stringify(SettingType.fromJson(JSON.parse(t)).toJson()))));
@@ -51,6 +52,7 @@ export class SettingTypeTests {
         [{}, { "notes.create": "Shift+Alt+N", "shell.closeTab": null }, { "shell.closeTab": "Mod+W" }],
         [[], null, "Mod+K", { "notes": "Mod+K" }, { "notes.create": "Mod+Ctrl+K" }, { "notes.create": "K" }, { "notes.create": "Mod+C" }, { "notes.create": "Mod+W" }, { "notes.create": 1 }]
       ],
+      [SettingType.languages(), [[], ["en-US", "en-GB-oxendict", "sh"]], [["en-US", "en-US"], ["EN-US"], ["en_US"], ["e"], ["en-"], ["en-toolongpart"], [1], "en-US", null]],
       [SettingTypeTests.TEMPLATES, [null], [false, "", {}, []]]
     ];
 

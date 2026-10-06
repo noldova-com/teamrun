@@ -265,6 +265,30 @@ describe("SettingRowComponent", () => {
     expect(changes).toEqual([["clock", "notes"], ["clock"]]);
   });
 
+  it("chooses spelling languages with a checkbox each, in the order offered, and leaves out one no longer offered", async () => {
+    render(SettingsFixture.spellCheckLanguages, ["sv-SE"]);
+    fixture.componentRef.setInput("languages", [new SelectOption("en-GB", "English (United Kingdom)"), new SelectOption("en-US", "English (United States)")]);
+    fixture.detectChanges();
+    const group = page.getByRole("group", { name: "Spelling languages" });
+
+    await group.getByRole("checkbox", { name: "English (United States)" }).click();
+    fixture.componentRef.setInput("value", ["en-US"]);
+    fixture.detectChanges();
+    await group.getByRole("checkbox", { name: "English (United Kingdom)" }).click();
+    fixture.componentRef.setInput("value", ["en-GB", "en-US"]);
+    fixture.detectChanges();
+    await group.getByRole("checkbox", { name: "English (United States)" }).click();
+
+    expect(changes).toEqual([["en-US"], ["en-GB", "en-US"], ["en-GB"]]);
+  });
+
+  it("says so when no spelling language is offered", () => {
+    const row = render(SettingsFixture.spellCheckLanguages);
+
+    expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("No spelling languages are offered on this device.");
+    expect(row.querySelector("tr-checkbox")).toBeNull();
+  });
+
   for (const mode of AppearanceFixture.modes)
     for (const theme of AppearanceFixture.themes)
       it(`follows the component table in the ${theme.id} theme in ${mode} mode`, async () => {

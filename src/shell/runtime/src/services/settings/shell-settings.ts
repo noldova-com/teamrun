@@ -27,6 +27,8 @@ export class ShellSettings {
   public static readonly mutedModules: QualifiedName = ShellSettings.named(Resources.mutedModulesSetting);
   public static readonly keyBindings: QualifiedName = ShellSettings.named(Resources.keyBindingsSetting);
   public static readonly recentCommandCount: QualifiedName = ShellSettings.named(Resources.recentCommandCountSetting);
+  public static readonly spellCheck: QualifiedName = ShellSettings.named(Resources.spellCheckSetting);
+  public static readonly spellCheckLanguages: QualifiedName = ShellSettings.named(Resources.spellCheckLanguagesSetting);
 
   public static readonly all: readonly SettingDefinition[] = [
     ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.formatThemeDescription(ProductInfo.current.name),
@@ -53,6 +55,10 @@ export class ShellSettings {
       SettingType.boolean(), true, SettingLocality.Shared, Resources.layoutGroup),
     ShellSettings.appearance(ShellSettings.recentCommandCount, Resources.recentCommandCountTitle, Resources.recentCommandCountDescription,
       SettingType.number(0, Resources.maximumRecentCommands, 1), Resources.defaultRecentCommands, SettingLocality.Shared, Resources.commandSearchGroup),
+    ShellSettings.appearance(ShellSettings.spellCheck, Resources.spellCheckTitle, Resources.spellCheckDescription,
+      SettingType.boolean(), true, SettingLocality.Shared, Resources.spellingGroup),
+    new SettingDefinition(ShellSettings.spellCheckLanguages, Resources.spellCheckLanguagesTitle, Resources.spellCheckLanguagesDescription,
+      SettingType.languages(), [], SettingLocality.Device, [], Resources.appearancePage, Resources.spellingGroup),
     new SettingDefinition(ShellSettings.doNotDisturb, Resources.doNotDisturbTitle, Resources.doNotDisturbDescription,
       SettingType.boolean(), false, SettingLocality.Device, [], Resources.notificationsPage, Resources.notificationsGroup),
     new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,
