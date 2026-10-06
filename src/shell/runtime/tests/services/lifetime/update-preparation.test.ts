@@ -30,15 +30,20 @@ export class UpdatePreparationTests {
       const installation = UpdateBarrierFixture.open(folder.path);
       await fixture.startAsync(30_000, undefined, undefined, process.env, new ServerSettings(undefined, undefined, undefined, undefined, 50, 1_000), installation.folder);
       const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
-      await fixture.handshakeAsync("cli", RuntimeBuild.identity);
+      const [cli] = await fixture.handshakeAsync("cli", RuntimeBuild.identity);
       await UpdateBarrierFixture.holdAsync(installation);
 
       desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
       const [responses] = await RuntimeHostFixture.readMessagesAsync(desktop, 2);
       const ready = UpdateReady.fromJson(responses.get("desktop:1")?.payload);
+      await UpdateBarrierFixture.readEventAsync(cli, ShellEvents.updating);
+      const late = await RuntimeHostFixture.callAsync(cli, "cli:1", ShellMethods.modules, null);
+      const updater = await RuntimeHostFixture.callAsync(desktop, "desktop:2", ShellMethods.modules, null);
 
       Assert.areEqual("A cli client did not answer in time.", ready.problems.join("|"));
       Assert.areEqual(0, ready.processes.length);
+      Assert.areEqual(FailureCode.Updating, late.failure?.code);
+      Assert.areEqual(FailureCode.Updating, updater.failure?.code);
     });
   }
 

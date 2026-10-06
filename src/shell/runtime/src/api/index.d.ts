@@ -2200,6 +2200,73 @@ export declare class Installation {
   public recordAsync(dataDirectory: string): Promise<void>;
 
   /**
+   * Lists the data directories in the record, skipping an entry that cannot
+   * be read and dropping one whose directory no longer exists.
+   * @returns A promise of the data directories' roots.
+   * @example
+   * ```ts
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   * export function countAsync(installation: Installation): Promise<number> {
+   *   return installation.listDataDirectoriesAsync().then(t => t.length);
+   * }
+   * ```
+   */
+  public listDataDirectoriesAsync(): Promise<readonly string[]>;
+
+  /**
+   * Creates the launch barrier, after settling one whose holder no longer
+   * runs as {@link Installation.checkAsync} does. It writes the barrier to a
+   * temporary file and links it into place, which fails when a barrier
+   * exists, so no reader sees it half-written.
+   * @param barrier The barrier to create.
+   * @param version The coordinating desktop's product version.
+   * @returns A promise of whether the barrier was created; false when another
+   * barrier holds or is unfinished.
+   * @throws Error With the code `EEXIST` when another barrier is created
+   * between the settling and the write.
+   * @example
+   * ```ts
+   * import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   * import { type Installation, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+   * export function holdAsync(installation: Installation, holder: UpdateProcess): Promise<boolean> {
+   *   return installation.holdAsync(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null), "0.2.0");
+   * }
+   * ```
+   */
+  public holdAsync(barrier: UpdateBarrier, version: string): Promise<boolean>;
+
+  /**
+   * Replaces the launch barrier through a temporary file and a rename, as its
+   * holder moves the update on.
+   * @param barrier The barrier's new content.
+   * @returns A promise that settles once the barrier is replaced.
+   * @example
+   * ```ts
+   * import { type Installation, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+   * export function closeAsync(installation: Installation, barrier: UpdateBarrier): Promise<void> {
+   *   return installation.replaceAsync(new UpdateBarrier(barrier.holder, barrier.version, UpdateBarrierState.Closing, null));
+   * }
+   * ```
+   */
+  public replaceAsync(barrier: UpdateBarrier): Promise<void>;
+
+  /**
+   * Removes the launch barrier, if there is one, for the holder that gives up
+   * its update before the handoff.
+   *
+   * @returns A promise that settles once the barrier is gone.
+   * @example
+   * ```ts
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function resumeAsync(installation: Installation): Promise<void> {
+   *   return installation.releaseAsync();
+   * }
+   * ```
+   */
+  public releaseAsync(): Promise<void>;
+
+  /**
    * Reads the launch barrier for a client that wants to start a runtime.
    * A barrier whose holder no longer runs is removed when the update stopped
    * before the handoff, or when it was handed off for this version. One
@@ -5020,10 +5087,10 @@ export declare class RuntimeServer implements IEventSink {
   public beginUpdate(failure: Failure): void;
 
   /**
-   * Refuses a connection's requests while the update is prepared, once that connection has saved for it, as
-   * {@link beginUpdate} describes.
+   * Refuses a connection's requests while the update is prepared, as {@link beginUpdate} describes: once it has saved,
+   * once the wait for saves ends, and from the start for the connection that asked for the update.
    *
-   * @param connection The connection that answered `shell.updateSaved`.
+   * @param connection The connection to refuse.
    * @example
    * ```ts
    * import type { RequestContext, RuntimeServer } from "@noldova/teamrun-shell-runtime";

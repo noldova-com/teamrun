@@ -32,6 +32,7 @@ export class UpdateMethodTests {
       const updating = await UpdateBarrierFixture.readEventAsync(cli, ShellEvents.updating);
       const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
       const beforeSaving = await RuntimeHostFixture.callAsync(cli, "cli:1", ShellMethods.modules, null);
+      const second = await RuntimeHostFixture.callAsync(cli, "cli:5", ShellMethods.update, new UpdateRequest(installation.folder).toJson());
       const saved = await RuntimeHostFixture.callAsync(cli, "cli:2", ShellMethods.updateSaved, new UpdateSaved(process.pid, ["The draft could not be saved."]).toJson());
       const refused = await RuntimeHostFixture.callAsync(cli, "cli:3", ShellMethods.modules, null);
       const work = await RuntimeHostFixture.callAsync(cli, "cli:4", ShellMethods.work, null);
@@ -43,10 +44,11 @@ export class UpdateMethodTests {
       Assert.areEqual("null", JSON.stringify(updating.payload));
       Assert.areEqual(`${FailureCode.Updating}|TeamRun is preparing to install an update.`, `${late.failure?.code}|${late.failure?.message}`);
       Assert.isFalse(beforeSaving.hasFailed);
+      Assert.areEqual(`${FailureCode.Updating}|TeamRun is preparing to install an update.`, `${second.failure?.code}|${second.failure?.message}`);
       Assert.isFalse(saved.hasFailed);
       Assert.areEqual(FailureCode.Updating, refused.failure?.code);
       Assert.isFalse(work.hasFailed);
-      Assert.isFalse(coordinating.hasFailed);
+      Assert.areEqual(FailureCode.Updating, coordinating.failure?.code);
       Assert.areEqual("The draft could not be saved.", ready.problems.join("|"));
       Assert.areEqual(`${process.pid} cli`, ready.processes.map(t => `${t.processId} ${t.role}`).join("|"));
       Assert.areEqual(`${FailureCode.Updating}|TeamRun is preparing to install an update.`, `${again.failure?.code}|${again.failure?.message}`);

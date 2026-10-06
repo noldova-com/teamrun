@@ -9,6 +9,7 @@ import { ErrorHandler, Injectable, inject } from "@angular/core";
 
 import { NotificationPost, NotificationSeverity, type QualifiedName, ShellMethods, ShellNotifications } from "@noldova/teamrun-shell-protocol";
 
+import { PartSaveOutcome } from "../enums/part-save-outcome";
 import { WindowPartFailureException } from "../exceptions/window-part-failure.exception";
 import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
@@ -25,11 +26,25 @@ export class ClosingService {
   private readonly errors: ErrorHandler = inject(ErrorHandler);
 
   public async saveAsync(): Promise<boolean> {
-    const [saved] = await Promise.all([
-      Promise.all([...this.parts.listSaves()].map(([moduleId, saves]) => this.savePartAsync(moduleId, saves))),
+    const outcomes = await this.saveAllAsync(false);
+    return outcomes.every(([, outcome]) => outcome !== PartSaveOutcome.Failed);
+  }
+
+  public async saveForUpdateAsync(): Promise<readonly string[]> {
+    const outcomes = await this.saveAllAsync(true);
+    return outcomes.flatMap(([moduleId, outcome]) => {
+      const name = this.statuses.nameOf(moduleId);
+      return outcome === PartSaveOutcome.Saved ? []
+        : [outcome === PartSaveOutcome.Failed ? Resources.formatPartSaveFailedForUpdate(name) : Resources.formatPartSaveUnfinished(name)];
+    });
+  }
+
+  private async saveAllAsync(isUpdate: boolean): Promise<readonly (readonly [string, PartSaveOutcome])[]> {
+    const [outcomes] = await Promise.all([
+      Promise.all([...this.parts.listSaves()].map(async ([moduleId, saves]) => [moduleId, await this.savePartAsync(moduleId, saves, isUpdate)] as const)),
       this.saveLayoutAsync()
     ]);
-    return saved.every(t => t);
+    return outcomes;
   }
 
   private async saveLayoutAsync(): Promise<void> {
@@ -41,7 +56,7 @@ export class ClosingService {
     }
   }
 
-  private async savePartAsync(moduleId: string, saves: readonly (() => Promise<void>)[]): Promise<boolean> {
+  private async savePartAsync(moduleId: string, saves: readonly (() => Promise<void>)[], isUpdate: boolean): Promise<PartSaveOutcome> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const unfinished = new Promise<boolean>(resolve => {
       timer = setTimeout(() => resolve(false), Resources.partSaveTimeout);
@@ -50,16 +65,18 @@ export class ClosingService {
     const saving = Promise.all(saves.map(t => ClosingService.runAsync(t)));
     try {
       if (await Promise.race([saving.then(() => true), unfinished]))
-        return true;
+        return PartSaveOutcome.Saved;
       saving.catch((error: unknown) => this.errors.handleError(new WindowPartFailureException(moduleId, Resources.windowPartSaveFailedLate, error)));
-      this.bridge.logError(moduleId, Resources.windowPartSaveUnfinished);
-      this.post(ShellNotifications.saveUnfinished, moduleId, Resources.formatPartSaveUnfinished(name), Resources.partSaveUnfinishedText, NotificationSeverity.Warning);
-      return true;
+      this.bridge.logError(moduleId, isUpdate ? Resources.windowPartSaveUnfinishedForUpdate : Resources.windowPartSaveUnfinished);
+      if (!isUpdate)
+        this.post(ShellNotifications.saveUnfinished, moduleId, Resources.formatPartSaveUnfinished(name), Resources.partSaveUnfinishedText, NotificationSeverity.Warning);
+      return PartSaveOutcome.Unfinished;
     }
     catch (error) {
-      this.errors.handleError(new WindowPartFailureException(moduleId, Resources.windowPartSaveFailed, error));
-      this.post(ShellNotifications.saveFailed, moduleId, Resources.formatPartSaveFailed(name), error instanceof Error ? error.message : String(error), NotificationSeverity.Error);
-      return false;
+      this.errors.handleError(new WindowPartFailureException(moduleId, isUpdate ? Resources.windowPartSaveFailedForUpdate : Resources.windowPartSaveFailed, error));
+      if (!isUpdate)
+        this.post(ShellNotifications.saveFailed, moduleId, Resources.formatPartSaveFailed(name), error instanceof Error ? error.message : String(error), NotificationSeverity.Error);
+      return PartSaveOutcome.Failed;
     }
     finally {
       clearTimeout(timer);

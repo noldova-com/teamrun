@@ -84,6 +84,99 @@ export class InstallationTests {
   }
 
   @TestMethod
+  public async listsTheRecordedDataDirectoriesThatStillExist(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    const kept = path.join(folder.path, "kept");
+    await mkdir(kept);
+    const empty = await installation.listDataDirectoriesAsync();
+    await installation.recordAsync(kept);
+    await installation.recordAsync(path.join(folder.path, "gone"));
+    await writeFile(path.join(installation.recordFolder, "broken.json"), "{");
+    await writeFile(path.join(installation.recordFolder, "other.txt"), "{}");
+
+    const roots = await installation.listDataDirectoriesAsync();
+
+    Assert.areEqual(0, empty.length);
+    Assert.areEqual(kept, roots.join("|"));
+    Assert.areEqual(["broken.json", "other.txt"].join("|"), (await readdir(installation.recordFolder)).filter(t => !/^[0-9a-f]{16}\.json$/.test(t)).toSorted().join("|"));
+    Assert.areEqual(3, (await readdir(installation.recordFolder)).length);
+  }
+
+  @TestMethod
+  public async passesOnAnErrorListingTheRecord(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    await mkdir(installation.folder, { recursive: true });
+    await writeFile(installation.recordFolder, "not a folder");
+
+    const error = await Assert.throwsAsync(() => installation.listDataDirectoriesAsync(), Error) as NodeJS.ErrnoException;
+
+    Assert.areEqual("ENOTDIR", error.code);
+  }
+
+  @TestMethod
+  public async holdsMovesOnAndReleasesItsBarrier(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    const preparing = new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Preparing, null);
+    const missing = await installation.readAsync();
+
+    const isHeld = await installation.holdAsync(preparing, "0.2.0");
+    const isHeldAgain = await installation.holdAsync(preparing, "0.2.0");
+    await installation.replaceAsync(new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Closing, null));
+    const closing = await installation.readAsync();
+    await installation.releaseAsync();
+    await installation.releaseAsync();
+
+    Assert.isNull(missing);
+    Assert.isTrue(isHeld);
+    Assert.isFalse(isHeldAgain);
+    Assert.areEqual(JSON.stringify(new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Closing, null).toJson()), JSON.stringify(closing?.toJson()));
+    Assert.areEqual(0, (await readdir(installation.folder)).length);
+  }
+
+  @TestMethod
+  public async holdsInPlaceOfABarrierLeftBeforeTheHandoffButNotOfAnUnfinishedOne(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    const preparing = new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Preparing, null);
+
+    await InstallationTests.writeAsync(installation, new UpdateBarrier(InstallationTests.GONE, "0.3.0", UpdateBarrierState.Closing, null));
+    const afterStopped = await installation.holdAsync(preparing, "0.2.0");
+    await InstallationTests.writeAsync(installation, new UpdateBarrier(InstallationTests.GONE, "0.4.0", UpdateBarrierState.HandedOff, null));
+    const afterUnfinished = await installation.holdAsync(preparing, "0.2.0");
+
+    Assert.isTrue(afterStopped);
+    Assert.isFalse(afterUnfinished);
+    Assert.areEqual("0.4.0", (await installation.readAsync())?.version);
+  }
+
+  @TestMethod
+  public async letsNoReaderSeeABarrierHalfWritten(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    const states: string[] = [];
+    let isDone = false;
+
+    const holding = installation.holdAsync(new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Preparing, null), "0.2.0").finally(() => {
+      isDone = true;
+    });
+    while (!isDone)
+      states.push((await installation.readAsync())?.state ?? "None");
+    for (const state of [UpdateBarrierState.Closing, UpdateBarrierState.HandedOff]) {
+      const replacing = installation.replaceAsync(new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", state, null));
+      states.push((await installation.readAsync())?.state ?? "None");
+      await replacing;
+    }
+
+    Assert.isTrue(await holding);
+    Assert.isTrue(states.length >= 3 && states.every(t => t === "None" || Object.values<string>(UpdateBarrierState).includes(t)), states.join(","));
+    Assert.areEqual(UpdateBarrierState.HandedOff, (await installation.readAsync())?.state);
+    Assert.areEqual("barrier.json", (await readdir(installation.folder)).join(","));
+  }
+
+  @TestMethod
   public async findsNoBarrierWhenNoneWasWritten(): Promise<void> {
     await using folder = await TemporaryFolderFixture.createAsync();
     const installation = InstallationTests.open(folder.path);

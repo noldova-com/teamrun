@@ -67,6 +67,7 @@ export class UpdatePreparation implements Disposable {
     this.expected = expected;
     this.answered = settled.resolve;
     this.server.beginUpdate(failure);
+    this.server.refuseAfterSave(connection);
     this.processes.pause();
     this.updating.publish(null);
     this.watchBarrier(new Installation(installationFolder, t => this.presence.isRunningAsync(t)));
@@ -74,6 +75,8 @@ export class UpdatePreparation implements Disposable {
     const timer = setTimeout(settled.resolve, this.saveWait);
     await settled.promise;
     clearTimeout(timer);
+    for (const client of expected)
+      this.server.refuseAfterSave(client.connection);
     return this.readReadyAsync(expected, answers);
   }
 

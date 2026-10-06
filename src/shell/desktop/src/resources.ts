@@ -14,6 +14,14 @@ import { MainProcessFailureKind } from "./enums/main-process-failure-kind.js";
 
 export class Resources {
   public static readonly folderSeparator: string = "/";
+  public static get updateUnderWay(): string {
+    return `Another update of ${Resources.applicationName} is under way.`;
+  }
+
+  public static get updateHolderNotFound(): string {
+    return `${Resources.applicationName} could not find its own process in the process table.`;
+  }
+
   public static get applicationName(): string {
     return ProductInfo.current.name;
   }
@@ -84,6 +92,8 @@ export class Resources {
   public static readonly appearanceChannel: string = "teamrun:appearance";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
+  public static readonly updateSaveRequestChannel: string = "teamrun:updateSaveRequest";
+  public static readonly updateSaveAnswerChannel: string = "teamrun:updateSaveAnswer";
   public static readonly startupStateChannel: string = "teamrun:startupState";
   public static readonly readStartupChannel: string = "teamrun:readStartup";
   public static readonly startupActionChannel: string = "teamrun:startupAction";
@@ -338,6 +348,13 @@ export class Resources {
   public static readonly windowHeight: number = 800;
   public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
+  public static readonly windowSaveUnanswered: string = "A window did not finish saving within 5 seconds.";
+  public static readonly windowSaveGone: string = "A window closed before it saved.";
+  public static readonly updateBarrierInterval: number = 1000;
+  public static readonly updatePrepareTimeout: number = 15000;
+  public static readonly updateExitWait: number = 10000;
+  public static readonly updateExitInterval: number = 250;
+  public static readonly workSeparator: string = "; ";
   public static readonly workQueryTimeout: number = 2000;
   public static readonly programTimeout: number = 5000;
   public static readonly programOutputLimit: number = 65536;
@@ -519,6 +536,30 @@ export class Resources {
 
   public static formatStarterFailed(failure: string): string {
     return `The runtime starter could not start the runtime: ${failure}`;
+  }
+
+  public static formatUpdateWork(description: string, dataDirectory: string): string {
+    return `${description} (${dataDirectory})`;
+  }
+
+  public static formatWorkStartedMeanwhile(work: string): string {
+    return `Work started while ${Resources.applicationName} prepared to update: ${work}`;
+  }
+
+  public static formatUpdateRefused(dataDirectory: string, message: string): string {
+    return `The runtime of ${dataDirectory} could not prepare for the update: ${message}`;
+  }
+
+  public static formatUpdateUnsaved(dataDirectory: string, problems: string): string {
+    return `Not everything of ${dataDirectory} was saved: ${problems}`;
+  }
+
+  public static formatProcessesNotExited(processes: string): string {
+    return `These processes did not exit within 10 seconds: ${processes}`;
+  }
+
+  public static formatUpdateSavedUnsent(message: string): string {
+    return `The runtime was not told that the windows had saved for the update: ${message}`;
   }
 
   public static formatRuntimeNotStarted(reason: string): string {

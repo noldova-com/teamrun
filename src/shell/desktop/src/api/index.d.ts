@@ -16,8 +16,8 @@ import type {
 
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchSettings, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -52,6 +52,11 @@ export declare enum StartupStateKind {
    * The runtime could not be started or reached; the person may try again.
    */
   Failed = "Failed",
+
+  /**
+   * TeamRun is saving the window's work and closing for an update.
+   */
+  Updating = "Updating",
 
   /**
    * The desktop is connected to the runtime.
@@ -263,6 +268,74 @@ export declare class QuitQuestion {
    * ```
    */
   public toJson(): JsonObject;
+}
+
+/**
+ * Stops every process of the installation before an update replaces its files, then calls the updater's handoff:
+ * it asks about work in progress, holds the launch barrier, has every runtime's clients save, stops every runtime and
+ * verifies by process id and start that each process has exited.
+ */
+export declare class UpdateStop {
+  /**
+   * Creates the update stop.
+   *
+   * @param installation The installation whose record and launch barrier it uses.
+   * @param presence Finds processes in the process table.
+   * @param connectAsync Connects to the runtime of a recorded data directory as the client `update`, without starting
+   * one; resolves `null` when the directory is not in use by this installation.
+   * @param askAsync Asks the person about the work in progress, listed by data directory; resolves `true` to stop it
+   * and go on, `false` to cancel the update.
+   * @param processId The coordinating desktop's process id.
+   * @param productVersion The coordinating desktop's product version.
+   * @param now Reads the current time, in milliseconds.
+   * @param wait Resolves after the given number of milliseconds.
+   * @example
+   * ```ts
+   * import { setTimeout as delay } from "node:timers/promises";
+   *
+   * import { UpdateStop } from "@noldova/teamrun-shell-desktop";
+   * import { type Installation, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function create(installation: Installation): UpdateStop {
+   *   return new UpdateStop(
+   *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(false),
+   *     process.pid, "0.2.0", Date.now, t => delay(t));
+   * }
+   * ```
+   */
+  public constructor(
+    installation: Installation,
+    presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
+    connectAsync: (dataDirectory: string) => Promise<IUpdateTarget | null>,
+    askAsync: (work: readonly string[]) => Promise<boolean>,
+    processId: number,
+    productVersion: string,
+    now: () => number,
+    wait: (milliseconds: number) => Promise<void>);
+
+  /**
+   * Stops the installation for an update and calls the handoff. It holds the launch barrier as `Preparing`, asks each
+   * runtime `shell.update` and then `shell.stop` with the policy that stops the work, waits up to 10 seconds for every
+   * runtime and every process they listed except the desktops to exit, sets the barrier to `Closing`, waits up to 10
+   * more seconds for the other desktops, then sets it to `HandedOff`. Every connection closes when it ends.
+   *
+   * @param version The version being installed.
+   * @param handOffAsync The updater's handoff, which replaces the application's files.
+   * @returns A promise of `true` once the handoff has run, or `false` when the person cancelled at the question about
+   * work, with nothing changed.
+   * @throws {UpdateStopException} Rejected with the reason when another update holds the barrier, work started
+   * meanwhile, a runtime refused or something did not save, a process did not exit in time or could not be checked,
+   * or the handoff failed; the barrier it held is removed first, so every surviving runtime and desktop resumes.
+   * @example
+   * ```ts
+   * import type { UpdateStop } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function restartAsync(stop: UpdateStop, handOffAsync: () => Promise<void>): Promise<boolean> {
+   *   return stop.runAsync("0.3.0", handOffAsync);
+   * }
+   * ```
+   */
+  public runAsync(version: string, handOffAsync: () => Promise<void>): Promise<boolean>;
 }
 
 /**
@@ -483,6 +556,83 @@ export interface IDesktopProcess {
    * ```
    */
   onUnhandledRejection(listener: (reason: unknown) => void): void;
+}
+
+/**
+ * What the desktop's runtime startup needs to follow an update that another
+ * desktop, or this one, coordinates.
+ */
+export interface IUpdateHost {
+  /**
+   * The desktop's process id, which it reports once its windows have saved.
+   */
+  readonly processId: number;
+
+  /**
+   * Reads the installation's launch barrier.
+   *
+   * @returns A promise of the barrier, or `null` when there is none.
+   * @throws Error Rejected when the barrier cannot be read.
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function readVersionAsync(host: IUpdateHost): Promise<string | undefined> {
+   *   return (await host.readBarrierAsync())?.version;
+   * }
+   * ```
+   */
+  readBarrierAsync(): Promise<UpdateBarrier | null>;
+
+  /**
+   * Asks every window to save for the update.
+   *
+   * @returns A promise of what did not save, empty when everything saved.
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isSavedAsync(host: IUpdateHost): Promise<boolean> {
+   *   return (await host.saveAsync()).length === 0;
+   * }
+   * ```
+   */
+  saveAsync(): Promise<readonly string[]>;
+
+  /**
+   * Quits the desktop at once, without asking about work or saving again.
+   *
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function close(host: IUpdateHost): void {
+   *   host.quit();
+   * }
+   * ```
+   */
+  quit(): void;
+}
+
+/**
+ * One runtime of the installation that an update stops: its data directory,
+ * its process and the update stop's connection to it as the client `update`.
+ */
+export interface IUpdateTarget {
+  /**
+   * The data directory the runtime owns.
+   */
+  readonly dataDirectory: string;
+
+  /**
+   * The runtime's process, by process id and start.
+   */
+  readonly runtime: UpdateProcess;
+
+  /**
+   * The connection to the runtime.
+   */
+  readonly connection: IRuntimeConnection;
 }
 
 /**
@@ -2610,6 +2760,20 @@ export declare class StartupState {
   public static failed(message: string): StartupState;
 
   /**
+   * The state while TeamRun saves the window's work and closes for an update.
+   *
+   * @param version The version being installed.
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.updating("0.3.0");
+   * ```
+   */
+  public static updating(version: string): StartupState;
+
+  /**
    * The state once connected.
    *
    * @returns The state.
@@ -2885,6 +3049,69 @@ export declare class CloseCoordinator {
 }
 
 /**
+ * Asks one window to save before TeamRun stops for an update, and collects what did not save: a window that is gone
+ * or does not answer in time counts as not saved, since an update is never worth an unsaved change.
+ */
+export declare class UpdateSaveCoordinator {
+  /**
+   * Creates the coordinator.
+   *
+   * @param send Sends a save request with its id to the window; returns `false` when the window is gone.
+   * @param timeout How long to wait for an answer, in milliseconds; a positive integer.
+   * @throws ArgumentOutOfRangeException synchronously when the timeout is not a positive integer.
+   * @example
+   * ```ts
+   * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const coordinator: UpdateSaveCoordinator = new UpdateSaveCoordinator(() => true, 5000);
+   * ```
+   */
+  public constructor(send: (requestId: string) => boolean, timeout: number);
+
+  /**
+   * Asks the window to save.
+   *
+   * @returns A promise of what did not save: the window's own list, or one problem when the window is gone or did
+   * not answer in time; empty when everything saved.
+   * @example
+   * ```ts
+   * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * const coordinator = new UpdateSaveCoordinator(t => coordinator.answer(t, []), 5000);
+   * export const problems: readonly string[] = await coordinator.requestAsync();
+   * ```
+   */
+  public requestAsync(): Promise<readonly string[]>;
+
+  /**
+   * Takes the window's answer to a request.
+   *
+   * @param requestId The request's id, as the window sent it.
+   * @param problems What the window could not save, as text.
+   * @returns `true` when the answer settled a waiting request; `false` for an unknown or late id or a malformed answer.
+   * @example
+   * ```ts
+   * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const isAccepted: boolean = new UpdateSaveCoordinator(() => true, 5000).answer("unknown", []);
+   * ```
+   */
+  public answer(requestId: unknown, problems: unknown): boolean;
+
+  /**
+   * Settles every waiting request as not saved, as when the window is gone.
+   *
+   * @example
+   * ```ts
+   * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * new UpdateSaveCoordinator(() => true, 5000).release();
+   * ```
+   */
+  public release(): void;
+}
+
+/**
  * One open window: it shows once its page has painted and its startup has settled, or unpainted after a limit; asks
  * its guard whether it may close, then its page to save; and keeps its bounds.
  */
@@ -2898,6 +3125,11 @@ export declare class OpenWindow implements IQuitPrompt {
    * Asks the page to save before the window closes.
    */
   public readonly coordinator: CloseCoordinator;
+
+  /**
+   * Asks the page to save before TeamRun stops for an update.
+   */
+  public readonly updateSaves: UpdateSaveCoordinator;
 
   /**
    * Restores and keeps the window's bounds.
@@ -3474,16 +3706,17 @@ export declare class RuntimeStartup {
    * @param log Receives each launch or connection failure, and the full description of any other failure.
    * @param now Reads the current time, in milliseconds.
    * @param wait Resolves after the given number of milliseconds, or rejects once the signal aborts.
+   * @param updates Reads the launch barrier, saves the windows and quits, while it follows an update.
    * @example
    * ```ts
    * import { setTimeout as delay } from "node:timers/promises";
    *
-   * import { type IRuntimeLauncher, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
+   * import { type IRuntimeLauncher, type IUpdateHost, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
    *
-   * export function create(launcher: IRuntimeLauncher): RuntimeStartup {
+   * export function create(launcher: IRuntimeLauncher, updates: IUpdateHost): RuntimeStartup {
    *   return new RuntimeStartup(
    *     launcher, state => console.log(state.kind), () => false, 2000, event => console.log(event.name.text), message => console.error(message),
-   *     Date.now, (milliseconds, signal) => delay(milliseconds, undefined, { signal }));
+   *     Date.now, (milliseconds, signal) => delay(milliseconds, undefined, { signal }), updates);
    * }
    * ```
    */
@@ -3495,7 +3728,8 @@ export declare class RuntimeStartup {
     forward: (event: Event) => void,
     log: (message: string) => void,
     now: () => number,
-    wait: (milliseconds: number, signal: AbortSignal) => Promise<void>);
+    wait: (milliseconds: number, signal: AbortSignal) => Promise<void>,
+    updates: IUpdateHost);
 
   /**
    * The latest state.
@@ -3514,6 +3748,12 @@ export declare class RuntimeStartup {
    * shown as a failure with its cause and an offer to try again, which counts afresh. A start or reconnection that
    * fails for any reason other than data from before the shell, an older build's work or a newer build is logged, an
    * unexpected failure in full, and shows the failure with an offer to try again.
+   *
+   * When the runtime announces `shell.updating`, the state becomes {@link StartupStateKind.Updating} with the version
+   * the launch barrier names, the windows save, and the runtime is told what did not save with `shell.updateSaved`;
+   * `shell.updateEnded` makes it ready again. A runtime that disconnects meanwhile is not reconnected: the launch
+   * barrier is read every second instead, and the desktop quits once it is `Closing` and held by another desktop, or
+   * reconnects once it is gone.
    *
    * @returns A promise that settles once the state is ready or shows why not.
    * @example
@@ -4042,6 +4282,31 @@ export declare class TrayHostWatcher {
    * ```
    */
   public stop(): void;
+}
+
+/**
+ * The exception thrown when an update cannot stop the installation; its message is the reason the updater shows.
+ */
+export declare class UpdateStopException extends Exception {
+  /**
+   * The exception's name, `"UpdateStopException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message Why the update stopped.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { UpdateStopException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: UpdateStopException = new UpdateStopException("Another update of TeamRun is under way.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
 }
 
 /**

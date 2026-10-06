@@ -13,5 +13,6 @@ export enum StartupStateKind {
   WaitingForWork = "WaitingForWork",
   NewerBuild = "NewerBuild",
   Failed = "Failed",
+  Updating = "Updating",
   Ready = "Ready"
 }

@@ -541,8 +541,8 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
   Work is shared, so one client's quit never cancels work another client may be using.
   The desktop's quit asks this way; the command line's stop does not.
 - A runtime of the same build can be asked to prepare for an update with `shell.update`.
-  It then refuses every new handshake with an `Updating` failure and announces `shell.updating` to its clients.
-  A client keeps its requests until it answers `shell.updateSaved`, so it can save; from then on, its requests other than `shell.updateSaved`, `shell.work` and `shell.stop` are refused with `Updating`.
+  It then refuses every new handshake with an `Updating` failure, starts no program, and announces `shell.updating` to its clients.
+  A client's requests are handled until it answers `shell.updateSaved` or the wait for the saves ends, so it can save; after that, its requests other than `shell.updateSaved`, `shell.work` and `shell.stop` are refused with `Updating`, as are those of the client that asked for the update, from the start.
   A second `shell.update` is refused with `Updating`, and one that names a folder other than an absolute path, or an installation other than the one the runtime was started for, with `InvalidParams`.
   Only while updating, it reads its own installation's launch barrier every second.
   It goes back to normal and announces `shell.updateEnded` once the barrier is confirmed missing, or once its holder is confirmed to have exited while the barrier is `Preparing` or `Closing`.
@@ -1041,10 +1041,11 @@ The update stop of the desktop where the person chose Restart to update coordina
    It creates the barrier as `Preparing`; an existing barrier whose holder runs means another update is under way, and the update fails.
    It reads the record again, and a runtime that came into use meanwhile with work in progress fails the update.
    A directory owned without discovery gets five seconds to publish it or let go, as for a starting runtime (section 6), and fails the update otherwise.
-   It then asks each runtime `shell.update`, naming the installation's folder, so no new client, request or program starts.
+   It then asks each runtime `shell.update`, naming the installation's folder, so no new client or program starts, and each client's requests end once it has saved.
 3. **Saves.**
-   Every client told `shell.updating` answers with `shell.updateSaved`, giving its process id.
+   Every client told `shell.updating` answers with `shell.updateSaved`, giving its process id, and until then its requests are still handled.
    A desktop first freezes its windows under the update card ([UI standards](UI-STANDARDS.md#8-component-metrics-and-behavior)) and runs section 9's saves, and names any window and module whose save failed or did not answer.
+   The saves' own requests are all its windows still send; a save that tries to start a program fails, and so stops the update.
    The command line answers at once and exits with the code for an update in progress.
    The runtime waits at most 6 seconds for every client, then answers `shell.update` with the outcome and the process id and start time of every client, every program it holds and its AppImage copy's mount; a client that does not answer fails the update.
    The handshake carries no process id, because every build must accept the handshake protocol version 1 defines (section 6).

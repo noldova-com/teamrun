@@ -91,6 +91,20 @@ describe("StartupComponent", () => {
     expect(buttons(fixture)).toEqual([]);
   });
 
+  it("says which version it installs while it saves the work and closes, without actions", async () => {
+    const fixture = await renderAsync("Updating", ["0.3.0"]);
+
+    expect(texts(fixture, "h1")).toEqual(["Installing TeamRun 0.3.0"]);
+    expect(texts(fixture, "p")).toEqual(["Saving your work and closing TeamRun"]);
+    expect(buttons(fixture)).toEqual([]);
+  });
+
+  it("leaves the version out of the title when the desktop gives none", async () => {
+    const fixture = await renderAsync("Updating", []);
+
+    expect(texts(fixture, "h1")).toEqual(["Installing TeamRun"]);
+  });
+
   it("names the newer build that is running", async () => {
     const fixture = await renderAsync("NewerBuild", ["2.0.0"]);
 

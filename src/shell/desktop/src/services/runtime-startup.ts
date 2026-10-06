@@ -9,19 +9,21 @@
 import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
-import { type Event, type Failure, type RuntimeHandover, StopPolicy } from "@noldova/teamrun-shell-protocol";
+import { type Event, type Failure, type RuntimeHandover, ShellEvents, ShellMethods, StopPolicy, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException,
   type IRuntimeClientListener,
   LaunchException,
   PreShellDataFoundException,
   RuntimeHandoverException,
+  UpdateBarrierState,
   WorkInProgressException
 } from "@noldova/teamrun-shell-runtime";
 
 import { StartupStateKind } from "../enums/startup-state-kind.js";
 import type { IRuntimeConnection } from "../interfaces/i-runtime-connection.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
+import type { IUpdateHost } from "../interfaces/i-update-host.js";
 import { StartupState } from "../models/startup-state.js";
 import { Resources } from "../resources.js";
 
@@ -34,6 +36,7 @@ export class RuntimeStartup {
   private readonly log: (message: string) => void;
   private readonly now: () => number;
   private readonly wait: (milliseconds: number, signal: AbortSignal) => Promise<void>;
+  private readonly updates: IUpdateHost;
   private readonly listener: IRuntimeClientListener;
   private readonly closing: AbortController = new AbortController();
   private state: StartupState = StartupState.connecting();
@@ -49,7 +52,8 @@ export class RuntimeStartup {
     forward: (event: Event) => void,
     log: (message: string) => void,
     now: () => number,
-    wait: (milliseconds: number, signal: AbortSignal) => Promise<void>) {
+    wait: (milliseconds: number, signal: AbortSignal) => Promise<void>,
+    updates: IUpdateHost) {
     this.launcher = launcher;
     this.publish = publish;
     this.handOver = handOver;
@@ -58,8 +62,9 @@ export class RuntimeStartup {
     this.log = log;
     this.now = now;
     this.wait = wait;
+    this.updates = updates;
     this.listener = {
-      onEvent: t => this.forward(t),
+      onEvent: t => this.receive(t),
       onDisconnected: t => this.reconnect(t)
     };
   }
@@ -179,10 +184,47 @@ export class RuntimeStartup {
     }
   }
 
+  private receive(event: Event): void {
+    if (event.name.equals(ShellEvents.updating))
+      void this.freezeAsync(this.connectionValue);
+    else if (event.name.equals(ShellEvents.updateEnded) && this.state.kind === StartupStateKind.Updating && !Object.isNull(this.connectionValue))
+      this.update(StartupState.ready());
+    this.forward(event);
+  }
+
+  private async freezeAsync(connection: IRuntimeConnection | null): Promise<void> {
+    if (Object.isNull(connection))
+      return;
+    const barrier = await this.updates.readBarrierAsync().catch(() => null);
+    this.update(StartupState.updating(barrier?.version ?? String.empty));
+    const saved = new UpdateSaved(this.updates.processId, await this.updates.saveAsync());
+    await connection.callAsync(ShellMethods.updateSaved, saved.toJson())
+      .catch((error: unknown) => this.log(Resources.formatUpdateSavedUnsent(String(error))));
+  }
+
+  private async followUpdateAsync(): Promise<void> {
+    while (!this.isClosed) {
+      await this.pauseAsync(Resources.updateBarrierInterval);
+      const barrier = await this.updates.readBarrierAsync().catch(() => undefined);
+      if (Object.isNull(barrier)) {
+        await this.attachAsync(StopPolicy.IfIdle);
+        return;
+      }
+      if (barrier?.state === UpdateBarrierState.Closing && barrier.holder.processId !== this.updates.processId) {
+        this.updates.quit();
+        return;
+      }
+    }
+  }
+
   private reconnect(failure: Failure | null): void {
     if (Object.isNull(this.connectionValue) || this.isClosed)
       return;
     this.connectionValue = null;
+    if (this.state.kind === StartupStateKind.Updating) {
+      void this.followUpdateAsync();
+      return;
+    }
     this.unstableEnds = this.now() - this.readyAt < Resources.stableConnectionPeriod ? this.unstableEnds + 1 : 1;
     const delay = Resources.reconnectionDelays[this.unstableEnds - 1];
     if (Object.isUndefined(delay))

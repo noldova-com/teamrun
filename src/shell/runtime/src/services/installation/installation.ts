@@ -7,11 +7,12 @@
  */
 
 import { createHash, randomUUID } from "node:crypto";
-import { realpathSync } from "node:fs";
-import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { existsSync, realpathSync } from "node:fs";
+import { link, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
+import { JsonReader } from "@noldova/teamrun-foundation-json";
 import type { UpdateProcess } from "@noldova/teamrun-shell-protocol";
 
 import { UpdateBarrierState } from "../../enums/update-barrier-state.js";
@@ -58,6 +59,34 @@ export class Installation {
     await mkdir(this.recordFolder, { recursive: true });
     await writeFile(temporary, JSON.stringify({ [Resources.dataDirectoryField]: root }));
     await rename(temporary, file);
+  }
+
+  public async listDataDirectoriesAsync(): Promise<readonly string[]> {
+    const files = await Installation.unlessMissingAsync(readdir(this.recordFolder)) ?? [];
+    const roots = await Promise.all(files.filter(t => t.endsWith(Resources.jsonExtension)).map(t => Installation.readEntryAsync(path.join(this.recordFolder, t))));
+    return roots.filter(t => !Object.isNull(t));
+  }
+
+  public async holdAsync(barrier: UpdateBarrier, version: string): Promise<boolean> {
+    if (await this.checkAsync(version) !== UpdateBarrierStatus.None)
+      return false;
+    await mkdir(this.folder, { recursive: true });
+    const temporary = await this.writeTemporaryAsync(barrier);
+    try {
+      await link(temporary, this.barrierFile);
+    }
+    finally {
+      await rm(temporary, { force: true });
+    }
+    return true;
+  }
+
+  public async replaceAsync(barrier: UpdateBarrier): Promise<void> {
+    await rename(await this.writeTemporaryAsync(barrier), this.barrierFile);
+  }
+
+  public async releaseAsync(): Promise<void> {
+    await rm(this.barrierFile, { force: true });
   }
 
   public async readAsync(): Promise<UpdateBarrier | null> {
@@ -123,6 +152,26 @@ export class Installation {
     catch {
       return null;
     }
+  }
+
+  private async writeTemporaryAsync(barrier: UpdateBarrier): Promise<string> {
+    const temporary = path.join(this.folder, Resources.formatTemporaryName(Resources.barrierFileName, randomUUID()));
+    await writeFile(temporary, JSON.stringify(barrier.toJson()));
+    return temporary;
+  }
+
+  private static async readEntryAsync(file: string): Promise<string | null> {
+    let root: string;
+    try {
+      root = JsonReader.fromValue(JSON.parse(await readFile(file, Resources.utf8Encoding))).readString(Resources.dataDirectoryField);
+    }
+    catch {
+      return null;
+    }
+    if (existsSync(root))
+      return root;
+    await rm(file, { force: true });
+    return null;
   }
 
   private readBarrierAsync(): Promise<string | null> {

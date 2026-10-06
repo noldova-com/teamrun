@@ -145,7 +145,12 @@ export class DesktopApplication {
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
     this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
     this.gate = new UpdateBarrierGate(installation, RuntimeBuild.identity.productVersion, electron.dialog, t => log.write(t));
-    this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }));
+    this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }), {
+      processId: process.processId,
+      readBarrierAsync: () => installation.readAsync(),
+      saveAsync: () => this.saveForUpdateAsync(),
+      quit: () => electron.app.exit(Resources.quitExitCode)
+    });
     this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
     this.spelling = spelling;
   }
@@ -247,6 +252,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.replaceMisspellingChannel, (event, text) => this.replaceMisspelling(event, text));
     this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
+    this.electron.ipcMain.handle(Resources.updateSaveAnswerChannel, (event, requestId, problems) => this.findTrusted(event)?.updateSaves.answer(requestId, problems) ?? false);
     this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
     this.electron.ipcMain.on(Resources.moduleLogChannel, (event, moduleId, message) => this.writeModuleLog(event, moduleId, message));
     this.electron.ipcMain.on(Resources.windowErrorChannel, (event, moduleId, text) => this.writeWindowError(event, moduleId, text));
@@ -707,6 +713,11 @@ export class DesktopApplication {
       this.log.write(Resources.formatAppearanceRejected(String(error)));
     }
     return open;
+  }
+
+  private async saveForUpdateAsync(): Promise<readonly string[]> {
+    const problems = await Promise.all([...this.windows.values()].map(t => t.updateSaves.requestAsync()));
+    return problems.flat();
   }
 
   private answerClose(event: IIpcEvent, requestId: unknown, isSaved: unknown): boolean {

@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
   UpdateBarrierState, UpdateBarrierStatus
@@ -553,6 +553,45 @@ export class DesktopApplicationTests {
 
       Assert.areEqual(0, electron.windows.length);
       Assert.areEqual(1, DesktopStartFixture.readErrors(desktop, "The launch barrier could not be settled: Error: No display").length);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async savesEveryWindowForAnUpdateAndQuitsWhenAnotherDesktopClosesTheInstallation(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      const launcher = new FakeRuntimeLauncher();
+      const installations: Installation[] = [];
+      DesktopStartFixture.start(electron, new FakeDesktopProcess("linux", [`--device-dir=${folder}`]), launcher, undefined, undefined, undefined, installations);
+      await electron.app.becomeReadyAsync();
+      await Condition.waitAsync(() => launcher.connections.length === 1);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      const coordinator = new UpdateProcess(4120, 1500, 1501, "desktop");
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(coordinator, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
+      const window = DesktopStartFixture.firstWindow(electron);
+      const event = DesktopStartFixture.trustedEvent("linux");
+
+      launcher.listener?.onEvent(new Event(ShellEvents.updating, null));
+      await Condition.waitAsync(() => window.webContents.sent.some(t => t[0] === "teamrun:updateSaveRequest"));
+      const request = window.webContents.sent.find(t => t[0] === "teamrun:updateSaveRequest");
+      const untrusted = electron.ipcMain.invoke("teamrun:updateSaveAnswer", { ...event, senderFrame: null }, request?.[1], []);
+      const answered = electron.ipcMain.invoke("teamrun:updateSaveAnswer", event, request?.[1], ["Notes couldn't save"]);
+      const connection = launcher.connections[0];
+      await Condition.waitAsync(() => connection?.calls.includes("shell.updateSaved") === true);
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(coordinator, "0.3.0", UpdateBarrierState.Closing, null).toJson()));
+      launcher.listener?.onDisconnected(null);
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.isTrue(window.webContents.sent.some(t => t[0] === "teamrun:startupState" && JSON.stringify(t[1]) === JSON.stringify({ kind: "Updating", details: ["0.3.0"] })));
+      Assert.isFalse(untrusted === true);
+      Assert.isTrue(answered === true);
+      Assert.areEqual(JSON.stringify(new UpdateSaved(1000, ["Notes couldn't save"]).toJson()), JSON.stringify(connection?.payloads.at(-1)));
     }
     finally {
       await rm(folder, { recursive: true, force: true });

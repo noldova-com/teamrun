@@ -41,7 +41,7 @@ export class FakeRuntimeConnection implements IRuntimeConnection {
       return Promise.resolve(answer);
     if (method.text === ShellMethods.work.text)
       return Promise.resolve(Response.success("r", { descriptions: [], sequence: 0 }));
-    if (method.text === ShellMethods.stop.text)
+    if (method.text === ShellMethods.stop.text || method.text === ShellMethods.updateSaved.text)
       return Promise.resolve(Response.success("r", null));
     if (this.isFailing)
       return Promise.resolve(Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
