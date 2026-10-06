@@ -7,11 +7,12 @@
  */
 
 import { existsSync } from "node:fs";
-import { chmod } from "node:fs/promises";
+import { chmod, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 import type ProductIdentity from "../packages/product-identity.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
+import ProcessTimeoutException from "../processes/process-timeout.exception.ts";
 import InstalledPackage from "./installed-package.ts";
 import PackageLayout from "./package-layout.ts";
 import PackageTarget from "./package-target.ts";
@@ -60,6 +61,19 @@ export default class PackageInstaller {
     }
   }
 
+  private static async describeAsync(installFolder: string): Promise<string> {
+    if (!existsSync(installFolder))
+      return `The installer had not created ${installFolder}.`;
+    const files = (await readdir(installFolder, { recursive: true, withFileTypes: true }))
+      .filter(t => t.isFile())
+      .map(t => path.join(t.parentPath, t.name))
+      .sort();
+    const lines: string[] = [];
+    for (const file of files)
+      lines.push(`${path.relative(installFolder, file)}: ${(await stat(file)).size} bytes`);
+    return [`${installFolder} held ${files.length} files when the installer was stopped:`, ...lines].join("\n");
+  }
+
   private static requireFile(file: string): void {
     if (!existsSync(file))
       throw new PackagingException(`The installed package has no ${file}.`);
@@ -69,8 +83,16 @@ export default class PackageInstaller {
     const localAppData = this.environment[PackageInstaller.LOCAL_APP_DATA] ?? "";
     if (localAppData.length === 0)
       throw new PackagingException(`${PackageInstaller.LOCAL_APP_DATA} must name the folder the installer installs into for the user.`);
-    await this.requireAsync(installer, PackageInstaller.SILENT_INSTALL, folder);
-    const program = path.join(localAppData, PackageInstaller.PROGRAMS_FOLDER, product.slug, `${product.name}${PackageInstaller.WINDOWS_PROGRAM_EXTENSION}`);
+    const installFolder = path.join(localAppData, PackageInstaller.PROGRAMS_FOLDER, product.slug);
+    try {
+      await this.requireAsync(installer, PackageInstaller.SILENT_INSTALL, folder);
+    }
+    catch (error) {
+      if (!(error instanceof ProcessTimeoutException))
+        throw error;
+      throw new PackagingException(`${error.message}\n${await PackageInstaller.describeAsync(installFolder)}`, { cause: error });
+    }
+    const program = path.join(installFolder, `${product.name}${PackageInstaller.WINDOWS_PROGRAM_EXTENSION}`);
     PackageInstaller.requireFile(program);
     return new InstalledPackage(program, program, path.join(path.dirname(program), PackageInstaller.RESOURCES_FOLDER));
   }
