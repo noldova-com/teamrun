@@ -7,7 +7,7 @@
  */
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { NotificationPost, SettingChange, SettingScope } from "@noldova/teamrun-shell-protocol";
+import { type NotificationPost, QualifiedName, type SettingChange, SettingEntry, type SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import type { IWindowPartHost } from "../../src/app/interfaces/i-window-part-host";
 import type { MenuItem } from "../../src/app/models/menu-item";
@@ -83,6 +83,11 @@ export class WindowPartContextHostFixture implements IWindowPartHost {
 
   public readSetting(name: string): JsonValue | undefined {
     return name === "notes.missing" ? undefined : `${name} value`;
+  }
+
+  public readSettingAsync(name: string, scope: SettingScope | null): Promise<SettingEntry> {
+    this.calls.push(`read ${name} ${scope?.id ?? "app"}`);
+    return Promise.resolve(new SettingEntry(QualifiedName.parse(name), `${name} at ${scope?.id ?? "app"}`, scope !== null));
   }
 
   public writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void> {

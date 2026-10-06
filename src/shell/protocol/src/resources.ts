@@ -170,6 +170,7 @@ export class Resources {
   public static readonly readWindowLayoutMember: string = "readWindowLayout";
   public static readonly writeWindowLayoutMember: string = "writeWindowLayout";
   public static readonly settingsMember: string = "settings";
+  public static readonly readSettingMember: string = "readSetting";
   public static readonly setSettingMember: string = "setSetting";
   public static readonly resetSettingMember: string = "resetSetting";
   public static readonly recentCommandsMember: string = "recentCommands";

@@ -27,6 +27,7 @@ export class ShellMethods {
   public static readonly readWindowLayout: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.readWindowLayoutMember);
   public static readonly writeWindowLayout: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.writeWindowLayoutMember);
   public static readonly settings: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.settingsMember);
+  public static readonly readSetting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.readSettingMember);
   public static readonly setSetting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.setSettingMember);
   public static readonly resetSetting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.resetSettingMember);
   public static readonly recentCommands: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.recentCommandsMember);

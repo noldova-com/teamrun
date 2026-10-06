@@ -1497,6 +1497,14 @@ export declare class ShellMethods {
   public static readonly settings: QualifiedName;
 
   /**
+   * `shell.readSetting`: asks for a setting's value in effect for a key,
+   * resolved through the key's scope object, its enclosing scope objects,
+   * the application and the default; its payload is a `SettingKey` and its
+   * answer a `SettingEntry`. It fails as `shell.setSetting` does.
+   */
+  public static readonly readSetting: QualifiedName;
+
+  /**
    * `shell.setSetting`: sets a setting's value; its payload is a
    * `SettingValue`. An unknown setting fails with `NotFound`; a value the
    * setting does not accept, a scope it does not list, or a device setting
@@ -2280,8 +2288,8 @@ export declare class SettingValue {
 }
 
 /**
- * A setting's value in effect for the application, and whether it is set
- * or the default.
+ * A setting's value in effect for the application or for a key, and whether
+ * a value is stored for it. The answer of `shell.readSetting`.
  */
 export declare class SettingEntry {
   /**
@@ -2295,7 +2303,8 @@ export declare class SettingEntry {
   public readonly value: JsonValue;
 
   /**
-   * Whether a value is set; `false` when the default is in effect.
+   * Whether a value is stored for the application or the key; `false` when
+   * the value comes from an enclosing scope or the default.
    */
   public readonly isSet: boolean;
 

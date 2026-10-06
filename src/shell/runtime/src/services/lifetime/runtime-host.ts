@@ -62,6 +62,7 @@ import { RecordCommandMethod } from "../recent-commands/record-command-method.js
 import { CommandRegistry } from "../registry/command-registry.js";
 import { EventRegistry } from "../registry/event-registry.js";
 import { MethodRegistry } from "../registry/method-registry.js";
+import { SettingReadMethod } from "../settings/setting-read-method.js";
 import { SettingResetMethod } from "../settings/setting-reset-method.js";
 import { SettingWriteMethod } from "../settings/setting-write-method.js";
 import { SettingsReadMethod } from "../settings/settings-read-method.js";
@@ -270,6 +271,7 @@ export class RuntimeHost implements IIdleParticipant {
         this.notifications.republish();
     });
     this.methods.register(ShellMethods.settings, new SettingsReadMethod(settings));
+    this.methods.register(ShellMethods.readSetting, new SettingReadMethod(settings));
     this.methods.register(ShellMethods.setSetting, new SettingWriteMethod(settings));
     this.methods.register(ShellMethods.resetSetting, new SettingResetMethod(settings));
     this.settings = settings;

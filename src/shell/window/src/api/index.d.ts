@@ -8,7 +8,7 @@
 
 import type { InjectionToken, InputSignal, Signal, Type } from "@angular/core";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { KeyChord, NotificationPost, SettingScope } from "@noldova/teamrun-shell-protocol";
+import type { KeyChord, NotificationPost, SettingEntry, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 /**
  * Whether the shell pads the page a view or document shows. The shell pads
@@ -652,8 +652,8 @@ export interface IWindowPartContext {
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
 
   /**
-   * Reads the value in effect of a setting of the module, a dependency or
-   * the shell.
+   * Reads the application's value in effect of a setting of the module, a
+   * dependency or the shell. `readSettingAsync` reads it for a scope object.
    *
    * @param name The setting's name.
    * @returns The value, or undefined while the window has not loaded the
@@ -669,6 +669,34 @@ export interface IWindowPartContext {
    * ```
    */
   readSetting(name: string): JsonValue | undefined;
+
+  /**
+   * Asks the runtime for the value in effect of a setting of the module, a
+   * dependency or the shell at a scope object: the value set for the
+   * object, else for each enclosing object, else for the application, else
+   * the default. A change at an enclosing scope or the application reaches
+   * `onSettingChanged` with that scope, not with the object's, so a part
+   * that shows the object reads it again.
+   *
+   * @param name The setting's name.
+   * @param scope The scope object; the application when left out or null.
+   * @returns A promise of the setting's name, the value in effect and
+   * whether a value is stored for the object itself; it rejects when the
+   * setting belongs to another module that is not a dependency, or the
+   * runtime refuses the request, such as for a scope the setting does not
+   * list.
+   * @example
+   * ```ts
+   * import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export async function isWrappedInProject(context: IWindowPartContext, project: string): Promise<boolean> {
+   *   const entry = await context.readSettingAsync("notes.wrapLines", new SettingScope(QualifiedName.parse("notes.project"), project));
+   *   return entry.value === true;
+   * }
+   * ```
+   */
+  readSettingAsync(name: string, scope?: SettingScope | null): Promise<SettingEntry>;
 
   /**
    * Changes a setting of the module. A value equal to the setting's default
@@ -719,8 +747,9 @@ export interface IWindowPartContext {
    * shell, in any scope.
    *
    * @param name The setting's name.
-   * @param listener Called with the value now in effect and the scope it
-   * changed in, null for the application scope.
+   * @param listener Called with the value now in effect, the scope it
+   * changed in, null for the application scope, and whether a value is
+   * stored for that scope, false after a reset.
    * @returns A function that stops listening; deactivation stops it too.
    * @throws Error synchronously when the setting belongs to another module.
    * @example
@@ -735,7 +764,7 @@ export interface IWindowPartContext {
    * }
    * ```
    */
-  onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null) => void): () => void;
+  onSettingChanged(name: string, listener: (value: JsonValue, scope: SettingScope | null, isSet: boolean) => void): () => void;
 }
 
 /**

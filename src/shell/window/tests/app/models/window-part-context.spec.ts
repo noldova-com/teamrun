@@ -96,22 +96,26 @@ describe("WindowPartContext", () => {
   it("reads its own, its dependencies' and the shell's settings, changes only its own, and hears their changes until withdrawn", async () => {
     const folder = new SettingScope(QualifiedName.parse("notes.folder"), "f1");
     const heard: string[] = [];
-    context.onSettingChanged("tasks.size", (value, scope) => heard.push(`${String(value)} ${scope?.id ?? "app"}`));
+    context.onSettingChanged("tasks.size", (value, scope, isSet) => heard.push(`${String(value)} ${scope?.id ?? "app"} ${String(isSet)}`));
 
     const read = ["notes.sortBy", "tasks.size", "shell.mode", "notes.missing"].map(t => context.readSetting(t));
+    const entries = await Promise.all([context.readSettingAsync("notes.sortBy", folder), context.readSettingAsync("tasks.size", folder), context.readSettingAsync("shell.mode")]);
     await context.writeSettingAsync("notes.sortBy", "date");
     await context.writeSettingAsync("notes.sortBy", "title", folder);
     await context.resetSettingAsync("notes.sortBy");
     await context.resetSettingAsync("notes.sortBy", folder);
     host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("shell.mode")), "Dark", true));
     host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size"), folder), 2, true));
+    host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size"), folder), 1, false));
     context.withdraw();
     host.changeSetting(new SettingChange(new SettingKey(QualifiedName.parse("tasks.size")), 3, true));
 
     expect(read).toEqual(["notes.sortBy value", "tasks.size value", "shell.mode value", undefined]);
-    expect(host.calls).toEqual(["write notes.sortBy \"date\" app", "write notes.sortBy \"title\" f1", "reset notes.sortBy app", "reset notes.sortBy f1", "refresh"]);
-    expect(heard).toEqual(["2 f1"]);
+    expect(entries.map(t => `${t.name.text}=${String(t.value)} ${String(t.isSet)}`)).toEqual(["notes.sortBy=notes.sortBy at f1 true", "tasks.size=tasks.size at f1 true", "shell.mode=shell.mode at app false"]);
+    expect(host.calls).toEqual(["read notes.sortBy f1", "read tasks.size f1", "read shell.mode app", "write notes.sortBy \"date\" app", "write notes.sortBy \"title\" f1", "reset notes.sortBy app", "reset notes.sortBy f1", "refresh"]);
+    expect(heard).toEqual(["2 f1 true", "1 f1 false"]);
     expect(() => context.readSetting("clock.speed")).toThrowError(WindowPartAccessException);
+    await expect(context.readSettingAsync("clock.speed", folder)).rejects.toThrowError(WindowPartAccessException);
     expect(() => context.onSettingChanged("clock.speed", () => undefined)).toThrowError(WindowPartAccessException);
     await expect(context.writeSettingAsync("tasks.size", 1)).rejects.toThrowError(WindowPartAccessException);
     await expect(context.resetSettingAsync("shell.mode")).rejects.toThrowError(WindowPartAccessException);

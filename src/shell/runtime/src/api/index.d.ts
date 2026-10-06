@@ -15,7 +15,7 @@ import { type ArgumentException, type ArgumentOutOfRangeException, Exception, ty
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type {
   BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response,
-  RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy, WorkReport
+  RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingEntry, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 
 /**
@@ -4702,6 +4702,30 @@ export declare class SettingsService {
    * ```
    */
   public read(key: SettingKey): JsonValue;
+
+  /**
+   * Reads the value in effect for a key as `read` does, and whether a value
+   * is stored for the key itself. It validates the key as `write` does: a
+   * device setting needs the key's device.
+   *
+   * @param key Which value.
+   * @returns The setting's name, the value in effect and whether a value is
+   * stored for the key, `false` when the value comes from an enclosing
+   * scope, the application or the default.
+   * @throws {SettingException} When no such setting is declared, the
+   * setting does not list the key's scope, or a device setting's key names
+   * no device.
+   * @example
+   * ```ts
+   * import { QualifiedName, type SettingEntry, SettingKey, SettingScope } from "@noldova/teamrun-shell-protocol";
+   * import type { SettingsService } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readMute(settings: SettingsService): SettingEntry {
+   *   return settings.readEntry(new SettingKey(QualifiedName.parse("chat.muted"), new SettingScope(QualifiedName.parse("chat.conversation"), "c42")));
+   * }
+   * ```
+   */
+  public readEntry(key: SettingKey): SettingEntry;
 
   /**
    * Reads a device setting's application values on every device that set
