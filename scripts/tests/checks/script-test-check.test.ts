@@ -7,10 +7,13 @@
  */
 
 import assert from "node:assert/strict";
-import { readdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import FlakyRecord from "../../checks/flaky-record.ts";
+import FlakyTest from "../../checks/flaky-test.ts";
 import ScriptTestCheck from "../../checks/script-test-check.ts";
 import PackageException from "../../packages/package.exception.ts";
 import PackageBuildFixture from "../fixtures/package-build.fixture.ts";
@@ -35,6 +38,27 @@ class TapRunnerFixture extends ProcessRunnerFixture {
   }
 }
 
+class RerunRunnerFixture extends ProcessRunnerFixture {
+  private readonly written: readonly { report?: string; state?: string }[];
+
+  public constructor(exitCodes: readonly (number | null)[], written: readonly { report?: string; state?: string }[]) {
+    super(exitCodes);
+
+    this.written = written;
+  }
+
+  public override async runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
+    const files = this.written[this.runs.length];
+    const report = commandArguments.find(t => t.startsWith("--test-reporter-destination=") && !t.endsWith("=stdout"));
+    const state = commandArguments.find(t => t.startsWith("--test-rerun-failures="));
+    if (report !== undefined && files?.report !== undefined)
+      await writeFile(report.slice("--test-reporter-destination=".length), files.report);
+    if (state !== undefined && files?.state !== undefined)
+      await writeFile(state.slice("--test-rerun-failures=".length), files.state);
+    return super.runAsync(command, commandArguments, directory, environment);
+  }
+}
+
 class ScriptTestCheckTests {
   public static register(): void {
     test("Node's test runner runs every script test with V8 coverage in a fresh folder, foundation's coverage run then measures the scripts outside their tests, and both must pass", async t => {
@@ -42,7 +66,7 @@ class ScriptTestCheckTests {
       const coverage = path.join(repository.directory, "_build", "script-coverage");
       await repository.writeAsync({ "_build/script-coverage/coverage-old.json": "{}" });
       const runner = new ProcessRunnerFixture([0, 0, 1, 0, 0, null]);
-      const check = new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, { KEPT: "yes", GITHUB_STEP_SUMMARY: "summary.md" });
+      const check = new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, { KEPT: "yes", GITHUB_STEP_SUMMARY: "summary.md" }, null);
 
       assert.equal(await check.runAsync(new TextOutputFixture()), true);
       assert.deepEqual(await readdir(coverage), []);
@@ -72,8 +96,8 @@ class ScriptTestCheckTests {
       const repository = await ScriptTestCheckTests.createRepositoryAsync(t);
       const output = new TextOutputFixture();
       const runner = new ProcessRunnerFixture();
-      const stale = new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory, new PackageException("The built artifacts are stale.")), runner, {});
-      const broken = new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory, new Error("Unexpected.")), runner, {});
+      const stale = new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory, new PackageException("The built artifacts are stale.")), runner, {}, null);
+      const broken = new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory, new Error("Unexpected.")), runner, {}, null);
 
       assert.equal(await stale.runAsync(output), false);
       await assert.rejects(broken.runAsync(output), /Unexpected\./);
@@ -128,10 +152,80 @@ class ScriptTestCheckTests {
       assert.deepEqual([broken.isPassing, broken.selected, broken.unselected], [false, 1, 2]);
       assert.deepEqual([unwritten.isPassing, unwritten.selected], [false, 0]);
     });
+
+    test("with flaky tests recorded, the script tests run once with a rerun state and a report, and a passing run records nothing", async t => {
+      const repository = await ScriptTestCheckTests.createRepositoryAsync(t);
+      await repository.writeAsync({ "_build/script-test-state.json": "stale", "_build/script-tests.tap": "stale" });
+      const runner = new RerunRunnerFixture([0, 0], []);
+      const check = new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {}, new FlakyRecord(repository.directory, {}));
+      const output = new TextOutputFixture();
+
+      assert.equal(await check.runAsync(output), true);
+
+      const state = path.join(repository.directory, "_build", "script-test-state.json");
+      const report = path.join(repository.directory, "_build", "script-tests.tap");
+      assert.deepEqual(runner.runs[0], [
+        process.execPath, repository.directory, "--test", "--test-timeout=30000", `--test-rerun-failures=${state}`,
+        "--test-reporter=spec", "--test-reporter-destination=stdout", "--test-reporter=tap", `--test-reporter-destination=${report}`, "scripts/tests/**/*.test.ts"
+      ]);
+      assert.equal(runner.runs.length, 2);
+      assert.deepEqual([existsSync(state), existsSync(report), existsSync(ScriptTestCheckTests.record(repository)), output.text], [false, false, false, ""]);
+    });
+
+    test("failed script tests run once more with the same coverage, and the tests that pass then are recorded as flaky with their first failure", async t => {
+      const repository = await ScriptTestCheckTests.createRepositoryAsync(t);
+      const file = path.join(repository.directory, "scripts", "tests", "alpha.test.ts");
+      const first = `TAP version 13\nnot ok 1 - once\n  ---\n  location: '${file}:3:1'\n  error: 'first'\n  ...\n`;
+      const state = JSON.stringify([{}, { "scripts/tests/alpha.test.ts:3:1": { name: "once", children: [], passed_on_attempt: 1 } }]);
+      const runner = new RerunRunnerFixture([1, 0, 0], [{ report: first }, { report: "TAP version 13\nok 1 - once\n", state }]);
+      const output = new TextOutputFixture();
+
+      assert.equal(await new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {}, new FlakyRecord(repository.directory, {})).runAsync(output), true);
+
+      const coverage = path.join(repository.directory, "_build", "script-coverage");
+      assert.deepEqual(runner.runs[1], runner.runs[0]);
+      assert.deepEqual(runner.environments.slice(0, 2), [{ NODE_V8_COVERAGE: coverage }, { NODE_V8_COVERAGE: coverage }]);
+      assert.deepEqual(FlakyRecord.parse(await readFile(ScriptTestCheckTests.record(repository), "utf8")),
+        [new FlakyTest("Script tests", "scripts/tests/alpha.test.ts", "once", `not ok 1 - once\n  ---\n  location: '${file}:3:1'\n  error: 'first'\n  ...`)]);
+      assert.equal(output.text, "Running the failed script tests once more.\nFlaky, passed when run again: once (scripts/tests/alpha.test.ts)\n");
+    });
+
+    test("script tests that fail again fail the check, and the tests that passed then are still recorded as flaky", async t => {
+      const repository = await ScriptTestCheckTests.createRepositoryAsync(t);
+      const state = JSON.stringify([{}, { "scripts/tests/alpha.test.ts:3:1": { name: "once", children: [], passed_on_attempt: 1 } }]);
+      const silent = new RerunRunnerFixture([1, 1, 0], []);
+      const runner = new RerunRunnerFixture([1, 1, 0], [{ report: "TAP version 13\n" }, { report: "TAP version 13\n", state }]);
+
+      assert.equal(await new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), silent, {}, new FlakyRecord(repository.directory, {})).runAsync(new TextOutputFixture()), false);
+      assert.deepEqual([silent.runs.length, existsSync(ScriptTestCheckTests.record(repository))], [3, false]);
+      assert.equal(await new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {}, new FlakyRecord(repository.directory, {})).runAsync(new TextOutputFixture()), false);
+
+      assert.deepEqual(FlakyRecord.parse(await readFile(ScriptTestCheckTests.record(repository), "utf8")), [new FlakyTest("Script tests", "scripts/tests/alpha.test.ts", "once", "")]);
+    });
+
+    test("a rerun that passes without naming a flaky test records the whole run with its first report, or with no failure when it wrote none", async t => {
+      const repository = await ScriptTestCheckTests.createRepositoryAsync(t);
+      const unnamed = "A run that failed and passed when run again, naming no test";
+      const reported = new RerunRunnerFixture([1, 0, 0], [{ report: "TAP version 13\nnot ok 1 - scripts/tests/beta.test.ts\n" }, { state: "[{}]" }]);
+      const silent = new RerunRunnerFixture([1, 0, 0], []);
+      const check = (runner: ProcessRunnerFixture): ScriptTestCheck => new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {}, new FlakyRecord(repository.directory, {}));
+
+      assert.equal(await check(reported).runAsync(new TextOutputFixture()), true);
+      assert.equal(await check(silent).runAsync(new TextOutputFixture()), true);
+
+      assert.deepEqual(FlakyRecord.parse(await readFile(ScriptTestCheckTests.record(repository), "utf8")), [
+        new FlakyTest("Script tests", "scripts/tests", unnamed, "TAP version 13\nnot ok 1 - scripts/tests/beta.test.ts\n"),
+        new FlakyTest("Script tests", "scripts/tests", unnamed, "")
+      ]);
+    });
+  }
+
+  private static record(repository: RepositoryFixture): string {
+    return path.join(repository.directory, "_build", "flaky-tests.json");
   }
 
   private static createUnbuilt(directory: string, runner: ProcessRunnerFixture): ScriptTestCheck {
-    return new ScriptTestCheck(directory, new PackageBuildFixture(directory, new PackageException("Nothing is built.")), runner, {});
+    return new ScriptTestCheck(directory, new PackageBuildFixture(directory, new PackageException("Nothing is built.")), runner, {}, null);
   }
 
   private static async createRepositoryAsync(t: TestContext): Promise<RepositoryFixture> {

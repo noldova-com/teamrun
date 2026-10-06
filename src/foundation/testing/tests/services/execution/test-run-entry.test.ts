@@ -112,6 +112,26 @@ export class TestRunEntryTests {
   }
 
   @TestMethod
+  @TestData("[\"failsAndLeaksATimer\",\"finishesCleanly\"]", "{}", true, "EntryLifetimeTests.failsAndLeaksATimer")
+  @TestData("[\"finishesCleanly\",\"exceedsItsTimeLimit\"]", "{\"TEAMRUN_TEST_TIMEOUT_MILLISECONDS\":\"200\"}", false, "EntryLifetimeTests.exceedsItsTimeLimit")
+  public async writesTheFailedTestsAndWhetherEveryTestRanToTheResultsFile(filters: string, variables: string, isComplete: boolean, identity: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const testsDirectory = join(directory.path, "tests");
+    await mkdir(testsDirectory);
+    const fixture = new URL("../../fixtures/execution/entry-lifetime.fixture.js", import.meta.url).href;
+    const testFile = join(testsDirectory, "lifetime.test.js");
+    await writeFile(testFile, `export { EntryLifetimeFixture as EntryLifetimeTests } from ${JSON.stringify(fixture)};\n`);
+    const resultsPath = join(directory.path, "results.json");
+
+    const result = await this.runEntryArgumentsAsync(["TestPackage", testsDirectory], filters, undefined, { ...JSON.parse(variables) as Record<string, string>, TEAMRUN_TEST_RESULTS_FILE: resultsPath });
+
+    const results = JSON.parse(await readFile(resultsPath, "utf8")) as { isComplete: boolean; failed: { identity: string; file: string; failure: string }[] };
+    Assert.areEqual(1, result.exitCode, result.errorOutput);
+    Assert.areEqual(JSON.stringify([isComplete, [identity], ["TestPackage/lifetime.test.js"]]), JSON.stringify([results.isComplete, results.failed.map(t => t.identity), results.failed.map(t => t.file)]));
+    Assert.isTrue(results.failed.every(t => t.failure.length > 0), JSON.stringify(results.failed));
+  }
+
+  @TestMethod
   public async endsTheRunAfterATestExceedsItsTimeLimit(): Promise<void> {
     using directory = new TemporaryDirectory();
     const testsDirectory = join(directory.path, "tests");
@@ -270,6 +290,7 @@ export class TestRunEntryTests {
     delete environment["TEAMRUN_TEMPORARY_ROOT"];
     delete environment["TEAMRUN_TEST_TIMEOUT_MILLISECONDS"];
     delete environment["TEAMRUN_TEST_SELECTION_FILE"];
+    delete environment["TEAMRUN_TEST_RESULTS_FILE"];
     Object.assign(environment, variables);
     if (Object.isNull(filters))
       delete environment["TEAMRUN_TEST_FILTERS"];
