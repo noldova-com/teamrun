@@ -41,6 +41,7 @@ class PackageConfigurationTests {
         electronDist: PackageConfigurationTests.DISTRIBUTION,
         electronVersion: "44.5.1",
         asar: { smartUnpack: false },
+        asarUnpack: ["**/*.node"],
         npmRebuild: false,
         nodeGypRebuild: false,
         buildDependenciesFromSource: false,
@@ -74,7 +75,7 @@ class PackageConfigurationTests {
           shortcutName: "Fixture Studio",
           uninstallDisplayName: "Fixture Studio",
           artifactName: "Fixture Studio-windows-x64.${ext}",
-          include: path.join(PackageConfigurationTests.ROOT, "assets", "installer", "command-path.nsh")
+          include: path.join(PackageConfigurationTests.ROOT, "assets", "installer", "installer.nsh")
         }
       });
     });

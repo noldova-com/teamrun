@@ -14,6 +14,7 @@ export class RuntimeApiTests {
   @TestMethod
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
+      "AddonLoadException",
       "AppImageCopyCleanup",
       "AppImageSource",
       "AttachOptions",
@@ -108,6 +109,14 @@ export class RuntimeApiTests {
       "SystemCommand",
       "SystemCommandException",
       "UnknownSchemaException",
+      "UpdateBarrier",
+      "UpdateBarrierState",
+      "UpdateBarrierStatus",
+      "UpdateInProgressException",
+      "ConnectedClient",
+      "DeviceFolder",
+      "Installation",
+      "ProcessPresence",
       "WindowsFolderProtector",
       "WorkInProgressException",
       "WorkItem",

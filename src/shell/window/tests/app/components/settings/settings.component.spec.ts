@@ -364,6 +364,22 @@ describe("SettingsComponent", () => {
       AppearanceFixture.expectLook(inset, DefaultTheme.theme, "settings-content-inset", "padding-left");
   });
 
+  it("starts each group title, on a page and in search results, where its setting rows' headings start, inside their padding", async () => {
+    const host = render();
+    const offsets = (heading: string): readonly number[] => [...host.querySelectorAll(".tr-settings-group")].map(t => {
+      const title = t.querySelector(heading) as HTMLElement;
+      const start = title.getBoundingClientRect().left + parseFloat(getComputedStyle(title).paddingInlineStart);
+      return Math.round(start - (t.querySelector(".tr-setting-row-heading") as HTMLElement).getBoundingClientRect().left);
+    });
+
+    const appearance = offsets(".tr-settings-group-title");
+    await searchAsync("clock");
+    const results = offsets(".tr-settings-result-group");
+
+    expect([appearance.length > 1, results.length]).toEqual([true, 2]);
+    expect([...appearance, ...results]).toEqual([...appearance, ...results].map(() => 0));
+  });
+
   it("searches only for what its own field holds", async () => {
     render();
     await searchAsync("tick");
@@ -571,7 +587,7 @@ describe("SettingsComponent", () => {
     AppearanceFixture.expectLook(getComputedStyle(element().querySelector(".tr-settings-pages") as Element).width, DefaultTheme.theme, "settings-pages-width", "width");
     expect(heading.marginTop).toBe("0px");
     AppearanceFixture.expectLook(heading.marginBottom, DefaultTheme.theme, "settings-heading-space", "margin-bottom");
-    expect(heading.paddingLeft).toBe("0px");
+    AppearanceFixture.expectLook(heading.paddingLeft, DefaultTheme.theme, "settings-item-padding", "padding-left", "padding");
     expect(heading.fontWeight).toBe("600");
     expect(heading.fontSize).toBe(`${parseFloat(getComputedStyle(document.body).fontSize) * 2}px`);
     expect(heading.color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "settings.headerForeground"));

@@ -28,6 +28,7 @@ export default class InstallRunnerFixture extends ProcessRunner {
   public uninstallLeaves: readonly string[] = [];
   public uninstallKeepsPath: boolean = false;
   public uninstallerStays: boolean = false;
+  public holders: ProcessResult = new ProcessResult(0, "Fixture Studio.exe: process 4 MsMpEng.exe, service WinDefend.", "");
   public readonly calls: (readonly string[])[] = [];
   public readonly limits: number[] = [];
   public readonly installerEnvironments: (NodeJS.ProcessEnv | undefined)[] = [];
@@ -65,6 +66,8 @@ export default class InstallRunnerFixture extends ProcessRunner {
       return new ProcessResult(9, "", `${name} broke`);
     if (name === "reg.exe")
       return this.answerRegistry();
+    if (name === "powershell.exe")
+      return this.holders;
     if (name === InstallRunnerFixture.UNINSTALLER)
       return this.uninstallAsync();
     if (commandArguments[0] === "--appimage-extract")
@@ -109,8 +112,12 @@ export default class InstallRunnerFixture extends ProcessRunner {
 
   private async uninstallAsync(): Promise<ProcessResult> {
     await rm(this.installFolder, { recursive: true, force: true });
-    for (const file of this.uninstallLeaves)
-      await InstallRunnerFixture.createAsync(path.join(this.installFolder, file));
+    for (const file of this.uninstallLeaves) {
+      if (file.endsWith("/"))
+        await mkdir(path.join(this.installFolder, file), { recursive: true });
+      else
+        await InstallRunnerFixture.createAsync(path.join(this.installFolder, file));
+    }
     await InstallRunnerFixture.createAsync(path.join(this.installFolder, InstallRunnerFixture.UNINSTALLER, ...(this.uninstallerStays ? ["locked"] : [])));
     if (!this.uninstallKeepsPath) {
       const rest = `;${this.userPath ?? ""};`.split(`;${this.commandFolder};`).join(";").slice(1, -1);

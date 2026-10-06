@@ -17,6 +17,7 @@ import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { QuitQuestion } from "../models/quit-question.js";
 import { Resources } from "../resources.js";
 import { CloseCoordinator } from "./close-coordinator.js";
+import { UpdateSaveCoordinator } from "./update-save-coordinator.js";
 import { WindowBoundsKeeper } from "./window-bounds-keeper.js";
 import { WindowErrorLimit } from "./window-error-limit.js";
 
@@ -33,6 +34,7 @@ export class OpenWindow implements IQuitPrompt {
 
   public readonly window: IDesktopWindow;
   public readonly coordinator: CloseCoordinator;
+  public readonly updateSaves: UpdateSaveCoordinator;
   public readonly bounds: WindowBoundsKeeper;
   public readonly errors: WindowErrorLimit = new WindowErrorLimit(Resources.windowErrorBurst, Resources.windowErrorPeriod);
 
@@ -40,7 +42,8 @@ export class OpenWindow implements IQuitPrompt {
     this.window = window;
     this.log = log;
     this.guard = guard;
-    this.coordinator = new CloseCoordinator(t => this.sendCloseRequest(t), Resources.closeAnswerTimeout);
+    this.coordinator = new CloseCoordinator(t => this.sendRequest(Resources.closeRequestChannel, t), Resources.closeAnswerTimeout);
+    this.updateSaves = new UpdateSaveCoordinator(t => this.sendRequest(Resources.updateSaveRequestChannel, t), Resources.closeAnswerTimeout);
     this.bounds = new WindowBoundsKeeper(window, displays, Resources.boundsSaveDelay, log, platform === Resources.windowsPlatform);
     window.on(Resources.closeEvent, event => {
       if (this.canClose)
@@ -54,6 +57,7 @@ export class OpenWindow implements IQuitPrompt {
       this.stopPaintTimer();
       this.bounds.cancelSave();
       this.coordinator.release();
+      this.updateSaves.release();
     });
   }
 
@@ -144,10 +148,10 @@ export class OpenWindow implements IQuitPrompt {
       this.closeNow();
   }
 
-  private sendCloseRequest(requestId: string): boolean {
+  private sendRequest(channel: string, requestId: string): boolean {
     if (this.window.isDestroyed() || this.window.webContents.isCrashed())
       return false;
-    this.window.webContents.send(Resources.closeRequestChannel, requestId);
+    this.window.webContents.send(channel, requestId);
     return true;
   }
 }

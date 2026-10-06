@@ -37,6 +37,7 @@ describe("FieldMenuComponent", () => {
   let bridge: DesktopBridgeFixture;
 
   async function startAsync(platform: string = "win32"): Promise<void> {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     bridge = DesktopBridgeFixture.install(platform);
     bridge.spelling = Promise.resolve({ languages: ["en-US"], fallback: null });
     TestBed.inject(SpellingService);
@@ -143,7 +144,10 @@ describe("FieldMenuComponent", () => {
     await answerAsync(150, 112, false, "Meetng", ["Meeting"]);
     await answerAsync(150, 110, true, "Meetng", ["Meeting"]);
     const isOpenAfterOthers = menu() !== null;
-    await vi.waitFor(() => expect(menu()).not.toBeNull());
+    vi.advanceTimersByTime(WAIT - 1);
+    const isOpenBeforeWait = menu() !== null;
+    vi.advanceTimersByTime(1);
+    await settledAsync();
     const plain = rows();
     await closeAsync();
     await answerAsync(150, 110, false, "Meetng", ["Meeting"]);
@@ -153,7 +157,7 @@ describe("FieldMenuComponent", () => {
     await answerAsync(150, 110, false);
     const isOpenAfterRemoval = menu() !== null;
 
-    expect(isOpenAfterOthers).toBe(false);
+    expect([isOpenAfterOthers, isOpenBeforeWait]).toEqual([false, false]);
     expect(plain).toEqual(["shell.cut (disabled)", "shell.copy (disabled)", "shell.paste", "shell.selectAll"]);
     expect([isOpenAfterLate, isOpenAfterRemoval]).toEqual([false, false]);
   });
@@ -175,7 +179,8 @@ describe("FieldMenuComponent", () => {
     const bounds = notes.getBoundingClientRect();
     await closeAsync();
     const menuKey = await keyAsync(notes, { key: "ContextMenu" });
-    await vi.waitFor(() => expect(menu()).not.toBeNull());
+    vi.advanceTimersByTime(WAIT);
+    await settledAsync();
     await userEvent.keyboard("{Enter}");
     await settledAsync();
     await vi.waitFor(() => expect(bridge.edits).toEqual(["Cut"]));
@@ -224,7 +229,6 @@ describe("FieldMenuComponent", () => {
   });
 
   it("stops listening for the desktop's messages and its wait when it goes", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     await startAsync();
     const field = find<HTMLInputElement>(".field");
     field.focus();

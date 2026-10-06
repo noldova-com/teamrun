@@ -45,6 +45,22 @@ describe("GalleryContentComponent", () => {
     expect(clipboard.texts).toEqual([cell("Default").querySelector("code")?.textContent]);
   });
 
+  it("fills the content column with each code block, except Long text's, which stays narrow to cut its language, and Default's long line still scrolls sideways at the widest Settings column", async () => {
+    fixture = await GalleryFixture.showAsync();
+    const frame = GalleryFixture.frames(fixture)[0] as HTMLElement;
+    frame.style.width = "calc(var(--tr-settings-content-width) - 2 * var(--tr-settings-content-inset))";
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const cells = [...GalleryFixture.frames(fixture)[0]?.querySelectorAll<HTMLElement>(".tr-gallery-specimen[aria-label=\"Code block\"] tr-gallery-cell") ?? []];
+    const width = (element: Element | null): number => element?.getBoundingClientRect().width ?? Number.NaN;
+    const body = cell("Default").querySelector(".tr-code-block-body") as HTMLElement;
+
+    const fills = cells.map(t => [t.getAttribute("aria-label"), width(t.querySelector("tr-code-block")) === width(t.closest(".tr-gallery-specimen"))]);
+
+    expect(fills).toEqual([["Default", true], ["Word wrap on", true], ["No language", true], ["Copy refused", true], ["Focus", true], ["Long text", false]]);
+    expect(getComputedStyle(frame).getPropertyValue("--tr-settings-content-width")).not.toBe("");
+    expect(body.scrollWidth).toBeGreaterThan(body.clientWidth);
+  });
+
   it("shows a code block wrapped and one with its copy button focused", async () => {
     fixture = await GalleryFixture.showAsync();
 

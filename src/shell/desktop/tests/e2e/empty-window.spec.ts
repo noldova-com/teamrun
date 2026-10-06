@@ -40,8 +40,8 @@ test.describe("the empty window", () => {
     }));
 
     expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: [
-      "actOnStartup", "answerClose", "answerQuit", "appearance", "copyText", "edit", "installCommand", "keepAppearance", "keepSpelling", "logError", "logModule", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent", "onFieldMenu",
-      "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "onStartup", "onTrayAvailable", "openLink", "openLogFolder", "platform", "readBuild", "readLayout", "readSpelling", "readStartup",
+      "actOnStartup", "answerClose", "answerQuit", "answerUpdateSave", "appearance", "copyText", "edit", "installCommand", "keepAppearance", "keepSpelling", "logError", "logModule", "notifyAppearance", "notifyReady", "onCloseRequest",
+      "onEvent", "onFieldMenu", "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "onStartup", "onTrayAvailable", "onUpdateSaveRequest", "openLink", "openLogFolder", "platform", "readBuild", "readLayout", "readSpelling", "readStartup",
       "readTrayAvailable", "replaceMisspelling", "request", "setMenuBar", "writeLayout"
     ] });
   });

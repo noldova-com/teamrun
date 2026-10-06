@@ -16,6 +16,7 @@ import { SettingsFixture } from "../fixtures/settings.fixture.js";
 import { SimulatedProcessesFixture } from "../fixtures/simulated-processes.fixture.js";
 import { SystemCommandFixture } from "../fixtures/system-command.fixture.js";
 import { TemporaryFolderFixture } from "../fixtures/temporary-folder.fixture.js";
+import { WindowsProcessApiFixture } from "../fixtures/windows-process-api.fixture.js";
 
 @TestClass
 export class RunningProcessTests {
@@ -27,18 +28,17 @@ export class RunningProcessTests {
     const program = await ProgramFixture.locateWindowsProgramAsync(folder.path);
     const clock = new ProcessClockFixture(1_000_000);
     let leader = 0;
-    const command = new SystemCommandFixture([
+    const windows = new WindowsProcessApiFixture([
       () => {
         clock.time = 1_010_000 + ProcessSupervisorFixture.HOUR;
-        return Promise.resolve([
+        return [
           `900831\t${leader}\t${1_009_000}\tC:\\Tools\\child.exe`,
           `900832\t${leader}\t${1_010_051}\tC:\\Other\\child.exe`,
           `900833\t${leader}\t${1_010_000 + ProcessSupervisorFixture.HOUR - 1}\tC:\\Other\\child.exe`
-        ].join("\n"));
-      },
-      t => simulated.answerKillsAsync(t)
+        ].join("\n");
+      }
     ]);
-    const processes = ProcessSupervisorFixture.create(settings, "win32", { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, command, clock);
+    const processes = ProcessSupervisorFixture.create(settings, "win32", { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, new SystemCommandFixture([]), clock, windows);
     const owned = await processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT], undefined, program));
     leader = owned.processId;
     for (const processId of [900_831, 900_832, 900_833])

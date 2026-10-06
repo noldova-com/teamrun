@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "selected-surface" as *;
 @use "states";
 
@@ -33,6 +34,8 @@
 
 .tr-tree-row#{states.$hover} {
   background-color: var(--tr-hover);
+
+  @include forced-hover;
 }
 
 .tr-tree-row-current,
@@ -71,6 +74,8 @@
 .tr-tree-row-drop {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(-1 * var(--tr-border-width));
+
+  @include forced-focus;
 }
 
 .tr-tree-drop-line {

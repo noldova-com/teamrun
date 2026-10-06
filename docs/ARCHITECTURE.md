@@ -429,7 +429,7 @@ Settings' Notifications page holds three settings.
 Do not disturb, `shell.doNotDisturb`, is a device setting: on that device it stops the window's toasts and the operating system's notifications and shows the silenced bell.
 Notifications from modules, `shell.mutedModules`, lists the modules turned off on every device, choosing among the modules that declare notification kinds, whatever their parts, as `shell.modules` reports them: their notifications still enter the list, without a toast, an operating system notification or a place in the unread count.
 Either way each notification stays in the list.
-Show TeamRun in the notification area, `shell.trayIcon`, is a device setting described in [Tray](#tray).
+Showing TeamRun's icon in the tray, `shell.trayIcon`, is a device setting whose title depends on the platform, described in [Tray](#tray).
 
 A module declares its notification kinds in `contributes.notifications`.
 A part posts a notification of one of them through its context and gets a handle that updates or dismisses it.
@@ -476,6 +476,10 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
 - A stopping runtime releases ownership last, after closing its databases and its log, so a data directory that no one owns holds no file its runtime opened.
 - A starting runtime that finds the directory owned leaves it to an owner that has published discovery.
   An owner without discovery is starting or stopping, so the new runtime keeps trying to take over for up to five seconds and leaves as soon as that owner publishes discovery.
+- The device folder keeps what belongs to the device rather than to a data directory: its identity, its last appearance preferences and each installation's record and launch barrier.
+  It is in the operating system's local application data by default; `--device-dir` names another for the desktop and the command line, as `--data-dir` names a data directory, and test runs give one of their own.
+- The launcher gives the runtime it starts its installation's folder.
+  Once it owns the directory and before it publishes discovery, the runtime adds the directory to its installation's record and checks the launch barrier, releasing ownership and exiting while the barrier holds, so a runtime whose launcher found no barrier cannot slip into an update that began meanwhile ([Stopping for an update](#stopping-for-an-update)).
 - Discovery metadata is published atomically and identifies the endpoint, the owner process and the program it runs from, the product and protocol versions and the runtime's build.
 - A new owner removes the discovery metadata an earlier owner left behind before it listens, because on macOS and Linux it reuses that owner's socket path.
   A launcher whose token is refused tries again only when the metadata has changed since it read it, at most three times.
@@ -537,6 +541,14 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
   Only when none is open does the policy apply as above.
   Work is shared, so one client's quit never cancels work another client may be using.
   The desktop's quit asks this way; the command line's stop does not.
+- A runtime of the same build can be asked to prepare for an update with `shell.update`.
+  It then refuses every new handshake with an `Updating` failure, starts no program, and announces `shell.updating` to its clients.
+  A client's requests are handled until it answers `shell.updateSaved` or the wait for the saves ends, so it can save; after that, its requests other than `shell.updateSaved`, `shell.work` and `shell.stop` are refused with `Updating`, as are those of the client that asked for the update, from the start.
+  A second `shell.update` is refused with `Updating`, and one that names a folder other than an absolute path, or an installation other than the one the runtime was started for, with `InvalidParams`.
+  Only while updating, it reads its own installation's launch barrier every second.
+  It goes back to normal and announces `shell.updateEnded` once the barrier is confirmed missing, or once its holder is confirmed to have exited while the barrier is `Preparing` or `Closing`.
+  A `HandedOff` barrier keeps it updating until the barrier is gone, whatever its holder, and so does any doubt: a barrier it cannot read or parse, or a holder it cannot look up.
+  [Stopping for an update](#stopping-for-an-update) owns the rest of the exchange.
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
 - Reconnect from durable records, allowing for missed events.
@@ -559,7 +571,7 @@ The runtime owns the process and ends it; the part does not.
 - **Identity.**
   A process is a record's when its id matches and its start can fall between the request and the return of the call that started it.
   Start times are compared on the clock the process table uses: on Linux, time since boot; on macOS and Windows, the wall clock.
-  They are compared with the table's precision: on Windows the table gives each process's creation time to the millisecond, compared within 50 ms; on macOS and Linux `ps` gives whole seconds, so a start is known only within a second on each side, widened by the time `ps` takes.
+  They are compared with the table's precision: on Windows the table gives each process's creation time to the millisecond, compared within 50 ms, and leaves out a process created more than 50 ms after it read its clock, since a clock of coarser resolution can lag the creation time; on macOS and Linux `ps` gives whole seconds, so a start is known only within a second on each side, widened by the time `ps` takes.
   On Windows, which reuses process ids quickly, a process an earlier runtime left must also run the recorded executable.
   Any other process is left alone.
   The boot is the kernel's boot id on Linux and the system's start time elsewhere.
@@ -567,13 +579,15 @@ The runtime owns the process and ends it; the part does not.
   On macOS and Linux each program leads its own process group, and stopping it sends the group SIGTERM; on Windows stopping closes the program's standard input.
   Whatever still runs after the grace period of 3 seconds is killed.
   On macOS and Linux the whole group is killed at once.
-  On Windows the program and the descendants that started after it, found in the process table, are killed from the top down; each is opened, checked against the start time the table showed and killed through that handle, so a process that took the id since is left alone.
+  On Windows the runtime reads the process table and ends processes through the system's own functions, which its Windows addon calls, and starts no other program.
+  It loads the addon at its first use; when the addon cannot be loaded, the ending fails, the record stays for the next start and the runtime's log names the addon.
+  The program and the descendants that started after it, found in the process table, are killed from the top down; each is opened, checked against the start time the table showed and killed through that handle, so a process that took the id since is left alone.
   The same call then reads the table again, which finds the children that the killed processes started before they ended, and waits on the handles; a further call kills those children the same way.
   A process or group that cannot be signalled does not stop the others: on macOS and Linux its record stays and the error is logged; on Windows it counts as still running.
   The runtime's log names what had to be killed and what still ran 5 seconds later.
 - **When.**
   A part's programs end when it deactivates, when it fails to activate and when the runtime stops; the part may stop one sooner, or abort the request's signal.
-  Once its programs begin to end, the part can start no more, and once the runtime begins to stop, no part can.
+  Once its programs begin to end, the part can start no more, and once the runtime begins to stop or to prepare for an update, no part can until it goes back to normal.
   On macOS and Linux a program that exits with an error has the rest of its group ended at once.
   After a clean exit the group stays until the part deactivates, and the runtime notes which processes it holds then: it is ended only while one of them still runs in it, which shows that the group was never emptied and its id never reused; otherwise the runtime's log names the group's processes and they are left running.
   On Windows nothing a program started is followed after the program exits; when it exits during the grace period, its children that started by the time the runtime saw it exit are killed with their trees.
@@ -594,6 +608,8 @@ The runtime owns the process and ends it; the part does not.
 ### Launching the runtime
 
 The runtime must not keep the files, sockets or pipes of the client that started it.
+No launcher starts a runtime while its installation's launch barrier holds ([Stopping for an update](#stopping-for-an-update)).
+When a runtime it started exits before it publishes discovery, the launcher reads the barrier again, and reports an update in progress rather than a failed launch while it holds.
 
 - **Linux:** starting a detached runtime requires executable Bash at `/bin/bash` and a readable, searchable `/proc/self/fd` from a mounted `/proc`.
   The launcher checks these before spawning and reports a missing requirement immediately.
@@ -646,6 +662,8 @@ The desktop cuts such text to its first 65,536 characters.
 - It refuses another build's runtime and names it, unless asked to take over; it then takes over only an older build's idle runtime, never stopping work.
   The rule that the person is never asked to find and quit another TeamRun is the desktop's.
 - It reports data from before the shell and never moves it.
+- While its installation's launch barrier holds, it starts no runtime and waits up to 30 seconds for the barrier to go, then exits with the code its document gives for an update in progress.
+  A runtime that answers `Updating` counts the same way.
 - Run from a development checkout through the checkout's launcher, it uses the checkout's data directory.
   Without that launcher it is a packaged build.
 
@@ -682,6 +700,7 @@ The ownership database of section 6 is separate.
 | Shortcuts, settings and their values per scope | The shell, in its database |
 | The commands each device last ran from command search | The shell, in its database, the 20 newest per device |
 | The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
+| The data directories an installation's runtimes have owned, the desktops running from it, and its launch barrier | The installation's folder beside the device's identity, outside every data directory ([Stopping for an update](#stopping-for-an-update)) |
 | The one-time hints the device has shown | The desktop, in `device-state.json` beside the device's identity, outside the data directory; one key for each hint, such as `trayCloseHintShown`, set once the hint has shown |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory; the window keeps the transient state of the shell's own tabs, such as Settings' page, under the tab's key while the tab is open, through moves, and drops it when the tab closes |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
@@ -756,6 +775,7 @@ It keeps the middle width the person left by dragging a side dock when that is u
 
 The desktop shows TeamRun's icon in the Windows notification area, the macOS menu bar or the Linux tray while the device setting `shell.trayIcon` is on.
 The runtime declares the setting with its own platform's title and default: "Show TeamRun in the notification area", on by default, on Windows; "in the menu bar", off by default, on macOS; and "in the tray", on by default, elsewhere.
+Both follow the runtime's platform, not the desktop's, so a desktop attached to a runtime on another system would show that system's title and default.
 The desktop reads the setting for its device once the runtime is ready, follows its changes for that device, and until it has read it uses its platform's default.
 On Linux the icon shows only while a StatusNotifierItem host is registered: the desktop asks the session bus through `/usr/bin/gdbus` whether `org.kde.StatusNotifierWatcher` reports `IsStatusNotifierHostRegistered`, and keeps `gdbus monitor` on that name to ask again when its owner changes or a host registers or leaves.
 A missing `gdbus`, no watcher or a failed answer means no host; when the monitor ends, the desktop asks once and starts it again after a wait that begins at a second and doubles up to a minute.
@@ -797,6 +817,8 @@ The window answers from the saves alone, without waiting for its notifications t
 The desktop waits at most 5 seconds for the window's answer, and a window that is gone or does not answer by then does not block closing.
 The window's own layout is the exception: a failed save of the layout is logged and closing proceeds, because losing the last layout change is minor.
 
+Restarting for an update runs the same saves in every window of the installation, but an update is never worth an unsaved change: a part whose save fails or has not settled after 4 seconds, and a window that is gone or does not answer within 5 seconds, stop the update and keep TeamRun open ([Stopping for an update](#stopping-for-an-update)).
+
 ## 10. Build, installation and updates
 
 ### Build inputs
@@ -806,7 +828,7 @@ The window's own layout is the exception: a failed save of the layout is logged 
 - Exact external dependency versions and lockfiles describe the install inputs.
 - The root manifest declares the product version and, separately, the protocol version.
   The build stamps each module part package's manifest with its module's version and every other package's manifest with the product version ([Modules and versions](#modules-and-versions)).
-- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable and icons folder.
+- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder and release repository.
   Windows' app user model ID, the macOS bundle ID and the Linux desktop name (`<id>.desktop`) derive from the application IDs.
   A packaged build uses the application ID.
   A development build uses `<development application ID>.<checkout hash>`, where the hash is the first eight hexadecimal digits of the SHA-256 of the checkout's absolute path.
@@ -824,6 +846,13 @@ The window's own layout is the exception: a failed save of the layout is logged 
   [Packaging](#packaging) describes the packaged layout.
 - Compile, package and install through one reproducible path.
   Tests and the window consume fresh installed artifacts, detecting stale inputs.
+  The platform and the processor are inputs too, because a package's archive can differ by both.
+- On Windows, `npm run build` compiles each Windows addon a package's manifest lists, with the node-gyp that npm bundles, for the machine's own processor, and puts it in the package's archive as `native/<name>.node`; other platforms build none.
+  node-gyp downloads the headers of the Node.js that runs the build once into `_build/node-gyp` and checks them against Node.js's published checksums.
+  The build turns off the link-time optimization that Node.js's own release build records, which node-gyp would otherwise pass on to Visual Studio's compiler and linker, and which they reject.
+  An addon uses only Node-API, whose interface stays the same across Node.js and Electron versions, and node-gyp's delay-load hook binds it to the program that loads it, so the same file runs under Node.js in the tests and under TeamRun's program.
+  The build needs Visual Studio's "Desktop development with C++" workload, with its C++ ARM64 build tools on an ARM64 machine, and stops with a message naming them when node-gyp finds no Visual Studio with them.
+  The [coding standards](CODING-STANDARDS.md#package-organization) own an addon's source.
   The coding standards own public declarations and documentation.
 - The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires.
   The build installs it from its lockfile, separately from the packages, and the Angular CLI builds and tests the Angular parts.
@@ -857,6 +886,7 @@ Module directories, compatibility ranges and separate module updates remain [def
 
 - The target matrix is Windows, Linux and macOS, each on x64 and ARM64.
   Declare support for a target only after its build and native acceptance are verified.
+  The root manifest's `teamrun.supportedTargets` declares them by id, such as `windows-x64`, and lists no target before its native acceptance.
 - Formats: Windows NSIS, macOS DMG plus the ZIP its updater downloads, and Linux AppImage.
 - Release downloads are named `TeamRun-<platform>-<arch>.<ext>` and each target's update information `latest-<platform>-<arch>.yml`.
   No file name contains the version, so an AppImage update replaces the installed file in place and keeps its location and launchers.
@@ -876,7 +906,9 @@ Each target is packaged on its own platform and processor.
     The packaging checks the window again for the Gallery.
   - The identity's icons, `LICENSE` and `assets/dictionaries`.
 
-  The stage becomes `resources/app.asar`, and nothing is unpacked: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
+  The stage becomes `resources/app.asar`: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
+  Only the Windows addons are unpacked, into `resources/app.asar.unpacked`, because Windows loads a library only from a file of its own; code loads an addon by its path inside `app.asar`, and Electron reads it from the unpacked copy.
+  The program's check of `app.asar` does not cover that copy, which lies in the same per-user install folder as `TeamRun.exe` and can be changed by the same user.
 - **Program.**
   The program is a copy of the installed Electron's distribution without its default app and `version` file, which electron-builder also leaves out of an Electron it downloads.
   It is named and labelled from the product identity: Windows' `TeamRun.exe` with its icon and version information, the macOS bundle with the application ID, and the Linux executable named after the slug, with its desktop file named `<application ID>.desktop`.
@@ -896,6 +928,9 @@ Each target is packaged on its own platform and processor.
   On macOS the system's spell checker chooses the languages, and the desktop copies and offers none.
 - **Installation.**
   The Windows installer installs for the current user without elevation and keeps the data directory when TeamRun is uninstalled.
+  Uninstalling tries for up to 30 seconds to remove the program's files, since another program, such as a virus scanner reading a freshly updated file, can hold one for a moment.
+  A file still held after that stays, and the uninstall says so: an interactive uninstall shows which files are left in which folder, and a silent one, run with `/S`, shows no message.
+  Without elevation the uninstaller cannot have Windows remove a file at the next restart.
 - **Command on the PATH (Windows).**
   The install folder holds `bin\teamrun.cmd`, named after the slug.
   It runs the installed program in Node mode with the command line's entry, waits for it and returns its exit code, so `teamrun` works from cmd and PowerShell.
@@ -905,7 +940,7 @@ Each target is packaged on its own platform and processor.
   Uninstalling removes exactly that entry, and the value itself when nothing else is left.
   A `Path` that cannot be read, or is too long for the installer's strings, is left unchanged.
   The [command line's document](../src/shell/cli/README.md#5-installed-teamrun) says what cmd does to its arguments.
-  The installer's include is `assets/installer/command-path.nsh`.
+  The installer's include is `assets/installer/installer.nsh`.
 - **Command on the PATH (macOS).**
   The bundle holds `Contents/Resources/bin/teamrun`, named after the slug.
   The script follows the links to itself back to the bundle and runs the bundle's program in Node mode with the command line's entry.
@@ -932,7 +967,7 @@ Each target is packaged on its own platform and processor.
   | CookieEncryption | off | TeamRun keeps no cookies: the window loads from `file://` and signs in nowhere. With the fuse on, the cookie key would live in the macOS Keychain or the Linux keyring, which can ask the person for access, and again after each update of an unsigned build. It turns on when TeamRun shows web content or signs in. |
   | LoadBrowserProcessSpecificV8Snapshot | off | The program has no snapshot of its own. |
 - **Tools.** electron-builder downloads its packaging tools into `_build/package/tool-cache` and checks each against the SHA-256 it pins.
-  Packages are unsigned; signing is a separate step.
+  Packages are unsigned; the separate signing step that [#326](https://github.com/noldova-com/teamrun/issues/326) adds will sign the Windows addons along with the program.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
 
 ### Publication
@@ -957,16 +992,21 @@ Each target is packaged on its own platform and processor.
     Two releases with the tag, a tag without a release or a draft for another revision fails with the reason.
   - A run that fails after creating the tag leaves the tag on the revision beside the draft.
     Running `release:publish` again continues the draft, and `release:check` refuses a new request for that version.
-- The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder and the release notes from `RELEASE_FOLDER` and `RELEASE_NOTES`.
+- The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder from `RELEASE_FOLDER` and the address of the run that built the release from `RELEASE_RUN_URL`.
+- `release:publish` writes the release notes.
+  They name the supported targets and the targets a CI run alone accepted, say whether the packages are signed, and link the run whose install checks the packages passed.
+- `teamrun.product.releaseRepository` names the repository whose releases are the update feed.
+  Like GitHub, the release scripts compare repository names without regard to case.
+  A release published to any other repository is an unsigned test release: its notes open by saying so and that an installed TeamRun never updates from it.
+  It follows every other rule here, including the versions and becoming that repository's latest release.
 - The **Release** workflow, `.github/workflows/release.yml`, releases its own repository.
   It runs only by hand, from `main`, with a version and a revision, and one release per repository runs at a time:
   - Its check job runs `release:check`.
-    Until TeamRun's packages are signed, it refuses to release `noldova-com/teamrun`, so a trial runs the workflow in a test repository.
+    Until TeamRun's packages are signed, `release:check` refuses a release to `releaseRepository`, so a trial runs the workflow in a test repository.
   - Each target then builds on its own runner, runs `npm test`, makes its packages, installs, starts and quits them as the Package workflow does, and writes its release files with `release:assets`.
     It keeps them as an artifact of the run, with three tries.
   - The publish job alone may write to the repository, behind the `publish` environment.
-    It takes every target's files from this run's artifacts, also when only it runs again, and runs `release:publish`.
-    The release notes say that each target's package passed its install check on its own runner, and link the run.
+    It takes every target's files from this run's artifacts, also when only it runs again, and runs `release:publish` with the run's address.
 - Releases use numbered versions such as `0.0.1` and `0.0.2`, without prerelease suffixes or build metadata, and matching `v`-prefixed tags.
   Each successful publication becomes the latest release.
 - Published application updates must use a version newer than the installed version.
@@ -974,7 +1014,7 @@ Each target is packaged on its own platform and processor.
 
 ### Updates
 
-- The installed updater checks an approved release feed for its platform and CPU.
+- The installed updater checks the releases of `teamrun.product.releaseRepository` for its platform and CPU, and no other repository's.
   Every packaged target updates itself: Windows through its installer, macOS through Squirrel.Mac and a Linux AppImage by replacing the file.
 - A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced; an installation that cannot update itself explains why.
 - The GitHub release route is anonymous HTTPS; a private repository is not made reachable by injecting repository or provider credentials.
@@ -984,16 +1024,90 @@ Each target is packaged on its own platform and processor.
 - Download and restart/install are explicit user actions; ordinary application close does not install an update.
   Section 9 owns the choice the person makes while work is in progress.
 
-Before replacing application files, coordinate every runtime and desktop using that installation, across data directories:
+The updater and the desktop's update stop divide an update at the person's Restart to update:
 
-1. Confirm that no work is in progress, which the person's choice under section 9 ensures; then block new launches and requests, and freeze editing.
-2. Acknowledge durable unsaved state and preferences, which the windows save as section 9 describes.
-3. Stop the processes modules own, flush and close databases, and verify process exit.
-4. Create verified recovery backups.
+- The updater owns checking the feed, downloading, validating, the update's states and everything the person sees of them, and the handoff, which replaces the application files the way its platform does.
+- The update stop owns everything from the work question to the handoff: it stops every process of the installation, as [Stopping for an update](#stopping-for-an-update) describes, and then calls the handoff.
+- On Windows and macOS the platform's installer starts the new version.
+  After an AppImage update the update stop starts it, once the old process has exited, from outside the old AppImage and without its open descriptors, because a process holding the old version's files keeps the replaced AppImage mounted.
+- A failure before the handoff returns to the updater with its reason.
+  The updater shows it, keeps the download and offers Restart to update again.
 
-Failure before installer handoff resumes surviving clients safely; uncertainty must not be treated as successful shutdown.
-A runtime of the old version keeps working from its own copy of the replaced AppImage until the new version takes it over, and its copy ends with it ([Launching the runtime](#launching-the-runtime)).
-After an AppImage update, the new version starts only once the old process has exited, from outside the old AppImage and without its open descriptors; a process holding the old version's files keeps the replaced AppImage mounted.
+An AppImage replaced by other means while its runtime runs leaves that runtime working from its own copy until a new version takes it over, and its copy ends with it ([Launching the runtime](#launching-the-runtime)).
+
+### Stopping for an update
+
+An installation is one copy of TeamRun's program: the program a runtime names as the one it runs from, the AppImage file on Linux.
+Every desktop, runtime and command line started from it belongs to it, whatever their data directory.
+Before the handoff replaces its files, every process of the installation stops, its unsaved state saved, and each stop is verified, never assumed from an acknowledgement.
+
+**Installation record.**
+Each installation has a folder `installations/<id>` beside the device's identity, outside every data directory, where the id is the first 16 hexadecimal digits of the SHA-256 of the program's canonical path: its real path with every link resolved, lower-cased on Windows.
+Its `data-directories` folder lists the canonical data directories the installation's runtimes have owned, one file for each, named after the same digest of the directory's path, so runtimes that start together never overwrite each other's entries; a runtime adds its own before it publishes discovery (section 6).
+An entry proves nothing by itself: a directory whose discovery names another program, that no runtime owns or that does not exist now is skipped, and its entry kept, since a directory can be missing only for a moment.
+Its `desktops` folder lists the desktops running from the installation, one file for each, named after its process id and holding its process id and start time; a desktop adds its own while it checks the launch barrier at start, logs it when it cannot and starts anyway, and the entry of a desktop that no longer runs is removed when the folder is next read.
+
+**Launch barrier.**
+The installation's `barrier.json` holds the coordinating desktop's process id and start time, the version being installed, the state `Preparing`, `Closing` or `HandedOff` and, once handed off, the process id and start time of the process that took the handoff when the platform gives one.
+It holds while its holder runs, and a `HandedOff` barrier for another version also while the process that took the handoff runs.
+It is written whole to a temporary file and linked into place, which fails when a barrier exists, so of two desktops that create it at once one finds the other's update under way, and each change of state replaces it through a temporary file and a rename, so no reader sees it half-written.
+While it holds:
+
+- No launcher starts a runtime, and a runtime that finds it after taking ownership releases ownership and exits.
+- A desktop that starts, before it opens a window, tells the person that TeamRun is installing an update and exits.
+- The command line waits for it as section 6 describes.
+
+A barrier whose holder no longer runs, matched by process id and start time, is settled by the next desktop or command line of the installation:
+
+- `Preparing` or `Closing`: the update stopped before the handoff.
+  The barrier is removed and the desktop's log says so.
+- `HandedOff`, found by the version being installed: the update finished, and the barrier is removed.
+- `HandedOff`, found by any other version, once the process that took the handoff has gone too or when none was recorded: the update may have failed or may still be installing.
+  The desktop says so and removes the barrier only when the person confirms; the command line exits with the code for an update in progress.
+  An installer's failure never clears the barrier by itself.
+- A barrier that cannot be parsed is treated the same way, whatever its holder, since nothing in it can be checked.
+
+A settled barrier is removed by first moving it aside under a unique name and deleting it only when it is still the barrier that was judged; one that replaced it meanwhile is put back and judged again, and when yet another took its place, the one moved aside is deleted.
+When the person confirms, the desktop reads and judges the barrier again, since the question may have stayed open for minutes, and removes it the same way; one that holds by then is reported as holding, and when the barrier cannot be removed, the desktop tells the person and quits.
+
+**Order.**
+The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use:
+
+1. **Work.**
+   It reads `shell.work` from each runtime and, when any work is in progress, asks section 9's question in its window, listing the work by data directory.
+   Cancelling ends the update with nothing changed.
+2. **Barrier.**
+   It creates the barrier as `Preparing`; an existing barrier whose holder runs means another update is under way, and the update fails.
+   It reads the record again and connects to every runtime that came into use meanwhile.
+   A directory owned without discovery gets five seconds to publish it or let go, as for a starting runtime (section 6), and fails the update otherwise.
+   It then asks each runtime `shell.update`, naming the installation's folder, so no new client or program starts, and each client's requests end once it has saved.
+3. **Saves.**
+   Every client told `shell.updating` answers with `shell.updateSaved`, giving its process id, and until then its requests are still handled.
+   A desktop first freezes its windows under the update card ([UI standards](UI-STANDARDS.md#8-component-metrics-and-behavior)) and runs section 9's saves, and names any window and module whose save failed or did not answer.
+   The saves' own requests are all its windows still send; a save that tries to start a program fails, and so stops the update.
+   The command line answers at once and exits with the code for an update in progress.
+   The runtime waits at most 6 seconds for every client, then answers `shell.update` with the outcome and the process id and start time of every client, every program it holds and its AppImage copy's mount; a client that does not answer fails the update.
+   The handshake carries no process id, because every build must accept the handshake protocol version 1 defines (section 6).
+4. **Stop.**
+   It reads `shell.work` from each runtime again, and work the person was not asked about in step 1 fails the update.
+   It asks each runtime `shell.stop`: with the policy "stop the work" when it still has work the person agreed to stop, otherwise "only if idle".
+   The runtime deactivates its parts, ends their programs, flushes and closes its databases, releases ownership and exits.
+5. **Verify.**
+   It waits up to 10 seconds for every runtime and every process step 3 listed except the desktops to exit, checking each by process id and start time as [Programs modules run](#programs-modules-run) identifies a process.
+   It then sets the barrier to `Closing`, and waits up to 10 more seconds for every other desktop, those step 3 listed and those the installation's `desktops` folder lists that still run, to see it, quit and be verified the same way.
+6. **Handoff.**
+   It sets the barrier to `HandedOff` and calls the handoff, then records in the barrier the process the handoff names as taking over.
+   After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage.
+
+A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and once the update has ended, the barrier missing or its holder gone before the handoff, it unfreezes and reconnects.
+A desktop without a runtime connection, while it reconnects, shows a failed start or is still starting, reads the barrier every second and quits when it is `Closing` for another desktop that still runs.
+A runtime that is still running goes back to normal when the barrier goes or its holder exits before the handoff, as section 6 describes, and its desktops unfreeze on `shell.updateEnded`.
+
+**Failure.**
+Any failure before the handoff, including a process that cannot be checked or a step that runs out of time, stops the update.
+The update stop removes the barrier, so every surviving runtime and desktop resumes, and returns the reason to the updater.
+A desktop whose runtime has already stopped reconnects, starting it again.
+Uncertainty never counts as a stop.
 
 ### Installation scope
 

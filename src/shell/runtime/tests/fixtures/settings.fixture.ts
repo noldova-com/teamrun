@@ -28,7 +28,7 @@ export class SettingsFixture implements AsyncDisposable {
     this.database = database;
     this.diagnostics = diagnostics;
     this.service = new SettingsService(database, definitions, diagnostics);
-    this.processes = new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), diagnostics, new ProcessSettings(1_000, 1_000));
+    this.processes = ProcessSupervisor.create(database, process.platform, process.env, new SystemCommand(), diagnostics, new ProcessSettings(1_000, 1_000));
   }
 
   public static async createAsync(definitions: readonly SettingDefinition[] = []): Promise<SettingsFixture> {

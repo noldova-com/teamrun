@@ -25,6 +25,7 @@ The runtime then stays up under its idle policy, so later calls attach to it.
 | Option | Meaning |
 |---|---|
 | `--data-dir <path>` | The data directory. Without it, the command line uses the same one the desktop would. |
+| `--device-dir <path>` | The device folder, which keeps the device's identity and each installation's record and launch barrier. Without it, the command line uses the same one the desktop would. |
 | `--json` | Prints exactly one JSON value on standard output, and an error as `{"code","message","details"}` on standard error. |
 | `--no-start` | `commands` and `run` fail with exit code 3 instead of starting a runtime. |
 | `--take-over` | `commands` and `run` take over another build's runtime when this build is newer and that runtime is idle. |
@@ -45,6 +46,7 @@ The exit codes are stable; scripts may rely on them.
 | 4 | Another build's runtime owns the data directory: an older one without `--take-over`, a newer one, or one with work in progress. The error names the running build and its program. |
 | 5 | The data directory cannot be used: it holds data from before the shell, another program's runtime owns it, or it is not a writable folder. Data from before the shell is reported and never moved. |
 | 6 | The command timed out or was cancelled. |
+| 8 | TeamRun is installing an update: the update was still under way after 30 seconds, or one that was handed to the installer may not have finished. Run the command again once TeamRun has restarted, or open TeamRun to settle an update that did not finish. |
 
 A failure from the runtime keeps the protocol's code in the JSON error.
 When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1.

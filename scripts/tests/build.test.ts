@@ -61,7 +61,7 @@ class BuildTests {
       const output = new TextOutputFixture();
       const tested = path.join(repository.directory, "_build", "variants", "tested");
       const withoutNotes = path.join(repository.directory, "_build", "variants", "without-notes");
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       const fingerprints = [
         await build.hashFingerprintAsync(BuildVariant.REGULAR),
         await build.hashFingerprintAsync(new BuildVariant(true, [])),
@@ -237,7 +237,7 @@ class BuildTests {
 
   private static createWith(root: string, angular: AngularProject, output: TextOutputFixture, environment: NodeJS.ProcessEnv = process.env): Build {
     const runner = new ProcessRunner();
-    return new Build(new PackageBuild(root, runner, environment), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), output);
+    return new Build(new PackageBuild(root, runner, environment, process.platform, process.arch), new ModuleCatalog(root), new ModuleArtifacts(root), new ProductFile(root), new GalleryFile(root), angular, new ElectronBinary(root, runner), output);
   }
 }
 

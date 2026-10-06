@@ -24,6 +24,7 @@ export default class ProductIdentity {
   private static readonly APPLICATION_ID: RegExp = /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$/;
   private static readonly SLUG: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   private static readonly VARIABLE: RegExp = /^[A-Z][A-Z0-9_]*$/;
+  private static readonly REPOSITORY: RegExp = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/;
   private static readonly UNSAFE_NAME: RegExp = /["\\\n\r]/;
   private static readonly UNSAFE_SEGMENT: RegExp = /[\\:*?"<>|]/;
   private static readonly SEPARATOR: string = "/";
@@ -41,6 +42,7 @@ export default class ProductIdentity {
   public readonly linuxDeviceFolder: string;
   public readonly dataDirectoryVariable: string;
   public readonly icons: string;
+  public readonly releaseRepository: string;
 
   public constructor(
     name: string,
@@ -51,7 +53,8 @@ export default class ProductIdentity {
     dataFolder: string,
     deviceFolders: readonly [windows: string, macos: string, linux: string],
     dataDirectoryVariable: string,
-    icons: string) {
+    icons: string,
+    releaseRepository: string) {
     const [windows, macos, linux] = deviceFolders;
     ProductIdentity.require(name.trim().length > 0 && !ProductIdentity.UNSAFE_NAME.test(name), "name", "a name without quotes, backslashes or line breaks");
     ProductIdentity.require(publisher.trim().length > 0 && !ProductIdentity.UNSAFE_NAME.test(publisher), "publisher", "a name without quotes, backslashes or line breaks");
@@ -62,6 +65,7 @@ export default class ProductIdentity {
     for (const [field, folder] of [["dataFolder", dataFolder], ["deviceFolders.windows", windows], ["deviceFolders.macos", macos], ["deviceFolders.linux", linux], ["icons", icons]] as const)
       ProductIdentity.require(ProductIdentity.isRelativeFolder(folder), field, "a relative folder whose segments are separated by /");
     ProductIdentity.require(ProductIdentity.VARIABLE.test(dataDirectoryVariable), "dataDirectoryVariable", "an uppercase environment variable name");
+    ProductIdentity.require(ProductIdentity.REPOSITORY.test(releaseRepository), "releaseRepository", "a GitHub repository written as owner/name");
 
     this.name = name;
     this.publisher = publisher;
@@ -74,6 +78,7 @@ export default class ProductIdentity {
     this.linuxDeviceFolder = linux;
     this.dataDirectoryVariable = dataDirectoryVariable;
     this.icons = icons;
+    this.releaseRepository = releaseRepository;
   }
 
   public static async readAsync(root: string): Promise<ProductIdentity> {
@@ -101,7 +106,8 @@ export default class ProductIdentity {
       ProductIdentity.readText(product, "dataFolder"),
       [ProductIdentity.readText(folders, "windows"), ProductIdentity.readText(folders, "macos"), ProductIdentity.readText(folders, "linux")],
       ProductIdentity.readText(product, "dataDirectoryVariable"),
-      ProductIdentity.readText(product, "icons"));
+      ProductIdentity.readText(product, "icons"),
+      ProductIdentity.readText(product, "releaseRepository"));
   }
 
   public get literals(): readonly string[] {
@@ -116,6 +122,10 @@ export default class ProductIdentity {
       this.dataDirectoryVariable,
       this.icons
     ])];
+  }
+
+  public isReleaseRepository(repository: string): boolean {
+    return repository.toLowerCase() === this.releaseRepository.toLowerCase();
   }
 
   public formatDevelopmentApplicationId(checkout: string): string {

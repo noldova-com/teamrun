@@ -8,7 +8,7 @@
 
 import { spawn } from "node:child_process";
 import { EventEmitter, once } from "node:events";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { PassThrough } from "node:stream";
 
 import "@noldova/teamrun-foundation-core";
@@ -16,10 +16,12 @@ import { Assert, CoverageEnvironment, TestClass, TestMethod } from "@noldova/tea
 import { DiscoveryReader, OwnershipLock, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimeHostFixture } from "../fixtures/runtime-host.fixture.js";
+import { TemporaryFolderFixture } from "../fixtures/temporary-folder.fixture.js";
+import { UpdateBarrierFixture } from "../fixtures/update-barrier.fixture.js";
 
 @TestClass
 export class RuntimeEntryTests {
-  private static readonly USAGE: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>]";
+  private static readonly USAGE: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>] [--installation-dir <folder>]";
 
   @TestMethod
   public explainsItsUsage(): Promise<void> {
@@ -54,6 +56,22 @@ export class RuntimeEntryTests {
 
       Assert.areEqual(1, code);
       Assert.isTrue(RuntimeEntryTests.read(error).startsWith("Error: "));
+    });
+  }
+
+  @TestMethod
+  public exitsWithTheUpdatingCodeWhileAnUpdateHoldsItsInstallation(): Promise<void> {
+    return RuntimeEntryTests.runAsync(async (fixture, signals, error) => {
+      await using folder = await TemporaryFolderFixture.createAsync();
+      const installation = UpdateBarrierFixture.open(folder.path);
+      await UpdateBarrierFixture.holdAsync(installation);
+
+      const code = await RuntimeEntry.runAsync(["--data-dir", fixture.dataDirectory.root, "--installation-dir", installation.folder], process.platform, process.env, signals, error);
+
+      Assert.areEqual(4, code);
+      Assert.isTrue(RuntimeEntryTests.read(error).includes("TeamRun is installing an update.\n"));
+      Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
+      Assert.areEqual(1, (await readdir(installation.recordFolder)).length);
     });
   }
 

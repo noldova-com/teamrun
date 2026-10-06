@@ -47,6 +47,9 @@ export class Resources {
     [CliCommand.Help]: "help"
   };
   public static readonly dataDirectoryFlag: string = "--data-dir";
+  public static readonly deviceDirectoryFlag: string = "--device-dir";
+  public static readonly updateWait: number = 30000;
+  public static readonly updatePollInterval: number = 250;
   public static readonly jsonFlag: string = "--json";
   public static readonly noStartFlag: string = "--no-start";
   public static readonly takeOverFlag: string = "--take-over";
@@ -77,13 +80,14 @@ export class Resources {
       String.empty,
       "Options:",
       "  --data-dir <path>   The data directory to use.",
+      "  --device-dir <path> The device folder to use.",
       "  --json              Prints one JSON value on standard output, and errors as JSON on standard error.",
       "  --no-start          Fails instead of starting a runtime when none is running (commands, run).",
       "  --take-over         Asks another build's idle runtime to stop and takes its place (commands, run).",
       "  --timeout <seconds> How long a command may run (run).",
       String.empty,
       "Exit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,",
-      "5 data directory unusable, 6 timed out or cancelled."
+      `5 data directory unusable, 6 timed out or cancelled, 8 ${Resources.productName} is installing an update.`
     ].join("\n");
   }
 

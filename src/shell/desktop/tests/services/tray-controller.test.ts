@@ -112,13 +112,18 @@ export class TrayControllerTests {
     const lost = new FakeElectron();
     const lostConnection = new FakeRuntimeConnection();
     await DesktopStartFixture.startReadyAsync("win32", new FakeRuntimeLauncher(lostConnection), lost, unidentified);
+    const menus = fixture.tray.menus.length;
+    const lostMenus = lost.tray.shown?.menus.length ?? 0;
 
     fixture.click("Do not disturb");
     DesktopStartFixture.click(lost.menu.templates.find(t => t === lost.tray.shown?.menus.at(-1))?.find(t => t.label === "Do not disturb"));
-    await Condition.waitAsync(() => DesktopStartFixture.readErrors(fixture.process, "Do not disturb could not be changed from the tray: ").length > 0);
+    await Condition.waitAsync(() => fixture.tray.menus.length > menus && (lost.tray.shown?.menus.length ?? 0) > lostMenus);
     await setImmediate();
 
     Assert.areEqual(1, DesktopStartFixture.readErrors(fixture.process, "Do not disturb could not be changed from the tray: The database is busy.").length);
+    Assert.areEqual(menus + 1, fixture.tray.menus.length);
+    Assert.areEqual(lostMenus + 1, lost.tray.shown?.menus.length);
+    Assert.isTrue(fixture.rows.includes("Do not disturb [ ]"));
     Assert.isFalse(lostConnection.calls.includes("shell.setSetting"));
     Assert.isFalse(lostConnection.calls.includes("shell.notifications"));
   }
@@ -184,6 +189,84 @@ export class TrayControllerTests {
     Assert.isDefined(shown);
     Assert.isUndefined(fixture.electron.tray.shown);
     Assert.areEqual("/usr/bin/gdbus", fixture.process.programs.starts[0]?.file);
+  }
+
+  @TestMethod
+  public async showsOnLinuxOnceTheSettingTurnsOnAfterAHostAppearedWhileItWasOff(): Promise<void> {
+    const fixture = new TrayFixture("linux");
+    fixture.connection.answers.set("shell.readSetting", Response.success("r", { name: "shell.trayIcon", value: false, isSet: true }));
+    await fixture.startAsync();
+
+    await fixture.process.programs.answerAsync("(<true>,)\n");
+    const whileOff = fixture.electron.tray.trays.length;
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: true, isSet: true });
+
+    Assert.areEqual(0, whileOff);
+    Assert.areEqual(DesktopStartFixture.icon("tray/tray-idle.png"), fixture.tray.images.at(-1));
+  }
+
+  @TestMethod
+  public async showsAgainWhenTheSettingIsResetToItsDefault(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    await fixture.startAsync();
+
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: false, isSet: true });
+    const hidden = fixture.electron.tray.shown;
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: true, isSet: false });
+
+    Assert.isUndefined(hidden);
+    Assert.areEqual(2, fixture.electron.tray.trays.length);
+    Assert.isDefined(fixture.electron.tray.shown);
+  }
+
+  @TestMethod
+  public async readsEverythingAgainOnTheNextReadyAndDropsWhatTheEarlierConnectionAnswersLate(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    const late = Promise.withResolvers<Response>();
+    fixture.connection.deferred.set("shell.work", () => late.promise);
+    await fixture.startAsync();
+
+    fixture.launcher.listener?.onDisconnected(null);
+    await Condition.waitAsync(() => fixture.launcher.connections[1]?.calls.includes("shell.readSetting") === true);
+    late.resolve(Response.success("r", { descriptions: ["Build"], sequence: 9 }));
+    await setImmediate();
+
+    Assert.areEqual(JSON.stringify(["shell.notifications", "shell.readSetting", "shell.work"]),
+      JSON.stringify(fixture.launcher.connections[1]?.calls.filter(t => ["shell.work", "shell.notifications", "shell.readSetting"].includes(t)).sort()));
+    Assert.isFalse(fixture.tray.images.includes(DesktopStartFixture.icon("tray/tray-running.ico")));
+    Assert.areEqual("TeamRun", fixture.tray.toolTips.at(-1));
+  }
+
+  @TestMethod
+  public async showsNoIconOnceTeamRunQuitsEvenWhenTheSettingTurnsOnAfterwards(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.connection.answers.set("shell.readSetting", Response.success("r", { name: "shell.trayIcon", value: false, isSet: true }));
+    await fixture.startAsync();
+
+    fixture.electron.app.emit("will-quit");
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: true, isSet: true });
+
+    Assert.areEqual(1, fixture.electron.tray.trays.length);
+    Assert.isUndefined(fixture.electron.tray.shown);
+  }
+
+  @TestMethod
+  public async triesAgainOnLinuxWhenATrayHostAppearsAfterTheIconFailedToShow(): Promise<void> {
+    const fixture = new TrayFixture("linux");
+    fixture.electron.tray.failure = new Error("The tray host refused the icon.");
+    await fixture.startAsync();
+
+    await fixture.process.programs.answerAsync("(<true>,)\n");
+    const failed = fixture.electron.tray.trays.length;
+    fixture.electron.tray.failure = null;
+    fixture.process.programs.output("StatusNotifierHostUnregistered");
+    await fixture.process.programs.answerAsync("(<false>,)\n");
+    fixture.process.programs.output("StatusNotifierHostRegistered");
+    await fixture.process.programs.answerAsync("(<true>,)\n");
+
+    Assert.areEqual(0, failed);
+    Assert.isDefined(fixture.electron.tray.shown);
+    Assert.areEqual(1, DesktopStartFixture.readErrors(fixture.process, "The tray icon could not be shown: Error: The tray host refused the icon.").length);
   }
 
   @TestMethod

@@ -83,12 +83,32 @@ export class ProcessSupervisorTests {
   }
 
   @TestMethod
+  public async startsNoProgramWhilePausedAndListsItsProgramsForAnUpdate(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const processes = ProcessSupervisorFixture.create(settings);
+    const owned = await processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT]));
+
+    processes.pause();
+    const refused = await Assert.throwsAsync(() => processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT])), ProcessStartException);
+    const listed = processes.updateProcesses;
+    processes.resume();
+    const resumed = await processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT]));
+    await processes.stopOwnedByAsync(ProcessSupervisorFixture.MODULE);
+
+    Assert.areEqual(`${process.execPath} was not started for the module notes, because the runtime is preparing for an update.`, refused.message);
+    Assert.areEqual(`${owned.processId} program`, listed.map(t => `${t.processId} ${t.role}`).join(","));
+    Assert.isTrue(listed.every(t => t.earliest <= t.latest));
+    Assert.areNotEqual(owned.processId, resumed.processId);
+  }
+
+  @TestMethod
   public async endsAProgramItCannotRecord(): Promise<void> {
     await using folder = await TemporaryFolderFixture.createAsync();
     using lock = OwnershipLock.acquire(new DataDirectory(folder.path));
     const database = await ShellDatabase.openAsync(lock, ShellMigrations.all);
     database.close();
-    const processes = new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), new TextOutputFixture());
+    const processes = ProcessSupervisor.create(database, process.platform, process.env, new SystemCommand(), new TextOutputFixture());
 
     const failure = await Assert.throwsAsync(() => processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT])), Error);
 
