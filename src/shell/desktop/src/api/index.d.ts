@@ -1036,7 +1036,7 @@ export interface IClipboardHost {
 }
 
 /**
- * Opens files and folders in the system's own application, as Electron's `shell` provides it.
+ * Opens files, folders and links in the system's own application, as Electron's `shell` provides it.
  */
 export interface IShellHost {
   /**
@@ -1054,6 +1054,23 @@ export interface IShellHost {
    * ```
    */
   openPath(path: string): Promise<string>;
+
+  /**
+   * Opens a link in the system's own application, such as a web page in the browser.
+   *
+   * @param url The link to open, one that `LinkPolicy.findAllowed` allowed.
+   * @returns A promise that settles once the system has taken the link.
+   * @throws Error asynchronously when the system cannot open it.
+   * @example
+   * ```ts
+   * import type { IShellHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function openDocsAsync(host: IShellHost): Promise<void> {
+   *   await host.openExternal("https://example.com/docs");
+   * }
+   * ```
+   */
+  openExternal(url: string): Promise<void>;
 }
 
 /**
@@ -1980,7 +1997,7 @@ export interface IElectron {
   readonly clipboard: IClipboardHost;
 
   /**
-   * The system's file manager, for opening the log folder.
+   * The system's file manager and browser, for opening the log folder and links.
    */
   readonly shell: IShellHost;
 
@@ -3112,6 +3129,26 @@ export declare class RuntimeStartup {
    * ```
    */
   public close(): void;
+}
+
+/**
+ * Decides which links TeamRun opens in the system's own application: well-formed http, https and mailto links without
+ * credentials, at most 32768 characters long.
+ */
+export declare class LinkPolicy {
+  /**
+   * Finds the link to open for a URL the window asked to open.
+   *
+   * @param url The URL as the window sent it; any value.
+   * @returns The link in its normalized form, or `null` for any other value, scheme or a URL that does not parse.
+   * @example
+   * ```ts
+   * import { LinkPolicy } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const link: string | null = LinkPolicy.findAllowed("https://example.com/docs");
+   * ```
+   */
+  public static findAllowed(url: unknown): string | null;
 }
 
 /**

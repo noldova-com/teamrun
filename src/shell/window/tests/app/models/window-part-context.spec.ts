@@ -247,6 +247,12 @@ describe("WindowPartContext", () => {
     expect(host.calls).toEqual(["log notes Opened the list"]);
   });
 
+  it("opens a link through the host", async () => {
+    await context.openLinkAsync("https://example.com/help");
+
+    expect(host.calls).toEqual(["openLink https://example.com/help"]);
+  });
+
   it("calls its own module's and its dependencies' methods and refuses others", async () => {
     expect(await context.requestAsync("notes.read", { id: 1 })).toEqual({ method: "notes.read", payload: { id: 1 } });
     expect(await context.requestAsync("tasks.list", null)).toEqual({ method: "tasks.list", payload: null });

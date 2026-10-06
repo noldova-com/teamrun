@@ -17,6 +17,7 @@ import { ModulesComponent } from "../../../src/app/components/modules/modules.co
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
 import { ContentPadding } from "../../../src/app/enums/content-padding";
 import { DockSide } from "../../../src/app/enums/dock-side";
+import { LinkNotOpenedException } from "../../../src/app/exceptions/link-not-opened.exception";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
@@ -590,6 +591,18 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
     expect(bridge.logged).toEqual(["notes: Opened the list"]);
+  });
+
+  it("opens a window part's link through the desktop, and rejects when the desktop does not open it", async () => {
+    const { host } = start([], []);
+
+    await host.openLinkAsync("https://example.com/help");
+    bridge.isLinkOpened = false;
+    const refusal = await host.openLinkAsync("file:///etc/passwd").catch((error: unknown) => error);
+
+    expect(bridge.links).toEqual(["https://example.com/help", "file:///etc/passwd"]);
+    expect([refusal instanceof LinkNotOpenedException, (refusal as Error).message])
+      .toEqual([true, "TeamRun did not open the link: it opens only well-formed http, https and mailto links, in the system's own application."]);
   });
 
   it("reports a layout that cannot load and still opens the documents asked for", async () => {

@@ -178,6 +178,10 @@ export class WindowPartContext implements IWindowPartContext {
     this.host.log(this.moduleId, message);
   }
 
+  public async openLinkAsync(url: string): Promise<void> {
+    await this.host.openLinkAsync(url);
+  }
+
   public async requestAsync(method: string, parameters: JsonValue): Promise<JsonValue> {
     this.requireAllowed(method);
     return this.host.requestAsync(method, parameters);

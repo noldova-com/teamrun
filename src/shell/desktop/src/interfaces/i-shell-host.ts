@@ -8,4 +8,6 @@
 
 export interface IShellHost {
   openPath(path: string): Promise<string>;
+
+  openExternal(url: string): Promise<void>;
 }

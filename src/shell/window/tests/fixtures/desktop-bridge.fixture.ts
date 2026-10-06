@@ -46,6 +46,8 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly logged: string[] = [];
   public readonly errorsLogged: (readonly [string | null, string])[] = [];
   public logFolderOpened: Promise<boolean> = Promise.resolve(true);
+  public readonly links: string[] = [];
+  public isLinkOpened: boolean = true;
   public readonly menuBars: JsonObject[] = [];
   public readonly edits: string[] = [];
 
@@ -143,6 +145,11 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public openLogFolder(): Promise<boolean> {
     this.logFolderOpens++;
     return this.logFolderOpened;
+  }
+
+  public openLink(url: string): Promise<boolean> {
+    this.links.push(url);
+    return Promise.resolve(this.isLinkOpened);
   }
 
   public edit(action: string): Promise<boolean> {

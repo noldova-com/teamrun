@@ -1373,6 +1373,45 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async opensOnlyAllowedLinksFromItsOwnWindowAndLogsTheOnesItDoesNotOpen(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+    const open = (url: unknown, event: IIpcEvent = trusted): Promise<boolean> => electron.ipcMain.invoke("teamrun:openLink", event, url) as Promise<boolean>;
+
+    const answers = [
+      await open("https://example.com/docs?page=2#top"),
+      await open("HTTP://Example.com"),
+      await open("mailto:support@example.com?subject=TeamRun"),
+      await open(`https://example.com/${"x".repeat(32748)}`),
+      await open(`https://example.com/${"x".repeat(32749)}`),
+      await open("file:///etc/passwd"),
+      await open("javascript:alert(1)"),
+      await open("teamrun://open"),
+      await open("https://user:secret@example.com/"),
+      await open("not a link"),
+      await open(5),
+      await open("https://example.com/", { sender: { id: 1 }, senderFrame: null })
+    ];
+    electron.shell.linkFailure = new Error("No browser is installed.");
+    answers.push(await open("https://example.com/"));
+
+    Assert.areEqual(JSON.stringify([true, true, true, true, false, false, false, false, false, false, false, false, false]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify([
+      "https://example.com/docs?page=2#top",
+      "http://example.com/",
+      "mailto:support@example.com?subject=TeamRun",
+      `https://example.com/${"x".repeat(32748)}`,
+      "https://example.com/"
+    ]), JSON.stringify(electron.shell.links));
+    const lines = process.errors.split("\n").filter(t => t.includes("link")).map(t => t.slice(t.indexOf(" ") + 1));
+    Assert.areEqual(JSON.stringify([
+      ...Array.from({ length: 7 }, () => "A link was not opened: only well-formed http, https and mailto links without credentials open."),
+      "A link could not be opened: Error: No browser is installed."
+    ]), JSON.stringify(lines));
+  }
+
+  @TestMethod
   public async editsItsOwnWindowWithTheSixEditActionsOnly(): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
     const trusted = DesktopStartFixture.trustedEvent("linux");

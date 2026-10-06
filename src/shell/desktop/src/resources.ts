@@ -51,12 +51,16 @@ export class Resources {
   public static readonly readBuildChannel: string = "teamrun:readBuild";
   public static readonly copyTextChannel: string = "teamrun:copyText";
   public static readonly openLogFolderChannel: string = "teamrun:openLogFolder";
+  public static readonly openLinkChannel: string = "teamrun:openLink";
   public static readonly notificationOpenedChannel: string = "teamrun:notificationOpened";
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
   public static readonly windowErrorChannel: string = "teamrun:windowError";
   public static readonly copyTextLimit: number = 65536;
+  public static readonly linkLimit: number = 32768;
+  public static readonly linkProtocols: readonly string[] = ["http:", "https:", "mailto:"];
+  public static readonly linkRefused: string = "A link was not opened: only well-formed http, https and mailto links without credentials open.";
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
   public static readonly windowShellMethods: readonly string[] = [
@@ -370,6 +374,10 @@ export class Resources {
 
   public static formatLogFolderNotOpened(reason: string): string {
     return `The log folder could not be opened: ${reason}`;
+  }
+
+  public static formatLinkNotOpened(reason: string): string {
+    return `A link could not be opened: ${reason}`;
   }
 
   public static formatSystemNotificationFailed(reason: string): string {
