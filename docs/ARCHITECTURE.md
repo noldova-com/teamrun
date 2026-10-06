@@ -397,7 +397,7 @@ A part reads the settings of its module, its dependencies and the shell, for the
 A window reads them all with `shell.settings`, reads one key's entry, its value in effect and whether the key itself holds it, with `shell.readSetting`, and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows.
 A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
-The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals.
+The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals, showing the page its `page` argument names when it has one.
 Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear, and About last.
 Keyboard shortcuts lists every command with its owner and key.
 The person records a new key, removes a key, resets a command to its default or resets every shortcut, and each change writes `shell.keyBindings` whole, in one write, built on the window's previous change until the setting reports that change; when two windows change it at the same moment, the later write is kept.
@@ -414,6 +414,7 @@ A chosen language that no longer ships is dropped at the next change.
 On macOS the system chooses the languages.
 
 About shows TeamRun's name, version, platform and processor and the update's state with its action (section 10), then its Updates group, which holds Check for updates, `shell.updateChecks`, a device setting whose choices are Automatically, the default, Only at start and Only when I ask.
+A build that cannot update leaves the group out of About and of a search, since the setting does nothing there.
 
 ### Setting scopes
 
