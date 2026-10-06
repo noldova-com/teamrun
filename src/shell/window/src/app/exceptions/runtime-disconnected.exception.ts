@@ -11,6 +11,8 @@ import { FailureCode } from "@noldova/teamrun-shell-protocol";
 import { RuntimeRequestException } from "./runtime-request.exception";
 
 export class RuntimeDisconnectedException extends RuntimeRequestException {
+  public override readonly name: string = "RuntimeDisconnectedException";
+
   public constructor(message: string) {
     super(FailureCode.Disconnected, message);
   }

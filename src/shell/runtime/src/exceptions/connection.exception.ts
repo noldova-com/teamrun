@@ -10,6 +10,7 @@ import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-ex
 import type { Failure } from "@noldova/teamrun-shell-protocol";
 
 export class ConnectionException extends Exception {
+  public override readonly name: string = "ConnectionException";
   public readonly failure: Failure | null;
 
   public constructor(message: string, failure: Failure | null = null, options?: ExceptionOptions) {

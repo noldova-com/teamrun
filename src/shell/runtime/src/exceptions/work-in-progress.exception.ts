@@ -12,6 +12,7 @@ import type { RunningWork } from "@noldova/teamrun-shell-protocol";
 import { Resources } from "../resources.js";
 
 export class WorkInProgressException extends Exception {
+  public override readonly name: string = "WorkInProgressException";
   public readonly work: RunningWork;
 
   public constructor(work: RunningWork) {

@@ -9,6 +9,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class ViewDialogException extends Exception {
+  public override readonly name: string = "ViewDialogException";
+
   public constructor(message: string) {
     super(message);
   }
