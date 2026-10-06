@@ -101,7 +101,7 @@ class PackageTests {
   private static readonly APPLE_DETAILS: string = "Authority=Developer ID Application: Fixture Works (FIXTURE123)\nTeamIdentifier=FIXTURE123\n";
   private static readonly APP_IMAGE: string = "Fixture Studio-linux-x64.AppImage";
   private static readonly STAGED: string = "The packaged window holds no Gallery.\nPackages in the stage: @noldova/teamrun-foundation-beta, "
-    + "@noldova/teamrun-foundation-alpha, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\n";
+    + "@noldova/teamrun-foundation-alpha, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\nThird-party packages in the stage: none.\n";
 
   private static archives: PackageArchivesFixture | null = null;
 

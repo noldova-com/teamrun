@@ -926,7 +926,7 @@ Each target is packaged on its own platform and processor.
   The packaged app mirrors the checkout's layout, so the desktop, the runtime and the command line find their files by the same relative paths as in a checkout:
   - `package.json` names the product, its version, its Linux desktop name and the desktop's entry as `main`.
   - `node_modules` holds the desktop, the command line and each module's runtime and CLI parts with their dependencies.
-    They are installed offline from the build's own archives, never from the registry, and without peer dependencies, since the program itself is the desktop's Electron.
+    They are installed offline from the build's own archives and the verified tarballs of their third-party packages, never from the registry, and without peer dependencies, since the program itself is the desktop's Electron.
   - `_build` holds the window, the module declarations and the product file of `npm run build -- --packaged`.
     The packaging checks the window again for the Gallery.
   - The identity's icons, `LICENSE` and `assets/dictionaries`.
@@ -934,6 +934,13 @@ Each target is packaged on its own platform and processor.
   The stage becomes `resources/app.asar`: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
   Only the Windows addons are unpacked, into `resources/app.asar.unpacked`, because Windows loads a library only from a file of its own; code loads an addon by its path inside `app.asar`, and Electron reads it from the unpacked copy.
   The program's check of `app.asar` does not cover that copy, which lies in the same per-user install folder as `TeamRun.exe` and can be changed by the same user.
+- **Third-party packages.**
+  A shipped package pins a third-party runtime dependency exactly, and the root `package.json` pins the same version, so the root `package-lock.json` locks its whole tree; packaging fails when they disagree.
+  Packaging takes the shipped packages' third-party dependencies, and theirs in turn, by npm's resolution in that lockfile, the nearest `node_modules` first, for the target's platform and processor: dev and peer dependencies never ship, and an optional dependency ships only where it runs.
+  It downloads each tarball from the lockfile's `resolved` URL into `_build/package/third-party`, where the next run reuses it, and fails unless its SHA-512 matches the lockfile's `integrity`.
+  The stage installs these tarballs beside the build's archives, so each package ships in one version, and packaging fails when the dependencies need two versions of one package.
+  Each package's `license` must be MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, BlueOak-1.0.0 or Python-2.0, or an `OR` expression with one of them, and its tarball must hold a license file; anything else, such as `AND`, fails packaging and names the package.
+  A package whose tarball holds no license file ships instead the reviewed text in `assets/licenses/third-party/<name>-<version>.txt`, with a scope's `/` written as `+`, kept only for an exact version whose tarball has none and reviewed against the upstream license field; another version of it fails again.
 - **Program.**
   The program is a copy of the installed Electron's distribution without its default app and `version` file, which electron-builder also leaves out of an Electron it downloads.
   It is named and labelled from the product identity: Windows' `TeamRun.exe` with its icon and version information, the macOS bundle with the application ID, and the Linux executable named after the slug, with its desktop file named `<application ID>.desktop`.
@@ -978,7 +985,8 @@ Each target is packaged on its own platform and processor.
   The Windows ARM64 installer's archive is compressed with 7-Zip's x86 filter.
   The ARM64 7-Zip that packages it would otherwise choose its ARM64 filter, which the installer's older extractor cannot read, so it would skip every `.exe` and `.dll` and still report success.
 - **Licenses.**
-  `resources/licenses` holds TeamRun's license, the fonts' and the spelling dictionaries' licenses and the window's third-party licenses.
+  `resources/licenses` holds TeamRun's license, the fonts' and the spelling dictionaries' licenses, the window's third-party licenses and `runtime-third-party.txt`.
+  That file names each third-party package with its license, the chosen one for an `OR` expression, and its license files.
   Electron's and Chromium's licenses stay beside the program.
 - **Fuses.**
   The program's Electron fuses allow only what TeamRun uses:
