@@ -228,6 +228,10 @@ export class WindowPartHostService implements IWindowPartHost {
     this.labels.setBadge(view, badge);
   }
 
+  public setTabWorking(tabKey: string, isWorking: boolean): void {
+    this.labels.setWorking(tabKey, isWorking);
+  }
+
   public refresh(): void {
     this.commands.setCommands(this.moduleOrder.flatMap(t => [
       ...this.runtimeCommands.filter(u => u.name.startsWith(`${t}${Resources.contributionSeparator}`)),

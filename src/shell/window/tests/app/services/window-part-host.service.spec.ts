@@ -1030,6 +1030,24 @@ describe("WindowPartHostService", () => {
     expect(TestBed.inject(ModuleStatusService).modules().map(t => t.id)).toEqual(["tasks"]);
   });
 
+  it("shows the tab a window part marks as working until the part is withdrawn", async () => {
+    let marks = 0;
+    const notes = new WindowPartFixture("notes", log, t => {
+      if (marks++ === 0)
+        t.markWorking("notes.list");
+    });
+    const { host } = start([source("notes", notes, [], ["notes.list"])], [status("notes")]);
+    const labels = TestBed.inject(TabLabelService);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const shown = labels.isWorking(new ViewTab("notes.list"));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect([shown, labels.isWorking(new ViewTab("notes.list"))]).toEqual([true, false]);
+  });
+
   it("shows the badge a window part sets on its view, set again when the part reactivates", async () => {
     const badge = new ViewBadge(2, "2 new");
     const notes = new WindowPartFixture("notes", log, t => t.setViewBadge("notes.list", badge));

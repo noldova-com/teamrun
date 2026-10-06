@@ -53,5 +53,7 @@ export interface IWindowPartHost {
 
   setViewBadge(view: string, badge: ViewBadge | null): void;
 
+  setTabWorking(tabKey: string, isWorking: boolean): void;
+
   refresh(): void;
 }
