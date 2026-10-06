@@ -8,7 +8,7 @@
 
 export type OutputKind = "expected" | "platform-log" | "failure";
 
-export interface ClassifiedLine {
+export interface IClassifiedLine {
   readonly kind: OutputKind;
   readonly text: string;
 }
@@ -21,8 +21,8 @@ export default class ErrorOutputClassifier {
 
   private isAfterGtkWarning: boolean = false;
 
-  public classify(text: string): ClassifiedLine[] {
-    const lines: ClassifiedLine[] = [];
+  public classify(text: string): IClassifiedLine[] {
+    const lines: IClassifiedLine[] = [];
     for (const line of text.split(/\r?\n/).map(t => t.trim()).filter(t => t.length > 0)) {
       const kind = this.classifyLine(line);
       if (kind !== "expected")
