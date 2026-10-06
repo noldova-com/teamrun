@@ -115,6 +115,7 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run package:smoke
+            APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run package:smoke
           else
             npm run package:smoke
           fi
