@@ -13,6 +13,7 @@ import type { Readable } from "node:stream";
 
 import { API, type Project } from "typescript/unstable/async";
 
+import TemporaryFolder from "../processes/temporary-folder.ts";
 import ApiPipe from "./api-pipe.ts";
 import ApiException from "./api.exception.ts";
 
@@ -81,7 +82,7 @@ export default class ApiServer {
     const [executable, ...prefix] = command;
     if (executable === undefined)
       throw new ApiException("The TypeScript API needs a command to start its server.");
-    const pipe = await ApiPipe.createAsync(process.platform);
+    const pipe = await ApiPipe.createAsync(process.platform, new TemporaryFolder());
     const child = spawn(executable, [...prefix, ...ApiServer.SERVER_ARGUMENTS, root, ApiServer.PIPE_OPTION, pipe.name], {
       cwd: root, shell: false, stdio: ["ignore", "ignore", "pipe"], windowsHide: true
     });
