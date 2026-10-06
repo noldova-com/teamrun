@@ -10,7 +10,7 @@ import { ChangeDetectionStrategy, Component } from "@angular/core";
 
 @Component({
   selector: "tr-menu-separator",
-  template: "",
+  templateUrl: "./menu-separator.component.html",
   styleUrl: "./menu-separator.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {

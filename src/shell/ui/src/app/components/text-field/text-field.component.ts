@@ -10,7 +10,7 @@ import { ChangeDetectionStrategy, Component } from "@angular/core";
 
 @Component({
   selector: "input[tr-text-field]",
-  template: "",
+  templateUrl: "./text-field.component.html",
   styleUrl: "./text-field.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {

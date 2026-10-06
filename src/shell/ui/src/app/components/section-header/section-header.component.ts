@@ -12,7 +12,7 @@ import { Resources } from "../../../resources";
 
 @Component({
   selector: "tr-section-header",
-  template: "{{ label() }}",
+  templateUrl: "./section-header.component.html",
   styleUrl: "./section-header.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
