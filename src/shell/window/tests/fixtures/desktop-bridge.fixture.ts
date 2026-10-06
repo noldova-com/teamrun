@@ -20,6 +20,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly openedListeners: Set<(id: string) => void> = new Set();
   private readonly quitListeners: Set<(question: unknown) => void> = new Set();
   private readonly fieldMenuListeners: Set<(request: unknown) => void> = new Set();
+  private readonly trayListeners: Set<(isAvailable: unknown) => void> = new Set();
 
   public platform: string;
   public appearance: unknown = null;
@@ -32,6 +33,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly answers: string[] = [];
   public readonly actions: string[] = [];
   public startup: unknown = { kind: "Ready", details: [] };
+  public trayAvailable: Promise<unknown> = Promise.resolve(true);
   public layout: unknown = null;
   public readonly requests: [string, JsonValue][] = [];
   public answer: unknown = { payload: null };
@@ -222,6 +224,20 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public answerQuit(choice: string): Promise<boolean> {
     this.quitAnswers.push(choice);
     return Promise.resolve(true);
+  }
+
+  public readTrayAvailable(): Promise<unknown> {
+    return this.trayAvailable;
+  }
+
+  public onTrayAvailable(listener: (isAvailable: unknown) => void): () => void {
+    this.trayListeners.add(listener);
+    return () => this.trayListeners.delete(listener);
+  }
+
+  public changeTrayAvailable(isAvailable: unknown): void {
+    for (const listener of this.trayListeners)
+      listener(isAvailable);
   }
 
   public logModule(moduleId: string, message: string): void {

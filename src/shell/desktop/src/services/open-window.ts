@@ -8,7 +8,6 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import { QuitOutcome } from "../enums/quit-outcome.js";
 import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 import type { ICloseGuard } from "../interfaces/i-close-guard.js";
 import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
@@ -24,6 +23,7 @@ import { WindowErrorLimit } from "./window-error-limit.js";
 export class OpenWindow implements IQuitPrompt {
   private readonly log: IDesktopLog;
   private readonly guard: ICloseGuard;
+  private readonly painted: PromiseWithResolvers<boolean> = Promise.withResolvers<boolean>();
   private closing: Promise<void> | null = null;
   private canClose: boolean = false;
   private isPainted: boolean = false;
@@ -49,6 +49,7 @@ export class OpenWindow implements IQuitPrompt {
       this.closing ??= this.closeWhenSavedAsync();
     });
     window.once(Resources.closedEvent, () => {
+      this.painted.resolve(false);
       this.stopSettleTimer();
       this.stopPaintTimer();
       this.bounds.cancelSave();
@@ -59,7 +60,12 @@ export class OpenWindow implements IQuitPrompt {
   public markPainted(): void {
     this.stopPaintTimer();
     this.isPainted = true;
+    this.painted.resolve(true);
     this.showWhenReady();
+  }
+
+  public whenPaintedAsync(): Promise<boolean> {
+    return this.painted.promise;
   }
 
   public showUnpaintedWithin(milliseconds: number): void {
@@ -69,6 +75,7 @@ export class OpenWindow implements IQuitPrompt {
   public showNow(): void {
     this.stopPaintTimer();
     this.isPainted = true;
+    this.painted.resolve(true);
     this.settle();
   }
 
@@ -112,25 +119,33 @@ export class OpenWindow implements IQuitPrompt {
     return true;
   }
 
-  private async closeWhenSavedAsync(): Promise<void> {
-    const outcome = await this.guard.confirmAsync(this);
-    const canClose = outcome !== QuitOutcome.Stay && await this.coordinator.requestAsync();
-    this.closing = null;
-    if (!canClose || this.window.isDestroyed())
-      return;
+  public async saveAsync(): Promise<boolean> {
+    if (!await this.coordinator.requestAsync())
+      return false;
+    if (this.window.isDestroyed())
+      return true;
     await this.bounds.saveAsync().catch((error: unknown) => this.log.write(error instanceof WindowStateUnavailableException
       ? Resources.formatBoundsLostAtClose(error.message)
       : Resources.formatBoundsUnsaved(String(error))));
-    if (outcome === QuitOutcome.StopWork)
-      await this.guard.stopWorkAsync();
+    return true;
+  }
+
+  public closeNow(): void {
     if (this.window.isDestroyed())
       return;
     this.canClose = true;
     this.window.close();
   }
 
+  private async closeWhenSavedAsync(): Promise<void> {
+    const canClose = await this.guard.canCloseAsync(this) && await this.saveAsync();
+    this.closing = null;
+    if (canClose)
+      this.closeNow();
+  }
+
   private sendCloseRequest(requestId: string): boolean {
-    if (this.window.isDestroyed())
+    if (this.window.isDestroyed() || this.window.webContents.isCrashed())
       return false;
     this.window.webContents.send(Resources.closeRequestChannel, requestId);
     return true;

@@ -110,21 +110,21 @@ export declare enum PathCommandOutcome {
 }
 
 /**
- * Whether closing the last window may go ahead.
+ * How quitting goes on after the question about work in progress.
  */
 export declare enum QuitOutcome {
   /**
-   * Close; no work is in progress, it finished, or it could not be read.
+   * Quit, stopping the runtime only if it is idle; no work is in progress, it finished, or it could not be read.
    */
   Quit = "Quit",
 
   /**
-   * Close, then stop the runtime's work.
+   * Quit, stopping the runtime's work and the runtime.
    */
   StopWork = "StopWork",
 
   /**
-   * Keep the window open.
+   * Stop quitting; TeamRun stays open.
    */
   Stay = "Stay"
 }
@@ -186,40 +186,163 @@ export interface IQuitPrompt {
 }
 
 /**
- * Decides whether closing a window may go ahead while work is in progress.
+ * Decides whether a window may close.
  */
 export interface ICloseGuard {
   /**
-   * Decides whether the window may close, asking the person when it is the last window and the runtime has work in
-   * progress.
+   * Decides whether the window may close: another window stays open, or TeamRun keeps running without windows. When
+   * it is the last window and TeamRun cannot keep running, the guard quits TeamRun instead and keeps the window open
+   * until the quit closes it.
    *
    * @param prompt The closing window.
-   * @returns A promise of the outcome.
+   * @returns A promise of whether the window may close.
    * @example
    * ```ts
-   * import { type ICloseGuard, type IQuitPrompt, QuitOutcome } from "@noldova/teamrun-shell-desktop";
+   * import type { ICloseGuard, IQuitPrompt } from "@noldova/teamrun-shell-desktop";
    *
-   * export async function mayCloseAsync(guard: ICloseGuard, prompt: IQuitPrompt): Promise<boolean> {
-   *   return await guard.confirmAsync(prompt) !== QuitOutcome.Stay;
+   * export function mayCloseAsync(guard: ICloseGuard, prompt: IQuitPrompt): Promise<boolean> {
+   *   return guard.canCloseAsync(prompt);
    * }
    * ```
    */
-  confirmAsync(prompt: IQuitPrompt): Promise<QuitOutcome>;
+  canCloseAsync(prompt: IQuitPrompt): Promise<boolean>;
+}
+
+/**
+ * What {@link QuitFlow} asks of the desktop as TeamRun closes windows and quits.
+ */
+export interface IQuitHost {
+  /**
+   * Whether TeamRun has decided to quit and is closing its windows.
+   *
+   * @returns Whether TeamRun is exiting.
+   * @example
+   * ```ts
+   * import type { IQuitHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isQuitting(host: IQuitHost): boolean {
+   *   return host.isExiting();
+   * }
+   * ```
+   */
+  isExiting(): boolean;
 
   /**
-   * Stops the runtime's work, once the windows have saved, when the person chose to.
+   * Whether TeamRun keeps running when its last window closes: on macOS, and while the tray icon really shows.
    *
-   * @returns A promise that settles once the runtime has answered or could not be reached.
+   * @returns Whether TeamRun keeps running without windows.
    * @example
    * ```ts
-   * import type { ICloseGuard } from "@noldova/teamrun-shell-desktop";
+   * import type { IQuitHost } from "@noldova/teamrun-shell-desktop";
    *
-   * export function stopAsync(guard: ICloseGuard): Promise<void> {
-   *   return guard.stopWorkAsync();
+   * export function staysInBackground(host: IQuitHost): boolean {
+   *   return host.keepsRunningWithoutWindows();
    * }
    * ```
    */
-  stopWorkAsync(): Promise<void>;
+  keepsRunningWithoutWindows(): boolean;
+
+  /**
+   * Whether a window is the last one open.
+   *
+   * @param prompt The window.
+   * @returns Whether no other window is open.
+   * @example
+   * ```ts
+   * import type { IQuitHost, IQuitPrompt } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function closesLast(host: IQuitHost, prompt: IQuitPrompt): boolean {
+   *   return host.isLast(prompt);
+   * }
+   * ```
+   */
+  isLast(prompt: IQuitPrompt): boolean;
+
+  /**
+   * Notes that the last window closes while TeamRun keeps running, so the desktop can say once where TeamRun went.
+   * @example
+   * ```ts
+   * import type { IQuitHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function hide(host: IQuitHost): void {
+   *   host.closeToBackground();
+   * }
+   * ```
+   */
+  closeToBackground(): void;
+
+  /**
+   * Asks every open window to save, as closing it would.
+   *
+   * @returns A promise of whether every window saved; a window whose save failed keeps TeamRun open.
+   * @example
+   * ```ts
+   * import type { IQuitHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function saveAsync(host: IQuitHost): Promise<boolean> {
+   *   return host.saveAllAsync();
+   * }
+   * ```
+   */
+  saveAllAsync(): Promise<boolean>;
+
+  /**
+   * Asks the runtime to stop unless another client uses it, which keeps it running with its work.
+   *
+   * @param policy How the runtime treats work in progress when no other client uses it.
+   * @returns A promise of whether the runtime refused because work is in progress under {@link StopPolicy.IfIdle}.
+   * @example
+   * ```ts
+   * import { StopPolicy } from "@noldova/teamrun-shell-protocol";
+   * import type { IQuitHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isBusyAsync(host: IQuitHost): Promise<boolean> {
+   *   return host.stopAsync(StopPolicy.IfIdle);
+   * }
+   * ```
+   */
+  stopAsync(policy: StopPolicy): Promise<boolean>;
+
+  /**
+   * Finds the window that asks the question about work in progress, opening one when none is open.
+   *
+   * @returns A promise of the window once its page has painted, or `null` when it closed first.
+   * @example
+   * ```ts
+   * import type { IQuitHost, IQuitPrompt } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function findAsync(host: IQuitHost): Promise<IQuitPrompt | null> {
+   *   return host.findPromptAsync();
+   * }
+   * ```
+   */
+  findPromptAsync(): Promise<IQuitPrompt | null>;
+
+  /**
+   * Asks the application to quit, which starts {@link QuitFlow.quitAsync}.
+   * @example
+   * ```ts
+   * import type { IQuitHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function startQuitting(host: IQuitHost): void {
+   *   host.quit();
+   * }
+   * ```
+   */
+  quit(): void;
+
+  /**
+   * Closes every window without asking again and quits the application.
+   * @example
+   * ```ts
+   * import type { IQuitHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(host: IQuitHost): void {
+   *   host.exit();
+   * }
+   * ```
+   */
+  exit(): void;
 }
 
 /**
@@ -266,60 +389,43 @@ export declare class QuitQuestion {
 }
 
 /**
- * Asks the person before the last window closes while the runtime has work in progress, and decides from the answer
- * and the runtime's reports of its work. Reading the work is bounded once; when it fails or times out, closing goes
- * ahead as it would without work. Reports carry a sequence, so a report heard before an older answer is handled still
- * wins.
+ * Asks the person, while TeamRun quits and the runtime has work in progress, whether to wait for the work or stop it,
+ * and decides from the answer and the runtime's reports of its work. Reading the work is bounded once; when it fails or
+ * times out, quitting goes ahead as it would without work. Reports carry a sequence, so a report heard before an older
+ * answer is handled still wins.
  */
-export declare class QuitCoordinator implements ICloseGuard {
+export declare class QuitCoordinator {
   /**
    * Creates the coordinator.
    *
-   * @param isLast Whether a window is the last one open, so closing it quits.
    * @param readWorkAsync Reads the runtime's work within its time limit, or `null` when it cannot.
-   * @param stopAsync Stops the runtime's work.
    * @example
    * ```ts
    * import { WorkReport } from "@noldova/teamrun-shell-protocol";
    * import { QuitCoordinator } from "@noldova/teamrun-shell-desktop";
    *
-   * export const coordinator: QuitCoordinator = new QuitCoordinator(() => true, async () => new WorkReport([], 0), async () => undefined);
+   * export const coordinator: QuitCoordinator = new QuitCoordinator(async () => new WorkReport([], 0));
    * ```
    */
-  public constructor(isLast: (prompt: IQuitPrompt) => boolean, readWorkAsync: () => Promise<WorkReport | null>, stopAsync: () => Promise<void>);
+  public constructor(readWorkAsync: () => Promise<WorkReport | null>);
 
   /**
-   * See {@link ICloseGuard.confirmAsync}. While a question is open, the window shows the newest work; closing goes
-   * ahead once no work is left, the window can no longer show the question, or the runtime is gone. A second request
-   * while one is open stays.
+   * Asks in a window when the runtime has work in progress. While the question is open, the window shows the newest
+   * work; quitting goes ahead once no work is left, the window can no longer show the question, or the runtime is gone.
+   * A second request while one is open stays.
    *
-   * @param prompt The closing window.
+   * @param prompt The window that asks.
    * @returns A promise of the outcome.
    * @example
    * ```ts
    * import type { IQuitPrompt, QuitCoordinator, QuitOutcome } from "@noldova/teamrun-shell-desktop";
    *
-   * export function confirmAsync(coordinator: QuitCoordinator, prompt: IQuitPrompt): Promise<QuitOutcome> {
-   *   return coordinator.confirmAsync(prompt);
+   * export function askAsync(coordinator: QuitCoordinator, prompt: IQuitPrompt): Promise<QuitOutcome> {
+   *   return coordinator.askAsync(prompt);
    * }
    * ```
    */
-  public confirmAsync(prompt: IQuitPrompt): Promise<QuitOutcome>;
-
-  /**
-   * See {@link ICloseGuard.stopWorkAsync}.
-   *
-   * @returns A promise that settles once the work was asked to stop.
-   * @example
-   * ```ts
-   * import type { QuitCoordinator } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function stopAsync(coordinator: QuitCoordinator): Promise<void> {
-   *   return coordinator.stopWorkAsync();
-   * }
-   * ```
-   */
-  public stopWorkAsync(): Promise<void>;
+  public askAsync(prompt: IQuitPrompt): Promise<QuitOutcome>;
 
   /**
    * Takes a `shell.work` event into account while a question is being prepared or is open.
@@ -355,7 +461,22 @@ export declare class QuitCoordinator implements ICloseGuard {
   public answer(prompt: IQuitPrompt, choice: unknown): boolean;
 
   /**
-   * Lets an open question close and closing go ahead, because the runtime is gone.
+   * Takes the question away and stays, because the person closed the window that shows it; another window is ignored.
+   *
+   * @param prompt The window that is closing.
+   * @example
+   * ```ts
+   * import type { IQuitPrompt, QuitCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function closing(coordinator: QuitCoordinator, prompt: IQuitPrompt): void {
+   *   coordinator.dismiss(prompt);
+   * }
+   * ```
+   */
+  public dismiss(prompt: IQuitPrompt): void;
+
+  /**
+   * Lets an open question close and quitting go ahead, because the runtime is gone.
    *
    * @example
    * ```ts
@@ -367,6 +488,62 @@ export declare class QuitCoordinator implements ICloseGuard {
    * ```
    */
   public release(): void;
+}
+
+/**
+ * Closes windows and quits TeamRun. Closing the last window quits only when TeamRun cannot keep running without
+ * windows. Quitting saves every window first, then asks the runtime to stop if it is idle unless another client uses
+ * it; while work is in progress it asks the person, saves again after the answer, and then stops the work or asks the
+ * runtime again to stop if it is idle. One quit runs at a time.
+ */
+export declare class QuitFlow implements ICloseGuard {
+  /**
+   * Creates the flow.
+   *
+   * @param host The desktop's windows, runtime and application.
+   * @param asker Asks the question about work in progress.
+   * @example
+   * ```ts
+   * import { type IQuitHost, QuitCoordinator, QuitFlow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(host: IQuitHost): QuitFlow {
+   *   return new QuitFlow(host, new QuitCoordinator(async () => null));
+   * }
+   * ```
+   */
+  public constructor(host: IQuitHost, asker: QuitCoordinator);
+
+  /**
+   * See {@link ICloseGuard.canCloseAsync}. While a quit runs, closing the window that asks its question cancels the
+   * quit; the window is then judged as any other once the quit has ended, and stays open when TeamRun exits.
+   *
+   * @param prompt The closing window.
+   * @returns A promise of whether the window may close.
+   * @example
+   * ```ts
+   * import type { IQuitPrompt, QuitFlow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function mayCloseAsync(flow: QuitFlow, prompt: IQuitPrompt): Promise<boolean> {
+   *   return flow.canCloseAsync(prompt);
+   * }
+   * ```
+   */
+  public canCloseAsync(prompt: IQuitPrompt): Promise<boolean>;
+
+  /**
+   * Quits TeamRun, or joins the quit already running.
+   *
+   * @returns A promise that settles once TeamRun exits or stays open.
+   * @example
+   * ```ts
+   * import type { QuitFlow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function quitAsync(flow: QuitFlow): Promise<void> {
+   *   return flow.quitAsync();
+   * }
+   * ```
+   */
+  public quitAsync(): Promise<void>;
 }
 
 /**
@@ -963,6 +1140,15 @@ export interface IApplicationHost {
    * @returns Electron's own return value, which the desktop does not use.
    */
   on(event: "will-quit", listener: () => void): unknown;
+
+  /**
+   * Listens for a request to quit, before any window closes; preventing the event keeps the application running.
+   *
+   * @param event The event's name.
+   * @param listener Called with the event each time the application is asked to quit.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
+  on(event: "before-quit", listener: (event: IPreventableEvent) => void): unknown;
 }
 
 /**
@@ -3046,8 +3232,7 @@ export declare class OpenWindow implements IQuitPrompt {
    * @param window The window, created hidden.
    * @param displays The displays, for placing restored bounds.
    * @param log Records why a window was shown unpainted and saves that failed.
-   * @param guard Decides whether closing the window may go ahead while work is in progress, and stops the work when
-   * the person chose to.
+   * @param guard Decides whether the window may close, or quits TeamRun instead.
    * @param platform The operating system's name, as Node reports it.
    * @example
    * ```ts
@@ -3089,6 +3274,51 @@ export declare class OpenWindow implements IQuitPrompt {
    * ```
    */
   public markPainted(): void;
+
+  /**
+   * Waits until the page has painted, or the window was shown unpainted.
+   *
+   * @returns A promise of `true` then, or `false` when the window closed first.
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readyAsync(open: OpenWindow): Promise<boolean> {
+   *   return open.whenPaintedAsync();
+   * }
+   * ```
+   */
+  public whenPaintedAsync(): Promise<boolean>;
+
+  /**
+   * Asks the page to save, as closing does, then saves the window's bounds. A page that has crashed counts as saved
+   * at once, and so does one that does not answer within five seconds.
+   *
+   * @returns A promise of whether the page saved; a failed bounds save is logged and does not count.
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function saveAsync(open: OpenWindow): Promise<boolean> {
+   *   return open.saveAsync();
+   * }
+   * ```
+   */
+  public saveAsync(): Promise<boolean>;
+
+  /**
+   * Closes the window at once, without its guard or another save, because TeamRun is exiting.
+   *
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function exit(open: OpenWindow): void {
+   *   open.closeNow();
+   * }
+   * ```
+   */
+  public closeNow(): void;
 
   /**
    * Settles the startup after a delay, whatever the runtime does by then.
@@ -3260,8 +3490,10 @@ export declare class WindowRecovery {
 
 /**
  * The desktop's main process: one sandboxed instance with one window, which it shows once the page has painted its
- * theme, or unpainted after ten seconds, and closes once the page has saved. It records its diagnostics in
- * `logs/desktop.log` once the data directory is usable, and on standard error.
+ * theme, or unpainted after ten seconds, and closes once the page has saved. Closing the last window quits it, except
+ * on macOS and while its tray icon shows, where it keeps running and says so once on the device; a quit saves every
+ * window before it asks the runtime to stop. It records its diagnostics in `logs/desktop.log` once the data directory
+ * is usable, and on standard error.
  */
 export declare class DesktopApplication {
   private constructor();
@@ -3278,15 +3510,16 @@ export declare class DesktopApplication {
    * @param createLauncher Creates the runtime launcher for the chosen settings.
    * @param readDeviceAsync Reads this device's identity from a folder: the one `--device-dir=` in the process's
    * arguments gives, otherwise the operating system's local application data. A failure leaves window bounds unkept.
-   * @param createAppearanceStore Creates the store of this device's last appearance preferences in the same folder. The
-   * desktop reads them before it opens a window, so the window's first frame already has them, and keeps those the
-   * window reports.
+   * @param createDeviceFile Creates the store of one of this device's files in the same folder: `appearance.json`, the
+   * last appearance preferences, which the desktop reads before it opens a window, so the window's first frame already
+   * has them, and keeps as the window reports them; and `device-state.json`, which records the one-time hints the
+   * device has shown.
    * @param createPathCommand Creates the service that links the command line on the macOS PATH for the program the
    * desktop runs from; the window's "Install command in PATH" command runs it and shows what happened.
    * @example
    * ```ts
    * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
-   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
+   * import { DesktopApplication, DeviceFileStore, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
    *
    * export function launch(electron: IElectron, process: IDesktopProcess): void {
    *   DesktopApplication.start(
@@ -3295,7 +3528,7 @@ export declare class DesktopApplication {
    *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
    *     t => new RuntimeLauncher(t, RuntimeBuild.identity),
    *     t => DeviceIdentity.readOrCreateAsync(t),
-   *     t => new AppearanceStore(t),
+   *     (folder, fileName) => new DeviceFileStore(folder, fileName),
    *     t => PathCommand.forBundle(t, () => Promise.resolve()));
    * }
    * ```
@@ -3306,24 +3539,24 @@ export declare class DesktopApplication {
     moduleUrl: string,
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
-    createAppearanceStore: (folder: string) => IAppearanceStore,
+    createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand): void;
 }
 
 /**
- * Where the desktop keeps this device's last appearance preferences, outside the data directory, so the next start
- * paints its first frame with them.
+ * One JSON object the desktop keeps for this device in a file outside the data directory, such as the last appearance
+ * preferences, so the next start has it before it reaches the runtime.
  */
-export interface IAppearanceStore {
+export interface IDeviceFileStore {
   /**
-   * Reads the preferences kept last.
+   * Reads the object kept last.
    *
-   * @returns A promise of the preferences, or `null` when none are kept; it rejects when the kept file cannot be read.
+   * @returns A promise of the object, or `null` when none is kept; it rejects when the kept file cannot be read.
    * @example
    * ```ts
-   * import type { IAppearanceStore } from "@noldova/teamrun-shell-desktop";
+   * import type { IDeviceFileStore } from "@noldova/teamrun-shell-desktop";
    *
-   * export async function hasAppearanceAsync(store: IAppearanceStore): Promise<boolean> {
+   * export async function hasAppearanceAsync(store: IDeviceFileStore): Promise<boolean> {
    *   return await store.readAsync() !== null;
    * }
    * ```
@@ -3331,20 +3564,20 @@ export interface IAppearanceStore {
   readAsync(): Promise<JsonObject | null>;
 
   /**
-   * Keeps the preferences, replacing those kept before; writes happen one at a time, in order.
+   * Keeps the object, replacing the one kept before; writes happen one at a time, in order.
    *
-   * @param preferences The appearance preferences the window reported.
-   * @returns A promise that settles once they are kept.
+   * @param value The object to keep.
+   * @returns A promise that settles once it is kept.
    * @example
    * ```ts
-   * import type { IAppearanceStore } from "@noldova/teamrun-shell-desktop";
+   * import type { IDeviceFileStore } from "@noldova/teamrun-shell-desktop";
    *
-   * export function keepDarkAsync(store: IAppearanceStore): Promise<void> {
+   * export function keepDarkAsync(store: IDeviceFileStore): Promise<void> {
    *   return store.writeAsync({ "shell.mode": "Dark" });
    * }
    * ```
    */
-  writeAsync(preferences: JsonObject): Promise<void>;
+  writeAsync(value: JsonObject): Promise<void>;
 }
 
 /**
@@ -3469,55 +3702,95 @@ export declare class SpellChecker {
 }
 
 /**
- * Keeps the appearance preferences in `appearance.json` in a device folder, writing a temporary file and renaming it so
- * an interrupted write never leaves a partial file.
+ * Shows each one-time hint once on a device, such as where TeamRun went when its last window closed into the tray, and
+ * records the hints it has shown in one keyed device file.
  */
-export declare class AppearanceStore implements IAppearanceStore {
+export declare class OneTimeHints {
+  /**
+   * Creates the hints.
+   *
+   * @param store The device file that records which hints have shown, keyed by name.
+   * @param log Records a record that cannot be read or written.
+   * @example
+   * ```ts
+   * import { DeviceFileStore, OneTimeHints } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const hints: OneTimeHints = new OneTimeHints(new DeviceFileStore("/home/person/.local/state/noldova/teamrun", "device-state.json"), console.error);
+   * ```
+   */
+  public constructor(store: IDeviceFileStore, log: (text: string) => void);
+
+  /**
+   * Shows a hint unless this device has shown it before, then records that it has; a hint is tried at most once a
+   * run, and one that could not show is not recorded. A record that cannot be read counts as no hint shown.
+   *
+   * @param key The hint's name in the record, such as `trayCloseHintShown`.
+   * @param show Shows the hint and returns whether it could.
+   * @returns A promise that settles once the hint is recorded or left alone.
+   * @example
+   * ```ts
+   * import type { OneTimeHints } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function hintAsync(hints: OneTimeHints): Promise<void> {
+   *   return hints.showOnceAsync("trayCloseHintShown", () => true);
+   * }
+   * ```
+   */
+  public showOnceAsync(key: string, show: () => boolean): Promise<void>;
+}
+
+/**
+ * Keeps one JSON object in a named file in a device folder, writing a temporary file and renaming it so an interrupted
+ * write never leaves a partial file.
+ */
+export declare class DeviceFileStore implements IDeviceFileStore {
   /**
    * Creates the store.
    *
    * @param folder The device folder.
+   * @param fileName The file's name in the folder, such as `appearance.json`.
+   * @throws {ArgumentException} When the file name is empty or whitespace.
    * @example
    * ```ts
-   * import { AppearanceStore } from "@noldova/teamrun-shell-desktop";
+   * import { DeviceFileStore } from "@noldova/teamrun-shell-desktop";
    *
-   * export const store: AppearanceStore = new AppearanceStore("/home/person/.local/state/noldova/teamrun");
+   * export const store: DeviceFileStore = new DeviceFileStore("/home/person/.local/state/noldova/teamrun", "appearance.json");
    * ```
    */
-  public constructor(folder: string);
+  public constructor(folder: string, fileName: string);
 
   /**
-   * Reads the preferences kept last.
+   * Reads the object kept last.
    *
-   * @returns A promise of the preferences, or `null` when the file does not exist.
+   * @returns A promise of the object, or `null` when the file does not exist.
    * @throws {SyntaxError} Asynchronously when the file is not JSON.
    * @throws {JsonException} Asynchronously when the file holds JSON that is not an object.
    * @example
    * ```ts
-   * import { AppearanceStore } from "@noldova/teamrun-shell-desktop";
+   * import { DeviceFileStore } from "@noldova/teamrun-shell-desktop";
    *
    * export function readAsync(folder: string): Promise<unknown> {
-   *   return new AppearanceStore(folder).readAsync();
+   *   return new DeviceFileStore(folder, "appearance.json").readAsync();
    * }
    * ```
    */
   public readAsync(): Promise<JsonObject | null>;
 
   /**
-   * Keeps the preferences, after any write still in progress, creating the folder when needed.
+   * Keeps the object, after any write still in progress, creating the folder when needed.
    *
-   * @param preferences The appearance preferences.
-   * @returns A promise that settles once they are kept, and rejects when they could not be written.
+   * @param value The object to keep.
+   * @returns A promise that settles once it is kept, and rejects when it could not be written.
    * @example
    * ```ts
-   * import { AppearanceStore } from "@noldova/teamrun-shell-desktop";
+   * import { DeviceFileStore } from "@noldova/teamrun-shell-desktop";
    *
    * export function keepAsync(folder: string): Promise<void> {
-   *   return new AppearanceStore(folder).writeAsync({ "shell.mode": "Light" });
+   *   return new DeviceFileStore(folder, "appearance.json").writeAsync({ "shell.mode": "Light" });
    * }
    * ```
    */
-  public writeAsync(preferences: JsonObject): Promise<void>;
+  public writeAsync(value: JsonObject): Promise<void>;
 }
 
 /**

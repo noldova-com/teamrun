@@ -22,17 +22,19 @@ import { DeviceIdentity, type IIpcEvent, PathCommandException, PathCommandOutcom
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
-import { FakeAppearanceStore } from "../fixtures/fake-appearance-store.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
+import { FakeDeviceFiles } from "../fixtures/fake-device-files.fixture.js";
 import { FakeDeviceIdentity } from "../fixtures/fake-device-identity.fixture.js";
 import { FakeElectron } from "../fixtures/fake-electron.fixture.js";
 import { FakePathCommand } from "../fixtures/fake-path-command.fixture.js";
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
 import { FakeRuntimeLauncher } from "../fixtures/fake-runtime-launcher.fixture.js";
+import { TrayFixture } from "../fixtures/tray.fixture.js";
 
 @TestClass
 export class DesktopApplicationTests {
+  private static readonly IF_IDLE: object = { policy: "IfIdle", keepsWhileShared: true };
   private static readonly NOTIFICATION_METHODS: readonly string[] = [
     "shell.notifications", "shell.postNotification", "shell.updateNotification", "shell.dismissNotification", "shell.markNotificationsRead", "shell.clearNotifications"
   ];
@@ -190,14 +192,13 @@ export class DesktopApplicationTests {
 
     window.close();
     window.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
+    await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
     await setImmediate();
-    const [request] = DesktopApplicationTests.closeRequests(window);
+    const [request] = DesktopStartFixture.closeRequests(window);
 
-    Assert.areEqual(1, DesktopApplicationTests.closeRequests(window).length);
-    Assert.areEqual("teamrun:closeRequest", request?.[0]);
+    Assert.areEqual(1, DesktopStartFixture.closeRequests(window).length);
     Assert.isFalse(window.isGone);
-    Assert.isTrue(electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), request?.[1], true) === true);
+    Assert.isTrue(electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), request, true) === true);
     await Condition.waitAsync(() => window.isGone);
   }
 
@@ -207,39 +208,42 @@ export class DesktopApplicationTests {
     const window = DesktopStartFixture.firstWindow(electron);
 
     window.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
-    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], false);
+    await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
+    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.closeRequests(window)[0], false);
     await setImmediate();
     window.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 2);
+    await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 2);
 
     Assert.isFalse(window.isGone);
-    Assert.areEqual(2, DesktopApplicationTests.closeRequests(window).length);
+    Assert.areEqual(2, DesktopStartFixture.closeRequests(window).length);
     window.destroy();
   }
 
   @TestMethod
-  public async asksItsWindowBeforeQuittingWithWorkInProgressAndQuitsOnceItHasFinished(): Promise<void> {
+  public async savesItsWindowThenAsksBeforeQuittingWithWorkInProgressAndQuitsOnceItHasFinished(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    DesktopApplicationTests.answerStops(connection, [DesktopApplicationTests.busy()]);
     const launcher = new FakeRuntimeLauncher(connection);
     const electron = await DesktopStartFixture.startReadyAsync("linux", launcher);
     const window = DesktopStartFixture.firstWindow(electron);
     const event = DesktopStartFixture.trustedEvent("linux");
+    DesktopApplicationTests.paint(electron, "linux", window);
 
     window.close();
+    const stopsBeforeSaving = DesktopApplicationTests.stops(connection).length;
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 1);
     await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
     const untrusted = electron.ipcMain.invoke("teamrun:quitAnswer", { ...event, senderFrame: null }, "Wait");
     const waiting = electron.ipcMain.invoke("teamrun:quitAnswer", event, "Wait");
     launcher.listener?.onEvent(new Event(ShellEvents.work, { descriptions: ["Indexing the project", "Saving the notes"], sequence: 2 }));
     launcher.listener?.onEvent(new Event(ShellEvents.work, { descriptions: "Saving" }));
-    const requestsWhileWorking = DesktopApplicationTests.closeRequests(window).length;
+    const requestsWhileWorking = DesktopStartFixture.closeRequests(window).length;
     launcher.listener?.onEvent(new Event(ShellEvents.work, { descriptions: [], sequence: 3 }));
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
-    electron.ipcMain.invoke("teamrun:closeAnswer", event, DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 2);
     await Condition.waitAsync(() => window.isGone);
 
-    Assert.areEqual("false,true,0", [untrusted, waiting, requestsWhileWorking].join(","));
+    Assert.areEqual("0,false,true,1", [stopsBeforeSaving, untrusted, waiting, requestsWhileWorking].join(","));
     Assert.areEqual(JSON.stringify([
       { descriptions: ["Indexing the project"], isWaiting: false },
       { descriptions: ["Indexing the project"], isWaiting: true },
@@ -247,57 +251,95 @@ export class DesktopApplicationTests {
       null
     ]), JSON.stringify(DesktopApplicationTests.quitQuestions(window)));
     Assert.areEqual(2000, connection.timeouts[connection.calls.lastIndexOf("shell.work")]);
-    Assert.isFalse(connection.calls.includes("shell.stop"));
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE, DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(connection)));
+    Assert.isTrue(electron.app.calls.includes("quit"));
   }
 
   @TestMethod
-  public async stopsTheWorkOnceItsWindowHasSavedWhenThePersonChoosesToAndStaysWhenTheyCancel(): Promise<void> {
+  public async savesAgainBeforeStoppingTheWorkWhenThePersonChoosesToAndStaysWhenTheyCancel(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
-    connection.answers.set("shell.stop", Response.failure("r", new Failure(FailureCode.Conflict, "The runtime is already stopping.")));
+    DesktopApplicationTests.answerStops(connection, [
+      DesktopApplicationTests.busy(), DesktopApplicationTests.busy(), Response.failure("r", new Failure(FailureCode.Internal, "The runtime is already stopping."))
+    ]);
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection), new FakeElectron(), new FakeDeviceIdentity(), process);
     const window = DesktopStartFixture.firstWindow(electron);
     const event = DesktopStartFixture.trustedEvent("linux");
+    DesktopApplicationTests.paint(electron, "linux", window);
 
     window.close();
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 1);
     await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
     electron.ipcMain.invoke("teamrun:quitAnswer", event, "Cancel");
     await setImmediate();
-    const isOpenAfterCancelling = !window.isGone && DesktopApplicationTests.closeRequests(window).length === 0;
+    const isOpenAfterCancelling = !window.isGone && DesktopStartFixture.closeRequests(window).length === 1;
     window.close();
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 2);
     await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 3);
     electron.ipcMain.invoke("teamrun:quitAnswer", event, "Stop");
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
-    const stoppedBeforeSaving = connection.calls.includes("shell.stop");
-    electron.ipcMain.invoke("teamrun:closeAnswer", event, DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 3);
+    const stopsBeforeSaving = DesktopApplicationTests.stops(connection).length;
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 3);
     await Condition.waitAsync(() => window.isGone);
 
     Assert.isTrue(isOpenAfterCancelling);
-    Assert.isFalse(stoppedBeforeSaving);
-    Assert.areEqual("{\"policy\":\"StopWork\"}", JSON.stringify(connection.payloads[connection.calls.indexOf("shell.stop")]));
-    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The runtime's work could not be stopped: The runtime is already stopping.").length);
+    Assert.areEqual(2, stopsBeforeSaving);
+    Assert.areEqual(JSON.stringify({ policy: "StopWork", keepsWhileShared: true }), JSON.stringify(DesktopApplicationTests.stops(connection).at(-1)));
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The runtime could not be stopped as TeamRun quits: The runtime is already stopping.").length);
+    Assert.isTrue(electron.app.calls.includes("quit"));
+  }
+
+  @TestMethod
+  public async quitsWithoutAskingWhenTheRuntimeIsKeptForAnotherClientOrStopsWhileIdle(): Promise<void> {
+    const kept = new FakeRuntimeConnection();
+    kept.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    kept.answers.set("shell.stop", Response.success("r", { keptFor: 1 }));
+    const shared = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(kept));
+    const idle = new FakeRuntimeConnection();
+    const alone = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(idle));
+    const first = DesktopStartFixture.firstWindow(shared);
+    const second = DesktopStartFixture.firstWindow(alone);
+
+    first.close();
+    second.close();
+    await DesktopStartFixture.answerSaveAsync(shared, "linux", first, 1);
+    await DesktopStartFixture.answerSaveAsync(alone, "linux", second, 1);
+    await Condition.waitAsync(() => first.isGone && second.isGone);
+
+    Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length + DesktopApplicationTests.quitQuestions(second).length);
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(kept)));
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(idle)));
+    Assert.isTrue(shared.app.calls.includes("quit") && alone.app.calls.includes("quit"));
   }
 
   @TestMethod
   public async quitsWithoutAskingWhenTheWorkCannotBeReadInTimeOrTheRuntimeLeavesWhileItAsks(): Promise<void> {
     const slow = new FakeRuntimeConnection();
     slow.deferred.set("shell.work", () => Promise.reject(new ConnectionException("The runtime did not answer shell.work in time.")));
+    slow.answers.set("shell.stop", DesktopApplicationTests.busy());
     const process = new FakeDesktopProcess("linux");
     const unanswered = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(slow), new FakeElectron(), new FakeDeviceIdentity(), process);
     const busy = new FakeRuntimeConnection();
     busy.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    busy.answers.set("shell.stop", DesktopApplicationTests.busy());
     const launcher = new FakeRuntimeLauncher(busy, new Promise<FakeRuntimeConnection>(() => undefined));
     const leaving = await DesktopStartFixture.startReadyAsync("linux", launcher);
     const first = DesktopStartFixture.firstWindow(unanswered);
     const second = DesktopStartFixture.firstWindow(leaving);
+    DesktopApplicationTests.paint(unanswered, "linux", first);
+    DesktopApplicationTests.paint(leaving, "linux", second);
 
     first.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(first).length === 1);
+    await DesktopStartFixture.answerSaveAsync(unanswered, "linux", first, 1);
+    await DesktopStartFixture.answerSaveAsync(unanswered, "linux", first, 2);
+    await Condition.waitAsync(() => first.isGone);
     second.close();
+    await DesktopStartFixture.answerSaveAsync(leaving, "linux", second, 1);
     await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(second).length === 1);
     launcher.listener?.onDisconnected(null);
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(second).length === 1);
+    await DesktopStartFixture.answerSaveAsync(leaving, "linux", second, 2);
+    await Condition.waitAsync(() => second.isGone);
 
     Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length);
     Assert.areEqual(2000, slow.timeouts[slow.calls.lastIndexOf("shell.work")]);
@@ -305,27 +347,173 @@ export class DesktopApplicationTests {
       1,
       DesktopStartFixture.readErrors(process, "The runtime's work could not be read before quitting, so TeamRun quits without asking: ConnectionException: The runtime did not answer shell.work in time.").length);
     Assert.areEqual("null", JSON.stringify(DesktopApplicationTests.quitQuestions(second).at(-1)));
-    first.destroy();
-    second.destroy();
+    Assert.areEqual(1, DesktopApplicationTests.stops(busy).length);
   }
 
   @TestMethod
-  public async quitsWithoutAskingWhileNoRuntimeIsConnectedOrWhenItsWorkCannotBeRead(): Promise<void> {
+  public async quitsWithoutAskingWhileNoRuntimeIsConnectedOrWhenItCannotBeStoppedOrItsWorkCannotBeRead(): Promise<void> {
     const connecting = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new Promise<FakeRuntimeConnection>(() => undefined)));
     const failing = new FakeRuntimeConnection();
-    failing.answers.set("shell.work", Response.failure("r", new Failure(FailureCode.Internal, "The runtime is stopping.")));
-    const refused = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(failing));
-    const first = DesktopStartFixture.firstWindow(connecting);
-    const second = DesktopStartFixture.firstWindow(refused);
+    failing.answers.set("shell.stop", Response.failure("r", new Failure(FailureCode.Internal, "The runtime is stopping.")));
+    const process = new FakeDesktopProcess("linux");
+    const refused = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(failing), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const unread = new FakeRuntimeConnection();
+    unread.answers.set("shell.stop", DesktopApplicationTests.busy());
+    const unreadable = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(unread));
+    const going = new FakeRuntimeConnection();
+    const launcher = new FakeRuntimeLauncher(going, new Promise<FakeRuntimeConnection>(() => undefined));
+    going.deferred.set("shell.stop", () => {
+      launcher.listener?.onDisconnected(null);
+      return Promise.resolve(DesktopApplicationTests.busy());
+    });
+    const gone = await DesktopStartFixture.startReadyAsync("linux", launcher);
+    const apps = [connecting, refused, unreadable, gone];
+    const windows = apps.map(t => DesktopStartFixture.firstWindow(t));
+    unread.answers.set("shell.work", Response.failure("r", new Failure(FailureCode.Internal, "The runtime is stopping.")));
 
-    first.close();
-    second.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(first).length === 1 && DesktopApplicationTests.closeRequests(second).length === 1);
+    for (const app of apps) {
+      const window = DesktopStartFixture.firstWindow(app);
+      DesktopApplicationTests.paint(app, "linux", window);
+      window.close();
+      await DesktopStartFixture.answerSaveAsync(app, "linux", window, 1);
+    }
+    await DesktopStartFixture.answerSaveAsync(unreadable, "linux", DesktopStartFixture.firstWindow(unreadable), 2);
+    await DesktopStartFixture.answerSaveAsync(gone, "linux", DesktopStartFixture.firstWindow(gone), 2);
+    await Condition.waitAsync(() => windows.every(t => t.isGone));
 
-    Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length + DesktopApplicationTests.quitQuestions(second).length);
-    Assert.isTrue(failing.calls.includes("shell.work"));
-    first.destroy();
-    second.destroy();
+    Assert.areEqual(0, windows.map(t => DesktopApplicationTests.quitQuestions(t).length).reduce((t, u) => t + u, 0));
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The runtime could not be stopped as TeamRun quits: The runtime is stopping.").length);
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE, DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(unread)));
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(going)));
+    Assert.isTrue(apps.every(t => t.app.calls.includes("quit")));
+  }
+
+  @TestMethod
+  public async closesIntoTheTrayWhileItsIconShowsAndSaysSoOnceWithoutQuitting(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.files.state.readFailure = new SyntaxError("Unexpected end of JSON input");
+    await fixture.startAsync();
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
+    await Condition.waitAsync(() => window.isGone && fixture.files.state.writes.length === 1);
+    const [hint] = fixture.electron.notifications.created;
+    hint?.click();
+    const reopened = fixture.electron.windows[1];
+    reopened?.close();
+    if (!Object.isUndefined(reopened))
+      await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", reopened, 1);
+    await Condition.waitAsync(() => reopened?.isGone === true);
+
+    Assert.areEqual(JSON.stringify(["TeamRun is still running", "Open it again or quit it from its icon in the system tray.", true]),
+      JSON.stringify([hint?.title, hint?.options.body, hint?.isShown]));
+    Assert.areEqual(1, fixture.electron.notifications.created.length);
+    Assert.areEqual(JSON.stringify([{ trayCloseHintShown: true }]), JSON.stringify(fixture.files.state.writes));
+    Assert.areEqual(1, DesktopStartFixture.readErrors(fixture.process, "The device's one-time hints could not be read, so they count as not shown: SyntaxError: Unexpected end of JSON input").length);
+    Assert.isFalse(fixture.electron.app.calls.some(t => t.startsWith("quit")));
+    Assert.isFalse(fixture.connection.calls.includes("shell.stop"));
+  }
+
+  @TestMethod
+  public async closesIntoTheTrayWithoutRecordingTheHintWhereNotificationsCannotShow(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.electron.notifications.isSupportedNow = false;
+    await fixture.startAsync();
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
+    await Condition.waitAsync(() => window.isGone);
+    await setImmediate();
+
+    Assert.areEqual(0, fixture.electron.notifications.created.length + fixture.files.state.writes.length);
+    Assert.isFalse(fixture.electron.app.calls.some(t => t.startsWith("quit")));
+  }
+
+  @TestMethod
+  public async opensAWindowWhenTheTrayIconGoesAwayWhileNoWindowIsOpen(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    await fixture.startAsync();
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
+    await Condition.waitAsync(() => window.isGone);
+    const windowsInTray = fixture.electron.windows.length;
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: false, isSet: true });
+
+    Assert.areEqual(1, windowsInTray);
+    Assert.areEqual(2, fixture.electron.windows.length);
+    Assert.isUndefined(fixture.electron.tray.shown);
+  }
+
+  @TestMethod
+  public async asksInANewWindowOnceItHasPaintedWhenQuitFromTheTrayWithWorkAndNoWindowOpen(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    DesktopApplicationTests.answerStops(fixture.connection, [DesktopApplicationTests.busy()]);
+    await fixture.startAsync();
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
+    await Condition.waitAsync(() => window.isGone);
+
+    fixture.click("Quit TeamRun");
+    await Condition.waitAsync(() => fixture.electron.windows.length === 2);
+    const asking = fixture.electron.windows[1];
+    Assert.isDefined(asking);
+    await setImmediate();
+    const questionsBeforePaint = DesktopApplicationTests.quitQuestions(asking).length;
+    fixture.electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("win32", asking.id), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(asking).length === 1);
+    fixture.electron.ipcMain.invoke("teamrun:quitAnswer", DesktopStartFixture.trustedEvent("win32", asking.id), "Stop");
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", asking, 1);
+    await Condition.waitAsync(() => asking.isGone);
+
+    Assert.areEqual(0, questionsBeforePaint);
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE, { policy: "StopWork", keepsWhileShared: true }]), JSON.stringify(DesktopApplicationTests.stops(fixture.connection)));
+    Assert.isTrue(fixture.electron.app.calls.includes("quit"));
+  }
+
+  @TestMethod
+  public async quitsWithoutAskingWhenTheWindowOpenedToAskClosesBeforeItPaints(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    DesktopApplicationTests.answerStops(fixture.connection, [DesktopApplicationTests.busy()]);
+    await fixture.startAsync();
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
+    await Condition.waitAsync(() => window.isGone);
+
+    fixture.click("Quit TeamRun");
+    await Condition.waitAsync(() => fixture.electron.windows.length === 2);
+    const asking = fixture.electron.windows[1];
+    Assert.isDefined(asking);
+    asking.destroy();
+    await Condition.waitAsync(() => fixture.electron.app.calls.includes("quit"));
+
+    Assert.areEqual(0, DesktopApplicationTests.quitQuestions(asking).length);
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE, DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(fixture.connection)));
+  }
+
+  @TestMethod
+  public async keepsRunningOnMacOSWhenTheLastWindowClosesWithoutAHintAndQuitsWhenAsked(): Promise<void> {
+    const files = new FakeDeviceFiles();
+    const electron = await DesktopStartFixture.startReadyAsync("darwin", undefined, undefined, undefined, undefined, files);
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(electron, "darwin", window, 1);
+    await Condition.waitAsync(() => window.isGone);
+    electron.app.emit("window-all-closed");
+    const callsInBackground = electron.app.calls.filter(t => t.startsWith("quit")).length;
+    electron.app.quit();
+    await Condition.waitAsync(() => electron.app.calls.includes("quit"));
+
+    Assert.areEqual(0, callsInBackground);
+    Assert.areEqual(0, electron.notifications.created.length + files.state.writes.length);
   }
 
   @TestMethod
@@ -423,17 +611,19 @@ export class DesktopApplicationTests {
     window.close();
     await setImmediate();
 
-    Assert.areEqual(0, DesktopApplicationTests.closeRequests(window).length);
+    Assert.areEqual(0, DesktopStartFixture.closeRequests(window).length);
     Assert.areEqual(JSON.stringify(["close"]), JSON.stringify(window.calls));
   }
 
   @TestMethod
-  public async quitsWhenTheLastWindowCloses(): Promise<void> {
+  public async quitsWhenTheLastWindowClosesWithoutATrayIcon(): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
 
+    DesktopStartFixture.firstWindow(electron).destroy();
     electron.app.emit("window-all-closed");
+    await Condition.waitAsync(() => electron.app.calls.includes("quit"));
 
-    Assert.areEqual("quit", electron.app.calls.at(-1));
+    Assert.areEqual("quit prevented", electron.app.calls.at(-2));
   }
 
   @TestMethod
@@ -450,10 +640,10 @@ export class DesktopApplicationTests {
 
   @TestMethod
   public async opensItsWindowWithTheDevicesLastAppearanceAndKeepsTheOneItsWindowReports(): Promise<void> {
-    const appearance = new FakeAppearanceStore();
-    appearance.kept = { "shell.mode": "Dark" };
+    const files = new FakeDeviceFiles();
+    files.appearance.kept = { "shell.mode": "Dark" };
     const process = new FakeDesktopProcess("darwin", ["--device-dir=/devices/this"]);
-    const electron = await DesktopStartFixture.startReadyAsync("darwin", undefined, undefined, undefined, process, appearance);
+    const electron = await DesktopStartFixture.startReadyAsync("darwin", undefined, undefined, undefined, process, files);
     const event = DesktopStartFixture.trustedEvent("darwin");
 
     electron.ipcMain.send("teamrun:keepAppearance", { sender: { id: 1 }, senderFrame: null }, { "shell.mode": "System" });
@@ -463,20 +653,20 @@ export class DesktopApplicationTests {
     DesktopStartFixture.firstWindow(electron).destroy();
     electron.app.emit("activate");
 
-    Assert.areEqual(JSON.stringify(["/devices/this"]), JSON.stringify(appearance.folders));
+    Assert.areEqual(JSON.stringify(["/devices/this", "appearance.json"]), JSON.stringify(files.created.find(t => t[1] === "appearance.json")));
     Assert.areEqual(JSON.stringify(["--teamrun-appearance={\"shell.mode\":\"Dark\"}"]), JSON.stringify(electron.windows[0]?.options.webPreferences?.additionalArguments));
-    Assert.areEqual(JSON.stringify([{ "shell.mode": "Light" }]), JSON.stringify(appearance.writes));
+    Assert.areEqual(JSON.stringify([{ "shell.mode": "Light" }]), JSON.stringify(files.appearance.writes));
     Assert.areEqual(JSON.stringify(["--teamrun-appearance={\"shell.mode\":\"Light\"}"]), JSON.stringify(electron.windows[1]?.options.webPreferences?.additionalArguments));
     Assert.areEqual(2, DesktopStartFixture.readErrors(process, "The window's appearance preferences are not valid, so they are not kept").length);
   }
 
   @TestMethod
   public async opensItsWindowInTheDefaultAppearanceWhenTheLastOneCannotBeReadAndReportsOneItCannotKeep(): Promise<void> {
-    const appearance = new FakeAppearanceStore();
-    appearance.readFailure = new SyntaxError("Unexpected end of JSON input");
-    appearance.writeFailure = new Error("The disk is full.");
+    const files = new FakeDeviceFiles();
+    files.appearance.readFailure = new SyntaxError("Unexpected end of JSON input");
+    files.appearance.writeFailure = new Error("The disk is full.");
     const process = new FakeDesktopProcess("linux");
-    const electron = await DesktopStartFixture.startReadyAsync("linux", undefined, undefined, undefined, process, appearance);
+    const electron = await DesktopStartFixture.startReadyAsync("linux", undefined, undefined, undefined, process, files);
 
     electron.ipcMain.send("teamrun:keepAppearance", DesktopStartFixture.trustedEvent("linux"), { "shell.mode": "Dark" });
     await Condition.waitAsync(() => DesktopStartFixture.readErrors(process, "The device's appearance could not be kept").length > 0);
@@ -1251,8 +1441,7 @@ export class DesktopApplicationTests {
     window.change("will-move");
 
     window.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
-    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("win32"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await DesktopStartFixture.answerSaveAsync(electron, "win32", window, 1);
     await Condition.waitAsync(() => window.isGone);
 
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The window closed without saving its bounds, because the runtime could not be reached").length);
@@ -1267,8 +1456,7 @@ export class DesktopApplicationTests {
     window.bounds = { x: 300, y: 150, width: 1100, height: 750 };
 
     window.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
-    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 1);
     await Condition.waitAsync(() => window.isGone);
 
     Assert.areEqual(
@@ -1288,8 +1476,7 @@ export class DesktopApplicationTests {
     };
 
     window.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
-    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 1);
     await Condition.waitAsync(() => window.isGone);
     await setImmediate();
 
@@ -1306,8 +1493,7 @@ export class DesktopApplicationTests {
     connection.isFailing = true;
 
     window.close();
-    await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(window).length === 1);
-    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), DesktopApplicationTests.closeRequests(window)[0]?.[1], true);
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 1);
     await Condition.waitAsync(() => window.isGone);
 
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds").length);
@@ -1653,7 +1839,7 @@ export class DesktopApplicationTests {
   public async installsTheCommandOnMacosForItsOwnWindowAndShowsWhatHappened(): Promise<void> {
     const electron = new FakeElectron();
     const pathCommand = new FakePathCommand();
-    DesktopStartFixture.start(electron, new FakeDesktopProcess("darwin"), new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeAppearanceStore(), pathCommand);
+    DesktopStartFixture.start(electron, new FakeDesktopProcess("darwin"), new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), pathCommand);
     await electron.app.becomeReadyAsync();
     electron.dialog.answers.push(0, 0, 0, 0);
     const answers = [await (electron.ipcMain.invoke("teamrun:installCommand", { sender: { id: 1 }, senderFrame: null }) as Promise<boolean>)];
@@ -1680,7 +1866,7 @@ export class DesktopApplicationTests {
     const process = new FakeDesktopProcess("darwin");
     const pathCommand = new FakePathCommand();
     DesktopStartFixture.start(linux, new FakeDesktopProcess("linux"));
-    DesktopStartFixture.start(mac, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeAppearanceStore(), pathCommand);
+    DesktopStartFixture.start(mac, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), pathCommand);
     await linux.app.becomeReadyAsync();
     await mac.app.becomeReadyAsync();
     mac.dialog.answers.push(0);
@@ -1739,11 +1925,12 @@ export class DesktopApplicationTests {
       await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), quitting);
       await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), looping, new FakeDeviceIdentity(), new FakeDesktopProcess("linux", [`--data-dir=${data}`]));
 
+      DesktopStartFixture.firstWindow(quitting).webContents.crashed = true;
       DesktopStartFixture.firstWindow(quitting).webContents.goAway("crashed", 5);
       DesktopStartFixture.firstWindow(looping).webContents.goAway("crashed", 5);
       await Condition.waitAsync(() => DesktopStartFixture.firstWindow(looping).webContents.calls.includes("reload"));
       DesktopStartFixture.firstWindow(looping).webContents.goAway("crashed", 5);
-      await Condition.waitAsync(() => looping.shell.opened.length === 1);
+      await Condition.waitAsync(() => looping.shell.opened.length === 1 && quitting.app.calls.includes("quit"));
 
       Assert.areEqual(1, quitting.app.calls.filter(t => t === "quit").length);
       Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(looping.shell.opened));
@@ -1792,8 +1979,20 @@ export class DesktopApplicationTests {
     return Response.fromJson(await (electron.ipcMain.invoke("teamrun:request", event, method, payload) as Promise<unknown>));
   }
 
-  private static closeRequests(window: FakeDesktopWindow): unknown[][] {
-    return window.webContents.sent.filter(t => t[0] === "teamrun:closeRequest");
+  private static paint(electron: FakeElectron, platform: string, window: FakeDesktopWindow): void {
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent(platform, window.id), DesktopStartFixture.APPEARANCE);
+  }
+
+  private static busy(): Response {
+    return Response.failure("r", new Failure(FailureCode.Conflict, "Work is in progress.", { descriptions: ["Indexing the project"] }));
+  }
+
+  private static answerStops(connection: FakeRuntimeConnection, answers: Response[]): void {
+    connection.deferred.set("shell.stop", () => Promise.resolve(answers.shift() ?? Response.success("r", null)));
+  }
+
+  private static stops(connection: FakeRuntimeConnection): unknown[] {
+    return connection.payloads.filter((_t, u) => connection.calls[u] === "shell.stop");
   }
 
   private static quitQuestions(window: FakeDesktopWindow): unknown[] {

@@ -142,6 +142,10 @@ export class TrayControllerTests {
     window.destroy();
     windows.click("Open TeamRun");
     windows.click("Quit TeamRun");
+    const reopened = windows.electron.windows[1];
+    Assert.isDefined(reopened);
+    await DesktopStartFixture.answerSaveAsync(windows.electron, "win32", reopened, 1);
+    await Condition.waitAsync(() => windows.electron.app.calls.includes("quit"));
 
     Assert.areEqual("restore,focus,focus", window.calls.filter(t => t === "restore" || t === "focus").join(","));
     Assert.areEqual(2, windows.electron.windows.length);
@@ -180,6 +184,27 @@ export class TrayControllerTests {
     Assert.isDefined(shown);
     Assert.isUndefined(fixture.electron.tray.shown);
     Assert.areEqual("/usr/bin/gdbus", fixture.process.programs.starts[0]?.file);
+  }
+
+  @TestMethod
+  public async tellsItsTrustedWindowsWhetherATrayHostCanShowTheIcon(): Promise<void> {
+    const linux = new TrayFixture("linux");
+    await linux.startAsync();
+    const windows = new TrayFixture("win32");
+    await windows.startAsync();
+    const event = DesktopStartFixture.trustedEvent("linux");
+    const window = DesktopStartFixture.firstWindow(linux.electron);
+
+    const before = linux.electron.ipcMain.invoke("teamrun:readTrayAvailable", event);
+    await linux.process.programs.answerAsync("(<true>,)\n");
+    const after = linux.electron.ipcMain.invoke("teamrun:readTrayAvailable", event);
+    const untrusted = linux.electron.ipcMain.invoke("teamrun:readTrayAvailable", { ...event, senderFrame: null });
+    linux.process.programs.output("StatusNotifierHostUnregistered");
+    await linux.process.programs.answerAsync("(<false>,)\n");
+
+    Assert.areEqual("[false,true,null,true]", JSON.stringify([before, after, untrusted, windows.electron.ipcMain.invoke("teamrun:readTrayAvailable", DesktopStartFixture.trustedEvent("win32"))]));
+    Assert.areEqual(JSON.stringify([["teamrun:trayAvailable", true], ["teamrun:trayAvailable", false]]),
+      JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:trayAvailable")));
   }
 
   @TestMethod

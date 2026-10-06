@@ -49,6 +49,8 @@ describe("DesktopBridgeService", () => {
     onNotificationOpened: (): (() => void) => () => undefined,
     onQuitQuestion: (): (() => void) => () => undefined,
     answerQuit: (): Promise<boolean> => Promise.resolve(true),
+    readTrayAvailable: (): Promise<unknown> => Promise.resolve(true),
+    onTrayAvailable: (): (() => void) => () => undefined,
     logModule: (): void => undefined,
     logError: (): void => undefined
   };
@@ -80,6 +82,8 @@ describe("DesktopBridgeService", () => {
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
     ["no onQuitQuestion", { ...complete, onQuitQuestion: null }],
     ["no answerQuit", { ...complete, answerQuit: null }],
+    ["no readTrayAvailable", { ...complete, readTrayAvailable: null }],
+    ["no onTrayAvailable", { ...complete, onTrayAvailable: null }],
     ["no logModule", { ...complete, logModule: null }],
     ["no logError", { ...complete, logError: null }]
   ];
@@ -306,6 +310,26 @@ describe("DesktopBridgeService", () => {
 
     expect(questions.map(t => t === null ? null : [t.descriptions, t.isWaiting])).toEqual([[["Indexing the project"], true], null]);
     expect([isTaken, bridge.quitAnswers, bridge.logged, bridge.errorsLogged]).toEqual([true, ["Wait"], ["clock: Ticked"], [["clock", "Error: It broke."]]]);
+  });
+
+  it("reads whether the desktop can show its tray icon, counting anything but a no as yes, and passes on each yes or no it reports", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+    const reports: boolean[] = [];
+    const reads: boolean[] = [];
+
+    for (const value of [false, true, null])
+      reads.push(await service.readTrayAvailableAsync().finally(() => bridge.trayAvailable = Promise.resolve(value)));
+    reads.push(await service.readTrayAvailableAsync());
+    const stop = service.onTrayAvailable(t => reports.push(t));
+    bridge.changeTrayAvailable(false);
+    bridge.changeTrayAvailable("no");
+    bridge.changeTrayAvailable(true);
+    stop();
+    bridge.changeTrayAvailable(false);
+
+    expect(reads).toEqual([true, false, true, true]);
+    expect(reports).toEqual([false, true]);
   });
 
   it("refuses a kept layout that is not a JSON object", async () => {

@@ -483,6 +483,40 @@ describe("SettingsComponent", () => {
     expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("None of this device's languages has a dictionary here, so words are checked in English (United States).");
   });
 
+  it("notes on the tray icon's row while the desktop shows no tray icons, drops the note once it does, and ignores a report that is not a yes or no", async () => {
+    bridge.trayAvailable = Promise.resolve(false);
+    settings.definitions.set([...SettingsFixture.all, SettingsFixture.trayIcon]);
+    render();
+    await fixture.whenStable();
+    await searchAsync("tray");
+    const note = (): string | null | undefined => element().querySelector("[data-setting='shell.trayIcon'] .tr-setting-row-note")?.textContent;
+
+    const unavailable = note();
+    bridge.changeTrayAvailable(true);
+    fixture.detectChanges();
+    const available = note();
+    bridge.changeTrayAvailable(false);
+    bridge.changeTrayAvailable("yes");
+    fixture.detectChanges();
+
+    expect(unavailable).toBe("This desktop shows no tray icons right now, so the icon appears once it does. On GNOME, turning on the AppIndicator extension adds them.");
+    expect(available).toBeUndefined();
+    expect(note()).toBe(unavailable);
+    expect(element().querySelectorAll(".tr-setting-row-note").length).toBe(1);
+  });
+
+  it("reports a failure to read whether the desktop shows tray icons and adds no note for it", async () => {
+    const failure = new Error("The desktop did not answer.");
+    bridge.trayAvailable = Promise.reject(failure);
+    settings.definitions.set([...SettingsFixture.all, SettingsFixture.trayIcon]);
+    render();
+    await fixture.whenStable();
+    await searchAsync("tray");
+
+    expect(errors).toEqual([failure]);
+    expect(element().querySelector("[data-setting='shell.trayIcon'] .tr-setting-row-note")).toBeNull();
+  });
+
   it("runs an action's command from its row, stores nothing, and finds the row by its label", async () => {
     const runs: string[] = [];
     settings.definitions.set([...SettingsFixture.all, SettingsFixture.alarms]);

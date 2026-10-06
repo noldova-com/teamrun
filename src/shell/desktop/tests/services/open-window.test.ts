@@ -10,7 +10,7 @@ import { setImmediate } from "node:timers/promises";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
-import { type IWindowStateStore, OpenWindow, QuitOutcome, QuitQuestion, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
+import { type IWindowStateStore, OpenWindow, QuitQuestion, WindowStateException, WindowStateUnavailableException } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeCloseGuard } from "../fixtures/fake-close-guard.fixture.js";
@@ -47,8 +47,8 @@ export class OpenWindowTests {
       const open = new OpenWindow(window, new FakeDisplayHost(), log, new FakeCloseGuard(), "win32");
       await open.bounds.restoreAsync(new RefusingStore(failure));
       window.close();
-      const request = window.webContents.sent.find(t => t[0] === "teamrun:closeRequest");
-      open.coordinator.answer(request?.[1], true);
+      await Condition.waitAsync(() => OpenWindowTests.closeRequests(window).length === 1);
+      open.coordinator.answer(OpenWindowTests.closeRequests(window)[0], true);
       await Condition.waitAsync(() => window.isGone);
       closed.push(window);
     }
@@ -64,7 +64,7 @@ export class OpenWindowTests {
   public async staysOpenWithoutAskingItsPageToSaveWhileTheGuardKeepsIt(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const guard = new FakeCloseGuard();
-    guard.outcome = QuitOutcome.Stay;
+    guard.canClose = false;
     const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), guard, "win32");
 
     window.close();
@@ -80,29 +80,38 @@ export class OpenWindowTests {
   }
 
   @TestMethod
-  public async stopsTheWorkOnlyOnceItsPageHasSavedWhenThePersonChoseTo(): Promise<void> {
+  public async savesForAQuitWithoutClosingAndClosesAtOnceWithoutTheGuardWhenTold(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
     const guard = new FakeCloseGuard();
-    guard.outcome = QuitOutcome.StopWork;
-    const refusing = new FakeDesktopWindow({}, 1);
-    const saving = new FakeDesktopWindow({}, 2);
-    const refused = new OpenWindow(refusing, new FakeDisplayHost(), new FakeDesktopLog(), guard, "win32");
-    const saved = new OpenWindow(saving, new FakeDisplayHost(), new FakeDesktopLog(), guard, "win32");
-    let isGoneWhenStopped: boolean | null = null;
-    guard.onStop = () => isGoneWhenStopped = saving.isGone;
+    const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), guard, "win32");
 
-    refusing.close();
-    await Condition.waitAsync(() => refusing.webContents.sent.some(t => t[0] === "teamrun:closeRequest"));
-    refused.coordinator.answer(refusing.webContents.sent.find(t => t[0] === "teamrun:closeRequest")?.[1], false);
-    saving.close();
-    await Condition.waitAsync(() => saving.webContents.sent.some(t => t[0] === "teamrun:closeRequest"));
-    const stopsBeforeSaving = guard.stops;
-    saved.coordinator.answer(saving.webContents.sent.find(t => t[0] === "teamrun:closeRequest")?.[1], true);
-    await Condition.waitAsync(() => saving.isGone);
+    const refusing = open.saveAsync();
+    await Condition.waitAsync(() => OpenWindowTests.closeRequests(window).length === 1);
+    open.coordinator.answer(OpenWindowTests.closeRequests(window)[0], false);
+    const saving = open.saveAsync();
+    await Condition.waitAsync(() => OpenWindowTests.closeRequests(window).length === 2);
+    open.coordinator.answer(OpenWindowTests.closeRequests(window)[1], true);
+    const results = [await refusing, await saving];
+    const isGoneAfterSaving = window.isGone;
+    open.closeNow();
+    open.closeNow();
 
-    Assert.isFalse(refusing.isGone);
-    Assert.areEqual(0, stopsBeforeSaving);
-    Assert.areEqual(1, guard.stops);
-    Assert.areEqual(false, isGoneWhenStopped);
+    Assert.areEqual("false,true", results.join(","));
+    Assert.isFalse(isGoneAfterSaving);
+    Assert.isTrue(window.isGone);
+    Assert.areEqual(0, guard.prompts.length);
+  }
+
+  @TestMethod
+  public async reportsWhetherItsPageHasPaintedOrItClosedFirst(): Promise<void> {
+    const windows = [new FakeDesktopWindow({}, 1), new FakeDesktopWindow({}, 2), new FakeDesktopWindow({}, 3)];
+    const [painted, shown, closed] = windows.map(t => new OpenWindow(t, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "win32"));
+
+    painted?.markPainted();
+    shown?.showNow();
+    windows[2]?.destroy();
+
+    Assert.areEqual("true,true,false", (await Promise.all([painted, shown, closed].map(t => t?.whenPaintedAsync()))).join(","));
   }
 
   @TestMethod
@@ -184,6 +193,10 @@ export class OpenWindowTests {
 
     Assert.areEqual("[]", JSON.stringify(window.calls));
     Assert.areEqual(0, log.lines.length);
+  }
+
+  private static closeRequests(window: FakeDesktopWindow): unknown[] {
+    return window.webContents.sent.filter(t => t[0] === "teamrun:closeRequest").map(t => t[1]);
   }
 
   private static startFence(milliseconds: number): FakeDesktopWindow {

@@ -55,6 +55,8 @@ export class Resources {
   public static readonly installCommandChannel: string = "teamrun:installCommand";
   public static readonly notificationOpenedChannel: string = "teamrun:notificationOpened";
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
+  public static readonly readTrayAvailableChannel: string = "teamrun:readTrayAvailable";
+  public static readonly trayAvailableChannel: string = "teamrun:trayAvailable";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
   public static readonly windowErrorChannel: string = "teamrun:windowError";
@@ -140,6 +142,10 @@ export class Resources {
   public static readonly createOnlyFlag: string = "wx";
   public static readonly textEncoding: BufferEncoding = "utf8";
   public static readonly appearanceFile: string = "appearance.json";
+  public static readonly deviceStateFile: string = "device-state.json";
+  public static readonly trayCloseHintKey: string = "trayCloseHintShown";
+  public static readonly trayCloseHintBody: string = "Open it again or quit it from its icon in the system tray.";
+  public static readonly fileNameParameter: string = "fileName";
   public static readonly temporarySuffix: string = ".tmp";
   public static readonly appearanceArgument: string = "--teamrun-appearance=";
   public static readonly appearanceLimit: number = 4096;
@@ -213,6 +219,7 @@ export class Resources {
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
   public static readonly willQuitEvent: "will-quit" = "will-quit";
+  public static readonly beforeQuitEvent: "before-quit" = "before-quit";
   public static readonly resizeEvent: "resize" = "resize";
   public static readonly moveEvent: "move" = "move";
   public static readonly willMoveEvent: "will-move" = "will-move";
@@ -461,8 +468,20 @@ export class Resources {
     return `The runtime's work could not be read before quitting, so ${Resources.applicationName} quits without asking: ${reason}`;
   }
 
-  public static formatWorkNotStopped(reason: string): string {
-    return `The runtime's work could not be stopped: ${reason}`;
+  public static formatRuntimeNotStopped(reason: string): string {
+    return `The runtime could not be stopped as ${Resources.applicationName} quits: ${reason}`;
+  }
+
+  public static get trayCloseHintTitle(): string {
+    return `${Resources.applicationName} is still running`;
+  }
+
+  public static formatHintsNotRead(reason: string): string {
+    return `The device's one-time hints could not be read, so they count as not shown: ${reason}`;
+  }
+
+  public static formatHintUnsaved(key: string, reason: string): string {
+    return `The device could not record that the hint ${key} has shown: ${reason}`;
   }
 
   public static formatModuleLogLine(moduleId: string, line: string): string {

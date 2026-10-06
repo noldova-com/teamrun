@@ -15,7 +15,6 @@ export class DesktopApiTests {
   public exportsTheCompleteRuntimeSurface(): void {
     Assert.areEqual(
       JSON.stringify([
-        "AppearanceStore",
         "ChildProgramHost",
         "CloseCoordinator",
         "DesktopApplication",
@@ -24,11 +23,13 @@ export class DesktopApiTests {
         "DetachedStart",
         "DetachedStartReply",
         "DetachedStartRequest",
+        "DeviceFileStore",
         "DeviceIdentity",
         "DeviceIdentityException",
         "LinkPolicy",
         "MainProcessFailureKind",
         "MainProcessRecovery",
+        "OneTimeHints",
         "OpenWindow",
         "PathCommand",
         "PathCommandException",
@@ -36,6 +37,7 @@ export class DesktopApiTests {
         "ProgramException",
         "QuitChoice",
         "QuitCoordinator",
+        "QuitFlow",
         "QuitOutcome",
         "QuitQuestion",
         "RuntimeStartup",

@@ -27,9 +27,10 @@ import { PathCommandException } from "../exceptions/path-command.exception.js";
 import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 import type { IContextMenuParams } from "../interfaces/i-context-menu-params.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
-import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
+import type { IDeviceFileStore } from "../interfaces/i-device-file-store.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
+import type { IPreventableEvent } from "../interfaces/i-preventable-event.js";
 import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
@@ -54,9 +55,11 @@ import { MenuBarTemplate } from "./menu-bar-template.js";
 import { DeviceIdentity } from "./device-identity.js";
 import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
+import { OneTimeHints } from "./one-time-hints.js";
 import { OpenWindow } from "./open-window.js";
 import type { PathCommand } from "./path-command.js";
 import { QuitCoordinator } from "./quit-coordinator.js";
+import { QuitFlow } from "./quit-flow.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
@@ -92,13 +95,15 @@ export class DesktopApplication {
   private readonly startup: RuntimeStartup;
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
+  private readonly quitFlow: QuitFlow;
+  private readonly hints: OneTimeHints;
   private readonly tray: TrayController;
   private readonly trayHosts: TrayHostWatcher;
   private readonly trayIcon: DeviceSettingFollower;
   private readonly spelling: SpellChecker;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly deviceFolder: string;
-  private readonly appearanceStore: IAppearanceStore;
+  private readonly appearanceStore: IDeviceFileStore;
   private readonly createPathCommand: (executablePath: string) => PathCommand;
   private appearance: JsonObject | null = null;
   private readonly windows: Map<number, OpenWindow> = new Map();
@@ -106,6 +111,7 @@ export class DesktopApplication {
   private device: Promise<string | null> = Promise.resolve(null);
   private knownDevice: string | null = null;
   private isReady: boolean = false;
+  private isExiting: boolean = false;
 
   private constructor(
     electron: IElectron,
@@ -116,7 +122,7 @@ export class DesktopApplication {
     log: DesktopLog,
     launcher: IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
-    createAppearanceStore: (folder: string) => IAppearanceStore,
+    createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     icons: AppIcons,
     spelling: SpellChecker) {
@@ -125,7 +131,7 @@ export class DesktopApplication {
     this.readDeviceAsync = readDeviceAsync;
     this.deviceFolder = DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument)
       ?? DeviceIdentity.locateFolder(process.platform, process.env, process.homeFolder);
-    this.appearanceStore = createAppearanceStore(this.deviceFolder);
+    this.appearanceStore = createDeviceFile(this.deviceFolder, Resources.appearanceFile);
     this.process = process;
     this.settings = settings;
     this.taskbar = taskbar;
@@ -137,10 +143,23 @@ export class DesktopApplication {
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
     this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }));
-    this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
+    this.quit = new QuitCoordinator(() => this.readWorkAsync());
+    this.quitFlow = new QuitFlow({
+      isExiting: () => this.isExiting,
+      keepsRunningWithoutWindows: () => this.keepsRunningWithoutWindows(),
+      isLast: t => this.isLastOpen(t),
+      closeToBackground: () => this.closeToBackground(),
+      saveAllAsync: () => this.saveAllAsync(),
+      stopAsync: t => this.stopAsync(t),
+      findPromptAsync: () => this.findPromptAsync(),
+      quit: () => electron.app.quit(),
+      exit: () => this.exit()
+    }, this.quit);
+    this.hints = new OneTimeHints(createDeviceFile(this.deviceFolder, Resources.deviceStateFile), t => this.log.write(t));
     this.tray = new TrayController(electron.tray, electron.menu, icons, process.platform,
-      { open: () => this.reopen(), openNotification: t => this.openNotification(t), setDoNotDisturb: t => void this.setDoNotDisturbAsync(t), quit: () => electron.app.quit() }, t => this.log.write(t));
-    this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.tray.setHostAvailable(t));
+      { open: () => this.reopen(), openNotification: t => this.openNotification(t), setDoNotDisturb: t => void this.setDoNotDisturbAsync(t), quit: () => electron.app.quit() }, t => this.log.write(t),
+      t => this.followTrayIcon(t));
+    this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.changeTrayHost(t));
     this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.tray.setEnabled(t === true), t => this.log.write(t));
     this.spelling = spelling;
@@ -152,7 +171,7 @@ export class DesktopApplication {
     moduleUrl: string,
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
-    createAppearanceStore: (folder: string) => IAppearanceStore,
+    createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
@@ -186,7 +205,7 @@ export class DesktopApplication {
     const spelling = new SpellChecker(
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, createPathCommand, icons,
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createDeviceFile, createPathCommand, icons,
       spelling);
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
@@ -203,7 +222,11 @@ export class DesktopApplication {
     }
     app.enableSandbox();
     app.on(Resources.secondInstanceEvent, () => this.focus());
-    app.on(Resources.windowAllClosedEvent, () => app.quit());
+    app.on(Resources.beforeQuitEvent, (event: IPreventableEvent) => this.beforeQuit(event));
+    app.on(Resources.windowAllClosedEvent, () => {
+      if (!this.keepsRunningWithoutWindows())
+        app.quit();
+    });
     app.on(Resources.willQuitEvent, () => {
       this.trayHosts.stop();
       this.tray.dispose();
@@ -230,6 +253,7 @@ export class DesktopApplication {
     this.electron.ipcMain.on(Resources.appearanceChannel, (event, appearance) => this.repaint(event, appearance));
     this.electron.ipcMain.on(Resources.keepAppearanceChannel, (event, preferences) => this.keepAppearance(event, preferences));
     this.electron.ipcMain.handle(Resources.readSpellingChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.spelling.toJson());
+    this.electron.ipcMain.handle(Resources.readTrayAvailableChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.trayHosts.isAvailable);
     this.electron.ipcMain.on(Resources.spellingChannel, (event, isChecking, languages) => this.keepSpelling(event, isChecking, languages));
     this.electron.ipcMain.handle(Resources.replaceMisspellingChannel, (event, text) => this.replaceMisspelling(event, text));
     this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
@@ -317,10 +341,10 @@ export class DesktopApplication {
     });
   }
 
-  private open(): void {
+  private open(): OpenWindow {
     const window = this.factory.create(WindowState.createDefault(ScreenArea.of(this.electron.screen.getPrimaryDisplay().workArea)), this.appearance);
     const contentsId = window.webContents.id;
-    const open = new OpenWindow(window, this.electron.screen, this.log, this.quit, this.settings.platform);
+    const open = new OpenWindow(window, this.electron.screen, this.log, this.quitFlow, this.settings.platform);
     window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());
     window.webContents.on(Resources.contextMenuEvent, (_event, params) => this.forwardFieldMenu(open, params));
     new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
@@ -329,6 +353,7 @@ export class DesktopApplication {
     open.settleWithin(Resources.connectingShowLimit);
     open.showUnpaintedWithin(Resources.paintShowLimit);
     void this.prepareAsync(open);
+    return open;
   }
 
   private publish(state: StartupState): void {
@@ -364,6 +389,13 @@ export class DesktopApplication {
         open.window.webContents.send(Resources.runtimeEventChannel, event.name.text, payload);
   }
 
+  private changeTrayHost(isAvailable: boolean): void {
+    this.tray.setHostAvailable(isAvailable);
+    for (const open of this.windows.values())
+      if (!open.window.isDestroyed())
+        open.window.webContents.send(Resources.trayAvailableChannel, isAvailable);
+  }
+
   private receiveWork(event: Event): void {
     try {
       const report = WorkReport.fromJson(event.payload);
@@ -393,10 +425,63 @@ export class DesktopApplication {
     }
   }
 
-  private async stopWorkAsync(): Promise<void> {
-    const failure = (await this.callAsync(ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson())).failure;
-    if (!Object.isUndefined(failure))
-      this.log.write(Resources.formatWorkNotStopped(failure.message));
+  private beforeQuit(event: IPreventableEvent): void {
+    if (this.isExiting)
+      return;
+    event.preventDefault();
+    void this.quitFlow.quitAsync();
+  }
+
+  private keepsRunningWithoutWindows(): boolean {
+    return this.settings.platform === Resources.macPlatform || this.tray.isShown;
+  }
+
+  private closeToBackground(): void {
+    if (this.settings.platform !== Resources.macPlatform)
+      void this.hints.showOnceAsync(Resources.trayCloseHintKey, () => this.showTrayCloseHint());
+  }
+
+  private showTrayCloseHint(): boolean {
+    const notifications = this.electron.notifications;
+    if (!notifications.isSupported())
+      return false;
+    const hint = notifications.create({ title: Resources.trayCloseHintTitle, body: Resources.trayCloseHintBody, icon: this.icons.window, silent: true });
+    hint.on(Resources.clickEvent, () => this.reopen());
+    hint.show();
+    return true;
+  }
+
+  private followTrayIcon(isShown: boolean): void {
+    if (!isShown && this.windows.size === 0 && !this.isExiting && !this.keepsRunningWithoutWindows())
+      this.open();
+  }
+
+  private async saveAllAsync(): Promise<boolean> {
+    const saved = await Promise.all([...this.windows.values()].map(t => t.saveAsync()));
+    return saved.every(t => t);
+  }
+
+  private async stopAsync(policy: StopPolicy): Promise<boolean> {
+    const failure = (await this.callAsync(ShellMethods.stop, new StopRequest(policy, true).toJson())).failure;
+    if (Object.isUndefined(failure) || failure.code === FailureCode.Disconnected)
+      return false;
+    if (failure.code === FailureCode.Conflict && policy === StopPolicy.IfIdle)
+      return true;
+    this.log.write(Resources.formatRuntimeNotStopped(failure.message));
+    return false;
+  }
+
+  private async findPromptAsync(): Promise<IQuitPrompt | null> {
+    const open = this.focus() ?? this.open();
+    return await open.whenPaintedAsync() ? open : null;
+  }
+
+  private exit(): void {
+    this.isExiting = true;
+    this.startup.close();
+    for (const open of this.windows.values())
+      open.closeNow();
+    this.electron.app.quit();
   }
 
   private answerQuit(event: IIpcEvent, choice: unknown): boolean {
@@ -703,7 +788,7 @@ export class DesktopApplication {
     if (!this.isPackaged)
       return false;
     this.process.startDetached(handover.executablePath, this.process.argv.filter(t => Resources.handoverArguments.some(u => t.startsWith(u))));
-    this.electron.app.quit();
+    this.exit();
     return true;
   }
 

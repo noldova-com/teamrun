@@ -39,6 +39,8 @@ export interface IDesktopBridge {
   onNotificationOpened(listener: (id: string) => void): () => void;
   onQuitQuestion(listener: (question: unknown) => void): () => void;
   answerQuit(choice: string): Promise<boolean>;
+  readTrayAvailable(): Promise<unknown>;
+  onTrayAvailable(listener: (isAvailable: unknown) => void): () => void;
   logModule(moduleId: string, message: string): void;
   logError(moduleId: string | null, text: string): void;
 }
