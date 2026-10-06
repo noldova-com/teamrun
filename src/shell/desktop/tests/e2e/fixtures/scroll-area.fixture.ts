@@ -53,7 +53,14 @@ export default class ScrollAreaFixture {
 
   public static panelEdgeGapAsync(area: Locator): Promise<number> {
     return ScrollAreaFixture.measureOneAsync("gap to the panel's edge", () => area.evaluateAll(all => all.map(t => {
-      const panel = t.closest("tr-panel-card") as HTMLElement;
+      const panel = t.closest<HTMLElement>("tr-panel-card");
+      if (panel === null) {
+        const ancestors: string[] = [];
+        for (let element: Element | null = t; element !== null; element = element.parentElement)
+          ancestors.push([element.localName, ...element.classList].join("."));
+        const where = t.isConnected ? "on the page" : "off the page";
+        throw new Error(`1 of ${all.length} matching scroll areas has no panel card around it, ${where}, under ${t.getRootNode().nodeName}: ${ancestors.join(" < ")}.`);
+      }
       const panelEnd = panel.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(panel).borderRightWidth);
       const areaEnd = t.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(t).borderRightWidth);
       return panelEnd - areaEnd;
