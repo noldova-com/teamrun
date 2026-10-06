@@ -104,6 +104,7 @@ Spec files share a page, so a spec leaves no application, painted appearance or 
 The real pointer stays wherever a spec file last moved it and sends real boundary events to whatever renders under it, so a spec that dispatches its own pointer enter and leave first moves the real pointer onto a shield over the page, as the tooltip fixture of the window tests does.
 Such a shield or pointer park is hovered through the kit tests' pointer fixture, which finds it by a test id: the browser runner otherwise finds a hovered element by its position among all elements of its tag in the document, so an earlier element of that tag that goes away while the hover starts leaves the hover a different element or none to find.
 The kit's global stylesheet is part of each spec file's initial state: before each file runs, a setup file waits for the page's stylesheet to finish loading, adds it when the page has none, and fails the file when it does not load or does not finish loading within its limit.
+Vitest's browser matchers, such as `expect.element`, arrive through their own script in the page, whose failure to load the runner does not report, so before each file runs, a setup file fails it at once, naming that script, when they are missing.
 A passing assertion alongside an unhandled framework error is not a pass.
 
 ### Flakiness and races
