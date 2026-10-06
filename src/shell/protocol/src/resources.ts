@@ -15,6 +15,7 @@ export class Resources {
   public static readonly pathSeparator: string = ".";
   public static readonly ownerPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly memberPattern: RegExp = /^[a-z][a-zA-Z0-9]*$/;
+  public static readonly languageTagPattern: RegExp = /^[a-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/;
   public static readonly protocolVersionPattern: RegExp = /^[1-9][0-9]*$/;
   public static readonly moduleVersionPattern: RegExp = /^(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})$/;
 

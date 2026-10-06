@@ -227,6 +227,15 @@ export declare enum SettingKind {
   KeyBindings = "KeyBindings",
 
   /**
+   * A list of distinct spelling language tags, such as `en-US`, each two or
+   * three lowercase letters followed by any number of hyphenated parts of
+   * up to eight letters or digits. The window offers the languages whose
+   * dictionaries ship with the desktop. Only the shell's
+   * `shell.spellCheckLanguages` has this kind.
+   */
+  Languages = "Languages",
+
+  /**
    * A button that runs a command, such as one that opens a module's own
    * document. It holds no value: its default and only accepted value is
    * `null`, so nothing is stored.
@@ -1820,6 +1829,20 @@ export declare class SettingType {
    * ```
    */
   public static keyBindings(): SettingType;
+
+  /**
+   * Creates the type of the setting that holds the spelling languages.
+   *
+   * @returns The languages type.
+   *
+   * @example
+   * ```ts
+   * import { SettingType } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const type: SettingType = SettingType.languages();
+   * ```
+   */
+  public static languages(): SettingType;
 
   /**
    * Creates the type of a setting whose row is a button that runs a

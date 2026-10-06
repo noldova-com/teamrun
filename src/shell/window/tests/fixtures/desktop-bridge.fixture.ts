@@ -20,7 +20,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly openedListeners: Set<(id: string) => void> = new Set();
   private readonly quitListeners: Set<(question: unknown) => void> = new Set();
 
-  public readonly platform: string;
+  public platform: string;
   public appearance: unknown = null;
   public readonly keptAppearances: JsonObject[] = [];
   public readonly appearances: JsonObject[] = [];
@@ -42,6 +42,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly copied: string[] = [];
   public isCopyAccepted: boolean = true;
   public logFolderOpens: number = 0;
+  public commandInstalls: number = 0;
   public readonly quitAnswers: string[] = [];
   public readonly logged: string[] = [];
   public readonly errorsLogged: (readonly [string | null, string])[] = [];
@@ -143,6 +144,11 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public openLogFolder(): Promise<boolean> {
     this.logFolderOpens++;
     return this.logFolderOpened;
+  }
+
+  public installCommand(): Promise<boolean> {
+    this.commandInstalls++;
+    return Promise.resolve(true);
   }
 
   public edit(action: string): Promise<boolean> {

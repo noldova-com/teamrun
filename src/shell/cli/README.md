@@ -54,6 +54,10 @@ The installer leaves the user's `Path` unchanged, without a message, when it can
 In that case add `%LOCALAPPDATA%\Programs\teamrun\bin` to the user's `Path` by hand: open Settings, search for "Edit environment variables for your account", select `Path`, choose Edit, then New, and open a new terminal.
 The command passes its arguments through cmd, which can change quotes, `%` and `^` in them; give `run` such JSON with `--args-file` or on standard input with `-` instead.
 
+On macOS, choose TeamRun > Install command in PATH. It links `/usr/local/bin/teamrun` to the command inside TeamRun, asking for an administrator's password when that folder cannot be written, so a terminal opened afterwards runs `teamrun` directly.
+A file named `/usr/local/bin/teamrun` that is not a link is left alone; move or remove it, then install the command again.
+If TeamRun moves, choose the command again to link its new place.
+
 ## 6. Development
 
 In a checkout, `npm run teamrun -- <command> [options]` runs the command line on the development app, with the checkout's own data directory unless `--data-dir` or `TEAMRUN_DATA_DIR` names another. A relative `--data-dir` is resolved from the folder `npm` was started in.

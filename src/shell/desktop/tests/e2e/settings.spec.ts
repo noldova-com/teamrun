@@ -76,7 +76,7 @@ test.describe("settings", () => {
     await expect(settingsTab(window)).toHaveCount(1);
     await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
     await expect(window.locator(".tr-settings-pages .tr-tree-label")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Notes", "Gallery"]);
-    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout", "Command search"]);
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout", "Command search", "Spelling"]);
     await window.getByRole("treeitem", { name: "Appearance", exact: true }).focus();
     await window.keyboard.press("ArrowDown");
     await window.keyboard.press("Enter");
@@ -92,6 +92,18 @@ test.describe("settings", () => {
     }
     await expect(window.locator("[data-command=\"shell.openSettings\"] .tr-shortcut-title")).toHaveText("Settings…");
     await desktop.checkpointAsync("settings-shortcuts");
+  });
+
+  test("Appearance's Spelling group checks spelling by default and says when no spelling language is offered", async ({ desktop }) => {
+    const window = desktop.window;
+    await SettingsFixture.openAsync(window);
+    const group = window.locator(".tr-settings-group").filter({ has: window.locator(".tr-settings-group-title", { hasText: "Spelling" }) });
+
+    await group.scrollIntoViewIfNeeded();
+
+    await expect(group.getByRole("checkbox", { name: /Underline misspelled words/ })).toBeChecked();
+    await expect(group.locator(".tr-setting-row-note")).toHaveText("No spelling languages are offered on this device.");
+    await desktop.checkpointAsync("settings-spelling");
   });
 
   test("a module's action setting opens the module's own document from its row once per press, by pointer or Enter, and stores nothing", async ({ desktop }) => {
