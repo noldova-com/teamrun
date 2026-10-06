@@ -12,7 +12,7 @@ import { userEvent } from "vitest/browser";
 
 import { TabComponent } from "../../../../src/app/components/tab/tab.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

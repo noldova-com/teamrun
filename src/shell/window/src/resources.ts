@@ -613,6 +613,11 @@ export class Resources {
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
   public static readonly windowPartActivationFailed: string = "Its window part failed to activate.";
   public static readonly windowPartReconnectionFailed: string = "Its window part failed to continue after the runtime started again.";
+  public static readonly windowPartSaveFailed: string = `Its window part failed to save while ${productName} was closing.`;
+  public static readonly windowPartSaveFailedLate: string = `Its window part failed to save after ${productName} stopped waiting for it.`;
+  public static readonly windowPartSaveUnfinished: string = `Its window part did not finish saving within 4 seconds while ${productName} was closing; ${productName} closed without it.`;
+  public static readonly partSaveTimeout: number = 4000;
+  public static readonly partSaveUnfinishedText: string = `${productName} closed after waiting 4 seconds for it.`;
   public static readonly windowLogLimit: number = 65536;
   public static readonly causeSeparator: string = "\nCaused by: ";
   public static readonly invalidInstance: string = "An instance is a string that is not blank.";
@@ -717,6 +722,14 @@ export class Resources {
   public static readonly quitListLimit: number = 5;
   public static readonly waitFocusSelector: string = "[data-tr-quit=Wait]";
   public static readonly cancelReference: string = "cancel";
+
+  public static formatPartSaveFailed(moduleName: string): string {
+    return `${moduleName} couldn't save, so ${Resources.productName} stayed open`;
+  }
+
+  public static formatPartSaveUnfinished(moduleName: string): string {
+    return `${moduleName} didn't finish saving`;
+  }
 
   public static formatMoreWork(count: number): string {
     return `and ${count} more`;

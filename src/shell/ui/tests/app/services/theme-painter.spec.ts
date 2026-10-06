@@ -10,7 +10,7 @@ import { ThemeMode } from "../../../src/app/enums/theme-mode";
 import { ThemeException } from "../../../src/app/exceptions/theme.exception";
 import { Theme } from "../../../src/app/models/theme";
 import { ThemePainter } from "../../../src/app/services/theme-painter";
-import { DefaultTheme } from "../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../src/app/models/default-theme";
 import { Resources } from "../../../src/resources";
 import { FixtureTheme } from "../../fixtures/fixture-theme";
 

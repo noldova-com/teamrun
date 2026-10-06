@@ -215,6 +215,7 @@ export default class Test {
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
     const { default: BucketNameCheck } = await import("./checks/bucket-name-check.ts");
     const { default: ConceptFileCheck } = await import("./checks/concept-file-check.ts");
+    const { default: ConceptFolderCheck } = await import("./checks/concept-folder-check.ts");
     const { default: EnumValueCheck } = await import("./checks/enum-value-check.ts");
     const { default: FoundationValueCheck } = await import("./checks/foundation-value-check.ts");
     const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
@@ -237,6 +238,7 @@ export default class Test {
       new FoundationValueCheck(files, new PackageCatalog(this.root), syntax),
       new EnumValueCheck(files, syntax),
       new ConceptFileCheck(this.root, files, syntax),
+      new ConceptFolderCheck(files, syntax),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),

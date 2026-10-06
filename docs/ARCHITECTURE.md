@@ -244,7 +244,7 @@ The application scope belongs to the shell. A module that owns a kind of object,
 
 The shell owns notifications. A module decides when something deserves one; muting, for example for one conversation, is a setting at that object's scope, applied by the module. The shell shows a notification without taking focus. Opening it brings TeamRun's window forward and runs the notification's command. Settings' Notifications page holds two settings. Do not disturb, `shell.doNotDisturb`, is a device setting: on that device it stops the window's toasts and the operating system's notifications and shows the silenced bell. Notifications from modules, `shell.mutedModules`, lists the modules turned off on every device, choosing among the modules that declare notification kinds, whatever their parts, as `shell.modules` reports them: their notifications still enter the list, without a toast, an operating system notification or a place in the unread count. Either way each notification stays in the list.
 
-A module declares its notification kinds in `contributes.notifications`. A part posts a notification of one of them through its context and gets a handle that updates or dismisses it:
+A module declares its notification kinds in `contributes.notifications`. A part posts a notification of one of them through its context and gets a handle that updates or dismisses it. The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` (section 9): they belong to no module, offer no command, and turning modules' notifications off never mutes them.
 
 - Its commands, the one opening it runs and those of its actions, are the module's own or a dependency's. A post with an undeclared kind or another module's command is refused.
 - Posting the same kind and key again replaces the earlier notification: it keeps its id and returns to the top, unread, because a new post is a new occurrence that deserves attention. An update through the handle is the same occurrence changing, such as progress moving on, so it keeps its place, time and whether it was read, and never changes its kind.
@@ -400,7 +400,7 @@ A runtime part reports the work it has in progress, such as a running reply or c
 
 When the person closes the last window, the desktop reads the runtime's work, waiting at most two seconds; when it cannot read it in that time, the window closes as it would without work. Otherwise the window asks, keeping the list current: waiting closes it once no work is left, even work that began while waiting; stopping the work asks the runtime to stop the work and itself once the window has saved; cancelling keeps TeamRun open. A window that can no longer ask, or a runtime that goes away, lets closing go ahead.
 
-Closing TeamRun waits for each window to save its unsaved state. A window part that reports a failed save keeps TeamRun open with the error, while a window that is gone or does not answer before the timeout does not block closing. The window's own layout is the exception: a failed save of the layout is logged and closing proceeds, because losing the last layout change is minor.
+Closing TeamRun, after that choice and before any work is stopped, waits for each window to save its unsaved state. The window runs the save steps its parts register through their context together with its own layout save. A part whose save fails keeps TeamRun open: the window logs the error and posts `shell.saveFailed` naming the module, and nothing is stopped. A part whose steps have not settled after 4 seconds does not block closing: the window logs it and posts `shell.saveUnfinished` naming the module, and logs a failure that comes later. The window answers from the saves alone, without waiting for its notifications to be posted. The desktop waits at most 5 seconds for the window's answer, and a window that is gone or does not answer by then does not block closing. The window's own layout is the exception: a failed save of the layout is logged and closing proceeds, because losing the last layout change is minor.
 
 ## 10. Build, installation and updates
 
@@ -514,7 +514,7 @@ A release still contains the shell and every module in its list, and an update r
 Before replacing application files, coordinate every runtime and desktop using that installation, across data directories:
 
 1. Confirm that no work is in progress, which the person's choice under section 9 ensures; then block new launches and requests, and freeze editing.
-2. Acknowledge durable unsaved state and preferences.
+2. Acknowledge durable unsaved state and preferences, which the windows save as section 9 describes.
 3. Stop the processes modules own, flush and close databases, and verify process exit.
 4. Create verified recovery backups.
 

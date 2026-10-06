@@ -431,6 +431,29 @@ export interface IWindowPartContext {
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
 
   /**
+   * Registers a step that saves the part's unsaved state when TeamRun
+   * closes, quits for a newer build or restarts. The window runs every
+   * part's steps and its own layout save together and closes only once they
+   * settle. A step that rejects keeps TeamRun open: the window logs the
+   * error and shows it as a notification naming the module, and the person
+   * closes again once it is fixed. A part whose steps have not settled after
+   * 4 seconds does not hold closing back: TeamRun closes, and the window
+   * logs it and posts a warning naming the module.
+   *
+   * @param save The step; it resolves once the state is saved.
+   * @returns A function that removes the step; deactivation removes it too.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function saveDraftsOnClose(context: IWindowPartContext, saveDraftsAsync: () => Promise<void>): () => void {
+   *   return context.registerSave(saveDraftsAsync);
+   * }
+   * ```
+   */
+  registerSave(save: () => Promise<void>): () => void;
+
+  /**
    * Supplies the rows of one of the module's dynamic menu groups. The window
    * asks again whenever it builds the menu or toolbar, and leaves out a row
    * whose command belongs to neither the module nor a dependency, and a group

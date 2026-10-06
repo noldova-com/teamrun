@@ -1387,6 +1387,37 @@ export declare class ShellEvents {
 }
 
 /**
+ * The notification kinds the shell posts itself. They belong to no module,
+ * so turning modules' notifications off never mutes them.
+ */
+export declare class ShellNotifications {
+  /**
+   * `shell.saveFailed`: a window part's save failed while TeamRun was
+   * closing, so TeamRun stayed open; an error naming the module.
+   */
+  public static readonly saveFailed: QualifiedName;
+
+  /**
+   * `shell.saveUnfinished`: a window part did not finish saving within its
+   * time while TeamRun was closing, and TeamRun closed without it; a
+   * warning naming the module.
+   */
+  public static readonly saveUnfinished: QualifiedName;
+
+  /**
+   * Every kind above, in this order.
+   *
+   * @example
+   * ```ts
+   * import { ShellNotifications } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isShellKind: boolean = ShellNotifications.all.some(t => t.text === "shell.saveFailed");
+   * ```
+   */
+  public static readonly all: readonly QualifiedName[];
+}
+
+/**
  * The names of the shell's methods that every build understands. They never
  * change after protocol version 1.
  */
