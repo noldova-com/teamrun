@@ -42,12 +42,12 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
-        "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
+        "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Coverage exclusions", "Unique names", "Declared dependencies", "Dependency pins", "Packages", "Package tests and coverage",
         "Script types", "API declarations", "API documentation", "API examples",
         "Script tests and coverage", "Angular tests and coverage", "Packaged build leaves out the Gallery"
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
-      assert.ok(output.text.endsWith("\n22 of 22 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n24 of 24 checks passed.\n"));
       for (const part of ["src/shell/ui", "src/shell/window"]) {
         assert.ok(output.text.includes(`\n${part}: matches its declarations\n`), output.text);
         assert.ok(output.text.includes(`\n${part}: documents every public member\n`), output.text);
@@ -73,7 +73,7 @@ class TestTests {
         ["Package tests and coverage"],
         ["Script tests and coverage"],
         [
-          "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages",
+          "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Coverage exclusions", "Unique names", "Declared dependencies", "Dependency pins", "Packages",
           "Script types", "API declarations", "API documentation", "API examples", "Angular tests and coverage", "Packaged build leaves out the Gallery"
         ]
       ]);
@@ -91,7 +91,7 @@ class TestTests {
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
-      assert.ok(output.text.endsWith("\n21 of 22 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n23 of 24 checks passed.\n"));
       assert.equal(runner.runs.length, 5);
     });
 
@@ -205,7 +205,7 @@ class TestTests {
     test("the documents selection runs only the document checks and says it is not the complete gate", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      await repository.writeAsync({ "README.md": "# TeamRun\n" });
+      await repository.writeAsync({ ".gitattributes": "* text=auto eol=lf\n", "README.md": "# TeamRun\n" });
       const runner = new ProcessRunnerFixture();
       const output = new TextOutputFixture();
 
@@ -216,7 +216,7 @@ class TestTests {
         "Filtered run: documents. A filtered run is not the complete gate.",
         "",
         "Documents",
-        "Checked 1 files and the links of 1 Markdown documents.",
+        "Checked 2 files and the links of 1 Markdown documents.",
         "Documents: passed",
         "",
         "1 of 1 checks passed.",
@@ -254,7 +254,7 @@ class TestTests {
     test("the documents selection runs in a checkout without installed packages", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      await repository.writeAsync({ "README.md": "# TeamRun\n", "package.json": await readFile(path.join(SourceTreeFixture.root, "package.json"), "utf8") });
+      await repository.writeAsync({ ".gitattributes": "* text=auto eol=lf\n", "README.md": "# TeamRun\n", "package.json": await readFile(path.join(SourceTreeFixture.root, "package.json"), "utf8") });
       await cp(path.join(SourceTreeFixture.root, "scripts"), path.join(repository.directory, "scripts"), { recursive: true });
       const environment = { ...process.env };
       delete environment["GITHUB_STEP_SUMMARY"];
@@ -299,7 +299,7 @@ class TestTests {
     test("the command exits with the selected checks' result and terminates", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      await repository.writeAsync({ "README.md": "# TeamRun\n" });
+      await repository.writeAsync({ ".gitattributes": "* text=auto eol=lf\n", "README.md": "# TeamRun\n" });
       const command = SourceTreeFixture.locateScript("test.ts");
       const environment = { ...process.env };
       delete environment["GITHUB_STEP_SUMMARY"];
@@ -335,7 +335,9 @@ class TestTests {
     const repository = await RepositoryFixture.createAsync();
     t.after(() => repository.disposeAsync());
     await repository.writeAsync({
+      ".gitattributes": "* text=auto eol=lf\n",
       "README.md": "# TeamRun\n",
+      "docs/TESTING.md": "# Testing\n\n| Scope | Requirement |\n|---|---|\n| Every package | 100% of executable production code |\n",
       "package.json": `${JSON.stringify(ProductIdentityFixture.manifest(), null, 2)}\n`,
       "src/modules/checkpoints/README.md": "# Checkpoints\n",
       "src/angular.json": `${JSON.stringify({ projects: { teamrun: { architect: { test: { options: { include: ["shell/*/tests/**/*.spec.ts"] } } } } } })}\n`,
