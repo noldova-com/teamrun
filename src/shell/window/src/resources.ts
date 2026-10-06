@@ -209,6 +209,18 @@ export class Resources {
   public static readonly installCommandCommand: string = "shell.installCommand";
   public static readonly installCommandTitle: string = "Install command in PATH";
   public static readonly installCommandGlyph: string = "terminal";
+  public static readonly checkForUpdatesCommand: string = "shell.checkForUpdates";
+  public static readonly checkForUpdatesTitle: string = "Check for updates";
+  public static readonly checkForUpdatesGlyph: string = "update";
+  public static readonly downloadUpdateCommand: string = "shell.downloadUpdate";
+  public static readonly downloadUpdateTitle: string = "Download update";
+  public static readonly downloadUpdateLabel: string = "Download";
+  public static readonly downloadUpdateGlyph: string = "download";
+  public static readonly restartToUpdateCommand: string = "shell.restartToUpdate";
+  public static readonly restartToUpdateTitle: string = "Restart to update";
+  public static readonly restartToUpdateLabel: string = "Restart to update";
+  public static readonly restartToUpdateGlyph: string = "restart_alt";
+  public static readonly pageArgument: string = "page";
   public static readonly openModulesCommand: string = "shell.openModules";
   public static readonly openModulesTitle: string = "Modules…";
   public static readonly modulesDocument: string = "shell.modules";
@@ -232,6 +244,7 @@ export class Resources {
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
   public static readonly galleryPage: string = "Gallery";
+  public static readonly aboutPage: string = "About";
   public static readonly galleryComponentToken: string = "GalleryComponent";
   public static readonly leadingSettingsPages: readonly string[] = [Resources.appearancePage, Resources.notificationsPage, Resources.shortcutsPage];
   public static readonly searchSettingsLabel: string = "Search settings";
@@ -610,6 +623,7 @@ export class Resources {
   public static readonly toolbarMenuShiftKey: string = "F10";
   public static readonly settingsGroup: string = "shell.settings";
   public static readonly commandLineGroup: string = "shell.commandLine";
+  public static readonly updatesGroup: string = "shell.updates";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";
   public static readonly contextInput: string = "context";
@@ -693,6 +707,12 @@ export class Resources {
   public static readonly codeField: string = "code";
   public static readonly messageField: string = "message";
   public static readonly unknownStartupState: string = "The startup state is not one the window knows.";
+  public static readonly unknownUpdateState: string = "The update state is not one the window knows.";
+  public static readonly invalidUpdateProgress: string = "An update's progress is a percentage from 0 to 100.";
+  public static readonly progressField: string = "progress";
+  public static readonly checkedAtField: string = "checkedAt";
+  public static readonly reasonField: string = "reason";
+  public static readonly mustMoveField: string = "mustMove";
   public static readonly notificationsNotConfirmed: string = "The runtime did not confirm the change to the notifications because the connection to it ended.";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly waitAction: string = "wait";
@@ -748,6 +768,31 @@ export class Resources {
     return `${displayName} didn't start`;
   }
 
+  public static formatUpdateAvailable(version: string): string {
+    return `${Resources.productName} ${version} is available`;
+  }
+
+  public static formatUpdateReady(version: string): string {
+    return `${Resources.productName} ${version} is ready to install`;
+  }
+
+  public static formatDownloadingUpdate(progress: number | null): string {
+    return Object.isNull(progress) ? "Downloading update" : `Downloading update ${progress}%`;
+  }
+
+  public static formatDownloadingVersion(version: string | null, progress: number | null = null): string {
+    const download = Object.isNull(version) ? `Downloading ${Resources.productName}` : `Downloading ${Resources.productName} ${version}`;
+    return Object.isNull(progress) ? download : `${download}, ${progress}%`;
+  }
+
+  public static formatUpToDate(checkedAt: string | null): string {
+    return Object.isNull(checkedAt) ? `${Resources.productName} is up to date` : `${Resources.productName} is up to date, checked ${checkedAt}`;
+  }
+
+  public static formatPlatform(platform: string, processor: string): string {
+    return `${Resources.platformTitles[platform] ?? platform} ${Resources.processorTitles[processor] ?? processor}`;
+  }
+
   public static formatProductVersion(productVersion: string): string {
     return `${Resources.productName} ${productVersion}`;
   }
@@ -785,6 +830,21 @@ export class Resources {
   }
 
   public static readonly notificationsGlyph: string = "notifications";
+  public static readonly updateAvailableItem: string = "Update available";
+  public static readonly restartToUpdateItem: string = "Restart to update";
+  public static readonly updateFailedItem: string = "Update failed";
+  public static readonly moveToUpdateItem: string = "Move to Applications to update";
+  public static readonly updateAvailableGlyph: string = "deployed_code_update";
+  public static readonly updateFailedGlyph: string = "error";
+  public static readonly checkingForUpdates: string = "Checking for updates…";
+  public static readonly updateFailed: string = "The update failed";
+  public static readonly updatesOff: string = "Updates are turned off in this build.";
+  public static readonly moveToApplications: string = `Move ${Resources.productName} to Applications to get updates.`;
+  public static readonly tryAgainLabel: string = "Try again";
+  public static readonly aboutLabel: string = `About ${Resources.productName}`;
+  public static readonly updateLabel: string = "Update";
+  public static readonly platformTitles: Readonly<Record<string, string>> = { win32: "Windows", darwin: "macOS", linux: "Linux" };
+  public static readonly processorTitles: Readonly<Record<string, string>> = { x64: "x64", arm64: "ARM64" };
   public static readonly notificationsOffGlyph: string = "notifications_off";
   public static readonly notificationsTitle: string = "Notifications";
   public static readonly clearAllLabel: string = "Clear all";

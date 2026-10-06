@@ -22,6 +22,7 @@ import { Layout } from "../../../../src/app/models/layout/layout";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { DesktopBridgeService } from "../../../../src/app/services/desktop-bridge.service";
 import type { LayoutService } from "../../../../src/app/services/layout.service";
+import { SettingsPageService } from "../../../../src/app/services/settings-page.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
 import { Resources } from "../../../../src/resources";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
@@ -58,6 +59,7 @@ class FakeGalleryComponent {}
 
 describe("SettingsComponent", () => {
   let fixture: ComponentFixture<SettingsComponent>;
+  let bridge: DesktopBridgeFixture;
   let settings: FakeSettingsService;
   let errors: unknown[];
   let gallery: Type<unknown> | null;
@@ -97,7 +99,7 @@ describe("SettingsComponent", () => {
   }
 
   beforeEach(async () => {
-    DesktopBridgeFixture.install("linux");
+    bridge = DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
     errors = [];
     gallery = null;
@@ -134,7 +136,7 @@ describe("SettingsComponent", () => {
     fixture.detectChanges();
 
     expect(appearance).toEqual({
-      pages: ["Appearance", "Notifications", "Keyboard shortcuts", "Clock"], current: ["Appearance"], groups: ["Theme", "Text"], rows: ["Mode", "Interface text size"]
+      pages: ["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "About"], current: ["Appearance"], groups: ["Theme", "Text"], rows: ["Mode", "Interface text size"]
     });
     expect([texts("[aria-selected=true]"), texts(".tr-settings-group-title"), texts(".tr-setting-row-title")]).toEqual([["Clock"], ["Words", "Ticks"], ["Greeting", "Tick step"]]);
     expect(markers).toEqual([true, false]);
@@ -390,7 +392,7 @@ describe("SettingsComponent", () => {
     const shown = [texts(".fake-gallery"), texts("[aria-selected=true]")];
     await searchAsync("tick");
 
-    expect(pages).toEqual(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery"]);
+    expect(pages).toEqual(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Gallery", "About"]);
     expect(shown).toEqual([["Controls"], ["Gallery"]]);
     expect(texts(".tr-settings-result-title")).toEqual(["Keyboard shortcuts", "Clock"]);
     expect(element().querySelector(".fake-gallery")).toBeNull();
@@ -417,7 +419,7 @@ describe("SettingsComponent", () => {
     settings.definitions.set(SettingsFixture.all.filter(t => t.name.owner !== "clock"));
     fixture.detectChanges();
 
-    expect([texts(".tr-tree-label"), texts(".tr-settings-group-title")]).toEqual([["Appearance", "Notifications", "Keyboard shortcuts"], ["Theme", "Text"]]);
+    expect([texts(".tr-tree-label"), texts(".tr-settings-group-title")]).toEqual([["Appearance", "Notifications", "Keyboard shortcuts", "About"], ["Theme", "Text"]]);
   });
 
   it("shows the page and the scroll positions it had when it is created again, as its tab becomes active again", async () => {
@@ -562,6 +564,47 @@ describe("SettingsComponent", () => {
 
     expect(settings.calls).toEqual(["reset shell.mode", "set shell.panelSize 15", "reset shell.mode"]);
     expect(errors.map(t => (t as Error).message)).toEqual(["The runtime refused the value.", "The runtime refused the value."]);
+  });
+
+  it("shows About last, with TeamRun's version above its Updates group, finds its setting in a search, and shows the page a command asks for", async () => {
+    settings.definitions.set([SettingsFixture.updateChecks, ...SettingsFixture.all]);
+    render();
+    await fixture.whenStable();
+    bridge.publishUpdate({ kind: "UpToDate", version: null, progress: null, checkedAt: null, reason: null, mustMove: false });
+    await fixture.whenStable();
+    const pages = texts(".tr-tree-label");
+
+    TestBed.inject(SettingsPageService).open("About");
+    TestBed.tick();
+    await fixture.whenStable();
+    const about = [texts("[aria-selected=true]"), texts(".tr-about-title"), texts(".tr-settings-group-title"), texts(".tr-setting-row-title")];
+    const requested = TestBed.inject(SettingsPageService).requested();
+    await page.getByRole("treeitem", { name: "Clock", exact: true }).click();
+    TestBed.inject(SettingsPageService).open("About");
+    TestBed.tick();
+    await fixture.whenStable();
+    const again = texts("[aria-selected=true]");
+    await searchAsync("updates");
+
+    expect(pages).toEqual(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "About"]);
+    expect(about).toEqual([["About"], ["TeamRun 1.2.3"], ["Updates"], ["Check for updates automatically"]]);
+    expect([requested, again]).toEqual([null, ["About"]]);
+    expect([texts(".tr-settings-result-title"), texts(".tr-setting-row-title"), element().querySelector("tr-about")]).toEqual([["Keyboard shortcuts", "About"], ["Check for updates automatically"], null]);
+  });
+
+  it("leaves the Updates group out of About and out of a search while the build turns updates off", async () => {
+    settings.definitions.set([SettingsFixture.updateChecks, ...SettingsFixture.all]);
+    render();
+    await fixture.whenStable();
+
+    TestBed.inject(SettingsPageService).open("About");
+    TestBed.tick();
+    await fixture.whenStable();
+    const about = [texts("[aria-selected=true]"), texts(".tr-about-status span"), texts(".tr-settings-group-title"), texts(".tr-setting-row-title")];
+    await searchAsync("updates");
+
+    expect(about).toEqual([["About"], ["Updates are turned off in this build."], [], []]);
+    expect([texts(".tr-settings-result-title"), texts(".tr-setting-row-title")]).toEqual([["Keyboard shortcuts"], []]);
   });
 
   it("follows the component table for the page list and headings", () => {

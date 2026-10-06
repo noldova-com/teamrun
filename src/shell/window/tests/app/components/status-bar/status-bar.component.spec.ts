@@ -54,7 +54,7 @@ describe("StatusBarComponent", () => {
     const names = (side: Element | undefined): readonly (string | null)[] => [...side?.children ?? []].map(t => t.getAttribute("data-tr-item") ?? t.tagName.toLowerCase());
 
     expect(names(bar.children[0])).toEqual(["notes.count", "clock.zone"]);
-    expect(names(bar.children[1])).toEqual(["clock.ticks", "notes.sync", "tr-notifications", "tr-module-failures"]);
+    expect(names(bar.children[1])).toEqual(["clock.ticks", "notes.sync", "tr-update-item", "tr-notifications", "tr-module-failures"]);
   });
 
   for (const mode of AppearanceFixture.modes)

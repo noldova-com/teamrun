@@ -12,10 +12,11 @@ import { BarItemsService } from "../../services/bar-items.service";
 import { ModuleFailuresComponent } from "../module-failures/module-failures.component";
 import { NotificationsComponent } from "../notifications/notifications.component";
 import { StatusBarItemComponent } from "../status-bar-item/status-bar-item.component";
+import { UpdateItemComponent } from "../update-item/update-item.component";
 
 @Component({
   selector: "tr-status-bar",
-  imports: [ModuleFailuresComponent, NotificationsComponent, StatusBarItemComponent],
+  imports: [ModuleFailuresComponent, NotificationsComponent, StatusBarItemComponent, UpdateItemComponent],
   templateUrl: "./status-bar.component.html",
   styleUrl: "./status-bar.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,

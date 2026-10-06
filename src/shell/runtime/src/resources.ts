@@ -225,9 +225,11 @@ export class Resources {
   public static readonly recentCommandCountSetting: string = "recentCommandCount";
   public static readonly spellCheckSetting: string = "spellCheck";
   public static readonly spellCheckLanguagesSetting: string = "spellCheckLanguages";
+  public static readonly updateChecksSetting: string = "updateChecks";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
+  public static readonly aboutPage: string = "About";
   public static readonly themeGroup: string = "Theme";
   public static readonly textGroup: string = "Text";
   public static readonly layoutGroup: string = "Layout";
@@ -235,6 +237,7 @@ export class Resources {
   public static readonly spellingGroup: string = "Spelling";
   public static readonly notificationsGroup: string = "Notifications";
   public static readonly shortcutsGroup: string = "Keys";
+  public static readonly updatesGroup: string = "Updates";
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
   public static readonly themeTitle: string = "Theme";
@@ -285,6 +288,8 @@ export class Resources {
   public static readonly spellCheckTitle: string = "Check spelling";
   public static readonly spellCheckDescription: string = "Underline misspelled words in the text you type and offer corrections in the text field's menu. Code is never checked.";
   public static readonly spellCheckLanguagesTitle: string = "Spelling languages";
+  public static readonly updateChecksTitle: string = "Check for updates automatically";
+  public static readonly updateChecksDescription: string = "Look for a newer version shortly after starting and every four hours on this device. Downloading and installing always wait for you.";
   public static readonly spellCheckLanguagesDescription: string = "The languages words are checked in on this device. With none chosen, the operating system's languages that have a dictionary are used, or else the first language offered. On macOS the system chooses the languages.";
   public static readonly recentCommandCountTitle: string = "Recent commands";
   public static readonly recentCommandCountDescription: string = "How many commands you recently ran from command search are listed first. 0 lists none.";
@@ -717,6 +722,10 @@ export class Resources {
 
   public static formatShellNotificationCommand(kind: string): string {
     return `The shell's notification kind ${kind} offers no command.`;
+  }
+
+  public static formatShellNotificationModuleCommand(kind: string, command: string): string {
+    return `The shell's notification kind ${kind} runs only the shell's commands, not ${command}.`;
   }
 
   public static formatNotificationNotFound(id: string): string {

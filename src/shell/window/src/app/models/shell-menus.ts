@@ -85,6 +85,8 @@ export class ShellMenus {
   ];
 
   public static of(isMac: boolean): MenuDeclarations {
-    return new MenuDeclarations(Resources.shellOwner, ShellMenus.PLACES, isMac ? [ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS] : [ShellMenus.EDITING, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS]);
+    const updates = new MenuGroup(Resources.updatesGroup, isMac ? Resources.appMenu : Resources.helpMenu, false, [MenuItem.ofCommand(Resources.checkForUpdatesCommand)]);
+    return new MenuDeclarations(Resources.shellOwner, ShellMenus.PLACES,
+      isMac ? [updates, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS] : [updates, ShellMenus.EDITING, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS]);
   }
 }

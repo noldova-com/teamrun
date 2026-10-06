@@ -13,7 +13,7 @@ import { ShellNotifications } from "@noldova/teamrun-shell-protocol";
 export class ShellNotificationsTests {
   @TestMethod
   public namesTheShellsOwnNotificationKinds(): void {
-    Assert.areEqual("shell.saveFailed,shell.saveUnfinished", ShellNotifications.all.map(t => t.text).join(","));
+    Assert.areEqual("shell.saveFailed,shell.saveUnfinished,shell.updateAvailable,shell.updateReady", ShellNotifications.all.map(t => t.text).join(","));
     Assert.isTrue(ShellNotifications.all.every(t => t.isShell));
   }
 }

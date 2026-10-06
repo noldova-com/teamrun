@@ -42,6 +42,9 @@ LICENSE file in the root directory of this source tree.
     }
     <tr-shortcuts [rows]="matchingShortcuts()" [query]="query()" />
   } @else {
+    @if (page.isAbout && !isResult) {
+      <tr-about />
+    }
     @for (group of page.groups; track group.title) {
       <section class="tr-settings-group" [attr.aria-label]="group.title">
         @if (isResult) {

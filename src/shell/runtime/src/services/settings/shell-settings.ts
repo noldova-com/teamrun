@@ -29,6 +29,7 @@ export class ShellSettings {
   public static readonly recentCommandCount: QualifiedName = ShellSettings.named(Resources.recentCommandCountSetting);
   public static readonly spellCheck: QualifiedName = ShellSettings.named(Resources.spellCheckSetting);
   public static readonly spellCheckLanguages: QualifiedName = ShellSettings.named(Resources.spellCheckLanguagesSetting);
+  public static readonly updateChecks: QualifiedName = ShellSettings.named(Resources.updateChecksSetting);
 
   public static readonly all: readonly SettingDefinition[] = [
     ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.formatThemeDescription(ProductInfo.current.name),
@@ -64,7 +65,9 @@ export class ShellSettings {
     new SettingDefinition(ShellSettings.mutedModules, Resources.mutedModulesTitle, Resources.mutedModulesDescription,
       SettingType.modules(), [], SettingLocality.Shared, [], Resources.notificationsPage, Resources.notificationsGroup),
     new SettingDefinition(ShellSettings.keyBindings, Resources.keyBindingsTitle, Resources.keyBindingsDescription,
-      SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup)
+      SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup),
+    new SettingDefinition(ShellSettings.updateChecks, Resources.updateChecksTitle, Resources.updateChecksDescription,
+      SettingType.boolean(), true, SettingLocality.Device, [], Resources.aboutPage, Resources.updatesGroup)
   ];
 
   private static named(member: string): QualifiedName {

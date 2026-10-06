@@ -12,5 +12,7 @@ import { QualifiedName } from "./qualified-name.js";
 export class ShellNotifications {
   public static readonly saveFailed: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.saveFailedMember);
   public static readonly saveUnfinished: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.saveUnfinishedMember);
-  public static readonly all: readonly QualifiedName[] = [ShellNotifications.saveFailed, ShellNotifications.saveUnfinished];
+  public static readonly updateAvailable: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.updateAvailableMember);
+  public static readonly updateReady: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.updateReadyMember);
+  public static readonly all: readonly QualifiedName[] = [ShellNotifications.saveFailed, ShellNotifications.saveUnfinished, ShellNotifications.updateAvailable, ShellNotifications.updateReady];
 }

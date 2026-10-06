@@ -60,6 +60,18 @@ export class NotificationPolicyTests {
     Assert.areEqual("The shell's notification kind shell.saveUnfinished offers no command.", policy.findRefusal(NotificationPolicyTests.post("shell.saveUnfinished", null, ["shell.openSettings"])));
   }
 
+  @TestMethod
+  public letsTheUpdateKindsRunOnlyTheShellsCommands(): void {
+    const policy = new NotificationPolicy([], () => true);
+
+    Assert.isNull(policy.findRefusal(NotificationPolicyTests.post("shell.updateAvailable", "shell.openSettings", ["shell.downloadUpdate"])));
+    Assert.isNull(policy.findRefusal(NotificationPolicyTests.post("shell.updateReady", null, [])));
+    Assert.areEqual("The shell's notification kind shell.updateReady runs only the shell's commands, not notes.open.",
+      policy.findRefusal(NotificationPolicyTests.post("shell.updateReady", "shell.openSettings", ["notes.open"])));
+    Assert.areEqual("The shell's notification kind shell.updateAvailable runs only the shell's commands, not notes.open.",
+      policy.findRefusal(NotificationPolicyTests.post("shell.updateAvailable", "notes.open", [])));
+  }
+
   private static post(kind: string, open: string | null, actions: readonly string[]): NotificationPost {
     return new NotificationPost(
       QualifiedName.parse(kind), null, "Title", null, NotificationSeverity.Info,

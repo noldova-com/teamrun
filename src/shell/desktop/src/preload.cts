@@ -23,6 +23,7 @@ function readAppearance(): unknown {
 
 contextBridge.exposeInMainWorld("teamrun", {
   platform: process.platform,
+  processor: process.arch,
   appearance: readAppearance(),
   notifyReady(appearance: unknown): void {
     ipcRenderer.send("teamrun:ready", appearance);
@@ -74,6 +75,17 @@ contextBridge.exposeInMainWorld("teamrun", {
   },
   installCommand(): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:installCommand") as Promise<boolean>;
+  },
+  readUpdate(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readUpdate");
+  },
+  onUpdate(listener: (state: unknown) => void): () => void {
+    const handler = (_event: IpcRendererEvent, state: unknown): void => listener(state);
+    ipcRenderer.on("teamrun:updateState", handler);
+    return () => ipcRenderer.removeListener("teamrun:updateState", handler);
+  },
+  actOnUpdate(action: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:updateAction", action) as Promise<boolean>;
   },
   keepAppearance(preferences: unknown): void {
     ipcRenderer.send("teamrun:keepAppearance", preferences);

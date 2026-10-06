@@ -16,6 +16,7 @@ import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { QuitService } from "../../services/quit.service";
 import { RecentCommandsService } from "../../services/recent-commands.service";
 import { StartupService } from "../../services/startup.service";
+import { UpdateNotifierService } from "../../services/update-notifier.service";
 import { WindowPartHostService } from "../../services/window-part-host.service";
 import { FieldMenuComponent } from "../field-menu/field-menu.component";
 import { StartupComponent } from "../startup/startup.component";
@@ -43,6 +44,7 @@ export class WindowComponent {
     inject(AppearanceSettingsService);
     inject(WindowPartHostService);
     inject(RecentCommandsService);
+    inject(UpdateNotifierService);
     const destroyed = inject(DestroyRef);
     destroyed.onDestroy(this.bridge.onCloseRequest(t => void this.closeAsync(t)));
     destroyed.onDestroy(inject(QuitService).listen());

@@ -16,23 +16,29 @@ export class SettingsPage {
   public readonly groups: readonly SettingsGroup[];
   public readonly isShortcuts: boolean;
   public readonly isGallery: boolean;
+  public readonly isAbout: boolean;
 
   public constructor(title: string, groups: readonly SettingsGroup[], isShortcuts: boolean = false, isGallery: boolean = false) {
     this.title = title;
     this.groups = [...groups];
     this.isShortcuts = isShortcuts;
     this.isGallery = isGallery;
+    this.isAbout = title === Resources.aboutPage;
   }
 
   public static galleryOf(title: string): SettingsPage {
     return new SettingsPage(title, [], false, true);
   }
 
-  public static pagesOf(definitions: readonly SettingDefinition[]): readonly SettingsPage[] {
-    const titles = [...new Set([...Resources.leadingSettingsPages, ...definitions.map(t => t.page)])];
-    return titles.map(title => title === Resources.shortcutsPage
-      ? new SettingsPage(title, [], true)
-      : new SettingsPage(title, SettingsPage.groupsOf(definitions.filter(t => t.page === title))));
+  public static pagesOf(definitions: readonly SettingDefinition[], extra: readonly SettingsPage[] = []): readonly SettingsPage[] {
+    const titles = [...new Set([...Resources.leadingSettingsPages, ...definitions.map(t => t.page)])].filter(t => t !== Resources.aboutPage);
+    return [
+      ...titles.map(title => title === Resources.shortcutsPage
+        ? new SettingsPage(title, [], true)
+        : new SettingsPage(title, SettingsPage.groupsOf(definitions.filter(t => t.page === title)))),
+      ...extra,
+      new SettingsPage(Resources.aboutPage, SettingsPage.groupsOf(definitions.filter(t => t.page === Resources.aboutPage)))
+    ];
   }
 
   public filter(isMatch: (definition: SettingDefinition) => boolean): SettingsPage {

@@ -67,6 +67,14 @@ export class DesktopApplication {
     ["Paste", t => t.paste()],
     ["SelectAll", t => t.selectAll()]
   ]);
+  private static readonly UPDATES_OFF: JsonObject = {
+    [Resources.kindField]: Resources.updateOffKind,
+    [Resources.updateVersionField]: null,
+    [Resources.updateProgressField]: null,
+    [Resources.updateCheckedAtField]: null,
+    [Resources.updateReasonField]: null,
+    [Resources.updateMustMoveField]: false
+  };
   private static readonly UNOWNED_STATES: readonly StartupStateKind[] = [StartupStateKind.Connecting, StartupStateKind.PreShellData, StartupStateKind.Failed];
 
   private readonly electron: IElectron;
@@ -209,6 +217,8 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.copyTextChannel, (event, text) => Object.isNull(this.findTrusted(event)) ? false : this.copyText(text));
     this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
     this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
+    this.electron.ipcMain.handle(Resources.readUpdateChannel, event => Object.isNull(this.findTrusted(event)) ? null : DesktopApplication.UPDATES_OFF);
+    this.electron.ipcMain.handle(Resources.updateActionChannel, () => false);
     this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
       if (this.windows.size === 0)

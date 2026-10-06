@@ -181,6 +181,8 @@ export class Resources {
   public static readonly recentCommandsChangedMember: string = "recentCommandsChanged";
   public static readonly saveFailedMember: string = "saveFailed";
   public static readonly saveUnfinishedMember: string = "saveUnfinished";
+  public static readonly updateAvailableMember: string = "updateAvailable";
+  public static readonly updateReadyMember: string = "updateReady";
   public static readonly optionsField: string = "options";
   public static readonly minimumField: string = "minimum";
   public static readonly maximumField: string = "maximum";

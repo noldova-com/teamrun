@@ -19,8 +19,12 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly menuListeners: Set<(id: string) => void> = new Set();
   private readonly openedListeners: Set<(id: string) => void> = new Set();
   private readonly quitListeners: Set<(question: unknown) => void> = new Set();
+  private readonly updateListeners: Set<(state: unknown) => void> = new Set();
 
   public platform: string;
+  public processor: string = "x64";
+  public update: unknown = { kind: "Off", version: null, progress: null, checkedAt: null, reason: null, mustMove: false };
+  public readonly updateActions: string[] = [];
   public appearance: unknown = null;
   public readonly keptAppearances: JsonObject[] = [];
   public readonly appearances: JsonObject[] = [];
@@ -69,7 +73,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   }
 
   public get listenerCount(): number {
-    return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.menuListeners.size + this.openedListeners.size;
+    return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.menuListeners.size + this.openedListeners.size + this.updateListeners.size;
   }
 
   public get closeListenerCount(): number {
@@ -149,6 +153,25 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public installCommand(): Promise<boolean> {
     this.commandInstalls++;
     return Promise.resolve(true);
+  }
+
+  public readUpdate(): Promise<unknown> {
+    return Promise.resolve(this.update);
+  }
+
+  public onUpdate(listener: (state: unknown) => void): () => void {
+    this.updateListeners.add(listener);
+    return () => this.updateListeners.delete(listener);
+  }
+
+  public actOnUpdate(action: string): Promise<boolean> {
+    this.updateActions.push(action);
+    return Promise.resolve(true);
+  }
+
+  public publishUpdate(state: unknown): void {
+    for (const listener of this.updateListeners)
+      listener(state);
   }
 
   public edit(action: string): Promise<boolean> {
