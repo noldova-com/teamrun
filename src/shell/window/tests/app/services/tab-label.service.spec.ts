@@ -39,6 +39,19 @@ describe("TabLabelService", () => {
     expect([labels.badgeOf(LayoutFixture.files), labels.badgeOf(LayoutFixture.plan)]).toEqual([null, null]);
   });
 
+  it("keeps whether each tab is working by its key, for views and documents alike", () => {
+    const labels = TestBed.inject(TabLabelService);
+
+    labels.setWorking(LayoutFixture.terminal.key, true);
+    labels.setWorking(LayoutFixture.plan.key, true);
+    labels.setWorking(LayoutFixture.plan.key, true);
+    labels.setWorking(LayoutFixture.files.key, false);
+    const working = [LayoutFixture.terminal, LayoutFixture.secondTerminal, LayoutFixture.plan, LayoutFixture.files].map(t => labels.isWorking(t));
+    labels.setWorking(LayoutFixture.plan.key, false);
+
+    expect([working, labels.isWorking(LayoutFixture.plan)]).toEqual([[true, false, true, false], false]);
+  });
+
   it("names a tab by its own title before its registered label", () => {
     const labels = TestBed.inject(TabLabelService);
     labels.register("notes.note", new TabLabel("Note", "note"));

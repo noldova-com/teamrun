@@ -135,6 +135,8 @@ export class ModuleDeclarationTests {
       Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "tasks.size" }] }), ArgumentException).message);
     Assert.areEqual("The module notes declares the setting notes.keys of the kind KeyBindings, which only the shell declares. (Parameter 'settings')",
       Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "notes.keys", type: { kind: "KeyBindings" }, default: {} }] }), ArgumentException).message);
+    Assert.areEqual("The module notes declares the setting notes.languages of the kind Languages, which only the shell declares. (Parameter 'settings')",
+      Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "notes.languages", type: { kind: "Languages" }, default: [] }] }), ArgumentException).message);
   }
 
   @TestMethod

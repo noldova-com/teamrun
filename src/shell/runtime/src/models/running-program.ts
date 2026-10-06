@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ProgramStatus } from "@noldova/teamrun-shell-protocol";
+
 export class RunningProgram {
   public readonly moduleId: string;
   public readonly program: string;
@@ -19,5 +21,9 @@ export class RunningProgram {
     this.processId = processId;
     this.started = started;
     this.hasExited = hasExited;
+  }
+
+  public toStatus(): ProgramStatus {
+    return new ProgramStatus(this.moduleId, this.program, this.processId, this.started, this.hasExited);
   }
 }

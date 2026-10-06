@@ -18,6 +18,9 @@ import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
 import { DocumentHeading } from "./document-heading";
+import { DocumentTab } from "./layout/document-tab";
+import type { Tab } from "./layout/tab";
+import { ViewTab } from "./layout/view-tab";
 import { MenuItem } from "./menu-item";
 import type { MenuRowContribution } from "./menu-row-contribution";
 import { NotificationHandle } from "./notification-handle";
@@ -43,6 +46,7 @@ export class WindowPartContext implements IWindowPartContext {
   private readonly saveList: (() => Promise<void>)[] = [];
   private readonly subscriptions: (() => void)[] = [];
   private readonly badgedViews: Set<string> = new Set();
+  private readonly workingTabs: Map<string, Set<object>> = new Map();
 
   public readonly moduleId: string;
 
@@ -148,6 +152,23 @@ export class WindowPartContext implements IWindowPartContext {
     this.host.setViewBadge(view, badge);
   }
 
+  public markWorking(name: string, instance?: string): () => void {
+    const key = this.findOwnTab(name, instance).key;
+    const mark = {};
+    const marks = this.workingTabs.get(key) ?? new Set<object>();
+    marks.add(mark);
+    if (marks.size === 1) {
+      this.workingTabs.set(key, marks);
+      this.host.setTabWorking(key, true);
+    }
+    return () => {
+      if (!marks.delete(mark) || marks.size > 0)
+        return;
+      this.workingTabs.delete(key);
+      this.host.setTabWorking(key, false);
+    };
+  }
+
   public runCommandAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
     this.requireAllowed(name);
     return this.host.runCommandAsync(name, commandArguments);
@@ -185,6 +206,10 @@ export class WindowPartContext implements IWindowPartContext {
 
   public log(message: string): void {
     this.host.log(this.moduleId, message);
+  }
+
+  public async openLinkAsync(url: string): Promise<void> {
+    await this.host.openLinkAsync(url);
   }
 
   public async requestAsync(method: string, parameters: JsonValue): Promise<JsonValue> {
@@ -244,6 +269,11 @@ export class WindowPartContext implements IWindowPartContext {
     for (const view of [...this.badgedViews])
       this.host.setViewBadge(view, null);
     this.badgedViews.clear();
+    for (const [key, marks] of this.workingTabs) {
+      marks.clear();
+      this.host.setTabWorking(key, false);
+    }
+    this.workingTabs.clear();
     this.statusBarItemList.length = 0;
     this.topBarActionList.length = 0;
     this.host.refresh();
@@ -274,6 +304,15 @@ export class WindowPartContext implements IWindowPartContext {
       throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, Resources.notificationKind, post.kind.text));
     for (const command of [...post.open === null ? [] : [post.open], ...post.actions.map(t => t.command)])
       this.requireAllowed(command.name.text);
+  }
+
+  private findOwnTab(name: string, instance: string | undefined): Tab {
+    this.requireOwn(name);
+    if (this.source.viewNames.includes(name))
+      return new ViewTab(name, instance);
+    if (this.source.documentNames.includes(name))
+      return new DocumentTab(name, instance);
+    throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, Resources.viewOrDocumentKind, name));
   }
 
   private requireOwn(name: string): void {

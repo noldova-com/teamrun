@@ -19,6 +19,7 @@ import type { GroupFrame } from "../../../../src/app/models/layout/group-frame";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { TabDropTarget } from "../../../../src/app/models/layout/tab-drop-target";
 import { LayoutService } from "../../../../src/app/services/layout.service";
+import { TabLabelService } from "../../../../src/app/services/tab-label.service";
 import { TabDragService } from "../../../../src/app/services/tab-drag.service";
 import { TabStripService } from "../../../../src/app/services/tab-strip.service";
 import { Resources } from "../../../../src/resources";
@@ -200,6 +201,16 @@ describe("TabGroupComponent", () => {
 
     expect(layout.layout().documents.preview).toBeNull();
     expect(preview?.classList.contains("tr-tab-preview")).toBe(false);
+  });
+
+  it("shows a tab marked as working busy with its spinner and keeps its close button", async () => {
+    TestBed.inject(TabLabelService).setWorking(LayoutFixture.plan.key, true);
+    await renderAsync();
+    const working = tab(0, 0);
+
+    expect([working.getAttribute("aria-busy"), working.classList.contains("tr-tab-working"), working.querySelector(".tr-tab-spinner") !== null]).toEqual(["true", true, true]);
+    expect(working.querySelector(".tr-tab-close")).not.toBeNull();
+    expect([tab(0, 1).hasAttribute("aria-busy"), tab(0, 1).querySelector(".tr-tab-spinner")]).toEqual([false, null]);
   });
 
   it("activates a clicked tab, closes a tab with its close button and starts a drag from a tab", async () => {

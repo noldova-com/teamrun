@@ -14,6 +14,8 @@ import { DeclarationsFormatException } from "../exceptions/declarations-format.e
 import { Resources } from "../resources.js";
 
 export class ModuleDeclaration {
+  private static readonly SHELL_ONLY_KINDS: readonly SettingKind[] = [SettingKind.KeyBindings, SettingKind.Languages];
+
   public readonly id: string;
   public readonly version: string;
   public readonly displayName: string;
@@ -41,7 +43,7 @@ export class ModuleDeclaration {
     const foreign = settings.find(t => t.name.owner !== id);
     if (!Object.isUndefined(foreign))
       throw new ArgumentException(Resources.formatSettingOwnerInvalid(id, foreign.name.text), Resources.settingsField);
-    const shellOnly = settings.find(t => t.type.kind === SettingKind.KeyBindings);
+    const shellOnly = settings.find(t => ModuleDeclaration.SHELL_ONLY_KINDS.includes(t.type.kind));
     if (!Object.isUndefined(shellOnly))
       throw new ArgumentException(Resources.formatSettingKindReserved(id, shellOnly.name.text, shellOnly.type.kind), Resources.settingsField);
     const commands = contributions.get(Resources.commandsKind) ?? [];

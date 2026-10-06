@@ -25,6 +25,7 @@ export class SettingType {
     [SettingKind.Text]: [Resources.maxLengthField],
     [SettingKind.Modules]: [],
     [SettingKind.KeyBindings]: [],
+    [SettingKind.Languages]: [],
     [SettingKind.Action]: [Resources.commandField, Resources.labelField]
   };
 
@@ -86,6 +87,10 @@ export class SettingType {
     return new SettingType(SettingKind.KeyBindings, [], null, null, null, null);
   }
 
+  public static languages(): SettingType {
+    return new SettingType(SettingKind.Languages, [], null, null, null, null);
+  }
+
   public static action(command: QualifiedName, label: string): SettingType {
     if (String.isNullOrWhitespace(label))
       throw new ArgumentException(Resources.settingLabelInvalid, Resources.labelField);
@@ -108,6 +113,8 @@ export class SettingType {
           return SettingType.modules();
         case SettingKind.KeyBindings:
           return SettingType.keyBindings();
+        case SettingKind.Languages:
+          return SettingType.languages();
         case SettingKind.Action:
           return SettingType.action(QualifiedName.parse(reader.readString(Resources.commandField), Resources.commandField), reader.readString(Resources.labelField));
         default:
@@ -128,6 +135,8 @@ export class SettingType {
         return Object.isString(value) && value.length <= Number(this.maxLength);
       case SettingKind.Modules:
         return Array.isArray(value) && value.every(t => Object.isString(t) && !String.isNullOrWhitespace(t)) && new Set(value).size === value.length;
+      case SettingKind.Languages:
+        return Array.isArray(value) && value.every(t => Object.isString(t) && Resources.languageTagPattern.test(t)) && new Set(value).size === value.length;
       case SettingKind.Action:
         return Object.isNull(value);
       default:
