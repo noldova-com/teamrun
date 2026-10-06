@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { userEvent } from "vitest/browser";
+import { PointerFixture } from "../../../ui/tests/fixtures/pointer.fixture";
 
 export class TooltipFixture {
   public static find(text: string): HTMLElement | undefined {
@@ -19,7 +19,7 @@ export class TooltipFixture {
       shield.popover = "manual";
       shield.style.cssText = "position: fixed; inset: 0; width: auto; height: auto; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: transparent;";
       shield.showPopover();
-      await userEvent.hover(shield);
+      await PointerFixture.hoverAsync(shield);
       return await check();
     }
     finally {

@@ -16,6 +16,7 @@ import { GalleryState } from "../../../../src/app/enums/gallery-state";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 import { MotionFixture } from "../../../fixtures/motion.fixture";
+import { PointerFixture } from "../../../fixtures/pointer.fixture";
 
 @Component({
   imports: [GalleryStateDirective],
@@ -84,7 +85,7 @@ describe("GalleryStateDirective", () => {
 
     expect(marked.map(t => name(t))).toEqual(["Button / Hover", "Button / Secondary, hover", "Icon button / Hover", "Choice pills / Hover", "Tab / Hover", "Toolbar button / Hover",
       "Menu / Rows", "Menu / Menu bar, hover"]);
-    await userEvent.hover(park);
+    await PointerFixture.hoverAsync(park);
     const shown = marked.map(t => namedLook(t));
     for (const element of marked)
       element.removeAttribute(GalleryResources.stateAttribute);
@@ -94,7 +95,7 @@ describe("GalleryStateDirective", () => {
       await userEvent.hover(element);
       real.push(namedLook(element));
     }
-    await userEvent.hover(park);
+    await PointerFixture.hoverAsync(park);
     for (const element of marked)
       element.setAttribute(GalleryResources.stateAttribute, GalleryState.Hover);
 
@@ -111,7 +112,7 @@ describe("GalleryStateDirective", () => {
 
     expect(marked.map(t => name(t))).toEqual(["Button / Focus", "Icon button / Focus", "Checkbox / Focus", "Text field / Focus", "Select / Focus", "Choice pills / Focus", "Tab / Focus",
       "Toolbar button / Focus", "Sash / Focus"]);
-    await userEvent.hover(park);
+    await PointerFixture.hoverAsync(park);
     for (const element of marked) {
       const shown = look(element);
       element.removeAttribute(GalleryResources.stateAttribute);

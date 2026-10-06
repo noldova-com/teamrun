@@ -69,6 +69,7 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
   public tagType: string = "commit";
   public isPublishingIgnored: boolean = false;
   public isTagDeletedOnPublish: boolean = false;
+  public isTagReadFailingOnPublish: boolean = false;
   public assetOnPublish: string | null = null;
   public tagOnCreate: string | null = null;
   public referenceFailure: string | null = null;
@@ -178,6 +179,7 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
       this.tags.set(release.tag, release.target);
     if (this.isTagDeletedOnPublish)
       this.tags.delete(release.tag);
+    this.isTagReadFailing ||= this.isTagReadFailingOnPublish;
     if (this.assetOnPublish !== null)
       release.assets.push(new AssetRecord(this.nextId++, this.assetOnPublish, 1, "uploaded", "sha256:00"));
     return release;

@@ -72,14 +72,14 @@ export default class ReleaseFileSet {
         const bytes = await readFile(path.join(folder, checksum));
         if (bytes.toString("utf8") !== ReleaseFileSet.formatChecksum(file))
           throw new ReleaseException(`${checksum} does not match ${file.name}.`);
-        checksums.push(new ReleaseFile(checksum, PackageDigest.of(bytes)));
+        checksums.push(new ReleaseFile(checksum, PackageDigest.fromBytes(bytes)));
       }
       const metadata = UpdateMetadata.formatFileName(target);
       const bytes = await readFile(path.join(folder, metadata));
       const text = bytes.toString("utf8");
       if (text !== this.describe(target, version, packages, UpdateMetadata.readReleaseDate(text, metadata)).format())
         throw new ReleaseException(`${metadata} does not describe version ${version} with ${packages.map(t => t.name).join(" and ")} as they are.`);
-      files.push(...packages, ...checksums, new ReleaseFile(metadata, PackageDigest.of(bytes)));
+      files.push(...packages, ...checksums, new ReleaseFile(metadata, PackageDigest.fromBytes(bytes)));
     }
     return files;
   }

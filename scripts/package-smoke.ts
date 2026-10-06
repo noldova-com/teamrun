@@ -37,6 +37,7 @@ export default class PackageSmoke {
   private static readonly KILL_LIMIT: number = 10_000;
   private static readonly SETTLE: number = 3_000;
   private static readonly PAUSE: number = 500;
+  private static readonly SECOND: number = 1_000;
   private static readonly ARCHIVE: string = "app.asar";
   private static readonly FOLDER_PREFIX: string = "tr-smoke-";
   private static readonly DATA_FOLDER: string = "data";
@@ -112,8 +113,9 @@ export default class PackageSmoke {
     const manifest = await RootManifest.readAsync(this.root);
     const folder = await this.temporaryFolder.createAsync(this.platform, PackageSmoke.FOLDER_PREFIX);
     this.folder = folder;
+    const started = Date.now();
     const installed = await new PackageInstaller(this.root, this.runner, this.environment).installAsync(target, manifest.product, folder);
-    this.output.write(`Installed: ${installed.desktop}\n`);
+    this.output.write(`Installed in ${((Date.now() - started) / PackageSmoke.SECOND).toFixed(1)} s: ${installed.desktop}\n`);
     const data = path.join(folder, PackageSmoke.DATA_FOLDER);
     await this.requireNoRuntimeAsync(installed, data, folder, "before the start");
     this.output.write("teamrun status before the start: no runtime.\n");

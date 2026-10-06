@@ -11,12 +11,14 @@ import path from "node:path";
 
 import ProcessResult from "../../processes/process-result.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
+import ProcessTimeoutException from "../../processes/process-timeout.exception.ts";
 
 export default class InstallRunnerFixture extends ProcessRunner {
   private readonly failing: readonly string[];
   private readonly directories: Set<string> = new Set<string>();
 
   public localAppData: string = "";
+  public installedBeforeTimeout: readonly string[] | null = null;
   public readonly calls: (readonly string[])[] = [];
   public readonly limits: number[] = [];
 
@@ -44,6 +46,11 @@ export default class InstallRunnerFixture extends ProcessRunner {
       return new ProcessResult(9, "", `${name} broke`);
     if (commandArguments[0] === "--appimage-extract")
       await InstallRunnerFixture.createAsync(path.join(directory, "squashfs-root", "fixture-studio"));
+    if (commandArguments[0] === "/S" && this.installedBeforeTimeout !== null) {
+      for (const file of this.installedBeforeTimeout)
+        await InstallRunnerFixture.createAsync(path.join(this.localAppData, "Programs", "fixture-studio", file));
+      throw new ProcessTimeoutException(`"${command}" did not finish within ${timeout} ms.`);
+    }
     if (commandArguments[0] === "/S")
       await InstallRunnerFixture.createAsync(path.join(this.localAppData, "Programs", "fixture-studio", "Fixture Studio.exe"));
     if (name === "ditto")
