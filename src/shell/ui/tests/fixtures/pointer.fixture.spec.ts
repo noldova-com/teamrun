@@ -23,7 +23,7 @@ describe("PointerFixture", () => {
     return element;
   }
 
-  it("hovers its target although an earlier child of body goes away while the hover starts", async () => {
+  it("hovers its target although an earlier child of body goes away while the hover starts, and leaves it without a test id", async () => {
     const earlier = [append(), append(), append()];
     const target = append();
     target.popover = "manual";
@@ -33,6 +33,6 @@ describe("PointerFixture", () => {
 
     await PointerFixture.hoverAsync(target);
 
-    expect([target.isConnected, earlier[0]?.isConnected, target.matches(":hover")]).toEqual([true, false, true]);
+    expect([target.isConnected, earlier[0]?.isConnected, target.matches(":hover"), target.hasAttribute("data-testid")]).toEqual([true, false, true, false]);
   });
 });

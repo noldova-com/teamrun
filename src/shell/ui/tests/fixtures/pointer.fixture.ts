@@ -15,6 +15,11 @@ export class PointerFixture {
   public static async hoverAsync(target: HTMLElement): Promise<void> {
     const id = `${PointerFixture.TARGET_PREFIX}${++PointerFixture.targets}`;
     target.dataset["testid"] = id;
-    await userEvent.hover(page.getByTestId(id));
+    try {
+      await userEvent.hover(page.getByTestId(id));
+    }
+    finally {
+      delete target.dataset["testid"];
+    }
   }
 }
