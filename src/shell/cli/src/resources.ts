@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
 export class Resources {
@@ -62,21 +63,21 @@ export class Resources {
   public static get usage(): string {
     return [
       `Usage: ${Resources.productSlug} <command> [options]`,
-      "",
+      String.empty,
       "Commands:",
       "  status                                   Reports the runtime, its modules and its work in progress. Never starts a runtime.",
       "  commands                                 Lists the runtime's commands.",
       "  run <command> [<json> | --args-file <path> | -]",
       "                                           Runs a runtime command with its arguments, printing its result.",
       `  open                                     Starts ${Resources.productName} or brings its window forward.`,
-      "",
+      String.empty,
       "Options:",
       "  --data-dir <path>   The data directory to use.",
       "  --json              Prints one JSON value on standard output, and errors as JSON on standard error.",
       "  --no-start          Fails instead of starting a runtime when none is running (commands, run).",
       "  --take-over         Asks another build's idle runtime to stop and takes its place (commands, run).",
       "  --timeout <seconds> How long a command may run (run).",
-      "",
+      String.empty,
       "Exit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,",
       "5 data directory unusable, 6 timed out or cancelled."
     ].join("\n");
@@ -145,7 +146,7 @@ export class Resources {
   }
 
   public static formatModule(id: string, state: string, cause: string | null): string {
-    return cause === null ? `${id} (${state.toLowerCase()})` : `${id} (${state.toLowerCase()}: ${cause})`;
+    return Object.isNull(cause) ? `${id} (${state.toLowerCase()})` : `${id} (${state.toLowerCase()}: ${cause})`;
   }
 
   public static formatWork(work: string): string {

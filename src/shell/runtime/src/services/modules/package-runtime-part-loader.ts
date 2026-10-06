@@ -17,7 +17,7 @@ export class PackageRuntimePartLoader implements IRuntimePartLoader {
   public async loadAsync(packageName: string): Promise<IRuntimePart> {
     const exports: object = await import(packageName);
     const type = Resources.runtimePartExport in exports ? exports[Resources.runtimePartExport] : undefined;
-    if (typeof type !== "function")
+    if (!Object.isFunction(type))
       throw new ModuleLoadException(Resources.runtimePartMissing);
 
     const part: unknown = Reflect.construct(type, []);
@@ -29,8 +29,8 @@ export class PackageRuntimePartLoader implements IRuntimePartLoader {
   private static isRuntimePart(value: unknown): value is IRuntimePart {
     return Object.isObject(value)
       && Resources.activateMember in value
-      && typeof value[Resources.activateMember] === "function"
+      && Object.isFunction(value[Resources.activateMember])
       && Resources.deactivateMember in value
-      && typeof value[Resources.deactivateMember] === "function";
+      && Object.isFunction(value[Resources.deactivateMember]);
   }
 }

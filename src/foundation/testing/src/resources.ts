@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
+
 export class Resources {
   public static readonly standardErrorDescriptor: number = 2;
   public static readonly failedExitCode: number = 1;
@@ -237,7 +239,7 @@ export class Resources {
   }
 
   public static formatSummaryDetails(escaped: string, truncated: boolean): string {
-    return `\n<details><summary>Details (full output in the step log)</summary>\n\n<pre>${escaped}</pre>\n${truncated ? "\nAdditional output omitted.\n" : ""}\n</details>\n`;
+    return `\n<details><summary>Details (full output in the step log)</summary>\n\n<pre>${escaped}</pre>\n${truncated ? "\nAdditional output omitted.\n" : String.empty}\n</details>\n`;
   }
 
   public static formatArrayRequired(location: string): string {
