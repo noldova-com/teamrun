@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -58,14 +59,20 @@ class PackageConfigurationTests {
           { from: path.join(PackageConfigurationTests.STAGE, "_build", "window", "3rdpartylicenses.txt"), to: "licenses/window-third-party.txt" }
         ],
         publish: null,
-        win: { target: [{ target: "nsis", arch: ["x64"] }], icon: path.join(icons, "icon-dark.ico"), artifactName: "Fixture Studio-windows-x64.${ext}" },
+        win: {
+          target: [{ target: "nsis", arch: ["x64"] }],
+          icon: path.join(icons, "icon-dark.ico"),
+          artifactName: "Fixture Studio-windows-x64.${ext}",
+          extraFiles: [{ from: path.join(PackageConfigurationTests.ROOT, "_build", "package", "command", "fixture-studio.cmd"), to: "bin/fixture-studio.cmd" }]
+        },
         nsis: {
           oneClick: true,
           perMachine: false,
           deleteAppDataOnUninstall: false,
           shortcutName: "Fixture Studio",
           uninstallDisplayName: "Fixture Studio",
-          artifactName: "Fixture Studio-windows-x64.${ext}"
+          artifactName: "Fixture Studio-windows-x64.${ext}",
+          include: path.join(PackageConfigurationTests.ROOT, "assets", "installer", "command-path.nsh")
         }
       });
     });
@@ -107,16 +114,34 @@ class PackageConfigurationTests {
       assert.equal(Object.hasOwn(Object(windowsFuses), "resetAdHocDarwinSignature"), false);
     });
 
-    test("the configuration is written as JSON, creating its folder", async t => {
+    test("the configuration is written as JSON, creating its folder, and a target other than Windows writes no command", async t => {
       const folder = await mkdtemp(path.join(tmpdir(), "teamrun-package-configuration-"));
       t.after(() => rm(folder, { recursive: true, force: true }));
-      const configuration = PackageConfigurationTests.create("linux", "x64");
-      const file = path.join(folder, "package", "electron-builder.json");
+      const configuration = PackageConfigurationTests.create("linux", "x64", folder);
+      const file = path.join(folder, "_build", "package", "electron-builder.json");
 
       await configuration.writeAsync(file);
 
       assert.deepEqual(JSON.parse(await readFile(file, "utf8")), JSON.parse(JSON.stringify(configuration.toJson())));
       assert.ok((await readFile(file, "utf8")).endsWith("}\n"));
+      assert.equal(existsSync(path.join(folder, "_build", "package", "command")), false);
+    });
+
+    test("a Windows target also writes the command the installer puts in its bin folder, which runs the installed program as Node with the command line's entry", async t => {
+      const root = await mkdtemp(path.join(tmpdir(), "teamrun-package-configuration-"));
+      t.after(() => rm(root, { recursive: true, force: true }));
+      const configuration = PackageConfigurationTests.create("windows", "arm64", root);
+
+      await configuration.writeAsync(path.join(root, "_build", "package", "electron-builder.json"));
+
+      assert.equal(await readFile(path.join(root, "_build", "package", "command", "fixture-studio.cmd"), "utf8"), [
+        "@echo off",
+        "setlocal",
+        "set ELECTRON_RUN_AS_NODE=1",
+        "\"%~dp0..\\Fixture Studio.exe\" \"%~dp0..\\resources\\app.asar\\node_modules\\@noldova\\teamrun-shell-cli\\services\\cli-entry.js\" %*",
+        "exit /b %ERRORLEVEL%",
+        ""
+      ].join("\r\n"));
     });
   }
 
@@ -124,9 +149,9 @@ class PackageConfigurationTests {
     return Object.fromEntries(Object.entries(configuration.toJson()).filter(([key]) => ["win", "nsis", "mac", "linux", "toolsets"].includes(key)));
   }
 
-  private static create(platform: string, architecture: string): PackageConfiguration {
+  private static create(platform: string, architecture: string, root: string = PackageConfigurationTests.ROOT): PackageConfiguration {
     return new PackageConfiguration(
-      PackageConfigurationTests.ROOT,
+      root,
       PackageConfigurationTests.MANIFEST,
       new PackageTarget(platform, architecture),
       PackageConfigurationTests.STAGE,

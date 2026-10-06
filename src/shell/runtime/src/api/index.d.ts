@@ -5572,8 +5572,8 @@ export declare class NotificationPolicy {
   public constructor(declarations: readonly ModuleDeclaration[], isActive: (moduleId: string) => boolean);
 
   /**
-   * Checks a window part's post: its kind's module is active and declares the kind, and its commands are that module's own
-   * or a dependency's.
+   * Checks a window's post: its kind's module is active and declares the kind, and its commands are that module's own
+   * or a dependency's. A kind of the shell's own, from `ShellNotifications`, is allowed without commands.
    *
    * @param post The post.
    * @returns Why the post is refused, safe to show, or `null` when it is allowed.

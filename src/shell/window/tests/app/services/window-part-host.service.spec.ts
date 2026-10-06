@@ -144,6 +144,18 @@ describe("WindowPartHostService", () => {
     expect(["shell.settings", "shell.modules"].map(t => labels.of(new DocumentTab(t))).map(t => [t.title, t.icon])).toEqual([["Settings", "settings"], ["Modules", "extension"]]);
   });
 
+  it("lists the save steps of the active parts that registered any, by module", async () => {
+    const save = (): Promise<void> => Promise.resolve();
+    const notes = new WindowPartFixture("notes", log, t => {
+      t.registerSave(save);
+    });
+    const { host } = start([source("notes", notes), source("clock", clockPart(log))], [status("notes"), status("clock")]);
+
+    await vi.waitFor(() => expect(log).toEqual(["activate notes", "activate clock"]));
+
+    await vi.waitFor(() => expect([...host.listSaves()]).toEqual([["notes", [save]]]));
+  });
+
   it("reads, sets, resets and follows settings through the settings service", async () => {
     bridge.responses.set("shell.settings", { payload: { definitions: [], entries: [] } });
     const { host, loads } = start([], []);

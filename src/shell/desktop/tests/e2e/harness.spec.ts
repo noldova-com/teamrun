@@ -135,7 +135,7 @@ test.describe("the workflows' checkpoints", () => {
 });
 
 test.describe("the layout checks", () => {
-  test("report a control cut off, outside the window, covered or under 24 × 24 px beside another, a region that scrolls sideways or shows no control, and the focus out of view, but not a control scrolled out of its scroll area or a small one spaced as large", async ({ desktop }) => {
+  test("report a control cut off, outside the window, covered or under 24 × 24 px beside another, a region that scrolls sideways or shows no control, readable text cut off without an ellipsis or at the bottom, and the focus out of view, but not a control scrolled out of its scroll area or a small one spaced as large", async ({ desktop }) => {
     const window = desktop.window;
     await window.evaluate(() => {
       const region = document.createElement("div");
@@ -165,6 +165,23 @@ test.describe("the layout checks", () => {
       "button \"Cut\" is cut off by div \"Cut\".",
       "button \"Small\" is 16 × 16 px, under 24 × 24, and too close to button \"Near\".",
       "div \"\" shows no control."
+    ]);
+    await window.evaluate(() => {
+      const region = document.createElement("div");
+      region.id = "text-check";
+      region.style.cssText = "position: fixed; left: 0; top: 300px; width: 400px; font-size: 16px; line-height: 20px";
+      region.innerHTML = [
+        "<div style=\"width: 40px; overflow: hidden; white-space: nowrap\">Cut without an ellipsis</div>",
+        "<div style=\"width: 40px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis\">Cut with an ellipsis</div>",
+        "<div style=\"height: 10px; overflow: hidden\">Short</div>",
+        "<div aria-hidden=\"true\" style=\"height: 10px; overflow: hidden\">Hidden from reading</div>",
+        "<div style=\"width: 40px; overflow-x: auto; white-space: nowrap\">Scrolls instead of cutting</div>"
+      ].join("");
+      document.body.append(region);
+    });
+    expect(await LayoutFixture.findCutTextAsync(window.locator("#text-check"))).toEqual([
+      "div \"Cut without an ellipsis\" cuts its text off at the side without an ellipsis.",
+      "div \"Short\" cuts its text off at the bottom."
     ]);
     await window.getByRole("button", { name: "Covered" }).focus();
     expect(await LayoutFixture.findFocusProblemsAsync(window, "Tab", 1)).toEqual(["Tab 1: button \"Outside\" has the focus out of view."]);

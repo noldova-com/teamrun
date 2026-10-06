@@ -85,6 +85,7 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
   public runtimeChecks: number = 1;
   public discovery: Discovery = "written";
   public killing: Killing = "ends";
+  public powerShell: Answer = "running";
   public copy: Copy = "mount";
   public copyEnds: boolean = true;
   public mounterRuns: boolean = true;
@@ -97,14 +98,18 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
   }
 
   public get statuses(): number {
-    return this.calls.filter(t => t[2] === "status").length;
+    return this.calls.filter(t => t.includes("status")).length;
   }
 
   public override async captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
     const result = await super.captureAsync(command, commandArguments, directory, timeout);
-    if (commandArguments[1] === "status") {
+    if (commandArguments.includes("status")) {
       this.environments.push(environment);
       return this.answer(String(commandArguments.at(-1)));
+    }
+    if (path.basename(command) === "pwsh") {
+      this.environments.push(environment);
+      return SmokeRunnerFixture.describe(this.powerShell, /'(.+)';/.exec(String(commandArguments.at(-1)))?.[1] ?? "");
     }
     if (result.isSuccessful && path.basename(command) === "taskkill")
       this.desktop.close();
@@ -175,6 +180,10 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
     }
     if (this.discovery === "unreadable")
       mkdirSync(path.join(data, "discovery", "runtime.json"), { recursive: true });
+    return SmokeRunnerFixture.describe(answer, data);
+  }
+
+  private static describe(answer: Answer | undefined, data: string): ProcessResult {
     switch (answer) {
       case "running":
         return new ProcessResult(0, JSON.stringify({ build: { productVersion: "0.0.7" }, dataDirectory: data }), "");
@@ -284,26 +293,89 @@ class PackageSmokeTests {
           + "The runtime's copy of the AppImage was still there 10000 ms after the runtime stopped: teamrun-copy mount 6060 6161 /fixture.AppImage\n");
       });
 
-    test("on Windows the installer installs silently for the user, and the desktop is closed through its window", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
-      const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-windows-x64.exe");
-      const runner = new SmokeRunnerFixture(["none", "running", "none"]);
-      const output = new TextOutputFixture();
-      runner.localAppData = path.join(repository.directory, "local");
-      const temporaryFolder = new TemporaryFolderFixture(repository.directory);
+    test("on Windows the installer installs silently for the user and adds its command to the user's Path, the command line answers through cmd and PowerShell, the desktop is closed through its window, and installing again and uninstalling keep the Path right",
+      { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+        const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-windows-x64.exe");
+        const runner = new SmokeRunnerFixture(["none", "running", "none"]);
+        const output = new TextOutputFixture();
+        runner.localAppData = path.join(repository.directory, "local");
+        runner.userPath = "C:\\Tools;";
+        const temporaryFolder = new TemporaryFolderFixture(repository.directory);
 
-      const exitCode = await PackageSmokeTests.runAsync(t, repository, "win32", runner, output, "x64", {}, temporaryFolder);
+        const exitCode = await PackageSmokeTests.runAsync(t, repository, "win32", runner, output, "x64", {}, temporaryFolder);
 
-      const program = path.join(repository.directory, "local", "Programs", "fixture-studio", "Fixture Studio.exe");
-      const status = ["Fixture Studio.exe", path.join(path.dirname(program), "resources", PackageSmokeTests.CLI), ...PackageSmokeTests.STATUS];
-      assert.equal(exitCode, 0, output.text);
-      assert.deepEqual(runner.calls, [["Fixture Studio-windows-x64.exe", "/S"], status, status, ["taskkill", "/PID", "4242"], status]);
-      assert.deepEqual(temporaryFolder.platforms, ["win32"]);
-      assert.deepEqual(runner.starts, [[program, `--data-dir=${path.join(runner.folder, "data")}`]]);
-      assert.deepEqual(runner.desktop.signals, []);
-      const installed = output.text.split("\n")[0] ?? "";
-      assert.match(installed, /^Installed in \d+\.\d s: /);
-      assert.equal(installed.slice(installed.indexOf(": ") + 2), program);
-    });
+        const installFolder = path.join(repository.directory, "local", "Programs", "fixture-studio");
+        const program = path.join(installFolder, "Fixture Studio.exe");
+        const bin = path.join(installFolder, "bin");
+        const data = path.join(runner.folder, "data");
+        const registry = ["reg.exe", "query", "HKCU\\Environment", "/v", "Path"];
+        const status = ["cmd.exe", "/d", "/c", "fixture-studio", ...PackageSmokeTests.STATUS];
+        const powerShell = ["pwsh", "-NoProfile", "-NonInteractive", "-Command", `& fixture-studio status --json --data-dir '${data}'; exit $LASTEXITCODE`];
+        assert.equal(exitCode, 0, output.text);
+        assert.deepEqual(runner.calls, [
+          registry,
+          ["Fixture Studio-windows-x64.exe", "/S"],
+          registry,
+          status,
+          status,
+          powerShell,
+          ["taskkill", "/PID", "4242"],
+          status,
+          ["Fixture Studio-windows-x64.exe", "/S"],
+          registry,
+          ["Uninstall Fixture Studio.exe", "/S", `_?=${installFolder}`],
+          registry
+        ]);
+        assert.deepEqual(runner.environments.map(t => t?.["PATH"]), [1, 2, 3, 4].map(() => `${bin};fixture-path`));
+        assert.deepEqual(temporaryFolder.platforms, ["win32"]);
+        assert.deepEqual(runner.starts, [[program, `--data-dir=${data}`]]);
+        assert.deepEqual(runner.desktop.signals, []);
+        assert.equal(runner.userPath, "C:\\Tools;");
+        const lines = output.text.split("\n");
+        assert.match(lines[0] ?? "", /^Installed in \d+\.\d s: /);
+        assert.equal(lines[0]?.slice(lines[0].indexOf(": ") + 2), program);
+        assert.deepEqual(lines.slice(1), [
+          `The user's Path holds ${bin} once.`,
+          "teamrun status before the start: no runtime.",
+          `teamrun status after the start: version 0.0.7 in ${data}.`,
+          `teamrun status through PowerShell: version 0.0.7 in ${data}.`,
+          "The desktop quit.",
+          "The runtime stopped once idle.",
+          `Installed again over itself, the user's Path still holds ${bin} once.`,
+          "Uninstalled: the program and its command are gone, and the user's Path is as it was before the install.",
+          ""
+        ]);
+      });
+
+    test("on Windows a Path that cannot be read, a command missing from it or on it twice, a PowerShell answer that fails or a Path the uninstall leaves changed fails the smoke check",
+      { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+        const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-windows-x64.exe");
+        const bin = path.join(repository.directory, "local", "Programs", "fixture-studio", "bin");
+        const cases: readonly Partial<SmokeRunnerFixture>[] = [
+          { registryAnswers: false },
+          { pathEntries: 0 },
+          { pathEntries: 2 },
+          { powerShell: "failed" },
+          { uninstallKeepsPath: true }
+        ];
+        const texts: string[] = [];
+
+        for (const settings of cases) {
+          const runner = new SmokeRunnerFixture(["none", "running", "none"]);
+          Object.assign(runner, { localAppData: path.join(repository.directory, "local"), ...settings });
+          const output = new TextOutputFixture();
+          assert.equal(await PackageSmokeTests.runAsync(t, repository, "win32", runner, output), 1, output.text);
+          texts.push(output.text.split("\n").filter(t => t.length > 0).at(-1) ?? "");
+        }
+
+        assert.deepEqual(texts, [
+          "ERROR: Access is denied.",
+          `The user's Path holds ${bin} 0 times instead of once: ""`,
+          `The user's Path holds ${bin} 2 times instead of once: ${JSON.stringify(`${bin};${bin}`)}`,
+          "The runtime could not start.",
+          `After the uninstall the user's Path is ${JSON.stringify(bin)} instead of null, as it was before the install.`
+        ]);
+      });
 
     test("on macOS the app comes out of the disk image, the screen is captured with the window, and the desktop is asked to quit", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
       const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-macos-arm64.dmg");

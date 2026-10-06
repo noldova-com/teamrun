@@ -155,6 +155,10 @@ export class WindowPartHostService implements IWindowPartHost {
       this.opener.open(moduleId, name, instance, title, isPreview);
   }
 
+  public listSaves(): ReadonlyMap<string, readonly (() => Promise<void>)[]> {
+    return new Map(this.activations.filter(t => t.context.saves.length > 0).map(t => [t.context.moduleId, [...t.context.saves]]));
+  }
+
   public log(moduleId: string, message: string): void {
     this.bridge.logModule(moduleId, message);
   }
