@@ -12,7 +12,6 @@ import type { Writable } from "node:stream";
 import AngularProject from "./angular/angular-project.ts";
 import GalleryFile from "./angular/gallery-file.ts";
 import AngularTestCheck from "./checks/angular-test-check.ts";
-import BucketNameCheck from "./checks/bucket-name-check.ts";
 import CoverageExclusionCheck from "./checks/coverage-exclusion-check.ts";
 import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
 import DependencyPinCheck from "./checks/dependency-pin-check.ts";
@@ -187,6 +186,8 @@ export default class Test {
     const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
     const { default: ApiDocumentationCheck } = await import("./checks/api-documentation-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
+    const { default: BucketNameCheck } = await import("./checks/bucket-name-check.ts");
+    const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
     const modules = new ModuleCatalog(this.root);
@@ -199,7 +200,7 @@ export default class Test {
       new LicenseHeaderCheck(this.root, files),
       new TestWaitCheck(this.root, files),
       new FieldOrderCheck(this.root, files),
-      new BucketNameCheck(this.root, files),
+      new BucketNameCheck(files, new SyntaxTreeReader(this.root, server, Test.API_TIMEOUT)),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),
