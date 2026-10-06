@@ -29,6 +29,6 @@ export class PendingQuit {
   }
 
   public show(): boolean {
-    return this.prompt.show(new QuitQuestion(this.report.descriptions, this.isWaiting));
+    return this.prompt.show(new QuitQuestion(this.report.descriptions, this.isWaiting, false));
   }
 }

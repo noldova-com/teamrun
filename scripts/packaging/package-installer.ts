@@ -86,8 +86,8 @@ export default class PackageInstaller {
     if (left.length > 0) {
       const files = left.filter(t => t.isFile()).map(t => path.join(t.parentPath, t.name)).sort();
       const names = left.map(t => path.relative(installFolder, path.join(t.parentPath, t.name))).sort();
-      throw new PackagingException(`The uninstaller left ${names.join(", ")} in ${installFolder}.\n`
-        + await new FileHolders(this.runner, folder, environment).describeAsync(files));
+      const holders = files.length === 0 ? "" : `\n${await new FileHolders(this.runner, folder, environment).describeAsync(files)}`;
+      throw new PackagingException(`The uninstaller left ${names.join(", ")} in ${installFolder}.${holders}`);
     }
     await rmdir(installFolder);
   }

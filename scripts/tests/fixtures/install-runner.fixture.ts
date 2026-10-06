@@ -112,8 +112,12 @@ export default class InstallRunnerFixture extends ProcessRunner {
 
   private async uninstallAsync(): Promise<ProcessResult> {
     await rm(this.installFolder, { recursive: true, force: true });
-    for (const file of this.uninstallLeaves)
-      await InstallRunnerFixture.createAsync(path.join(this.installFolder, file));
+    for (const file of this.uninstallLeaves) {
+      if (file.endsWith("/"))
+        await mkdir(path.join(this.installFolder, file), { recursive: true });
+      else
+        await InstallRunnerFixture.createAsync(path.join(this.installFolder, file));
+    }
     await InstallRunnerFixture.createAsync(path.join(this.installFolder, InstallRunnerFixture.UNINSTALLER, ...(this.uninstallerStays ? ["locked"] : [])));
     if (!this.uninstallKeepsPath) {
       const rest = `;${this.userPath ?? ""};`.split(`;${this.commandFolder};`).join(";").slice(1, -1);

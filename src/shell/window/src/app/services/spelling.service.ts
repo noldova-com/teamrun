@@ -58,7 +58,8 @@ export class SpellingService {
       return [];
     const suggestions = json.readStringArray(Resources.suggestionsArgument).slice(0, Resources.suggestionLimit)
       .map(t => MenuItem.ofCommand(Resources.replaceMisspellingCommand, { [Resources.textArgument]: t }, t));
-    return suggestions.length > 0 ? suggestions : [MenuItem.ofCommand(Resources.replaceMisspellingCommand, {}, Resources.noSuggestionsLabel)];
+    const offered = suggestions.length > 0 ? suggestions : [MenuItem.ofCommand(Resources.replaceMisspellingCommand, {}, Resources.noSuggestionsLabel)];
+    return [...offered, MenuItem.ofCommand(Resources.addToDictionaryCommand, { [Resources.wordArgument]: word })];
   }
 
   private keep(isChecking: boolean, languages: readonly string[]): void {

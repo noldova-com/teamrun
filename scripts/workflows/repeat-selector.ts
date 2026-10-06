@@ -22,6 +22,7 @@ export default class RepeatSelector {
   private static readonly TEST_SUFFIXES: readonly string[] = [TestMirror.TEST_SUFFIX, TestMirror.SPEC_SUFFIX];
   private static readonly IMPORT_PATTERN: RegExp = /(?:\bfrom\s+|\bimport\s*\(?\s*)["'](\.{1,2}\/[^"']+)["']/g;
   private static readonly RESOLVED_SUFFIXES: readonly string[] = ["", ".ts", "/index.ts"];
+  private static readonly WORKFLOW_TEST_PATTERN: RegExp = /\btest\(\s*["'`]/g;
 
   private readonly root: string;
   private readonly files: RepositoryFiles;
@@ -61,7 +62,8 @@ export default class RepeatSelector {
         }
       }
 
-    return new RepeatSelection([...selected].filter(t => !TestMirror.isWorkflow(t)), [...selected].filter(t => TestMirror.isWorkflow(t)));
+    const workflows = [...selected].filter(t => TestMirror.isWorkflow(t));
+    return new RepeatSelection([...selected].filter(t => !TestMirror.isWorkflow(t)), workflows, await this.countTestsAsync(workflows));
   }
 
   private static isTestTree(file: string): boolean {
@@ -70,6 +72,13 @@ export default class RepeatSelector {
 
   private static isTest(file: string): boolean {
     return RepeatSelector.isTestTree(file) && RepeatSelector.TEST_SUFFIXES.some(t => file.endsWith(t)) && !file.split("/").includes(RepeatSelector.FIXTURES_FOLDER);
+  }
+
+  private async countTestsAsync(workflows: readonly string[]): Promise<number> {
+    let count = 0;
+    for (const workflow of workflows)
+      count += [...(await readFile(path.join(this.root, workflow), "utf8")).matchAll(RepeatSelector.WORKFLOW_TEST_PATTERN)].length;
+    return count;
   }
 
   private async readImportersAsync(files: readonly string[], listed: ReadonlySet<string>): Promise<ReadonlyMap<string, readonly string[]>> {

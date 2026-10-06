@@ -91,7 +91,13 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.legs) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    env:
+      TIME_LIMIT_MINUTES: 60
+      STOP_MARGIN_SECONDS: 480
     steps:
+      - name: Note when the job started
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Stop Spotlight indexing
         if: runner.os == 'macOS'
         run: sudo mdutil -i off /System/Volumes/Data
@@ -107,11 +113,11 @@ jobs:
           architecture: ${{ matrix.architecture }}
 
       - name: Build
-        if: needs.plan.outputs.test-arguments != ''
+        if: needs.plan.outputs.test-arguments != '' && matrix.hasTests
         run: npm run build
 
       - name: Repeat the tests
-        if: needs.plan.outputs.test-arguments != ''
+        if: needs.plan.outputs.test-arguments != '' && matrix.hasTests
         env:
           TEST_ARGUMENTS: ${{ needs.plan.outputs.test-arguments }}
           REPEATS: ${{ matrix.repeats }}
@@ -122,17 +128,29 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Repeat the UI workflows
+        id: ui
         if: needs.plan.outputs.workflow-arguments != ''
         env:
           WORKFLOW_ARGUMENTS: ${{ needs.plan.outputs.workflow-arguments }}
           REPEATS: ${{ matrix.repeats }}
+          SHARD: ${{ matrix.shard }}
         run: |
-          set -- $WORKFLOW_ARGUMENTS --repeat-each "$REPEATS" --retries 0
+          budget=$(node scripts/workflows/repeat-budget.ts "$JOB_STARTED" "$TIME_LIMIT_MINUTES" "$STOP_MARGIN_SECONDS")
+          set -- $WORKFLOW_ARGUMENTS --repeat-each "$REPEATS" --retries 0 --global-timeout "$budget"
+          if [ -n "$SHARD" ]; then
+            set -- "$@" --shard "$SHARD"
+          fi
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- "$@"
           else
             npm run test:ui -- "$@"
           fi
+
+      - name: Summarize the UI workflows
+        if: always() && steps.ui.outcome != 'skipped'
+        env:
+          REPEAT_LEG: ${{ matrix.name }}
+        run: node scripts/repeat-summary.ts
 
       - name: Keep what the failures left
         id: failures
@@ -220,7 +238,7 @@ jobs:
             exit 0
           fi
           if [ "$REPEAT_RESULT" != success ]; then
-            echo "::error title=A repeat did not pass::The repeat jobs ended with the result $REPEAT_RESULT."
+            echo "::error title=A repeat did not pass::The repeat jobs ended with the result $REPEAT_RESULT. Each repeat job's summary says whether its UI tests failed or it ran out of time."
             exit 1
           fi
           echo "Every repeat passed on every target."
