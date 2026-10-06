@@ -17,7 +17,7 @@ import { ChildProcessStarter, RuntimeBuild } from "@noldova/teamrun-shell-runtim
 @TestClass
 export class CliContextTests {
   @TestMethod
-  public startsTheRuntimeDirectlyAndTheDesktopDetachedAndReadsTheRuntimesInstallationsDeclarationsByDefault(): void {
+  public startsTheRuntimeDirectlyAndTheDesktopDetachedByDefault(): void {
     const streams = new PassThrough();
     const signals = new EventEmitter();
 
@@ -29,7 +29,6 @@ export class CliContextTests {
     Assert.isInstanceOf(context.desktopOpener, DesktopOpener);
     Assert.areEqual("1", context.environment["A"]);
     Assert.areEqual(`linux/home/person/opt/teamrun/teamrun${entry}`, `${context.platform}${context.homeFolder}${context.executablePath}${context.runtimeEntryPath}`);
-    Assert.areEqual(path.join("/opt", "teamrun", "_build", "modules", "declarations.json"), context.declarationsFile);
     Assert.areEqual(RuntimeBuild.identity, context.identity);
     Assert.areEqual(signals, context.signals);
     Assert.isTrue(context.output === streams && context.error === streams && context.input === streams);

@@ -481,10 +481,10 @@ A command has exactly these fields:
 | `examples` | Optional examples, each with `arguments`, the text after `teamrun <id> <command>`, and a `description` |
 
 The command line shows an argument as `<kebab-case>` and an option as `--kebab-case`.
-The build also refuses a command whose arguments and options repeat a name, a required argument after an optional one, a variadic argument that is not last, and an option whose command-line form is one of the command line's global options.
+The build also refuses a command whose arguments and options repeat a name, a required argument after an optional one, a variadic argument that is not last, and an option whose command-line form is one of the command line's own options.
 
 The command line reads the call against the declaration before it starts or reaches a runtime, so a call that does not match starts none.
-It gives the handler the arguments and options as one frozen object keyed by their names, holding the default or nothing for those not given, and a signal that aborts when the command is cancelled or times out.
+It gives the handler the arguments and options as one read-only object keyed by their names, holding the default or nothing for those not given, and a signal that aborts when the command is cancelled or times out.
 A command reaches its module's runtime part only through requests on the command line's connection, never through the module's database or files.
 The handler returns the command's result, a JSON value and the text for people; the command line owns the output, and a part never writes to it.
 Help comes from the declarations alone, without a runtime or module code.

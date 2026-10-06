@@ -29,7 +29,9 @@ export class CliOutput {
   }
 
   public writeHelp(help: string): void {
-    this.output.write(`${help}\n`);
+    if (this.isJson)
+      return this.writeJson({ help });
+    this.output.write(`${help}${Resources.lineEnd}`);
   }
 
   public writeStatus(report: StatusReport): void {
@@ -74,17 +76,18 @@ export class CliOutput {
 
   public writeFailure(failure: CliFailure, usage: string | null): void {
     if (this.isJson) {
-      this.error.write(`${JSON.stringify(failure.toJson())}\n`);
+      this.error.write(`${JSON.stringify(failure.toJson())}${Resources.lineEnd}`);
       return;
     }
-    this.error.write(Object.isNull(usage) ? `${failure.message}\n` : `${failure.message}\n\n${usage}\n`);
+    const lines = Object.isNull(usage) ? [failure.message] : [failure.message, String.empty, usage];
+    this.error.write(`${lines.join(Resources.lineEnd)}${Resources.lineEnd}`);
   }
 
   private writeJson(value: JsonValue): void {
-    this.output.write(`${JSON.stringify(value)}\n`);
+    this.output.write(`${JSON.stringify(value)}${Resources.lineEnd}`);
   }
 
   private writeLines(lines: readonly string[]): void {
-    this.output.write(`${lines.join("\n")}\n`);
+    this.output.write(`${lines.join(Resources.lineEnd)}${Resources.lineEnd}`);
   }
 }

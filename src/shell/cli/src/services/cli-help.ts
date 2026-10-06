@@ -21,9 +21,9 @@ export class CliHelp {
     if (listed.length === 0)
       return Resources.usage;
     const indent = Resources.helpIndent;
-    const rows = listed.flatMap(module => [
-      [`${indent}${module.displayName}`, String.empty] as const,
-      ...module.commands.map(t => [`${indent}${indent}${Resources.formatModuleCommand(module.id, t.word)}`, t.summary] as const)
+    const rows = listed.flatMap((module): (readonly [string, string])[] => [
+      [`${indent}${module.displayName}`, String.empty],
+      ...module.commands.map((t): readonly [string, string] => [`${indent}${indent}${Resources.formatModuleCommand(module.id, t.word)}`, t.summary])
     ]);
     return [Resources.usage, String.empty, Resources.moduleCommandsTitle, ...CliHelp.formatRows(rows)].join(Resources.lineEnd);
   }
@@ -92,7 +92,7 @@ export class CliHelp {
       option.description,
       option.isRequired ? Resources.requiredOption : String.empty,
       option.isRepeated ? Resources.repeatedOption : String.empty,
-      Object.isNull(option.defaultValue) ? String.empty : Resources.formatDefault(String(option.defaultValue))
+      Object.isNull(option.defaultValue) ? String.empty : Resources.formatDefault(JSON.stringify(option.defaultValue))
     ].filter(t => t.length > 0).join(" ");
   }
 }

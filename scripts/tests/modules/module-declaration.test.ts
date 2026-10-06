@@ -12,7 +12,6 @@ import { test, type TestContext } from "node:test";
 import ModuleCatalog from "../../modules/module-catalog.ts";
 import ModuleDeclaration from "../../modules/module-declaration.ts";
 import ModuleException from "../../modules/module.exception.ts";
-import CliUsageFixture from "../fixtures/cli-usage.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class ModuleDeclarationTests {
@@ -28,10 +27,6 @@ class ModuleDeclarationTests {
   };
 
   public static register(): void {
-    test("the reserved module ids are the shell's own and the command line's own commands", () => {
-      assert.deepEqual(ModuleDeclaration.RESERVED_IDS.toSorted(), ["shell", ...CliUsageFixture.readOwnCommands()].toSorted());
-    });
-
     test("a valid declaration is read with its parts, dependencies, contributions and generated names", async t => {
       const repository = await ModuleDeclarationTests.createAsync(t, ModuleDeclarationTests.FOLDER, ModuleDeclarationTests.VALID);
       await repository.writeAsync({ "src/modules/notes/runtime/package.json": "{}\n", "src/modules/notes/window/src/api/index.ts": "export {};\n" });

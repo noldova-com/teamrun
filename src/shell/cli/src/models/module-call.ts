@@ -42,7 +42,7 @@ export class ModuleCall {
         given.set(option, option.isRepeated ? [...(Array.isArray(previous) ? previous : []), value] : value);
       }
     }
-    return new ModuleCall(command, Object.freeze({ ...ModuleCall.readArguments(command, positional), ...ModuleCall.readOptions(command, given) }));
+    return new ModuleCall(command, { ...ModuleCall.readArguments(command, positional), ...ModuleCall.readOptions(command, given) });
   }
 
   private static readOption(command: CliCommandDefinition, token: string, queue: string[]): readonly [CliOptionDefinition, JsonValue] {
@@ -74,9 +74,8 @@ export class ModuleCall {
       throw new UsageException(Resources.formatUnexpectedArgument(extra));
     command.arguments.forEach((argument, index) => {
       const value = argument.isVariadic ? positional.slice(index) : positional[index];
-      const isGiven = Array.isArray(value) ? value.length > 0 : !Object.isUndefined(value);
-      if (isGiven)
-        values[argument.name] = Array.isArray(value) ? Object.freeze(value) : String(value);
+      if (!Object.isUndefined(value) && !(Array.isArray(value) && value.length === 0))
+        values[argument.name] = value;
       else if (argument.isRequired)
         throw new UsageException(Resources.formatArgumentRequired(argument.placeholder));
     });
@@ -88,7 +87,7 @@ export class ModuleCall {
     for (const option of command.options) {
       const value = given.get(option);
       if (!Object.isUndefined(value))
-        values[option.name] = Object.freeze(value);
+        values[option.name] = value;
       else if (option.isRequired)
         throw new UsageException(Resources.formatOptionRequired(option.flag));
       else if (!Object.isNull(option.defaultValue))

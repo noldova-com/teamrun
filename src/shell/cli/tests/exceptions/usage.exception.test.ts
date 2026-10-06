@@ -35,8 +35,8 @@ export class UsageExceptionTests {
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(build.declarationsFile);
 
-    const help = await fixture.runModuleAsync(build.declarationsFile, ["help", "probe", "refuse"]);
-    const result = await fixture.runModuleAsync(build.declarationsFile, ["probe", "refuse"]);
+    const help = await fixture.runModuleAsync(build, ["help", "probe", "refuse"]);
+    const result = await fixture.runModuleAsync(build, ["probe", "refuse"]);
 
     Assert.areEqual(2, result.code);
     Assert.areEqual(`The probe refuses these arguments.\n\n${help.output}`, result.error);

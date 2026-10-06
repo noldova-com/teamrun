@@ -21,14 +21,30 @@ export class CliCommandExceptionTests {
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(build.declarationsFile);
 
-    const text = await fixture.runModuleAsync(build.declarationsFile, ["probe", "fail-with-code"]);
-    const json = await fixture.runModuleAsync(build.declarationsFile, ["probe", "fail-with-code", "--json"]);
+    const text = await fixture.runModuleAsync(build, ["probe", "fail-with-code"]);
+    const json = await fixture.runModuleAsync(build, ["probe", "fail-with-code", "--json"]);
 
     Assert.areEqual(1, text.code, text.error);
     Assert.areEqual("The probe's command broke.\n", text.error);
     Assert.areEqual("", text.output);
     Assert.areEqual(1, json.code, json.error);
     Assert.areEqual("{\"code\":\"ProbeBroke\",\"message\":\"The probe's command broke.\",\"details\":{\"why\":\"asked\"}}\n", json.error);
+  }
+
+  @TestMethod
+  public async standsInForAnyOtherErrorACommandThrows(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
+    await fixture.startHostAsync(build.declarationsFile);
+
+    const text = await fixture.runModuleAsync(build, ["probe", "throw-plain"]);
+    const json = await fixture.runModuleAsync(build, ["probe", "throw-plain", "--json"]);
+
+    Assert.areEqual(1, text.code, text.error);
+    Assert.areEqual("The command failed: Error: The probe tripped.\n", text.error);
+    Assert.areEqual(1, json.code, json.error);
+    Assert.areEqual("{\"code\":\"Failed\",\"message\":\"The command failed: Error: The probe tripped.\"}\n", json.error);
+    Assert.areEqual("activate probe\ndeactivate probe\n".repeat(2), await build.readPartsLogAsync());
   }
 
   @TestMethod

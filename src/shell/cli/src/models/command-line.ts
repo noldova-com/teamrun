@@ -17,7 +17,6 @@ export class CommandLine {
   private static readonly VALUE_OPTIONS: readonly string[] = [Resources.dataDirectoryFlag, Resources.deviceDirectoryFlag, Resources.timeoutFlag, Resources.argumentsFileFlag];
   private static readonly SWITCHES: readonly string[] = [Resources.jsonFlag, Resources.noStartFlag, Resources.takeOverFlag, Resources.helpFlag];
   private static readonly ATTACHING: readonly CliCommand[] = [CliCommand.Commands, CliCommand.Run];
-  private static readonly OWN_COMMANDS: readonly Exclude<CliCommand, CliCommand.Module>[] = [CliCommand.Status, CliCommand.Commands, CliCommand.Run, CliCommand.Open, CliCommand.Help];
 
   public readonly command: CliCommand;
   public readonly dataDirectory: string | null;
@@ -63,7 +62,7 @@ export class CommandLine {
     const options = new Map<string, string>();
     const positional: string[] = [];
     const queue = [...commandLineArguments];
-    const isModule = (): boolean => positional.length > 0 && !CommandLine.OWN_COMMANDS.some(t => Resources.commandWords[t] === positional[0]);
+    const isModule = (): boolean => !Object.isUndefined(positional[0]) && !Resources.ownCommands.has(positional[0]);
     for (let argument = queue.shift(); !Object.isUndefined(argument); argument = queue.shift()) {
       if (argument === Resources.flagPrefix && isModule()) {
         positional.push(argument, ...queue.splice(0));
@@ -88,7 +87,7 @@ export class CommandLine {
       else
         throw new UsageException(Resources.formatUnknownOption(argument));
     }
-    if (positional[0] === Resources.commandWords[CliCommand.Help])
+    if (Resources.ownCommands.get(positional[0] ?? String.empty) === CliCommand.Help)
       return new CommandLine(CliCommand.Help, null, options.has(Resources.jsonFlag), true, false, null, String.empty, ArgumentsSource.None, String.empty, null, positional.slice(1));
     if (options.has(Resources.helpFlag) && !isModule())
       return new CommandLine(CliCommand.Help, null, options.has(Resources.jsonFlag));
@@ -99,15 +98,15 @@ export class CommandLine {
     const [name, ...rest] = positional;
     if (Object.isUndefined(name))
       throw new UsageException(Resources.commandRequired);
-    const command = CommandLine.OWN_COMMANDS.find(t => Resources.commandWords[t] === name);
+    const command = Resources.ownCommands.get(name);
     if (Object.isUndefined(command))
       return CommandLine.createModule(positional, options);
     for (const option of [Resources.noStartFlag, Resources.takeOverFlag])
       if (options.has(option) && !CommandLine.ATTACHING.includes(command))
-        throw new UsageException(Resources.formatOptionNotForCommand(option, command));
+        throw new UsageException(Resources.formatOptionNotForCommand(option, name));
     for (const option of [Resources.timeoutFlag, Resources.argumentsFileFlag])
       if (options.has(option) && command !== CliCommand.Run)
-        throw new UsageException(Resources.formatOptionNotForCommand(option, command));
+        throw new UsageException(Resources.formatOptionNotForCommand(option, name));
 
     const [commandName, argumentsValue, unexpected] = command === CliCommand.Run ? rest : [undefined, undefined, rest[0]];
     if (!Object.isUndefined(unexpected))

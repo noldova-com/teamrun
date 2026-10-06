@@ -195,12 +195,6 @@ export declare class CliContext {
   public readonly updateWaitMilliseconds: number;
 
   /**
-   * The build's module declarations, which give the modules' commands and
-   * their help.
-   */
-  public readonly declarationsFile: string;
-
-  /**
    * Creates the context.
    *
    * @param environment The environment.
@@ -217,8 +211,6 @@ export declare class CliContext {
    * @param desktopOpener Starts the desktop; a detached process by default.
    * @param processId The command line's process id; the running process's by default.
    * @param updateWaitMilliseconds How long to wait for an update under way, in milliseconds; 30 seconds by default.
-   * @param declarationsFile The build's module declarations; by default `_build/modules/declarations.json` of the
-   * installation the runtime's entry script belongs to.
    * @example
    * ```ts
    * import { homedir } from "node:os";
@@ -244,8 +236,7 @@ export declare class CliContext {
     runtimeStarter?: IProcessStarter,
     desktopOpener?: IDesktopOpener,
     processId?: number,
-    updateWaitMilliseconds?: number,
-    declarationsFile?: string);
+    updateWaitMilliseconds?: number);
 }
 
 /**
@@ -447,14 +438,14 @@ export interface ICliCommandHandler {
    *
    * @param values The arguments and options by their names: a variadic
    * argument and a repeated option as lists, a `Boolean` option as `true`, an
-   * option not given as its default, and nothing for others not given. The
-   * object and its lists are frozen.
+   * option not given as its default, and nothing for others not given.
    * @param signal Aborts when the person presses Ctrl+C or the command's
    * `--timeout` passes; the command line then reports the stop without
    * waiting for the handler.
    * @returns A promise of the command's result.
    * @throws UsageException Rejected when the command refuses its arguments.
-   * @throws CliCommandException Rejected when the command fails.
+   * @throws CliCommandException Rejected when the command fails; the command
+   * line reports any other rejection as one with the code `Failed`.
    * @example
    * ```ts
    * import { CliCommandResult, type ICliCommandHandler } from "@noldova/teamrun-shell-cli";
@@ -496,12 +487,15 @@ export interface ICliPartContext {
 
   /**
    * Calls a method of the runtime over the command line's connection, which
-   * is how a command reaches its module's runtime part.
+   * is how a command reaches its module's runtime part. The method belongs to
+   * the part's module or to a module it depends on.
    *
    * @param method The method's qualified name, such as `notes.add`.
    * @param payload Its payload.
    * @param signal Cancels the call; pass the command's signal.
    * @returns A promise of the method's result.
+   * @throws ArgumentException Rejected when the name is not a qualified name
+   * or the method belongs to another module.
    * @throws MethodFailureException Rejected with the runtime's failure.
    * @example
    * ```ts
@@ -548,10 +542,11 @@ export interface ICliPart {
   activateAsync(context: ICliPartContext): Promise<void>;
 
   /**
-   * Deactivates the part once the command has ended: it releases its timers
-   * and files.
+   * Deactivates the part once the command has ended, also when its
+   * activation failed or was stopped: it releases its timers and files.
    *
-   * @returns A promise that resolves once the part has released everything.
+   * @returns A promise that resolves once the part has released everything; a
+   * rejection ends a command that succeeded with {@link ExitCode.Failed}.
    * @example
    * ```ts
    * import type { ICliPart } from "@noldova/teamrun-shell-cli";

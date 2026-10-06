@@ -10,6 +10,7 @@ import "@noldova/teamrun-foundation-core";
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
 import { CliCommand } from "./enums/cli-command.js";
+import { CommandLineNames } from "./models/command-line-names.js";
 
 export class Resources {
   public static get productName(): string {
@@ -40,37 +41,37 @@ export class Resources {
   public static readonly jsonIndent: number = 2;
   public static readonly codeParameterName: string = "code";
   public static readonly nameParameterName: string = "name";
+  public static readonly methodParameterName: string = "method";
   public static readonly nameSeparator: string = ".";
   public static readonly capitalPattern: RegExp = /[A-Z]/g;
   public static readonly wordSeparator: string = "-";
-  public static readonly numberPattern: RegExp = /^-?\d+(?:\.\d+)?$/;
+  public static readonly numberPattern: RegExp = /^-?(?!(?:\D*\d){16})\d+(?:\.\d+)?$/;
   public static readonly lineEnd: string = "\n";
-  public static readonly declarationsFormatVersion: number = 1;
-  public static readonly declarationsSegments: readonly string[] = ["..", "..", "..", "..", "_build", "modules", "declarations.json"];
-  public static readonly cliPartExport: string = "CliPart";
-  public static readonly activateMember: string = "activateAsync";
-  public static readonly deactivateMember: string = "deactivateAsync";
+  public static readonly reasonSeparator: string = " ";
+  public static readonly cliPartExport: "CliPart" = "CliPart";
+  public static readonly activateMember: "activateAsync" = "activateAsync";
+  public static readonly deactivateMember: "deactivateAsync" = "deactivateAsync";
 
-  public static readonly commandWords: Readonly<Record<Exclude<CliCommand, CliCommand.Module>, string>> = {
-    [CliCommand.Status]: "status",
-    [CliCommand.Commands]: "commands",
-    [CliCommand.Run]: "run",
-    [CliCommand.Open]: "open",
-    [CliCommand.Help]: "help"
-  };
-  public static readonly dataDirectoryFlag: string = "--data-dir";
-  public static readonly deviceDirectoryFlag: string = "--device-dir";
+  public static readonly ownCommands: ReadonlyMap<string, Exclude<CliCommand, CliCommand.Module>> = new Map([
+    [CommandLineNames.status, CliCommand.Status],
+    [CommandLineNames.commands, CliCommand.Commands],
+    [CommandLineNames.run, CliCommand.Run],
+    [CommandLineNames.open, CliCommand.Open],
+    [CommandLineNames.help, CliCommand.Help]
+  ]);
+  public static readonly flagPrefix: string = "--";
+  public static readonly dataDirectoryFlag: string = `${Resources.flagPrefix}${CommandLineNames.dataDirectory}`;
+  public static readonly deviceDirectoryFlag: string = `${Resources.flagPrefix}${CommandLineNames.deviceDirectory}`;
   public static readonly updateWait: number = 30000;
   public static readonly updatePollInterval: number = 250;
-  public static readonly jsonFlag: string = "--json";
-  public static readonly noStartFlag: string = "--no-start";
-  public static readonly takeOverFlag: string = "--take-over";
-  public static readonly timeoutFlag: string = "--timeout";
-  public static readonly argumentsFileFlag: string = "--args-file";
-  public static readonly helpFlag: string = "--help";
+  public static readonly jsonFlag: string = `${Resources.flagPrefix}${CommandLineNames.json}`;
+  public static readonly noStartFlag: string = `${Resources.flagPrefix}${CommandLineNames.noStart}`;
+  public static readonly takeOverFlag: string = `${Resources.flagPrefix}${CommandLineNames.takeOver}`;
+  public static readonly timeoutFlag: string = `${Resources.flagPrefix}${CommandLineNames.timeout}`;
+  public static readonly argumentsFileFlag: string = `${Resources.flagPrefix}${CommandLineNames.argumentsFile}`;
+  public static readonly helpFlag: string = `${Resources.flagPrefix}${CommandLineNames.help}`;
   public static readonly inputArgument: string = "-";
   public static readonly valueSeparator: string = "=";
-  public static readonly flagPrefix: string = "--";
 
   public static readonly usageCode: string = "Usage";
   public static readonly noRuntimeCode: string = "NoRuntime";
@@ -104,7 +105,7 @@ export class Resources {
       String.empty,
       "Exit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,",
       `5 data directory unusable, 6 timed out or cancelled, 7 module not active, 8 ${Resources.productName} is installing an update.`
-    ].join("\n");
+    ].join(Resources.lineEnd);
   }
 
   public static readonly moduleCommandsTitle: string = "Module commands:";
@@ -150,8 +151,8 @@ export class Resources {
     return `"${option}" is not an option.`;
   }
 
-  public static formatOptionNotForCommand(option: string, command: Exclude<CliCommand, CliCommand.Module>): string {
-    return `The ${option} option does not apply to ${Resources.commandWords[command]}.`;
+  public static formatOptionNotForCommand(option: string, word: string): string {
+    return `The ${option} option does not apply to ${word}.`;
   }
 
   public static formatOptionNeedsValue(option: string): string {
@@ -202,12 +203,12 @@ export class Resources {
     return name.replace(Resources.capitalPattern, t => `${Resources.wordSeparator}${t.toLowerCase()}`);
   }
 
-  public static formatDeclarationsUnreadable(file: string, reason: string): string {
-    return `The module declarations ${file} could not be read: ${reason}`;
+  public static formatCliCommandsUnreadable(file: string, reason: string): string {
+    return `The module declarations ${file} hold command-line commands that are not valid: ${reason}`;
   }
 
-  public static formatDeclarationsVersion(version: number): string {
-    return `Their format version is ${version}, not ${Resources.declarationsFormatVersion}.`;
+  public static formatCliCommandPath(moduleId: string, index: number): string {
+    return `${moduleId}.cliCommands.${index}`;
   }
 
   public static formatOptionNotForModuleCommands(option: string): string {
@@ -227,7 +228,7 @@ export class Resources {
   }
 
   public static formatOptionNotNumber(option: string, value: string): string {
-    return `The ${option} option takes a number, not "${value}".`;
+    return `The ${option} option takes a number of at most 15 digits, not "${value}".`;
   }
 
   public static formatOptionRepeated(option: string): string {
@@ -250,12 +251,24 @@ export class Resources {
     return `Its command-line part failed to start: ${reason}`;
   }
 
+  public static formatCliPartStopFailed(reasons: string): string {
+    return `A command-line part failed to stop: ${reasons}`;
+  }
+
+  public static formatCommandFailed(reason: string): string {
+    return `The command failed: ${reason}`;
+  }
+
   public static formatCommandNotRegistered(name: string): string {
     return `Its command-line part did not register ${name}.`;
   }
 
   public static formatCommandNotDeclared(name: string, moduleId: string): string {
     return `${name} is not a command-line command that ${moduleId} declares.`;
+  }
+
+  public static formatMethodNotReachable(method: string, moduleId: string): string {
+    return `${method} is not a method of ${moduleId} or of a module it depends on.`;
   }
 
   public static formatCommandRegisteredTwice(name: string): string {

@@ -22,6 +22,9 @@ export class CliHelpTests {
     "  echo-values     Runs probe.echoValues.",
     "  call-runtime    Runs probe.callRuntime.",
     "  call-missing    Runs probe.callMissing.",
+    "  call-malformed  Runs probe.callMalformed.",
+    "  call-other      Runs probe.callOther.",
+    "  throw-plain     Runs probe.throwPlain.",
     "  wait-forever    Runs probe.waitForever.",
     "  fail-with-code  Runs probe.failWithCode.",
     "  refuse          Runs probe.refuse.",
@@ -37,10 +40,11 @@ export class CliHelpTests {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     const plain = await fixture.runAsync(["help"]);
+    const json = await fixture.runAsync(["help", "--json"]);
 
-    const help = await fixture.runModuleAsync(build.declarationsFile, ["help"]);
-    const flag = await fixture.runModuleAsync(build.declarationsFile, ["status", "--help"]);
-    const word = await fixture.runModuleAsync(build.declarationsFile, ["help", "status"]);
+    const help = await fixture.runModuleAsync(build, ["help"]);
+    const flag = await fixture.runModuleAsync(build, ["status", "--help"]);
+    const word = await fixture.runModuleAsync(build, ["help", "status"]);
 
     Assert.areEqual(0, help.code, help.error);
     Assert.isTrue(help.output.startsWith(`${plain.output}\nModule commands:\n  Probe\n    teamrun probe echo-values     Runs probe.echoValues.\n`), help.output);
@@ -49,6 +53,7 @@ export class CliHelpTests {
     Assert.isFalse(help.output.includes("\n  Quiet\n"), help.output);
     Assert.areEqual(help.output, flag.output);
     Assert.areEqual(help.output, word.output);
+    Assert.areEqual(JSON.stringify({ help: plain.output.trimEnd() }), json.output.trimEnd());
     Assert.isNull(await fixture.readRuntimeProcessIdAsync());
   }
 
@@ -57,10 +62,10 @@ export class CliHelpTests {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
 
-    const help = await fixture.runModuleAsync(build.declarationsFile, ["help", "probe"]);
-    const flag = await fixture.runModuleAsync(build.declarationsFile, ["probe", "--help"]);
-    const unknown = await fixture.runModuleAsync(build.declarationsFile, ["probe", "nope", "--help"]);
-    const quiet = await fixture.runModuleAsync(build.declarationsFile, ["help", "quiet"]);
+    const help = await fixture.runModuleAsync(build, ["help", "probe"]);
+    const flag = await fixture.runModuleAsync(build, ["probe", "--help"]);
+    const unknown = await fixture.runModuleAsync(build, ["probe", "nope", "--help"]);
+    const quiet = await fixture.runModuleAsync(build, ["help", "quiet"]);
 
     Assert.areEqual(0, help.code, help.error);
     Assert.areEqual(CliHelpTests.PROBE_HELP, help.output);
@@ -87,7 +92,7 @@ export class CliHelpTests {
       "  --loud            The loud.",
       "  --tag <text>      The tag. Repeatable.",
       "  --level <number>  The level. Required.",
-      "  --prefix <text>   The prefix. Default: Probe.",
+      "  --prefix <text>   The prefix. Default: \"Probe\".",
       "  --note <text>     The note.",
       "",
       "Examples:",
@@ -98,10 +103,10 @@ export class CliHelpTests {
       ""
     ].join("\n");
 
-    const help = await fixture.runModuleAsync(build.declarationsFile, ["help", "probe", "echo-values"]);
-    const flag = await fixture.runModuleAsync(build.declarationsFile, ["probe", "echo-values", "--help", "--bogus"]);
-    const call = await fixture.runModuleAsync(build.declarationsFile, ["help", "probe", "call-runtime"]);
-    const quiet = await fixture.runModuleAsync(build.declarationsFile, ["help", "probe", "stay-quiet"]);
+    const help = await fixture.runModuleAsync(build, ["help", "probe", "echo-values"]);
+    const flag = await fixture.runModuleAsync(build, ["probe", "echo-values", "--help", "--bogus"]);
+    const call = await fixture.runModuleAsync(build, ["help", "probe", "call-runtime"]);
+    const quiet = await fixture.runModuleAsync(build, ["help", "probe", "stay-quiet"]);
 
     Assert.areEqual(0, help.code, help.error);
     Assert.areEqual(expected, help.output);
@@ -119,6 +124,7 @@ export class CliHelpTests {
     const usage = (await fixture.runAsync(["help"])).output;
     const cases: readonly (readonly [readonly string[], string, string])[] = [
       [["help", "nope"], "\"nope\" is not a command.", usage],
+      [["help", "run", "extra"], "\"extra\" was not expected.", usage],
       [["nope", "run"], "\"nope\" is not a command.", usage],
       [["help", "probe", "nope"], "\"nope\" is not a command of probe.", CliHelpTests.PROBE_HELP],
       [["help", "probe", "echo-values", "extra"], "\"extra\" was not expected.", CliHelpTests.PROBE_HELP],
@@ -128,7 +134,7 @@ export class CliHelpTests {
     ];
 
     for (const [commandLineArguments, message, help] of cases) {
-      const result = await fixture.runModuleAsync(build.declarationsFile, commandLineArguments);
+      const result = await fixture.runModuleAsync(build, commandLineArguments);
 
       Assert.areEqual(2, result.code, commandLineArguments.join(" "));
       Assert.areEqual(`${message}\n\n${help}`, result.error);

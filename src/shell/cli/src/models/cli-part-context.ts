@@ -8,6 +8,7 @@
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import { QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import type { ICliCommandHandler } from "../interfaces/i-cli-command-handler.js";
 import type { ICliPartContext } from "../interfaces/i-cli-part-context.js";
@@ -17,12 +18,12 @@ import type { CliModule } from "./cli-module.js";
 export class CliPartContext implements ICliPartContext {
   private readonly module: CliModule;
   private readonly handlers: Map<string, ICliCommandHandler>;
-  private readonly request: (method: string, payload: JsonValue, signal: AbortSignal) => Promise<JsonValue>;
+  private readonly request: (method: QualifiedName, payload: JsonValue, signal: AbortSignal) => Promise<JsonValue>;
 
   public constructor(
     module: CliModule,
     handlers: Map<string, ICliCommandHandler>,
-    request: (method: string, payload: JsonValue, signal: AbortSignal) => Promise<JsonValue>) {
+    request: (method: QualifiedName, payload: JsonValue, signal: AbortSignal) => Promise<JsonValue>) {
     this.module = module;
     this.handlers = handlers;
     this.request = request;
@@ -40,7 +41,10 @@ export class CliPartContext implements ICliPartContext {
     this.handlers.set(name, handler);
   }
 
-  public requestAsync(method: string, payload: JsonValue, signal: AbortSignal): Promise<JsonValue> {
-    return this.request(method, payload, signal);
+  public async requestAsync(method: string, payload: JsonValue, signal: AbortSignal): Promise<JsonValue> {
+    const name = QualifiedName.parse(method);
+    if (name.owner !== this.module.id && !this.module.dependencies.includes(name.owner))
+      throw new ArgumentException(Resources.formatMethodNotReachable(method, this.module.id), Resources.methodParameterName);
+    return await this.request(name, payload, signal);
   }
 }

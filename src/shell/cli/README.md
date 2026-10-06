@@ -80,25 +80,30 @@ The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how
 
 - **Reserved words.**
   A module's id is never one of the command line's own commands: `status`, `commands`, `run`, `open` and `help`.
-  The build refuses a module whose id is one of them.
-  A new command of the command line's own is added to this list first, so the build then refuses a module that already uses its name.
+  The build refuses a module whose id is one of them, and a module command's option named like one of the command line's own options, `--args-file` included.
+  The build reads both lists from the command line's source, so a new command or option of the command line's own refuses a module that already uses its name.
 - **Reading the call.**
   Arguments come in their declared order.
   An option is `--name value` or `--name=value`, a `Boolean` option is `--name` alone, and a repeated option may be given more than once, its values in order.
-  A `Number` takes a decimal number, such as `3` or `-2.5`.
+  A `Number` takes a decimal number of at most 15 digits, such as `3` or `-2.5`.
   Options, including the [global options](#3-options), may stand anywhere after the command, among the arguments.
   `--` ends the options: everything after it is an argument, even when it starts with `--`.
   A missing required argument or option, an unknown option, a value of the wrong type, a value given to a `Boolean` option or an argument too many exits with code 2 and prints the command's usage, and no runtime starts.
 - **Running.**
   The command line then reaches the runtime as `run` does, starting one unless `--no-start` is given.
   It runs the command only when the command's module is active, after starting that module's command-line part and those of its dependencies; otherwise it exits with code 7.
+  A part that fails to start also exits with code 7.
+  `--timeout` and an interruption cover starting the parts as well as running the command, and exit with code 6.
+  Every part that started, or began to start, is stopped afterwards in reverse order, even when one fails to stop; a part that fails to stop makes a command that succeeded exit with code 1.
+  A part reaches only the methods of its own module and of the modules it depends on.
   `teamrun run` exits with code 7 too for a runtime command whose module is not active.
 - **Output.**
   A command prints its text on standard output, and with `--json` exactly its one JSON value instead.
-  A command that fails exits with code 1 and prints its error, with `--json` as `{"code","message","details"}` on standard error, where the code is the module's own or the protocol's.
+  A command that fails exits with code 1 and prints its error, with `--json` as `{"code","message","details"}` on standard error, where the code is the module's own or the protocol's, or `Failed` for any other error the command throws.
   A command that refuses its arguments exits with code 2.
 - **Help.**
   `teamrun help` lists the command line's own commands, then each module's commands under the module's display name, in module order, each with its summary.
   `teamrun help <module>` and `teamrun <module> --help` list one module's commands.
   `teamrun help <module> <command>` and `teamrun <module> <command> --help` print the command's usage, description, arguments, options with their types and defaults, and examples.
+  With `--json`, help prints `{"help"}` with the same text.
   Help reads only the build's declarations, so it never starts or reaches a runtime and lists every module of the build, active or not.

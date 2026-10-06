@@ -17,7 +17,7 @@ export class CliModuleReaderTests {
   @TestMethod
   public async refusesDeclarationsItCannotReadAsAFailureNamingTheFile(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
-    const prefix = `The module declarations ${fixture.declarationsFile} could not be read: `;
+    const prefix = `The module declarations ${fixture.declarationsFile} are not valid: `;
 
     await fixture.writeDeclarationsAsync([], 2);
     const version = await fixture.runAsync(["help", "--json"]);
@@ -31,12 +31,12 @@ export class CliModuleReaderTests {
     const missing = await fixture.runAsync(["help"]);
 
     Assert.areEqual(1, version.code, version.error);
-    Assert.areEqual(`${JSON.stringify({ code: "Failed", message: `${prefix}Their format version is 2, not 1.` })}\n`, version.error);
-    Assert.areEqual(`${prefix}$.formatVersion: Expected number.\n`, versionText.error);
-    Assert.areEqual(`${prefix}$.modules.0.displayName: The field is required.\n`, module.error);
-    Assert.areEqual(`${prefix}$: The text is not valid JSON.\n`, text.error);
+    Assert.areEqual(`${JSON.stringify({ code: "Failed", message: `${prefix}DeclarationsFormatException: The module declarations have the unsupported format version 2.` })}\n`, version.error);
+    Assert.areEqual(`${prefix}DeclarationsFormatException: The module declarations have the unsupported format version 1.\n`, versionText.error);
+    Assert.areEqual(`${prefix}DeclarationsFormatException: A module declaration's version is missing or invalid.\n`, module.error);
+    Assert.isTrue(text.error.startsWith(`${prefix}SyntaxError: `), text.error);
     Assert.areEqual(1, missing.code);
-    Assert.isTrue(missing.error.startsWith(`${prefix}ENOENT`), missing.error);
+    Assert.isTrue(missing.error.startsWith(`${prefix}Error: ENOENT`), missing.error);
     Assert.areEqual("", missing.output);
   }
 

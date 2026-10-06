@@ -119,9 +119,9 @@ export class CliTests {
     await fixture.startHostAsync(build.declarationsFile);
     const marker = build.locate(ProbeBuildFixture.CLI_WAITING_MARKER);
 
-    const timedOut = await fixture.runModuleAsync(build.declarationsFile, ["probe", "wait-forever", "--timeout", "1", "--json"]);
+    const timedOut = await fixture.runModuleAsync(build, ["probe", "wait-forever", "--timeout", "1", "--json"]);
     await rm(marker, { force: true });
-    const running = fixture.runModuleAsync(build.declarationsFile, ["probe", "wait-forever", "--json"]);
+    const running = fixture.runModuleAsync(build, ["probe", "wait-forever", "--json"]);
     await ProbeBuildFixture.waitUntilWaitingAsync(marker);
     fixture.signals.emit("SIGINT");
     const interrupted = await running;
@@ -132,5 +132,27 @@ export class CliTests {
     Assert.areEqual("Cancelled", (JSON.parse(interrupted.error) as { code: string }).code);
     Assert.areEqual(0, fixture.signals.listenerCount("SIGINT"));
     Assert.areEqual("activate probe\ndeactivate probe\nactivate probe\ndeactivate probe\n", await build.readPartsLogAsync());
+  }
+
+  @TestMethod
+  public async stopsAModuleCommandWhosePartNeverFinishesStartingAndStopsThatPart(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
+    await fixture.startHostAsync(build.declarationsFile);
+    const marker = build.locate(ProbeBuildFixture.STALLED_MARKER);
+
+    const timedOut = await fixture.runModuleAsync(build, ["stalled", "run", "--timeout", "1", "--json"]);
+    await rm(marker, { force: true });
+    const running = fixture.runModuleAsync(build, ["stalled", "run", "--json"]);
+    await ProbeBuildFixture.waitUntilWaitingAsync(marker);
+    fixture.signals.emit("SIGINT");
+    const interrupted = await running;
+
+    Assert.areEqual(6, timedOut.code, timedOut.error);
+    Assert.areEqual("DeadlineExceeded", (JSON.parse(timedOut.error) as { code: string }).code);
+    Assert.areEqual(6, interrupted.code, interrupted.error);
+    Assert.areEqual("Cancelled", (JSON.parse(interrupted.error) as { code: string }).code);
+    Assert.areEqual(0, fixture.signals.listenerCount("SIGINT"));
+    Assert.areEqual("activate stalled\ndeactivate stalled\n".repeat(2), await build.readPartsLogAsync());
   }
 }

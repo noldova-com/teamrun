@@ -27,6 +27,8 @@ export class Resources {
   public static readonly dependenciesParameterName: string = "dependencies";
   public static readonly runtimePackageParameterName: string = "runtimePackage";
   public static readonly contributesParameterName: string = "contributes";
+  public static readonly cliPackageField: string = "cliPackage";
+  public static readonly cliCommandsField: string = "cliCommands";
   public static readonly rootNotAbsolute: string = "The data directory must be an absolute path.";
   public static readonly migrationIdInvalid: string = "A migration id is lowercase letters and digits separated by single hyphens.";
   public static readonly moduleIdInvalid: string = "A module id is lowercase kebab-case and is not \"shell\".";

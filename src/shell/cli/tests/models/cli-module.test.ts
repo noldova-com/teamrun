@@ -30,14 +30,16 @@ export class CliModuleTests {
   @TestMethod
   public async refusesDeclarationsWhoseModuleLacksAFieldTheCommandLineReads(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
-    const prefix = `The module declarations ${fixture.declarationsFile} could not be read: $.modules.0.`;
+    const prefix = `The module declarations ${fixture.declarationsFile} `;
+    const invalid = (field: string): string => `are not valid: DeclarationsFormatException: A module declaration's ${field} is missing or invalid.`;
     const module = ProbeBuildFixture.declare("notes", "Notes", [], []);
     const cases: readonly (readonly [Readonly<Record<string, unknown>>, string])[] = [
-      [{ ...module, id: " " }, "id: Expected a string that is not blank."],
-      [{ ...module, description: undefined }, "description: The field is required."],
-      [{ ...module, dependencies: [1] }, "dependencies.0: Expected string."],
-      [{ ...module, cliPackage: false }, "cliPackage: Expected string."],
-      [{ ...module, cliCommands: ["notes.add"] }, "cliCommands.0: Expected object."]
+      [{ ...module, id: " " }, invalid("id")],
+      [{ ...module, description: undefined }, invalid("description")],
+      [{ ...module, dependencies: [1] }, invalid("dependencies")],
+      [{ ...module, cliPackage: false }, invalid("cliPackage")],
+      [{ ...module, cliCommands: {} }, invalid("cliCommands")],
+      [{ ...module, cliCommands: ["notes.add"] }, "hold command-line commands that are not valid: JsonException: notes.cliCommands.0: Expected a JSON object."]
     ];
 
     for (const [declared, problem] of cases) {

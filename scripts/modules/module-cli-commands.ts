@@ -10,12 +10,12 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { CommandLineNames } from "../../src/shell/cli/src/models/command-line-names.ts";
 import ModuleException from "./module.exception.ts";
 
 export default class ModuleCliCommands {
   public static readonly FILE_NAME: string = "cli.json";
   public static readonly KIND: string = "cliCommands";
-  public static readonly GLOBAL_OPTIONS: readonly string[] = ["data-dir", "device-dir", "json", "no-start", "take-over", "timeout", "help"];
   private static readonly COMMAND_FIELDS: readonly string[] = ["name", "summary", "description", "arguments", "options", "examples"];
   private static readonly OPTIONAL_COMMAND_FIELDS: readonly string[] = ["description", "examples"];
   private static readonly ARGUMENT_FIELDS: readonly string[] = ["name", "description", "required", "variadic"];
@@ -70,7 +70,7 @@ export default class ModuleCliCommands {
       throw fail("must not have a required argument after an optional one");
     if (commandArguments.slice(0, -1).some(t => t["variadic"] === true))
       throw fail("must have only its last argument variadic");
-    const global = options.map(t => ModuleCliCommands.toKebabCase(String(t["name"]))).filter(t => ModuleCliCommands.GLOBAL_OPTIONS.includes(t));
+    const global = options.map(t => ModuleCliCommands.toKebabCase(String(t["name"]))).filter(t => CommandLineNames.ownOptions.includes(t));
     if (global.length > 0)
       throw fail(`must not have options the command line has itself: ${global.map(t => `--${t}`).join(", ")}`);
     return { name: record.get("name"), summary: record.get("summary"), description, arguments: commandArguments, options, examples };

@@ -19,10 +19,10 @@ export class CliCommandResultTests {
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(build.declarationsFile);
 
-    const unended = await fixture.runModuleAsync(build.declarationsFile, ["needy", "run"]);
-    const ended = await fixture.runModuleAsync(build.declarationsFile, ["probe", "call-runtime", "hi"]);
-    const quiet = await fixture.runModuleAsync(build.declarationsFile, ["probe", "stay-quiet"]);
-    const quietJson = await fixture.runModuleAsync(build.declarationsFile, ["probe", "stay-quiet", "--json"]);
+    const unended = await fixture.runModuleAsync(build, ["needy", "run"]);
+    const ended = await fixture.runModuleAsync(build, ["probe", "call-runtime", "hi"]);
+    const quiet = await fixture.runModuleAsync(build, ["probe", "stay-quiet"]);
+    const quietJson = await fixture.runModuleAsync(build, ["probe", "stay-quiet", "--json"]);
 
     Assert.areEqual("Needy ran.\n", unended.output);
     Assert.areEqual("The runtime answered hi.\n", ended.output);

@@ -8,6 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { ModuleNotActiveException } from "../exceptions/module-not-active.exception.js";
 import type { ICliCommandHandler } from "../interfaces/i-cli-command-handler.js";
@@ -19,11 +20,11 @@ import { Resources } from "../resources.js";
 
 export class CliPartHost {
   private readonly modules: readonly CliModule[];
-  private readonly request: (method: string, payload: JsonValue, signal: AbortSignal) => Promise<JsonValue>;
+  private readonly request: (method: QualifiedName, payload: JsonValue, signal: AbortSignal) => Promise<JsonValue>;
   private readonly started: ICliPart[] = [];
   private readonly handlers: Map<string, ICliCommandHandler> = new Map();
 
-  public constructor(modules: readonly CliModule[], request: (method: string, payload: JsonValue, signal: AbortSignal) => Promise<JsonValue>) {
+  public constructor(modules: readonly CliModule[], request: (method: QualifiedName, payload: JsonValue, signal: AbortSignal) => Promise<JsonValue>) {
     this.modules = modules;
     this.request = request;
   }
@@ -42,34 +43,45 @@ export class CliPartHost {
     return handler;
   }
 
-  public async stopAsync(): Promise<void> {
-    for (const part of this.started.toReversed())
-      await part.deactivateAsync();
+  public async stopAsync(): Promise<readonly string[]> {
+    const failures: string[] = [];
+    for (const part of this.started.splice(0).toReversed()) {
+      try {
+        await part.deactivateAsync();
+      }
+      catch (error) {
+        failures.push(String(error));
+      }
+    }
+    return failures;
   }
 
   private async startPartAsync(module: CliModule, packageName: string): Promise<void> {
     let part: unknown;
     try {
-      const type: unknown = Reflect.get(await import(packageName) as object, Resources.cliPartExport);
+      const exports: object = await import(packageName);
+      const type = Resources.cliPartExport in exports ? exports[Resources.cliPartExport] : undefined;
       part = Object.isFunction(type) ? Reflect.construct(type, []) : undefined;
     }
     catch (error) {
-      throw new ModuleNotActiveException(module.id, Resources.formatCliPartFailed((error as Error).message));
+      throw new ModuleNotActiveException(module.id, Resources.formatCliPartFailed(String(error)));
     }
     if (!CliPartHost.isCliPart(part))
       throw new ModuleNotActiveException(module.id, Resources.cliPartMissing);
+    this.started.push(part);
     try {
       await part.activateAsync(new CliPartContext(module, this.handlers, this.request));
     }
     catch (error) {
-      throw new ModuleNotActiveException(module.id, Resources.formatCliPartFailed((error as Error).message));
+      throw new ModuleNotActiveException(module.id, Resources.formatCliPartFailed(String(error)));
     }
-    this.started.push(part);
   }
 
   private static isCliPart(value: unknown): value is ICliPart {
     return Object.isObject(value)
-      && Object.isFunction(Reflect.get(value, Resources.activateMember))
-      && Object.isFunction(Reflect.get(value, Resources.deactivateMember));
+      && Resources.activateMember in value
+      && Object.isFunction(value[Resources.activateMember])
+      && Resources.deactivateMember in value
+      && Object.isFunction(value[Resources.deactivateMember]);
   }
 }

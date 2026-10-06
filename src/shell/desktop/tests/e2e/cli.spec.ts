@@ -54,7 +54,7 @@ test.describe("the command line", () => {
     expect(Date.parse((JSON.parse(json.output) as { time: string }).time)).not.toBeNaN();
     expect(help.code, help.error).toBe(0);
     expect(help.output).toContain("Usage: teamrun clock show-time [--prefix <text>]");
-    expect(help.output).toContain("--prefix <text>  The words before the time. Default: It is.");
+    expect(help.output).toContain("--prefix <text>  The words before the time. Default: \"It is\".");
     expect(unknown.code).toBe(2);
     expect(unknown.error).toContain("\"rewind\" is not a command of clock.");
   });

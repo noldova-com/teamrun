@@ -7,16 +7,17 @@
  */
 
 import { EventEmitter } from "node:events";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PassThrough } from "node:stream";
+import { pathToFileURL } from "node:url";
 
 import "@noldova/teamrun-foundation-core";
 import { Wait } from "@noldova/teamrun-foundation-testing";
 import { Cli, CliContext } from "@noldova/teamrun-shell-cli";
 import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
 import {
-  DataDirectory, DeviceFolder, DiscoveryReader, type IProcessStarter, OwnershipLock, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions,
+  DataDirectory, DeviceFolder, DiscoveryReader, type IProcessStarter, ModuleDeclarationReader, OwnershipLock, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions,
   ServerSettings, SystemCommand
 } from "@noldova/teamrun-shell-runtime";
 
@@ -38,6 +39,7 @@ export class CliFixture implements AsyncDisposable {
   public readonly root: string;
   public readonly dataDirectory: string;
   public readonly homeFolder: string;
+  public readonly entryPath: string;
   public readonly declarationsFile: string;
   public readonly opener: FakeDesktopOpenerFixture = new FakeDesktopOpenerFixture();
   public readonly signals: EventEmitter = new EventEmitter();
@@ -47,11 +49,18 @@ export class CliFixture implements AsyncDisposable {
     this.root = folder.path;
     this.dataDirectory = path.join(folder.path, "data");
     this.homeFolder = path.join(folder.path, "home");
-    this.declarationsFile = path.join(folder.path, "declarations.json");
+    this.entryPath = path.join(folder.path, "build", "node_modules", "@noldova", "teamrun-shell-runtime", "services", "runtime-entry.mjs");
+    this.declarationsFile = ModuleDeclarationReader.locate(this.entryPath);
   }
 
   public static async createAsync(): Promise<CliFixture> {
     const fixture = new CliFixture(await SocketFolderFixture.createAsync("tr-cli-"));
+    await mkdir(path.dirname(fixture.entryPath), { recursive: true });
+    await writeFile(fixture.entryPath, [
+      `import { RuntimeEntry } from "${pathToFileURL(RuntimeEntry.entryPath).href}";`,
+      "void RuntimeEntry.settleAsync(RuntimeEntry.runAsync(process.argv.slice(2), process.platform, process.env, process, process.stderr), process.stderr, process);"
+    ].join("\n"));
+    await mkdir(path.dirname(fixture.declarationsFile), { recursive: true });
     await fixture.writeDeclarationsAsync([]);
     return fixture;
   }
@@ -72,20 +81,20 @@ export class CliFixture implements AsyncDisposable {
     input: string = "",
     starter?: IProcessStarter,
     updateWaitMilliseconds?: number,
-    declarationsFile: string = build?.declarationsFile ?? this.declarationsFile): Promise<{ code: number; output: string; error: string }> {
+    entryPath: string = build?.entryPath ?? this.entryPath): Promise<{ code: number; output: string; error: string }> {
     const output = new PassThrough({ encoding: "utf8" });
     const error = new PassThrough({ encoding: "utf8" });
     const inputStream = new PassThrough({ encoding: "utf8" });
     inputStream.end(input);
     const identity: BuildIdentity = build?.identity ?? RuntimeBuild.identity;
-    const context = new CliContext(environment, process.platform, this.homeFolder, process.execPath, build?.entryPath ?? RuntimeEntry.entryPath, identity,
-      output, error, inputStream, this.signals, starter, this.opener, process.pid, updateWaitMilliseconds, declarationsFile);
+    const context = new CliContext(environment, process.platform, this.homeFolder, process.execPath, entryPath, identity,
+      output, error, inputStream, this.signals, starter, this.opener, process.pid, updateWaitMilliseconds);
     const code = await new Cli(context).runAsync(commandLineArguments);
     return { code, output: String(output.read() ?? ""), error: String(error.read() ?? "") };
   }
 
-  public runModuleAsync(declarationsFile: string, commandLineArguments: readonly string[]): Promise<{ code: number; output: string; error: string }> {
-    return this.runAsync([CliFixture.DATA_DIRECTORY_FLAG, this.dataDirectory, ...commandLineArguments], null, this.environment, "", undefined, undefined, declarationsFile);
+  public runModuleAsync(build: ProbeBuildFixture, commandLineArguments: readonly string[]): Promise<{ code: number; output: string; error: string }> {
+    return this.runAsync([CliFixture.DATA_DIRECTORY_FLAG, this.dataDirectory, ...commandLineArguments], null, this.environment, "", undefined, undefined, build.entryPath);
   }
 
   public async writeDeclarationsAsync(modules: readonly unknown[], formatVersion: unknown = 1): Promise<void> {

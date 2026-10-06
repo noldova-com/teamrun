@@ -33,6 +33,14 @@ export class ModuleDeclarationReaderTests {
   }
 
   @TestMethod
+  public locatesTheDeclarationsOfTheBuildAnEntryPointBelongsTo(): void {
+    const root = path.resolve("teamrun");
+    const entryPath = path.join(root, "node_modules", "@noldova", "teamrun-shell-runtime", "services", "runtime-entry.js");
+
+    Assert.areEqual(path.join(root, "_build", "modules", "declarations.json"), ModuleDeclarationReader.locate(entryPath));
+  }
+
+  @TestMethod
   public refusesAMissingOrMalformedFileAndNamesIt(): Promise<void> {
     return ModuleDeclarationReaderTests.runAsync(async file => {
       const missing = await Assert.throwsAsync(() => ModuleDeclarationReader.readAsync(file), DeclarationsFormatException);

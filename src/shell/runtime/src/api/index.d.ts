@@ -4010,6 +4010,17 @@ export declare class ModuleDeclaration {
   public readonly settings: readonly SettingDefinition[];
 
   /**
+   * Its command-line package, or `null` when it has no command-line part.
+   */
+  public readonly cliPackage: string | null;
+
+  /**
+   * Its command-line commands' definitions as the build writes them, which
+   * the command line reads.
+   */
+  public readonly cliCommands: readonly JsonValue[];
+
+  /**
    * Creates the declaration.
    *
    * @param id The module's id: lowercase kebab-case and not `shell`.
@@ -4021,6 +4032,9 @@ export declare class ModuleDeclaration {
    * @param runtimePackage Its runtime package, or `null`.
    * @param contributions The names it contributes, by kind.
    * @param settings The definitions of its settings, each its own; none by
+   * default.
+   * @param cliPackage Its command-line package, or `null`, the default.
+   * @param cliCommands Its command-line commands' definitions; none by
    * default.
    * @throws {ArgumentException} When the id, the version, the display name or
    * the description is not valid, or a setting belongs to another owner, is of
@@ -4041,7 +4055,9 @@ export declare class ModuleDeclaration {
     dependencies: readonly string[],
     runtimePackage: string | null,
     contributions: ReadonlyMap<string, readonly string[]>,
-    settings?: readonly SettingDefinition[]);
+    settings?: readonly SettingDefinition[],
+    cliPackage?: string | null,
+    cliCommands?: readonly JsonValue[]);
 
   /**
    * Reads a declaration from its form in `declarations.json`.
@@ -4049,7 +4065,8 @@ export declare class ModuleDeclaration {
    * @param value The value read from the file.
    * @returns The declaration.
    * @throws {DeclarationsFormatException} When the value is no object or a
-   * field is missing or invalid, including a setting's definition.
+   * field is missing or invalid, including a setting's definition; the
+   * optional `cliPackage` and `cliCommands` default to `null` and none.
    * @example
    * ```ts
    * import { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
@@ -5697,6 +5714,21 @@ export declare class ModuleContext implements IRuntimePartContext, Disposable {
  * Reads the build's module declarations.
  */
 export declare class ModuleDeclarationReader {
+  /**
+   * Locates the declarations file of the build whose installed runtime starts
+   * from the given entry point.
+   *
+   * @param runtimeEntryPath The installed runtime's entry point.
+   * @returns The build's `_build/modules/declarations.json`.
+   * @example
+   * ```ts
+   * import { ModuleDeclarationReader, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const declarationsFile: string = ModuleDeclarationReader.locate(RuntimeEntry.entryPath);
+   * ```
+   */
+  public static locate(runtimeEntryPath: string): string;
+
   /**
    * Reads the declarations file.
    *

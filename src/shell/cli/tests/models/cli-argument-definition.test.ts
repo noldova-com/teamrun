@@ -27,7 +27,7 @@ export class CliArgumentDefinitionTests {
   @TestMethod
   public async refusesDeclarationsWhoseArgumentLacksADescriptionOrFlags(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
-    const prefix = `The module declarations ${fixture.declarationsFile} could not be read: $.modules.0.cliCommands.0.arguments.0.`;
+    const prefix = `The module declarations ${fixture.declarationsFile} hold command-line commands that are not valid: JsonException: notes.cliCommands.0.arguments.0.`;
     const cases: readonly (readonly [Readonly<Record<string, unknown>>, string])[] = [
       [{ name: "notePath", description: " ", required: true, variadic: false }, "description: Expected a string that is not blank."],
       [{ name: "notePath", description: "The path.", variadic: false }, "required: The field is required."],

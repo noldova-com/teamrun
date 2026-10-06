@@ -18,12 +18,12 @@ export class ModuleNotActiveExceptionTests {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(build.declarationsFile);
-    const status = await fixture.runModuleAsync(build.declarationsFile, ["status", "--json"]);
+    const status = await fixture.runModuleAsync(build, ["status", "--json"]);
     const modules = (JSON.parse(status.output) as { modules: { id: string; cause?: string }[] }).modules;
     const cause = (id: string): string => String(modules.find(t => t.id === id)?.cause);
 
-    const failing = await fixture.runModuleAsync(build.declarationsFile, ["failing", "run"]);
-    const blocked = await fixture.runModuleAsync(build.declarationsFile, ["blocked", "run", "--json"]);
+    const failing = await fixture.runModuleAsync(build, ["failing", "run"]);
+    const blocked = await fixture.runModuleAsync(build, ["blocked", "run", "--json"]);
 
     Assert.areEqual(7, failing.code, failing.error);
     Assert.areEqual(`The module failing is not active: ${cause("failing")}\n`, failing.error);
@@ -42,9 +42,9 @@ export class ModuleNotActiveExceptionTests {
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(build.declarationsFile);
 
-    const failing = await fixture.runModuleAsync(build.declarationsFile, ["run", "failing.run", "--json"]);
-    const unknownModule = await fixture.runModuleAsync(build.declarationsFile, ["run", "nosuch.run", "--json"]);
-    const unknownCommand = await fixture.runModuleAsync(build.declarationsFile, ["run", "probe.nope", "--json"]);
+    const failing = await fixture.runModuleAsync(build, ["run", "failing.run", "--json"]);
+    const unknownModule = await fixture.runModuleAsync(build, ["run", "nosuch.run", "--json"]);
+    const unknownCommand = await fixture.runModuleAsync(build, ["run", "probe.nope", "--json"]);
 
     Assert.areEqual(7, failing.code, failing.error);
     Assert.areEqual("ModuleNotActive", (JSON.parse(failing.error) as { code: string }).code);
@@ -61,7 +61,7 @@ export class ModuleNotActiveExceptionTests {
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(plain.declarationsFile);
 
-    const result = await fixture.runModuleAsync(build.declarationsFile, ["needy", "run"]);
+    const result = await fixture.runModuleAsync(build, ["needy", "run"]);
 
     Assert.areEqual(7, result.code, result.error);
     Assert.areEqual("The module needy is not active: The runtime does not have it.\n", result.error);

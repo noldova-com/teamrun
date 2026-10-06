@@ -7,7 +7,6 @@
  */
 
 import type { EventEmitter } from "node:events";
-import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 
 import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
@@ -32,7 +31,6 @@ export class CliContext {
   public readonly desktopOpener: IDesktopOpener;
   public readonly processId: number;
   public readonly updateWaitMilliseconds: number;
-  public readonly declarationsFile: string;
 
   public constructor(
     environment: NodeJS.ProcessEnv,
@@ -48,8 +46,7 @@ export class CliContext {
     runtimeStarter: IProcessStarter = new ChildProcessStarter(),
     desktopOpener: IDesktopOpener = new DesktopOpener(),
     processId: number = process.pid,
-    updateWaitMilliseconds: number = Resources.updateWait,
-    declarationsFile: string = path.join(path.dirname(runtimeEntryPath), ...Resources.declarationsSegments)) {
+    updateWaitMilliseconds: number = Resources.updateWait) {
     this.environment = environment;
     this.platform = platform;
     this.homeFolder = homeFolder;
@@ -64,6 +61,5 @@ export class CliContext {
     this.desktopOpener = desktopOpener;
     this.processId = processId;
     this.updateWaitMilliseconds = updateWaitMilliseconds;
-    this.declarationsFile = declarationsFile;
   }
 }

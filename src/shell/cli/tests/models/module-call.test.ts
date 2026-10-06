@@ -14,16 +14,16 @@ import { ProbeBuildFixture } from "../fixtures/probe-build.fixture.js";
 @TestClass
 export class ModuleCallTests {
   @TestMethod
-  public async readsArgumentsAndOptionsInAnyOrderWithTheirDefaultsAsOneFrozenObject(): Promise<void> {
+  public async readsArgumentsAndOptionsInAnyOrderWithTheirDefaultsAsOneObject(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(build.declarationsFile);
 
-    const mixed = await fixture.runModuleAsync(build.declarationsFile, ["probe", "echo-values", "hi", "--level", "2", "--tag", "a", "there", "--loud", "--tag=b", "more"]);
-    const json = await fixture.runModuleAsync(build.declarationsFile, ["probe", "echo-values", "--json", "hi", "--level=-2.5", "--times", "0.5", "--note=--x", "--prefix", "-"]);
+    const mixed = await fixture.runModuleAsync(build, ["probe", "echo-values", "hi", "--level", "-123456789.012345", "--tag", "a", "there", "--loud", "--tag=b", "more"]);
+    const json = await fixture.runModuleAsync(build, ["probe", "echo-values", "--json", "hi", "--level=-2.5", "--times", "0.5", "--note=--x", "--prefix", "-"]);
 
     Assert.areEqual(0, mixed.code, mixed.error);
-    Assert.areEqual("{\"text\":\"hi\",\"moreText\":[\"there\",\"more\"],\"times\":1,\"loud\":true,\"tag\":[\"a\",\"b\"],\"level\":2,\"prefix\":\"Probe\"} (frozen)\n", mixed.output);
+    Assert.areEqual("{\"text\":\"hi\",\"moreText\":[\"there\",\"more\"],\"times\":1,\"loud\":true,\"tag\":[\"a\",\"b\"],\"level\":-123456789.012345,\"prefix\":\"Probe\"}\n", mixed.output);
     Assert.areEqual(0, json.code, json.error);
     Assert.areEqual("{\"text\":\"hi\",\"times\":0.5,\"level\":-2.5,\"prefix\":\"-\",\"note\":\"--x\"}\n", json.output);
   }
@@ -34,10 +34,10 @@ export class ModuleCallTests {
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
     await fixture.startHostAsync(build.declarationsFile);
 
-    const result = await fixture.runModuleAsync(build.declarationsFile, ["probe", "echo-values", "--level", "1", "--", "--tag", "--json", "--", "-x"]);
+    const result = await fixture.runModuleAsync(build, ["probe", "echo-values", "--level", "1", "--", "--tag", "--json", "--", "-x"]);
 
     Assert.areEqual(0, result.code, result.error);
-    Assert.areEqual("{\"text\":\"--tag\",\"moreText\":[\"--json\",\"--\",\"-x\"],\"times\":1,\"level\":1,\"prefix\":\"Probe\"} (frozen)\n", result.output);
+    Assert.areEqual("{\"text\":\"--tag\",\"moreText\":[\"--json\",\"--\",\"-x\"],\"times\":1,\"level\":1,\"prefix\":\"Probe\"}\n", result.output);
   }
 
   @TestMethod
@@ -49,8 +49,9 @@ export class ModuleCallTests {
       [[...echo, "--level", "1"], "The <text> argument is required."],
       [[...echo, "hi"], "The --level option is required."],
       [[...echo, "hi", "--level", "1", "--bogus"], "\"--bogus\" is not an option."],
-      [[...echo, "hi", "--level", "x"], "The --level option takes a number, not \"x\"."],
-      [[...echo, "hi", "--level", "1.", "--loud"], "The --level option takes a number, not \"1.\"."],
+      [[...echo, "hi", "--level", "x"], "The --level option takes a number of at most 15 digits, not \"x\"."],
+      [[...echo, "hi", "--level", "1.", "--loud"], "The --level option takes a number of at most 15 digits, not \"1.\"."],
+      [[...echo, "hi", "--level", "1234567890.123456"], "The --level option takes a number of at most 15 digits, not \"1234567890.123456\"."],
       [[...echo, "hi", "--level", "1", "--loud=yes"], "The --loud option takes no value."],
       [[...echo, "hi", "--level"], "The --level option needs a value."],
       [[...echo, "hi", "--level", "1", "--note", "--loud"], "The --note option needs a value."],
@@ -61,8 +62,8 @@ export class ModuleCallTests {
     ];
 
     for (const [commandLineArguments, message] of cases) {
-      const result = await fixture.runModuleAsync(build.declarationsFile, commandLineArguments);
-      const help = await fixture.runModuleAsync(build.declarationsFile, ["help", ...commandLineArguments.slice(0, 2)]);
+      const result = await fixture.runModuleAsync(build, commandLineArguments);
+      const help = await fixture.runModuleAsync(build, ["help", ...commandLineArguments.slice(0, 2)]);
 
       Assert.areEqual(2, result.code, commandLineArguments.join(" "));
       Assert.areEqual(`${message}\n\n${help.output}`, result.error);

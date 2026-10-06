@@ -19,7 +19,6 @@ import {
   CommandRun,
   Failure,
   FailureCode,
-  ModuleState,
   type ModuleStatus,
   ModuleStatusList,
   QualifiedName,
@@ -51,9 +50,9 @@ import {
 import { ArgumentsSource } from "../enums/arguments-source.js";
 import { CliCommand } from "../enums/cli-command.js";
 import { ExitCode } from "../enums/exit-code.js";
+import { CliCommandException } from "../exceptions/cli-command.exception.js";
 import { ModuleNotActiveException } from "../exceptions/module-not-active.exception.js";
 import { UsageException } from "../exceptions/usage.exception.js";
-import type { ICliCommandHandler } from "../interfaces/i-cli-command-handler.js";
 import type { CliCommandResult } from "../models/cli-command-result.js";
 import type { CliContext } from "../models/cli-context.js";
 import { CliFailure } from "../models/cli-failure.js";
@@ -119,13 +118,15 @@ export class Cli {
   }
 
   private async helpAsync(commandLine: CommandLine, output: CliOutput): Promise<number> {
-    const modules = await CliModuleReader.readAsync(this.context.declarationsFile);
+    const modules = await CliModuleReader.readAsync(this.context.runtimeEntryPath);
     const [moduleId, word, unexpected] = commandLine.moduleArguments;
     const module = modules.find(t => t.id === moduleId);
     if (Object.isUndefined(module)) {
-      if (Object.isUndefined(moduleId) || Object.values(Resources.commandWords).includes(moduleId))
-        return Cli.help(output, CliHelp.formatAll(modules));
-      return this.fail(output, new UsageException(Resources.formatUnknownCommand(moduleId)), Resources.usage);
+      if (!Object.isUndefined(moduleId) && !Resources.ownCommands.has(moduleId))
+        return this.fail(output, new UsageException(Resources.formatUnknownCommand(moduleId)), Resources.usage);
+      if (!Object.isUndefined(word))
+        return this.fail(output, new UsageException(Resources.formatUnexpectedArgument(word)), Resources.usage);
+      return Cli.help(output, CliHelp.formatAll(modules));
     }
     if (!Object.isUndefined(unexpected))
       return this.fail(output, new UsageException(Resources.formatUnexpectedArgument(unexpected)), CliHelp.formatModule(module));
@@ -138,7 +139,7 @@ export class Cli {
   }
 
   private async runModuleAsync(commandLine: CommandLine, output: CliOutput): Promise<number> {
-    const modules = await CliModuleReader.readAsync(this.context.declarationsFile);
+    const modules = await CliModuleReader.readAsync(this.context.runtimeEntryPath);
     const module = modules.find(t => t.id === commandLine.commandName);
     if (Object.isUndefined(module))
       return this.fail(output, new UsageException(Resources.formatUnknownCommand(commandLine.commandName)), Resources.usage);
@@ -168,22 +169,23 @@ export class Cli {
 
   private async runModuleCommandAsync(commandLine: CommandLine, modules: readonly CliModule[], module: CliModule, call: ModuleCall): Promise<CliCommandResult> {
     const client = await this.attachAsync(commandLine, this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
-    const host = new CliPartHost(modules, (method, payload, signal) => Cli.callAsync(client, QualifiedName.parse(method), payload, undefined, signal));
     try {
-      const status = await Cli.findModuleAsync(client, module.id);
-      if (Object.isUndefined(status))
-        throw new ModuleNotActiveException(module.id, Resources.moduleNotInRuntime);
-      Cli.requireActive(status);
-      const handler = await host.startAsync(module, call.command);
-      return await this.handleAsync(handler, call.values, commandLine.timeoutMilliseconds);
+      const host = new CliPartHost(modules, (method, payload, signal) => Cli.callAsync(client, method, payload, undefined, signal));
+      const outcome = await this.untilStoppedAsync(signal => Cli.runPartsAsync(client, host, module, call, signal), commandLine.timeoutMilliseconds)
+        .then(result => ({ result }), (error: unknown) => ({ error }));
+      const failures = await host.stopAsync();
+      if ("error" in outcome)
+        throw outcome.error;
+      if (failures.length > 0)
+        throw new CliCommandException(Resources.failedCode, Resources.formatCliPartStopFailed(failures.join(Resources.reasonSeparator)));
+      return outcome.result;
     }
     finally {
-      await host.stopAsync();
       client.close();
     }
   }
 
-  private async handleAsync(handler: ICliCommandHandler, values: Readonly<Record<string, JsonValue>>, timeout: number | null): Promise<CliCommandResult> {
+  private async untilStoppedAsync<T>(work: (signal: AbortSignal) => Promise<T>, timeout: number | null): Promise<T> {
     const controller = new AbortController();
     const stopped = Promise.withResolvers<never>();
     const stop = (failure: Failure): void => {
@@ -194,11 +196,27 @@ export class Cli {
     this.context.signals.on(Resources.interruptSignal, interrupt);
     const timer = Object.isNull(timeout) ? undefined : setTimeout(() => stop(new Failure(FailureCode.DeadlineExceeded, Resources.timedOut)), timeout);
     try {
-      return await Promise.race([handler.handleAsync(values, controller.signal), stopped.promise]);
+      return await Promise.race([work(controller.signal), stopped.promise]);
     }
     finally {
       clearTimeout(timer);
       this.context.signals.off(Resources.interruptSignal, interrupt);
+    }
+  }
+
+  private static async runPartsAsync(client: RuntimeClient, host: CliPartHost, module: CliModule, call: ModuleCall, signal: AbortSignal): Promise<CliCommandResult> {
+    const status = await Cli.findModuleAsync(client, module.id, signal);
+    if (Object.isUndefined(status))
+      throw new ModuleNotActiveException(module.id, Resources.moduleNotInRuntime);
+    Cli.requireActive(status);
+    const handler = await host.startAsync(module, call.command);
+    try {
+      return await handler.handleAsync(call.values, signal);
+    }
+    catch (error) {
+      throw error instanceof UsageException || error instanceof CliCommandException || error instanceof MethodFailureException
+        ? error
+        : new CliCommandException(Resources.failedCode, Resources.formatCommandFailed(String(error)));
     }
   }
 
@@ -323,13 +341,13 @@ export class Cli {
     return ExitCode.Success;
   }
 
-  private static async findModuleAsync(client: RuntimeClient, moduleId: string): Promise<ModuleStatus | undefined> {
-    return ModuleStatusList.fromJson(await Cli.callAsync(client, ShellMethods.modules, null)).modules.find(t => t.id === moduleId);
+  private static async findModuleAsync(client: RuntimeClient, moduleId: string, signal?: AbortSignal): Promise<ModuleStatus | undefined> {
+    return ModuleStatusList.fromJson(await Cli.callAsync(client, ShellMethods.modules, null, undefined, signal)).modules.find(t => t.id === moduleId);
   }
 
   private static requireActive(status: ModuleStatus): void {
-    if (status.state !== ModuleState.Active)
-      throw new ModuleNotActiveException(status.id, String(status.cause), status.blockedBy);
+    if (!Object.isNull(status.cause))
+      throw new ModuleNotActiveException(status.id, status.cause, status.blockedBy);
   }
 
   private static isUpdateUnderWay(error: unknown): boolean {

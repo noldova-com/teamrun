@@ -10,6 +10,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { CommandLineNames } from "../../src/shell/cli/src/models/command-line-names.ts";
 import type IModuleDeclarationJson from "./interfaces/i-module-declaration-json.ts";
 import ModuleCliCommands from "./module-cli-commands.ts";
 import ModuleMenus from "./module-menus.ts";
@@ -18,8 +19,8 @@ import ModuleSettings from "./module-settings.ts";
 
 export default class ModuleDeclaration {
   public static readonly PARTS: readonly string[] = ["runtime", "window", "cli"];
-  public static readonly RESERVED_IDS: readonly string[] = ["shell", "status", "commands", "run", "open", "help"];
 
+  private static readonly RESERVED_IDS: readonly string[] = ["shell", ...CommandLineNames.ownCommands];
   private static readonly FILE_NAME: string = "module.json";
   private static readonly ID_PATTERN: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   private static readonly VERSION_PATTERN: RegExp = /^(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})$/;

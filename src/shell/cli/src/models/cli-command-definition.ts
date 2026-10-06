@@ -42,7 +42,7 @@ export class CliCommandDefinition {
       reader.readNullableString("description"),
       reader.readObjectArray("arguments").map(t => CliArgumentDefinition.fromJson(t)),
       reader.readObjectArray("options").map(t => CliOptionDefinition.fromJson(t)),
-      reader.readObjectArray("examples").map(t => [t.readString("arguments"), t.readNonBlankString("description")] as const));
+      reader.readObjectArray("examples").map((t): readonly [string, string] => [t.readString("arguments"), t.readNonBlankString("description")]));
   }
 
   public get word(): string {

@@ -6,8 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { JsonReader } from "@noldova/teamrun-foundation-json";
+import { JsonReader } from "@noldova/teamrun-foundation-json";
+import type { ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
 
+import { Resources } from "../resources.js";
 import { CliCommandDefinition } from "./cli-command-definition.js";
 
 export class CliModule {
@@ -27,13 +29,13 @@ export class CliModule {
     this.commands = commands;
   }
 
-  public static fromJson(reader: JsonReader): CliModule {
+  public static fromDeclaration(declaration: ModuleDeclaration): CliModule {
     return new CliModule(
-      reader.readNonBlankString("id"),
-      reader.readNonBlankString("displayName"),
-      reader.readNonBlankString("description"),
-      reader.readStringArray("dependencies"),
-      reader.readNullableString("cliPackage"),
-      reader.readObjectArray("cliCommands").map(t => CliCommandDefinition.fromJson(t)));
+      declaration.id,
+      declaration.displayName,
+      declaration.description,
+      declaration.dependencies,
+      declaration.cliPackage,
+      declaration.cliCommands.map((t, index) => CliCommandDefinition.fromJson(JsonReader.fromValue(t, Resources.formatCliCommandPath(declaration.id, index)))));
   }
 }
