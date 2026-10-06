@@ -509,6 +509,7 @@ export class DesktopApplication {
   }
 
   private async refreshTrayAsync(): Promise<void> {
+    const epoch = this.notifier.epoch;
     const device = await this.device;
     if (Object.isNull(device))
       return;
@@ -517,6 +518,8 @@ export class DesktopApplication {
       this.callAsync(ShellMethods.notifications, new NotificationsQuery(device).toJson()),
       this.trayIcon.refreshAsync(device)
     ]);
+    if (epoch !== this.notifier.epoch)
+      return;
     try {
       if (!work.hasFailed)
         this.tray.receiveWork(WorkReport.fromJson(work.payload));
@@ -530,11 +533,13 @@ export class DesktopApplication {
 
   private async setDoNotDisturbAsync(isOn: boolean): Promise<void> {
     const device = await this.device;
-    if (Object.isNull(device))
+    const failure = Object.isNull(device)
+      ? new Failure(FailureCode.Unavailable, Resources.deviceNotIdentified)
+      : (await this.callAsync(ShellMethods.setSetting, new SettingValue(new SettingKey(ShellSettings.doNotDisturb, null, device), isOn).toJson())).failure;
+    if (Object.isUndefined(failure))
       return;
-    const failure = (await this.callAsync(ShellMethods.setSetting, new SettingValue(new SettingKey(ShellSettings.doNotDisturb, null, device), isOn).toJson())).failure;
-    if (!Object.isUndefined(failure))
-      this.log.write(Resources.formatDoNotDisturbNotSet(failure.message));
+    this.log.write(Resources.formatDoNotDisturbNotSet(failure.message));
+    this.tray.rebuildMenu();
   }
 
   private reopen(): void {

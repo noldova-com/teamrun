@@ -29,6 +29,7 @@ export class TrayController {
   private isEnabled: boolean = false;
   private isHostAvailable: boolean = false;
   private hasFailed: boolean = false;
+  private isDisposed: boolean = false;
   private work: WorkReport | null = null;
   private notifications: NotificationState | null = null;
   private image: string = String.empty;
@@ -50,6 +51,8 @@ export class TrayController {
   }
 
   public setHostAvailable(isAvailable: boolean): void {
+    if (isAvailable && !this.isHostAvailable)
+      this.hasFailed = false;
     this.isHostAvailable = isAvailable;
     this.update();
   }
@@ -74,13 +77,18 @@ export class TrayController {
     this.update();
   }
 
+  public rebuildMenu(): void {
+    this.menuKey = String.empty;
+    this.update();
+  }
+
   public dispose(): void {
-    this.isEnabled = false;
+    this.isDisposed = true;
     this.update();
   }
 
   private update(): void {
-    if (!this.isEnabled || !this.isHostAvailable) {
+    if (!this.isEnabled || !this.isHostAvailable || this.isDisposed) {
       this.tray?.destroy();
       this.tray = null;
       this.image = String.empty;
