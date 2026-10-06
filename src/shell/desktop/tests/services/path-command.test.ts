@@ -59,9 +59,11 @@ export class PathCommandTests {
   }
 
   @TestMethod
-  public replacesALinkToElsewhereAndKeepsALinkThatIsAlreadyRightThroughTheLinkCalls(): Promise<void> {
+  public replacesALinkToElsewhereKeepsALinkThatIsAlreadyRightAndLeavesAFileThroughTheLinkCalls(): Promise<void> {
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
       const link = path.join(folder, "bin", "teamrun");
+      const file = path.join(folder, "file");
+      await writeFile(file, "someone else's teamrun");
       const ran: (readonly string[])[] = [];
       const files = new PathCommandFilesFixture();
       files.linkStubs = new Map([[link, path.join(folder, "old", "teamrun")]]);
@@ -70,9 +72,9 @@ export class PathCommandTests {
         return Promise.resolve();
       });
 
-      const outcomes = [await command.installAsync(), await command.installAsync()];
+      const outcomes = [await command.installAsync(), await command.installAsync(), await new PathCommand(target, file, files, () => Promise.resolve()).installAsync()];
 
-      Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.AlreadyInstalled].join(), outcomes.join());
+      Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.AlreadyInstalled, PathCommandOutcome.Occupied].join(), outcomes.join());
       Assert.areEqual(target, files.linkStubs.get(link));
       Assert.areEqual(0, ran.length);
     });
