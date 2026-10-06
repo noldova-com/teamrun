@@ -19,15 +19,6 @@ import { DeviceIdentityException } from "../exceptions/device-identity.exception
 import { Resources } from "../resources.js";
 
 export class DeviceIdentity {
-  public static locateFolder(platform: string, environment: NodeJS.ProcessEnv, homeFolder: string): string {
-    if (platform === Resources.windowsPlatform)
-      return path.join(environment[Resources.localAppDataVariable] ?? path.join(homeFolder, ...Resources.windowsLocalAppData), ...Resources.windowsDeviceFolder);
-    if (platform === Resources.macPlatform)
-      return path.join(homeFolder, ...Resources.macDeviceFolder);
-    const state = environment[Resources.xdgStateVariable];
-    return path.join(Object.isUndefined(state) || String.isNullOrWhitespace(state) ? path.join(homeFolder, ...Resources.xdgStateDefault) : state, ...Resources.linuxDeviceFolder);
-  }
-
   public static async readOrCreateAsync(folder: string): Promise<string> {
     const file = path.join(folder, Resources.deviceFileName);
     if (!existsSync(file)) {

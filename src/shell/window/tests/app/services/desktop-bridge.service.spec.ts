@@ -29,6 +29,8 @@ describe("DesktopBridgeService", () => {
     notifyAppearance: (): void => undefined,
     onCloseRequest: (): (() => void) => () => undefined,
     answerClose: (): Promise<boolean> => Promise.resolve(true),
+    onUpdateSaveRequest: (): (() => void) => () => undefined,
+    answerUpdateSave: (): Promise<boolean> => Promise.resolve(true),
     readStartup: (): Promise<unknown> => Promise.resolve(null),
     onStartup: (): (() => void) => () => undefined,
     actOnStartup: (): Promise<boolean> => Promise.resolve(true),
@@ -61,6 +63,8 @@ describe("DesktopBridgeService", () => {
     ["no notifyAppearance", { ...complete, notifyAppearance: null }],
     ["no onCloseRequest", { ...complete, onCloseRequest: null }],
     ["no answerClose", { ...complete, answerClose: null }],
+    ["no onUpdateSaveRequest", { ...complete, onUpdateSaveRequest: null }],
+    ["no answerUpdateSave", { ...complete, answerUpdateSave: null }],
     ["no readStartup", { ...complete, readStartup: null }],
     ["no onStartup", { ...complete, onStartup: null }],
     ["no actOnStartup", { ...complete, actOnStartup: null }],
@@ -135,6 +139,21 @@ describe("DesktopBridgeService", () => {
     expect(requests).toEqual(["first"]);
     expect(await service.answerCloseAsync("first", false)).toBe(true);
     expect(bridge.answers).toEqual(["first:false"]);
+  });
+
+  it("passes an update's save requests on until unsubscribed and answers them with what did not save", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+    const requests: string[] = [];
+
+    const unsubscribe = service.onUpdateSaveRequest(t => requests.push(t));
+    bridge.requestUpdateSave("first");
+    unsubscribe();
+    bridge.requestUpdateSave("second");
+
+    expect(requests).toEqual(["first"]);
+    expect(await service.answerUpdateSaveAsync("first", ["Notes couldn't save"])).toBe(true);
+    expect(bridge.updateSaveAnswers).toEqual(["first:Notes couldn't save"]);
   });
 
   it("reads and follows the startup state until unsubscribed, and passes the person's choice on", async () => {

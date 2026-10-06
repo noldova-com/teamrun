@@ -42,6 +42,10 @@ LICENSE file in the root directory of this source tree.
       <h1 class="tr-startup-title">{{ resources.newerBuildTitle }}</h1>
       <p>{{ resources.formatNewerBuild(state().details[0] ?? "") }}</p>
     }
+    @case (kinds.Updating) {
+      <h1 class="tr-startup-title">{{ resources.formatUpdatingTitle(state().details[0] ?? "") }}</h1>
+      <p class="tr-startup-detail">{{ resources.updatingText }}</p>
+    }
     @case (kinds.Failed) {
       <h1 class="tr-startup-title">{{ resources.failedTitle }}</h1>
       <p class="tr-startup-detail">{{ state().details[0] }}</p>

@@ -64,4 +64,24 @@ describe("StartupService", () => {
 
     expect(bridge.listenerCount).toBe(0);
   });
+
+  it("announces an update once, covers the window for it and announces starting again after it", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce").mockResolvedValue();
+    const service = TestBed.inject(StartupService);
+    await vi.waitFor(() => expect(service.hasStarted()).toBe(true));
+
+    bridge.publishStartup({ kind: "Updating", details: ["0.3.0"] });
+    const isCovered = service.isReconnecting();
+    bridge.publishStartup({ kind: "Updating", details: ["0.3.0"] });
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Updating", details: [] });
+
+    expect(isCovered).toBe(true);
+    expect(announce.mock.calls).toEqual([
+      ["Installing TeamRun 0.3.0", Resources.politeAnnouncement],
+      [Resources.startingTitle, Resources.politeAnnouncement],
+      ["Installing TeamRun ", Resources.politeAnnouncement]
+    ]);
+  });
 });

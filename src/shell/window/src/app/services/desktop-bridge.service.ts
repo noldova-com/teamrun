@@ -59,6 +59,14 @@ export class DesktopBridgeService implements ClipboardWriter {
     return this.bridge.answerClose(requestId, isSaved);
   }
 
+  public onUpdateSaveRequest(listener: (requestId: string) => void): () => void {
+    return this.bridge.onUpdateSaveRequest(listener);
+  }
+
+  public answerUpdateSaveAsync(requestId: string, problems: readonly string[]): Promise<boolean> {
+    return this.bridge.answerUpdateSave(requestId, problems);
+  }
+
   public async readStartupAsync(): Promise<StartupState> {
     return StartupState.fromJson(await this.bridge.readStartup());
   }
@@ -196,6 +204,8 @@ export class DesktopBridgeService implements ClipboardWriter {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.notifyAppearance))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onCloseRequest))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerClose))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onUpdateSaveRequest))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerUpdateSave))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readStartup))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onStartup))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.actOnStartup))) &&

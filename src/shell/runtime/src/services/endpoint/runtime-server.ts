@@ -22,6 +22,7 @@ import {
   FrameWriter,
   Handshake,
   ProtocolException,
+  type QualifiedName,
   Request,
   Response,
   type RuntimeHandover,
@@ -35,6 +36,7 @@ import { MethodFailureException } from "../../exceptions/method-failure.exceptio
 import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { ISessionListener } from "../../interfaces/i-session-listener.js";
 import type { CapabilityToken } from "../../models/capability-token.js";
+import { ConnectedClient } from "../../models/connected-client.js";
 import { Endpoint } from "../../models/endpoint.js";
 import { ProductInfo } from "../../models/product-info.js";
 import type { Refusal } from "../../models/refusal.js";
@@ -45,6 +47,8 @@ import type { MethodRegistry } from "../registry/method-registry.js";
 import { ClientSession } from "./client-session.js";
 
 export class RuntimeServer implements IEventSink {
+  private static readonly UPDATE_METHODS: readonly QualifiedName[] = [ShellMethods.updateSaved, ShellMethods.work, ShellMethods.stop];
+
   private readonly identity: BuildIdentity;
   private readonly token: CapabilityToken;
   private readonly handover: RuntimeHandover;
@@ -60,6 +64,9 @@ export class RuntimeServer implements IEventSink {
   private server: Server | null = null;
   private socketPath: string | null = null;
   private refusal: Refusal | null = null;
+  private updating: Failure | null = null;
+  private readonly saved: Set<number> = new Set();
+  private nextConnection: number = 1;
 
   public constructor(
     identity: BuildIdentity,
@@ -86,6 +93,10 @@ export class RuntimeServer implements IEventSink {
 
   public get sessionCount(): number {
     return this.sessions.size;
+  }
+
+  public get clients(): readonly ConnectedClient[] {
+    return [...this.sessions].filter(t => t.state === SessionState.Authenticated).map(t => new ConnectedClient(t.connection, t.client));
   }
 
   public countOtherClients(context: RequestContext): number {
@@ -122,6 +133,19 @@ export class RuntimeServer implements IEventSink {
     this.refusal = null;
     for (const session of this.refusals.keys())
       session.end();
+  }
+
+  public beginUpdate(failure: Failure): void {
+    this.updating = failure;
+  }
+
+  public refuseAfterSave(connection: number): void {
+    this.saved.add(connection);
+  }
+
+  public endUpdate(): void {
+    this.updating = null;
+    this.saved.clear();
   }
 
   public broadcast(event: Event): void {
@@ -218,7 +242,7 @@ export class RuntimeServer implements IEventSink {
   }
 
   private accept(socket: Socket): void {
-    const session = new ClientSession(socket, this.settings.maximumFrameLength, this.listener);
+    const session = new ClientSession(socket, this.nextConnection++, this.settings.maximumFrameLength, this.listener);
     this.sessions.add(session);
     const timer = setTimeout(() => {
       if (session.state === SessionState.AwaitingHandshake)
@@ -244,6 +268,11 @@ export class RuntimeServer implements IEventSink {
       session.send(Response.failure(message.id, new Failure(FailureCode.BuildMismatch, Resources.formatBuildMismatchFailure(ProductInfo.current.name), this.handover.toJson())));
       return;
     }
+    if (!Object.isNull(this.updating)) {
+      session.send(Response.failure(message.id, this.updating));
+      session.end();
+      return;
+    }
     if (!Object.isNull(this.refusal)) {
       this.refusals.set(session, this.refusal);
       session.enter(SessionState.Refused, message.client);
@@ -263,6 +292,10 @@ export class RuntimeServer implements IEventSink {
     const refusal = this.refusals.get(session);
     if (!Object.isUndefined(refusal) && !request.method.equals(refusal.method) && !request.method.equals(ShellMethods.stop)) {
       session.send(Response.failure(request.id, refusal.failure));
+      return;
+    }
+    if (!Object.isNull(this.updating) && this.saved.has(session.connection) && !RuntimeServer.UPDATE_METHODS.some(t => t.equals(request.method))) {
+      session.send(Response.failure(request.id, this.updating));
       return;
     }
     const handler = this.methods.find(request.method);
@@ -292,7 +325,7 @@ export class RuntimeServer implements IEventSink {
       settle(Response.failure(request.id, new Failure(code, code === FailureCode.DeadlineExceeded ? Resources.deadlineExceeded : Resources.cancelled)));
     }, { once: true });
     session.trackRequest(request.id, controller);
-    const context = new RequestContext(session.client, request.payload, controller.signal);
+    const context = new RequestContext(session.client, request.payload, controller.signal, session.connection);
     this.askers.set(context, session);
     Promise.try(() => handler.handleAsync(context)).then(
       (result: JsonValue) => settle(Response.success(request.id, result)),

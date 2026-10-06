@@ -12,8 +12,11 @@ import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 
 import { DataDirectoryOwnedException } from "../exceptions/data-directory-owned.exception.js";
+import { UpdateInProgressException } from "../exceptions/update-in-progress.exception.js";
 import { RuntimeOptions } from "../models/runtime-options.js";
 import { Resources } from "../resources.js";
+import { SystemCommand } from "./commands/system-command.js";
+import { ProcessPresence } from "./installation/process-presence.js";
 import { RuntimeHost } from "./lifetime/runtime-host.js";
 
 export class RuntimeEntry {
@@ -33,13 +36,13 @@ export class RuntimeEntry {
 
     let host: RuntimeHost;
     try {
-      host = await RuntimeHost.startAsync(options, platform, environment);
+      host = await RuntimeHost.startAsync(options, platform, environment, ProcessPresence.create(platform, new SystemCommand()));
     }
     catch (failure) {
       if (failure instanceof DataDirectoryOwnedException)
         return Resources.ownedExitCode;
       error.write(`${String(failure)}\n`);
-      return Resources.failureExitCode;
+      return failure instanceof UpdateInProgressException ? Resources.updatingExitCode : Resources.failureExitCode;
     }
 
     const stop = (): void => host.requestStop(Resources.stoppedBySignal);

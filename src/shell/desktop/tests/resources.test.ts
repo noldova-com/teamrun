@@ -20,7 +20,7 @@ export class ResourcesTests {
     const product = ProductInfo.current;
     const electron = new FakeElectron();
     DesktopStartFixture.start(electron, new FakeDesktopProcess("win32"));
-    await electron.app.becomeReadyAsync();
+    await DesktopStartFixture.openAsync(electron);
 
     Assert.isTrue(electron.app.calls.includes(`setName ${product.name}`), electron.app.calls.join(", "));
     Assert.isTrue(DesktopStartFixture.firstWindow(electron).appDetails?.appId?.startsWith(`${product.developmentApplicationId}.`) === true);

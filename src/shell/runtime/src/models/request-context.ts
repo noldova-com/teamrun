@@ -15,11 +15,13 @@ export class RequestContext {
   public readonly client: string;
   public readonly payload: JsonValue;
   public readonly signal: AbortSignal;
+  public readonly connection: number;
 
-  public constructor(client: string, payload: JsonValue, signal: AbortSignal) {
+  public constructor(client: string, payload: JsonValue, signal: AbortSignal, connection: number) {
     ArgumentException.throwIfNullOrWhitespace(client, Resources.clientParameterName);
 
     this.client = client;
+    this.connection = connection;
     this.payload = payload;
     this.signal = signal;
   }

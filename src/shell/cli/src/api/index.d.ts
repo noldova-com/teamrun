@@ -50,7 +50,13 @@ export declare enum ExitCode {
   /**
    * The command timed out or was cancelled.
    */
-  Stopped = 6
+  Stopped = 6,
+
+  /**
+   * TeamRun is installing an update: the update was still under way after
+   * the wait, or one handed to the installer may not have finished.
+   */
+  Updating = 8
 }
 
 /**
@@ -169,6 +175,18 @@ export declare class CliContext {
   public readonly desktopOpener: IDesktopOpener;
 
   /**
+   * The command line's process id, which it reports when a runtime prepares
+   * for an update.
+   */
+  public readonly processId: number;
+
+  /**
+   * How long a command waits for an update that is under way to finish
+   * before it gives up, in milliseconds.
+   */
+  public readonly updateWaitMilliseconds: number;
+
+  /**
    * Creates the context.
    *
    * @param environment The environment.
@@ -183,6 +201,8 @@ export declare class CliContext {
    * @param signals Raises `SIGINT` when the person interrupts a command.
    * @param runtimeStarter Starts the runtime; a direct process launch by default.
    * @param desktopOpener Starts the desktop; a detached process by default.
+   * @param processId The command line's process id; the running process's by default.
+   * @param updateWaitMilliseconds How long to wait for an update under way, in milliseconds; 30 seconds by default.
    * @example
    * ```ts
    * import { homedir } from "node:os";
@@ -206,7 +226,9 @@ export declare class CliContext {
     input: Readable,
     signals: EventEmitter,
     runtimeStarter?: IProcessStarter,
-    desktopOpener?: IDesktopOpener);
+    desktopOpener?: IDesktopOpener,
+    processId?: number,
+    updateWaitMilliseconds?: number);
 }
 
 /**

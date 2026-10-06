@@ -111,6 +111,7 @@ export class UtilityProcessStarterTests {
       await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(runtime));
     }
     finally {
+      await rm(`${root}-installation`, { recursive: true, force: true });
       await rm(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 50 });
     }
   }

@@ -20,6 +20,7 @@ export class StartupStateTests {
       StartupState.waitingForWork(["Indexing the project", "Building"]),
       StartupState.newerBuild("2.0.0"),
       StartupState.failed("The runtime could not start."),
+      StartupState.updating("0.3.0"),
       StartupState.ready()
     ];
 
@@ -31,6 +32,7 @@ export class StartupStateTests {
         { kind: StartupStateKind.WaitingForWork, details: ["Indexing the project", "Building"] },
         { kind: StartupStateKind.NewerBuild, details: ["2.0.0"] },
         { kind: StartupStateKind.Failed, details: ["The runtime could not start."] },
+        { kind: StartupStateKind.Updating, details: ["0.3.0"] },
         { kind: StartupStateKind.Ready, details: [] }
       ]),
       JSON.stringify(states.map(t => ({ kind: t.kind, details: t.details }))));
