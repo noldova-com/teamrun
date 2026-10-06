@@ -13,7 +13,7 @@ import { userEvent } from "vitest/browser";
 import { QuickInputComponent } from "../../../../src/app/components/quick-input/quick-input.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { QuickInputItem } from "../../../../src/app/models/quick-input-item";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 const many: readonly QuickInputItem[] = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));
@@ -298,13 +298,53 @@ describe("QuickInputComponent", () => {
     expect(filtering.componentInstance.chosen).toEqual(["notes.command20"]);
   });
 
-  it("starts at the first option again when its options change, and chooses nothing and announces no results when it has none", async () => {
+  it("keeps its active option when its options change for the same query while that option is still listed, and starts at the first again for a new query", async () => {
+    await pressAsync("End");
+    host.items.set(many.map(t => new QuickInputItem(t.id, t.title, t.icon, t.detail, t.keyLabel)));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const rebuilt = activeIndex();
+    host.items.set(many.slice(20));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const moved = activeIndex();
+    await pressAsync("Enter");
+
+    host.query.set("Command");
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect([rebuilt, moved, activeIndex()]).toEqual([29, 9, 0]);
+    expect(host.chosen).toEqual(["notes.command29"]);
+  });
+
+  it("starts at the first option when the options for a new query arrive after the query, though the options listed before are among them", async () => {
+    await pressAsync("End");
+    host.query.set("Command 2");
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const typed = activeIndex();
+
+    host.items.set([...many.slice(2, 3), ...many.slice(0, 1), ...many.slice(20)]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await pressAsync("Enter");
+
+    expect([typed, activeIndex()]).toEqual([0, 0]);
+    expect(host.chosen).toEqual(["notes.command2"]);
+  });
+
+  it("starts at the first option again when its active one is no longer listed, and chooses nothing and announces no results when it has none", async () => {
     await pressAsync("End");
     host.items.set(many.slice(0, 2));
     fixture.detectChanges();
     await fixture.whenStable();
     const status = fixture.nativeElement.querySelector("[role=status]") as HTMLElement;
     const twoResults = status.textContent;
+    expect(activeIndex()).toBe(0);
+    host.items.set(many);
+    fixture.detectChanges();
+    await fixture.whenStable();
     expect(activeIndex()).toBe(0);
 
     host.items.set([]);

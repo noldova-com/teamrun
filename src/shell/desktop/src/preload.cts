@@ -72,8 +72,28 @@ contextBridge.exposeInMainWorld("teamrun", {
   openLogFolder(): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:openLogFolder") as Promise<boolean>;
   },
+  openLink(url: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:openLink", url) as Promise<boolean>;
+  },
+  installCommand(): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:installCommand") as Promise<boolean>;
+  },
   keepAppearance(preferences: unknown): void {
     ipcRenderer.send("teamrun:keepAppearance", preferences);
+  },
+  readSpelling(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readSpelling");
+  },
+  keepSpelling(isChecking: boolean, languages: readonly string[]): void {
+    ipcRenderer.send("teamrun:spelling", isChecking, languages);
+  },
+  onFieldMenu(listener: (request: unknown) => void): () => void {
+    const handler = (_event: IpcRendererEvent, request: unknown): void => listener(request);
+    ipcRenderer.on("teamrun:fieldMenu", handler);
+    return () => ipcRenderer.removeListener("teamrun:fieldMenu", handler);
+  },
+  replaceMisspelling(text: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:replaceMisspelling", text) as Promise<boolean>;
   },
   edit(action: string): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:edit", action) as Promise<boolean>;

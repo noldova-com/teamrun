@@ -20,6 +20,7 @@ import type { TopBarActionContribution } from "../models/top-bar-action-contribu
 import type { ViewBadge } from "../models/view-badge";
 import type { ViewContribution } from "../models/view-contribution";
 import type { IDocumentOptions } from "./i-document-options";
+import type { IDocumentUpdate } from "./i-document-update";
 import type { IViewDialogOptions } from "./i-view-dialog-options";
 
 export interface IWindowPartContext {
@@ -28,15 +29,19 @@ export interface IWindowPartContext {
   registerCommand(command: CommandContribution): void;
   registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem;
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
+  registerSave(save: () => Promise<void>): () => void;
   provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void;
   setViewBadge(view: string, badge: ViewBadge | null): void;
+  markWorking(name: string, instance?: string): () => void;
   isAllowed(name: string): boolean;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;
   openDocument(name: string, instance: string, title: string, options?: IDocumentOptions): void;
   keepDocument(name: string, instance: string): void;
+  updateDocument(name: string, instance: string, update: IDocumentUpdate): void;
   showInDialogAsync(name: string, options?: IViewDialogOptions): Promise<void>;
   log(message: string): void;
+  openLinkAsync(url: string): Promise<void>;
   requestAsync(method: string, parameters: JsonValue): Promise<JsonValue>;
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
   readSetting(name: string): JsonValue | undefined;

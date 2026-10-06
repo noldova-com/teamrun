@@ -52,6 +52,10 @@ export class NotesWindowPart implements IWindowPart {
     "Help", "FAQ", "Website", "Logo", "Ship it"
   ];
 
+  private static readonly DEEP_BREADCRUMB: readonly string[] = [
+    "Team notes kept for the whole release", "Archive of everything decided before the launch", "Reviews of the window and its controls", "Weeks 38 to 41"
+  ];
+
   private static readonly LONG_COUNT: string = "2 notes, neither pinned nor archived, both last changed today by the person who wrote them, and both waiting for review";
   private static readonly SAVE_FAILED: NotificationPost = new NotificationPost(
     QualifiedName.parse("notes.saveFailed"), null, "Note 2 couldn't be saved", "The disk is full.", NotificationSeverity.Error, null,
@@ -68,8 +72,9 @@ export class NotesWindowPart implements IWindowPart {
       () => import("./components/notes-outline/notes-outline.component").then(t => t.NotesOutlineComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution("notes.note",
       () => import("./components/note/note.component").then(t => t.NoteComponent)));
-    context.openDocument("notes.note", "1", "Note 1");
-    context.openDocument("notes.note", "2", "Note 2");
+    context.registerSave(() => NotesWindowPart.saveAsync());
+    context.openDocument("notes.note", "1", "Note 1", { breadcrumb: ["Notes", "Drafts"] });
+    context.openDocument("notes.note", "2", "Note 2", { breadcrumb: ["Notes"] });
     let count = 2;
     const counter = context.registerStatusBarItem(new StatusBarItemContribution("notes.count", StatusBarSide.Left, new StatusBarItemState("2 notes")));
     context.registerCommand(new CommandContribution("notes.newNote", "New note", "note_add", "Mod+Alt+N", async () => {
@@ -83,6 +88,10 @@ export class NotesWindowPart implements IWindowPart {
       context.openDocument("notes.note", `week-${note.readInteger("week")}`, note.readString("title"));
       return null;
     }, commandArguments => commandArguments !== null && JsonReader.fromValue(commandArguments).hasField("week")));
+    context.registerCommand(new CommandContribution("notes.moveNote", "Move note 2 deep into the archive", null, null, async () => {
+      context.updateDocument("notes.note", "2", { title: "Note 2, moved after the review of the window row", breadcrumb: NotesWindowPart.DEEP_BREADCRUMB });
+      return null;
+    }));
     for (const [name, title, by] of NotesWindowPart.SORTINGS)
       context.registerCommand(new CommandContribution(name, title, null, null, async () => {
         NotesState.sortBy.set(by);
@@ -124,6 +133,17 @@ export class NotesWindowPart implements IWindowPart {
   }
 
   public async deactivateAsync(): Promise<void> {
+  }
+
+  private static saveAsync(): Promise<void> {
+    switch (NotesState.saving()) {
+      case "fails":
+        return Promise.reject(new Error("The disk is full."));
+      case "hangs":
+        return new Promise<void>(() => undefined);
+      default:
+        return Promise.resolve();
+    }
   }
 
   private static async readOptionsAsync(context: IWindowPartContext, counter: StatusBarItem): Promise<JsonReader> {

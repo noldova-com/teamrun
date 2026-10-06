@@ -6,13 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
 
 import { RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
+import CliFixture from "./fixtures/cli.fixture.ts";
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import ContrastFixture from "./fixtures/contrast.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
@@ -40,6 +41,11 @@ async function openFromCommandSearchAsync(window: Page): Promise<void> {
   await expect(window.getByRole("option").first()).toHaveAttribute("data-item", "shell.openModules");
   await window.keyboard.press("Enter");
   await expect(window.locator("tr-modules")).toBeVisible();
+}
+
+async function startProgramAsync(dataDirectory: string, ...commandArguments: string[]): Promise<number[]> {
+  const started = JSON.parse(await CliFixture.runAsync("run", "clock.startProgram", ...commandArguments, "--json", "--data-dir", dataDirectory)) as { processId: number; childProcessId: number };
+  return [started.processId, started.childProcessId];
 }
 
 async function setModeAsync(window: Page, mode: string): Promise<void> {
@@ -95,6 +101,47 @@ test.describe("the Modules document", () => {
       expect(lowest).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
       await desktop.checkpointAsync(`modules-document-${mode.toLowerCase()}`);
     }
+  });
+
+  test("lists a module's running programs while they run, with their count in its row, in light and dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await expect(window.locator("[data-fixture-content=clock-face]")).toBeVisible();
+    await openFromCommandSearchAsync(window);
+    await expect(window.locator(".tr-modules-section-title")).toHaveText(["Running programs", "Contributes"]);
+    await expect(window.locator(".tr-modules-detail").getByText("No programs are running.")).toBeVisible();
+    const executable = await readFile(path.resolve("_build", "development-app", "path.txt"), "utf8");
+
+    const running = await startProgramAsync(desktop.dataDirectory);
+    const program = window.locator(`.tr-modules-program[data-process="${running[0]}"]`);
+
+    await expect(program.locator(".tr-modules-program-name")).toHaveText(path.basename(executable));
+    await expect(program.locator(".tr-modules-program-path")).toHaveText(executable);
+    await expect(program.locator(".tr-modules-program-process")).toHaveText(`Process ${running[0]}`);
+    await expect(program.locator(".tr-modules-program-state")).toHaveText("Running for less than a minute");
+    await expect(row(window, "clock").locator(".tr-modules-row-programs")).toHaveText("1 program");
+    await expect(window.locator(".tr-modules-row-programs")).toHaveCount(1);
+    for (const mode of ["Light", "Dark"] as const) {
+      await setModeAsync(window, mode);
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(mode.toLowerCase());
+      const lowest = await ContrastFixture.measureLowestTextContrastAsync(row(window, "clock"), colors[mode].selected);
+      expect(lowest).toBeGreaterThanOrEqual(ContrastFixture.MINIMUM_TEXT_CONTRAST);
+      await desktop.checkpointAsync(`modules-document-program-${mode.toLowerCase()}`);
+    }
+
+    const exited = process.platform === "win32" ? [] : await startProgramAsync(desktop.dataDirectory, "\"exit\"");
+    if (process.platform !== "win32") {
+      const kept = window.locator(`.tr-modules-program[data-process="${exited[0]}"]`);
+      await expect(kept.locator(".tr-modules-program-state")).toHaveText("Exited, its processes still run");
+      await expect(row(window, "clock").locator(".tr-modules-row-programs")).toHaveText("2 programs");
+      await desktop.checkpointAsync("modules-document-program-exited");
+    }
+
+    await CliFixture.runAsync("run", "clock.stopProgram", "--data-dir", desktop.dataDirectory);
+
+    await expect(program).toHaveCount(0);
+    await expect.poll(() => running.filter(t => DesktopApplicationFixture.isAlive(t))).toEqual([]);
+    await expect(window.locator(".tr-modules-program")).toHaveCount(exited.length > 0 ? 1 : 0);
+    await expect(window.locator(".tr-modules-row-programs")).toHaveText(exited.length > 0 ? ["1 program"] : []);
   });
 
   test("follows a module that stops starting while open, showing its cause and the module it blocks", async ({ desktop }) => {

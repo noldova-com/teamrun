@@ -13,6 +13,7 @@ import { ProductInfo } from "../models/product-info.js";
 import { Resources } from "../resources.js";
 
 export class RuntimeHandoverException extends Exception {
+  public override readonly name: string = "RuntimeHandoverException";
   public readonly handover: RuntimeHandover;
 
   public constructor(handover: RuntimeHandover) {

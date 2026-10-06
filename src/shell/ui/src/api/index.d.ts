@@ -768,6 +768,13 @@ export declare class ChoicePillsComponent {
   public readonly label: InputSignal<string>;
 
   /**
+   * The id, or space-separated ids, of the elements that describe the group,
+   * such as a setting's description and its {@link FieldMessageComponent};
+   * nothing describes it when null, the default.
+   */
+  public readonly describedBy: InputSignal<string | null>;
+
+  /**
    * Emits the value of the option the person chooses, by pointer or by
    * keyboard, only when it differs from {@link ChoicePillsComponent.value}.
    */
@@ -1091,7 +1098,11 @@ export declare class ConfigurationTableFillDirective {
  * ends the press that opened the menu, and when the host is hidden or
  * scrolled away. Focus
  * returns to the host when a chosen row, Escape or Tab closes the last menu.
- * It extends the CDK's menu trigger base, from which it inherits
+ * One trigger can also serve as the context menu of other elements, such as
+ * every text field under it, through
+ * {@link ContextMenuTriggerDirective.openAtPointer} and
+ * {@link ContextMenuTriggerDirective.openFromKeyboard} with a target, which
+ * then takes the host's place. It extends the CDK's menu trigger base, from which it inherits
  * `menuTemplateRef`, `menuData`, `isOpen()`, `opened` and `closed`.
  */
 export declare class ContextMenuTriggerDirective extends CdkMenuTriggerBase {
@@ -1169,6 +1180,82 @@ export declare class ContextMenuTriggerDirective extends CdkMenuTriggerBase {
    * ```
    */
   public open(point: DOMRect, origin: FocusOrigin): void;
+
+  /**
+   * Opens the menu at a right click's pointer as the context menu of a
+   * target, as the host's own right click does: the menu follows the target,
+   * closes when it is hidden or scrolled away, and returns focus to it. The
+   * event's default and propagation stop, and the click that ends the press
+   * leaves the menu open. Nothing opens while no template is bound.
+   *
+   * @param event The `contextmenu` event; one from the keyboard, whose button
+   * is not the secondary one, focuses the first row as a key does.
+   * @param target The element the menu belongs to, the host by default.
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ContextMenuTriggerDirective, MenuComponent, MenuItemComponent } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-field-actions",
+   *   imports: [ContextMenuTriggerDirective, MenuComponent, MenuItemComponent],
+   *   host: { "(document:contextmenu)": "openForField($event)" },
+   *   template: `
+   *     <span [trContextMenuTriggerFor]="actions"></span>
+   *     <ng-template #actions>
+   *       <tr-menu>
+   *         <button tr-menu-item label="Clear"></button>
+   *       </tr-menu>
+   *     </ng-template>`
+   * })
+   * export class FieldActionsComponent {
+   *   private readonly trigger: Signal<ContextMenuTriggerDirective> = viewChild.required(ContextMenuTriggerDirective);
+   *
+   *   protected openForField(event: MouseEvent): void {
+   *     if (event.target instanceof HTMLInputElement)
+   *       this.trigger().openAtPointer(event, event.target);
+   *   }
+   * }
+   * ```
+   */
+  public openAtPointer(event: MouseEvent, target?: HTMLElement): void;
+
+  /**
+   * Opens the menu below a target's start as its context menu when the key
+   * is the ContextMenu key or Shift+F10, preventing the key's default, as
+   * the host's own keys do; other keys do nothing. The menu follows the
+   * target and returns focus to it, and its first row takes focus.
+   *
+   * @param event The `keydown` event.
+   * @param target The element the menu belongs to, the host by default.
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ContextMenuTriggerDirective, MenuComponent, MenuItemComponent } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-field-keys",
+   *   imports: [ContextMenuTriggerDirective, MenuComponent, MenuItemComponent],
+   *   host: { "(document:keydown)": "openForField($event)" },
+   *   template: `
+   *     <span [trContextMenuTriggerFor]="actions"></span>
+   *     <ng-template #actions>
+   *       <tr-menu>
+   *         <button tr-menu-item label="Clear"></button>
+   *       </tr-menu>
+   *     </ng-template>`
+   * })
+   * export class FieldKeysComponent {
+   *   private readonly trigger: Signal<ContextMenuTriggerDirective> = viewChild.required(ContextMenuTriggerDirective);
+   *
+   *   protected openForField(event: KeyboardEvent): void {
+   *     if (event.target instanceof HTMLInputElement)
+   *       this.trigger().openFromKeyboard(event, event.target);
+   *   }
+   * }
+   * ```
+   */
+  public openFromKeyboard(event: KeyboardEvent, target?: HTMLElement): void;
 
   /**
    * Closes the menu and its submenus. Nothing happens while it is closed.
@@ -1479,6 +1566,35 @@ export declare class DragGesture {
    * ```
    */
   public static hasStarted(startX: number, startY: number, x: number, y: number): boolean;
+}
+
+/**
+ * A validation message below a field, `tr-field-message`: error-colored text
+ * that wraps anywhere rather than widen its row, an alert that is announced
+ * when it appears. The field names it in `aria-describedby` and takes
+ * `aria-invalid="true"` while it shows.
+ *
+ * @example
+ * ```ts
+ * import { Component, type WritableSignal, signal } from "@angular/core";
+ * import { FieldMessageComponent, TextFieldComponent } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-port-field",
+ *   imports: [FieldMessageComponent, TextFieldComponent],
+ *   template: `
+ *     <input tr-text-field type="number" aria-label="Port" [attr.aria-invalid]="error() ? true : null" [attr.aria-describedby]="error() ? 'port-error' : null" />
+ *     @if (error(); as message) {
+ *       <tr-field-message id="port-error">{{ message }}</tr-field-message>
+ *     }
+ *   `
+ * })
+ * export class PortFieldComponent {
+ *   protected readonly error: WritableSignal<string | null> = signal(null);
+ * }
+ * ```
+ */
+export declare class FieldMessageComponent {
 }
 
 /**
@@ -2494,9 +2610,11 @@ export declare class QueryMatcher {
  */
 export declare class QuickInputComponent {
   /**
-   * The results in the order shown. Every change makes the first one active
-   * again. A result with a section starts that section, after a separator
-   * unless it is the first.
+   * The results in the order shown. A result the person made active with the
+   * keys stays active through a change while it is still listed, until the
+   * query changes; otherwise a change makes the first one active. A result
+   * with a section starts that section, after a separator unless it is the
+   * first.
    */
   public readonly items: InputSignal<readonly QuickInputItem[]>;
 
@@ -2829,6 +2947,13 @@ export declare class SelectComponent {
   public readonly label: InputSignal<string>;
 
   /**
+   * The id, or space-separated ids, of the elements that describe the button,
+   * such as a setting's description and its {@link FieldMessageComponent};
+   * nothing describes it when null, the default.
+   */
+  public readonly describedBy: InputSignal<string | null>;
+
+  /**
    * Whether the button is disabled; false when not bound.
    */
   public readonly disabled: InputSignal<boolean>;
@@ -3048,7 +3173,8 @@ export declare class TabComponent {
 /**
  * The kit's text field, `input[tr-text-field]`, which styles a native input
  * and leaves its value, events and validation to it. The input needs an
- * accessible name, and `aria-invalid="true"` gives it the error border.
+ * accessible name, and `aria-invalid="true"` gives it the error border; a
+ * {@link FieldMessageComponent} below it explains the error.
  *
  * @example
  * ```ts
@@ -3173,6 +3299,12 @@ export declare class Theme {
  * value or a shape. {@link ThemePainter.paint} throws it.
  */
 export declare class ThemeException extends Exception {
+  /**
+   * The exception's name, `"ThemeException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -3811,6 +3943,12 @@ export declare class TreeMove {
  * parent is missing, is the row itself or lies inside it.
  */
 export declare class TreeMoveException extends Exception {
+  /**
+   * The exception's name, `"TreeMoveException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *

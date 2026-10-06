@@ -20,6 +20,7 @@ export { ConfigurationTableDirective } from "../app/components/configuration-tab
 export { DialogComponent } from "../app/components/dialog/dialog.component";
 export { DockingGuideComponent } from "../app/components/docking-guide/docking-guide.component";
 export { DockingPlateComponent } from "../app/components/docking-plate/docking-plate.component";
+export { FieldMessageComponent } from "../app/components/field-message/field-message.component";
 export { IconButtonComponent } from "../app/components/icon-button/icon-button.component";
 export { InlineCodeComponent } from "../app/components/inline-code/inline-code.component";
 export { ContextMenuTriggerDirective } from "../app/components/menu/context-menu-trigger.directive";
@@ -81,4 +82,4 @@ export { DialogService } from "../app/services/dialog.service";
 export { OverlayBoundsService } from "../app/services/overlay-bounds.service";
 export { ThemePainter } from "../app/services/theme-painter";
 export { TypographyPainter } from "../app/services/typography-painter";
-export { DefaultTheme } from "../app/themes/default-theme";
+export { DefaultTheme } from "../app/models/default-theme";

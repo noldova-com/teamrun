@@ -11,6 +11,7 @@ import { Resources } from "../resources.js";
 import { ArgumentException } from "./argument.exception.js";
 
 export class ArgumentOutOfRangeException extends ArgumentException {
+  public override readonly name: string = "ArgumentOutOfRangeException";
   public readonly actualValue: unknown;
 
   public constructor(parameterName?: string, actualValue?: unknown, message?: string, options?: ExceptionOptions) {

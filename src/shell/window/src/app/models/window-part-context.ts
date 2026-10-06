@@ -12,10 +12,15 @@ import type { NotificationPost, SettingEntry, SettingScope } from "@noldova/team
 import { WindowPartAccessException } from "../exceptions/window-part-access.exception";
 import type { IWindowPartContext } from "../interfaces/i-window-part-context";
 import type { IDocumentOptions } from "../interfaces/i-document-options";
+import type { IDocumentUpdate } from "../interfaces/i-document-update";
 import type { IViewDialogOptions } from "../interfaces/i-view-dialog-options";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
+import { DocumentHeading } from "./document-heading";
+import { DocumentTab } from "./layout/document-tab";
+import type { Tab } from "./layout/tab";
+import { ViewTab } from "./layout/view-tab";
 import { MenuItem } from "./menu-item";
 import type { MenuRowContribution } from "./menu-row-contribution";
 import { NotificationHandle } from "./notification-handle";
@@ -38,8 +43,10 @@ export class WindowPartContext implements IWindowPartContext {
   private readonly topBarActionList: TopBarAction[] = [];
   private readonly viewList: ViewContribution[] = [];
   private readonly documentList: DocumentContribution[] = [];
+  private readonly saveList: (() => Promise<void>)[] = [];
   private readonly subscriptions: (() => void)[] = [];
   private readonly badgedViews: Set<string> = new Set();
+  private readonly workingTabs: Map<string, Set<object>> = new Map();
 
   public readonly moduleId: string;
 
@@ -56,6 +63,10 @@ export class WindowPartContext implements IWindowPartContext {
 
   public get documents(): readonly DocumentContribution[] {
     return this.documentList;
+  }
+
+  public get saves(): readonly (() => Promise<void>)[] {
+    return this.saveList;
   }
 
   public get commands(): readonly CommandContribution[] {
@@ -111,6 +122,15 @@ export class WindowPartContext implements IWindowPartContext {
     return registered;
   }
 
+  public registerSave(save: () => Promise<void>): () => void {
+    this.saveList.push(save);
+    return () => {
+      const index = this.saveList.indexOf(save);
+      if (index >= 0)
+        this.saveList.splice(index, 1);
+    };
+  }
+
   public provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void {
     this.requireOwn(group);
     if (!this.host.declaresDynamicMenuGroup(this.moduleId, group))
@@ -132,6 +152,23 @@ export class WindowPartContext implements IWindowPartContext {
     this.host.setViewBadge(view, badge);
   }
 
+  public markWorking(name: string, instance?: string): () => void {
+    const key = this.findOwnTab(name, instance).key;
+    const mark = {};
+    const marks = this.workingTabs.get(key) ?? new Set<object>();
+    marks.add(mark);
+    if (marks.size === 1) {
+      this.workingTabs.set(key, marks);
+      this.host.setTabWorking(key, true);
+    }
+    return () => {
+      if (!marks.delete(mark) || marks.size > 0)
+        return;
+      this.workingTabs.delete(key);
+      this.host.setTabWorking(key, false);
+    };
+  }
+
   public runCommandAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
     this.requireAllowed(name);
     return this.host.runCommandAsync(name, commandArguments);
@@ -147,12 +184,19 @@ export class WindowPartContext implements IWindowPartContext {
 
   public openDocument(name: string, instance: string, title: string, options: IDocumentOptions = {}): void {
     this.requireOwn(name);
-    this.host.openDocument(this.moduleId, name, instance, title, options.preview === true);
+    this.host.openDocument(this.moduleId, name, instance, new DocumentHeading(title, options.breadcrumb ?? []), options.preview === true);
   }
 
   public keepDocument(name: string, instance: string): void {
     this.requireOwn(name);
     this.host.keepDocument(this.moduleId, name, instance);
+  }
+
+  public updateDocument(name: string, instance: string, update: IDocumentUpdate): void {
+    this.requireOwn(name);
+    const title = Object.isUndefined(update.title) ? null : DocumentHeading.requireTitle(update.title);
+    const breadcrumb = Object.isUndefined(update.breadcrumb) ? null : DocumentHeading.requireBreadcrumb(update.breadcrumb);
+    this.host.updateDocument(this.moduleId, name, instance, title, breadcrumb);
   }
 
   public async showInDialogAsync(name: string, options: IViewDialogOptions = {}): Promise<void> {
@@ -162,6 +206,10 @@ export class WindowPartContext implements IWindowPartContext {
 
   public log(message: string): void {
     this.host.log(this.moduleId, message);
+  }
+
+  public async openLinkAsync(url: string): Promise<void> {
+    await this.host.openLinkAsync(url);
   }
 
   public async requestAsync(method: string, parameters: JsonValue): Promise<JsonValue> {
@@ -214,12 +262,18 @@ export class WindowPartContext implements IWindowPartContext {
       unsubscribe();
     this.viewList.length = 0;
     this.documentList.length = 0;
+    this.saveList.length = 0;
     this.commandList.length = 0;
     for (const handle of [...this.notifications])
       this.dismissNotification(handle);
     for (const view of [...this.badgedViews])
       this.host.setViewBadge(view, null);
     this.badgedViews.clear();
+    for (const [key, marks] of this.workingTabs) {
+      marks.clear();
+      this.host.setTabWorking(key, false);
+    }
+    this.workingTabs.clear();
     this.statusBarItemList.length = 0;
     this.topBarActionList.length = 0;
     this.host.refresh();
@@ -250,6 +304,15 @@ export class WindowPartContext implements IWindowPartContext {
       throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, Resources.notificationKind, post.kind.text));
     for (const command of [...post.open === null ? [] : [post.open], ...post.actions.map(t => t.command)])
       this.requireAllowed(command.name.text);
+  }
+
+  private findOwnTab(name: string, instance: string | undefined): Tab {
+    this.requireOwn(name);
+    if (this.source.viewNames.includes(name))
+      return new ViewTab(name, instance);
+    if (this.source.documentNames.includes(name))
+      return new DocumentTab(name, instance);
+    throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, Resources.viewOrDocumentKind, name));
   }
 
   private requireOwn(name: string): void {

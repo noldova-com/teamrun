@@ -51,12 +51,17 @@ export class Resources {
   public static readonly readBuildChannel: string = "teamrun:readBuild";
   public static readonly copyTextChannel: string = "teamrun:copyText";
   public static readonly openLogFolderChannel: string = "teamrun:openLogFolder";
+  public static readonly openLinkChannel: string = "teamrun:openLink";
+  public static readonly installCommandChannel: string = "teamrun:installCommand";
   public static readonly notificationOpenedChannel: string = "teamrun:notificationOpened";
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
   public static readonly windowErrorChannel: string = "teamrun:windowError";
   public static readonly copyTextLimit: number = 65536;
+  public static readonly linkLimit: number = 32768;
+  public static readonly linkProtocols: readonly string[] = ["http:", "https:", "mailto:"];
+  public static readonly linkRefused: string = "A link was not opened: only well-formed http, https and mailto links without credentials open.";
   public static readonly shellOwner: string = "shell";
   public static readonly methodParameter: string = "method";
   public static readonly windowShellMethods: readonly string[] = [
@@ -74,7 +79,8 @@ export class Resources {
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text,
     ShellMethods.recentCommands.text,
-    ShellMethods.recordCommand.text
+    ShellMethods.recordCommand.text,
+    ShellMethods.programs.text
   ];
   public static readonly deviceMethods: readonly string[] = [
     ShellMethods.settings.text,
@@ -139,6 +145,28 @@ export class Resources {
   public static readonly appearanceLimit: number = 4096;
   public static readonly appearanceTooLarge: string = "The appearance preferences are larger than 4096 characters.";
   public static readonly keepAppearanceChannel: string = "teamrun:keepAppearance";
+  public static readonly readSpellingChannel: string = "teamrun:readSpelling";
+  public static readonly spellingChannel: string = "teamrun:spelling";
+  public static readonly fieldMenuChannel: string = "teamrun:fieldMenu";
+  public static readonly replaceMisspellingChannel: string = "teamrun:replaceMisspelling";
+  public static readonly dictionaryFolderSegments: readonly string[] = ["assets", "dictionaries"];
+  public static readonly dictionariesFile: string = "dictionaries.json";
+  public static readonly dictionariesFolder: string = "Dictionaries";
+  public static readonly dictionariesField: string = "dictionaries";
+  public static readonly languageField: string = "language";
+  public static readonly fileField: string = "file";
+  public static readonly languagesField: string = "languages";
+  public static readonly fallbackField: string = "fallback";
+  public static readonly isKeyboardField: string = "isKeyboard";
+  public static readonly wordField: string = "word";
+  public static readonly suggestionsField: string = "suggestions";
+  public static readonly keyboardMenuSource: string = "keyboard";
+  public static readonly spellingTextLimit: number = 100;
+  public static readonly languageTagPattern: RegExp = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
+  public static readonly dictionaryFilePattern: RegExp = /^[A-Za-z0-9-]+\.bdic$/;
+  public static readonly urlSeparator: string = "/";
+  public static readonly listSeparator: string = ", ";
+  public static readonly spellingInvalid: string = "The spelling preferences must be whether to check and a list of language tags.";
   public static readonly uuidPattern: RegExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   public static readonly hashPrefix: string = "#";
   public static readonly queryPrefix: string = "?";
@@ -168,6 +196,8 @@ export class Resources {
   public static readonly closedEvent: "closed" = "closed";
   public static readonly clickEvent: "click" = "click";
   public static readonly failedEvent: "failed" = "failed";
+  public static readonly dataEvent: "data" = "data";
+  public static readonly errorEvent: "error" = "error";
   public static readonly secondInstanceEvent: "second-instance" = "second-instance";
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
@@ -187,10 +217,45 @@ export class Resources {
   public static readonly rendererEndLimit: number = 5_000;
   public static readonly renderProcessGoneEvent: "render-process-gone" = "render-process-gone";
   public static readonly didStartLoadingEvent: "did-start-loading" = "did-start-loading";
+  public static readonly contextMenuEvent: "context-menu" = "context-menu";
   public static readonly unresponsiveEvent: "unresponsive" = "unresponsive";
   public static readonly responsiveEvent: "responsive" = "responsive";
   public static readonly cleanExitReason: string = "clean-exit";
   public static readonly warningBoxType: "warning" = "warning";
+  public static readonly infoBoxType: "info" = "info";
+  public static get commandName(): string {
+    return ProductInfo.current.slug;
+  }
+
+  public static readonly bundleCommandSegments: readonly string[] = ["..", "Resources", "bin"];
+  public static readonly pathCommandFolder: string = "/usr/local/bin";
+  public static readonly scriptRunner: string = "/usr/bin/osascript";
+  public static readonly administratorScript: readonly string[] = [
+    "-e", "on run argv",
+    "-e", "set commandLink to quoted form of (item 3 of argv)",
+    "-e", "do shell script \"[ -e \" & commandLink & \" ] && [ ! -L \" & commandLink & \" ] && exit 3; /bin/mkdir -p \" & quoted form of (item 2 of argv) & \" && /bin/ln -sfh \" & quoted form of (item 1 of argv) & \" \" & commandLink with prompt (item 4 of argv) with administrator privileges",
+    "-e", "end run"
+  ];
+  public static readonly userCancelledCode: string = "(-128)";
+  public static readonly occupiedExitCode: string = "(3)";
+  public static readonly missingErrorCode: string = "ENOENT";
+  public static readonly errorCodeField: "code" = "code";
+  public static readonly deniedErrorCodes: readonly string[] = ["EACCES", "EPERM"];
+  public static get commandInstalled(): string {
+    return `The ${Resources.commandName} command is installed.`;
+  }
+
+  public static get commandAlreadyInstalled(): string {
+    return `The ${Resources.commandName} command is already installed.`;
+  }
+
+  public static get commandNotInstalled(): string {
+    return `The ${Resources.commandName} command was not installed.`;
+  }
+
+  public static get commandMissingDetail(): string {
+    return `This build of ${Resources.applicationName} has no command to link; an installed ${Resources.applicationName} has one.`;
+  }
   public static get windowStopped(): string {
     return `${Resources.applicationName}'s window stopped unexpectedly.`;
   }
@@ -246,6 +311,18 @@ export class Resources {
   public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
   public static readonly workQueryTimeout: number = 2000;
+  public static readonly programTimeout: number = 5000;
+  public static readonly programOutputLimit: number = 65536;
+  public static readonly gdbusPath: string = "/usr/bin/gdbus";
+  public static readonly trayHostQueryArguments: readonly string[] = [
+    "call", "--session", "--dest", "org.kde.StatusNotifierWatcher", "--object-path", "/StatusNotifierWatcher",
+    "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierWatcher", "IsStatusNotifierHostRegistered"
+  ];
+  public static readonly trayHostMonitorArguments: readonly string[] = ["monitor", "--session", "--dest", "org.kde.StatusNotifierWatcher"];
+  public static readonly trayHostRegisteredAnswer: string = "(<true>,)";
+  public static readonly trayMonitorFirstDelay: number = 1000;
+  public static readonly trayMonitorLongestDelay: number = 60_000;
+  public static readonly trayMonitorDelayGrowth: number = 2;
   public static readonly windowLogLimit: number = 65536;
   public static readonly windowErrorBurst: number = 10;
   public static readonly windowErrorPeriod: number = 60000;
@@ -372,6 +449,34 @@ export class Resources {
     return `The log folder could not be opened: ${reason}`;
   }
 
+  public static formatLinkNotOpened(reason: string): string {
+    return `A link could not be opened: ${reason}`;
+  }
+
+  public static formatAdministratorPrompt(link: string): string {
+    return `${Resources.applicationName} wants to link ${link} to its ${Resources.commandName} command, so that terminals can run it.`;
+  }
+
+  public static formatCommandInstalledDetail(link: string): string {
+    return `${link} links to the command inside ${Resources.applicationName}. Terminals opened from now on run it as ${Resources.commandName}.`;
+  }
+
+  public static formatCommandAlreadyInstalledDetail(link: string): string {
+    return `${link} already links to the command inside this ${Resources.applicationName}.`;
+  }
+
+  public static formatCommandOccupiedDetail(link: string): string {
+    return `${link} is a file that is not a link, so ${Resources.applicationName} leaves it alone. Move or remove it, then install the command again.`;
+  }
+
+  public static formatPathCommandFailed(link: string, reason: string): string {
+    return `The ${Resources.commandName} command could not be linked at ${link}: ${reason}`;
+  }
+
+  public static formatProgramFailed(file: string, reason: string): string {
+    return `${file} failed: ${reason}`;
+  }
+
   public static formatSystemNotificationFailed(reason: string): string {
     return `The operating system did not show a notification: ${reason}`;
   }
@@ -390,6 +495,26 @@ export class Resources {
 
   public static formatRuntimeNotStarted(reason: string): string {
     return `The runtime could not be started or reached, so the window offers to try again: ${reason}`;
+  }
+
+  public static formatDictionariesUnread(reason: string): string {
+    return `The list of shipped dictionaries could not be read, so no spelling language is offered: ${reason}`;
+  }
+
+  public static formatDictionaryUncopied(reason: string): string {
+    return `A shipped dictionary could not be put in the profile, so its language is not offered: ${reason}`;
+  }
+
+  public static formatDictionaryFieldInvalid(value: string): string {
+    return `"${value}" is not a language tag or a dictionary file name.`;
+  }
+
+  public static formatSpellingLanguagesRefused(languages: string, reason: string): string {
+    return `The spell checker refused the languages ${languages}: ${reason}`;
+  }
+
+  public static formatSpellingRejected(reason: string): string {
+    return `The window's spelling preferences were rejected: ${reason}`;
   }
 
   public static formatAppearanceUnread(reason: string): string {

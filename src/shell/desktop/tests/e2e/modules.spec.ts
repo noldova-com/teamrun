@@ -61,7 +61,7 @@ test.describe("modules", () => {
     const log = (): Promise<string> => readFile(path.join(desktop.dataDirectory, "logs", "desktop.log"), "utf8");
 
     await expect(desktop.window.locator("tr-module-failures button")).toHaveText(/1 module didn't start/);
-    await expect.poll(log).toMatch(/Window error in clock: \S*: Its window part failed to activate\./);
+    await expect.poll(log).toMatch(/Window error in clock: WindowPartFailureException: Its window part failed to activate\./);
     expect(await log()).toMatch(/Window error in clock: Caused by: Error: The clock's window part was asked to fail\./);
     expect(desktop.acceptFailures(/Window error in clock: |failed to activate|asked to fail/).length).toBeGreaterThan(0);
   });

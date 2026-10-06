@@ -8,4 +8,5 @@
 
 export interface IDocumentOptions {
   readonly preview?: boolean;
+  readonly breadcrumb?: readonly string[];
 }

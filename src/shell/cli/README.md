@@ -4,7 +4,8 @@
 
 ## 1. Purpose
 
-The command line reports on the data directory's runtime and runs the runtime's commands and the modules' own commands from a terminal or a script. It shares the runtime and the data directory with the desktop.
+The command line reports on the data directory's runtime and runs the runtime's commands and the modules' own commands from a terminal or a script.
+It shares the runtime and the data directory with the desktop.
 
 ## 2. Commands
 
@@ -17,7 +18,8 @@ The command line reports on the data directory's runtime and runs the runtime's 
 | `teamrun open` | Starts TeamRun with the same data directory, or brings its window forward when it already runs. |
 | `teamrun help [<module> [<command>]]` | Prints the usage: the command line's own commands and every module's commands, a module's commands, or one command's arguments, options and examples. Never starts a runtime. |
 
-`commands`, `run` and module commands start a runtime when none is running. The runtime then stays up under its idle policy, so later calls attach to it.
+`commands`, `run` and module commands start a runtime when none is running.
+The runtime then stays up under its idle policy, so later calls attach to it.
 
 ## 3. Options
 
@@ -47,20 +49,54 @@ The exit codes are stable; scripts may rely on them.
 | 6 | The command timed out or was cancelled. |
 | 7 | The command's module is not active: it failed or is blocked in the runtime, or its command-line part failed to start in this command line. The error names the module, its cause and, for a blocked module, the dependency that blocks it. |
 
-A failure from the runtime keeps the protocol's code in the JSON error. When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1. A command the runtime leaves unanswered on an open connection reports `Unavailable`.
+A failure from the runtime keeps the protocol's code in the JSON error.
+When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1.
+A command the runtime leaves unanswered on an open connection reports `Unavailable`.
 
-## 5. Development
+## 5. Installed TeamRun
 
-In a checkout, `npm run teamrun -- <command> [options]` runs the command line on the development app, with the checkout's own data directory unless `--data-dir` or `TEAMRUN_DATA_DIR` names another. A relative `--data-dir` is resolved from the folder `npm` was started in.
+On Windows the installer puts `teamrun` on the user's `Path`, so a terminal opened after the install runs it directly.
+Terminals that were already open keep their old `Path` until they are restarted.
+The installer leaves the user's `Path` unchanged, without a message, when it cannot read it or when adding the folder would make it about 8,190 characters or longer.
+In that case add `%LOCALAPPDATA%\Programs\teamrun\bin` to the user's `Path` by hand: open Settings, search for "Edit environment variables for your account", select `Path`, choose Edit, then New, and open a new terminal.
+The command passes its arguments through cmd, which can change quotes, `%` and `^` in them; give `run` such JSON with `--args-file` or on standard input with `-` instead.
+
+On macOS, choose TeamRun > Install command in PATH.
+It links `/usr/local/bin/teamrun` to the command inside TeamRun, asking for an administrator's password when that folder cannot be written, so a terminal opened afterwards runs `teamrun` directly.
+A file named `/usr/local/bin/teamrun` that is not a link is left alone; move or remove it, then install the command again.
+If TeamRun moves, choose the command again to link its new place.
+
+## 6. Development
+
+In a checkout, `npm run teamrun -- <command> [options]` runs the command line on the development app, with the checkout's own data directory unless `--data-dir` or `TEAMRUN_DATA_DIR` names another.
+A relative `--data-dir` is resolved from the folder `npm` was started in.
 
 ## 7. Module commands
 
-A module adds its commands under its id, as `teamrun <module> <command>`, where the command is the kebab-case form of the name the module declares: `notes.addNote` is `teamrun notes add-note`. The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how a module declares them.
+A module adds its commands under its id, as `teamrun <module> <command>`, where the command is the kebab-case form of the name the module declares: `notes.addNote` is `teamrun notes add-note`.
+The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how a module declares them.
 
-- **Reserved words.** A module's id is never one of the command line's own commands: `status`, `commands`, `run`, `open` and `help`. The build refuses a module whose id is one of them. A new command of the command line's own is added to this list first, so the build then refuses a module that already uses its name.
-- **Reading the call.** Arguments come in their declared order. An option is `--name value` or `--name=value`, a `Boolean` option is `--name` alone, and a repeated option may be given more than once, its values in order. A `Number` takes a decimal number, such as `3` or `-2.5`. Options, including the [global options](#3-options), may stand anywhere after the command, among the arguments. `--` ends the options: everything after it is an argument, even when it starts with `--`. A missing required argument or option, an unknown option, a value of the wrong type, a value given to a `Boolean` option or an argument too many exits with code 2 and prints the command's usage, and no runtime starts.
-- **Running.** The command line then reaches the runtime as `run` does, starting one unless `--no-start` is given. It runs the command only when the command's module is active, after starting that module's command-line part and those of its dependencies; otherwise it exits with code 7. `teamrun run` exits with code 7 too for a runtime command whose module is not active.
-- **Output.** A command prints its text on standard output, and with `--json` exactly its one JSON value instead. A command that fails exits with code 1 and prints its error, with `--json` as `{"code","message","details"}` on standard error, where the code is the module's own or the protocol's. A command that refuses its arguments exits with code 2.
-- **Help.** `teamrun help` lists the command line's own commands, then each module's commands under the module's display name, in module order, each with its summary. `teamrun help <module>` and `teamrun <module> --help` list one module's commands. `teamrun help <module> <command>` and `teamrun <module> <command> --help` print the command's usage, description, arguments, options with their types and defaults, and examples. Help reads only the build's declarations, so it never starts or reaches a runtime and lists every module of the build, active or not.
-
-An unknown module or command, or a module without a command, exits with code 2 and prints the usage.
+- **Reserved words.**
+  A module's id is never one of the command line's own commands: `status`, `commands`, `run`, `open` and `help`.
+  The build refuses a module whose id is one of them.
+  A new command of the command line's own is added to this list first, so the build then refuses a module that already uses its name.
+- **Reading the call.**
+  Arguments come in their declared order.
+  An option is `--name value` or `--name=value`, a `Boolean` option is `--name` alone, and a repeated option may be given more than once, its values in order.
+  A `Number` takes a decimal number, such as `3` or `-2.5`.
+  Options, including the [global options](#3-options), may stand anywhere after the command, among the arguments.
+  `--` ends the options: everything after it is an argument, even when it starts with `--`.
+  A missing required argument or option, an unknown option, a value of the wrong type, a value given to a `Boolean` option or an argument too many exits with code 2 and prints the command's usage, and no runtime starts.
+- **Running.**
+  The command line then reaches the runtime as `run` does, starting one unless `--no-start` is given.
+  It runs the command only when the command's module is active, after starting that module's command-line part and those of its dependencies; otherwise it exits with code 7.
+  `teamrun run` exits with code 7 too for a runtime command whose module is not active.
+- **Output.**
+  A command prints its text on standard output, and with `--json` exactly its one JSON value instead.
+  A command that fails exits with code 1 and prints its error, with `--json` as `{"code","message","details"}` on standard error, where the code is the module's own or the protocol's.
+  A command that refuses its arguments exits with code 2.
+- **Help.**
+  `teamrun help` lists the command line's own commands, then each module's commands under the module's display name, in module order, each with its summary.
+  `teamrun help <module>` and `teamrun <module> --help` list one module's commands.
+  `teamrun help <module> <command>` and `teamrun <module> <command> --help` print the command's usage, description, arguments, options with their types and defaults, and examples.
+  Help reads only the build's declarations, so it never starts or reaches a runtime and lists every module of the build, active or not.

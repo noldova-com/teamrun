@@ -26,6 +26,7 @@ export class ChoicePillsComponent {
   public readonly options = input.required<readonly SelectOption[]>();
   public readonly value = input.required<string>();
   public readonly label = input.required<string>();
+  public readonly describedBy = input<string | null>(null);
   public readonly valueChange = output<string>();
 
   protected readonly tabStop: Signal<string | undefined> = computed(() => (this.options().find(t => t.value === this.value()) ?? this.options()[0])?.value);

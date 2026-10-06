@@ -17,6 +17,7 @@ import { ModulesComponent } from "../../../src/app/components/modules/modules.co
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
 import { ContentPadding } from "../../../src/app/enums/content-padding";
 import { DockSide } from "../../../src/app/enums/dock-side";
+import { LinkNotOpenedException } from "../../../src/app/exceptions/link-not-opened.exception";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { WindowPartFailureException } from "../../../src/app/exceptions/window-part-failure.exception";
 import { StatusBarSide } from "../../../src/app/enums/status-bar-side";
@@ -24,6 +25,7 @@ import type { IWindowPart } from "../../../src/app/interfaces/i-window-part";
 import { BuildTokens } from "../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../src/app/models/command-contribution";
 import { DocumentContribution } from "../../../src/app/models/document-contribution";
+import { DocumentHeading } from "../../../src/app/models/document-heading";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
@@ -43,6 +45,7 @@ import { BarItemsService } from "../../../src/app/services/bar-items.service";
 import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
+import { LiveViewService } from "../../../src/app/services/live-view.service";
 import { MenuService } from "../../../src/app/services/menu.service";
 import { ModuleStatusService } from "../../../src/app/services/module-status.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
@@ -142,6 +145,18 @@ describe("WindowPartHostService", () => {
     expect(["shell.settings", "shell.modules"].map(t => layout.registry().hasDocument(t))).toEqual([true, true]);
     expect([settings?.context, await settings?.loadComponent(), modules?.context, await modules?.loadComponent()]).toEqual([null, SettingsComponent, null, ModulesComponent]);
     expect(["shell.settings", "shell.modules"].map(t => labels.of(new DocumentTab(t))).map(t => [t.title, t.icon])).toEqual([["Settings", "settings"], ["Modules", "extension"]]);
+  });
+
+  it("lists the save steps of the active parts that registered any, by module", async () => {
+    const save = (): Promise<void> => Promise.resolve();
+    const notes = new WindowPartFixture("notes", log, t => {
+      t.registerSave(save);
+    });
+    const { host } = start([source("notes", notes), source("clock", clockPart(log))], [status("notes"), status("clock")]);
+
+    await vi.waitFor(() => expect(log).toEqual(["activate notes", "activate clock"]));
+
+    await vi.waitFor(() => expect([...host.listSaves()]).toEqual([["notes", [save]]]));
   });
 
   it("reads, sets, resets and follows settings through the settings service", async () => {
@@ -471,14 +486,33 @@ describe("WindowPartHostService", () => {
     const part = new WindowPartFixture("notes", log, t => {
       t.registerDocument(new DocumentContribution("notes.note", load));
       t.openDocument("notes.note", "1", "Note 1");
-      t.openDocument("notes.note", "2", " ");
+      t.openDocument("notes.page", "2", "Page");
     });
     const { host, layout } = start([source("notes", part)], [status("notes")]);
 
     await vi.waitFor(() => expect(errors.length).toBe(1));
-    host.openDocument("notes", "notes.note", "3", "Note 3", false);
+    host.openDocument("notes", "notes.note", "3", new DocumentHeading("Note 3"), false);
 
     expect(layout.layout().documents.tabs).toEqual([new DocumentTab("notes.note", "1"), new DocumentTab("notes.note", "3")]);
+  });
+
+  it("changes the heading of a document opened during activation once it opens, and of an open one at once", async () => {
+    const note = new DocumentTab("notes.note", "1");
+    const part = new WindowPartFixture("notes", log, t => {
+      t.registerDocument(new DocumentContribution("notes.note", load));
+      t.openDocument("notes.note", "1", "Note 1");
+      t.updateDocument("notes.note", "1", { breadcrumb: ["Notes"] });
+      t.updateDocument("notes.note", "2", { title: "Note 2" });
+    });
+    const { host, layout } = start([source("notes", part)], [status("notes")]);
+    const labels = TestBed.inject(TabLabelService);
+    await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note]));
+    const opened = labels.headingOf(note).text;
+
+    host.updateDocument("notes", "notes.note", "1", "Plan", null);
+
+    expect([opened, labels.headingOf(note).text]).toEqual(["Notes › Note 1", "Notes › Plan"]);
+    expect(errors).toEqual([]);
   });
 
   it("restores the saved documents a part opens during activation with the saved active one, leaves out one the layout lacks, and opens it when asked later", async () => {
@@ -493,7 +527,7 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(layout.layout().documents.tabs).toHaveLength(3));
     const restored = [layout.layout().documents.tabs, layout.layout().documents.active];
 
-    host.openDocument("notes", "notes.note", "4", "Note 4", false);
+    host.openDocument("notes", "notes.note", "4", new DocumentHeading("Note 4"), false);
 
     expect(restored).toEqual([[note("1"), note("2"), note("3")], note("1")]);
     expect(TestBed.inject(TabLabelService).of(note("3")).title).toBe("Note 3");
@@ -512,12 +546,14 @@ describe("WindowPartHostService", () => {
     vi.spyOn(TestBed.inject(LayoutStoreService), "readAsync").mockReturnValue(new Promise(resolve => read = resolve));
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
-    host.openDocument("notes", "notes.note", "4", "Note 4", false);
+    host.openDocument("notes", "notes.note", "4", new DocumentHeading("Note 4"), false);
     host.keepDocument("notes", "notes.note", "1");
+    host.updateDocument("notes", "notes.note", "1", "First note", ["Notes"]);
     read(saved.toJson());
 
     await vi.waitFor(() => expect(layout.layout().documents.tabs).toEqual([note("1"), note("2"), note("4")]));
     expect(layout.layout().documents.active).toEqual(note("4"));
+    expect(TestBed.inject(TabLabelService).headingOf(note("1")).text).toBe("Notes › First note");
   });
 
   it("keeps the active document when the runtime is ready again, and adds a document the parts open while reactivating that is not open", async () => {
@@ -578,6 +614,18 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(host.generation()).toBe(1));
 
     expect(bridge.logged).toEqual(["notes: Opened the list"]);
+  });
+
+  it("opens a window part's link through the desktop, and rejects when the desktop does not open it", async () => {
+    const { host } = start([], []);
+
+    await host.openLinkAsync("https://example.com/help");
+    bridge.isLinkOpened = false;
+    const refusal = await host.openLinkAsync("file:///etc/passwd").catch((error: unknown) => error);
+
+    expect(bridge.links).toEqual(["https://example.com/help", "file:///etc/passwd"]);
+    expect([refusal instanceof LinkNotOpenedException, (refusal as Error).message])
+      .toEqual([true, "TeamRun did not open the link: it opens only well-formed http, https and mailto links, in the system's own application."]);
   });
 
   it("reports a layout that cannot load and still opens the documents asked for", async () => {
@@ -661,6 +709,22 @@ describe("WindowPartHostService", () => {
     expect(loads.length).toBe(1);
     expect(errors.map(t => (t as Error).message)).toEqual(["tasks did not stop"]);
     expect(host.findContribution(new ViewTab("notes.list"))?.context?.moduleId).toBe("notes");
+  });
+
+  it("destroys the live views of a part it rebuilds before deactivating the part, and keeps those of a part that continues", async () => {
+    const notes = notesPart(log);
+    const clock = clockPart(log);
+    notes.onReconnect = () => true;
+    const { host } = start([source("notes", notes), source("clock", clock)], [status("notes"), status("clock")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const tabs = [new ViewTab("notes.list"), new DocumentTab("notes.note", "1"), new ViewTab("clock.list"), new DocumentTab("clock.note", "1"), ShellDocuments.settingsTab];
+    vi.spyOn(TestBed.inject(LiveViewService), "destroy").mockImplementation(owns => log.push(`destroy ${tabs.filter(owns).map(t => t.name).join(",")}`));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "activate clock", "reconnect notes", "reconnect clock", "destroy clock.list", "deactivate clock", "activate clock"]);
   });
 
   it("keeps a part that continues when the runtime is ready again, with its context and its tabs' revisions, and moves on only the rebuilt module's tabs", async () => {
@@ -1003,6 +1067,24 @@ describe("WindowPartHostService", () => {
 
     expect(seen).toEqual([[], ["tasks"]]);
     expect(TestBed.inject(ModuleStatusService).modules().map(t => t.id)).toEqual(["tasks"]);
+  });
+
+  it("shows the tab a window part marks as working until the part is withdrawn", async () => {
+    let marks = 0;
+    const notes = new WindowPartFixture("notes", log, t => {
+      if (marks++ === 0)
+        t.markWorking("notes.list");
+    });
+    const { host } = start([source("notes", notes, [], ["notes.list"])], [status("notes")]);
+    const labels = TestBed.inject(TabLabelService);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const shown = labels.isWorking(new ViewTab("notes.list"));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect([shown, labels.isWorking(new ViewTab("notes.list"))]).toEqual([true, false]);
   });
 
   it("shows the badge a window part sets on its view, set again when the part reactivates", async () => {

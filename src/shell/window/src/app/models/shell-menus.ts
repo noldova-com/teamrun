@@ -25,6 +25,7 @@ export class ShellMenus {
     new MenuPlace(Resources.windowMenu, Resources.windowMenuTitle, true),
     new MenuPlace(Resources.helpMenu, Resources.helpMenuTitle, true),
     new MenuPlace(Resources.tabMenu, Resources.tabMenuTitle, false),
+    new MenuPlace(Resources.fieldMenu, Resources.fieldMenuTitle, false),
     new MenuPlace(Resources.tabMoveToMenu, Resources.moveToLabel, false, Resources.moveToGlyph),
     new MenuPlace(Resources.tabSplitMenu, Resources.splitLabel, false, Resources.splitGlyph),
     new MenuPlace(Resources.tabDockMenu, Resources.dockLabel, false, Resources.dockGlyph),
@@ -34,6 +35,9 @@ export class ShellMenus {
   ];
   private static readonly EDITING: MenuGroup = new MenuGroup(Resources.editingGroup, Resources.editMenu, false,
     Object.values(EditAction).map(t => MenuItem.ofCommand(Resources.editCommands[t])));
+  private static readonly FIELD_EDITING: MenuGroup = new MenuGroup(Resources.fieldEditingGroup, Resources.fieldMenu, false,
+    Resources.fieldEditActions.map(t => MenuItem.ofCommand(Resources.editCommands[t])));
+  private static readonly FIELD_SPELLING: MenuGroup = MenuGroup.dynamic(Resources.fieldSpellingGroup, Resources.fieldMenu, false);
   private static readonly GROUPS: readonly MenuGroup[] = [
     new MenuGroup(Resources.closeGroup, Resources.fileMenu, false, [MenuItem.ofCommand(Resources.closeTabCommand)]),
     new MenuGroup(Resources.searchGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.showCommandsCommand)]),
@@ -77,10 +81,13 @@ export class ShellMenus {
       Object.values(PanelEdge).map(t => MenuItem.ofCommand(Resources.splitTabCommands[t], {}, Resources.splitLabels[t]))),
     new MenuGroup(Resources.tabDockGroup, Resources.tabDockMenu, false,
       Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.dockTabCommands[t], {}, Resources.dockLabels[t]))),
-    new MenuGroup(Resources.settingsGroup, Resources.appMenu, false, [MenuItem.ofCommand(Resources.openSettingsCommand)])
+    new MenuGroup(Resources.settingsGroup, Resources.appMenu, false, [MenuItem.ofCommand(Resources.openSettingsCommand)]),
+    new MenuGroup(Resources.commandLineGroup, Resources.appMenu, false, [MenuItem.ofCommand(Resources.installCommandCommand)])
   ];
 
   public static of(isMac: boolean): MenuDeclarations {
-    return new MenuDeclarations(Resources.shellOwner, ShellMenus.PLACES, isMac ? ShellMenus.GROUPS : [ShellMenus.EDITING, ...ShellMenus.GROUPS]);
+    return new MenuDeclarations(Resources.shellOwner, ShellMenus.PLACES, isMac
+      ? [ShellMenus.FIELD_SPELLING, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS]
+      : [ShellMenus.EDITING, ShellMenus.FIELD_SPELLING, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS]);
   }
 }

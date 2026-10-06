@@ -26,6 +26,12 @@ export class ShellMethodsTests {
   }
 
   @TestMethod
+  public namesTheProgramsMethod(): void {
+    Assert.areEqual("shell.programs", ShellMethods.programs.text);
+    Assert.isTrue(ShellMethods.programs.isShell);
+  }
+
+  @TestMethod
   public namesTheCommandMethods(): void {
     Assert.areEqual("shell.commands", ShellMethods.commands.text);
     Assert.areEqual("shell.runCommand", ShellMethods.runCommand.text);

@@ -16,6 +16,7 @@ import { MenuCheck } from "../../../../src/app/enums/menu-check";
 import { CommandRow } from "../../../../src/app/models/command-row";
 import { MenuSection } from "../../../../src/app/models/menu-section";
 import { Toolbar } from "../../../../src/app/models/toolbar";
+import { ClosingService } from "../../../../src/app/services/closing.service";
 import { LayoutStoreService } from "../../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../../src/app/services/layout.service";
 import { ToolbarService } from "../../../../src/app/services/toolbar.service";
@@ -36,7 +37,7 @@ describe("WindowComponent", () => {
     await fixture.whenStable();
     const root: HTMLElement = fixture.nativeElement;
 
-    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-status-bar", "tr-toasts"]);
+    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-status-bar", "tr-toasts", "tr-field-menu"]);
     expect(root.getBoundingClientRect().height).toBe(innerHeight);
     expect(root.querySelector("tr-empty-window")).not.toBeNull();
   });
@@ -89,7 +90,7 @@ describe("WindowComponent", () => {
     await fixture.whenStable();
     const root: HTMLElement = fixture.nativeElement;
 
-    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-toolbar-band", "tr-startup", "tr-status-bar", "tr-toasts"]);
+    expect([...root.children].map(t => t.tagName.toLowerCase())).toEqual(["tr-window-row", "tr-toolbar-band", "tr-startup", "tr-status-bar", "tr-toasts", "tr-field-menu"]);
     bridge.publishStartup({ kind: "Ready", details: [] });
     await fixture.whenStable();
 
@@ -113,7 +114,7 @@ describe("WindowComponent", () => {
     bridge.publishStartup({ kind: "Ready", details: [] });
     await fixture.whenStable();
 
-    expect(tags).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-startup", "tr-status-bar", "tr-toasts"]);
+    expect(tags).toEqual(["tr-window-row", "tr-toolbar-band", "tr-workspace", "tr-startup", "tr-status-bar", "tr-toasts", "tr-field-menu"]);
     expect(cardBox).toEqual(workspaceBox);
     expect(announced).toEqual(["Starting TeamRun…", true]);
     expect(root.querySelector("tr-workspace")).toBe(workspace);
@@ -131,6 +132,18 @@ describe("WindowComponent", () => {
 
     expect(bridge.layout).toBeNull();
     expect(bridge.closeListenerCount).toBe(0);
+  });
+
+  it("answers a close request as not saved when a window part's save failed", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const fixture = TestBed.createComponent(WindowComponent);
+    await fixture.whenStable();
+    vi.spyOn(TestBed.inject(ClosingService), "saveAsync").mockResolvedValue(false);
+
+    bridge.requestClose("request");
+
+    await vi.waitFor(() => expect(bridge.answers).toEqual(["request:false"]));
+    fixture.destroy();
   });
 
   it("saves a changed layout before it answers a close request", async () => {

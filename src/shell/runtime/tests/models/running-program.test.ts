@@ -25,4 +25,11 @@ export class RunningProgramTests {
     Assert.isFalse(program.hasExited);
     Assert.isTrue(exited.hasExited);
   }
+
+  @TestMethod
+  public reportsItsModuleProgramProcessStartAndWhetherItExited(): void {
+    const status = new RunningProgram("git", "/usr/bin/git", 4_210, new Date(1_000), true).toStatus();
+
+    Assert.areEqual("{\"module\":\"git\",\"program\":\"/usr/bin/git\",\"processId\":4210,\"startedAt\":\"1970-01-01T00:00:01.000Z\",\"hasExited\":true}", JSON.stringify(status.toJson()));
+  }
 }

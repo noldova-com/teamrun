@@ -145,6 +145,12 @@ export declare function Skip(reason: string): (value: Function) => void;
  */
 export declare class AssertFailedException extends TestingException {
   /**
+   * The exception's name, `"AssertFailedException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * The value the assertion expected, or `undefined` when it compares none.
    */
   public readonly expected: unknown;
@@ -181,6 +187,12 @@ export declare class AssertFailedException extends TestingException {
  */
 export declare class TestingException extends Exception {
   /**
+   * The exception's name, `"TestingException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message The violation.
@@ -204,6 +216,12 @@ export declare class TestingException extends Exception {
  * limit. A run that records it ends after reporting it.
  */
 export declare class TestTimeoutException extends TestingException {
+  /**
+   * The exception's name, `"TestTimeoutException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The time limit that elapsed, in milliseconds.
    */

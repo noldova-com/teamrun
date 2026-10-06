@@ -7,13 +7,14 @@
  */
 
 import { existsSync } from "node:fs";
-import { chmod, readdir, stat } from "node:fs/promises";
+import { chmod, readdir, rm, rmdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 import type ProductIdentity from "../packages/product-identity.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessTimeoutException from "../processes/process-timeout.exception.ts";
 import InstalledPackage from "./installed-package.ts";
+import PackageConfiguration from "./package-configuration.ts";
 import PackageLayout from "./package-layout.ts";
 import PackageTarget from "./package-target.ts";
 import PackagingException from "./packaging.exception.ts";
@@ -26,6 +27,10 @@ export default class PackageInstaller {
   private static readonly WINDOWS_LIBRARY_EXTENSION: string = ".dll";
   private static readonly RESOURCES_FOLDER: string = "resources";
   private static readonly SILENT_INSTALL: readonly string[] = ["/S"];
+  private static readonly UNINSTALLER_PREFIX: string = "Uninstall ";
+  private static readonly IN_PLACE_OPTION: string = "_?=";
+  private static readonly REMOVE_RETRIES: number = 20;
+  private static readonly REMOVE_RETRY_DELAY: number = 500;
   private static readonly MODULE_PATH: string = "PSModulePath";
   private static readonly SYSTEM_ROOT: string = "SystemRoot";
   private static readonly WINDOWS_POWERSHELL_MODULES: readonly string[] = ["System32", "WindowsPowerShell", "v1.0", "Modules"];
@@ -63,6 +68,23 @@ export default class PackageInstaller {
       default:
         return this.unpackAppImageAsync(locate(PackageTarget.APP_IMAGE), product, folder);
     }
+  }
+
+  public async uninstallWindowsAsync(product: ProductIdentity, folder: string): Promise<void> {
+    const installFolder = this.locateWindowsFolder(product);
+    const uninstaller = path.join(installFolder, `${PackageInstaller.UNINSTALLER_PREFIX}${product.name}${PackageInstaller.WINDOWS_PROGRAM_EXTENSION}`);
+    await this.runner.requireAsync(uninstaller, [...PackageInstaller.SILENT_INSTALL, `${PackageInstaller.IN_PLACE_OPTION}${installFolder}`], folder, PackageInstaller.LIMIT,
+      this.createInstallerEnvironment());
+    try {
+      await rm(uninstaller, { maxRetries: PackageInstaller.REMOVE_RETRIES, retryDelay: PackageInstaller.REMOVE_RETRY_DELAY });
+    }
+    catch (error) {
+      throw new PackagingException(`The uninstaller ${uninstaller} could not be removed after it ran: ${String(error)}`, { cause: error });
+    }
+    const left = await readdir(installFolder, { recursive: true });
+    if (left.length > 0)
+      throw new PackagingException(`The uninstaller left ${left.sort().join(", ")} in ${installFolder}.`);
+    await rmdir(installFolder);
   }
 
   private static async describeAsync(installFolder: string): Promise<string> {
@@ -103,11 +125,15 @@ export default class PackageInstaller {
     return { ...Object.fromEntries(others), [PackageInstaller.MODULE_PATH]: modules };
   }
 
-  private async installWindowsAsync(installer: string, product: ProductIdentity, folder: string): Promise<InstalledPackage> {
+  private locateWindowsFolder(product: ProductIdentity): string {
     const localAppData = this.environment[PackageInstaller.LOCAL_APP_DATA] ?? "";
     if (localAppData.length === 0)
       throw new PackagingException(`${PackageInstaller.LOCAL_APP_DATA} must name the folder the installer installs into for the user.`);
-    const installFolder = path.join(localAppData, PackageInstaller.PROGRAMS_FOLDER, product.slug);
+    return path.join(localAppData, PackageInstaller.PROGRAMS_FOLDER, product.slug);
+  }
+
+  private async installWindowsAsync(installer: string, product: ProductIdentity, folder: string): Promise<InstalledPackage> {
+    const installFolder = this.locateWindowsFolder(product);
     const environment = this.createInstallerEnvironment();
     try {
       await this.runner.requireAsync(installer, PackageInstaller.SILENT_INSTALL, folder, PackageInstaller.LIMIT, environment);
@@ -121,8 +147,9 @@ export default class PackageInstaller {
     const libraries = (await readdir(new PackageLayout(this.root).electron))
       .filter(t => path.extname(t).toLowerCase() === PackageInstaller.WINDOWS_LIBRARY_EXTENSION)
       .map(t => path.join(installFolder, t));
-    PackageInstaller.requireFiles([program, ...libraries]);
-    return new InstalledPackage(program, program, path.join(path.dirname(program), PackageInstaller.RESOURCES_FOLDER));
+    const command = path.join(installFolder, PackageConfiguration.COMMAND_FOLDER, `${product.slug}${PackageConfiguration.WINDOWS_COMMAND_EXTENSION}`);
+    PackageInstaller.requireFiles([program, command, ...libraries]);
+    return new InstalledPackage(program, program, path.join(path.dirname(program), PackageInstaller.RESOURCES_FOLDER), command);
   }
 
   private async copyFromDiskImageAsync(image: string, product: ProductIdentity, folder: string): Promise<InstalledPackage> {
@@ -145,7 +172,7 @@ export default class PackageInstaller {
     await this.requireAsync(PackageInstaller.DISK_IMAGES, [...PackageInstaller.DETACH, mount], folder);
     const program = path.join(application, ...PackageInstaller.BUNDLE_SEGMENTS, product.name);
     PackageInstaller.requireFiles([program]);
-    return new InstalledPackage(program, program, path.join(application, ...PackageInstaller.BUNDLE_RESOURCES_SEGMENTS));
+    return new InstalledPackage(program, program, path.join(application, ...PackageInstaller.BUNDLE_RESOURCES_SEGMENTS), null);
   }
 
   private async unpackAppImageAsync(file: string, product: ProductIdentity, folder: string): Promise<InstalledPackage> {
@@ -154,7 +181,7 @@ export default class PackageInstaller {
     const extracted = path.join(folder, PackageInstaller.EXTRACTED_FOLDER);
     const program = path.join(extracted, product.slug);
     PackageInstaller.requireFiles([program]);
-    return new InstalledPackage(file, program, path.join(extracted, PackageInstaller.RESOURCES_FOLDER));
+    return new InstalledPackage(file, program, path.join(extracted, PackageInstaller.RESOURCES_FOLDER), null);
   }
 
   private requireAsync(command: string, commandArguments: readonly string[], folder: string): Promise<void> {

@@ -14,6 +14,12 @@ LICENSE file in the root directory of this source tree.
 <button type="button" [attr.data-fixture-content]="'notes-reset-note-' + instance()" (click)="resetNote()">Reset this note</button>
 <button type="button" [attr.data-fixture-content]="'notes-wrap-inbox-' + instance()" (click)="wrapInbox()">Wrap the inbox</button>
 <button type="button" [attr.data-fixture-content]="'notes-reset-inbox-' + instance()" (click)="resetInbox()">Reset the inbox</button>
+@for (choice of savings; track choice[0]) {
+  <button type="button" [attr.data-fixture-content]="'notes-save-' + choice[0]" [attr.aria-pressed]="saving() === choice[0]" (click)="saveBy(choice[0])">{{ choice[1] }}</button>
+}
+<button type="button" [attr.data-fixture-content]="'notes-work-' + instance()" [attr.aria-pressed]="working()" (click)="toggleWorking()">Work on this note</button>
+<a class="tr-notes-note-link" href="https://example.com/notes" [attr.data-fixture-content]="'notes-link-' + instance()">Read about notes</a>
+<button type="button" [attr.data-fixture-content]="'notes-help-' + instance()" (click)="openHelp()">Open help</button>
 <p class="tr-notes-note-runtime" data-fixture-content="notes-runtime" [attr.data-continued]="continued()">Runtime {{ runtime() }}</p>
 @for (section of sections; track section) {
   <h2>{{ section }}</h2>

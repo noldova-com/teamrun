@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Stats } from "node:fs";
 import type { Writable } from "node:stream";
 
 import type {
@@ -76,6 +77,36 @@ export declare enum QuitChoice {
    * Keep TeamRun open.
    */
   Cancel = "Cancel"
+}
+
+/**
+ * What installing the command on the macOS PATH did.
+ */
+export declare enum PathCommandOutcome {
+  /**
+   * The link now points to the command inside the app.
+   */
+  Installed = "Installed",
+
+  /**
+   * The link already pointed to the command inside this app, so nothing changed.
+   */
+  AlreadyInstalled = "AlreadyInstalled",
+
+  /**
+   * A file that is not a link has the link's name; it is left alone.
+   */
+  Occupied = "Occupied",
+
+  /**
+   * This build has no command to link, as in a development start.
+   */
+  Missing = "Missing",
+
+  /**
+   * The person cancelled the system's administrator prompt.
+   */
+  Cancelled = "Cancelled"
 }
 
 /**
@@ -796,6 +827,21 @@ export interface IApplicationHost {
   requestSingleInstanceLock(): boolean;
 
   /**
+   * Lists the operating system's preferred languages, most preferred first.
+   *
+   * @returns Language tags such as `en-US` or `de`.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function firstLanguage(app: IApplicationHost): string | undefined {
+   *   return app.getPreferredSystemLanguages()[0];
+   * }
+   * ```
+   */
+  getPreferredSystemLanguages(): string[];
+
+  /**
    * Runs every renderer in the sandbox.
    *
    * @example
@@ -970,13 +1016,63 @@ export interface IPermissionHost {
 }
 
 /**
+ * Turns spell checking on and off and chooses its dictionaries, as an Electron session provides it.
+ */
+export interface ISpellCheckHost {
+  /**
+   * Turns spell checking on or off for every window of the session.
+   *
+   * @param isEnabled Whether misspelled words are marked.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stopChecking(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerEnabled(false);
+   * }
+   * ```
+   */
+  setSpellCheckerEnabled(isEnabled: boolean): void;
+
+  /**
+   * Chooses the languages words are checked in. macOS ignores it, because its system checker chooses.
+   *
+   * @param languages Language tags whose dictionaries the session has, such as `en-US`.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkInEnglish(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerLanguages(["en-US"]);
+   * }
+   * ```
+   */
+  setSpellCheckerLanguages(languages: string[]): void;
+
+  /**
+   * Sets the address a dictionary that is not in the profile's `Dictionaries` folder would be downloaded from.
+   *
+   * @param url The address, ending in `/`.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function downloadNothing(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerDictionaryDownloadURL("file:///home/ada/.teamrun/desktop/Dictionaries/");
+   * }
+   * ```
+   */
+  setSpellCheckerDictionaryDownloadURL(url: string): void;
+}
+
+/**
  * Electron's `session` module, as far as the desktop uses it.
  */
 export interface ISessionHost {
   /**
    * The session the window's web contents use.
    */
-  readonly defaultSession: IPermissionHost;
+  readonly defaultSession: IPermissionHost & ISpellCheckHost;
 }
 
 /**
@@ -1036,7 +1132,7 @@ export interface IClipboardHost {
 }
 
 /**
- * Opens files and folders in the system's own application, as Electron's `shell` provides it.
+ * Opens files, folders and links in the system's own application, as Electron's `shell` provides it.
  */
 export interface IShellHost {
   /**
@@ -1054,6 +1150,53 @@ export interface IShellHost {
    * ```
    */
   openPath(path: string): Promise<string>;
+
+  /**
+   * Opens a link in the system's own application, such as a web page in the browser.
+   *
+   * @param url The link to open, one that `LinkPolicy.findAllowed` allowed.
+   * @returns A promise that settles once the system has taken the link.
+   * @throws Error asynchronously when the system cannot open it.
+   * @example
+   * ```ts
+   * import type { IShellHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function openDocsAsync(host: IShellHost): Promise<void> {
+   *   await host.openExternal("https://example.com/docs");
+   * }
+   * ```
+   */
+  openExternal(url: string): Promise<void>;
+}
+
+/**
+ * What Electron reports about a right click or a context menu key in a page, as far as the desktop uses it.
+ */
+export interface IContextMenuParams {
+  /**
+   * The horizontal position of the menu in the page, in CSS pixels.
+   */
+  readonly x: number;
+
+  /**
+   * The vertical position of the menu in the page, in CSS pixels.
+   */
+  readonly y: number;
+
+  /**
+   * The misspelled word under the menu, or empty when there is none.
+   */
+  readonly misspelledWord: string;
+
+  /**
+   * The spell checker's suggestions for the misspelled word, best first.
+   */
+  readonly dictionarySuggestions: string[];
+
+  /**
+   * What asked for the menu, such as `mouse` or `keyboard`.
+   */
+  readonly menuSourceType: string;
 }
 
 /**
@@ -1136,6 +1279,24 @@ export interface IWindowContents {
    * ```
    */
   on(event: "did-start-loading", listener: () => void): unknown;
+
+  /**
+   * Listens for the page asking for a context menu, which Electron reports only when the page did not cancel the
+   * request.
+   *
+   * @param event The event's name.
+   * @param listener Receives Electron's event and what it reports about the menu.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function follow(contents: IWindowContents, words: string[]): void {
+   *   contents.on("context-menu", (_event, params) => words.push(params.misspelledWord));
+   * }
+   * ```
+   */
+  on(event: "context-menu", listener: (event: unknown, params: IContextMenuParams) => void): unknown;
 
   /**
    * Decides what happens when the page asks to open a window.
@@ -1310,6 +1471,21 @@ export interface IWindowContents {
    * ```
    */
   selectAll(): void;
+
+  /**
+   * Replaces the misspelled word around the page's selection, as one step that Undo reverts.
+   *
+   * @param text The replacement.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function correct(contents: IWindowContents): void {
+   *   contents.replaceMisspelling("world");
+   * }
+   * ```
+   */
+  replaceMisspelling(text: string): void;
 
   /**
    * Returns the operating system's id of the page's renderer process.
@@ -1890,6 +2066,94 @@ export interface IParentPort {
 }
 
 /**
+ * The file operations {@link PathCommand} links the command with, as Node.js's `fs/promises` provides them.
+ */
+export interface IPathCommandFiles {
+  /**
+   * Reads a file's own status, without following a link.
+   *
+   * @param file The file to read.
+   * @returns Its status; rejects with an error whose `code` is `ENOENT` when nothing is there.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isLinkAsync(files: IPathCommandFiles, file: string): Promise<boolean> {
+   *   return (await files.lstat(file)).isSymbolicLink();
+   * }
+   * ```
+   */
+  lstat(file: string): Promise<Stats>;
+
+  /**
+   * Reads where a link points.
+   *
+   * @param link The link to read.
+   * @returns The path it points to.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function targetAsync(files: IPathCommandFiles): Promise<string> {
+   *   return files.readlink("/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  readlink(link: string): Promise<string>;
+
+  /**
+   * Removes a file or a link.
+   *
+   * @param file The file to remove.
+   * @returns A promise that settles once it is removed.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function unlinkAsync(files: IPathCommandFiles): Promise<void> {
+   *   return files.rm("/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  rm(file: string): Promise<void>;
+
+  /**
+   * Makes a folder and any folders above it that are missing.
+   *
+   * @param folder The folder to make.
+   * @param options Always recursive.
+   * @returns The first folder it made, or `undefined` when all were there.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function prepareAsync(files: IPathCommandFiles): Promise<void> {
+   *   await files.mkdir("/usr/local/bin", { recursive: true });
+   * }
+   * ```
+   */
+  mkdir(folder: string, options: { readonly recursive: true }): Promise<string | undefined>;
+
+  /**
+   * Makes a link.
+   *
+   * @param target The path the link points to.
+   * @param link The link to make.
+   * @returns A promise that settles once the link is made; rejects with an error whose `code` of `EACCES` or `EPERM`
+   * makes {@link PathCommand.installAsync} ask for an administrator.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function linkAsync(files: IPathCommandFiles): Promise<void> {
+   *   return files.symlink("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  symlink(target: string, link: string): Promise<void>;
+}
+
+/**
  * An Electron utility process, as the desktop uses one.
  */
 export interface IUtilityProcess {
@@ -1980,7 +2244,7 @@ export interface IElectron {
   readonly clipboard: IClipboardHost;
 
   /**
-   * The system's file manager, for opening the log folder.
+   * The system's file manager and browser, for opening the log folder and links.
    */
   readonly shell: IShellHost;
 
@@ -2020,6 +2284,12 @@ export interface IElectron {
  * The exception thrown when this device's identity file cannot be read or holds no valid identity.
  */
 export declare class DeviceIdentityException extends Exception {
+  /**
+   * The exception's name, `"DeviceIdentityException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -2898,10 +3168,12 @@ export declare class DesktopApplication {
    * @param createAppearanceStore Creates the store of this device's last appearance preferences in the same folder. The
    * desktop reads them before it opens a window, so the window's first frame already has them, and keeps those the
    * window reports.
+   * @param createPathCommand Creates the service that links the command line on the macOS PATH for the program the
+   * desktop runs from; the window's "Install command in PATH" command runs it and shows what happened.
    * @example
    * ```ts
    * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
-   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron } from "@noldova/teamrun-shell-desktop";
+   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
    *
    * export function launch(electron: IElectron, process: IDesktopProcess): void {
    *   DesktopApplication.start(
@@ -2910,7 +3182,8 @@ export declare class DesktopApplication {
    *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
    *     t => new RuntimeLauncher(t, RuntimeBuild.identity),
    *     t => DeviceIdentity.readOrCreateAsync(t),
-   *     t => new AppearanceStore(t));
+   *     t => new AppearanceStore(t),
+   *     t => PathCommand.forBundle(t, () => Promise.resolve()));
    * }
    * ```
    */
@@ -2920,7 +3193,8 @@ export declare class DesktopApplication {
     moduleUrl: string,
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
-    createAppearanceStore: (folder: string) => IAppearanceStore): void;
+    createAppearanceStore: (folder: string) => IAppearanceStore,
+    createPathCommand: (executablePath: string) => PathCommand): void;
 }
 
 /**
@@ -2958,6 +3232,127 @@ export interface IAppearanceStore {
    * ```
    */
   writeAsync(preferences: JsonObject): Promise<void>;
+}
+
+/**
+ * Puts the dictionaries that ship with the desktop where Electron's spell checker finds them.
+ */
+export declare class SpellingDictionaries {
+  /**
+   * Puts each dictionary the folder's `dictionaries.json` lists into the profile's `Dictionaries` folder, where
+   * Electron's spell checker finds it, unless it is already there. It runs before the application is ready, because
+   * Electron reads that folder as it becomes ready. A dictionary whose entry is not valid or whose file cannot be copied
+   * is left out and logged.
+   *
+   * @param sourceFolder The folder of the shipped dictionaries.
+   * @param profileFolder The profile folder, Electron's `userData`.
+   * @param log Receives each line to log.
+   * @returns The languages of the dictionaries in the profile, in the list's order; none when the list cannot be read.
+   * @example
+   * ```ts
+   * import { SpellingDictionaries } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function install(profile: string): readonly string[] {
+   *   return SpellingDictionaries.install("/opt/teamrun/assets/dictionaries", profile, line => console.error(line));
+   * }
+   * ```
+   */
+  public static install(sourceFolder: string, profileFolder: string, log: (text: string) => void): readonly string[];
+
+  /**
+   * Gives the profile's `Dictionaries` folder as a `file:` URL ending in a slash, the address the spell checker gives
+   * Chromium for downloads. Chromium cannot download from a `file:` URL, so a missing dictionary fails at once without
+   * a connection, and no local process can answer in its place as one listening on a loopback port could.
+   *
+   * @param profileFolder The profile folder, Electron's `userData`.
+   * @returns The folder's `file:` URL with a trailing slash.
+   * @example
+   * ```ts
+   * import { SpellingDictionaries } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function addressOf(profile: string): string {
+   *   return SpellingDictionaries.addressOf(profile);
+   * }
+   * ```
+   */
+  public static addressOf(profileFolder: string): string;
+}
+
+/**
+ * Applies the spelling settings to the window's session. On Windows and Linux it checks only in shipped languages and
+ * points the dictionary download address at the profile's own dictionary folder as a `file:` URL, from which Chromium
+ * cannot download, so a dictionary is never downloaded; on macOS the system checker chooses the languages and only
+ * checking on or off applies.
+ */
+export declare class SpellChecker {
+  /**
+   * Creates the spell checker.
+   *
+   * @param host Gives the session once the application is ready.
+   * @param languages The shipped languages in the profile, in their order.
+   * @param address The dictionary download address, the profile's own dictionary folder as a `file:` URL, which Chromium cannot download from.
+   * @param platform The operating system, as `process.platform` names it.
+   * @param readSystemLanguages Lists the operating system's preferred languages.
+   * @param log Receives each line to log.
+   * @example
+   * ```ts
+   * import { type ISpellCheckHost, SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(session: ISpellCheckHost): SpellChecker {
+   *   return new SpellChecker(() => session, ["en-US"], "file:///home/ada/.teamrun/desktop/Dictionaries/", "linux", () => ["en-US"], line => console.error(line));
+   * }
+   * ```
+   */
+  public constructor(host: () => ISpellCheckHost, languages: readonly string[], address: string, platform: string, readSystemLanguages: () => readonly string[], log: (text: string) => void);
+
+  /**
+   * Points the dictionary download at the profile's own dictionary folder and checks in the languages an empty choice means, before any window opens.
+   *
+   * @example
+   * ```ts
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function start(checker: SpellChecker): void {
+   *   checker.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Turns checking on or off and checks in the chosen languages that ship, in their shipped order. With none of them,
+   * it checks in the operating system's languages that ship, or else in the first shipped language. A language list
+   * the session refuses is logged.
+   *
+   * @param isChecking Whether misspelled words are marked.
+   * @param chosen The chosen language tags.
+   * @example
+   * ```ts
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkInEnglish(checker: SpellChecker): void {
+   *   checker.apply(true, ["en-US"]);
+   * }
+   * ```
+   */
+  public apply(isChecking: boolean, chosen: readonly string[]): void;
+
+  /**
+   * Describes what the window may offer.
+   *
+   * @returns `languages`, the shipped languages, none on macOS; and `fallback`, the language an empty choice checks in
+   * when none of the operating system's languages ships, or `null`.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(checker: SpellChecker): JsonObject {
+   *   return checker.toJson();
+   * }
+   * ```
+   */
+  public toJson(): JsonObject;
 }
 
 /**
@@ -3115,6 +3510,26 @@ export declare class RuntimeStartup {
 }
 
 /**
+ * Decides which links TeamRun opens in the system's own application: well-formed http, https and mailto links without
+ * credentials, at most 32768 characters long.
+ */
+export declare class LinkPolicy {
+  /**
+   * Finds the link to open for a URL the window asked to open.
+   *
+   * @param url The URL as the window sent it; any value.
+   * @returns The link in its normalized form, or `null` for any other value, scheme or a URL that does not parse.
+   * @example
+   * ```ts
+   * import { LinkPolicy } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const link: string | null = LinkPolicy.findAllowed("https://example.com/docs");
+   * ```
+   */
+  public static findAllowed(url: unknown): string | null;
+}
+
+/**
  * Decides which frames may use the bridge: only the main frame of the window's own page.
  */
 export declare class SenderPolicy {
@@ -3259,9 +3674,336 @@ export declare class SystemNotifier {
 }
 
 /**
+ * Puts the command line on the macOS PATH by linking a folder on it, `/usr/local/bin`, to the command inside the app
+ * bundle. When the folder cannot be written, it asks for an administrator through the system's prompt.
+ */
+export declare class PathCommand {
+  /**
+   * Creates the service for one command and one link.
+   *
+   * @param target The command inside the app bundle.
+   * @param link The link to make on the PATH.
+   * @param files The file operations it links with.
+   * @param runProgramAsync Runs a program to its end, for the system's administrator prompt, and rejects with an error
+   * whose message holds the program's standard error when it fails; `(-128)` in it means the person cancelled.
+   * @example
+   * ```ts
+   * import { lstat, mkdir, readlink, rm, symlink } from "node:fs/promises";
+   *
+   * import { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const command: PathCommand = new PathCommand("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun",
+   *   { lstat, readlink, rm, mkdir, symlink }, () => Promise.resolve());
+   * ```
+   */
+  public constructor(target: string, link: string, files: IPathCommandFiles, runProgramAsync: (program: string, args: readonly string[]) => Promise<void>);
+
+  /**
+   * The link this service makes.
+   *
+   * @example
+   * ```ts
+   * import type { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(command: PathCommand): string {
+   *   return `The command line is linked at ${command.linkPath}.`;
+   * }
+   * ```
+   */
+  public get linkPath(): string;
+
+  /**
+   * Creates the service for the bundle the desktop runs from, with Node.js's file operations: the command is
+   * `Contents/Resources/bin/teamrun` and the link `/usr/local/bin/teamrun`.
+   *
+   * @param executablePath The program the desktop runs from, in `Contents/MacOS`.
+   * @param runProgramAsync Runs a program to its end, for the system's administrator prompt, and rejects with an error
+   * whose message holds the program's standard error when it fails; `(-128)` in it means the person cancelled.
+   * @returns The service.
+   * @example
+   * ```ts
+   * import { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const command: PathCommand = PathCommand.forBundle("/Applications/TeamRun.app/Contents/MacOS/TeamRun", () => Promise.resolve());
+   * ```
+   */
+  public static forBundle(executablePath: string, runProgramAsync: (program: string, args: readonly string[]) => Promise<void>): PathCommand;
+
+  /**
+   * Links the command on the PATH. A link to elsewhere is replaced; a file that is not a link is left alone. When the
+   * link's folder cannot be written or read, the system's administrator prompt makes the folder and the link, and
+   * leaves alone a file that is not a link, which it finds there with administrator rights.
+   *
+   * @returns A promise of what happened.
+   * @throws PathCommandException, through the promise, when the link cannot be read or made, or the administrator
+   * prompt fails for another reason than the person cancelling it.
+   * @example
+   * ```ts
+   * import { type PathCommand, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isLinkedAsync(command: PathCommand): Promise<boolean> {
+   *   const outcome = await command.installAsync();
+   *   return outcome === PathCommandOutcome.Installed || outcome === PathCommandOutcome.AlreadyInstalled;
+   * }
+   * ```
+   */
+  public installAsync(): Promise<PathCommandOutcome>;
+}
+
+/**
+ * The exception thrown when the command cannot be linked on the macOS PATH.
+ */
+export declare class PathCommandException extends Exception {
+  /**
+   * The exception's name, `"PathCommandException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { PathCommandException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: PathCommandException = new PathCommandException("The teamrun command could not be linked at /usr/local/bin/teamrun.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * Runs other programs for the desktop, without a shell or a window.
+ */
+export interface IProgramHost {
+  /**
+   * Runs a program to its end.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @returns A promise of the program's standard output.
+   * @throws ProgramException, through the promise, when the program cannot start, ends with an error or runs too long.
+   * @example
+   * ```ts
+   * import type { IProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readVersionAsync(programs: IProgramHost): Promise<string> {
+   *   return programs.runAsync("/usr/bin/gdbus", ["--version"], process.env);
+   * }
+   * ```
+   */
+  runAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): Promise<string>;
+
+  /**
+   * Starts a program that keeps running and passes its standard output on as it comes.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param onOutput Receives each piece of the program's standard output.
+   * @param onExit Called once, when the program ends or cannot start.
+   * @returns The running program.
+   * @example
+   * ```ts
+   * import type { IProgramHost, StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function monitor(programs: IProgramHost): StartedProgram {
+   *   return programs.start("/usr/bin/gdbus", ["monitor", "--session"], process.env, t => console.log(t), () => console.log("ended"));
+   * }
+   * ```
+   */
+  start(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onOutput: (text: string) => void, onExit: () => void): StartedProgram;
+}
+
+/**
+ * A program that an {@link IProgramHost} started.
+ */
+export declare class StartedProgram {
+  /**
+   * Creates the running program.
+   *
+   * @param end Ends the program.
+   * @example
+   * ```ts
+   * import { StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const program: StartedProgram = new StartedProgram(() => undefined);
+   * ```
+   */
+  public constructor(end: () => void);
+
+  /**
+   * Ends the program; its host's exit callback follows once it has ended.
+   *
+   * @example
+   * ```ts
+   * import type { StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(program: StartedProgram): void {
+   *   program.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+}
+
+/**
+ * Runs other programs as child processes of the desktop.
+ */
+export declare class ChildProgramHost implements IProgramHost {
+  /**
+   * Creates the host.
+   *
+   * @param timeout How long, in milliseconds, a program run to its end may take before it is ended and fails.
+   * @example
+   * ```ts
+   * import { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const programs: ChildProgramHost = new ChildProgramHost(5000);
+   * ```
+   */
+  public constructor(timeout: number);
+
+  /**
+   * Runs a program to its end.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @returns A promise of the program's standard output.
+   * @throws ProgramException, through the promise, when the program cannot start, ends with an error, runs longer than
+   * the timeout or writes more than 64 KiB.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readVersionAsync(programs: ChildProgramHost): Promise<string> {
+   *   return programs.runAsync("/usr/bin/gdbus", ["--version"], process.env);
+   * }
+   * ```
+   */
+  public runAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): Promise<string>;
+
+  /**
+   * Starts a program that keeps running and passes its standard output on as it comes.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param onOutput Receives each piece of the program's standard output.
+   * @param onExit Called once, when the program ends or cannot start.
+   * @returns The running program.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost, StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function monitor(programs: ChildProgramHost): StartedProgram {
+   *   return programs.start("/usr/bin/gdbus", ["monitor", "--session"], process.env, t => console.log(t), () => console.log("ended"));
+   * }
+   * ```
+   */
+  public start(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onOutput: (text: string) => void, onExit: () => void): StartedProgram;
+}
+
+/**
+ * The exception a program host gives when a program cannot start, ends with an error or runs too long.
+ */
+export declare class ProgramException extends Exception {
+  /**
+   * The exception's name, `"ProgramException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong, naming the program.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { ProgramException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: ProgramException = new ProgramException("/usr/bin/gdbus failed: spawn /usr/bin/gdbus ENOENT");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * Tells whether the desktop has somewhere to show a tray icon. Windows and macOS always have one. On Linux it asks the
+ * session bus, through `/usr/bin/gdbus`, whether a StatusNotifierWatcher has a host registered, and asks again whenever
+ * the watcher's name changes owner or the watcher signals a host coming or going. A missing `gdbus`, a missing watcher
+ * or a failed answer means no host. When the monitor ends, it asks once and starts the monitor again after a wait that
+ * begins at a second and doubles up to a minute, back to a second once the monitor is heard again.
+ */
+export declare class TrayHostWatcher {
+  /**
+   * Creates the watcher.
+   *
+   * @param platform The platform, as `process.platform` names it.
+   * @param programs Runs `gdbus`.
+   * @param environment The environment `gdbus` runs in, which names the session bus.
+   * @param delayAsync Waits the given milliseconds before the monitor starts again.
+   * @param onChange Called with the new answer whenever it changes.
+   * @example
+   * ```ts
+   * import { ChildProgramHost, TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const watcher: TrayHostWatcher = new TrayHostWatcher(process.platform, new ChildProgramHost(5000), process.env,
+   *   t => new Promise<void>(resolve => setTimeout(resolve, t)), t => console.log(t));
+   * ```
+   */
+  public constructor(platform: string, programs: IProgramHost, environment: NodeJS.ProcessEnv, delayAsync: (milliseconds: number) => Promise<void>, onChange: (isAvailable: boolean) => void);
+
+  /**
+   * Whether a tray host is there: always on Windows and macOS; on Linux, not until the session bus says so.
+   */
+  public get isAvailable(): boolean;
+
+  /**
+   * Starts watching the session bus on Linux; elsewhere, and when it already watches, it does nothing.
+   *
+   * @example
+   * ```ts
+   * import type { TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(watcher: TrayHostWatcher): void {
+   *   watcher.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Stops watching, ends the monitor and ignores answers that arrive afterward; the last answer stays.
+   *
+   * @example
+   * ```ts
+   * import type { TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function close(watcher: TrayHostWatcher): void {
+   *   watcher.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+}
+
+/**
  * The exception thrown when a window's state cannot be read or kept through the runtime.
  */
 export declare class WindowStateException extends Exception {
+  /**
+   * The exception's name, `"WindowStateException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -3282,6 +4024,12 @@ export declare class WindowStateException extends Exception {
  * has no connection, or the connection failed. A refusal from the runtime is a {@link WindowStateException} instead.
  */
 export declare class WindowStateUnavailableException extends WindowStateException {
+  /**
+   * The exception's name, `"WindowStateUnavailableException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *

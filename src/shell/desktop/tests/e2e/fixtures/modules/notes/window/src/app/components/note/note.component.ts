@@ -27,15 +27,28 @@ export class NoteComponent {
 
   protected readonly runtime: Signal<string> = NotesState.runtime;
   protected readonly continued: Signal<number> = NotesState.continued;
+  protected readonly saving: Signal<string> = NotesState.saving;
+  protected readonly savings: readonly ["saves" | "fails" | "hangs", string][] = [["saves", "Save normally"], ["fails", "Fail saving"], ["hangs", "Never finish saving"]];
   protected readonly sections: readonly string[] = ["Context", "Goals", "Decisions", "Open questions", "Risks", "Timeline", "Owners", "Dependencies", "Testing", "Rollout", "Follow-ups", "Notes from review"];
   protected readonly wrapping: WritableSignal<string> = signal("");
+  protected readonly working: WritableSignal<boolean> = signal(false);
   private readonly context: IWindowPartContext = inject(WindowPartTokens.context);
   private readonly note: Signal<SettingScope> = computed(() => new SettingScope(QualifiedName.parse("notes.entry"), this.instance()));
   private reads: number = 0;
+  private clearWorking: () => void = () => undefined;
 
   public constructor() {
     effect(() => this.readWrapping(this.note()));
     inject(DestroyRef).onDestroy(this.context.onSettingChanged(NoteComponent.WRAPS_LINES, () => this.readWrapping(this.note())));
+    inject(DestroyRef).onDestroy(() => this.clearWorking());
+  }
+
+  protected toggleWorking(): void {
+    if (this.working())
+      this.clearWorking();
+    else
+      this.clearWorking = this.context.markWorking("notes.note", this.instance());
+    this.working.update(t => !t);
   }
 
   protected wrapNote(): void {
@@ -52,6 +65,14 @@ export class NoteComponent {
 
   protected resetInbox(): void {
     void this.context.resetSettingAsync(NoteComponent.WRAPS_LINES, NoteComponent.INBOX);
+  }
+
+  protected saveBy(saving: "saves" | "fails" | "hangs"): void {
+    NotesState.saving.set(saving);
+  }
+
+  protected openHelp(): void {
+    void this.context.openLinkAsync("https://example.com/help");
   }
 
   private readWrapping(note: SettingScope): void {

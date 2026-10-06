@@ -8,7 +8,7 @@
 
 import { ThemeMode } from "../../../src/app/enums/theme-mode";
 import type { Theme } from "../../../src/app/models/theme";
-import { DefaultTheme } from "../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../src/app/models/default-theme";
 import { Resources } from "../../../src/resources";
 import { AppearanceFixture } from "../../fixtures/appearance.fixture";
 

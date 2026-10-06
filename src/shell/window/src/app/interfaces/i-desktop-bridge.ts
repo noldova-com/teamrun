@@ -26,7 +26,13 @@ export interface IDesktopBridge {
   readBuild(): Promise<unknown>;
   copyText(text: string): Promise<boolean>;
   openLogFolder(): Promise<boolean>;
+  openLink(url: string): Promise<boolean>;
+  installCommand(): Promise<boolean>;
   keepAppearance(preferences: JsonObject): void;
+  readSpelling(): Promise<unknown>;
+  keepSpelling(isChecking: boolean, languages: readonly string[]): void;
+  onFieldMenu(listener: (request: unknown) => void): () => void;
+  replaceMisspelling(text: string): Promise<boolean>;
   edit(action: string): Promise<boolean>;
   setMenuBar(menuBar: JsonObject): void;
   onMenuCommand(listener: (id: string) => void): () => void;

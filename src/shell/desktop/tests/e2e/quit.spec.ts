@@ -15,24 +15,24 @@ import ClockWorkFixture from "./fixtures/clock-work.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
+async function closeWindowAsync(desktop: DesktopApplicationFixture): Promise<void> {
+  await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+}
+
+async function waitForExitAsync(desktop: DesktopApplicationFixture): Promise<number | null> {
+  const child = desktop.application.process();
+  return await new Promise<number | null>(resolve => {
+    if (child.exitCode !== null)
+      resolve(child.exitCode);
+    else
+      child.once("exit", resolve);
+  });
+}
+
 test.describe("quitting while a module works", () => {
   const startProgramAsync = async (dataDirectory: string): Promise<number[]> => {
     const started = JSON.parse(await CliFixture.runAsync("run", "clock.startProgram", "--json", "--data-dir", dataDirectory)) as { processId: number; childProcessId: number };
     return [started.processId, started.childProcessId];
-  };
-
-  const closeWindowAsync = async (desktop: DesktopApplicationFixture): Promise<void> => {
-    await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
-  };
-
-  const waitForExitAsync = async (desktop: DesktopApplicationFixture): Promise<number | null> => {
-    const child = desktop.application.process();
-    return await new Promise<number | null>(resolve => {
-      if (child.exitCode !== null)
-        resolve(child.exitCode);
-      else
-        child.once("exit", resolve);
-    });
   };
 
   test("asks before quitting, stays open when the person cancels and quits once the work they waited for finishes @smoke", async ({ desktop }) => {
@@ -148,5 +148,49 @@ test.describe("quitting while a module works", () => {
     await expect.poll(() => programs.filter(t => DesktopApplicationFixture.isAlive(t)), { timeout: 5_000 }).toEqual([]);
     expect(existsSync(path.join(desktop.dataDirectory, "work", "clock", "stopped"))).toBe(true);
     expect(await readFile(path.join(desktop.dataDirectory, "logs", "runtime.log"), "utf8")).toContain("clock: The clock began counting.\n");
+  });
+});
+
+test.describe("saving before quitting", () => {
+  const readDesktopLogAsync = async (desktop: DesktopApplicationFixture): Promise<string> =>
+    await readFile(path.join(desktop.dataDirectory, "logs", "desktop.log"), "utf8");
+
+  test("stays open with the error naming the module when a window part's save fails, and quits once it saves @smoke", async ({ desktop }) => {
+    const window = desktop.window;
+    await window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]").click();
+    await window.locator("[data-fixture-content=notes-save-fails]:visible").click();
+    const toast = window.locator(".tr-toast", { hasText: "Notes couldn't save, so TeamRun stayed open" });
+
+    await closeWindowAsync(desktop);
+
+    await expect(toast).toBeVisible();
+    await expect(toast.locator(".tr-toast-text")).toHaveText("The disk is full.");
+    await expect(toast).toHaveAttribute("data-severity", "Error");
+    await expect(toast.locator(".tr-toast-meta")).toContainText("TeamRun");
+    expect(await desktop.isVisibleAsync()).toBe(true);
+    await expect.poll(() => readDesktopLogAsync(desktop)).toMatch(/Window error in notes: WindowPartFailureException: Its window part failed to save while TeamRun was closing\./);
+    await desktop.checkpointAsync("quit-save-failed");
+    await window.locator("[data-fixture-content=notes-save-saves]:visible").click();
+    const exited = waitForExitAsync(desktop);
+    await closeWindowAsync(desktop);
+
+    expect(await exited).toBe(0);
+    expect(desktop.acceptFailures(/Window error in notes: |^renderer: ERROR WindowPartFailureException: Its window part failed to save while TeamRun was closing\./).length).toBeGreaterThan(0);
+  });
+
+  test("quits after 4 seconds without a window part whose save never settles, and logs a warning naming the module", async ({ desktop }) => {
+    const window = desktop.window;
+    await window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]").click();
+    await window.locator("[data-fixture-content=notes-save-hangs]:visible").click();
+    const exited = waitForExitAsync(desktop);
+    const started = Date.now();
+
+    await closeWindowAsync(desktop);
+
+    expect(await exited).toBe(0);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(4000);
+    expect(await readDesktopLogAsync(desktop)).toContain(
+      "Window error in notes: Its window part did not finish saving within 4 seconds while TeamRun was closing; TeamRun closed without it.");
+    expect(desktop.acceptFailures(/Window error in notes: Its window part did not finish saving within 4 seconds/).length).toBeGreaterThan(0);
   });
 });

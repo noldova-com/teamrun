@@ -52,7 +52,7 @@ export class WindowFactory {
         nodeIntegration: false,
         nodeIntegrationInWorker: false,
         webSecurity: true,
-        spellcheck: false,
+        spellcheck: true,
         additionalArguments: Object.isNull(appearance) ? [] : [`${Resources.appearanceArgument}${JSON.stringify(appearance)}`]
       }
     };

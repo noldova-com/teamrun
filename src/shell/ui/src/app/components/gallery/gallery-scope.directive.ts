@@ -11,7 +11,7 @@ import { DestroyRef, Directive, ElementRef, effect, inject, input } from "@angul
 import { ThemeMode } from "../../enums/theme-mode";
 import type { Theme } from "../../models/theme";
 import { ThemePainter } from "../../services/theme-painter";
-import { DefaultTheme } from "../../themes/default-theme";
+import { DefaultTheme } from "../../models/default-theme";
 import { GalleryResources } from "./gallery-resources";
 
 @Directive({

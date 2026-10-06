@@ -97,6 +97,32 @@ describe("SettingRowComponent", () => {
     expect([button?.disabled, runs]).toEqual([true, 0]);
   });
 
+  it("describes every kind of control by its description, which a boolean's checkbox takes as its label instead", () => {
+    const controls: readonly (readonly [SettingDefinition, JsonValue, string])[] = [
+      [SettingsFixture.mode, "Dark", "[role=radiogroup]"],
+      [SettingsFixture.accent, "Blue", ".tr-select-button"],
+      [SettingsFixture.panelSize, 14, "input"],
+      [SettingsFixture.greeting, "Noon", "input"],
+      [SettingsFixture.alarms, null, "button"],
+      [SettingsFixture.mutedModules, [], "[role=group]"]
+    ];
+    const described = controls.map(([definition, value, selector]) => {
+      const row = render(definition, value);
+      const ids = row.querySelector(`.tr-setting-row-control ${selector}`)?.getAttribute("aria-describedby")?.split(" ") ?? [];
+      return [definition.name.text, ids.map(t => document.getElementById(t)?.textContent?.trim())];
+    });
+    const languages = render(SettingsFixture.spellCheckLanguages, []);
+    fixture.componentRef.setInput("languages", [new SelectOption("en-US", "English (United States)")]);
+    fixture.detectChanges();
+    const languageIds = languages.querySelector(".tr-setting-row-control [role=group]")?.getAttribute("aria-describedby")?.split(" ") ?? [];
+    const languagesDescribed = languageIds.map(t => document.getElementById(t)?.textContent?.trim());
+    const boolean = render(SettingsFixture.doNotDisturb, false);
+
+    expect(languagesDescribed).toEqual([SettingsFixture.spellCheckLanguages.description]);
+    expect(described).toEqual(controls.map(([definition]) => [definition.name.text, [definition.description]]));
+    expect([boolean.querySelector(".tr-setting-row-description"), boolean.querySelector("input")?.getAttribute("aria-describedby")]).toEqual([null, null]);
+  });
+
   it("changes a boolean with its checkbox, labelled by the description", async () => {
     render(SettingsFixture.doNotDisturb, false);
 
@@ -144,7 +170,8 @@ describe("SettingRowComponent", () => {
       field.dispatchEvent(new Event("change"));
       fixture.detectChanges();
       const alert = row.querySelector("[role=alert]");
-      shown.push([field.value, alert?.textContent?.trim() ?? "", String(field.getAttribute("aria-invalid")), String(field.getAttribute("aria-describedby") === alert?.id)]);
+      const description = row.querySelector(".tr-setting-row-description")?.id;
+      shown.push([field.value, alert?.textContent?.trim() ?? "", String(field.getAttribute("aria-invalid")), String(field.getAttribute("aria-describedby") === `${description} ${alert?.id}`)]);
     }
 
     expect(shown).toEqual([
@@ -263,6 +290,37 @@ describe("SettingRowComponent", () => {
 
     expect(checked).toEqual([true, false]);
     expect(changes).toEqual([["clock", "notes"], ["clock"]]);
+  });
+
+  it("chooses spelling languages with a checkbox each, in the order offered, and leaves out one no longer offered", async () => {
+    render(SettingsFixture.spellCheckLanguages, ["sv-SE"]);
+    fixture.componentRef.setInput("languages", [new SelectOption("en-GB", "English (United Kingdom)"), new SelectOption("en-US", "English (United States)")]);
+    fixture.detectChanges();
+    const group = page.getByRole("group", { name: "Spelling languages" });
+
+    await group.getByRole("checkbox", { name: "English (United States)" }).click();
+    fixture.componentRef.setInput("value", ["en-US"]);
+    fixture.detectChanges();
+    await group.getByRole("checkbox", { name: "English (United Kingdom)" }).click();
+    fixture.componentRef.setInput("value", ["en-GB", "en-US"]);
+    fixture.detectChanges();
+    await group.getByRole("checkbox", { name: "English (United States)" }).click();
+
+    expect(changes).toEqual([["en-US"], ["en-GB", "en-US"], ["en-GB"]]);
+  });
+
+  it("shows the note it is given about the spelling languages, under the languages offered or alone", () => {
+    const row = render(SettingsFixture.spellCheckLanguages);
+
+    expect(row.querySelector(".tr-setting-row-note")).toBeNull();
+    fixture.componentRef.setInput("languagesNote", "No spelling languages are offered on this device.");
+    fixture.detectChanges();
+    expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("No spelling languages are offered on this device.");
+    expect(row.querySelector("tr-checkbox")).toBeNull();
+    fixture.componentRef.setInput("languages", [new SelectOption("en-US", "English (United States)")]);
+    fixture.detectChanges();
+    expect(row.querySelectorAll("tr-checkbox").length).toBe(1);
+    expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("No spelling languages are offered on this device.");
   });
 
   for (const mode of AppearanceFixture.modes)

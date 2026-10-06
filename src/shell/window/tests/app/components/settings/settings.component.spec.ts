@@ -18,16 +18,12 @@ import { ClipboardWriter, DefaultTheme, ThemeMode } from "@noldova/teamrun-shell
 import { SettingsComponent } from "../../../../src/app/components/settings/settings.component";
 import { GalleryTokens } from "../../../../src/app/models/gallery-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
-import { Layout } from "../../../../src/app/models/layout/layout";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { DesktopBridgeService } from "../../../../src/app/services/desktop-bridge.service";
-import type { LayoutService } from "../../../../src/app/services/layout.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
 import { Resources } from "../../../../src/resources";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
-import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
-import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { ModuleStatusFixture } from "../../../fixtures/module-status.fixture";
 import { SettingsFixture } from "../../../fixtures/settings.fixture";
 
@@ -61,7 +57,7 @@ describe("SettingsComponent", () => {
   let settings: FakeSettingsService;
   let errors: unknown[];
   let gallery: Type<unknown> | null;
-  let layout: LayoutService;
+  let bridge: DesktopBridgeFixture;
 
   function render(mode: ThemeMode = ThemeMode.Light, height: string = String.empty): HTMLElement {
     AppearanceFixture.apply(DefaultTheme.theme, mode);
@@ -96,8 +92,8 @@ describe("SettingsComponent", () => {
     return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   }
 
-  beforeEach(async () => {
-    DesktopBridgeFixture.install("linux");
+  beforeEach(() => {
+    bridge = DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
     errors = [];
     gallery = null;
@@ -115,8 +111,6 @@ describe("SettingsComponent", () => {
       new CommandContribution("clock.tick", "Tick the clock", null, "Ctrl+Alt+T", () => Promise.resolve(null)),
       new CommandContribution("clock.stop", "Stop the clock", null, "Ctrl+Alt+T", () => Promise.resolve(null))
     ]);
-    const registry = LayoutFixture.createRegistry();
-    layout = await LayoutServiceFixture.prepareAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.settings));
   });
 
   afterEach(async () => {
@@ -420,49 +414,6 @@ describe("SettingsComponent", () => {
     expect([texts(".tr-tree-label"), texts(".tr-settings-group-title")]).toEqual([["Appearance", "Notifications", "Keyboard shortcuts"], ["Theme", "Text"]]);
   });
 
-  it("shows the page and the scroll positions it had when it is created again, as its tab becomes active again", async () => {
-    render(ThemeMode.Light, "5rem");
-    await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
-    fixture.detectChanges();
-    const scrollers = (): readonly HTMLElement[] => [".tr-settings-pages", ".tr-settings-content"].map(t => element().querySelector(t) as HTMLElement);
-    scrollers().forEach((t, index) => {
-      t.scrollTop = 24 + index * 40;
-      t.dispatchEvent(new Event("scroll"));
-    });
-    const left = scrollers().map(t => t.scrollTop);
-    fixture.destroy();
-
-    render(ThemeMode.Light, "5rem");
-    await fixture.whenStable();
-
-    expect(left.every(t => t > 0)).toBe(true);
-    expect([texts(".tr-settings-pages [aria-selected=true]"), scrollers().map(t => t.scrollTop)]).toEqual([["Keyboard shortcuts"], left]);
-  });
-
-  it("opens on its first page with no search once its tab was closed", async () => {
-    render();
-    await page.getByRole("treeitem", { name: "Clock" }).click();
-    await searchAsync("tick");
-    fixture.destroy();
-
-    layout.close(LayoutFixture.settings);
-    TestBed.tick();
-    layout.openDocument(LayoutFixture.settings);
-    render();
-
-    expect([texts(".tr-settings-pages [aria-selected=true]"), (element().querySelector(".tr-settings-search-field") as HTMLInputElement).value]).toEqual([["Appearance"], ""]);
-  });
-
-  it("shows the search it had when it is created again", async () => {
-    render();
-    await searchAsync("tick");
-    fixture.destroy();
-
-    render();
-
-    expect([(element().querySelector(".tr-settings-search-field") as HTMLInputElement).value, texts(".tr-settings-result-title")]).toEqual(["tick", ["Keyboard shortcuts", "Clock"]]);
-  });
-
   it("shows every command's owner and key on Keyboard shortcuts, a key another command kept, and the person's bindings as modified", async () => {
     settings.values.update(t => new Map([...t, ["shell.keyBindings", { "shell.closeTab": null }]]));
     render();
@@ -518,6 +469,18 @@ describe("SettingsComponent", () => {
     expect(empty).toEqual(["No settings match your search."]);
     expect(current).toEqual([]);
     expect([(element().querySelector(".tr-settings-search-field") as HTMLInputElement).value, texts(".tr-settings-result-title")]).toEqual(["", []]);
+  });
+
+  it("offers the desktop's spelling languages on the Spelling languages row and says which one checks words when none of the device's languages is offered", async () => {
+    bridge.spelling = Promise.resolve({ languages: ["en-US"], fallback: "en-US" });
+    settings.definitions.set([...SettingsFixture.all, SettingsFixture.spellCheckLanguages]);
+    render();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const row = element().querySelector("[data-setting='shell.spellCheckLanguages']") as HTMLElement;
+
+    expect([...row.querySelectorAll(".tr-checkbox-text")].map(t => t.textContent?.trim())).toEqual(["English (United States)"]);
+    expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("None of this device's languages has a dictionary here, so words are checked in English (United States).");
   });
 
   it("runs an action's command from its row, stores nothing, and finds the row by its label", async () => {

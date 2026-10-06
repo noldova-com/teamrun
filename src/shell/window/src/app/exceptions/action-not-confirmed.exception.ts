@@ -11,6 +11,8 @@ import { Exception } from "@noldova/teamrun-foundation-exceptions";
 import { RuntimeDisconnectedException } from "./runtime-disconnected.exception";
 
 export class ActionNotConfirmedException extends Exception {
+  public override readonly name: string = "ActionNotConfirmedException";
+
   public constructor(message: string, cause: unknown) {
     super(message, { cause });
   }

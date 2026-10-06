@@ -14,7 +14,7 @@ import { SampleException } from "../fixtures/sample-exception.fixture.js";
 @TestClass
 export class ExceptionTests {
   @TestMethod
-  public setsNameToTheConcreteClassName(): void {
+  public takesTheNameItsClassSets(): void {
     Assert.areEqual("SampleException", new SampleException("message").name);
   }
 
