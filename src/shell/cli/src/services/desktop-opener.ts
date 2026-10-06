@@ -9,7 +9,7 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 
-import type { IDesktopOpener } from "../interfaces/desktop-opener.js";
+import type { IDesktopOpener } from "../interfaces/i-desktop-opener.js";
 
 export class DesktopOpener implements IDesktopOpener {
   private static readonly SPAWN_EVENT: string = "spawn";

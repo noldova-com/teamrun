@@ -8,7 +8,7 @@
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
-import type { IMethodHandler } from "../../interfaces/method-handler.js";
+import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
 import type { CommandRegistry } from "../registry/command-registry.js";
 

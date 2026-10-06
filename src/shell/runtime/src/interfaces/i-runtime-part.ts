@@ -7,7 +7,7 @@
  */
 
 import type { Migration } from "../models/migration.js";
-import type { IRuntimePartContext } from "./runtime-part-context.js";
+import type { IRuntimePartContext } from "./i-runtime-part-context.js";
 
 export interface IRuntimePart {
   readonly migrations?: readonly Migration[];

@@ -7,7 +7,7 @@
  */
 
 import BuildMatrix from "./build-matrix.ts";
-import type IRepeatLeg from "./interfaces/repeat-leg.ts";
+import type IRepeatLeg from "./interfaces/i-repeat-leg.ts";
 
 export default class RepeatMatrix {
   public static readonly PASSES: number = 5;

@@ -48,6 +48,6 @@ export { TestDiscovery } from "../services/discovery/test-discovery.js";
 export { TestExecutor } from "../services/execution/test-executor.js";
 export { TestRunner } from "../services/execution/test-runner.js";
 export { CoverageReportWriter } from "../services/reporting/coverage-report-writer.js";
-export { GitHubSummaryWriter } from "../services/reporting/git-hub-summary-writer.js";
+export { GitHubSummaryWriter } from "../services/reporting/github-summary-writer.js";
 export { TestReportWriter } from "../services/reporting/test-report-writer.js";
 export { Wait } from "../services/waiting/wait.js";

@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type ITestName from "../../totals/interfaces/test-name.ts";
+import type ITestName from "../../totals/interfaces/i-test-name.ts";
 import type JsonFields from "../../totals/json-fields.ts";
 
 export default interface IUiTest extends ITestName {

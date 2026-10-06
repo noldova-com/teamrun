@@ -13,7 +13,7 @@ import type { Writable } from "node:stream";
 import type PackageCatalog from "../packages/package-catalog.ts";
 import type PackageManifest from "../packages/package-manifest.ts";
 import PackageException from "../packages/package.exception.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class PackageLayoutCheck implements ICheck {
   private static readonly REQUIRED: readonly string[] = ["src/tsconfig.json", "src/resources.ts", "tests/tsconfig.json"];

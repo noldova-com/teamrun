@@ -34,7 +34,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 
 import { ConnectionException } from "../../exceptions/connection.exception.js";
-import type { IRuntimeClientListener } from "../../interfaces/runtime-client-listener.js";
+import type { IRuntimeClientListener } from "../../interfaces/i-runtime-client-listener.js";
 import { ClientSettings } from "../../models/client-settings.js";
 import type { Endpoint } from "../../models/endpoint.js";
 import { PendingCall } from "../../models/pending-call.js";

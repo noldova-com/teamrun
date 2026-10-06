@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { TreeNode } from "../../../src/app/models/tree-node";
+import { TreeNode } from "../../../src/app/models/tree.node";
 
 describe("TreeNode", () => {
   it("holds its id, label and icon, which is none by default, and is a branch only when it has children", () => {

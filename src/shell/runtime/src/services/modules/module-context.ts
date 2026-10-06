@@ -15,11 +15,11 @@ import { type NotificationPost, QualifiedName } from "@noldova/teamrun-shell-pro
 import { ModuleDatabaseException } from "../../exceptions/module-database.exception.js";
 import { RegistrationException } from "../../exceptions/registration.exception.js";
 import { ServiceAccessException } from "../../exceptions/service-access.exception.js";
-import type { IMethodHandler } from "../../interfaces/method-handler.js";
-import type { IModuleDatabase } from "../../interfaces/module-database.js";
-import type { IModuleLog } from "../../interfaces/module-log.js";
-import type { IModuleSettings } from "../../interfaces/module-settings.js";
-import type { IRuntimePartContext } from "../../interfaces/runtime-part-context.js";
+import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
+import type { IModuleDatabase } from "../../interfaces/i-module-database.js";
+import type { IModuleLog } from "../../interfaces/i-module-log.js";
+import type { IModuleSettings } from "../../interfaces/i-module-settings.js";
+import type { IRuntimePartContext } from "../../interfaces/i-runtime-part-context.js";
 import type { EventChannel } from "../../models/event-channel.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { NotificationHandle } from "../../models/notification-handle.js";
@@ -38,7 +38,7 @@ import type { EventRegistry } from "../registry/event-registry.js";
 import type { MethodRegistry } from "../registry/method-registry.js";
 import type { ServiceRegistry } from "../registry/service-registry.js";
 import { ModuleSettings } from "../settings/module-settings.js";
-import type { SettingsService } from "../settings/settings-service.js";
+import type { SettingsService } from "../settings/settings.service.js";
 import type { WorkTracker } from "../work/work-tracker.js";
 import { ModuleLog } from "./module-log.js";
 

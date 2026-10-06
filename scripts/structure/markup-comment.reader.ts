@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type ICommentReader from "./interfaces/comment-reader.ts";
+import type ICommentReader from "./interfaces/i-comment.reader.ts";
 import LicenseHeader from "./license-header.ts";
 
 export default class MarkupCommentReader implements ICommentReader {

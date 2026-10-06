@@ -13,8 +13,8 @@ import path from "node:path";
 import { test, type TestContext } from "node:test";
 
 import RunTotals from "../run-totals.ts";
-import type ICoverageCount from "../totals/interfaces/coverage-count.ts";
-import type IRunnerCounts from "../totals/interfaces/runner-counts.ts";
+import type ICoverageCount from "../totals/interfaces/i-coverage-count.ts";
+import type IRunnerCounts from "../totals/interfaces/i-runner-counts.ts";
 import RunnerTotals from "../totals/runner-totals.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
 import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";

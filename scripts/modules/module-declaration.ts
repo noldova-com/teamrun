@@ -10,7 +10,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import type IModuleDeclarationJson from "./interfaces/module-declaration-json.ts";
+import type IModuleDeclarationJson from "./interfaces/i-module-declaration-json.ts";
 import ModuleMenus from "./module-menus.ts";
 import ModuleException from "./module.exception.ts";
 import ModuleSettings from "./module-settings.ts";

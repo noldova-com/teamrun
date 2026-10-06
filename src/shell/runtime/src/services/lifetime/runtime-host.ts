@@ -20,7 +20,7 @@ import { type BuildIdentity, Failure, FailureCode, NotificationBroadcast, PreShe
 import { DataDirectoryState } from "../../enums/data-directory-state.js";
 import { WindowStateKind } from "../../enums/window-state-kind.js";
 import { DataDirectoryOwnedException } from "../../exceptions/data-directory-owned.exception.js";
-import type { IIdleParticipant } from "../../interfaces/idle-participant.js";
+import type { IIdleParticipant } from "../../interfaces/i-idle-participant.js";
 import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
 import type { EventChannel } from "../../models/event-channel.js";
@@ -65,7 +65,7 @@ import { MethodRegistry } from "../registry/method-registry.js";
 import { SettingResetMethod } from "../settings/setting-reset-method.js";
 import { SettingWriteMethod } from "../settings/setting-write-method.js";
 import { SettingsReadMethod } from "../settings/settings-read-method.js";
-import { SettingsService } from "../settings/settings-service.js";
+import { SettingsService } from "../settings/settings.service.js";
 import { ShellSettings } from "../settings/shell-settings.js";
 import { WindowStateReadMethod } from "../window-state/window-state-read-method.js";
 import { WindowStateStore } from "../window-state/window-state-store.js";

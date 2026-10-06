@@ -56,6 +56,14 @@ class JsonFieldsTests {
       assert.throws(() => fields.texts("list"), new TotalsException("record.json has a list list that is not all text."));
       assert.throws(() => fields.object("number"), new TotalsException("record.json, number, is not a JSON object."));
     });
+
+    test("a number may be any finite number, and anything else is refused", () => {
+      const fields = JsonFields.parse(JSON.stringify({ negative: -1, fraction: 1.25, text: "3", huge: 1e999 }), "record.json");
+
+      assert.deepEqual([fields.number("negative"), fields.number("fraction")], [-1, 1.25]);
+      for (const name of ["text", "huge", "missing"])
+        assert.throws(() => fields.number(name), new TotalsException(`record.json has no number ${name}.`));
+    });
   }
 }
 
