@@ -21,6 +21,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <tr-checkbox class="labelled" [checked]="checked()" [disabled]="disabled()" (checkedChange)="changes.push($event)">Do not disturb</tr-checkbox>
     <tr-checkbox class="bare" [checked]="true" />
+    <tr-checkbox class="wrapped" style="width: 9rem">A label that is far too long to fit the width its checkbox gives it</tr-checkbox>
   `
 })
 class CheckboxHostComponent {
@@ -84,6 +85,34 @@ describe("CheckboxComponent", () => {
     expect(style.outlineStyle).toBe("solid");
     expect(style.outlineColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "focusBorder"));
   });
+
+  function firstLine(name: string): DOMRect {
+    const text = fixture.nativeElement.querySelector(`tr-checkbox.${name} .tr-checkbox-text`).firstChild as Text;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 1);
+    return range.getBoundingClientRect();
+  }
+
+  const centre = (rect: DOMRect): number => (rect.top + rect.bottom) / 2;
+
+  for (const panelSize of AppearanceFixture.panelSizes)
+    it(`centres the box on the first line of its label, one line or several, at panel size ${panelSize}`, () => {
+      render(DefaultTheme.theme, ThemeMode.Light, panelSize);
+      const text = (name: string): HTMLElement => fixture.nativeElement.querySelector(`tr-checkbox.${name} .tr-checkbox-text`);
+      const lineHeight = Number.parseFloat(getComputedStyle(text("wrapped")).lineHeight);
+
+      for (const name of ["labelled", "wrapped"]) {
+        const line = text(name).getBoundingClientRect().top + lineHeight / 2;
+        const glyphs = firstLine(name);
+
+        AppearanceFixture.expectPixels(centre(box(name).getBoundingClientRect()), line);
+        expect(centre(box(name).getBoundingClientRect())).toBeGreaterThan(glyphs.top);
+        expect(centre(box(name).getBoundingClientRect())).toBeLessThan(glyphs.bottom);
+      }
+      expect(text("labelled").getBoundingClientRect().height).toBeCloseTo(lineHeight, 1);
+      expect(text("wrapped").getBoundingClientRect().height).toBeGreaterThan(lineHeight * 2.5);
+    });
 
   for (const panelSize of AppearanceFixture.panelSizes)
     it(`centres the drawn tick in the box at panel size ${panelSize}`, () => {
