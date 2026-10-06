@@ -10,7 +10,7 @@ import { Component } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
 import { InlineCodeComponent } from "../../../../src/app/components/inline-code/inline-code.component";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 
