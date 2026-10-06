@@ -18,7 +18,7 @@ export class DeviceStateTests {
     const store = new FakeDeviceFileStore();
     store.kept = { otherHintShown: true };
     let shown = 0;
-    const show = (): boolean => ++shown > 0;
+    const show = (): Promise<boolean> => Promise.resolve(++shown > 0);
 
     await new DeviceState(store, () => undefined).showOnceAsync("trayCloseHintShown", show);
     const state = new DeviceState(store, () => undefined);
@@ -35,8 +35,8 @@ export class DeviceStateTests {
     const state = new DeviceState(store, () => undefined);
     let tries = 0;
 
-    await state.showOnceAsync("trayCloseHintShown", () => ++tries < 0);
-    await state.showOnceAsync("trayCloseHintShown", () => ++tries < 0);
+    await state.showOnceAsync("trayCloseHintShown", () => Promise.resolve(++tries < 0));
+    await state.showOnceAsync("trayCloseHintShown", () => Promise.resolve(++tries < 0));
 
     Assert.areEqual(1, tries);
     Assert.areEqual(0, store.writes.length);
@@ -48,7 +48,7 @@ export class DeviceStateTests {
     store.kept = { trayCloseHintShown: true };
     const state = new DeviceState(store, () => undefined);
 
-    await Promise.all([state.rememberAsync("trayIcon", false), state.rememberAsync("trayIcon", true), state.showOnceAsync("otherHintShown", () => true)]);
+    await Promise.all([state.rememberAsync("trayIcon", false), state.rememberAsync("trayIcon", true), state.showOnceAsync("otherHintShown", () => Promise.resolve(true))]);
     store.kept = {};
 
     Assert.areEqual(JSON.stringify([
@@ -69,7 +69,7 @@ export class DeviceStateTests {
     const state = new DeviceState(store, t => lines.push(t));
     let shown = 0;
 
-    await state.showOnceAsync("trayCloseHintShown", () => ++shown > 0);
+    await state.showOnceAsync("trayCloseHintShown", () => Promise.resolve(++shown > 0));
     await state.rememberAsync("trayIcon", false);
 
     Assert.areEqual(1, shown);

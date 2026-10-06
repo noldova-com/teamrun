@@ -264,19 +264,6 @@ export interface IQuitHost {
   isLast(prompt: IQuitPrompt): boolean;
 
   /**
-   * Notes that the last window closes while TeamRun keeps running, so the desktop can say once where TeamRun went.
-   * @example
-   * ```ts
-   * import type { IQuitHost } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function hide(host: IQuitHost): void {
-   *   host.closeToBackground();
-   * }
-   * ```
-   */
-  closeToBackground(): void;
-
-  /**
    * Asks every open window to save, as closing it would.
    *
    * @returns A promise of whether every window saved; a window whose save failed keeps TeamRun open.
@@ -1940,6 +1927,23 @@ export interface ISystemNotification {
    * ```
    */
   close(): void;
+
+  /**
+   * Listens for the operating system showing the notification.
+   *
+   * @param event `"show"`.
+   * @param listener Called once it shows.
+   * @returns Electron's notification, for chaining.
+   * @example
+   * ```ts
+   * import type { ISystemNotification } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function whenShown(notification: ISystemNotification): Promise<void> {
+   *   return new Promise(resolve => notification.on("show", resolve));
+   * }
+   * ```
+   */
+  on(event: "show", listener: () => void): unknown;
 
   /**
    * Listens for the person clicking the notification.
@@ -3925,7 +3929,7 @@ export declare class DesktopApplication {
    * @param createDeviceFile Creates the store of one of this device's files in the same folder: `appearance.json`, the
    * last appearance preferences, which the desktop reads before it opens a window, so the window's first frame already
    * has them, and keeps as the window reports them; and `device-state.json`, which records the one-time hints the
-   * device has shown.
+   * device has shown and the value of `shell.trayIcon` the desktop follows, so the icon starts from it.
    * @param createPathCommand Creates the service that links the command line on the macOS PATH for the program the
    * desktop runs from; the window's "Install command in PATH" command runs it and shows what happened.
    * @param recordDesktopAsync Records this desktop in its installation, as {@link DesktopRecord.recordAsync} does, while
@@ -4232,8 +4236,8 @@ export declare class SpellChecker {
 
 /**
  * Keeps the device's own state in one keyed device file: the one-time hints it has shown, such as where TeamRun went
- * when its last window closed into the tray, and the tray icon setting last heard from the runtime. It reads the file
- * once and writes one change at a time, so changes never overwrite each other.
+ * when its last window closed into the tray, and the tray icon setting the desktop follows, written as it changes. It
+ * reads the file once and writes one change at a time, so changes never overwrite each other.
  */
 export declare class DeviceState {
   /**
@@ -4271,18 +4275,18 @@ export declare class DeviceState {
    * run, and one that could not show is not recorded.
    *
    * @param key The hint's name in the state, such as `trayCloseHintShown`.
-   * @param show Shows the hint and returns whether it could.
+   * @param showAsync Shows the hint and resolves to whether the operating system showed it.
    * @returns A promise that settles once the hint is recorded or left alone.
    * @example
    * ```ts
    * import type { DeviceState } from "@noldova/teamrun-shell-desktop";
    *
    * export function hintAsync(state: DeviceState): Promise<void> {
-   *   return state.showOnceAsync("trayCloseHintShown", () => true);
+   *   return state.showOnceAsync("trayCloseHintShown", () => Promise.resolve(true));
    * }
    * ```
    */
-  public showOnceAsync(key: string, show: () => boolean): Promise<void>;
+  public showOnceAsync(key: string, showAsync: () => Promise<boolean>): Promise<void>;
 
   /**
    * Records a value under a key, after any change already being written; a failed write is logged.

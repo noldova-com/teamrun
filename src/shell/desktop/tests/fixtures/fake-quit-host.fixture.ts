@@ -31,10 +31,6 @@ export class FakeQuitHost implements IQuitHost {
     return this.isLastWindow;
   }
 
-  public closeToBackground(): void {
-    this.calls.push("background");
-  }
-
   public async saveAllAsync(): Promise<boolean> {
     this.calls.push("save");
     await this.saving;

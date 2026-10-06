@@ -28,12 +28,12 @@ export class DeviceState {
     return this.state;
   }
 
-  public async showOnceAsync(key: string, show: () => boolean): Promise<void> {
+  public async showOnceAsync(key: string, showAsync: () => Promise<boolean>): Promise<void> {
     if (this.shown.has(key))
       return;
     this.shown.add(key);
     const state = await this.readAsync();
-    if (state[key] === true || !show())
+    if (state[key] === true || !await showAsync())
       return;
     await this.rememberAsync(key, true);
   }

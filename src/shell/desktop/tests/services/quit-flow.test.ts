@@ -31,7 +31,7 @@ export class QuitFlowTests {
     const last = await flow.canCloseAsync(prompt);
 
     Assert.areEqual("true,true,false", [notLast, kept, last].join(","));
-    Assert.areEqual("background,quit", host.calls.join(","));
+    Assert.areEqual("quit", host.calls.join(","));
   }
 
   @TestMethod

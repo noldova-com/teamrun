@@ -236,7 +236,10 @@ export class TrayControllerTests {
     Assert.isDefined(fixture.electron.tray.shown);
     answer.resolve(Response.success("r", { name: "shell.trayIcon", value: true, isSet: false }));
     await setImmediate();
-    Assert.areEqual(0, fixture.files.state.writes.length);
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: false, isSet: true });
+    await Condition.waitAsync(() => fixture.files.state.writes.length === 1);
+
+    Assert.areEqual(JSON.stringify([{ trayIcon: false }]), JSON.stringify(fixture.files.state.writes));
   }
 
   @TestMethod

@@ -6,16 +6,45 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import CliFixture from "./fixtures/cli.fixture.ts";
+import ClockWorkFixture from "./fixtures/clock-work.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
+const HINT_REFUSED: RegExp = /The operating system did not show the hint that TeamRun is still running/;
+
 interface ITrayBridge {
   readTrayAvailable(): Promise<unknown>;
+}
+
+async function keepsRunningAsync(desktop: DesktopApplicationFixture): Promise<boolean> {
+  return process.platform === "darwin" || await desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as ITrayBridge).readTrayAvailable()) === true;
+}
+
+async function closeIntoTheTrayAsync(desktop: DesktopApplicationFixture): Promise<string> {
+  const hints = path.join(desktop.root, "device", "device-state.json");
+  await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+  await expect.poll(() => desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(0);
+  if (process.platform === "darwin")
+    return "none";
+  let outcome = "";
+  await expect.poll(() => {
+    outcome = existsSync(hints) ? "shown" : desktop.failures.some(t => HINT_REFUSED.test(t)) ? "refused" : "";
+    return outcome;
+  }).not.toBe("");
+  desktop.acceptFailures(HINT_REFUSED);
+  return outcome;
+}
+
+async function startAgainAsync(desktop: DesktopApplicationFixture): Promise<number | null> {
+  const launch = await desktop.application.evaluate(() => ({ executablePath: process.execPath, argv: process.argv, workingDirectory: process.cwd(), environment: process.env }));
+  const second = spawn(launch.executablePath, launch.argv.slice(launch.argv.findIndex(t => t.endsWith("main.js"))), { cwd: launch.workingDirectory, env: launch.environment, stdio: "ignore" });
+  return await new Promise<number | null>(resolve => second.once("exit", resolve));
 }
 
 test.describe("closing and quitting beside the tray icon", () => {
@@ -26,23 +55,53 @@ test.describe("closing and quitting beside the tray icon", () => {
     const child = desktop.application.process();
     const exited = new Promise<number | null>(resolve => child.once("exit", resolve));
     const hints = path.join(desktop.root, "device", "device-state.json");
-    const keepsRunning = process.platform === "darwin" || await desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as ITrayBridge).readTrayAvailable()) === true;
+    const keepsRunning = await keepsRunningAsync(desktop);
     await desktop.checkpointAsync("tray-quit-before-closing");
 
-    await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
     if (keepsRunning) {
-      await expect.poll(() => desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(0);
-      if (process.platform === "darwin")
-        expect(existsSync(hints)).toBe(false);
+      if (await closeIntoTheTrayAsync(desktop) === "shown")
+        expect(JSON.parse(await readFile(hints, "utf8"))).toEqual({ trayCloseHintShown: true });
       else
-        await expect.poll(async () => existsSync(hints) ? JSON.parse(await readFile(hints, "utf8")) as unknown : null).toEqual({ trayCloseHintShown: true });
+        expect(existsSync(hints)).toBe(false);
       expect(child.exitCode).toBeNull();
       expect(programs.every(t => DesktopApplicationFixture.isAlive(t))).toBe(true);
       await desktop.application.evaluate(({ app }) => app.quit());
     }
+    else
+      await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
 
     expect(await exited).toBe(0);
     await expect.poll(() => DesktopApplicationFixture.isAlive(runtime), { timeout: 30_000 }).toBe(false);
     await expect.poll(() => programs.filter(t => DesktopApplicationFixture.isAlive(t)), { timeout: 5_000 }).toEqual([]);
+  });
+
+  test("a second start while TeamRun runs without a window opens one window and exits", async ({ desktop }) => {
+    test.skip(!await keepsRunningAsync(desktop), "TeamRun quits with its last window where the desktop shows no tray.");
+    await closeIntoTheTrayAsync(desktop);
+    const reopened = desktop.application.waitForEvent("window");
+
+    expect(await startAgainAsync(desktop)).toBe(0);
+    await expect((await reopened).locator("tr-window")).toBeVisible();
+    expect(await startAgainAsync(desktop)).toBe(0);
+
+    expect(await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+  });
+
+  test("a quit with work running and no window asks in a new window and quits once the person stops the work", async ({ desktop }) => {
+    test.skip(!await keepsRunningAsync(desktop), "TeamRun quits with its last window where the desktop shows no tray.");
+    await expect(desktop.window.locator("tr-window")).toBeVisible();
+    await ClockWorkFixture.beginAsync(desktop);
+    await closeIntoTheTrayAsync(desktop);
+    const asking = desktop.application.waitForEvent("window");
+    const child = desktop.application.process();
+    const exited = new Promise<number | null>(resolve => child.once("exit", resolve));
+
+    await desktop.application.evaluate(({ app }) => app.quit());
+    const question = (await asking).getByRole("dialog", { name: "Work is still running" });
+    await expect(question.getByRole("listitem")).toHaveText([ClockWorkFixture.WORK]);
+    await question.getByRole("button", { name: "Stop the work and quit" }).click();
+
+    expect(await exited).toBe(0);
+    expect(existsSync(path.join(desktop.dataDirectory, "work", "clock", "stopped"))).toBe(true);
   });
 });

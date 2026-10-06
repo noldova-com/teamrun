@@ -46,6 +46,7 @@ import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IPreventableEvent } from "../interfaces/i-preventable-event.js";
 import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
+import type { ISystemNotification } from "../interfaces/i-system-notification.js";
 import type { IUpdateHost } from "../interfaces/i-update-host.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
@@ -131,6 +132,7 @@ export class DesktopApplication {
   private isReady: boolean = false;
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
+  private trayCloseHint: ISystemNotification | null = null;
 
   private constructor(
     electron: IElectron,
@@ -169,7 +171,10 @@ export class DesktopApplication {
       hasUpdateEndedAsync: () => installation.hasEndedAsync(),
       saveAsync: () => this.saveForUpdateAsync(),
       passBarrierAsync: t => this.passBarrierAsync(() => this.gate.askAsync(t)),
-      quit: () => electron.app.exit(Resources.quitExitCode)
+      quit: () => {
+        this.isExiting = true;
+        electron.app.exit(Resources.quitExitCode);
+      }
     };
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }), updates);
     this.watch = new UpdateBarrierWatch(updates, () => !Object.isNull(this.startup.connection), Resources.updateBarrierInterval);
@@ -179,7 +184,6 @@ export class DesktopApplication {
       isExiting: () => this.isExiting,
       keepsRunningWithoutWindows: () => this.keepsRunningWithoutWindows(),
       isLast: t => this.isLastOpen(t),
-      closeToBackground: () => this.closeToBackground(),
       saveAllAsync: () => this.saveAllAsync(),
       stopAsync: t => this.stopAsync(t),
       findPromptAsync: () => this.findPromptAsync(),
@@ -256,7 +260,7 @@ export class DesktopApplication {
       return;
     }
     app.enableSandbox();
-    app.on(Resources.secondInstanceEvent, () => this.focus());
+    app.on(Resources.secondInstanceEvent, () => this.reopen());
     app.on(Resources.beforeQuitEvent, (event: IPreventableEvent) => this.beforeQuit(event));
     app.on(Resources.windowAllClosedEvent, () => {
       if (!this.keepsRunningWithoutWindows())
@@ -420,7 +424,10 @@ export class DesktopApplication {
     window.webContents.on(Resources.contextMenuEvent, (_event, params) => this.forwardFieldMenu(open, params));
     new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
-    window.once(Resources.closedEvent, () => this.windows.delete(contentsId));
+    window.once(Resources.closedEvent, () => {
+      this.windows.delete(contentsId);
+      this.closeToBackground();
+    });
     open.settleWithin(Resources.connectingShowLimit);
     open.showUnpaintedWithin(Resources.paintShowLimit);
     void this.prepareAsync(open);
@@ -508,18 +515,34 @@ export class DesktopApplication {
   }
 
   private closeToBackground(): void {
-    if (this.settings.platform !== Resources.macPlatform)
-      void this.deviceState.showOnceAsync(Resources.trayCloseHintKey, () => this.showTrayCloseHint());
+    if (this.windows.size === 0 && !this.isExiting && this.settings.platform !== Resources.macPlatform && this.tray.isShown)
+      void this.deviceState.showOnceAsync(Resources.trayCloseHintKey, () => this.showTrayCloseHintAsync());
   }
 
-  private showTrayCloseHint(): boolean {
+  private showTrayCloseHintAsync(): Promise<boolean> {
     const notifications = this.electron.notifications;
     if (!notifications.isSupported())
-      return false;
-    const hint = notifications.create({ title: Resources.trayCloseHintTitle, body: Resources.trayCloseHintBody, icon: this.icons.window, silent: true });
-    hint.on(Resources.clickEvent, () => this.reopen());
+      return Promise.resolve(false);
+    const shown = Promise.withResolvers<boolean>();
+    const hint = notifications.create({ title: Resources.trayCloseHintTitle, body: Resources.formatTrayCloseHintBody(this.settings.platform), icon: this.icons.window, silent: true });
+    const release = (): void => {
+      if (this.trayCloseHint === hint)
+        this.trayCloseHint = null;
+    };
+    hint.on(Resources.showEvent, () => shown.resolve(true));
+    hint.on(Resources.clickEvent, () => {
+      release();
+      this.reopen();
+    });
+    hint.on(Resources.closeEvent, release);
+    hint.on(Resources.failedEvent, (_event, error) => {
+      release();
+      this.log.write(Resources.formatTrayCloseHintFailed(error));
+      shown.resolve(false);
+    });
+    this.trayCloseHint = hint;
     hint.show();
-    return true;
+    return shown.promise;
   }
 
   private followTrayIconSetting(value: JsonValue): void {
@@ -705,7 +728,7 @@ export class DesktopApplication {
   }
 
   private reopen(): void {
-    if (Object.isNull(this.focus()))
+    if (this.hasPassedBarrier && !this.isExiting && Object.isNull(this.focus()))
       this.open();
   }
 

@@ -14,7 +14,6 @@ export interface IQuitHost {
   isExiting(): boolean;
   keepsRunningWithoutWindows(): boolean;
   isLast(prompt: IQuitPrompt): boolean;
-  closeToBackground(): void;
   saveAllAsync(): Promise<boolean>;
   stopAsync(policy: StopPolicy): Promise<boolean>;
   findPromptAsync(): Promise<IQuitPrompt | null>;

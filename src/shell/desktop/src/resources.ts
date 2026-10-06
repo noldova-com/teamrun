@@ -195,7 +195,6 @@ export class Resources {
   public static readonly deviceStateFile: string = "device-state.json";
   public static readonly trayCloseHintKey: string = "trayCloseHintShown";
   public static readonly trayIconStateKey: string = "trayIcon";
-  public static readonly trayCloseHintBody: string = "Open it again or quit it from its icon in the system tray.";
   public static readonly fileNameParameter: string = "fileName";
   public static readonly temporarySuffix: string = ".tmp";
   public static readonly appearanceArgument: string = "--teamrun-appearance=";
@@ -265,6 +264,7 @@ export class Resources {
   public static readonly closeEvent: "close" = "close";
   public static readonly closedEvent: "closed" = "closed";
   public static readonly clickEvent: "click" = "click";
+  public static readonly showEvent: "show" = "show";
   public static readonly failedEvent: "failed" = "failed";
   public static readonly dataEvent: "data" = "data";
   public static readonly errorEvent: "error" = "error";
@@ -535,6 +535,14 @@ export class Resources {
 
   public static get trayCloseHintTitle(): string {
     return `${Resources.applicationName} is still running`;
+  }
+
+  public static formatTrayCloseHintBody(platform: string): string {
+    return `Open it again or quit it from its icon in the ${platform === Resources.windowsPlatform ? "notification area" : "tray"}.`;
+  }
+
+  public static formatTrayCloseHintFailed(reason: string): string {
+    return `The operating system did not show the hint that ${Resources.applicationName} is still running, so it counts as not shown: ${reason}`;
   }
 
   public static formatDeviceStateNotRead(reason: string): string {

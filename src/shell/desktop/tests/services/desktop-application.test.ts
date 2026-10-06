@@ -399,6 +399,7 @@ export class DesktopApplicationTests {
     const window = DesktopStartFixture.firstWindow(fixture.electron);
 
     window.close();
+    const hintsBeforeSaving = fixture.electron.notifications.created.length;
     await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
     await Condition.waitAsync(() => window.isGone && fixture.files.state.writes.length === 1);
     const [hint] = fixture.electron.notifications.created;
@@ -409,7 +410,8 @@ export class DesktopApplicationTests {
       await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", reopened, 1);
     await Condition.waitAsync(() => reopened?.isGone === true);
 
-    Assert.areEqual(JSON.stringify(["TeamRun is still running", "Open it again or quit it from its icon in the system tray.", true]),
+    Assert.areEqual(0, hintsBeforeSaving);
+    Assert.areEqual(JSON.stringify(["TeamRun is still running", "Open it again or quit it from its icon in the notification area.", true]),
       JSON.stringify([hint?.title, hint?.options.body, hint?.isShown]));
     Assert.areEqual(1, fixture.electron.notifications.created.length);
     Assert.areEqual(JSON.stringify([{ trayCloseHintShown: true }]), JSON.stringify(fixture.files.state.writes));
@@ -424,14 +426,89 @@ export class DesktopApplicationTests {
     fixture.electron.notifications.isSupportedNow = false;
     await fixture.startAsync();
     const window = DesktopStartFixture.firstWindow(fixture.electron);
+    const checksBeforeClosing = fixture.electron.notifications.supportChecks;
 
     window.close();
     await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
-    await Condition.waitAsync(() => window.isGone);
-    await setImmediate();
+    await Condition.waitAsync(() => window.isGone && fixture.electron.notifications.supportChecks > checksBeforeClosing);
 
     Assert.areEqual(0, fixture.electron.notifications.created.length + fixture.files.state.writes.length);
     Assert.isFalse(fixture.electron.app.calls.some(t => t.startsWith("quit")));
+  }
+
+  @TestMethod
+  public async logsATrayHintTheSystemRefusesAndRecordsNothingForTheRestOfTheRun(): Promise<void> {
+    const fixture = new TrayFixture("linux");
+    fixture.electron.notifications.refusal = "Notifications are turned off.";
+    await fixture.startAsync();
+    await fixture.process.programs.answerAsync("(<true>,)\n");
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "linux", window, 1);
+    await Condition.waitAsync(() => window.isGone && DesktopStartFixture.readErrors(fixture.process, "The operating system did not show").length === 1);
+
+    fixture.electron.notifications.refusal = null;
+    fixture.tray.click();
+    const reopened = fixture.electron.windows[1];
+    reopened?.close();
+    if (!Object.isUndefined(reopened))
+      await DesktopStartFixture.answerSaveAsync(fixture.electron, "linux", reopened, 1);
+    await Condition.waitAsync(() => reopened?.isGone === true);
+
+    Assert.areEqual(JSON.stringify(["The operating system did not show the hint that TeamRun is still running, so it counts as not shown: Notifications are turned off."]),
+      JSON.stringify(DesktopStartFixture.readErrors(fixture.process, "The operating system did not show")));
+    Assert.areEqual(JSON.stringify([["Open it again or quit it from its icon in the tray.", false]]),
+      JSON.stringify(fixture.electron.notifications.created.map(t => [t.options.body, t.isShown])));
+    Assert.isFalse(fixture.files.state.writes.some(t => Object.hasOwn(t, "trayCloseHintShown")));
+  }
+
+  @TestMethod
+  public async opensAWindowWhenStartedAgainWhileInTheTray(): Promise<void> {
+    const fixture = new TrayFixture("linux");
+    await fixture.startAsync();
+    await fixture.process.programs.answerAsync("(<true>,)\n");
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "linux", window, 1);
+    await Condition.waitAsync(() => window.isGone);
+
+    fixture.electron.app.emit("second-instance");
+    fixture.electron.app.emit("second-instance");
+
+    Assert.areEqual(2, fixture.electron.windows.length);
+    Assert.areEqual(false, fixture.electron.windows[1]?.isGone);
+  }
+
+  @TestMethod
+  public async opensNoWindowWhenStartedAgainBeforeItsLaunchBarrierIsChecked(): Promise<void> {
+    const electron = new FakeElectron();
+    DesktopStartFixture.start(electron, new FakeDesktopProcess("linux"));
+    await electron.app.becomeReadyAsync();
+
+    electron.app.emit("second-instance");
+    const whileChecking = electron.windows.length;
+    await Condition.waitAsync(() => electron.windows.length > 0);
+    electron.app.emit("second-instance");
+
+    Assert.areEqual(0, whileChecking);
+    Assert.areEqual(1, electron.windows.length);
+  }
+
+  @TestMethod
+  public async opensNoWindowFromTheHintOrAnotherStartWhileQuitting(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    await fixture.startAsync();
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
+    await Condition.waitAsync(() => window.isGone && fixture.electron.notifications.created.length === 1);
+
+    fixture.click("Quit TeamRun");
+    await Condition.waitAsync(() => fixture.electron.app.calls.includes("quit"));
+    fixture.electron.notifications.created[0]?.click();
+    fixture.electron.app.emit("second-instance");
+
+    Assert.areEqual(1, fixture.electron.windows.length);
   }
 
   @TestMethod

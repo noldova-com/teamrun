@@ -34,10 +34,8 @@ export class QuitFlow implements ICloseGuard {
       return false;
     if (!this.host.isLast(prompt))
       return true;
-    if (this.host.keepsRunningWithoutWindows()) {
-      this.host.closeToBackground();
+    if (this.host.keepsRunningWithoutWindows())
       return true;
-    }
     this.host.quit();
     return false;
   }
