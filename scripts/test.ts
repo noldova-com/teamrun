@@ -13,7 +13,9 @@ import AngularProject from "./angular/angular-project.ts";
 import GalleryFile from "./angular/gallery-file.ts";
 import AngularTestCheck from "./checks/angular-test-check.ts";
 import BucketNameCheck from "./checks/bucket-name-check.ts";
+import CoverageExclusionCheck from "./checks/coverage-exclusion-check.ts";
 import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
+import DependencyPinCheck from "./checks/dependency-pin-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
 import FieldOrderCheck from "./checks/field-order-check.ts";
 import GitHubConfigurationCheck from "./checks/github-configuration-check.ts";
@@ -205,8 +207,10 @@ export default class Test {
       new ModuleImportCheck(tree, modules),
       new WindowImportCheck(tree),
       new TestMirrorCheck(this.root, tree),
+      new CoverageExclusionCheck(this.root, new PackageCatalog(this.root)),
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
+      new DependencyPinCheck(this.root, files),
       new PackageCheck(build),
       ...selection === undefined || selection.packages.length > 0 ? [new PackageTestCheck(this.root, build, this.runner, this.environment, selection?.packages)] : [],
       new TypeCheck(this.root, this.runner),
