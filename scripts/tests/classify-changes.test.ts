@@ -13,6 +13,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import ClassifyChanges from "../classify-changes.ts";
+import PackageCatalog from "../packages/package-catalog.ts";
 import ProcessRunner from "../processes/process-runner.ts";
 import Git from "../repository/git.ts";
 import BuildMatrix from "../workflows/build-matrix.ts";
@@ -33,7 +34,7 @@ class ClassifyChangesTests {
       const outputPath = path.join(repository.directory, "output.txt");
       const summaryPath = path.join(repository.directory, "summary.md");
       const log = new TextOutputFixture();
-      const classify = new ClassifyChanges(new ChangeClassifier(new Git(repository.directory, new ProcessRunner())), log);
+      const classify = new ClassifyChanges(ClassifyChangesTests.createClassifier(repository.directory), log);
       const environment = { GITHUB_OUTPUT: outputPath, GITHUB_STEP_SUMMARY: summaryPath, EVENT_NAME: "pull_request", BASE_SHA: base, HEAD_SHA: head };
 
       assert.equal(await classify.runAsync(environment), 0);
@@ -42,9 +43,11 @@ class ClassifyChangesTests {
       const outputs = (await readFile(outputPath, "utf8")).split("\n");
       assert.deepEqual(outputs.filter(t => /^(run-code|run-ui|deferred)=/.test(t)), ["run-code=false", "run-ui=false", "deferred=Windows ARM64, macOS x64", "run-code=true", "run-ui=true", "deferred="]);
       const skipped = `Code builds and tests are not required; the document checks still run. Only Markdown documentation changed since the merge base ${base}.`;
+      const none = "Selection: every check other than the tests, no tests, and no UI workflow. This run does not narrow its jobs to the selection yet.";
       const full = "Full build and test verification selected. Events other than pull requests and merge groups verify everything.";
-      assert.equal(await readFile(summaryPath, "utf8"), `${skipped}\n${full}\n`);
-      assert.equal(log.text, `${skipped}\n${full}\n`);
+      const everything = "Selection: everything. Events other than pull requests and merge groups verify everything. This run does not narrow its jobs to the selection yet.";
+      assert.equal(await readFile(summaryPath, "utf8"), `${skipped}\n${none}\n${full}\n${everything}\n`);
+      assert.equal(log.text, `${skipped}\n${none}\n${full}\n${everything}\n`);
     });
 
     test("a push plans the UI workflows of every target but macOS x64 and names it, and a manual run plans every target's", async t => {
@@ -52,7 +55,7 @@ class ClassifyChangesTests {
       t.after(() => repository.disposeAsync());
       await repository.commitAsync({ "src/index.ts": "export {};\n" });
       const outputPath = path.join(repository.directory, "output.txt");
-      const classify = new ClassifyChanges(new ChangeClassifier(new Git(repository.directory, new ProcessRunner())), new TextOutputFixture());
+      const classify = new ClassifyChanges(ClassifyChangesTests.createClassifier(repository.directory), new TextOutputFixture());
       const classifyAsync = async (eventName: string): Promise<ReadonlyMap<string, string>> => {
         await writeFile(outputPath, "");
         assert.equal(await classify.runAsync({ GITHUB_OUTPUT: outputPath, GITHUB_STEP_SUMMARY: path.join(repository.directory, "summary.md"), EVENT_NAME: eventName }), 0);
@@ -77,7 +80,7 @@ class ClassifyChangesTests {
       await repository.commitAsync({ "src/index.ts": "export {};\n" });
       const outputPath = path.join(repository.directory, "output.txt");
       await writeFile(outputPath, "");
-      const classify = new ClassifyChanges(new ChangeClassifier(new Git(repository.directory, new ProcessRunner())), new TextOutputFixture());
+      const classify = new ClassifyChanges(ClassifyChangesTests.createClassifier(repository.directory), new TextOutputFixture());
 
       assert.equal(await classify.runAsync({ GITHUB_OUTPUT: outputPath, GITHUB_STEP_SUMMARY: path.join(repository.directory, "summary.md"), EVENT_NAME: "push" }), 0);
 
@@ -126,7 +129,7 @@ class ClassifyChangesTests {
     });
 
     test("missing or empty output and summary files fail before classifying", async () => {
-      const classifier = new ChangeClassifier(new Git("unused", new ProcessRunner()));
+      const classifier = ClassifyChangesTests.createClassifier("unused");
       for (const environment of [{}, { GITHUB_OUTPUT: "", GITHUB_STEP_SUMMARY: "summary.md" }, { GITHUB_OUTPUT: "output.txt" }, { GITHUB_OUTPUT: "output.txt", GITHUB_STEP_SUMMARY: "" }]) {
         const log = new TextOutputFixture();
 
@@ -154,6 +157,7 @@ class ClassifyChangesTests {
       const refused = spawnSync(process.execPath, [command], { cwd: repository.directory, env: { ...environment, GITHUB_OUTPUT: "" }, encoding: "utf8", timeout: 10_000 });
 
       assert.equal(classified.status, 0, classified.stderr);
+      assert.match(classified.stdout, /^Selection: every check other than the tests, the script tests, and no UI workflow\. /m);
       const outputs = new Map((await readFile(environment.GITHUB_OUTPUT, "utf8")).trim().split("\n").map(t => [t.slice(0, t.indexOf("=")), t.slice(t.indexOf("=") + 1)]));
       assert.equal(outputs.get("run-code"), "true");
       assert.equal(outputs.get("run-ui"), "false");
@@ -186,10 +190,14 @@ class ClassifyChangesTests {
     });
   }
 
+  private static createClassifier(directory: string): ChangeClassifier {
+    return new ChangeClassifier(new Git(directory, new ProcessRunner()), new PackageCatalog(directory));
+  }
+
   private static async classifyAsync(directory: string, eventName: string): Promise<ReadonlyMap<string, string>> {
     const outputPath = path.join(directory, "output.txt");
     await writeFile(outputPath, "");
-    const classify = new ClassifyChanges(new ChangeClassifier(new Git(directory, new ProcessRunner())), new TextOutputFixture());
+    const classify = new ClassifyChanges(ClassifyChangesTests.createClassifier(directory), new TextOutputFixture());
     assert.equal(await classify.runAsync({ GITHUB_OUTPUT: outputPath, GITHUB_STEP_SUMMARY: path.join(directory, "summary.md"), EVENT_NAME: eventName }), 0);
     return new Map((await readFile(outputPath, "utf8")).trim().split("\n").map(t => [t.slice(0, t.indexOf("=")), t.slice(t.indexOf("=") + 1)]));
   }

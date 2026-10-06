@@ -28,6 +28,7 @@ import PackageTestCheck from "./checks/package-test-check.ts";
 import PackagedBuildCheck from "./checks/packaged-build-check.ts";
 import ProductIdentityCheck from "./checks/product-identity-check.ts";
 import ScriptTestCheck from "./checks/script-test-check.ts";
+import type SelectedTests from "./checks/selected-tests.ts";
 import ShellIndependenceCheck from "./checks/shell-independence-check.ts";
 import TestMirrorCheck from "./checks/test-mirror-check.ts";
 import TestWaitCheck from "./checks/test-wait-check.ts";
@@ -49,7 +50,7 @@ import TestPart from "./test-part.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Test {
-  private static readonly USAGE: string = "Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | --part <part> [--repeat <count>]]\n";
+  private static readonly USAGE: string = "Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] | [--part <part>] --checks-only [--repeat <count>]]\n";
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly SUMMARY_HEADER: string = "| Check | Result |\n|---|---|\n";
   private static readonly FILTERED_SUMMARY_HEADER: string = "| Check | Result | Unit | Discovered | Selected | Unselected |\n|---|---|---|---|---|---|\n";
@@ -89,7 +90,7 @@ export default class Test {
       if (options.repeat > 1)
         this.output.write(`\nRun ${run} of ${options.repeat}\n`);
       const exitCode = options.filters.length === 0
-        ? await this.runChecksAsync(await this.createChecksAsync(options.part), options.part === null ? null : `Part run: ${options.part}. Only all ${TestPart.ALL.length} parts together are the complete gate.\n`)
+        ? await this.runChecksAsync(await this.createChecksAsync(options.part, options.selection), Test.formatNotice(options))
         : await this.runFilteredAsync(options.filters);
       if (exitCode !== 0) {
         if (options.repeat > 1)
@@ -162,6 +163,12 @@ export default class Test {
     return failures === 0 ? 0 : 1;
   }
 
+  private static formatNotice(options: TestOptions): string | null {
+    const part = options.part === null ? "" : `Part run: ${options.part}. Only all ${TestPart.ALL.length} parts together are the complete gate.\n`;
+    const selection = options.selection === undefined ? "" : `Selected run: every check other than the tests, and ${options.selection.description}. A selected run is not the complete gate.\n`;
+    return part + selection === "" ? null : part + selection;
+  }
+
   private static formatSummaryFilter(filter: string): string {
     return `<code>${filter.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("|", "&#124;")}</code>`;
   }
@@ -170,7 +177,7 @@ export default class Test {
     return [new DocumentCheck(this.root, new RepositoryFiles(this.root, new Git(this.root, this.runner)))];
   }
 
-  private async createChecksAsync(part: string | null): Promise<readonly ICheck[]> {
+  private async createChecksAsync(part: string | null, selection?: SelectedTests): Promise<readonly ICheck[]> {
     const files = new RepositoryFiles(this.root, new Git(this.root, this.runner));
     const documents = new DocumentCheck(this.root, files);
     const { default: ApiCatalog } = await import("./api/api-catalog.ts");
@@ -184,9 +191,7 @@ export default class Test {
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const apis = new ApiCatalog(this.root, new PackageCatalog(this.root), new BuildLayout(this.root), angular, Test.API_PARTS);
     const server = [ApiServer.locateCompiler()];
-    const packageTests = new PackageTestCheck(this.root, build, this.runner, this.environment);
-    const scriptTests = new ScriptTestCheck(this.root, build, this.runner, this.environment);
-    const partOf = (check: ICheck): string => check === packageTests ? TestPart.PACKAGES : check === scriptTests ? TestPart.SCRIPTS : TestPart.ANGULAR_AND_CHECKS;
+    const partOf = (check: ICheck): string => check instanceof PackageTestCheck ? TestPart.PACKAGES : check instanceof ScriptTestCheck ? TestPart.SCRIPTS : TestPart.ANGULAR_AND_CHECKS;
     const checks = [
       documents,
       new LicenseHeaderCheck(this.root, files),
@@ -203,13 +208,13 @@ export default class Test {
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
       new PackageCheck(build),
-      packageTests,
+      ...selection === undefined || selection.packages.length > 0 ? [new PackageTestCheck(this.root, build, this.runner, this.environment, selection?.packages)] : [],
       new TypeCheck(this.root, this.runner),
       new ApiDeclarationCheck(this.root, apis, server, Test.API_TIMEOUT),
       new ApiDocumentationCheck(this.root, apis, server, Test.API_TIMEOUT),
       new ApiExampleCheck(this.root, apis, this.runner, server, Test.API_TIMEOUT),
-      scriptTests,
-      new AngularTestCheck(angular),
+      ...selection === undefined || selection.runsScriptTests ? [new ScriptTestCheck(this.root, build, this.runner, this.environment)] : [],
+      ...selection === undefined || selection.runsAngularTests ? [new AngularTestCheck(angular)] : [],
       new PackagedBuildCheck(this.root, new PackagedBuild(this.root, this.runner, new GalleryFile(this.root), angular), angular)
     ];
     return checks.filter(t => part === null || partOf(t) === part);
