@@ -9,8 +9,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
+import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import LayoutFixture from "./fixtures/layout.fixture.ts";
 import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
@@ -18,8 +18,7 @@ import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 test.use({ desktopVariant: BuildVariantFixture.noModules });
 
 test.describe("the harness's viewport and cursor guard", () => {
-  const readViewport = (desktop: DesktopApplicationFixture): Promise<readonly number[]> =>
-    desktop.window.evaluate(() => [innerWidth, innerHeight, devicePixelRatio]);
+  const readViewport = (desktop: DesktopApplicationFixture): Promise<readonly number[]> => desktop.readViewportAsync();
   const isCursorInside = (desktop: DesktopApplicationFixture): Promise<boolean> => desktop.application.evaluate(({ BrowserWindow, screen }) => {
     const cursor = screen.getCursorScreenPoint();
     const bounds = BrowserWindow.getAllWindows()[0]?.getBounds();
@@ -41,6 +40,12 @@ test.describe("the harness's viewport and cursor guard", () => {
     expect([await readViewport(desktop), await isCursorInside(desktop)]).toEqual([[1920, 1080, 1], false]);
     expect(await isHovered(desktop)).toBe(false);
     await desktop.checkpointAsync("harness-suite-viewport");
+  });
+
+  test("a pixel ratio off by a rounding error, as a display scaled above 100% reports one, reads as the ratio it is, while one really different stays different", () => {
+    const ratios = [1.0000000149011612, 2.0000000298023224, 1.2500000186264515, 1.25, 1.000002];
+
+    expect(ratios.map(t => DesktopApplicationFixture.roundPixelRatio(t))).toEqual([1, 2, 1.25, 1.25, 1.000002]);
   });
 
   test("a workflow starts with nothing hovered even when the pointer left the window without moving", async ({ desktop }) => {
@@ -145,6 +150,27 @@ test.describe("the workflows' checkpoints", () => {
     expect([zoomed.readUInt32BE(16), zoomed.readUInt32BE(20)]).toEqual([1920, 1080]);
     expect(corners.slice(0, 4)).toEqual([[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 0, 255]]);
     expect(corners[4]).not.toEqual([255, 0, 0]);
+  });
+
+  test.describe("on a display scaled to 125%", () => {
+    test.use({ desktopArguments: ["--force-device-scale-factor=1.25"] });
+
+    test("the suite's viewport keeps one device pixel per CSS pixel through checkpoints, a clipped screenshot and zoom, and each checkpoint records the ratio it is", async ({ desktop }, testInfo) => {
+      const readRatio = async (): Promise<number> => (await desktop.readViewportAsync())[2] ?? Number.NaN;
+      const ratios = [await readRatio()];
+
+      await desktop.checkpointAsync("harness-scaled");
+      ratios.push(await readRatio());
+      const clipped = await desktop.window.screenshot({ clip: { x: 0, y: 0, width: 100, height: 50 } });
+      ratios.push(await readRatio());
+      await desktop.zoomAsync(2, 960);
+      const zoomed = await desktop.checkpointAsync("harness-scaled-zoomed");
+      await desktop.zoomAsync(1, 1920);
+
+      expect([ratios, await desktop.readViewportAsync()]).toEqual([[1, 1, 1], [1920, 1080, 1]]);
+      expect([clipped.readUInt32BE(16), clipped.readUInt32BE(20), zoomed.readUInt32BE(16), zoomed.readUInt32BE(20)]).toEqual([100, 50, 1920, 1080]);
+      expect(testInfo.annotations.filter(t => t.type === "checkpoint").map(t => (JSON.parse(t.description ?? "") as { pixelRatio: number }).pixelRatio)).toEqual([1, 2]);
+    });
   });
 });
 
