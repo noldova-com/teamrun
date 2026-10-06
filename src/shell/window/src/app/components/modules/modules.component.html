@@ -25,6 +25,9 @@ LICENSE file in the root directory of this source tree.
         <span class="tr-modules-row-meta">
           <span class="tr-modules-id" data-truncates [trTooltip]="module.id" [trTooltipTruncated]="true">{{ module.id }}</span>
           <span class="tr-modules-row-version">{{ module.version }}</span>
+          @if (countOf(module); as count) {
+            <span class="tr-modules-row-programs">{{ count }}</span>
+          }
         </span>
         <span class="tr-modules-description">{{ module.description }}</span>
       </button>
@@ -34,6 +37,7 @@ LICENSE file in the root directory of this source tree.
   </nav>
   @if (current(); as module) {
     @let contributions = contributionsOf(module);
+    @let programs = programsOf(module);
     <section class="tr-modules-detail" [attr.aria-labelledby]="'tr-modules-detail-' + module.id">
       <h2 class="tr-modules-detail-title" [id]="'tr-modules-detail-' + module.id">{{ module.displayName }}</h2>
       <p class="tr-modules-detail-id">{{ module.id }}</p>
@@ -59,6 +63,25 @@ LICENSE file in the root directory of this source tree.
       </dl>
       @if (module.state !== active) {
         <tr-module-actions [module]="module" />
+      }
+      <h3 class="tr-modules-section-title">{{ resources.programsTitle }}</h3>
+      @if (programs.length > 0) {
+        <ul class="tr-modules-programs">
+          @for (program of programs; track program.processId) {
+            <li class="tr-modules-program" [attr.data-process]="program.processId">
+              <span class="tr-modules-program-head">
+                <span class="tr-modules-program-name" data-truncates [trTooltip]="program.name" [trTooltipTruncated]="true">{{ program.name }}</span>
+                <span class="tr-modules-program-state" [trTooltip]="program.started">{{ program.state }}</span>
+              </span>
+              <span class="tr-modules-program-meta">
+                <span class="tr-modules-program-path" data-truncates [trTooltip]="program.path" [trTooltipTruncated]="true">{{ program.path }}</span>
+                <span class="tr-modules-program-process">{{ program.process }}</span>
+              </span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="tr-modules-none">{{ resources.noPrograms }}</p>
       }
       <h3 class="tr-modules-section-title">{{ resources.contributionsTitle }}</h3>
       @if (contributions.length > 0) {

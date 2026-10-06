@@ -45,8 +45,9 @@ export class Resources {
     "const child = require(\"node:child_process\").spawn(process.execPath, [\"-e\", \"setInterval(() => undefined, 1000)\"],",
     "{ detached: process.platform === \"win32\", stdio: \"ignore\", windowsHide: true });",
     "process.stdout.write(String(child.pid) + \"\\n\");",
-    "setInterval(() => undefined, 1000);"
+    "if (process.argv.includes(\"exit\")) child.unref(); else setInterval(() => undefined, 1000);"
   ].join(" ");
+  public static readonly exitArgument: string = "exit";
   public static readonly programEndedMessage: string = "The clock's program ended before it named its child.";
   public static readonly stoppedMarker: string = "stopped";
   public static readonly abortEvent: string = "abort";

@@ -67,9 +67,10 @@ export class RuntimePart implements IRuntimePart {
       }
     }));
     context.registerCommand(new RuntimeCommand(Resources.startProgramCommand, Resources.startProgramTitle, null, null, {
-      handleAsync: async () => {
+      handleAsync: async request => {
+        const exits = request.payload === Resources.exitArgument ? [Resources.exitArgument] : [];
         const owned = await context.startProcessAsync(new ProcessRequest(
-          process.execPath, [Resources.evaluateArgument, Resources.programScript], await context.getWorkFolderAsync(), { [Resources.nodeVariable]: "1" }, []));
+          process.execPath, [Resources.evaluateArgument, Resources.programScript, ...exits], await context.getWorkFolderAsync(), { [Resources.nodeVariable]: "1" }, []));
         this.programs.push(owned);
         for await (const line of createInterface({ input: owned.output }))
           return { processId: owned.processId, childProcessId: Number(line) };

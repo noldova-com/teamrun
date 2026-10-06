@@ -687,6 +687,12 @@ export class Resources {
     ["views", "Views"],
     [Resources.notificationsKind, "Notification kinds"]
   ];
+  public static readonly programsTitle: string = "Running programs";
+  public static readonly noPrograms: string = "No programs are running.";
+  public static readonly programExited: string = "Exited, its processes still run";
+  public static readonly pathSeparators: RegExp = /[\\/]/u;
+  public static readonly minuteDuration: number = 60_000;
+  public static readonly programStartFormat: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
   public static readonly moduleSelector: string = "[data-module]";
   public static readonly moduleData: string = "module";
   public static readonly bridgeName: string = "teamrun";
@@ -757,6 +763,30 @@ export class Resources {
 
   public static formatModuleDidNotStart(displayName: string): string {
     return `${displayName} didn't start`;
+  }
+
+  public static formatRunningFor(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    if (minutes < 1)
+      return "Running for less than a minute";
+    if (hours < 1)
+      return `Running for ${minutes} min`;
+    if (days < 1)
+      return minutes % 60 === 0 ? `Running for ${hours} h` : `Running for ${hours} h ${minutes % 60} min`;
+    return hours % 24 === 0 ? `Running for ${days} d` : `Running for ${days} d ${hours % 24} h`;
+  }
+
+  public static formatProgramStarted(time: string): string {
+    return `Started ${time}`;
+  }
+
+  public static formatProcessId(processId: number): string {
+    return `Process ${processId}`;
+  }
+
+  public static formatProgramCount(count: number): string {
+    return count === 1 ? "1 program" : `${count} programs`;
   }
 
   public static formatProductVersion(productVersion: string): string {
