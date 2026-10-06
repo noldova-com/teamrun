@@ -62,7 +62,7 @@ export default class GitHubApi {
     await this.captureAsync(this.formatRequest("POST", resource, [], []));
   }
 
-  public async sendAsync(method: string, resource: string, texts: readonly (readonly [string, string])[], flags: readonly (readonly [string, boolean])[]): Promise<unknown> {
+  public async sendAsync(method: string, resource: string, texts: readonly (readonly [string, string])[], flags: readonly (readonly [string, boolean | number])[]): Promise<unknown> {
     return this.parse(await this.captureAsync(this.formatRequest(method, resource, texts, flags)), resource);
   }
 
@@ -74,7 +74,7 @@ export default class GitHubApi {
     await this.captureAsync(["release", "upload", tag, file, "--repo", this.repository], GitHubApi.UPLOAD_TIMEOUT);
   }
 
-  private formatRequest(method: string, resource: string, texts: readonly (readonly [string, string])[], flags: readonly (readonly [string, boolean])[]): readonly string[] {
+  private formatRequest(method: string, resource: string, texts: readonly (readonly [string, string])[], flags: readonly (readonly [string, boolean | number])[]): readonly string[] {
     return ["api", "--method", method, this.locate(resource), ...texts.flatMap(([name, value]) => ["--raw-field", `${name}=${value}`]),
       ...flags.flatMap(([name, value]) => ["--field", `${name}=${value}`])];
   }

@@ -10,12 +10,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 
-import SandboxHelper from "../../desktop/sandbox-helper.ts";
+import SandboxValidator from "../../desktop/sandbox.validator.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
-class SandboxHelperTests {
+class SandboxValidatorTests {
   private static readonly EXECUTABLE: string = path.resolve("development app", "fixture-studio");
-  private static readonly HELPER: string = path.join(path.dirname(SandboxHelperTests.EXECUTABLE), "chrome-sandbox");
+  private static readonly HELPER: string = path.join(path.dirname(SandboxValidatorTests.EXECUTABLE), "chrome-sandbox");
   private static readonly ROOT: number = 0;
   private static readonly PERSON: number = 1000;
   private static readonly CONFIGURED: number = 0o104755;
@@ -30,12 +30,12 @@ class SandboxHelperTests {
       ];
 
       for (const [file, value] of restrictions) {
-        const problem = await SandboxHelperTests.create("linux", { [file]: value }, SandboxHelperTests.PERSON, SandboxHelperTests.INSTALLED)
-          .findProblemAsync(SandboxHelperTests.EXECUTABLE);
+        const problem = await SandboxValidatorTests.create("linux", { [file]: value }, SandboxValidatorTests.PERSON, SandboxValidatorTests.INSTALLED)
+          .findProblemAsync(SandboxValidatorTests.EXECUTABLE);
 
         assert.equal(problem, [
           "This system restricts unprivileged user namespaces, so Chromium's sandbox needs its helper owned by root with the setuid bit. Set it up once:",
-          `  sudo chown root:root '${SandboxHelperTests.HELPER}' && sudo chmod 4755 '${SandboxHelperTests.HELPER}'`,
+          `  sudo chown root:root '${SandboxValidatorTests.HELPER}' && sudo chmod 4755 '${SandboxValidatorTests.HELPER}'`,
           "Then run npm start again. Preparing the development app again, after a change to Electron, the version or the icons, needs the step again.",
           ""
         ].join("\n"), file);
@@ -45,8 +45,8 @@ class SandboxHelperTests {
     test("a helper owned by root without the setuid bit, or with it but another owner, still needs the setup", async () => {
       const restricted = { "/proc/sys/kernel/apparmor_restrict_unprivileged_userns": "1" };
 
-      for (const [uid, mode] of [[SandboxHelperTests.ROOT, SandboxHelperTests.INSTALLED], [SandboxHelperTests.PERSON, SandboxHelperTests.CONFIGURED]] as const)
-        assert.notEqual(await SandboxHelperTests.create("linux", restricted, uid, mode).findProblemAsync(SandboxHelperTests.EXECUTABLE), null, `${uid} ${mode}`);
+      for (const [uid, mode] of [[SandboxValidatorTests.ROOT, SandboxValidatorTests.INSTALLED], [SandboxValidatorTests.PERSON, SandboxValidatorTests.CONFIGURED]] as const)
+        assert.notEqual(await SandboxValidatorTests.create("linux", restricted, uid, mode).findProblemAsync(SandboxValidatorTests.EXECUTABLE), null, `${uid} ${mode}`);
     });
 
     test("a configured helper, an open system, a missing helper and other systems start without a word", async () => {
@@ -56,24 +56,24 @@ class SandboxHelperTests {
         "/proc/sys/kernel/unprivileged_userns_clone": "1",
         "/proc/sys/user/max_user_namespaces": "63000"
       };
-      const cases: readonly [string, SandboxHelper][] = [
-        ["configured", SandboxHelperTests.create("linux", restricted, SandboxHelperTests.ROOT, SandboxHelperTests.CONFIGURED)],
-        ["open", SandboxHelperTests.create("linux", open, SandboxHelperTests.PERSON, SandboxHelperTests.INSTALLED)],
-        ["nothing to read", SandboxHelperTests.create("linux", {}, SandboxHelperTests.PERSON, SandboxHelperTests.INSTALLED)],
-        ["missing helper", new SandboxHelper("linux", async () => "1", async () => null)],
-        ["Windows", SandboxHelperTests.create("win32", restricted, SandboxHelperTests.PERSON, SandboxHelperTests.INSTALLED)],
-        ["macOS", SandboxHelperTests.create("darwin", restricted, SandboxHelperTests.PERSON, SandboxHelperTests.INSTALLED)]
+      const cases: readonly [string, SandboxValidator][] = [
+        ["configured", SandboxValidatorTests.create("linux", restricted, SandboxValidatorTests.ROOT, SandboxValidatorTests.CONFIGURED)],
+        ["open", SandboxValidatorTests.create("linux", open, SandboxValidatorTests.PERSON, SandboxValidatorTests.INSTALLED)],
+        ["nothing to read", SandboxValidatorTests.create("linux", {}, SandboxValidatorTests.PERSON, SandboxValidatorTests.INSTALLED)],
+        ["missing helper", new SandboxValidator("linux", async () => "1", async () => null)],
+        ["Windows", SandboxValidatorTests.create("win32", restricted, SandboxValidatorTests.PERSON, SandboxValidatorTests.INSTALLED)],
+        ["macOS", SandboxValidatorTests.create("darwin", restricted, SandboxValidatorTests.PERSON, SandboxValidatorTests.INSTALLED)]
       ];
 
       for (const [name, sandbox] of cases)
-        assert.equal(await sandbox.findProblemAsync(SandboxHelperTests.EXECUTABLE), null, name);
+        assert.equal(await sandbox.findProblemAsync(SandboxValidatorTests.EXECUTABLE), null, name);
     });
 
     test("a helper's path with a quote stays one shell word", async () => {
       const executable = path.resolve("it's here", "fixture-studio");
       const restricted = { "/proc/sys/kernel/apparmor_restrict_unprivileged_userns": "1" };
 
-      const problem = await SandboxHelperTests.create("linux", restricted, SandboxHelperTests.PERSON, SandboxHelperTests.INSTALLED).findProblemAsync(executable);
+      const problem = await SandboxValidatorTests.create("linux", restricted, SandboxValidatorTests.PERSON, SandboxValidatorTests.INSTALLED).findProblemAsync(executable);
 
       const helper = path.join(path.dirname(executable), "chrome-sandbox");
       assert.ok(problem?.includes(`sudo chmod 4755 '${helper.replaceAll("'", "'\\''")}'`), problem ?? "");
@@ -86,16 +86,16 @@ class SandboxHelperTests {
       const present = path.join(repository.directory, "restriction");
       const missing = path.join(repository.directory, "missing");
 
-      assert.equal(await SandboxHelper.readOptionalTextAsync(present), "1\n");
-      assert.equal(await SandboxHelper.readOptionalTextAsync(missing), null);
-      assert.equal((await SandboxHelper.statOptionalAsync(present))?.isFile(), true);
-      assert.equal(await SandboxHelper.statOptionalAsync(missing), null);
+      assert.equal(await SandboxValidator.readOptionalTextAsync(present), "1\n");
+      assert.equal(await SandboxValidator.readOptionalTextAsync(missing), null);
+      assert.equal((await SandboxValidator.statOptionalAsync(present))?.isFile(), true);
+      assert.equal(await SandboxValidator.statOptionalAsync(missing), null);
     });
   }
 
-  private static create(platform: string, files: Readonly<Record<string, string>>, uid: number, mode: number): SandboxHelper {
-    return new SandboxHelper(platform, async t => files[t] ?? null, async () => ({ uid, mode }));
+  private static create(platform: string, files: Readonly<Record<string, string>>, uid: number, mode: number): SandboxValidator {
+    return new SandboxValidator(platform, async t => files[t] ?? null, async () => ({ uid, mode }));
   }
 }
 
-SandboxHelperTests.register();
+SandboxValidatorTests.register();

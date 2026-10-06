@@ -96,19 +96,42 @@ export class TestRunEntryTests {
   @TestData("[\"noTestIsNamedThis\"]", 0, 8)
   @TestData("[\"finishesCleanly\"]", 1, 8)
   @TestData("[\"finishesCleanly\",\"keepsTheCoverageFolderOutOfItsEnvironment\"]", 2, 8)
-  public async writesWhatItDiscoveredAndSelectedToTheSelectionFileAndLeavesAnEmptySelectionToItsCaller(filters: string, selected: number, discovered: number): Promise<void> {
+  public async writesWhatItDiscoveredAndSelectedToTheResultFileAndLeavesAnEmptySelectionToItsCaller(filters: string, selected: number, discovered: number): Promise<void> {
     using directory = new TemporaryDirectory();
     const testsDirectory = join(directory.path, "tests");
     await mkdir(testsDirectory);
     const fixture = new URL("../../fixtures/execution/entry-lifetime.fixture.js", import.meta.url).href;
     await writeFile(join(testsDirectory, "lifetime.test.js"), `export { EntryLifetimeFixture as EntryLifetimeTests } from ${JSON.stringify(fixture)};\n`);
-    const selectionPath = join(directory.path, "selection.json");
+    const resultPath = join(directory.path, "result.json");
 
-    const result = await this.runEntryArgumentsAsync(["TestPackage", testsDirectory], filters, undefined, { TEAMRUN_TEST_SELECTION_FILE: selectionPath });
+    const result = await this.runEntryArgumentsAsync(["TestPackage", testsDirectory], filters, undefined, { TEAMRUN_TEST_RESULT_FILE: resultPath });
 
     Assert.areEqual(0, result.exitCode, result.errorOutput);
     Assert.isFalse(result.errorOutput.includes("No test matched the filters"), result.errorOutput);
-    Assert.areEqual(JSON.stringify({ discovered, selected }), await readFile(selectionPath, "utf8"));
+    Assert.areEqual(
+      JSON.stringify({ discovered, selected, passed: selected, failed: 0, skipped: 0, unreached: 0, skips: [], files: selected === 0 ? [] : ["TestPackage/lifetime.test.js"] }),
+      await readFile(resultPath, "utf8"));
+  }
+
+  @TestMethod
+  public async writesEachSkippedTestWithItsReasonToTheResultFile(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const testsDirectory = join(directory.path, "tests");
+    await mkdir(testsDirectory);
+    const fixture = new URL("../../fixtures/decorators/partly-skipped-fixture.fixture.js", import.meta.url).href;
+    await writeFile(join(testsDirectory, "skipped.test.js"), `export { PartlySkippedFixtureTests } from ${JSON.stringify(fixture)};\n`);
+    const resultPath = join(directory.path, "result.json");
+
+    const result = await this.runEntryArgumentsAsync(["TestPackage", testsDirectory], "[]", undefined, { TEAMRUN_TEST_RESULT_FILE: resultPath });
+
+    Assert.areEqual(0, result.exitCode, result.errorOutput);
+    Assert.areEqual(
+      JSON.stringify({
+        discovered: 2, selected: 2, passed: 1, failed: 0, skipped: 1, unreached: 0,
+        skips: [{ file: "TestPackage/skipped.test.js", names: ["PartlySkippedFixtureTests.pending"], reason: "this method is pending" }],
+        files: ["TestPackage/skipped.test.js"]
+      }),
+      await readFile(resultPath, "utf8"));
   }
 
   @TestMethod
@@ -289,7 +312,7 @@ export class TestRunEntryTests {
       environment["GITHUB_STEP_SUMMARY"] = summaryPath;
     delete environment["TEAMRUN_TEMPORARY_ROOT"];
     delete environment["TEAMRUN_TEST_TIMEOUT_MILLISECONDS"];
-    delete environment["TEAMRUN_TEST_SELECTION_FILE"];
+    delete environment["TEAMRUN_TEST_RESULT_FILE"];
     delete environment["TEAMRUN_TEST_RESULTS_FILE"];
     Object.assign(environment, variables);
     if (Object.isNull(filters))

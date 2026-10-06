@@ -19,8 +19,10 @@ export default class InstallRunnerFixture extends ProcessRunner {
 
   public localAppData: string = "";
   public installedBeforeTimeout: readonly string[] | null = null;
+  public libraries: readonly string[] = ["ffmpeg.dll", "libEGL.DLL"];
   public readonly calls: (readonly string[])[] = [];
   public readonly limits: number[] = [];
+  public readonly installerEnvironments: (NodeJS.ProcessEnv | undefined)[] = [];
 
   public constructor(failing: readonly string[] = []) {
     super();
@@ -37,11 +39,12 @@ export default class InstallRunnerFixture extends ProcessRunner {
       await rm(directory, { recursive: true, force: true });
   }
 
-  public override async captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number): Promise<ProcessResult> {
+  public override async captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
     const name = path.basename(command);
     this.directories.add(directory);
     this.calls.push([name, ...commandArguments.map(t => t.startsWith(directory) ? path.relative(directory, t) : t)]);
     this.limits.push(timeout);
+    this.installerEnvironments.push(environment);
     if (this.failing.includes(name) || this.failing.includes(String(commandArguments[0])))
       return new ProcessResult(9, "", `${name} broke`);
     if (commandArguments[0] === "--appimage-extract")
@@ -51,8 +54,10 @@ export default class InstallRunnerFixture extends ProcessRunner {
         await InstallRunnerFixture.createAsync(path.join(this.localAppData, "Programs", "fixture-studio", file));
       throw new ProcessTimeoutException(`"${command}" did not finish within ${timeout} ms.`);
     }
-    if (commandArguments[0] === "/S")
-      await InstallRunnerFixture.createAsync(path.join(this.localAppData, "Programs", "fixture-studio", "Fixture Studio.exe"));
+    if (commandArguments[0] === "/S") {
+      for (const file of ["Fixture Studio.exe", ...this.libraries])
+        await InstallRunnerFixture.createAsync(path.join(this.localAppData, "Programs", "fixture-studio", file));
+    }
     if (name === "ditto")
       await InstallRunnerFixture.createAsync(path.join(String(commandArguments[1]), "Contents", "MacOS", "Fixture Studio"));
     return new ProcessResult(0, "", "");
