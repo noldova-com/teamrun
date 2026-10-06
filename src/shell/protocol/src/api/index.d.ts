@@ -681,7 +681,9 @@ export declare class RuntimeHandover {
 
 /**
  * The payload of `shell.stop`, which asks a runtime to stop. Its wire form
- * never changes after protocol version 1.
+ * never changes after protocol version 1: every build reads and writes the
+ * form with only `policy`, so any build can stop any earlier one, and a
+ * client sends `keepsWhileShared` only to a runtime of its own build.
  */
 export declare class StopRequest {
   /**
@@ -690,27 +692,37 @@ export declare class StopRequest {
   public readonly policy: StopPolicy;
 
   /**
+   * Whether the runtime keeps running, its work untouched, while another
+   * client is connected, answering with a {@link KeptRuntime} instead of
+   * applying the policy.
+   */
+  public readonly keepsWhileShared: boolean;
+
+  /**
    * Creates the request.
    *
    * @param policy How the runtime treats work in progress.
+   * @param keepsWhileShared Whether the runtime keeps running while another
+   * client is connected; `false` by default.
    *
    * @example
    * ```ts
    * import { StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
    *
-   * export const request: StopRequest = new StopRequest(StopPolicy.IfIdle);
+   * export const request: StopRequest = new StopRequest(StopPolicy.IfIdle, true);
    * ```
    */
-  public constructor(policy: StopPolicy);
+  public constructor(policy: StopPolicy, keepsWhileShared?: boolean);
 
   /**
    * Reads a request from its wire form.
    *
    * @param value The untrusted value.
    * @param path The path a failure reports; `$` by default.
-   * @returns The request.
+   * @returns The request; `keepsWhileShared` is `false` when absent.
    * @throws JsonException synchronously when the policy is missing or
-   * unknown, or another field is present; its path names the field.
+   * unknown, `keepsWhileShared` is not a boolean, or another field is
+   * present; its path names the field.
    *
    * @example
    * ```ts
@@ -724,13 +736,75 @@ export declare class StopRequest {
   /**
    * Returns the wire form.
    *
-   * @returns The `policy` field.
+   * @returns The `policy` field, and `keepsWhileShared` only when it is `true`.
    *
    * @example
    * ```ts
    * import { Request, ShellMethods, StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
    *
    * export const stop: Request = new Request("r1", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle).toJson());
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The answer to a `shell.stop` that keeps the runtime running while it is
+ * shared: other clients are connected, so it applied no policy and left its
+ * work untouched.
+ */
+export declare class KeptRuntime {
+  /**
+   * How many other clients are connected; at least 1.
+   */
+  public readonly keptFor: number;
+
+  /**
+   * Creates the answer.
+   *
+   * @param keptFor How many other clients are connected.
+   * @throws ArgumentException synchronously when `keptFor` is not a whole
+   * number from 1.
+   *
+   * @example
+   * ```ts
+   * import { KeptRuntime } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const kept: KeptRuntime = new KeptRuntime(1);
+   * ```
+   */
+  public constructor(keptFor: number);
+
+  /**
+   * Reads an answer from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The answer.
+   * @throws JsonException synchronously when `keptFor` is missing or not a
+   * whole number from 1, or another field is present; its path names the
+   * field.
+   *
+   * @example
+   * ```ts
+   * import { KeptRuntime } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const kept: KeptRuntime = KeptRuntime.fromJson({ keptFor: 2 });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): KeptRuntime;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `keptFor` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { KeptRuntime } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new KeptRuntime(1).toJson();
    * ```
    */
   public toJson(): JsonObject;

@@ -60,6 +60,7 @@ export class RuntimeServer implements IEventSink {
   private readonly listener: ISessionListener;
   private readonly sessions: Set<ClientSession> = new Set();
   private readonly refusals: Map<ClientSession, Refusal> = new Map();
+  private readonly askers: WeakMap<RequestContext, ClientSession> = new WeakMap();
   private server: Server | null = null;
   private socketPath: string | null = null;
   private refusal: Refusal | null = null;
@@ -96,6 +97,11 @@ export class RuntimeServer implements IEventSink {
 
   public get clients(): readonly ConnectedClient[] {
     return [...this.sessions].filter(t => t.state === SessionState.Authenticated).map(t => new ConnectedClient(t.connection, t.client));
+  }
+
+  public countOtherClients(context: RequestContext): number {
+    const asker = this.askers.get(context);
+    return [...this.sessions].filter(t => t !== asker && t.state === SessionState.Authenticated).length;
   }
 
   public async listenTcpAsync(): Promise<Endpoint> {
@@ -319,7 +325,9 @@ export class RuntimeServer implements IEventSink {
       settle(Response.failure(request.id, new Failure(code, code === FailureCode.DeadlineExceeded ? Resources.deadlineExceeded : Resources.cancelled)));
     }, { once: true });
     session.trackRequest(request.id, controller);
-    Promise.try(() => handler.handleAsync(new RequestContext(session.client, request.payload, controller.signal, session.connection))).then(
+    const context = new RequestContext(session.client, request.payload, controller.signal, session.connection);
+    this.askers.set(context, session);
+    Promise.try(() => handler.handleAsync(context)).then(
       (result: JsonValue) => settle(Response.success(request.id, result)),
       (error: unknown) => settle(Response.failure(request.id, RuntimeServer.describeFailure(error))));
   }

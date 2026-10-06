@@ -4766,6 +4766,22 @@ export declare class RuntimeServer implements IEventSink {
   public get clients(): readonly ConnectedClient[];
 
   /**
+   * Counts the authenticated connections other than the one that made a request, whatever names their clients gave.
+   *
+   * @param context The request's context, as the server passed it to the method handler.
+   * @returns The number of such connections; every authenticated connection when the server did not make the context.
+   * @example
+   * ```ts
+   * import type { RequestContext, RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isShared(server: RuntimeServer, context: RequestContext): boolean {
+   *   return server.countOtherClients(context) > 0;
+   * }
+   * ```
+   */
+  public countOtherClients(context: RequestContext): number;
+
+  /**
    * Listens on a loopback port the system assigns.
    *
    * @returns A promise of the endpoint.

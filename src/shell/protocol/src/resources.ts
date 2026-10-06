@@ -37,6 +37,8 @@ export class Resources {
   public static readonly detailsField: string = "details";
   public static readonly executablePathField: string = "executablePath";
   public static readonly policyField: string = "policy";
+  public static readonly keepsWhileSharedField: string = "keepsWhileShared";
+  public static readonly keptForField: string = "keptFor";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly installationField: string = "installation";
   public static readonly problemsField: string = "problems";
@@ -110,6 +112,7 @@ export class Resources {
   public static readonly notificationSequenceInvalid: string = "A notification's sequence must be a whole number from 1.";
   public static readonly currentSequenceInvalid: string = "The notifications' sequence must be a whole number from 0.";
   public static readonly workSequenceInvalid: string = "The work's sequence must be a whole number from 0.";
+  public static readonly keptForInvalid: string = "The number of other clients a runtime is kept for must be a whole number from 1.";
   public static readonly commandSequenceInvalid: string = "The commands' sequence must be a whole number from 0.";
   public static readonly processIdInvalid: string = "A running program's process id must be a whole number from 1.";
   public static readonly programStartInvalid: string = "A running program's start must be a date and time.";
