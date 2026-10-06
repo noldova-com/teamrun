@@ -32,6 +32,7 @@ export class Resources {
   public static readonly interruptSignal: string = "SIGINT";
   public static readonly millisecondsPerSecond: number = 1_000;
   public static readonly minimumTimeoutSeconds: number = 1;
+  public static readonly wholeSecondsPattern: RegExp = /^\d+$/;
   public static readonly maximumTimeoutSeconds: number = 3_600;
   public static readonly jsonIndent: number = 2;
 
