@@ -38,6 +38,7 @@ export class WindowPartContext implements IWindowPartContext {
   private readonly topBarActionList: TopBarAction[] = [];
   private readonly viewList: ViewContribution[] = [];
   private readonly documentList: DocumentContribution[] = [];
+  private readonly saveList: (() => Promise<void>)[] = [];
   private readonly subscriptions: (() => void)[] = [];
   private readonly badgedViews: Set<string> = new Set();
 
@@ -56,6 +57,10 @@ export class WindowPartContext implements IWindowPartContext {
 
   public get documents(): readonly DocumentContribution[] {
     return this.documentList;
+  }
+
+  public get saves(): readonly (() => Promise<void>)[] {
+    return this.saveList;
   }
 
   public get commands(): readonly CommandContribution[] {
@@ -109,6 +114,15 @@ export class WindowPartContext implements IWindowPartContext {
     this.topBarActionList.push(registered);
     this.host.refresh();
     return registered;
+  }
+
+  public registerSave(save: () => Promise<void>): () => void {
+    this.saveList.push(save);
+    return () => {
+      const index = this.saveList.indexOf(save);
+      if (index >= 0)
+        this.saveList.splice(index, 1);
+    };
   }
 
   public provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void {
@@ -214,6 +228,7 @@ export class WindowPartContext implements IWindowPartContext {
       unsubscribe();
     this.viewList.length = 0;
     this.documentList.length = 0;
+    this.saveList.length = 0;
     this.commandList.length = 0;
     for (const handle of [...this.notifications])
       this.dismissNotification(handle);

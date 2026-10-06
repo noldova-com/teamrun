@@ -14,11 +14,7 @@ import LayoutFixture from "./fixtures/layout.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 async function openMenuAsync(window: Page): Promise<Locator> {
-  const bar = window.locator("tr-menu-bar");
-  if (await bar.isVisible())
-    await bar.getByRole("menuitem").first().click();
-  else
-    await window.locator(".tr-window-row-menu").click();
+  await window.locator("tr-tab-group:has(tr-tab[data-tab-key=\"document/notes.note/1\"]) .tr-tab-group-menu").click();
   const menu = window.getByRole("menu").last();
   await expect(menu).toBeVisible();
   return menu;

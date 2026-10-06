@@ -1098,7 +1098,11 @@ export declare class ConfigurationTableFillDirective {
  * ends the press that opened the menu, and when the host is hidden or
  * scrolled away. Focus
  * returns to the host when a chosen row, Escape or Tab closes the last menu.
- * It extends the CDK's menu trigger base, from which it inherits
+ * One trigger can also serve as the context menu of other elements, such as
+ * every text field under it, through
+ * {@link ContextMenuTriggerDirective.openAtPointer} and
+ * {@link ContextMenuTriggerDirective.openFromKeyboard} with a target, which
+ * then takes the host's place. It extends the CDK's menu trigger base, from which it inherits
  * `menuTemplateRef`, `menuData`, `isOpen()`, `opened` and `closed`.
  */
 export declare class ContextMenuTriggerDirective extends CdkMenuTriggerBase {
@@ -1176,6 +1180,82 @@ export declare class ContextMenuTriggerDirective extends CdkMenuTriggerBase {
    * ```
    */
   public open(point: DOMRect, origin: FocusOrigin): void;
+
+  /**
+   * Opens the menu at a right click's pointer as the context menu of a
+   * target, as the host's own right click does: the menu follows the target,
+   * closes when it is hidden or scrolled away, and returns focus to it. The
+   * event's default and propagation stop, and the click that ends the press
+   * leaves the menu open. Nothing opens while no template is bound.
+   *
+   * @param event The `contextmenu` event; one from the keyboard, whose button
+   * is not the secondary one, focuses the first row as a key does.
+   * @param target The element the menu belongs to, the host by default.
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ContextMenuTriggerDirective, MenuComponent, MenuItemComponent } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-field-actions",
+   *   imports: [ContextMenuTriggerDirective, MenuComponent, MenuItemComponent],
+   *   host: { "(document:contextmenu)": "openForField($event)" },
+   *   template: `
+   *     <span [trContextMenuTriggerFor]="actions"></span>
+   *     <ng-template #actions>
+   *       <tr-menu>
+   *         <button tr-menu-item label="Clear"></button>
+   *       </tr-menu>
+   *     </ng-template>`
+   * })
+   * export class FieldActionsComponent {
+   *   private readonly trigger: Signal<ContextMenuTriggerDirective> = viewChild.required(ContextMenuTriggerDirective);
+   *
+   *   protected openForField(event: MouseEvent): void {
+   *     if (event.target instanceof HTMLInputElement)
+   *       this.trigger().openAtPointer(event, event.target);
+   *   }
+   * }
+   * ```
+   */
+  public openAtPointer(event: MouseEvent, target?: HTMLElement): void;
+
+  /**
+   * Opens the menu below a target's start as its context menu when the key
+   * is the ContextMenu key or Shift+F10, preventing the key's default, as
+   * the host's own keys do; other keys do nothing. The menu follows the
+   * target and returns focus to it, and its first row takes focus.
+   *
+   * @param event The `keydown` event.
+   * @param target The element the menu belongs to, the host by default.
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ContextMenuTriggerDirective, MenuComponent, MenuItemComponent } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-field-keys",
+   *   imports: [ContextMenuTriggerDirective, MenuComponent, MenuItemComponent],
+   *   host: { "(document:keydown)": "openForField($event)" },
+   *   template: `
+   *     <span [trContextMenuTriggerFor]="actions"></span>
+   *     <ng-template #actions>
+   *       <tr-menu>
+   *         <button tr-menu-item label="Clear"></button>
+   *       </tr-menu>
+   *     </ng-template>`
+   * })
+   * export class FieldKeysComponent {
+   *   private readonly trigger: Signal<ContextMenuTriggerDirective> = viewChild.required(ContextMenuTriggerDirective);
+   *
+   *   protected openForField(event: KeyboardEvent): void {
+   *     if (event.target instanceof HTMLInputElement)
+   *       this.trigger().openFromKeyboard(event, event.target);
+   *   }
+   * }
+   * ```
+   */
+  public openFromKeyboard(event: KeyboardEvent, target?: HTMLElement): void;
 
   /**
    * Closes the menu and its submenus. Nothing happens while it is closed.

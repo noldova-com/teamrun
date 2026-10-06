@@ -7,7 +7,7 @@
  */
 
 import { ThemeMode } from "../src/app/enums/theme-mode";
-import { DefaultTheme } from "../src/app/themes/default-theme";
+import { DefaultTheme } from "../src/app/models/default-theme";
 import { Resources } from "../src/resources";
 
 describe("Resources", () => {

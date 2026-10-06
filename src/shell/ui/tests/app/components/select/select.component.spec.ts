@@ -14,7 +14,7 @@ import { page, userEvent } from "vitest/browser";
 import { SelectComponent } from "../../../../src/app/components/select/select.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { SelectOption } from "../../../../src/app/models/select-option";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

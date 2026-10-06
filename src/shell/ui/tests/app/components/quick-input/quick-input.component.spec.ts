@@ -13,7 +13,7 @@ import { userEvent } from "vitest/browser";
 import { QuickInputComponent } from "../../../../src/app/components/quick-input/quick-input.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { QuickInputItem } from "../../../../src/app/models/quick-input-item";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 const many: readonly QuickInputItem[] = Array.from({ length: 30 }, (_, index) => new QuickInputItem(`notes.command${index}`, `Command ${index}`, null, null, null));

@@ -21,6 +21,7 @@ import { DataDirectoryState } from "../../enums/data-directory-state.js";
 import { WindowStateKind } from "../../enums/window-state-kind.js";
 import { DataDirectoryOwnedException } from "../../exceptions/data-directory-owned.exception.js";
 import type { IIdleParticipant } from "../../interfaces/i-idle-participant.js";
+import { AppImageSource } from "../../models/app-image-source.js";
 import { CapabilityToken } from "../../models/capability-token.js";
 import type { Endpoint } from "../../models/endpoint.js";
 import type { EventChannel } from "../../models/event-channel.js";
@@ -73,6 +74,7 @@ import { WindowStateStore } from "../window-state/window-state-store.js";
 import { WindowStateWriteMethod } from "../window-state/window-state-write-method.js";
 import { WorkMethod } from "../work/work-method.js";
 import { WorkTracker } from "../work/work-tracker.js";
+import { AppImageCopyCleanup } from "./app-image-copy-cleanup.js";
 import { IdleMonitor } from "./idle-monitor.js";
 import { MoveAsideMethod } from "./move-aside-method.js";
 import { RuntimeLog } from "./runtime-log.js";
@@ -123,7 +125,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.server = new RuntimeServer(
       this.identity,
       this.token,
-      new RuntimeHandover(this.identity, process.execPath),
+      new RuntimeHandover(this.identity, AppImageSource.locateProgram(environment, process.execPath)),
       this.methods,
       options.serverSettings,
       () => this.idle.check(),
@@ -170,6 +172,7 @@ export class RuntimeHost implements IIdleParticipant {
     let database: ShellDatabase | null = null;
     try {
       log = await RuntimeLog.openAsync(lock, options.startLogName);
+      await AppImageCopyCleanup.removeAsync(lock.dataDirectory, log.diagnostics);
       const inspection = await DataDirectoryInspector.inspectAsync(options.dataDirectory);
       if (inspection.state !== DataDirectoryState.PreShell)
         database = await ShellDatabase.openAsync(lock, ShellMigrations.all);
@@ -232,7 +235,7 @@ export class RuntimeHost implements IIdleParticipant {
       endpoint.toString(),
       this.token.value,
       process.pid,
-      process.execPath,
+      AppImageSource.locateProgram(this.environment, process.execPath),
       this.identity.productVersion,
       this.identity.protocolVersion,
       this.identity.fingerprint);
