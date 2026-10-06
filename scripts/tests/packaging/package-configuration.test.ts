@@ -75,7 +75,7 @@ class PackageConfigurationTests {
           shortcutName: "Fixture Studio",
           uninstallDisplayName: "Fixture Studio",
           artifactName: "Fixture Studio-windows-x64.${ext}",
-          include: path.join(PackageConfigurationTests.ROOT, "assets", "installer", "command-path.nsh")
+          include: path.join(PackageConfigurationTests.ROOT, "assets", "installer", "installer.nsh")
         }
       });
     });
