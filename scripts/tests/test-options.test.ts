@@ -17,7 +17,15 @@ class TestOptionsTests {
     test("no arguments select the complete gate once", () => {
       const options = TestOptions.parse([]);
 
-      assert.deepEqual([options.isDocuments, options.filters, options.repeat], [false, [], 1]);
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.part], [false, [], 1, null]);
+    });
+
+    test("a part selects its checks, once or repeated", () => {
+      const once = TestOptions.parse(["--part", "packages"]);
+      const repeated = TestOptions.parse(["--repeat", "3", "--part", "angular-and-checks"]);
+
+      assert.deepEqual([once.isDocuments, once.filters, once.repeat, once.part], [false, [], 1, "packages"]);
+      assert.deepEqual([repeated.isDocuments, repeated.filters, repeated.repeat, repeated.part], [false, [], 3, "angular-and-checks"]);
     });
 
     test("documents alone selects the document checks", () => {
@@ -52,6 +60,11 @@ class TestOptionsTests {
         [["--repeat", "2.5"], "--repeat takes a whole number from 1."],
         [["--repeat", "two"], "--repeat takes a whole number from 1."],
         [["--repeat", "2", "--repeat", "3"], "--repeat may be given only once."],
+        [["--part"], "--part takes one of packages, scripts, angular-and-checks."],
+        [["--part", "ui"], "--part takes one of packages, scripts, angular-and-checks."],
+        [["--part", "scripts", "--part", "packages"], "--part may be given only once."],
+        [["--part", "scripts", "--filter", "alpha"], "--part runs a whole part, so it takes no --filter."],
+        [["--filter", "alpha", "--part", "scripts"], "--part runs a whole part, so it takes no --filter."],
         [["coverage"], "\"coverage\" is not an option of npm test."],
         [["--filter", "alpha", "extra"], "\"extra\" is not an option of npm test."],
         [["--repeat", "2", "documents"], "\"documents\" is not an option of npm test."]

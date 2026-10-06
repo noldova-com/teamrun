@@ -100,11 +100,16 @@ class ClassifyChangesTests {
       assert.equal(outputs.get("run-code"), "true");
       assert.equal(outputs.get("run-ui"), "false");
       assert.equal(outputs.get("deferred"), "Windows ARM64, macOS x64");
+      const parts = [
+        { part: "packages", name: "Package tests", prebuilt: true, build: false, angular: false },
+        { part: "scripts", name: "Script tests", prebuilt: true, build: false, angular: false },
+        { part: "angular-and-checks", name: "Angular tests and checks", prebuilt: true, build: true, angular: true }
+      ];
       assert.deepEqual(JSON.parse(outputs.get("targets") ?? ""), [
-        { target: "Linux x64", runner: "ubuntu-24.04", architecture: "x64" },
-        { target: "Linux ARM64", runner: "ubuntu-24.04-arm", architecture: "arm64" },
-        { target: "Windows x64", runner: "windows-2025", architecture: "x64" },
-        { target: "macOS ARM64", runner: "macos-15", architecture: "arm64" }
+        { target: "Linux x64", runner: "ubuntu-24.04", architecture: "x64", jobs: parts },
+        { target: "Linux ARM64", runner: "ubuntu-24.04-arm", architecture: "arm64", jobs: parts },
+        { target: "Windows x64", runner: "windows-2025", architecture: "x64", jobs: parts },
+        { target: "macOS ARM64", runner: "macos-15", architecture: "arm64", jobs: [{ part: "", name: "Build and test", prebuilt: false, build: true, angular: true }] }
       ]);
       assert.equal(outputs.get("target-table"), "Linux x64|ubuntu-24.04|Linux|x64;Linux ARM64|ubuntu-24.04-arm|Linux|arm64;Windows x64|windows-2025|Windows|x64;macOS ARM64|macos-15|macOS|arm64");
       assert.equal(outputs.get("ui-targets"), "linux-x64 linux-arm64 windows-x64 macos-arm64");

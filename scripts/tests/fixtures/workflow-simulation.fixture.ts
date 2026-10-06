@@ -21,7 +21,7 @@ export default class WorkflowSimulation {
   private static readonly STEP_PATTERN: RegExp = /^( *)- name: (.+)$/;
   private static readonly KEY_PATTERN: RegExp = /^([a-z-]+):(?: (.*))?$/;
   private static readonly OUTCOME_PATTERN: RegExp = /^steps\.([a-z-]+)\.outcome (==|!=) '([a-z]+)'$/;
-  private static readonly MATRIX_PATTERN: RegExp = /^matrix\.([a-z]+) (==|!=) '([a-z]+)'$/;
+  private static readonly MATRIX_PATTERN: RegExp = /^matrix\.([a-z]+) (==|!=) '([a-z-]+)'$/;
   private static readonly MATRIX_FLAG_PATTERN: RegExp = /^matrix\.([a-z]+)$/;
   private static readonly ALWAYS: string = "always()";
   private static readonly FAILURE: string = "failure()";
