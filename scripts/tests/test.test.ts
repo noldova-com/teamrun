@@ -255,6 +255,7 @@ class TestTests {
       assert.equal(exitCode, 0, output.text);
       const line = "Angular tests: 2 discovered, 2 executed, 1 passed, 1 failed (1 passed when run again; see the flaky record), 0 skipped, 0 unselected, 0 unreached; coverage Not measured.\n";
       assert.equal(output.text.split(line).length, 3, output.text);
+      assert.equal(JSON.parse(await readFile(path.join(repository.directory, "_build", "totals", "angular.json"), "utf8")).rerunPassed, 1);
     });
 
     test("a repeat without filters repeats the complete gate", async t => {

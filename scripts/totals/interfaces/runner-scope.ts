@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export default interface IRunnerFindings {
-  readonly duplicates: readonly string[];
-  readonly empty: readonly string[];
+export default interface IRunnerScope {
+  readonly expected: readonly string[];
+  readonly shard: string | null;
 }

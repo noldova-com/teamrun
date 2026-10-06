@@ -37,7 +37,7 @@ export default class UiTestReport {
   public async readAsync(report: JsonFields, list: JsonFields): Promise<RunnerResult> {
     const ran = this.collect(report);
     const listed = this.collect(list);
-    const listedFiles = new Set(listed.map(t => t.file));
+    const listedFiles = new Set(this.listFiles(list));
     ran.forEach(t => this.count(t));
     const testFiles = await this.listTestFilesAsync(list.object("config"));
     return new RunnerResult(new JsonFields({
@@ -52,6 +52,10 @@ export default class UiTestReport {
       duplicates: this.tests.duplicates,
       empty: testFiles.filter(t => !listedFiles.has(t))
     }, this.source));
+  }
+
+  public listFiles(list: JsonFields): readonly string[] {
+    return [...new Set(this.collect(list).map(t => t.file))].sort();
   }
 
   private collect(report: JsonFields): IUiTest[] {
