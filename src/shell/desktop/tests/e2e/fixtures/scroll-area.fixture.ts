@@ -14,19 +14,16 @@ export default class ScrollAreaFixture {
   private static readonly DRAG_STEPS: number = 5;
   private static readonly FRAME: number = 16;
 
-  public static async scrollbarSizesAsync(area: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
-    await expect(area).toHaveCount(1);
-    return await area.evaluateAll(all => {
-      if (all.length !== 1)
-        throw new Error(`${all.length} elements match the scroll area, so its scrollbars can't be measured.`);
-      const element = all[0] as HTMLElement;
+  public static scrollbarSizesAsync(area: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
+    return ScrollAreaFixture.measureOneAsync("scrollbar sizes", () => area.evaluateAll(all => all.map(t => {
+      const element = t as HTMLElement;
       const style = getComputedStyle(element);
       return {
         vertical: element.offsetWidth - element.clientWidth - Number.parseFloat(style.borderLeftWidth) - Number.parseFloat(style.borderRightWidth),
         horizontal: element.offsetHeight - element.clientHeight - Number.parseFloat(style.borderTopWidth) - Number.parseFloat(style.borderBottomWidth),
         rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
       };
-    });
+    })));
   }
 
   public static async revealThumbColorAsync(window: Page, area: Locator): Promise<void> {
@@ -54,17 +51,13 @@ export default class ScrollAreaFixture {
     return window.screenshot({ clip });
   }
 
-  public static async panelEdgeGapAsync(area: Locator): Promise<number> {
-    await expect(area).toHaveCount(1);
-    return await area.evaluateAll(all => {
-      if (all.length !== 1)
-        throw new Error(`${all.length} elements match the scroll area, so its gap to the panel's edge can't be measured.`);
-      const t = all[0] as HTMLElement;
+  public static panelEdgeGapAsync(area: Locator): Promise<number> {
+    return ScrollAreaFixture.measureOneAsync("gap to the panel's edge", () => area.evaluateAll(all => all.map(t => {
       const panel = t.closest("tr-panel-card") as HTMLElement;
       const panelEnd = panel.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(panel).borderRightWidth);
       const areaEnd = t.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(t).borderRightWidth);
       return panelEnd - areaEnd;
-    });
+    })));
   }
 
   public static scrollTopAsync(area: Locator): Promise<number> {
@@ -98,6 +91,12 @@ export default class ScrollAreaFixture {
   public static async expectThumbShownAsync(area: Locator, isShown: boolean): Promise<void> {
     const expected = isShown ? await ScrollAreaFixture.readShownColorAsync(area) : ScrollAreaFixture.HIDDEN;
     await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area), { message: `the thumb's color, ${isShown ? "shown" : "hidden"}`, intervals: [ScrollAreaFixture.FRAME] }).toBe(expected);
+  }
+
+  private static async measureOneAsync<T>(what: string, measureAllAsync: () => Promise<T[]>): Promise<T> {
+    let measured: T[] = [];
+    await expect.poll(async () => (measured = await measureAllAsync()).length, { message: `the scroll areas that match, to measure their ${what}` }).toBe(1);
+    return measured[0] as T;
   }
 
   private static thumbColorAsync(area: Locator): Promise<string> {
