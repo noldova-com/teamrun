@@ -8,6 +8,8 @@
 
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
+import { CliCommand } from "./enums/cli-command.js";
+
 export class Resources {
   public static get productName(): string {
     return ProductInfo.current.name;
@@ -41,6 +43,13 @@ export class Resources {
   public static readonly runCommand: string = "run";
   public static readonly openCommand: string = "open";
   public static readonly helpCommand: string = "help";
+  public static readonly commandWords: Readonly<Record<CliCommand, string>> = {
+    [CliCommand.Status]: "status",
+    [CliCommand.Commands]: "commands",
+    [CliCommand.Run]: "run",
+    [CliCommand.Open]: "open",
+    [CliCommand.Help]: Resources.helpCommand
+  };
   public static readonly dataDirectoryFlag: string = "--data-dir";
   public static readonly jsonFlag: string = "--json";
   public static readonly noStartFlag: string = "--no-start";
@@ -108,8 +117,8 @@ export class Resources {
     return `"${option}" is not an option.`;
   }
 
-  public static formatOptionNotForCommand(option: string, command: string): string {
-    return `The ${option} option does not apply to ${command}.`;
+  public static formatOptionNotForCommand(option: string, command: CliCommand): string {
+    return `The ${option} option does not apply to ${Resources.commandWords[command]}.`;
   }
 
   public static formatOptionNeedsValue(option: string): string {

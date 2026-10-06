@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 
 import { CliFixture } from "../fixtures/cli.fixture.js";
 import { ProbeBuildFixture } from "../fixtures/probe-build.fixture.js";
@@ -42,6 +42,20 @@ export class CommandLineTests {
     Assert.areEqual("1\n", longest.output);
     Assert.areEqual(0, padded.code, padded.error);
     Assert.areEqual("2\n", padded.output);
+  }
+
+  @TestMethod
+  @TestData("status", "The --timeout option does not apply to status.")
+  @TestData("commands", "The --timeout option does not apply to commands.")
+  @TestData("open", "The --timeout option does not apply to open.")
+  @TestData("run", "The run command needs the name of a command to run.")
+  public async readsEachCommandWordAsItsCommand(word: string, message: string): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+
+    const result = await fixture.runAsync([word, "--timeout", "5"]);
+
+    Assert.areEqual(2, result.code, result.error);
+    Assert.isTrue(result.error.startsWith(`${message}\n\nUsage: `), result.error);
   }
 
   @TestMethod
