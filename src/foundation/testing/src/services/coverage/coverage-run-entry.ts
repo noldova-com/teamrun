@@ -18,7 +18,7 @@ import { CoverageProject } from "../../models/coverage/coverage-project.js";
 import type { CoverageResult } from "../../models/coverage/coverage-result.js";
 import { Resources } from "../../resources.js";
 import { CoverageReportWriter } from "../reporting/coverage-report-writer.js";
-import { GitHubSummaryWriter } from "../reporting/git-hub-summary-writer.js";
+import { GitHubSummaryWriter } from "../reporting/github-summary-writer.js";
 import { CoverageAnalyzer } from "./coverage-analyzer.js";
 
 export class CoverageRunEntry {

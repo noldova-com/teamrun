@@ -12,6 +12,7 @@ import path from "node:path";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 test.use({ desktopVariant: BuildVariantFixture.noModules });
 
@@ -86,5 +87,24 @@ test.describe("the workflows' checkpoints", () => {
 
     expect(workflows.filter(([, text]) => !/checkpointAsync\(|captureMainWindowAsync\(/.test(text)).map(([file]) => file)).toEqual([]);
     expect(names.filter((t, index) => names.indexOf(t) !== index)).toEqual([]);
+  });
+
+  test("a checkpoint records the appearance settings in effect, the mode the page shows, the zoom, the CSS viewport and the pixel ratio", async ({ desktop }, testInfo) => {
+    const window = desktop.window;
+    const settings = { theme: "shell.default", mode: "Dark", interfaceFont: "Noldova", codeFont: "Noldova", panelSize: 17, messageSize: 14, codeSize: 14 };
+    await WindowModeFixture.setAsync(window, "Dark");
+    await window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
+      .request("shell.setSetting", { name: "shell.panelSize", value: 17 }));
+    await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).fontSize)).not.toBe("16px");
+
+    await desktop.checkpointAsync("harness-checkpoint-record");
+    await desktop.zoomAsync(2, 960);
+    const zoomed = await desktop.readAppearanceAsync();
+    await desktop.zoomAsync(1, 1920);
+
+    expect(testInfo.annotations.filter(t => t.type === "checkpoint").map(t => JSON.parse(t.description ?? ""))).toEqual([
+      { name: "harness-checkpoint-record", settings, colorScheme: "dark", zoom: 1, viewport: { width: 1920, height: 1080 }, pixelRatio: 1 }
+    ]);
+    expect(zoomed).toEqual({ settings, colorScheme: "dark", zoom: 2, viewport: { width: 960, height: 540 }, pixelRatio: 2 });
   });
 });

@@ -9,7 +9,7 @@
 import type { QualifiedName } from "@noldova/teamrun-shell-protocol";
 
 import { RegistrationException } from "../../exceptions/registration.exception.js";
-import type { IMethodHandler } from "../../interfaces/method-handler.js";
+import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
 import { Registration } from "../../models/registration.js";
 import { Resources } from "../../resources.js";
 

@@ -9,7 +9,7 @@
 import type { Writable } from "node:stream";
 
 import type CheckSelection from "../check-selection.ts";
-import type ICheck from "./check.ts";
+import type ICheck from "./i-check.ts";
 
 export default interface ISelectableCheck extends ICheck {
   runSelectedAsync(filters: readonly string[], output: Writable): Promise<CheckSelection>;

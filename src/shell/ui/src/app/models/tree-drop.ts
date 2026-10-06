@@ -8,7 +8,7 @@
 
 import { TreeDropPlace } from "../enums/tree-drop-place";
 import type { TreeMove } from "./tree-move";
-import type { TreeNode } from "./tree-node";
+import type { TreeNode } from "./tree.node";
 
 export class TreeDrop {
   public readonly target: TreeNode;

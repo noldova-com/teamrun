@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type IRunnerSkip from "../totals/interfaces/runner-skip.ts";
+import type IRunnerSkip from "../totals/interfaces/i-runner-skip.ts";
 import JsonFields from "../totals/json-fields.ts";
 import RunnerResult from "../totals/runner-result.ts";
 import TestNames from "../totals/test-names.ts";

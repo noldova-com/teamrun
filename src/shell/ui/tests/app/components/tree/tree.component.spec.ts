@@ -13,7 +13,7 @@ import { userEvent } from "vitest/browser";
 
 import { TreeComponent } from "../../../../src/app/components/tree/tree.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { TreeNode } from "../../../../src/app/models/tree-node";
+import { TreeNode } from "../../../../src/app/models/tree.node";
 import { DefaultTheme } from "../../../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import { MotionFixture } from "../../../fixtures/motion.fixture";

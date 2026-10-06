@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type IBuildTargetOptions from "./interfaces/build-target-options.ts";
+import type IBuildTargetOptions from "./interfaces/i-build-target-options.ts";
 import UiShard from "./ui-shard.ts";
 
 export default class BuildTarget {

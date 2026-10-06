@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IFolderProtector } from "../../interfaces/folder-protector.js";
+import type { IFolderProtector } from "../../interfaces/i-folder-protector.js";
 import { Resources } from "../../resources.js";
 import type { SystemCommand } from "../commands/system-command.js";
 import { PosixFolderProtector } from "./posix-folder-protector.js";
