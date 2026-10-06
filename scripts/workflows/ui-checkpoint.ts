@@ -7,7 +7,7 @@
  */
 
 import JsonFields from "../totals/json-fields.ts";
-import type IUiCheckpointSettings from "./interfaces/ui-checkpoint-settings.ts";
+import type IUiCheckpointSettings from "./interfaces/i-ui-checkpoint-settings.ts";
 
 export default class UiCheckpoint {
   private static readonly ANNOTATION: string = "checkpoint";
