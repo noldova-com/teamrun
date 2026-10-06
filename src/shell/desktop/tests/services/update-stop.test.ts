@@ -30,6 +30,7 @@ export class UpdateStopTests {
   private readonly waits: number[] = [];
   private answer: boolean = true;
   private rereads: boolean = false;
+  private isWaitedOut: boolean = false;
   private onAsk?: () => void;
   private time: number = 0;
   private onConnect?: (dataDirectory: string) => Promise<void>;
@@ -146,7 +147,7 @@ export class UpdateStopTests {
   }
 
   @TestMethod
-  public stopsWorkThatStartedWhileThePersonWaitedOnceTheirListShowedIt(): Promise<void> {
+  public stopsTheWorkShownWhenThePersonChoseStopIncludingWorkThatStartedWhileTheyWaited(): Promise<void> {
     return this.runAsync(async (installation, folder) => {
       const first = await this.recordAsync(installation, folder, "first");
       this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
@@ -161,6 +162,21 @@ export class UpdateStopTests {
       Assert.areEqual(JSON.stringify([`A reply (${first})`, `A command (${first})`]), JSON.stringify(this.asked[1]));
       Assert.areEqual("shell.work|shell.work|shell.update|shell.work|shell.stop", this.connection(first).calls.join("|"));
       Assert.areEqual(JSON.stringify({ policy: "StopWork" }), JSON.stringify(this.connection(first).payloads[4]));
+    });
+  }
+
+  @TestMethod
+  public failsWhenWorkStartsAgainAfterThePersonWaitedForItToFinish(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      const first = await this.recordAsync(installation, folder, "first");
+      this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
+      this.isWaitedOut = true;
+
+      const failure = await this.failAsync(installation);
+
+      Assert.areEqual(`Work started while TeamRun prepared to update: A reply (${first})`, failure.message);
+      Assert.areEqual("shell.work|shell.update|shell.work", this.connection(first).calls.join("|"));
+      Assert.isFalse(existsSync(installation.barrierFile));
     });
   }
 
@@ -376,9 +392,12 @@ export class UpdateStopTests {
       async (t, read) => {
         this.asked.push(t);
         this.onAsk?.();
+        const shown = this.rereads ? await read() : t;
         if (this.rereads)
-          this.asked.push(await read());
-        return this.answer;
+          this.asked.push(shown);
+        if (!this.answer)
+          return null;
+        return this.isWaitedOut ? [] : shown;
       },
       UpdateStopTests.SELF,
       "0.2.0",

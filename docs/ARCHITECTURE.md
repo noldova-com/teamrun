@@ -1080,7 +1080,7 @@ The update stop of the desktop where the person chose Restart to update coordina
    The runtime waits at most 6 seconds for every client, then answers `shell.update` with the outcome and the process id and start time of every client, every program it holds and its AppImage copy's mount; a client that does not answer fails the update.
    The handshake carries no process id, because every build must accept the handshake protocol version 1 defines (section 6).
 4. **Stop.**
-   It reads `shell.work` from each runtime again, and work that step 1's question never showed fails the update.
+   It reads `shell.work` from each runtime again, and work the person did not agree to stop fails the update: what step 1's question listed when they chose to stop the work, and nothing when they waited until none was left.
    It asks each runtime `shell.stop`: with the policy "stop the work" when it still has work the person agreed to stop, otherwise "only if idle".
    The runtime deactivates its parts, ends their programs, flushes and closes its databases, releases ownership and exits.
 5. **Verify.**

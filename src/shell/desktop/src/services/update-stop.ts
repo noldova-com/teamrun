@@ -19,7 +19,7 @@ export class UpdateStop {
   private readonly installation: Installation;
   private readonly presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">;
   private readonly connectAsync: (dataDirectory: string) => Promise<IUpdateTarget | null>;
-  private readonly askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<boolean>;
+  private readonly askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<readonly string[] | null>;
   private readonly processId: number;
   private readonly productVersion: string;
   private readonly now: () => number;
@@ -29,7 +29,7 @@ export class UpdateStop {
     installation: Installation,
     presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
     connectAsync: (dataDirectory: string) => Promise<IUpdateTarget | null>,
-    askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<boolean>,
+    askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<readonly string[] | null>,
     processId: number,
     productVersion: string,
     now: () => number,
@@ -51,9 +51,10 @@ export class UpdateStop {
     try {
       targets.push(...await this.connectAllAsync(await this.installation.listDataDirectoriesAsync()));
       const work = await this.readWorkAsync(targets);
-      const agreed = new Set(work);
-      if (work.length > 0 && !await this.askAsync(work, () => this.rereadWorkAsync(targets, agreed)))
+      const answer = work.length > 0 ? await this.askAsync(work, () => this.rereadWorkAsync(targets)) : [];
+      if (Object.isNull(answer))
         return false;
+      const agreed = new Set(answer);
       const holder = await this.stampSelfAsync();
       isHeld = await this.installation.holdAsync(new UpdateBarrier(holder, version, UpdateBarrierState.Preparing, null), this.productVersion);
       if (!isHeld)
@@ -95,7 +96,7 @@ export class UpdateStop {
     return (await Promise.all(targets.map(t => this.readTargetWorkAsync(t)))).flat();
   }
 
-  private async rereadWorkAsync(targets: IUpdateTarget[], seen: Set<string>): Promise<readonly string[]> {
+  private async rereadWorkAsync(targets: IUpdateTarget[]): Promise<readonly string[]> {
     const work = await Promise.all(targets.map(t => this.readTargetWorkAsync(t).catch((error: unknown) => {
       if (error instanceof ConnectionException)
         return null;
@@ -105,10 +106,7 @@ export class UpdateStop {
       target.connection.close();
       targets.splice(targets.indexOf(target), 1);
     }
-    const current = work.filter(t => !Object.isNull(t)).flat();
-    for (const description of current)
-      seen.add(description);
-    return current;
+    return work.filter(t => !Object.isNull(t)).flat();
   }
 
   private async readTargetWorkAsync(target: IUpdateTarget): Promise<readonly string[]> {

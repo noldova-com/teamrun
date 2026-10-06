@@ -18,7 +18,7 @@ export class UpdateWorkQuestion {
   private readonly interval: number;
   private readonly wait: (milliseconds: number, signal: AbortSignal) => Promise<void>;
   private readonly finished: AbortController = new AbortController();
-  private readonly outcome: PromiseWithResolvers<boolean> = Promise.withResolvers<boolean>();
+  private readonly outcome: PromiseWithResolvers<readonly string[] | null> = Promise.withResolvers<readonly string[] | null>();
   private work: readonly string[] = [];
   private isWaiting: boolean = false;
 
@@ -33,7 +33,7 @@ export class UpdateWorkQuestion {
     return this.finished.signal.aborted;
   }
 
-  public askAsync(work: readonly string[]): Promise<boolean> {
+  public askAsync(work: readonly string[]): Promise<readonly string[] | null> {
     this.work = work;
     this.present();
     return this.outcome.promise;
@@ -48,9 +48,9 @@ export class UpdateWorkQuestion {
       void this.waitAsync();
     }
     else if (choice === QuitChoice.Stop)
-      this.finish(true);
+      this.finish(this.work);
     else if (choice === QuitChoice.Cancel)
-      this.finish(false);
+      this.finish(null);
     else
       return false;
     return true;
@@ -67,7 +67,7 @@ export class UpdateWorkQuestion {
         return;
       }
       if (this.work.length === 0)
-        this.finish(true);
+        this.finish([]);
       else
         this.present();
     }
@@ -75,10 +75,10 @@ export class UpdateWorkQuestion {
 
   private present(): void {
     if (!this.isFinished && !this.prompt.show(new QuitQuestion(this.work, this.isWaiting, true)))
-      this.finish(false);
+      this.finish(null);
   }
 
-  private finish(outcome: boolean): void {
+  private finish(outcome: readonly string[] | null): void {
     if (this.end())
       this.outcome.resolve(outcome);
   }

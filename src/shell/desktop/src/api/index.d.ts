@@ -290,8 +290,8 @@ export declare class UpdateStop {
    * @param connectAsync Connects to the runtime of a recorded data directory as the client `update`, without starting
    * one; resolves `null` when the directory is not in use by this installation.
    * @param askAsync Asks the person about the work in progress, listed by data directory, and can read it again to
-   * keep the list current while the person waits for it; resolves `true` to go on, stopping any work left, `false` to
-   * cancel the update.
+   * keep the list current while the person waits for it; resolves the work the person agreed to stop, the list shown
+   * when they chose Stop or empty when they waited until none was left, or `null` to cancel the update.
    * @param processId The coordinating desktop's process id.
    * @param productVersion The coordinating desktop's product version.
    * @param now Reads the current time, in milliseconds.
@@ -305,7 +305,7 @@ export declare class UpdateStop {
    *
    * export function create(installation: Installation): UpdateStop {
    *   return new UpdateStop(
-   *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(false),
+   *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(null),
    *     process.pid, "0.2.0", Date.now, t => delay(t));
    * }
    * ```
@@ -314,7 +314,7 @@ export declare class UpdateStop {
     installation: Installation,
     presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
     connectAsync: (dataDirectory: string) => Promise<IUpdateTarget | null>,
-    askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<boolean>,
+    askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<readonly string[] | null>,
     processId: number,
     productVersion: string,
     now: () => number,
@@ -322,9 +322,9 @@ export declare class UpdateStop {
 
   /**
    * Stops the installation for an update and calls the handoff. It holds the launch barrier as `Preparing`, asks each
-   * runtime `shell.update`, then reads each runtime's work again: work the person was not shown fails the update,
-   * and `shell.stop` stops the work of a runtime that still has the work they agreed to stop and otherwise stops only
-   * if idle. It waits up to 10 seconds for every runtime and every process they listed except the desktops to exit,
+   * runtime `shell.update`, then reads each runtime's work again: work the person did not agree to stop fails the
+   * update, and `shell.stop` stops the work of a runtime that still has the work they agreed to stop and otherwise
+   * stops only if idle. It waits up to 10 seconds for every runtime and every process they listed except the desktops to exit,
    * sets the barrier to `Closing`, waits up to 10 more seconds for the other desktops, those the runtimes listed and
    * those recorded in the installation that still run, then sets it to `HandedOff`. Every connection closes when it
    * ends. When the handoff names the process that took over, the barrier records it, so the barrier holds while that
@@ -3239,18 +3239,19 @@ export declare class UpdateWorkQuestion {
    * Shows the question and settles with the person's choice. It asks once; withdraws the question when it settles.
    *
    * @param work The work in progress, each named with its data directory.
-   * @returns A promise of `true` to go on with the update, `false` to cancel it.
+   * @returns A promise of the work the person agreed to stop: the list shown when they chose Stop, or empty when they
+   * waited until none was left, which agrees to nothing; `null` when they cancelled.
    * @throws Error Rejected with the error of a reading that fails while the person waits.
    * @example
    * ```ts
    * import type { UpdateWorkQuestion } from "@noldova/teamrun-shell-desktop";
    *
-   * export function askAsync(question: UpdateWorkQuestion): Promise<boolean> {
+   * export function askAsync(question: UpdateWorkQuestion): Promise<readonly string[] | null> {
    *   return question.askAsync(["Indexing the project (/work/data)"]);
    * }
    * ```
    */
-  public askAsync(work: readonly string[]): Promise<boolean>;
+  public askAsync(work: readonly string[]): Promise<readonly string[] | null>;
 
   /**
    * Takes the person's choice from the window that asks.

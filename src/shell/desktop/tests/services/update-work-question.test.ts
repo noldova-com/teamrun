@@ -30,7 +30,7 @@ export class UpdateWorkQuestionTests {
     const asked = question.askAsync(["A reply (/data/one)"]);
     const answers = [question.answer(stranger, QuitChoice.Stop), question.answer(this.prompt, "Later"), question.answer(this.prompt, QuitChoice.Stop), question.answer(this.prompt, QuitChoice.Cancel)];
 
-    Assert.isTrue(await asked);
+    Assert.areEqual(JSON.stringify(["A reply (/data/one)"]), JSON.stringify(await asked));
     Assert.areEqual(JSON.stringify([false, false, true, false]), JSON.stringify(answers));
     Assert.areEqual(JSON.stringify(["A reply (/data/one) update", "none"]), JSON.stringify(this.prompt.shown));
   }
@@ -44,8 +44,8 @@ export class UpdateWorkQuestionTests {
 
     const unasked = await this.create().askAsync(["A reply (/data/one)"]);
 
-    Assert.isFalse(await asked);
-    Assert.isFalse(unasked);
+    Assert.isNull(await asked);
+    Assert.isNull(unasked);
     Assert.areEqual(JSON.stringify(["A reply (/data/one) update", "none", "A reply (/data/one) update", "none"]), JSON.stringify(this.prompt.shown));
   }
 
@@ -60,7 +60,7 @@ export class UpdateWorkQuestionTests {
     await this.tickAsync();
     await this.tickAsync();
 
-    Assert.isTrue(await asked);
+    Assert.areEqual(0, (await asked)?.length);
     Assert.isTrue(waits);
     Assert.isFalse(waitsAgain);
     Assert.areEqual(JSON.stringify([
@@ -78,9 +78,23 @@ export class UpdateWorkQuestionTests {
     question.answer(this.prompt, QuitChoice.Cancel);
     await setImmediate();
 
-    Assert.isFalse(await asked);
+    Assert.isNull(await asked);
     Assert.areEqual(0, this.clock.pending);
     Assert.areEqual(0, this.reads.length);
+  }
+
+  @TestMethod
+  public async agreesToStopTheListShownWhenThePersonStopsWhileWaiting(): Promise<void> {
+    const question = this.create();
+    this.reads.push(["A reply (/data/one)", "A command (/data/two)"]);
+    const asked = question.askAsync(["A reply (/data/one)"]);
+    question.answer(this.prompt, QuitChoice.Wait);
+    await this.tickAsync();
+
+    question.answer(this.prompt, QuitChoice.Stop);
+
+    Assert.areEqual(JSON.stringify(["A reply (/data/one)", "A command (/data/two)"]), JSON.stringify(await asked));
+    Assert.areEqual(0, this.clock.pending);
   }
 
   @TestMethod
@@ -95,7 +109,7 @@ export class UpdateWorkQuestionTests {
     read.resolve(["A reply (/data/one)"]);
     await setImmediate();
 
-    Assert.isFalse(await asked);
+    Assert.isNull(await asked);
     Assert.areEqual(JSON.stringify(["A reply (/data/one) update", "A reply (/data/one) waiting update", "none"]), JSON.stringify(this.prompt.shown));
     Assert.areEqual(0, this.clock.pending);
   }
