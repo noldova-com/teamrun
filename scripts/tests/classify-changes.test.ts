@@ -114,7 +114,7 @@ class ClassifyChangesTests {
       assert.deepEqual(Object.keys(plan), ["linux-x64", "linux-arm64", "windows-x64", "macos-arm64"]);
       const linux = { target: "Linux x64", runner: "ubuntu-24.04", architecture: "x64" };
       assert.deepEqual(plan["windows-x64"], { build: [], shards: [{ ...windows, shard: 1, shards: 1, grep: "@smoke", prebuilt: false }] });
-      assert.deepEqual(plan["linux-x64"], { build: [linux], shards: [1, 2].map(t => ({ ...linux, shard: t, shards: 2, grep: "", prebuilt: true })) });
+      assert.deepEqual(plan["linux-x64"], { build: [linux], shards: [1, 2, 3, 4, 5].map(t => ({ ...linux, shard: t, shards: 5, grep: "", prebuilt: true })) });
       assert.equal(refused.status, 1);
     });
   }
