@@ -22,6 +22,7 @@ import {
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import { PathCommandException } from "../exceptions/path-command.exception.js";
+import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 import type { IContextMenuParams } from "../interfaces/i-context-menu-params.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
@@ -508,7 +509,10 @@ export class DesktopApplication {
     if (kind === StartupStateKind.Connecting)
       return;
     if (kind === StartupStateKind.Ready && this.restored.has(open))
-      await open.bounds.saveUnsavedAsync().catch((error: unknown) => this.log.write(Resources.formatBoundsUnsaved(String(error))));
+      await open.bounds.saveUnsavedAsync().catch((error: unknown) => {
+        if (!(error instanceof WindowStateUnavailableException))
+          this.log.write(Resources.formatBoundsUnsaved(String(error)));
+      });
     else if (kind === StartupStateKind.Ready) {
       this.restored.add(open);
       const device = await this.device;
