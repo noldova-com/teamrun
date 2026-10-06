@@ -60,12 +60,14 @@ class SourceScannerTests {
       ]);
     });
 
-    test("comments are skipped and their lines counted", () => {
+    test("comments are skipped, their lines counted, and the line each starts on kept", () => {
       const source = new SourceScanner("// \"line\"\n/* \"block\"\n*/ \"kept\"\n/* open \"block\"").scan();
       const ending = new SourceScanner("\"first\" // trailing").scan();
 
       assert.deepEqual(SourceScannerTests.format(source.texts), ["3:kept"]);
       assert.deepEqual(SourceScannerTests.format(ending.texts), ["1:first"]);
+      assert.deepEqual(source.comments, [1, 2, 4]);
+      assert.deepEqual(ending.comments, [1]);
     });
 
     test("regular expressions are skipped where an operand may start and slashes elsewhere divide", () => {
