@@ -11,7 +11,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Failure, FailureCode, NotificationPost, NotificationReference } from "@noldova/teamrun-shell-protocol";
 
 import { MethodFailureException } from "../../exceptions/method-failure.exception.js";
-import type { IMethodHandler } from "../../interfaces/method-handler.js";
+import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
 import type { NotificationCenter } from "./notification-center.js";
 import type { NotificationPolicy } from "./notification-policy.js";

@@ -7,7 +7,7 @@
  */
 
 import type MarkedModule from "../marked-module.ts";
-import type IVitestPluginContext from "./vitest-plugin-context.ts";
+import type IVitestPluginContext from "./i-vitest-plugin-context.ts";
 
 export default interface IVitestPlugin {
   readonly name: string;

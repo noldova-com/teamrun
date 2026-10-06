@@ -12,7 +12,7 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 
-import type { IModuleDatabase } from "../../interfaces/module-database.js";
+import type { IModuleDatabase } from "../../interfaces/i-module-database.js";
 import type { Migration } from "../../models/migration.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";

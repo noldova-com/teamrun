@@ -9,7 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 
 import { SystemCommandException } from "../../exceptions/system-command.exception.js";
-import type { IProcessTableReader } from "../../interfaces/process-table-reader.js";
+import type { IProcessTableReader } from "../../interfaces/i-process-table.reader.js";
 import { ProcessTable } from "../../models/process-table.js";
 import { ProcessTableEntry } from "../../models/process-table-entry.js";
 import { Resources } from "../../resources.js";

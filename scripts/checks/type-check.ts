@@ -8,7 +8,7 @@
 
 import type ProcessRunner from "../processes/process-runner.ts";
 import TypeScriptCompiler from "../toolchain/typescript-compiler.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class TypeCheck implements ICheck {
   private static readonly PROJECT_ARGUMENTS: readonly string[] = ["--project", "scripts/tsconfig.json"];

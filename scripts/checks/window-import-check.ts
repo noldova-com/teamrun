@@ -12,7 +12,7 @@ import type { Writable } from "node:stream";
 import type SourceFile from "../structure/source-file.ts";
 import SourceScanner from "../structure/source-scanner.ts";
 import type SourceTree from "../structure/source-tree.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class WindowImportCheck implements ICheck {
   private static readonly PART_PATTERNS: readonly RegExp[] = [

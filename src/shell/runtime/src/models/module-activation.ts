@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IRuntimePart } from "../interfaces/runtime-part.js";
+import type { IRuntimePart } from "../interfaces/i-runtime-part.js";
 import type { ModuleDatabase } from "../services/database/module-database.js";
 import type { ModuleContext } from "../services/modules/module-context.js";
 import type { ProcessSupervisor } from "../services/process/process-supervisor.js";

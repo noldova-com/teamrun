@@ -8,7 +8,7 @@
 
 import type { Writable } from "node:stream";
 
-import type { IModuleLog } from "../../interfaces/module-log.js";
+import type { IModuleLog } from "../../interfaces/i-module-log.js";
 import { Resources } from "../../resources.js";
 import type { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
 import { LogText } from "../diagnostics/log-text.js";

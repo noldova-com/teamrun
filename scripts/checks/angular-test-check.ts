@@ -14,7 +14,7 @@ import TotalsException from "../totals/totals.exception.ts";
 import CheckSelection from "./check-selection.ts";
 import type FlakyRecord from "./flaky-record.ts";
 import FlakyTest from "./flaky-test.ts";
-import type ISelectableCheck from "./interfaces/selectable-check.ts";
+import type ISelectableCheck from "./interfaces/i-selectable-check.ts";
 
 export default class AngularTestCheck implements ISelectableCheck {
   public static readonly RUNNER: string = "angular";

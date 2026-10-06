@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type ICoverageCount from "../totals/interfaces/coverage-count.ts";
+import type ICoverageCount from "../totals/interfaces/i-coverage-count.ts";
 import type RunnerResult from "../totals/runner-result.ts";
 import type RetriedTest from "./retried-test.ts";
 

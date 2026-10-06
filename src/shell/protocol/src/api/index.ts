@@ -14,7 +14,7 @@ export { SettingLocality } from "../enums/setting-locality.js";
 export { StopPolicy } from "../enums/stop-policy.js";
 export { WireMessageKind } from "../enums/wire-message-kind.js";
 export { ProtocolException } from "../exceptions/protocol.exception.js";
-export type { IKeyStroke } from "../interfaces/key-stroke.js";
+export type { IKeyStroke } from "../interfaces/i-key-stroke.js";
 export { BuildIdentity } from "../models/build-identity.js";
 export { Cancel } from "../models/cancel.js";
 export { CommandInfo } from "../models/command-info.js";

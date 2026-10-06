@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 
-import ApiSymbolWalker from "../../api/api-symbol.walker.ts";
+import ApiSymbolWalker from "../../api/api-symbol-walker.ts";
 import ApiVisibility from "../../api/api-visibility.ts";
 import ApiException from "../../api/api.exception.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";

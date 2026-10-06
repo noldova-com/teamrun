@@ -12,7 +12,7 @@ import { GallerySize } from "../../enums/gallery-size";
 import { PanelSurface } from "../../enums/panel-surface";
 import { SashOrientation } from "../../enums/sash-orientation";
 import { TreeMove } from "../../models/tree-move";
-import { TreeNode } from "../../models/tree-node";
+import { TreeNode } from "../../models/tree.node";
 import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { PanelCardComponent } from "../panel-card/panel-card.component";
 import { SashComponent } from "../sash/sash.component";

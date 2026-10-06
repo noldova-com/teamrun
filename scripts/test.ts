@@ -22,8 +22,8 @@ import FlakyRecord from "./checks/flaky-record.ts";
 import type FlakyTest from "./checks/flaky-test.ts";
 import GitHubConfigurationCheck from "./checks/github-configuration-check.ts";
 import LicenseHeaderCheck from "./checks/license-header-check.ts";
-import type ICheck from "./checks/interfaces/check.ts";
-import type ISelectableCheck from "./checks/interfaces/selectable-check.ts";
+import type ICheck from "./checks/interfaces/i-check.ts";
+import type ISelectableCheck from "./checks/interfaces/i-selectable-check.ts";
 import ModuleFolderCheck from "./checks/module-folder-check.ts";
 import ModuleImportCheck from "./checks/module-import-check.ts";
 import NameUniquenessCheck from "./checks/name-uniqueness-check.ts";
@@ -212,6 +212,7 @@ export default class Test {
     const { default: ApiDocumentationCheck } = await import("./checks/api-documentation-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
     const { default: BucketNameCheck } = await import("./checks/bucket-name-check.ts");
+    const { default: ConceptFileCheck } = await import("./checks/concept-file-check.ts");
     const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
@@ -229,6 +230,7 @@ export default class Test {
       new FieldOrderCheck(this.root, files),
       new BucketNameCheck(files, syntax),
       new AngularFileCheck(files, syntax),
+      new ConceptFileCheck(this.root, files, syntax),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),

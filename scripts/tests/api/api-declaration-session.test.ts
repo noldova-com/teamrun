@@ -15,7 +15,7 @@ import ApiDeclarationSession from "../../api/api-declaration-session.ts";
 import ApiPackage from "../../api/api-package.ts";
 import ApiProject from "../../api/api-project.ts";
 import ApiServer from "../../api/api-server.ts";
-import ApiSymbolWalker from "../../api/api-symbol.walker.ts";
+import ApiSymbolWalker from "../../api/api-symbol-walker.ts";
 import ApiVisibility from "../../api/api-visibility.ts";
 import ApiException from "../../api/api.exception.ts";
 import ApiPackageFixture from "../fixtures/api-package.fixture.ts";
