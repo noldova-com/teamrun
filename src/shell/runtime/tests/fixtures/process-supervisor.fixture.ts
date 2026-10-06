@@ -13,6 +13,7 @@ import "@noldova/teamrun-foundation-core";
 import { Assert, Wait } from "@noldova/teamrun-foundation-testing";
 import { type OwnedProcess, ProcessClock, ProcessSettings, ProcessSupervisor, SystemCommand } from "@noldova/teamrun-shell-runtime";
 
+import { ProcessClockFixture } from "./process-clock.fixture.js";
 import { ProgramFixture } from "./program.fixture.js";
 import type { SettingsFixture } from "./settings.fixture.js";
 
@@ -24,7 +25,7 @@ export class ProcessSupervisorFixture {
   public static readonly SEEN: string = "SELECT started, seen FROM owned_processes";
   public static readonly HOUR: number = 3_600_000;
   public static readonly SYSTEM_ROOT: string = process.env["SystemRoot"] ?? "C:\\Windows";
-  public static readonly LINUX: ProcessClock = new ProcessClock("boot", true);
+  public static readonly LINUX: ProcessClock = new ProcessClockFixture(24 * ProcessSupervisorFixture.HOUR, "boot", true);
   public static readonly WINDOWS: ProcessClock = ProcessClock.create("win32");
 
   public static readStarted(settings: SettingsFixture): number {

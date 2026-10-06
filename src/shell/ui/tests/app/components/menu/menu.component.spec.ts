@@ -73,6 +73,30 @@ describe("MenuComponent", () => {
   });
 });
 
+describe("MenuComponent's held hover", () => {
+  afterEach(() => AppearanceFixture.reset());
+
+  it("holds an entry only from an element, and ends the hold on the first pointer move without an error", () => {
+    AppearanceFixture.apply();
+    const fixture = TestBed.createComponent(MenuHostComponent);
+    fixture.detectChanges();
+    const menu: HTMLElement = fixture.nativeElement.querySelector("tr-menu");
+    const errors: ErrorEvent[] = [];
+    const listen = (event: ErrorEvent): void => void errors.push(event);
+    window.addEventListener("error", listen);
+
+    menu.appendChild(document.createTextNode("text")).dispatchEvent(new MouseEvent("mouseenter"));
+    const held = menu.classList.contains("tr-menu-pointer-still");
+    document.dispatchEvent(new Event("pointermove"));
+    fixture.detectChanges();
+    window.removeEventListener("error", listen);
+
+    expect(held).toBe(true);
+    expect(menu.classList.contains("tr-menu-pointer-still")).toBe(false);
+    expect(errors).toEqual([]);
+  });
+});
+
 describe("MenuComponent's trailing column", () => {
   let fixture: ComponentFixture<ColumnHostComponent>;
 

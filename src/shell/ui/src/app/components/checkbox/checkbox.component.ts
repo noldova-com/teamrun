@@ -23,6 +23,7 @@ export class CheckboxComponent {
   public readonly checkedChange = output<boolean>();
 
   protected toggle(event: Event): void {
-    this.checkedChange.emit((event.target as HTMLInputElement).checked);
+    if (event.target instanceof HTMLInputElement)
+      this.checkedChange.emit(event.target.checked);
   }
 }

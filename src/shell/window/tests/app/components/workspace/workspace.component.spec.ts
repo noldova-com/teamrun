@@ -95,6 +95,22 @@ describe("WorkspaceComponent", () => {
     expect(document.activeElement).toBe(focused);
   });
 
+  it("remembers the focus only from an HTML element, so a focus that moves in an SVG element does not take its place", async () => {
+    const fixture = await renderAsync(ViewRegistry.createEmpty());
+    const workspace = (fixture.nativeElement as HTMLElement).querySelector("tr-workspace") as HTMLElement;
+    const focused = workspace.appendChild(document.createElement("button"));
+    focused.focus();
+    const graphic = workspace.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "svg"));
+
+    graphic.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    await settleAsync(fixture);
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await settleAsync(fixture);
+
+    expect(document.activeElement).toBe(focused);
+  });
+
   it("focuses the active tab of the group that held the focus when its place is gone once the parts load again", async () => {
     const registry = LayoutFixture.createRegistry();
     const fixture = await renderAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.plan));

@@ -455,7 +455,16 @@ A release still contains the shell and every module in its list, and an update r
 - Publish an immutable reviewed revision and matching version, with platform- and CPU-specific installers, integrity data and update metadata.
 - Build jobs do not receive publication authority. Only packaging jobs for a platform the release declares signed receive signing credentials, and publication rejects a package whose signing differs from that declaration.
 - The publisher consumes the exact artifact identified by the successful build, including when only publication is retried; it must not guess the artifact from the retry's attempt number.
-- Upload retries are bounded and verify any existing outcome. Incomplete uploads remain unpublished, and published tags and assets are not silently replaced.
+- Each upload gets at most three attempts, 10 seconds apart, and each attempt first verifies any existing outcome. Only a timeout, a failure without an HTTP status, a server error, 408 or 429 is retried. Incomplete uploads remain unpublished, and published tags and assets are not silently replaced.
+- A release carries, for each target, its packages, a checksum file `<package>.sha256` in `sha256sum`'s format, and its update information in electron-updater's format: the version; each package's name, SHA-512 in base64 and size; the package the updater downloads, again as `path` with its SHA-512; and the release date. After `npm run package`, `npm run release:assets` writes the checksums and the metadata beside the machine's packages, with the root manifest's version.
+- `npm run release:check` checks a requested release before anything is built: the version is the root manifest's, follows the versioning below and has no tag yet, and the revision is a full commit SHA that `main` contains.
+- `npm run release:publish` publishes every target's files from one folder:
+  - It first checks that the folder holds exactly a release's files and that every checksum and metadata file matches its packages, reading each file once.
+  - It creates a draft release for the revision and uploads each file.
+  - Once GitHub has every file and no other, each with the size and SHA-256 the check read, it creates the version's tag on the revision. A tag that already exists is kept only on the revision. Then it publishes the draft and checks the published files and the tag again.
+  - Run again, it continues the draft, or changes nothing when the published release's files and tag match. Two releases with the tag, a tag without a release or a draft for another revision fails with the reason.
+  - A run that fails after creating the tag leaves the tag on the revision beside the draft. Running `release:publish` again continues the draft, and `release:check` refuses a new request for that version.
+- The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder and the release notes from `RELEASE_FOLDER` and `RELEASE_NOTES`.
 - Releases use numbered versions such as `0.0.1` and `0.0.2`, without prerelease suffixes or build metadata, and matching `v`-prefixed tags. Each successful publication becomes the latest release.
 - Published application updates must use a version newer than the installed version.
 - Nightly builds, when introduced, remain downloadable pipeline artifacts; they do not create releases or enter the application update feed.
