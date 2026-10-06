@@ -8,6 +8,7 @@
 
 import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { page, userEvent } from "vitest/browser";
 
 import { CheckboxComponent } from "../../../../src/app/components/checkbox/checkbox.component";
@@ -60,6 +61,14 @@ describe("CheckboxComponent", () => {
     expect(getComputedStyle(mark("bare")).opacity).toBe("1");
     expect(mark("labelled").getAttribute("aria-hidden")).toBe("true");
     expect(getComputedStyle(fixture.nativeElement.querySelector("tr-checkbox.bare .tr-checkbox-text")).display).toBe("none");
+  });
+
+  it("reports a change only when it comes from its own box", () => {
+    render();
+
+    fixture.debugElement.query(By.css("tr-checkbox.labelled input")).triggerEventHandler("change", { target: document.createElement("div") });
+
+    expect(fixture.componentInstance.changes).toEqual([]);
   });
 
   it("shows the focus outline only on keyboard focus", async () => {

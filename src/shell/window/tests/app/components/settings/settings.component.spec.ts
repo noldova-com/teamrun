@@ -8,6 +8,7 @@
 
 import { Component, ErrorHandler, type Signal, type Type, type WritableSignal, computed, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { page, userEvent } from "vitest/browser";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -365,6 +366,16 @@ describe("SettingsComponent", () => {
     expect(shown.flat().map(t => t[1])).toEqual(shown.flat().map(t => t[0]));
     for (const inset of insets.flat())
       AppearanceFixture.expectLook(inset, DefaultTheme.theme, "settings-content-inset", "padding-left");
+  });
+
+  it("searches only for what its own field holds", async () => {
+    render();
+    await searchAsync("tick");
+
+    fixture.debugElement.query(By.css(".tr-settings-search-field")).triggerEventHandler("input", { target: document.createElement("div") });
+    fixture.detectChanges();
+
+    expect(texts(".tr-settings-result-title")).toEqual(["Keyboard shortcuts", "Clock"]);
   });
 
   it("shows the Gallery as the last page when the build has one, and leaves it out of a search", async () => {
