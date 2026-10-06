@@ -136,6 +136,27 @@ test.describe("settings", () => {
     await expect.poll(async () => Math.abs(await ScrollAreaFixture.scrollTopAsync(content) - drag.start - drag.distance)).toBeLessThan(drag.distance / 10);
   });
 
+  test("a page scrolled with the keyboard while the pointer rests elsewhere shows its thumb, then hides it about a second after the scroll", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator(".tr-settings-content");
+    await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
+    await content.locator(".tr-settings-group-title").first().click();
+    await ScrollAreaFixture.restPointerAsync(window, content);
+    const hidden = await ScrollAreaFixture.scrollbarImageAsync(window, content, "vertical");
+
+    const scrolled = Date.now();
+    await window.keyboard.press("PageDown");
+    await ScrollAreaFixture.expectThumbShownAsync(content, true);
+    const shown = await ScrollAreaFixture.scrollbarImageAsync(window, content, "vertical");
+    await desktop.checkpointAsync("settings-keyboard-scroll-thumb");
+    expect(shown).not.toEqual(hidden);
+    expect(await ScrollAreaFixture.scrollTopAsync(content)).toBeGreaterThan(0);
+    await ScrollAreaFixture.expectThumbShownAsync(content, false);
+
+    expect(Date.now() - scrolled).toBeGreaterThanOrEqual(1000);
+    expect(await content.evaluate(t => t.matches(":hover"))).toBe(false);
+  });
+
   test("on a wide panel Settings scrolls from its page list to the panel's edge, keeps its column's width and scrolls by the wheel past the column", async ({ desktop }) => {
     const window = desktop.window;
     const content = window.locator(".tr-settings-content");

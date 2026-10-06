@@ -12,6 +12,7 @@ export default class ScrollAreaFixture {
   private static readonly HIDDEN: string = "rgba(0, 0, 0, 0)";
   private static readonly HOVER_POSITION: Readonly<Record<"x" | "y", number>> = { x: 20, y: 10 };
   private static readonly DRAG_STEPS: number = 5;
+  private static readonly FRAME: number = 16;
 
   public static scrollbarSizesAsync(area: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
     return area.evaluate(t => {
@@ -26,11 +27,18 @@ export default class ScrollAreaFixture {
   }
 
   public static async revealThumbColorAsync(window: Page, area: Locator): Promise<void> {
-    await ScrollAreaFixture.restAsync(window, area);
+    await ScrollAreaFixture.restPointerAsync(window, area);
     await ScrollAreaFixture.hoverAsync(area);
   }
 
   public static async thumbChangesOnHoverAsync(window: Page, area: Locator, axis: "vertical" | "horizontal"): Promise<boolean> {
+    await ScrollAreaFixture.restPointerAsync(window, area);
+    const rest = await ScrollAreaFixture.scrollbarImageAsync(window, area, axis);
+    await ScrollAreaFixture.hoverAsync(area);
+    return !rest.equals(await ScrollAreaFixture.scrollbarImageAsync(window, area, axis));
+  }
+
+  public static async scrollbarImageAsync(window: Page, area: Locator, axis: "vertical" | "horizontal"): Promise<Buffer> {
     const clip = await area.evaluate((t, direction) => {
       const element = t as HTMLElement;
       const box = element.getBoundingClientRect();
@@ -40,10 +48,7 @@ export default class ScrollAreaFixture {
         ? { x: left + element.clientWidth, y: top, width: element.offsetWidth - element.clientWidth - element.clientLeft * 2, height: element.clientHeight }
         : { x: left, y: top + element.clientHeight, width: element.clientWidth, height: element.offsetHeight - element.clientHeight - element.clientTop * 2 };
     }, axis);
-    await ScrollAreaFixture.restAsync(window, area);
-    const rest = await window.screenshot({ clip });
-    await ScrollAreaFixture.hoverAsync(area);
-    return !rest.equals(await window.screenshot({ clip }));
+    return window.screenshot({ clip });
   }
 
   public static panelEdgeGapAsync(area: Locator): Promise<number> {
@@ -78,24 +83,32 @@ export default class ScrollAreaFixture {
     return { start: thumb.start, distance: distance * thumb.ratio };
   }
 
+  public static async restPointerAsync(window: Page, area: Locator): Promise<void> {
+    await window.mouse.move(1, 1);
+    await ScrollAreaFixture.expectThumbShownAsync(area, false);
+  }
+
+  public static async expectThumbShownAsync(area: Locator, isShown: boolean): Promise<void> {
+    const expected = isShown ? await ScrollAreaFixture.readShownColorAsync(area) : ScrollAreaFixture.HIDDEN;
+    await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area), { message: `the thumb's color, ${isShown ? "shown" : "hidden"}`, intervals: [ScrollAreaFixture.FRAME] }).toBe(expected);
+  }
+
   private static thumbColorAsync(area: Locator): Promise<string> {
     return area.evaluate(t => getComputedStyle(t).getPropertyValue("--tr-scroll-thumb"));
   }
 
-  private static async restAsync(window: Page, area: Locator): Promise<void> {
-    await window.mouse.move(1, 1);
-    await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area)).toBe(ScrollAreaFixture.HIDDEN);
-  }
-
-  private static async hoverAsync(area: Locator): Promise<void> {
-    const shown = await area.evaluate(t => {
+  private static readShownColorAsync(area: Locator): Promise<string> {
+    return area.evaluate(t => {
       const probe = (t.parentElement ?? document.body).appendChild(document.createElement("div"));
       probe.style.color = "var(--tr-scrollbar)";
       const color = getComputedStyle(probe).color;
       probe.remove();
       return color;
     });
+  }
+
+  private static async hoverAsync(area: Locator): Promise<void> {
     await area.hover({ position: ScrollAreaFixture.HOVER_POSITION });
-    await expect.poll(() => ScrollAreaFixture.thumbColorAsync(area)).toBe(shown);
+    await ScrollAreaFixture.expectThumbShownAsync(area, true);
   }
 }

@@ -469,6 +469,14 @@ export declare class AnchoredOverlay {
  * The one instance, in the root injector, paints them on the document's root
  * element as CSS custom properties, the `color-scheme`, shape attributes and
  * the root font size, and paints them again whenever they change.
+ *
+ * It also shows scroll area thumbs while they scroll. One passive listener on
+ * the document catches every scroll and marks the element that scrolled, or
+ * the root element when the document itself scrolls, with a
+ * `data-tr-scrolling` attribute. The mark shows that element's thumb and
+ * leaves it one second after the last scroll, when the thumb fades out, or
+ * hides at once when reduced motion is preferred, unless the pointer rests on
+ * the element. The listener and every mark go when the application ends.
  */
 export declare class AppearanceService {
   /**

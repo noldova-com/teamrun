@@ -269,6 +269,8 @@ export class Resources {
   public static readonly resizeEvent: string = "resize";
   public static readonly pointerLeaveEvent: "pointerleave" = "pointerleave";
   public static readonly scrollEvent: string = "scroll";
+  public static readonly scrollingAttribute: string = "data-tr-scrolling";
+  public static readonly scrollRevealDelay: number = 1000;
   public static readonly keyboardFocusOrigin: FocusOrigin = "keyboard";
   public static readonly mouseFocusOrigin: FocusOrigin = "mouse";
   public static readonly programFocusOrigin: FocusOrigin = "program";
