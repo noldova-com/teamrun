@@ -17,7 +17,7 @@ import { UpdateBarrierFixture } from "../../fixtures/update-barrier.fixture.js";
 @TestClass
 export class UpdateMethodTests {
   @TestMethod
-  public answersWithWhatEveryOtherClientSavedAndTheirProcessesAndRefusesNewWorkMeanwhile(): Promise<void> {
+  public answersWithWhatEveryOtherClientSavedAndTheirProcessesAndRefusesEachClientOnceItSaved(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
       await using folder = await TemporaryFolderFixture.createAsync();
       const installation = UpdateBarrierFixture.open(folder.path);
@@ -29,21 +29,39 @@ export class UpdateMethodTests {
       desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
       const updating = await UpdateBarrierFixture.readEventAsync(cli, ShellEvents.updating);
       const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
-      const refused = await RuntimeHostFixture.callAsync(cli, "cli:1", ShellMethods.modules, null);
-      const work = await RuntimeHostFixture.callAsync(cli, "cli:2", ShellMethods.work, null);
-      const saved = await RuntimeHostFixture.callAsync(cli, "cli:3", ShellMethods.updateSaved, new UpdateSaved(process.pid, ["The draft could not be saved."]).toJson());
+      const beforeSaving = await RuntimeHostFixture.callAsync(cli, "cli:1", ShellMethods.modules, null);
+      const saved = await RuntimeHostFixture.callAsync(cli, "cli:2", ShellMethods.updateSaved, new UpdateSaved(process.pid, ["The draft could not be saved."]).toJson());
+      const refused = await RuntimeHostFixture.callAsync(cli, "cli:3", ShellMethods.modules, null);
+      const work = await RuntimeHostFixture.callAsync(cli, "cli:4", ShellMethods.work, null);
       const [responses] = await RuntimeHostFixture.readMessagesAsync(desktop, 2);
       const ready = UpdateReady.fromJson(responses.get("desktop:1")?.payload);
-      const again = await RuntimeHostFixture.callAsync(desktop, "desktop:2", ShellMethods.update, new UpdateRequest(installation.folder).toJson());
+      const coordinating = await RuntimeHostFixture.callAsync(desktop, "desktop:2", ShellMethods.modules, null);
+      const again = await RuntimeHostFixture.callAsync(desktop, "desktop:3", ShellMethods.update, new UpdateRequest(installation.folder).toJson());
 
       Assert.areEqual("null", JSON.stringify(updating.payload));
       Assert.areEqual(`${FailureCode.Updating}|TeamRun is preparing to install an update.`, `${late.failure?.code}|${late.failure?.message}`);
+      Assert.isFalse(beforeSaving.hasFailed);
+      Assert.isFalse(saved.hasFailed);
       Assert.areEqual(FailureCode.Updating, refused.failure?.code);
       Assert.isFalse(work.hasFailed);
-      Assert.isFalse(saved.hasFailed);
+      Assert.isFalse(coordinating.hasFailed);
       Assert.areEqual("The draft could not be saved.", ready.problems.join("|"));
       Assert.areEqual(`${process.pid} cli`, ready.processes.map(t => `${t.processId} ${t.role}`).join("|"));
       Assert.areEqual(`${FailureCode.Updating}|TeamRun is preparing to install an update.`, `${again.failure?.code}|${again.failure?.message}`);
+    });
+  }
+
+  @TestMethod
+  public refusesAnInstallationFolderThatIsNotAnAbsolutePath(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      await fixture.startAsync(30_000);
+      const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+
+      const refused = await RuntimeHostFixture.callAsync(desktop, "desktop:1", ShellMethods.update, new UpdateRequest("installations/0123456789abcdef").toJson());
+      const modules = await RuntimeHostFixture.callAsync(desktop, "desktop:2", ShellMethods.modules, null);
+
+      Assert.areEqual(`${FailureCode.InvalidParams}|The installation's folder must be an absolute path.`, `${refused.failure?.code}|${refused.failure?.message}`);
+      Assert.isFalse(modules.hasFailed);
     });
   }
 }

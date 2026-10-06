@@ -72,6 +72,7 @@ import { SenderPolicy } from "./sender-policy.js";
 import { SpellChecker } from "./spell-checker.js";
 import { SpellingDictionaries } from "./spelling-dictionaries.js";
 import { SystemNotifier } from "./system-notifier.js";
+import { UpdateBarrierGate } from "./update-barrier-gate.js";
 import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
 
@@ -97,6 +98,7 @@ export class DesktopApplication {
   private readonly policy: SenderPolicy;
   private readonly factory: WindowFactory;
   private readonly startup: RuntimeStartup;
+  private readonly gate: UpdateBarrierGate;
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
   private readonly spelling: SpellChecker;
@@ -123,7 +125,8 @@ export class DesktopApplication {
     createAppearanceStore: (folder: string) => IAppearanceStore,
     createPathCommand: (executablePath: string) => PathCommand,
     icons: AppIcons,
-    spelling: SpellChecker) {
+    spelling: SpellChecker,
+    installation: Installation) {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
@@ -139,6 +142,7 @@ export class DesktopApplication {
     this.policy = new SenderPolicy(settings.windowUrl);
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
     this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
+    this.gate = new UpdateBarrierGate(installation, RuntimeBuild.identity.productVersion, electron.dialog, t => log.write(t));
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }));
     this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
     this.spelling = spelling;
@@ -176,7 +180,7 @@ export class DesktopApplication {
       process.platform);
     const presence = ProcessPresence.create(process.platform, new SystemCommand(), process.env);
     const installation = new Installation(
-      Installation.locate(DesktopApplication.locateDeviceFolder(process), AppImageSource.locateProgram(process.env, process.execPath)), t => presence.isRunningAsync(t));
+      Installation.locate(DesktopApplication.locateDeviceFolder(process), AppImageSource.locateProgram(process.env, process.execPath), process.platform), t => presence.isRunningAsync(t));
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
@@ -188,7 +192,7 @@ export class DesktopApplication {
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createAppearanceStore, createPathCommand, icons,
-      spelling);
+      spelling, installation);
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -207,6 +211,16 @@ export class DesktopApplication {
     app.on(Resources.windowAllClosedEvent, () => app.quit());
     app.on(Resources.willQuitEvent, () => this.startup.close());
     void app.whenReady().then(() => this.ready());
+  }
+
+  private async passBarrierAsync(pass: () => Promise<boolean>): Promise<boolean> {
+    try {
+      return await pass();
+    }
+    catch (error) {
+      this.log.write(Resources.formatBarrierUnsettled(String(error)));
+      return false;
+    }
   }
 
   private ready(): void {
@@ -249,7 +263,11 @@ export class DesktopApplication {
       if (this.windows.size === 0)
         this.open();
     });
-    void this.readAppearanceAsync().then(() => {
+    void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync()]).then(([isClear]) => {
+      if (!isClear) {
+        this.electron.app.exit(Resources.quitExitCode);
+        return;
+      }
       this.open();
       void this.startup.startAsync();
     });

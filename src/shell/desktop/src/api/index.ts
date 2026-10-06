@@ -80,6 +80,7 @@ export { SpellChecker } from "../services/spell-checker.js";
 export { SpellingDictionaries } from "../services/spelling-dictionaries.js";
 export { SystemNotifier } from "../services/system-notifier.js";
 export { TrayHostWatcher } from "../services/tray-host-watcher.js";
+export { UpdateBarrierGate } from "../services/update-barrier-gate.js";
 export { UtilityProcessStarter } from "../services/utility-process-starter.js";
 export { WindowBoundsKeeper } from "../services/window-bounds-keeper.js";
 export { WindowErrorLimit } from "../services/window-error-limit.js";

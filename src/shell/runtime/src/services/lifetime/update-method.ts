@@ -6,11 +6,16 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import path from "node:path";
+
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { UpdateRequest } from "@noldova/teamrun-shell-protocol";
+import { Failure, FailureCode, UpdateRequest } from "@noldova/teamrun-shell-protocol";
+
+import { MethodFailureException } from "../../exceptions/method-failure.exception.js";
 
 import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
+import { Resources } from "../../resources.js";
 import type { UpdatePreparation } from "./update-preparation.js";
 
 export class UpdateMethod implements IMethodHandler {
@@ -21,6 +26,9 @@ export class UpdateMethod implements IMethodHandler {
   }
 
   public async handleAsync(context: RequestContext): Promise<JsonValue> {
-    return (await this.preparation.prepareAsync(context.connection, UpdateRequest.fromJson(context.payload))).toJson();
+    const request = UpdateRequest.fromJson(context.payload);
+    if (!path.isAbsolute(request.installation))
+      throw new MethodFailureException(new Failure(FailureCode.InvalidParams, Resources.installationNotAbsolute));
+    return (await this.preparation.prepareAsync(context.connection, request)).toJson();
   }
 }

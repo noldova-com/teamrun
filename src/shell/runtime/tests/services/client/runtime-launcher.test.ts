@@ -18,6 +18,7 @@ import {
   AttachOptions,
   BuildMismatchException,
   ConnectionException,
+  type IProcessStarter,
   LaunchException,
   LaunchSettings,
   MethodFailureException,
@@ -104,6 +105,27 @@ export class RuntimeLauncherTests {
     Assert.areEqual(UpdateBarrierStatus.Held, exception.status);
     Assert.isFalse(existsSync(launch.dataDirectory.discoveryFile));
     Assert.isFalse(existsSync(installation.recordFolder));
+  }
+
+  @TestMethod
+  public async reportsAnUpdateWhenTheRuntimeItStartedExitsForABarrierThatAppearedMeanwhile(): Promise<void> {
+    await using launch = await RuntimeLaunchFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = UpdateBarrierFixture.open(folder.path);
+    const starter: IProcessStarter = {
+      startAsync: async (executable, launchArguments, environment, errorFile) => {
+        await UpdateBarrierFixture.holdAsync(installation);
+        return await launch.starter.startAsync(executable, launchArguments, environment, errorFile);
+      }
+    };
+
+    const exception = await Assert.throwsAsync(
+      () => new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, starter, installation).attachAsync("desktop", new ClientListenerFixture()),
+      UpdateInProgressException);
+
+    Assert.areEqual(UpdateBarrierStatus.Held, exception.status);
+    Assert.isFalse(existsSync(launch.dataDirectory.discoveryFile));
+    Assert.areEqual(1, (await readdir(installation.recordFolder)).length);
   }
 
   @TestMethod

@@ -490,6 +490,7 @@ export class Resources {
   public static readonly cancelled: string = "The request was cancelled.";
   public static readonly workInProgress: string = "Work is in progress; stopping now would interrupt it.";
   public static readonly updateNotPreparing: string = "The runtime is not preparing for an update.";
+  public static readonly installationNotAbsolute: string = "The installation's folder must be an absolute path.";
   public static readonly updateSaveWait: number = 6000;
   public static readonly updateBarrierInterval: number = 1000;
   public static readonly clientClosed: string = "The connection to the runtime is closed.";

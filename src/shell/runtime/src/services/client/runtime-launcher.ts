@@ -110,7 +110,7 @@ export class RuntimeLauncher {
         started = await this.startAsync();
       }
       else if (!started.isRunning && !OwnershipLock.isOwned(this.settings.dataDirectory))
-        throw await RuntimeLauncher.describeExitAsync(started);
+        throw await this.describeExitAsync(started);
       const timeout = this.readTimeout(deadline, limit);
       if (!Object.isNull(timeout)) {
         await RuntimeLauncher.forgetAsync(started);
@@ -134,9 +134,10 @@ export class RuntimeLauncher {
       await rm(started.startLog, { force: true });
   }
 
-  private static async describeExitAsync(started: StartedRuntime): Promise<LaunchException> {
+  private async describeExitAsync(started: StartedRuntime): Promise<LaunchException> {
     const text = await readFile(started.startLog, Resources.utf8Encoding);
     await rm(started.startLog, { force: true });
+    await this.requireNoUpdateAsync();
     const reason = new DiagnosticRedactor(homedir()).redact(text.slice(-Resources.startLogTailLength).trim());
     return new LaunchException(String.isNullOrWhitespace(reason) ? Resources.runtimeExitedWithoutReason : Resources.formatRuntimeExited(reason));
   }

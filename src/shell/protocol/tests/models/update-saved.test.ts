@@ -34,4 +34,14 @@ export class UpdateSavedTests {
     Assert.areEqual("$.problems.0", Assert.throws(() => UpdateSaved.fromJson({ processId: 1, problems: [2] }), JsonException).path);
     Assert.areEqual("$.client", Assert.throws(() => UpdateSaved.fromJson({ processId: 1, problems: [], client: "cli" }), JsonException).path);
   }
+
+  @TestMethod
+  public takesAtMostAHundredProblemsOfAtMostAThousandCharacters(): void {
+    const most = new UpdateSaved(1, Array.from({ length: 100 }, () => "x".repeat(1_000)));
+
+    Assert.areEqual(100, most.problems.length);
+    Assert.throws(() => new UpdateSaved(1, Array.from({ length: 101 }, () => "x")), ArgumentOutOfRangeException);
+    Assert.throws(() => new UpdateSaved(1, ["x".repeat(1_001)]), ArgumentOutOfRangeException);
+    Assert.areEqual("$.problems", Assert.throws(() => UpdateSaved.fromJson({ processId: 1, problems: Array.from({ length: 101 }, () => "x") }), JsonException).path);
+  }
 }

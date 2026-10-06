@@ -180,7 +180,7 @@ export class Cli {
       ? DeviceFolder.locate(context.platform, context.environment, context.homeFolder)
       : path.resolve(commandLine.deviceDirectory);
     const presence = ProcessPresence.create(context.platform, new SystemCommand(), context.environment);
-    const installation = new Installation(Installation.locate(deviceFolder, AppImageSource.locateProgram(context.environment, context.executablePath)), t => presence.isRunningAsync(t));
+    const installation = new Installation(Installation.locate(deviceFolder, AppImageSource.locateProgram(context.environment, context.executablePath), context.platform), t => presence.isRunningAsync(t));
     return new RuntimeLauncher(settings, context.identity, context.runtimeStarter, installation);
   }
 

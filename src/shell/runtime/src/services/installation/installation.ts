@@ -7,7 +7,8 @@
  */
 
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { realpathSync } from "node:fs";
+import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
@@ -32,8 +33,18 @@ export class Installation {
     this.isRunningAsync = isRunningAsync;
   }
 
-  public static locate(deviceFolder: string, programPath: string): string {
-    return path.join(deviceFolder, Resources.installationsFolderName, Installation.digest(path.resolve(programPath)));
+  public static locate(deviceFolder: string, programPath: string, platform: string): string {
+    const canonical = Installation.canonicalize(programPath);
+    return path.join(deviceFolder, Resources.installationsFolderName, Installation.digest(platform === Resources.windowsPlatform ? canonical.toLowerCase() : canonical));
+  }
+
+  private static canonicalize(file: string): string {
+    try {
+      return realpathSync.native(file);
+    }
+    catch {
+      return path.resolve(file);
+    }
   }
 
   private static digest(text: string): string {
@@ -49,6 +60,15 @@ export class Installation {
     await rename(temporary, file);
   }
 
+  public async releaseAsync(): Promise<void> {
+    await rm(this.barrierFile, { force: true });
+  }
+
+  public async readAsync(): Promise<UpdateBarrier | null> {
+    const text = await this.readBarrierAsync();
+    return Object.isNull(text) ? null : UpdateBarrier.fromJson(JSON.parse(text));
+  }
+
   public async checkAsync(version: string): Promise<UpdateBarrierStatus> {
     const text = await this.readBarrierAsync();
     if (Object.isNull(text))
@@ -60,14 +80,24 @@ export class Installation {
       return UpdateBarrierStatus.Held;
     if (barrier.state === UpdateBarrierState.HandedOff && barrier.version !== version)
       return UpdateBarrierStatus.Unfinished;
-    await rm(this.barrierFile, { force: true });
-    return UpdateBarrierStatus.None;
+    return await this.removeStaleAsync(text, version);
   }
 
-  public async isHeldAsync(): Promise<boolean> {
-    const text = await this.readBarrierAsync();
-    const barrier = Object.isNull(text) ? null : Installation.parse(text);
-    return !Object.isNull(barrier) && await this.isRunningAsync(barrier.holder);
+  public async isGoneAsync(): Promise<boolean> {
+    return Object.isNull(await this.readBarrierAsync());
+  }
+
+  private async removeStaleAsync(text: string, version: string): Promise<UpdateBarrierStatus> {
+    const claimed = path.join(this.folder, Resources.formatTemporaryName(Resources.barrierFileName, randomUUID()));
+    if (Object.isNull(await Installation.unlessMissingAsync(rename(this.barrierFile, claimed).then(() => claimed))))
+      return await this.checkAsync(version);
+    if (await readFile(claimed, Resources.utf8Encoding) !== text) {
+      await link(claimed, this.barrierFile);
+      await rm(claimed);
+      return await this.checkAsync(version);
+    }
+    await rm(claimed, { force: true });
+    return UpdateBarrierStatus.None;
   }
 
   private static parse(text: string): UpdateBarrier | null {
@@ -79,9 +109,13 @@ export class Installation {
     }
   }
 
-  private async readBarrierAsync(): Promise<string | null> {
+  private readBarrierAsync(): Promise<string | null> {
+    return Installation.unlessMissingAsync(readFile(this.barrierFile, Resources.utf8Encoding));
+  }
+
+  private static async unlessMissingAsync<T>(operation: Promise<T>): Promise<T | null> {
     try {
-      return await readFile(this.barrierFile, Resources.utf8Encoding);
+      return await operation;
     }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code === Resources.missingFileErrorCode)

@@ -51,13 +51,16 @@ export class UpdatePreparation implements Disposable {
   }
 
   public async prepareAsync(connection: number, request: UpdateRequest): Promise<UpdateReady> {
+    const failure = new Failure(FailureCode.Updating, Resources.formatUpdating(ProductInfo.current.name));
+    if (!Object.isNull(this.answers))
+      throw new MethodFailureException(failure);
     const answers = new Map<number, UpdateSaved>();
     const expected = this.server.clients.filter(t => t.connection !== connection);
     const settled = Promise.withResolvers<void>();
     this.answers = answers;
     this.expected = expected;
     this.answered = settled.resolve;
-    this.server.beginUpdate(new Failure(FailureCode.Updating, Resources.formatUpdating(ProductInfo.current.name)));
+    this.server.beginUpdate(failure);
     this.processes.pause();
     this.updating.publish(null);
     this.watchBarrier(new Installation(request.installation, t => this.presence.isRunningAsync(t)));
@@ -72,6 +75,7 @@ export class UpdatePreparation implements Disposable {
     if (Object.isNull(this.answers))
       throw new MethodFailureException(new Failure(FailureCode.Conflict, Resources.updateNotPreparing));
     this.answers.set(connection, saved);
+    this.server.refuseAfterSave(connection);
     this.settleIfAnswered(this.answers);
   }
 
@@ -97,12 +101,12 @@ export class UpdatePreparation implements Disposable {
 
   private watchBarrier(installation: Installation): void {
     this.watched = installation;
-    this.watch = setTimeout(() => void installation.isHeldAsync().catch(() => false).then(isHeld => {
+    this.watch = setTimeout(() => void installation.isGoneAsync().catch(() => false).then(isGone => {
       if (this.watched === installation) {
-        if (isHeld)
-          this.watchBarrier(installation);
-        else
+        if (isGone)
           this.end();
+        else
+          this.watchBarrier(installation);
       }
     }), this.barrierInterval);
     this.watch.unref();

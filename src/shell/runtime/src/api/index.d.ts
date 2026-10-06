@@ -2121,7 +2121,7 @@ export declare class Installation {
    * import { Installation, type ProcessPresence } from "@noldova/teamrun-shell-runtime";
    *
    * export function open(deviceFolder: string, presence: ProcessPresence): Installation {
-   *   return new Installation(Installation.locate(deviceFolder, process.execPath), t => presence.isRunningAsync(t));
+   *   return new Installation(Installation.locate(deviceFolder, process.execPath, process.platform), t => presence.isRunningAsync(t));
    * }
    * ```
    */
@@ -2130,19 +2130,22 @@ export declare class Installation {
   /**
    * Returns an installation's folder: `installations/<id>` in the device
    * folder, where the id is the first 16 hexadecimal digits of the SHA-256 of
-   * the program's resolved path.
+   * the program's canonical path: its real path with every link resolved,
+   * lower-cased on Windows, or its resolved path when the program cannot be
+   * found.
    *
    * @param deviceFolder The device folder.
    * @param programPath The program the installation runs, the AppImage file on Linux.
+   * @param platform The operating system, as `process.platform` names it.
    * @returns The folder's path.
    * @example
    * ```ts
    * import { Installation } from "@noldova/teamrun-shell-runtime";
    *
-   * export const folder: string = Installation.locate("/home/person/.local/state/noldova/teamrun", "/opt/TeamRun/teamrun");
+   * export const folder: string = Installation.locate("/home/person/.local/state/noldova/teamrun", "/opt/TeamRun/teamrun", "linux");
    * ```
    */
-  public static locate(deviceFolder: string, programPath: string): string;
+  public static locate(deviceFolder: string, programPath: string, platform: string): string;
 
   /**
    * Adds a data directory to the record, replacing its file atomically.
@@ -2165,7 +2168,9 @@ export declare class Installation {
    * A barrier whose holder no longer runs is removed when the update stopped
    * before the handoff, or when it was handed off for this version; one
    * handed off for another version, or one that cannot be read, is
-   * `Unfinished` and stays.
+   * `Unfinished` and stays. A stale barrier is first moved aside under a
+   * unique name and removed only when it is still the one judged stale; a
+   * barrier that replaced it meanwhile is put back and checked again.
    *
    * @param version The client's product version.
    * @returns A promise of the barrier's status.
@@ -2181,19 +2186,53 @@ export declare class Installation {
   public checkAsync(version: string): Promise<UpdateBarrierStatus>;
 
   /**
-   * Whether a readable launch barrier holds and its holder still runs.
+   * Whether the launch barrier is confirmed missing. A barrier that cannot be
+   * parsed, or whose holder no longer runs, is still there.
    *
-   * @returns A promise of whether the barrier holds.
+   * @returns A promise of whether there is no barrier.
+   * @throws Error When the barrier cannot be read for any reason but its absence.
    * @example
    * ```ts
    * import type { Installation } from "@noldova/teamrun-shell-runtime";
    *
-   * export function isUpdatingAsync(installation: Installation): Promise<boolean> {
-   *   return installation.isHeldAsync();
+   * export function hasEndedAsync(installation: Installation): Promise<boolean> {
+   *   return installation.isGoneAsync();
    * }
    * ```
    */
-  public isHeldAsync(): Promise<boolean>;
+  public isGoneAsync(): Promise<boolean>;
+
+  /**
+   * Removes the launch barrier, if there is one.
+   *
+   * @returns A promise that settles once the barrier is gone.
+   * @example
+   * ```ts
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function resumeAsync(installation: Installation): Promise<void> {
+   *   return installation.releaseAsync();
+   * }
+   * ```
+   */
+  public releaseAsync(): Promise<void>;
+
+  /**
+   * Reads the launch barrier.
+   *
+   * @returns A promise of the barrier, or null when there is none.
+   * @throws JsonException When the barrier's JSON has a missing or invalid field.
+   * @throws SyntaxError When the barrier is not JSON.
+   * @example
+   * ```ts
+   * import { type Installation, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function isClosingAsync(installation: Installation): Promise<boolean> {
+   *   return (await installation.readAsync())?.state === UpdateBarrierState.Closing;
+   * }
+   * ```
+   */
+  public readAsync(): Promise<UpdateBarrier | null>;
 }
 
 /**
@@ -4755,9 +4794,9 @@ export declare class RuntimeServer implements IEventSink {
   public admit(): void;
 
   /**
-   * Starts preparing for an update: every later handshake is answered with the failure and the connection ends, and an
-   * authenticated connection may call only `shell.updateSaved`, `shell.work` and `shell.stop`; any other request is
-   * answered with the failure.
+   * Starts preparing for an update: every later handshake is answered with the failure and the connection ends. A
+   * connection keeps its requests until {@link refuseAfterSave} names it; it may then call only `shell.updateSaved`,
+   * `shell.work` and `shell.stop`, and any other request is answered with the failure.
    *
    * @param failure The `Updating` failure.
    * @example
@@ -4773,7 +4812,23 @@ export declare class RuntimeServer implements IEventSink {
   public beginUpdate(failure: Failure): void;
 
   /**
-   * Stops preparing for an update, so handshakes and requests are handled as before.
+   * Refuses a connection's requests while the update is prepared, once that connection has saved for it, as
+   * {@link beginUpdate} describes.
+   *
+   * @param connection The connection that answered `shell.updateSaved`.
+   * @example
+   * ```ts
+   * import type { RequestContext, RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function saved(server: RuntimeServer, context: RequestContext): void {
+   *   server.refuseAfterSave(context.connection);
+   * }
+   * ```
+   */
+  public refuseAfterSave(connection: number): void;
+
+  /**
+   * Stops preparing for an update, so handshakes and every connection's requests are handled as before.
    * @example
    * ```ts
    * import type { RuntimeServer } from "@noldova/teamrun-shell-runtime";

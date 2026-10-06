@@ -17,6 +17,7 @@ import { Assert } from "@noldova/teamrun-foundation-testing";
 import type { Installation, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
+import { Condition } from "./condition.fixture.js";
 import { FakeAppearanceStore } from "./fake-appearance-store.fixture.js";
 import { FakeDesktopProcess } from "./fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "./fake-desktop-window.fixture.js";
@@ -59,9 +60,14 @@ export class DesktopStartFixture {
     process: FakeDesktopProcess = new FakeDesktopProcess(platform),
     appearance: FakeAppearanceStore = new FakeAppearanceStore()): Promise<FakeElectron> {
     DesktopStartFixture.start(electron, process, launcher, device, appearance);
-    await electron.app.becomeReadyAsync();
+    await DesktopStartFixture.openAsync(electron);
     await setImmediate();
     return electron;
+  }
+
+  public static async openAsync(electron: FakeElectron): Promise<void> {
+    await electron.app.becomeReadyAsync();
+    await Condition.waitAsync(() => electron.windows.length > 0);
   }
 
   public static async verifyMenuBarRefusedAsync(menuBar: string, reason: string): Promise<void> {

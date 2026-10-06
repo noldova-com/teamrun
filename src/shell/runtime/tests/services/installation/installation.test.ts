@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
@@ -23,13 +23,27 @@ export class InstallationTests {
   private static readonly GONE: UpdateProcess = new UpdateProcess(4121, 1500, 1501, "desktop");
 
   @TestMethod
-  public isNamedByItsProgramsResolvedPath(): void {
-    const folder = Installation.locate("device", path.join("opt", "TeamRun", "teamrun"));
+  public isNamedByItsProgramsResolvedPathIgnoringCaseOnWindows(): void {
+    const folder = Installation.locate("device", path.join("opt", "TeamRun", "teamrun"), "linux");
 
     Assert.areEqual(path.join("device", "installations"), path.dirname(folder));
     Assert.isTrue(/^[0-9a-f]{16}$/.test(path.basename(folder)), folder);
-    Assert.areEqual(folder, Installation.locate("device", path.join("opt", "other", "..", "TeamRun", "teamrun")));
-    Assert.areNotEqual(folder, Installation.locate("device", path.join("opt", "TeamRun", "other")));
+    Assert.areEqual(folder, Installation.locate("device", path.join("opt", "other", "..", "TeamRun", "teamrun"), "linux"));
+    Assert.areNotEqual(folder, Installation.locate("device", path.join("opt", "TeamRun", "other"), "linux"));
+    Assert.areNotEqual(folder, Installation.locate("device", path.join("opt", "teamrun", "TEAMRUN"), "linux"));
+    Assert.areEqual(Installation.locate("device", path.join("opt", "TeamRun", "teamrun"), "win32"), Installation.locate("device", path.join("opt", "teamrun", "TEAMRUN"), "win32"));
+  }
+
+  @TestMethod
+  public async isNamedByTheProgramALinkLeadsTo(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const real = path.join(folder.path, "real");
+    const linked = path.join(folder.path, "linked");
+    await mkdir(real);
+    await writeFile(path.join(real, "teamrun"), "");
+    await symlink(real, linked, "junction");
+
+    Assert.areEqual(Installation.locate("device", path.join(real, "teamrun"), process.platform), Installation.locate("device", path.join(linked, "teamrun"), process.platform));
   }
 
   @TestMethod
@@ -52,12 +66,29 @@ export class InstallationTests {
   }
 
   @TestMethod
+  public async readsAndReleasesItsBarrier(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = InstallationTests.open(folder.path);
+    const closing = new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Closing);
+    const missing = await installation.readAsync();
+
+    await InstallationTests.writeAsync(installation, closing);
+    const found = await installation.readAsync();
+    await installation.releaseAsync();
+    await installation.releaseAsync();
+
+    Assert.isNull(missing);
+    Assert.areEqual(JSON.stringify(closing.toJson()), JSON.stringify(found?.toJson()));
+    Assert.areEqual(0, (await readdir(installation.folder)).length);
+  }
+
+  @TestMethod
   public async findsNoBarrierWhenNoneWasWritten(): Promise<void> {
     await using folder = await TemporaryFolderFixture.createAsync();
     const installation = InstallationTests.open(folder.path);
 
     Assert.areEqual(UpdateBarrierStatus.None, await installation.checkAsync("0.2.0"));
-    Assert.isFalse(await installation.isHeldAsync());
+    Assert.isTrue(await installation.isGoneAsync());
   }
 
   @TestMethod
@@ -67,7 +98,7 @@ export class InstallationTests {
     await InstallationTests.writeAsync(installation, new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.HandedOff));
 
     Assert.areEqual(UpdateBarrierStatus.Held, await installation.checkAsync("0.2.0"));
-    Assert.isTrue(await installation.isHeldAsync());
+    Assert.isFalse(await installation.isGoneAsync());
     Assert.isTrue(existsSync(installation.barrierFile));
   }
 
@@ -84,11 +115,45 @@ export class InstallationTests {
     const results: string[] = [];
     for (const barrier of barriers) {
       await InstallationTests.writeAsync(installation, barrier);
-      const isHeld = await installation.isHeldAsync();
-      results.push(`${isHeld} ${await installation.checkAsync("0.2.0")} ${existsSync(installation.barrierFile)}`);
+      const isGone = await installation.isGoneAsync();
+      results.push(`${isGone} ${await installation.checkAsync("0.2.0")} ${await installation.isGoneAsync()}`);
     }
 
-    Assert.areEqual(["false None false", "false None false", "false None false"].join("|"), results.join("|"));
+    Assert.areEqual(["false None true", "false None true", "false None true"].join("|"), results.join("|"));
+    Assert.areEqual("", (await readdir(installation.folder)).join(","));
+  }
+
+  @TestMethod
+  public async keepsAFreshBarrierThatReplacedTheStaleOneWhileItsHolderWasChecked(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const barrierFile = path.join(folder.path, "installation", "barrier.json");
+    const fresh = JSON.stringify(new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.Preparing).toJson());
+    const installation = new Installation(path.join(folder.path, "installation"), async t => {
+      if (t.processId === InstallationTests.GONE.processId)
+        await writeFile(barrierFile, fresh);
+      return t.processId === InstallationTests.RUNNING.processId;
+    });
+    await InstallationTests.writeAsync(installation, new UpdateBarrier(InstallationTests.GONE, "0.3.0", UpdateBarrierState.Preparing));
+
+    const status = await installation.checkAsync("0.2.0");
+
+    Assert.areEqual(UpdateBarrierStatus.Held, status);
+    Assert.areEqual(fresh, await readFile(barrierFile, "utf8"));
+    Assert.areEqual("barrier.json", (await readdir(installation.folder)).join(","));
+  }
+
+  @TestMethod
+  public async findsNoBarrierWhenAnotherProcessRemovedTheStaleOneWhileItsHolderWasChecked(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const barrierFile = path.join(folder.path, "installation", "barrier.json");
+    const installation = new Installation(path.join(folder.path, "installation"), async () => {
+      await rm(barrierFile, { force: true });
+      return false;
+    });
+    await InstallationTests.writeAsync(installation, new UpdateBarrier(InstallationTests.GONE, "0.3.0", UpdateBarrierState.Closing));
+
+    Assert.areEqual(UpdateBarrierStatus.None, await installation.checkAsync("0.2.0"));
+    Assert.areEqual("", (await readdir(installation.folder)).join(","));
   }
 
   @TestMethod
@@ -97,9 +162,9 @@ export class InstallationTests {
     const installation = InstallationTests.open(folder.path);
 
     await InstallationTests.writeAsync(installation, new UpdateBarrier(InstallationTests.GONE, "0.3.0", UpdateBarrierState.HandedOff));
-    const handedOff = `${await installation.isHeldAsync()} ${await installation.checkAsync("0.2.0")}`;
+    const handedOff = `${await installation.isGoneAsync()} ${await installation.checkAsync("0.2.0")}`;
     await writeFile(installation.barrierFile, "{\"holder\":");
-    const unreadable = `${await installation.isHeldAsync()} ${await installation.checkAsync("0.2.0")}`;
+    const unreadable = `${await installation.isGoneAsync()} ${await installation.checkAsync("0.2.0")}`;
 
     Assert.areEqual("false Unfinished", handedOff);
     Assert.areEqual("false Unfinished", unreadable);
@@ -113,8 +178,10 @@ export class InstallationTests {
     await mkdir(installation.barrierFile, { recursive: true });
 
     const error = await Assert.throwsAsync(() => installation.checkAsync("0.2.0"), Error) as NodeJS.ErrnoException;
+    const watched = await Assert.throwsAsync(() => installation.isGoneAsync(), Error) as NodeJS.ErrnoException;
 
     Assert.areEqual("EISDIR", error.code);
+    Assert.areEqual("EISDIR", watched.code);
   }
 
   private static open(folder: string): Installation {

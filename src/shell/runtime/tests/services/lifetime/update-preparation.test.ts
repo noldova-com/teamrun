@@ -7,7 +7,8 @@
  */
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
@@ -40,25 +41,31 @@ export class UpdatePreparationTests {
   }
 
   @TestMethod
-  public goesBackToNormalWhenTheBarriersHolderExits(): Promise<void> {
+  public goesBackToNormalOnlyOnceTheBarrierIsGone(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
       await using folder = await TemporaryFolderFixture.createAsync();
       const installation = UpdateBarrierFixture.open(folder.path);
       await fixture.startAsync(30_000, undefined, undefined, process.env, new ServerSettings(undefined, undefined, undefined, undefined, 5_000, 20), installation.folder);
       const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
       const [cli] = await fixture.handshakeAsync("cli", RuntimeBuild.identity);
-      const holder = spawn(process.execPath, ["-e", "const end = Date.now() + 500; setInterval(() => end < Date.now() && process.exit(0), 10);"], { stdio: "ignore" });
+      const holder = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000);"], { stdio: "ignore" });
       await once(holder, "spawn");
       await UpdateBarrierFixture.holdAsync(installation, Number(holder.pid));
       desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
       await UpdateBarrierFixture.readEventAsync(cli, ShellEvents.updating);
       await RuntimeHostFixture.callAsync(cli, "cli:1", ShellMethods.updateSaved, new UpdateSaved(process.pid, []).toJson());
+      holder.kill();
+      await once(holder, "exit");
+      await delay(200);
 
+      const [, whileHeld] = await fixture.handshakeAsync("held", RuntimeBuild.identity);
+      await rm(installation.barrierFile);
       const ended = await UpdateBarrierFixture.readEventAsync(cli, ShellEvents.updateEnded);
       const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
       const modules = await RuntimeHostFixture.callAsync(cli, "cli:2", ShellMethods.modules, null);
       const saved = await RuntimeHostFixture.callAsync(cli, "cli:3", ShellMethods.updateSaved, new UpdateSaved(process.pid, []).toJson());
 
+      Assert.areEqual(FailureCode.Updating, whileHeld.failure?.code);
       Assert.areEqual("null", JSON.stringify(ended.payload));
       Assert.isFalse(late.hasFailed);
       Assert.isFalse(modules.hasFailed);
@@ -67,7 +74,7 @@ export class UpdatePreparationTests {
   }
 
   @TestMethod
-  public answersAtOnceWithoutOtherClientsAndGoesBackToNormalWhenTheBarrierCannotBeRead(): Promise<void> {
+  public answersAtOnceWithoutOtherClientsAndKeepsUpdatingWhileTheBarrierCannotBeReadOrParsed(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
       await using folder = await TemporaryFolderFixture.createAsync();
       const installation = UpdateBarrierFixture.open(folder.path);
@@ -79,10 +86,19 @@ export class UpdatePreparationTests {
       const [responses] = await RuntimeHostFixture.readMessagesAsync(desktop, 2);
       await rm(installation.barrierFile);
       await mkdir(installation.barrierFile);
+      await delay(200);
+      const [, unreadable] = await fixture.handshakeAsync("unreadable", RuntimeBuild.identity);
+      await rm(installation.barrierFile, { recursive: true });
+      await writeFile(installation.barrierFile, "{\"holder\":");
+      await delay(200);
+      const [, unparsable] = await fixture.handshakeAsync("unparsable", RuntimeBuild.identity);
+      await rm(installation.barrierFile);
       await UpdateBarrierFixture.readEventAsync(desktop, ShellEvents.updateEnded);
       const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
 
       Assert.isTrue(UpdateReady.fromJson(responses.get("desktop:1")?.payload).isReady);
+      Assert.areEqual(FailureCode.Updating, unreadable.failure?.code);
+      Assert.areEqual(FailureCode.Updating, unparsable.failure?.code);
       Assert.isFalse(late.hasFailed);
     });
   }

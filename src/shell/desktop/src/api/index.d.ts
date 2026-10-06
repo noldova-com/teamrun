@@ -17,7 +17,7 @@ import type {
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchSettings, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -3017,6 +3017,71 @@ export declare class OpenWindow implements IQuitPrompt {
    * ```
    */
   public showNow(): void;
+}
+
+/**
+ * Checks the installation's launch barrier when the desktop starts, before it opens a window. While another desktop
+ * holds the barrier, it tells the person with the operating system's message box that TeamRun is installing an update,
+ * and the desktop exits. A barrier whose holder is gone after a handoff to another version may mean an installer is
+ * still running, so it asks the person and removes the barrier only when they choose to open TeamRun. A barrier left
+ * before the handoff is removed silently, and the desktop's log says so.
+ */
+export declare class UpdateBarrierGate {
+  /**
+   * Creates the gate.
+   *
+   * @param installation The installation whose launch barrier it checks.
+   * @param productVersion The desktop's product version, which settles a barrier handed off to it.
+   * @param dialog Shows the operating system's message box.
+   * @param log Writes a line to the desktop's log.
+   * @example
+   * ```ts
+   * import { type IDialogHost, UpdateBarrierGate } from "@noldova/teamrun-shell-desktop";
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function create(installation: Installation, dialog: IDialogHost): UpdateBarrierGate {
+   *   return new UpdateBarrierGate(installation, "0.2.0", dialog, t => console.log(t));
+   * }
+   * ```
+   */
+  public constructor(installation: Pick<Installation, "readAsync" | "checkAsync" | "releaseAsync">, productVersion: string, dialog: IDialogHost, log: (text: string) => void);
+
+  /**
+   * Checks the barrier and, when it holds, asks as {@link askAsync} does. A barrier that cannot be read lets the
+   * desktop start, and the runtime's launch reports it.
+   *
+   * @returns A promise of `true` when the desktop may start, `false` when it exits.
+   * @throws Error Rejected when the message box fails or the barrier cannot be removed.
+   * @example
+   * ```ts
+   * import type { UpdateBarrierGate } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function startAsync(gate: UpdateBarrierGate, open: () => void): Promise<void> {
+   *   if (await gate.passAsync())
+   *     open();
+   * }
+   * ```
+   */
+  public passAsync(): Promise<boolean>;
+
+  /**
+   * Tells the person what a barrier means: `Held` shows that TeamRun is installing an update, with OK; `Unfinished`
+   * asks with Quit, the default, and Open TeamRun, which removes the barrier; `None` asks nothing.
+   *
+   * @param status What the barrier means for this installation.
+   * @returns A promise of `true` when the desktop may start, `false` when it exits.
+   * @throws Error Rejected when the message box fails or the barrier cannot be removed.
+   * @example
+   * ```ts
+   * import type { UpdateBarrierGate } from "@noldova/teamrun-shell-desktop";
+   * import { UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function askAsync(gate: UpdateBarrierGate): Promise<boolean> {
+   *   return gate.askAsync(UpdateBarrierStatus.Unfinished);
+   * }
+   * ```
+   */
+  public askAsync(status: UpdateBarrierStatus): Promise<boolean>;
 }
 
 /**

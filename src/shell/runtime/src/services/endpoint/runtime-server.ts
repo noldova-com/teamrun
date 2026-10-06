@@ -64,6 +64,7 @@ export class RuntimeServer implements IEventSink {
   private socketPath: string | null = null;
   private refusal: Refusal | null = null;
   private updating: Failure | null = null;
+  private readonly saved: Set<number> = new Set();
   private nextConnection: number = 1;
 
   public constructor(
@@ -132,8 +133,13 @@ export class RuntimeServer implements IEventSink {
     this.updating = failure;
   }
 
+  public refuseAfterSave(connection: number): void {
+    this.saved.add(connection);
+  }
+
   public endUpdate(): void {
     this.updating = null;
+    this.saved.clear();
   }
 
   public broadcast(event: Event): void {
@@ -282,7 +288,7 @@ export class RuntimeServer implements IEventSink {
       session.send(Response.failure(request.id, refusal.failure));
       return;
     }
-    if (!Object.isNull(this.updating) && !RuntimeServer.UPDATE_METHODS.some(t => t.equals(request.method))) {
+    if (!Object.isNull(this.updating) && this.saved.has(session.connection) && !RuntimeServer.UPDATE_METHODS.some(t => t.equals(request.method))) {
       session.send(Response.failure(request.id, this.updating));
       return;
     }

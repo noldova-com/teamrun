@@ -202,7 +202,7 @@ export class CliFailureTests {
   public async reportsAnUpdateStillUnderWayAfterWaitingForIt(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     const device = path.join(fixture.root, "device");
-    await CliFailureTests.holdBarrierAsync(Installation.locate(device, process.execPath));
+    await CliFailureTests.holdBarrierAsync(Installation.locate(device, process.execPath, process.platform));
     const started = Date.now();
 
     const waited = await fixture.runAsync(fixture.withDataDirectory(["commands", "--device-dir", device, "--json"]), null, fixture.environment, "", undefined, 300);
@@ -218,7 +218,7 @@ export class CliFailureTests {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0");
     await fixture.startHostAsync(build.declarationsFile);
-    const installation = Installation.locate(fixture.deviceFolder, process.execPath);
+    const installation = Installation.locate(fixture.deviceFolder, process.execPath, process.platform);
     await CliFailureTests.holdBarrierAsync(installation);
     const settings = new LaunchSettings(new DataDirectory(fixture.dataDirectory), process.execPath, RuntimeEntry.entryPath, fixture.environment, process.platform);
     const desktop = await new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", { onEvent: () => undefined, onDisconnected: () => undefined });

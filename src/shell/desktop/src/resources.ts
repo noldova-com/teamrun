@@ -26,6 +26,37 @@ export class Resources {
     return ProductInfo.current.developmentApplicationId;
   }
 
+  public static get updateInstalling(): string {
+    return `${Resources.applicationName} is installing an update.`;
+  }
+
+  public static get updateInstallingDetail(): string {
+    return `Open ${Resources.applicationName} again once the update has finished.`;
+  }
+
+  public static get updateUnfinished(): string {
+    return `An update of ${Resources.applicationName} may still be installing, or it did not finish.`;
+  }
+
+  public static get updateUnfinishedDetail(): string {
+    return `If no installer is still running, open ${Resources.applicationName} to go on with the version you have.`;
+  }
+
+  public static get openApplicationButton(): string {
+    return `Open ${Resources.applicationName}`;
+  }
+
+  public static readonly okButton: string = "OK";
+  public static readonly updateStoppedBeforeHandoff: string = "An update stopped before its handoff, so its launch barrier was removed.";
+  public static readonly updateBarrierCleared: string = "The person chose to open the application after an unfinished update, so its launch barrier was removed.";
+  public static formatBarrierUnreadable(message: string): string {
+    return `The launch barrier could not be read: ${message}`;
+  }
+
+  public static formatBarrierUnsettled(message: string): string {
+    return `The launch barrier could not be settled: ${message}`;
+  }
+
   public static readonly checkoutHashAlgorithm: string = "sha256";
   public static readonly hexEncoding: "hex" = "hex";
   public static readonly checkoutHashLength: number = 8;

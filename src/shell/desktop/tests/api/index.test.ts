@@ -51,6 +51,7 @@ export class DesktopApiTests {
         "SystemNotifier",
         "TaskbarIdentity",
         "TrayHostWatcher",
+        "UpdateBarrierGate",
         "UtilityProcessStarter",
         "WindowAppearance",
         "WindowBoundsKeeper",

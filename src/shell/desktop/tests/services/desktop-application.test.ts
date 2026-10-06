@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
   UpdateBarrierState, UpdateBarrierStatus
@@ -477,6 +477,87 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async opensNoWindowAndExitsWhileAnotherDesktopInstallsAnUpdate(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      electron.dialog.answers.push(0);
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      const installations: Installation[] = [];
+      const launcher = new FakeRuntimeLauncher();
+      DesktopStartFixture.start(electron, new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), launcher, undefined, undefined, undefined, installations);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), environment).stampAsync([[process.pid, "desktop"]]);
+      Assert.isDefined(holder);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing).toJson()));
+
+      await electron.app.becomeReadyAsync();
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(0, electron.windows.length);
+      Assert.areEqual(0, launcher.calls.length);
+      Assert.areEqual(JSON.stringify(["TeamRun is installing an update."]), JSON.stringify(electron.dialog.boxes.map(t => t.options.message)));
+      Assert.isTrue(existsSync(installation.barrierFile));
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async removesABarrierAnUpdateLeftBeforeItsHandoffLogsItAndOpensItsWindow(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      const desktop = new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment);
+      const installations: Installation[] = [];
+      DesktopStartFixture.start(electron, desktop, new FakeRuntimeLauncher(), undefined, undefined, undefined, installations);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(new UpdateProcess(process.pid, 1, 2, "desktop"), "0.3.0", UpdateBarrierState.Closing).toJson()));
+
+      await DesktopStartFixture.openAsync(electron);
+
+      Assert.areEqual(0, electron.dialog.boxes.length);
+      Assert.isFalse(existsSync(installation.barrierFile));
+      Assert.areEqual(1, DesktopStartFixture.readErrors(desktop, "An update stopped before its handoff, so its launch barrier was removed.").length);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async quitsAndLogsWhenItCannotTellThePersonThatAnUpdateIsInstalling(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      electron.dialog.failure = new Error("No display");
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      const desktop = new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment);
+      const installations: Installation[] = [];
+      DesktopStartFixture.start(electron, desktop, new FakeRuntimeLauncher(), undefined, undefined, undefined, installations);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, "{\"holder\":");
+
+      await electron.app.becomeReadyAsync();
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(0, electron.windows.length);
+      Assert.areEqual(1, DesktopStartFixture.readErrors(desktop, "The launch barrier could not be settled: Error: No display").length);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
   public async opensItsWindowWithTheDevicesLastAppearanceAndKeepsTheOneItsWindowReports(): Promise<void> {
     const appearance = new FakeAppearanceStore();
     appearance.kept = { "shell.mode": "Dark" };
@@ -573,7 +654,7 @@ export class DesktopApplicationTests {
     process.isDefaultApp = true;
 
     const [settings] = DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(handover));
-    return electron.app.becomeReadyAsync().then(async () => {
+    return DesktopStartFixture.openAsync(electron).then(async () => {
       await setImmediate();
 
       Assert.areEqual(DataDirectoryLocator.locate(false, {}, process.homeFolder, DesktopStartFixture.checkoutRoot()).root, settings?.dataDirectory.root);
@@ -634,7 +715,7 @@ export class DesktopApplicationTests {
     ]);
     const electron = new FakeElectron(true, true);
     DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(handover));
-    return electron.app.becomeReadyAsync().then(async () => {
+    return DesktopStartFixture.openAsync(electron).then(async () => {
       await setImmediate();
 
       Assert.areEqual(
@@ -1562,7 +1643,7 @@ export class DesktopApplicationTests {
     try {
       const electron = new FakeElectron();
       DesktopStartFixture.start(electron, new FakeDesktopProcess("linux", [`--data-dir=${data}`]));
-      await electron.app.becomeReadyAsync();
+      await DesktopStartFixture.openAsync(electron);
 
       const refused = await (electron.ipcMain.invoke("teamrun:openLogFolder", { sender: { id: 1 }, senderFrame: null }) as Promise<boolean>);
       const isOpened = await (electron.ipcMain.invoke("teamrun:openLogFolder", DesktopStartFixture.trustedEvent("linux")) as Promise<boolean>);
@@ -1582,7 +1663,7 @@ export class DesktopApplicationTests {
     const electron = new FakeElectron();
     const pathCommand = new FakePathCommand();
     DesktopStartFixture.start(electron, new FakeDesktopProcess("darwin"), new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeAppearanceStore(), pathCommand);
-    await electron.app.becomeReadyAsync();
+    await DesktopStartFixture.openAsync(electron);
     electron.dialog.answers.push(0, 0, 0, 0);
     const answers = [await (electron.ipcMain.invoke("teamrun:installCommand", { sender: { id: 1 }, senderFrame: null }) as Promise<boolean>)];
 
@@ -1609,8 +1690,8 @@ export class DesktopApplicationTests {
     const pathCommand = new FakePathCommand();
     DesktopStartFixture.start(linux, new FakeDesktopProcess("linux"));
     DesktopStartFixture.start(mac, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeAppearanceStore(), pathCommand);
-    await linux.app.becomeReadyAsync();
-    await mac.app.becomeReadyAsync();
+    await DesktopStartFixture.openAsync(linux);
+    await DesktopStartFixture.openAsync(mac);
     mac.dialog.answers.push(0);
     pathCommand.failure = new PathCommandException("The teamrun command could not be linked at /usr/local/bin/teamrun: Error: Command failed: /usr/bin/osascript");
 
@@ -1695,8 +1776,8 @@ export class DesktopApplicationTests {
       const uncreatedProcess = new FakeDesktopProcess("linux", [`--data-dir=${blocked}`]);
       DesktopStartFixture.start(unopened, unopenedProcess);
       DesktopStartFixture.start(uncreated, uncreatedProcess);
-      await unopened.app.becomeReadyAsync();
-      await uncreated.app.becomeReadyAsync();
+      await DesktopStartFixture.openAsync(unopened);
+      await DesktopStartFixture.openAsync(uncreated);
       const answers: boolean[] = [];
 
       answers.push(await (unopened.ipcMain.invoke("teamrun:openLogFolder", DesktopStartFixture.trustedEvent("linux")) as Promise<boolean>));

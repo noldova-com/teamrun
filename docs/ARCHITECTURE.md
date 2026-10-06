@@ -533,8 +533,11 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
   - When the policy is "only if idle" and work is in progress, `shell.stop` is answered with a `Conflict` failure whose details list the work in progress.
     Otherwise the runtime answers, cancels its work and stops.
 - A runtime of the same build can be asked to prepare for an update with `shell.update`.
-  It then refuses every new handshake and every new request with an `Updating` failure, except `shell.updateSaved`, `shell.work` and `shell.stop`, and announces `shell.updating` to its clients.
-  Only while updating, it reads its installation's launch barrier every second, and when the barrier is gone or its holder no longer runs, it goes back to normal and announces `shell.updateEnded`.
+  It then refuses every new handshake with an `Updating` failure and announces `shell.updating` to its clients.
+  A client keeps its requests until it answers `shell.updateSaved`, so it can save; from then on, its requests other than `shell.updateSaved`, `shell.work` and `shell.stop` are refused with `Updating`.
+  A second `shell.update` is refused with `Updating`, and one that names a folder other than an absolute path with `InvalidParams`.
+  Only while updating, it reads its installation's launch barrier every second, and only once the barrier is confirmed gone does it go back to normal and announce `shell.updateEnded`.
+  A barrier it cannot read or parse keeps it updating.
   [Stopping for an update](#stopping-for-an-update) owns the rest of the exchange.
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
@@ -594,6 +597,7 @@ The runtime owns the process and ends it; the part does not.
 
 The runtime must not keep the files, sockets or pipes of the client that started it.
 No launcher starts a runtime while its installation's launch barrier holds ([Stopping for an update](#stopping-for-an-update)).
+When a runtime it started exits before it publishes discovery, the launcher reads the barrier again, and reports an update in progress rather than a failed launch while it holds.
 
 - **Linux:** starting a detached runtime requires executable Bash at `/bin/bash` and a readable, searchable `/proc/self/fd` from a mounted `/proc`.
   The launcher checks these before spawning and reports a missing requirement immediately.
@@ -978,12 +982,13 @@ Every desktop, runtime and command line started from it belongs to it, whatever 
 Before the handoff replaces its files, every process of the installation stops, its unsaved state saved, and each stop is verified, never assumed from an acknowledgement.
 
 **Installation record.**
-Each installation has a folder `installations/<id>` beside the device's identity, outside every data directory, where the id is the first 16 hexadecimal digits of the SHA-256 of the program's canonical path.
+Each installation has a folder `installations/<id>` beside the device's identity, outside every data directory, where the id is the first 16 hexadecimal digits of the SHA-256 of the program's canonical path: its real path with every link resolved, lower-cased on Windows.
 Its `data-directories` folder lists the canonical data directories the installation's runtimes have owned, one file for each, named after the same digest of the directory's path, so runtimes that start together never overwrite each other's entries; a runtime adds its own before it publishes discovery (section 6).
 An entry proves nothing by itself: a directory whose discovery names another program, or that no runtime owns, is skipped, and one that no longer exists is dropped.
 
 **Launch barrier.**
-The installation's `barrier.json`, created exclusively, holds the coordinating desktop's process id and start time, the version being installed and the state `Preparing`, `Closing` or `HandedOff`.
+The installation's `barrier.json` holds the coordinating desktop's process id and start time, the version being installed and the state `Preparing`, `Closing` or `HandedOff`.
+It is written whole to a temporary file and linked into place, which fails when a barrier exists, and each change of state replaces it through a temporary file and a rename, so no reader sees it half-written.
 While it holds:
 
 - No launcher starts a runtime, and a runtime that finds it after taking ownership releases ownership and exits.
@@ -998,6 +1003,8 @@ A barrier whose holder no longer runs, matched by process id and start time, is 
 - `HandedOff`, found by any other version: the update may still be installing or may have failed.
   The desktop says so and removes the barrier only when the person confirms; the command line exits with the code for an update in progress.
   An installer's failure never clears the barrier by itself.
+
+A settled barrier is removed by first moving it aside under a unique name and deleting it only when it is still the barrier that was judged; one that replaced it meanwhile is put back and judged again.
 
 **Order.**
 The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use:
