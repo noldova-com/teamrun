@@ -25,7 +25,9 @@ export default class ScriptTestState {
     const last = Array.isArray(attempts) ? attempts.at(-1) : undefined;
     if (typeof last !== "object" || last === null)
       return [];
-    const entries = Object.entries(last as Record<string, unknown>).filter(([, t]) => typeof t === "object" && t !== null) as [string, Record<string, unknown>][];
+    const entries = Object.entries(last as Record<string, unknown>)
+      .filter(([, t]) => typeof t === "object" && t !== null)
+      .map(([key, t]) => [key.split(path.win32.sep).join(path.posix.sep), t]) as [string, Record<string, unknown>][];
     const parents = new Map<string, string>();
     for (const [key, entry] of entries)
       for (const child of Array.isArray(entry["children"]) ? entry["children"] as unknown[] : [])
