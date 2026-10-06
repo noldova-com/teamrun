@@ -14,11 +14,12 @@ import { LayoutGeometry } from "../../../../src/app/models/layout/layout-geometr
 import { SideDropTarget } from "../../../../src/app/models/layout/side-drop-target";
 import { SplitDropTarget } from "../../../../src/app/models/layout/split-drop-target";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("SplitDropTarget", () => {
   const registry = LayoutFixture.createRegistry();
   const layout = Layout.createDefault(registry);
-  const geometry = new LayoutGeometry(120, 60, layout, registry);
+  const geometry = new LayoutGeometry(120, 60, layout, registry, LayoutMetricsFixture.standard);
 
   it("splits the group with the view and previews the half it takes", () => {
     const target = new SplitDropTarget(0, PanelEdge.Right);

@@ -15,6 +15,7 @@ import { Layout } from "../../../../src/app/models/layout/layout";
 import { LayoutGeometry } from "../../../../src/app/models/layout/layout-geometry";
 import { Resources } from "../../../../src/resources";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("DockingOverlay", () => {
   const registry = LayoutFixture.createRegistry();
@@ -28,7 +29,7 @@ describe("DockingOverlay", () => {
   }
 
   it("centers each side guide in the area a docked tab would take, the bottom one in the area between the side docks", () => {
-    const geometry = new LayoutGeometry(120, 60, Layout.createDefault(registry), registry);
+    const geometry = new LayoutGeometry(120, 60, Layout.createDefault(registry), registry, LayoutMetricsFixture.standard);
     const overlay = new DockingOverlay(geometry);
 
     for (const side of sides) {
@@ -41,7 +42,7 @@ describe("DockingOverlay", () => {
   });
 
   it("puts the outer guide at the window's bottom edge, centred across it, and lifts the bottom guide clear of it", () => {
-    const geometry = new LayoutGeometry(120, 60, Layout.createDefault(registry).openView(LayoutFixture.terminal, registry).resizeDock(DockSide.Bottom, 10), registry);
+    const geometry = new LayoutGeometry(120, 60, Layout.createDefault(registry).openView(LayoutFixture.terminal, registry).resizeDock(DockSide.Bottom, 10), registry, LayoutMetricsFixture.standard);
     const overlay = new DockingOverlay(geometry);
     const outer = overlay.outerGuide();
     const inner = overlay.guide(DockSide.Bottom);
@@ -52,7 +53,7 @@ describe("DockingOverlay", () => {
   });
 
   it("centers a group's plate on the group when no side guide is in the way", () => {
-    const geometry = new LayoutGeometry(120, 60, Layout.createDefault(registry), registry);
+    const geometry = new LayoutGeometry(120, 60, Layout.createDefault(registry), registry, LayoutMetricsFixture.standard);
     const plate = new DockingOverlay(geometry).plate(frame(geometry, 0));
 
     expect(DockingOverlay.plateSize).toBe(7.75);
@@ -62,7 +63,7 @@ describe("DockingOverlay", () => {
   it("moves a group's plate clear of the side guide it would cover", () => {
     const layout = Layout.createDefault(registry).openView(LayoutFixture.terminal, registry)
       .resizeDock(DockSide.Left, 10).resizeDock(DockSide.Right, 10).resizeDock(DockSide.Bottom, 10);
-    const geometry = new LayoutGeometry(120, 60, layout, registry);
+    const geometry = new LayoutGeometry(120, 60, layout, registry, LayoutMetricsFixture.standard);
     const overlay = new DockingOverlay(geometry);
     const clearance = Resources.dockingPlateClearance;
 

@@ -23,6 +23,7 @@ import type { DropTarget } from "../models/layout/drop-target";
 import { EarlyDocument } from "../models/layout/early-document";
 import { Layout } from "../models/layout/layout";
 import { LayoutGeometry } from "../models/layout/layout-geometry";
+import { LayoutMetrics } from "../models/layout/layout-metrics";
 import { LayoutReader } from "../models/layout/layout.reader";
 import type { ToolbarLayout } from "../models/layout/toolbar-layout";
 import type { SplitHandle } from "../models/layout/split-handle";
@@ -44,6 +45,7 @@ export class LayoutService {
   private readonly layoutState: WritableSignal<Layout> = signal(Layout.createDefault(this.registryState()));
   private readonly width: WritableSignal<number> = signal(0);
   private readonly height: WritableSignal<number> = signal(0);
+  private readonly metrics: WritableSignal<LayoutMetrics | null> = signal(null);
   private readonly currentGroupId: WritableSignal<number | null> = signal(null);
   private readonly revealedState: WritableSignal<TabReveal | null> = signal(null);
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -57,11 +59,12 @@ export class LayoutService {
   public readonly registry: Signal<ViewRegistry> = this.registryState.asReadonly();
   public readonly iconSides: Signal<ReadonlySet<DockSide>> = computed(() =>
     new Set([...Resources.dockStyleSettings].filter(([, name]) => this.settings.values().get(name) === DockStyle.Icons).map(([side]) => side)));
+  public readonly isMeasured: Signal<boolean> = computed(() => !Object.isNull(this.metrics()));
   public readonly previewTabs: Signal<boolean> = computed(() => this.settings.values().get(Resources.previewTabsSetting) !== false);
   private readonly kept: WritableSignal<DockSide | null> = signal(null);
   public readonly geometry: Signal<LayoutGeometry> = linkedSignal({
-    source: () => ({ width: this.width(), height: this.height(), layout: this.layoutState(), registry: this.registryState(), iconSides: this.iconSides(), kept: this.kept() }),
-    computation: (source, previous?: { readonly value: LayoutGeometry }) => new LayoutGeometry(source.width, source.height, source.layout, source.registry, source.iconSides,
+    source: () => ({ width: this.width(), height: this.height(), layout: this.layoutState(), registry: this.registryState(), metrics: this.metrics(), iconSides: this.iconSides(), kept: this.kept() }),
+    computation: (source, previous?: { readonly value: LayoutGeometry }) => new LayoutGeometry(source.width, source.height, source.layout, source.registry, source.metrics ?? LayoutMetrics.none, source.iconSides,
       new DockYield(source.layout.middleSize ?? Resources.middlePreferredSize, previous?.value.closedSides ?? new Set(), source.kept))
   });
   public readonly currentGroup: Signal<TabGroup> = computed(() => {
@@ -90,6 +93,10 @@ export class LayoutService {
     this.height.set(height);
     if (!untracked(() => this.geometry().isKeeping))
       this.kept.set(null);
+  }
+
+  public setMetrics(metrics: LayoutMetrics): void {
+    this.metrics.set(metrics);
   }
 
   public async loadAsync(): Promise<boolean> {
@@ -173,7 +180,7 @@ export class LayoutService {
   }
 
   public resizeDock(side: DockSide, size: number): void {
-    const layout = this.layoutState().resizeDock(side, size);
+    const layout = this.layoutState().resizeDock(side, Math.max(this.geometry().metrics.dockMinimum, size));
     if (side === DockSide.Bottom) {
       this.update(layout);
       return;
@@ -181,7 +188,7 @@ export class LayoutService {
     const geometry = this.geometry();
     const other = side === DockSide.Left ? DockSide.Right : DockSide.Left;
     const shown = geometry.dock(other).width;
-    const held = geometry.isCollapsed(other) || layout.dock(other).preferredTrack <= shown + Resources.panelGap ? layout : layout.resizeDock(other, shown);
+    const held = geometry.isCollapsed(other) || layout.dock(other).preferredTrack(geometry.metrics) <= shown + geometry.metrics.gap ? layout : layout.resizeDock(other, shown);
     this.update(held.withMiddleSize(this.middleAfter(side, size)));
   }
 

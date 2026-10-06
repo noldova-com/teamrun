@@ -14,6 +14,7 @@ import { LayoutGeometry } from "../../../../src/app/models/layout/layout-geometr
 import { SideDropTarget } from "../../../../src/app/models/layout/side-drop-target";
 import { TabDropTarget } from "../../../../src/app/models/layout/tab-drop-target";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("SideDropTarget", () => {
   const registry = LayoutFixture.createRegistry();
@@ -23,13 +24,13 @@ describe("SideDropTarget", () => {
     const target = new SideDropTarget(DockSide.Bottom);
 
     expect(target.place(layout, LayoutFixture.files).dock(DockSide.Bottom).root?.groups.map(t => t.tabs)).toEqual([[LayoutFixture.files]]);
-    expect(target.preview(new LayoutGeometry(120, 60, layout, registry))).toEqual(new Bounds(0.25, 43.5, 119.5, 16.25));
+    expect(target.preview(new LayoutGeometry(120, 60, layout, registry, LayoutMetricsFixture.standard))).toEqual(new Bounds(0.25, 43.5, 119.5, 16.25));
   });
 
   it("sets the bottom dock's span with the view it docks, previews the area under that span, and leaves a document alone", () => {
     const between = new SideDropTarget(DockSide.Bottom, BottomDockSpan.Between);
     const placed = between.place(layout, LayoutFixture.files);
-    const geometry = new LayoutGeometry(120, 60, layout, registry);
+    const geometry = new LayoutGeometry(120, 60, layout, registry, LayoutMetricsFixture.standard);
 
     expect([placed.bottomSpan, placed.dock(DockSide.Bottom).root?.groups.map(t => t.tabs)]).toEqual([BottomDockSpan.Between, [[LayoutFixture.files]]]);
     expect(new SideDropTarget(DockSide.Bottom, BottomDockSpan.Full).place(placed, LayoutFixture.files).bottomSpan).toBe(BottomDockSpan.Full);
