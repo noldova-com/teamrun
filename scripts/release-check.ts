@@ -95,7 +95,7 @@ export default class ReleaseCheck {
         + `release a revision whose run on ${ReleaseCheck.MAIN} passed.`);
     const output = this.environment[ReleaseCheck.OUTPUT_VARIABLE];
     if (output !== undefined)
-      await appendFile(output, `${ReleaseCheck.SIGNED_OUTPUT}=${JSON.stringify(signed)}\n`);
+      await appendFile(output, `${ReleaseCheck.SIGNED_OUTPUT}=${signed.join(" ")}\n`);
     this.output.write(`${request.version.tag} of ${request.repository} from ${request.revision}: the version is new, the revision is on ${ReleaseCheck.MAIN} `
       + `and its Build and test run there passed. Signed platforms: ${signed.length === 0 ? "none" : signed.join(", ")}.\n`);
   }

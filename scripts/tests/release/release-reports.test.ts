@@ -69,7 +69,7 @@ class ReleaseReportsTests {
 
       await assert.rejects(new ReleaseReports([]).verifyAsync(folder), new ReleaseException(`${ReleaseReportsTests.FAILED}notes.txt holds no package report.\n`
         + "report-linux-arm64 holds no package report.\nreport-linux-x64 holds no package report.\nreport-macos-x64's package report cannot be read.\n"
-        + "No package report covers linux-x64.\nNo package report covers linux-arm64.\nNo package report covers macos-x64."));
+        + "No package report covers macos-x64.\nNo package report covers linux-x64.\nNo package report covers linux-arm64."));
       await assert.rejects(new ReleaseReports([]).verifyAsync(path.join(folder, "missing")), new ReleaseException(`The package reports in ${path.join(folder, "missing")} cannot be read.`));
     });
   }

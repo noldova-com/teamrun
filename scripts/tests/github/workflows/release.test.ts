@@ -7,6 +7,8 @@
  */
 
 import assert from "node:assert/strict";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 
 import BuildMatrix from "../../../workflows/build-matrix.ts";
@@ -21,7 +23,10 @@ class ReleaseWorkflowTests {
   private static readonly UPLOAD_ACTION: string = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1";
   private static readonly UPLOADS: readonly [string, string, string] = ["Keep the release files", "Keep the release files again", "Keep the release files a last time"];
   private static readonly REPORT_UPLOADS: readonly [string, string, string] = ["Keep the package report", "Keep the package report again", "Keep the package report a last time"];
-  private static readonly SIGNED: string = "contains(fromJSON(needs.check.outputs.signed), matrix.platform)";
+  private static readonly SIGNED: string = "matrix.signed == 'true'";
+  private static readonly LIST_STEP: string = "List the targets, apart from those the release signs";
+  private static readonly PUBLISH_NEEDS: string = "    needs: [build, build-signed]\n"
+    + "    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.build-signed.result == 'success' || needs.build-signed.result == 'skipped') }}\n";
   private static readonly CREDENTIALS: readonly (readonly [string, string])[] = [
     ["windows", "AZURE_TENANT_ID"], ["windows", "AZURE_CLIENT_ID"], ["windows", "AZURE_CLIENT_SECRET"], ["macos", "MAC_CERTIFICATE"], ["macos", "MAC_CERTIFICATE_PASSWORD"],
     ["macos", "APPLE_API_KEY_P8"], ["macos", "APPLE_API_KEY_ID"], ["macos", "APPLE_API_ISSUER"]
@@ -37,7 +42,7 @@ class ReleaseWorkflowTests {
       assert.ok(text.includes("      revision:\n        description: The full commit SHA on main to release.\n        required: true\n        type: string\n\npermissions:\n  contents: read\n\n"));
       assert.ok(text.includes("concurrency:\n  group: release-${{ github.repository }}\n  cancel-in-progress: false\n"));
       assert.deepEqual(text.match(/^\s+\w[\w-]*: write$/gm), ["      contents: write"]);
-      assert.ok(text.includes("    needs: build\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    environment: publish\n    permissions:\n      contents: write\n"
+      assert.ok(text.includes(`${ReleaseWorkflowTests.PUBLISH_NEEDS}    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    environment: publish\n    permissions:\n      contents: write\n`
         + "    concurrency:\n      group: release-publish-${{ github.repository }}\n      cancel-in-progress: false\n"));
       assert.deepEqual([...text.matchAll(/\$\{\{ ([^}]+) \}\}/g)].map(t => t[1] ?? "").filter(t => t.includes("secrets.")),
         ReleaseWorkflowTests.CREDENTIALS.map(([platform, name]) => `${ReleaseWorkflowTests.SIGNED} && matrix.platform == '${platform}' && secrets.${name} || ''`));
@@ -65,15 +70,29 @@ class ReleaseWorkflowTests {
       assert.ok(workflow.text.indexOf(ReleaseWorkflowTests.MAIN_STEP) < workflow.text.indexOf("Check out the revision"));
     });
 
-    test("every target builds, tests, packages, starts its package and writes its release files on its own runner after the check, and every step has its own time limit", async () => {
+    test("every target builds, tests, packages, starts its package and writes its release files on its own runner after the check, and every step has its own time limit", { timeout: ReleaseWorkflowTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(ReleaseWorkflowTests.WORKFLOW);
       const package_ = await WorkflowFileFixture.readAsync("package.yml");
       const targets = new BuildMatrix("workflow_dispatch").targets
-        .map(t => `          - { target: ${t.name}, runner: ${t.runner}, architecture: ${t.architecture}, platform: ${t.name.split(" ")[0]?.toLowerCase()} }\n`).join("");
+        .map(t => ({ target: t.name, runner: t.runner, architecture: t.architecture, platform: t.name.split(" ")[0]?.toLowerCase() ?? "" }));
       const steps = workflow.text.split(/\n(?= +- name: )/).slice(1);
+      const list = async (signing: string): Promise<readonly unknown[]> => {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        await writeFile(path.join(doubles.directory, "outputs.txt"), "");
+        const result = await doubles.runAsync(workflow.readStepScript(ReleaseWorkflowTests.LIST_STEP), { GITHUB_OUTPUT: "outputs.txt", SIGNING: signing });
+        assert.equal(result.status, 0, result.stderr);
+        return (await doubles.readFileAsync("outputs.txt")).split("\n").filter(t => t.length > 0).map(t => JSON.parse(t.slice(t.indexOf("=") + 1)));
+      };
+      const isSigned = (platform: string): boolean => platform === "windows" || platform === "macos";
 
-      assert.ok(workflow.text.includes(`    needs: check\n    strategy:\n      fail-fast: true\n      matrix:\n        include:\n${targets}    runs-on: \${{ matrix.runner }}\n`
-        + `    environment: \${{ ${ReleaseWorkflowTests.SIGNED} && 'release' || '' }}\n    timeout-minutes: 105\n`));
+      assert.deepEqual(await list(""), [targets.map(t => ({ ...t, signed: "false" })), []]);
+      assert.deepEqual(await list("windows macos"), [
+        targets.filter(t => !isSigned(t.platform)).map(t => ({ ...t, signed: "false" })),
+        targets.filter(t => isSigned(t.platform)).map(t => ({ ...t, signed: "true" }))
+      ]);
+      assert.ok(workflow.text.includes("    needs: check\n    strategy:\n      fail-fast: true\n      matrix:\n        include: ${{ fromJSON(needs.check.outputs.targets) }}\n"
+        + "    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 105\n    steps: &build-steps\n"));
       for (const step of ["Build", "Test", "Make the package", "Install, start and quit the package", "Write the checksums and the update information"])
         assert.ok(workflow.text.includes(`      - name: ${step}\n`), step);
       assert.deepEqual(["Build", "Test", "Write the checksums and the update information"].map(t => workflow.readStepScript(t)),
@@ -98,12 +117,17 @@ class ReleaseWorkflowTests {
 
         assert.deepEqual(await run("true"), ["npm run package -- --signed"]);
         assert.deepEqual(await run("false"), ["npm run package"]);
-        assert.ok(workflow.text.includes("    outputs:\n      signed: ${{ steps.check.outputs.signed }}\n"));
+        assert.ok(workflow.text.includes("    outputs:\n      targets: ${{ steps.targets.outputs.targets }}\n      signed-targets: ${{ steps.targets.outputs.signed-targets }}\n"));
         assert.ok(workflow.text.includes("      - name: Check the version and the revision\n        id: check\n"));
-        assert.ok(workflow.text.includes(`      - name: Make the package\n        timeout-minutes: 40\n        env:\n          SIGNED: \${{ ${ReleaseWorkflowTests.SIGNED} }}\n`
+        assert.ok(workflow.text.includes(`      - name: ${ReleaseWorkflowTests.LIST_STEP}\n        id: targets\n        timeout-minutes: 1\n        env:\n          SIGNING: \${{ steps.check.outputs.signed }}\n`));
+        assert.ok(workflow.text.includes("  build-signed:\n    name: Build, test, package and sign (${{ matrix.target }})\n    needs: check\n    if: needs.check.outputs.signed-targets != '[]'\n"
+          + "    strategy:\n      fail-fast: true\n      matrix:\n        include: ${{ fromJSON(needs.check.outputs.signed-targets) }}\n"
+          + "    runs-on: ${{ matrix.runner }}\n    environment: release\n    timeout-minutes: 105\n    steps: *build-steps\n\n  publish:\n"));
+        assert.equal(workflow.text.match(/&build-steps|\*build-steps/g)?.length, 2);
+        assert.ok(workflow.text.includes(`      - name: Make the package\n        timeout-minutes: 40\n        env:\n          SIGNED: \${{ matrix.signed }}\n`
           + ReleaseWorkflowTests.CREDENTIALS.map(([platform, name]) => `          ${name}: \${{ ${ReleaseWorkflowTests.SIGNED} && matrix.platform == '${platform}' && secrets.${name} || '' }}\n`).join("")
           + "        run: |\n"));
-        assert.equal(workflow.text.match(/environment: /g)?.length, 2);
+        assert.deepEqual(workflow.text.match(/environment: .*/g), ["environment: release", "environment: publish"]);
       });
 
     test("a build keeps its package report with three tries apart from the release files, and fails when there is none", async () => {
@@ -165,7 +189,7 @@ class ReleaseWorkflowTests {
         + "          RELEASE_FOLDER: ${{ github.workspace }}/_build/release\n"
         + "          RELEASE_REPORTS: ${{ github.workspace }}/_build/release-reports\n"
         + "          RELEASE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n        run: node scripts/release-publish.ts\n"));
-      assert.ok(workflow.text.includes("    name: Publish the release\n    needs: build\n"));
+      assert.ok(workflow.text.includes(`    name: Publish the release\n${ReleaseWorkflowTests.PUBLISH_NEEDS}`));
       assert.ok(workflow.text.indexOf("Take this run's release files") < workflow.text.indexOf("      - name: Publish the release\n"));
     });
   }

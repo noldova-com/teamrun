@@ -38,7 +38,8 @@ jobs:
       actions: read
       contents: read
     outputs:
-      signed: ${{ steps.check.outputs.signed }}
+      targets: ${{ steps.targets.outputs.targets }}
+      signed-targets: ${{ steps.targets.outputs.signed-targets }}
     steps:
       - name: Require the workflow from main
         timeout-minutes: 1
@@ -104,23 +105,47 @@ jobs:
           RELEASE_REVISION: ${{ inputs.revision }}
         run: node scripts/release-check.ts
 
+      - name: List the targets, apart from those the release signs
+        id: targets
+        timeout-minutes: 1
+        env:
+          SIGNING: ${{ steps.check.outputs.signed }}
+        run: |
+          set -euo pipefail
+          targets=''
+          signed_targets=''
+          while IFS='|' read -r target runner architecture platform; do
+            signed=false
+            case " $SIGNING " in
+              *" $platform "*) signed=true ;;
+            esac
+            entry="{\"target\":\"$target\",\"runner\":\"$runner\",\"architecture\":\"$architecture\",\"platform\":\"$platform\",\"signed\":\"$signed\"}"
+            if [ "$signed" = true ]; then
+              signed_targets="$signed_targets${signed_targets:+,}$entry"
+            else
+              targets="$targets${targets:+,}$entry"
+            fi
+          done <<'TARGETS'
+          Linux x64|ubuntu-24.04|x64|linux
+          Linux ARM64|ubuntu-24.04-arm|arm64|linux
+          Windows x64|windows-2025|x64|windows
+          Windows ARM64|windows-11-arm|arm64|windows
+          macOS x64|macos-15-intel|x64|macos
+          macOS ARM64|macos-15|arm64|macos
+          TARGETS
+          echo "targets=[$targets]" >> "$GITHUB_OUTPUT"
+          echo "signed-targets=[$signed_targets]" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build, test and package (${{ matrix.target }})
     needs: check
     strategy:
       fail-fast: true
       matrix:
-        include:
-          - { target: Linux x64, runner: ubuntu-24.04, architecture: x64, platform: linux }
-          - { target: Linux ARM64, runner: ubuntu-24.04-arm, architecture: arm64, platform: linux }
-          - { target: Windows x64, runner: windows-2025, architecture: x64, platform: windows }
-          - { target: Windows ARM64, runner: windows-11-arm, architecture: arm64, platform: windows }
-          - { target: macOS x64, runner: macos-15-intel, architecture: x64, platform: macos }
-          - { target: macOS ARM64, runner: macos-15, architecture: arm64, platform: macos }
+        include: ${{ fromJSON(needs.check.outputs.targets) }}
     runs-on: ${{ matrix.runner }}
-    environment: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && 'release' || '' }}
     timeout-minutes: 105
-    steps:
+    steps: &build-steps
       - name: Stop Spotlight indexing
         if: runner.os == 'macOS'
         timeout-minutes: 2
@@ -165,15 +190,15 @@ jobs:
       - name: Make the package
         timeout-minutes: 40
         env:
-          SIGNED: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) }}
-          AZURE_TENANT_ID: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'windows' && secrets.AZURE_TENANT_ID || '' }}
-          AZURE_CLIENT_ID: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'windows' && secrets.AZURE_CLIENT_ID || '' }}
-          AZURE_CLIENT_SECRET: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'windows' && secrets.AZURE_CLIENT_SECRET || '' }}
-          MAC_CERTIFICATE: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE || '' }}
-          MAC_CERTIFICATE_PASSWORD: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
-          APPLE_API_KEY_P8: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.APPLE_API_KEY_P8 || '' }}
-          APPLE_API_KEY_ID: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
-          APPLE_API_ISSUER: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+          SIGNED: ${{ matrix.signed }}
+          AZURE_TENANT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          MAC_CERTIFICATE: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE || '' }}
+          MAC_CERTIFICATE_PASSWORD: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_P8: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_KEY_P8 || '' }}
+          APPLE_API_KEY_ID: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
         run: |
           if [ "$SIGNED" = true ]; then
             npm run package -- --signed
@@ -305,9 +330,23 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+  build-signed:
+    name: Build, test, package and sign (${{ matrix.target }})
+    needs: check
+    if: needs.check.outputs.signed-targets != '[]'
+    strategy:
+      fail-fast: true
+      matrix:
+        include: ${{ fromJSON(needs.check.outputs.signed-targets) }}
+    runs-on: ${{ matrix.runner }}
+    environment: release
+    timeout-minutes: 105
+    steps: *build-steps
+
   publish:
     name: Publish the release
-    needs: build
+    needs: [build, build-signed]
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.build-signed.result == 'success' || needs.build-signed.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: publish

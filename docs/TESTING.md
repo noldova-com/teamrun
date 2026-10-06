@@ -373,7 +373,8 @@ Once the runtime has stopped, it installs again over the install and requires th
 It then uninstalls silently and requires the install folder emptied and the user's `Path` as it was before the install.
 On macOS, once the runtime answers, it links the bundle's `Contents/Resources/bin/teamrun` from its own folder and requires that link's `teamrun status` to report the runtime as well.
 A run by hand packages every target, macOS included, and keeps the packages and the package report as artifacts for two weeks.
-A run by hand from `main` with `signed` set signs the packages of the platforms in `teamrun.signedPlatforms`: those jobs run in the `release` environment, and their packaging step alone receives its platform's credentials, as in a release.
+A run by hand from `main` with `signed` set signs the packages of the platforms a release to the update feed signs, as `node scripts/signed-platforms.ts` reads them from `teamrun.signedPlatforms`.
+Those targets package in their own job in the `release` environment, whose packaging step alone receives its platform's credentials, as in a release; the other targets package without an environment.
 `signed` is refused from any other ref, a tag included, and the nightly run never signs.
 The nightly run calls it for Windows x64 and Linux x64 only, keeps those packages three days and reports a failure to make or start the package like its other jobs, in the issue "Nightly: packaging <target>".
 A package that was made and started but could not be kept fails the job without an issue, since the product did not fail.

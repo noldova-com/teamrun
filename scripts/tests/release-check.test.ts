@@ -51,7 +51,7 @@ class ReleaseCheckTests {
       assert.deepEqual(exitCodes, [0, 0]);
       assert.equal(output.text, `v0.0.7 of noldova-com/teamrun from ${ReleaseCheckTests.REVISION}: the version is new, the revision is on main and its Build and test run there passed. `
         + "Signed platforms: none.\n");
-      assert.equal(await readFile(outputs, "utf8"), "signed=[]\n");
+      assert.equal(await readFile(outputs, "utf8"), "signed=\n");
       assert.deepEqual(github.requests, ["GET /releases/latest", `GET ${ReleaseCheckTests.TAG}`, `GET ${ReleaseCheckTests.COMPARE}`, `GET ${ReleaseCheckTests.RUNS}`]);
     });
 
@@ -127,7 +127,7 @@ class ReleaseCheckTests {
       assert.equal(await ReleaseCheckTests.checkAsync(repository, github, output, "0.0.7", { GITHUB_OUTPUT: outputs }), 0, output.text);
 
       assert.ok(output.text.endsWith("passed. Signed platforms: windows, macos.\n"), output.text);
-      assert.equal(await readFile(outputs, "utf8"), "signed=[\"windows\",\"macos\"]\n");
+      assert.equal(await readFile(outputs, "utf8"), "signed=windows macos\n");
     });
 
     test("a release to the update feed whose declaration leaves Windows or macOS unsigned is refused before GitHub is asked anything, whatever the case it is written in", async t => {

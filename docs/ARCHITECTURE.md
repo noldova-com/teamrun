@@ -1025,7 +1025,7 @@ Each target is packaged on its own platform and processor.
 - A release carries, for each target, its packages, a checksum file `<package>.sha256` in `sha256sum`'s format, and its update information in electron-updater's format: the version; each package's name, SHA-512 in base64 and size; the package the updater downloads, again as `path` with its SHA-512; and the release date.
   After `npm run package`, `npm run release:assets` writes the checksums and the metadata beside the machine's packages, with the root manifest's version.
 - `npm run release:check` checks a requested release before anything is built: the version is the root manifest's, follows the versioning below and has no tag yet, and the revision is a full commit SHA that `main` contains and whose latest **Build and test** run on `main` passed, which covers the full UI workflows that a release's own builds don't repeat.
-  It names the platforms the release signs, and writes them as the step's `signed` output, a JSON list, when `GITHUB_OUTPUT` is set.
+  It names the platforms the release signs, and writes them as the step's `signed` output, separated by spaces, when `GITHUB_OUTPUT` is set.
 - `npm run release:publish` publishes every target's files from one folder:
   - It first checks the package reports in `RELEASE_REPORTS`, one folder per target with its `package-report.json`: every target needs exactly one, and each must say signed and checked for a platform the release signs, and neither for any other.
     A missing, extra, unreadable or differing report stops the release before anything is published, naming each problem.
@@ -1047,13 +1047,15 @@ Each target is packaged on its own platform and processor.
   It follows every other rule here, including the versions and becoming that repository's latest release.
 - The **Release** workflow, `.github/workflows/release.yml`, releases its own repository.
   It runs only by hand, from `main`, with a version and a revision, and one release per repository runs at a time:
-  - Its check job runs `release:check`, and passes on the platforms it signs.
+  - Its check job runs `release:check`, then lists the targets in two groups: those of the platforms the release signs, and the rest.
   - Each target then builds on its own runner, runs `npm test`, makes its packages, installs, starts and quits them as the Package workflow does, and writes its release files with `release:assets`.
     It keeps them, and apart from them its package report, as artifacts of the run, with three tries each.
-  - A target of a signed platform runs in the `release` environment and makes its packages with `--signed`.
-    Only its packaging step receives the credentials, and only those of its own platform: the Windows signing section's three Azure variables, or the macOS signing section's five.
-    Every other target, and every target of a trial, runs outside that environment without credentials.
+  - The signed targets build in their own job, the only one that names the `release` environment, and make their packages with `--signed`; it runs only when the release signs a platform.
+    The other targets, and every target of a trial, build in a job without an environment or credentials.
+    Both jobs run one list of steps.
+    Only the signing job's packaging step receives credentials, and only those of its own platform: the Windows signing section's three Azure variables, or the macOS signing section's five.
   - The publish job alone may write to the repository, behind the `publish` environment.
+    It runs once the unsigned targets' job passed and the signing job passed or was not needed.
     It takes every target's files and package report from this run's artifacts, also when only it runs again, and runs `release:publish` with the run's address.
 - Releases use numbered versions such as `0.0.1` and `0.0.2`, without prerelease suffixes or build metadata, and matching `v`-prefixed tags.
   Each successful publication becomes the latest release.
