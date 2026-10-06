@@ -45,11 +45,10 @@ test.describe("the harness's viewport and cursor guard", () => {
 
   test("a workflow starts with nothing hovered even when the pointer left the window without moving", async ({ desktop }) => {
     await desktop.window.mouse.move(100, 100);
-    const hovered = await isHovered(desktop);
+    await expect.poll(() => isHovered(desktop)).toBe(true);
 
     await desktop.useViewportAsync(1920, 1080);
 
-    expect(hovered).toBe(true);
     expect(await isHovered(desktop)).toBe(false);
   });
 
