@@ -318,7 +318,6 @@ export class Resources {
   }
 
   public static readonly linuxPlatform: string = "linux";
-  public static readonly macPlatform: string = "darwin";
   public static readonly loopbackHost: string = "127.0.0.1";
   public static readonly tcpEndpointPrefix: string = "tcp://127.0.0.1:";
   public static readonly portPattern: RegExp = /^[1-9]\d{0,4}$/;
