@@ -12,8 +12,8 @@ export class ProcessClockFixture extends ProcessClock {
   public time: number;
   public clockOffset: number = 0;
 
-  public constructor(time: number) {
-    super("1700000000", false);
+  public constructor(time: number, boot: string = "1700000000", isBootRelative: boolean = false) {
+    super(boot, isBootRelative);
 
     this.time = time;
   }

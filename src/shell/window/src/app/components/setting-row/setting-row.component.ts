@@ -61,8 +61,9 @@ export class SettingRowComponent {
   }
 
   protected commitNumber(event: Event): void {
-    const field = event.target as HTMLInputElement;
-    const value = field.valueAsNumber;
+    if (!(event.target instanceof HTMLInputElement))
+      return;
+    const value = event.target.valueAsNumber;
     const type = this.definition().type;
     if (!Number.isNaN(value) && type.accepts(value)) {
       this.choose(value);
@@ -72,16 +73,18 @@ export class SettingRowComponent {
   }
 
   protected revertNumber(event: Event): void {
-    const field = event.target as HTMLInputElement;
-    if (Object.isNull(this.error()) && field.valueAsNumber === this.current())
+    if (!(event.target instanceof HTMLInputElement))
+      return;
+    if (Object.isNull(this.error()) && event.target.valueAsNumber === this.current())
       return;
     event.stopPropagation();
-    field.value = String(this.current());
+    event.target.value = String(this.current());
     this.error.set(null);
   }
 
   protected commitText(event: Event): void {
-    this.choose((event.target as HTMLInputElement).value);
+    if (event.target instanceof HTMLInputElement)
+      this.choose(event.target.value);
   }
 
   protected toggleModule(id: string, isChecked: boolean): void {

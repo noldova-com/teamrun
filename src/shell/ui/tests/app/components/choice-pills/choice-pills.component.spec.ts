@@ -131,6 +131,16 @@ describe("ChoicePillsComponent", () => {
     expect(document.activeElement).toBe(fixture.nativeElement.querySelector(".before"));
   });
 
+  it("moves only for a key pressed on one of its pills, not on its group", () => {
+    render();
+
+    group().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    fixture.detectChanges();
+
+    expect(host.changes).toEqual([]);
+    expect(selected()).toEqual(["Light"]);
+  });
+
   it("shows the keyboard focus as an outline inside the pill", async () => {
     render();
     pills()[1]?.focus();

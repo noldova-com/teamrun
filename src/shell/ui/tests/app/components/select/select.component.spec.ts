@@ -244,4 +244,20 @@ describe("SelectComponent", () => {
         AppearanceFixture.expectLook(other.minHeight, theme, "dropdown-row-height", "min-height");
         AppearanceFixture.expectLook(other.paddingLeft, theme, "dropdown-row-padding", "padding-left");
       });
+
+  it("closes on Enter or Space only from an HTML element that holds the value, not from an SVG element that does", async () => {
+    render();
+    await openAsync();
+    const graphic = (list() as HTMLElement).appendChild(document.createElementNS("http://www.w3.org/2000/svg", "svg"));
+    graphic.setAttribute("data-value", "System");
+
+    graphic.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    graphic.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    fixture.detectChanges();
+
+    expect(list()).not.toBeNull();
+    options()[2]?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    fixture.detectChanges();
+    expect(list()).toBeNull();
+  });
 });

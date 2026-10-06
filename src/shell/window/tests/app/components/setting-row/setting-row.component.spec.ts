@@ -7,6 +7,7 @@
  */
 
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 import { page, userEvent } from "vitest/browser";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -209,6 +210,23 @@ describe("SettingRowComponent", () => {
     fixture.detectChanges();
 
     expect(row.querySelector("[role=alert]")?.textContent?.trim()).toBe("Enter a number from 0 to 1 in steps of 0.25.");
+  });
+
+  it("takes a number, a text or an escape only from its own field", () => {
+    const foreign = { target: document.createElement("div"), stopPropagation: () => {
+      throw new Error("An escape from another element was handled.");
+    } };
+    const number = render(SettingsFixture.panelSize, 14);
+    const numberField = fixture.debugElement.query(By.css("input"));
+    numberField.triggerEventHandler("change", foreign);
+    numberField.triggerEventHandler("keydown.escape", foreign);
+    fixture.detectChanges();
+    const numberShown = [number.querySelector("[role=alert]"), (number.querySelector("input") as HTMLInputElement).value];
+    render(SettingsFixture.greeting);
+    fixture.debugElement.query(By.css("input")).triggerEventHandler("change", foreign);
+
+    expect(numberShown).toEqual([null, "14"]);
+    expect(changes).toEqual([]);
   });
 
   it("changes text when the field is committed", () => {

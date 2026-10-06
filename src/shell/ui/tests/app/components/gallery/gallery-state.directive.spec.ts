@@ -42,6 +42,7 @@ describe("GalleryStateDirective", () => {
   const look = (element: Element): string[] => [element, ...element.querySelectorAll("*")]
     .flatMap(t => [null, "::before", "::after"].map(pseudo => properties.map(p => getComputedStyle(t, pseudo).getPropertyValue(p)).join(" ")));
   const name = (element: Element): string => `${element.closest(".tr-gallery-specimen")?.getAttribute("aria-label") ?? ""} / ${element.closest("tr-gallery-cell")?.getAttribute("aria-label") ?? ""}`;
+  const namedLook = (element: Element): readonly [string, readonly string[]] => [name(element), look(element)];
 
   let park: HTMLElement;
 
@@ -83,19 +84,23 @@ describe("GalleryStateDirective", () => {
 
     expect(marked.map(t => name(t))).toEqual(["Button / Hover", "Button / Secondary, hover", "Icon button / Hover", "Choice pills / Hover", "Tab / Hover", "Toolbar button / Hover",
       "Menu / Rows", "Menu / Menu bar, hover"]);
-    for (const element of marked) {
-      const shown = look(element);
+    await userEvent.hover(park);
+    const shown = marked.map(t => namedLook(t));
+    for (const element of marked)
       element.removeAttribute(GalleryResources.stateAttribute);
-      await userEvent.hover(park);
-      const plain = look(element);
+    const plain = marked.map(t => namedLook(t));
+    const real: (readonly [string, readonly string[]])[] = [];
+    for (const element of marked) {
       await userEvent.hover(element);
-      const real = look(element);
-      await userEvent.hover(park);
+      real.push(namedLook(element));
+    }
+    await userEvent.hover(park);
+    for (const element of marked)
       element.setAttribute(GalleryResources.stateAttribute, GalleryState.Hover);
 
-      expect([name(element), shown]).toEqual([name(element), real]);
-      expect([name(element), shown]).not.toEqual([name(element), plain]);
-    }
+    expect(shown).toEqual(real);
+    for (const [index, cell] of shown.entries())
+      expect(cell).not.toEqual(plain[index]);
   });
 
   it("shows in each of the Gallery's Focus cells the look its control has when it really holds the keyboard focus", async () => {

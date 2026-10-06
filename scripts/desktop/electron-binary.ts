@@ -9,7 +9,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Writable } from "node:stream";
-import { setTimeout } from "node:timers/promises";
+import timers from "node:timers/promises";
 
 import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
@@ -21,18 +21,17 @@ export default class ElectronBinary {
   private static readonly DISTRIBUTION_FOLDER: string = "dist";
   private static readonly ATTEMPTS: number = 4;
   private static readonly ATTEMPT_TIMEOUT: number = 600_000;
+  private static readonly PAUSE: number = 15_000;
   private static readonly INSTALLING: string = "Installing Electron's binary...\n";
 
   private readonly directory: string;
   private readonly root: string;
   private readonly runner: ProcessRunner;
-  private readonly pauseMilliseconds: number;
 
-  public constructor(root: string, runner: ProcessRunner, pauseMilliseconds: number = 15_000) {
+  public constructor(root: string, runner: ProcessRunner) {
     this.root = root;
     this.directory = path.join(root, ...ElectronBinary.PACKAGE_SEGMENTS);
     this.runner = runner;
-    this.pauseMilliseconds = pauseMilliseconds;
   }
 
   public isInstalled(): boolean {
@@ -53,8 +52,8 @@ export default class ElectronBinary {
         return;
       failure = result.isSuccessful ? "it reported success, but the binary is still missing" : `exit code ${result.exitCode}: ${result.errorOutput.trim()}`;
       if (attempt < ElectronBinary.ATTEMPTS) {
-        output.write(`Electron's binary could not be installed (attempt ${attempt} of ${ElectronBinary.ATTEMPTS}); trying again in ${this.pauseMilliseconds / 1000} seconds.\n`);
-        await setTimeout(this.pauseMilliseconds);
+        output.write(`Electron's binary could not be installed (attempt ${attempt} of ${ElectronBinary.ATTEMPTS}); trying again in ${ElectronBinary.PAUSE / 1000} seconds.\n`);
+        await timers.setTimeout(ElectronBinary.PAUSE);
       }
     }
     throw new ProcessException(`Electron's binary could not be installed in ${ElectronBinary.ATTEMPTS} attempts; the last failed with ${failure}.`);

@@ -127,7 +127,9 @@ export class SettingsComponent {
   }
 
   protected search(event: Event): void {
-    this.query.set((event.target as HTMLInputElement).value);
+    if (!(event.target instanceof HTMLInputElement))
+      return;
+    this.query.set(event.target.value);
     this.keep();
   }
 
