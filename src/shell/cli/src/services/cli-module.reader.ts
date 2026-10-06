@@ -20,7 +20,7 @@ export class CliModuleReader {
       return declarations.map(t => CliModule.fromDeclaration(t));
     }
     catch (error) {
-      throw new DeclarationsFormatException(Resources.formatCliCommandsUnreadable(file, String(error)), new ExceptionOptions(error));
+      throw new DeclarationsFormatException(Resources.formatCliCommandsUnreadable(file, Resources.formatReason(error)), new ExceptionOptions(error));
     }
   }
 }

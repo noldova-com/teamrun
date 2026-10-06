@@ -30,7 +30,7 @@ export class ResourcesTests {
       "\n  --no-start ",
       "\n  --take-over ",
       "\n  --timeout <seconds> ",
-      "\nExit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,\n5 data directory unusable, 6 timed out or cancelled, 7 module not active, 8 TeamRun is installing an update.\n"
+      "\nExit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,\n5 data directory unusable, 6 timed out or cancelled, 7 module not active, 8 TeamRun is installing an update,\n9 a module command ran but a command-line part failed to stop.\n"
     ];
 
     const help = await fixture.runAsync(["help"]);

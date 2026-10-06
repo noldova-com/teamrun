@@ -39,7 +39,7 @@ export class CliOptionDefinitionTests {
   @TestMethod
   public async refusesDeclarationsWhoseOptionHasAnUnknownTypeOrLacksAField(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
-    const prefix = `The module declarations ${fixture.declarationsFile} hold command-line commands that are not valid: JsonException: notes.cliCommands.0.options.0.`;
+    const prefix = `The module declarations ${fixture.declarationsFile} hold command-line commands that are not valid: notes.cliCommands.0.options.0.`;
     const option = { name: "title", description: "The title.", type: "Text", required: false, repeated: false, default: null };
     const cases: readonly (readonly [Readonly<Record<string, unknown>>, string])[] = [
       [{ ...option, type: "Date" }, "type: Expected one of Text, Number, Boolean."],

@@ -25,6 +25,7 @@ export class CliHelpTests {
     "  call-malformed  Runs probe.callMalformed.",
     "  call-other      Runs probe.callOther.",
     "  throw-plain     Runs probe.throwPlain.",
+    "  call-later      Runs probe.callLater.",
     "  wait-forever    Runs probe.waitForever.",
     "  fail-with-code  Runs probe.failWithCode.",
     "  refuse          Runs probe.refuse.",

@@ -81,7 +81,7 @@ export class CliFixture implements AsyncDisposable {
     input: string = "",
     starter?: IProcessStarter,
     updateWaitMilliseconds?: number,
-    entryPath: string = build?.entryPath ?? this.entryPath): Promise<{ code: number; output: string; error: string }> {
+    entryPath: string = build?.entryPath ?? this.entryPath): Promise<{ code: number; output: string; error: string; readLaterError: () => string }> {
     const output = new PassThrough({ encoding: "utf8" });
     const error = new PassThrough({ encoding: "utf8" });
     const inputStream = new PassThrough({ encoding: "utf8" });
@@ -90,10 +90,10 @@ export class CliFixture implements AsyncDisposable {
     const context = new CliContext(environment, process.platform, this.homeFolder, process.execPath, entryPath, identity,
       output, error, inputStream, this.signals, starter, this.opener, process.pid, updateWaitMilliseconds);
     const code = await new Cli(context).runAsync(commandLineArguments);
-    return { code, output: String(output.read() ?? ""), error: String(error.read() ?? "") };
+    return { code, output: String(output.read() ?? ""), error: String(error.read() ?? ""), readLaterError: () => String(error.read() ?? "") };
   }
 
-  public runModuleAsync(build: ProbeBuildFixture, commandLineArguments: readonly string[]): Promise<{ code: number; output: string; error: string }> {
+  public runModuleAsync(build: ProbeBuildFixture, commandLineArguments: readonly string[]): Promise<{ code: number; output: string; error: string; readLaterError: () => string }> {
     return this.runAsync([CliFixture.DATA_DIRECTORY_FLAG, this.dataDirectory, ...commandLineArguments], null, this.environment, "", undefined, undefined, build.entryPath);
   }
 

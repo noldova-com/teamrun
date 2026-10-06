@@ -39,7 +39,7 @@ export class CliModuleTests {
       [{ ...module, dependencies: [1] }, invalid("dependencies")],
       [{ ...module, cliPackage: false }, invalid("cliPackage")],
       [{ ...module, cliCommands: {} }, invalid("cliCommands")],
-      [{ ...module, cliCommands: ["notes.add"] }, "hold command-line commands that are not valid: JsonException: notes.cliCommands.0: Expected a JSON object."]
+      [{ ...module, cliCommands: ["notes.add"] }, "hold command-line commands that are not valid: notes.cliCommands.0: Expected a JSON object."]
     ];
 
     for (const [declared, problem] of cases) {

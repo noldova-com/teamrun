@@ -19,6 +19,11 @@ export class ProbeBuildFixture implements AsyncDisposable {
   public static readonly PARTS_LOG: string = "parts.log";
   public static readonly CLI_WAITING_MARKER: string = "cli-waiting";
   public static readonly STALLED_MARKER: string = "stalled";
+  public static readonly SLOW_MARKER: string = "slow";
+  public static readonly SLOW_RELEASE: string = "slow-released";
+  public static readonly SLOW_STICKS: string = "slow-sticks";
+  public static readonly CALL_WAITING_MARKER: string = "call-waiting";
+  public static readonly CALL_RELEASE: string = "call-released";
   private static readonly WAITING_MARKER: string = "waiting";
   private static readonly RELEASE_MARKER: string = "released";
   private static readonly WAIT_LIMIT: number = 15_000;
@@ -52,19 +57,27 @@ export class ProbeBuildFixture implements AsyncDisposable {
     "}"
   ].join("\n");
   private static readonly LOGGING_PART: string = [
-    "import { appendFileSync } from \"node:fs\";",
+    "import { appendFileSync, existsSync } from \"node:fs\";",
     "const log = new URL(\"./parts.log\", import.meta.url);",
     "export class LoggingPart {",
     "  constructor(id) { this.id = id; }",
     "  async activateAsync(context) { appendFileSync(log, `activate ${this.id}\\n`); await this.register(context); }",
     "  async deactivateAsync() { appendFileSync(log, `deactivate ${this.id}\\n`); }",
     "  register() {}",
+    "}",
+    "export async function waitForFileAsync(name) {",
+    "  const file = new URL(`./${name}`, import.meta.url);",
+    `  const deadline = Date.now() + ${ProbeBuildFixture.WAIT_LIMIT};`,
+    "  while (!existsSync(file)) {",
+    `    if (Date.now() > deadline) throw new Error(\`\${name} did not appear within ${ProbeBuildFixture.WAIT_LIMIT} ms.\`);`,
+    "    await new Promise(resolve => setTimeout(resolve, 20));",
+    "  }",
     "}"
   ].join("\n");
   private static readonly PROBE_CLI_PART: string = [
     "import { writeFileSync } from \"node:fs\";",
     "import { CliCommandException, CliCommandResult, UsageException } from \"@noldova/teamrun-shell-cli\";",
-    "import { LoggingPart } from \"./logging-part.mjs\";",
+    "import { LoggingPart, waitForFileAsync } from \"./logging-part.mjs\";",
     `const waiting = new URL("./${ProbeBuildFixture.CLI_WAITING_MARKER}", import.meta.url);`,
     "export class CliPart extends LoggingPart {",
     "  constructor() { super(\"probe\"); }",
@@ -78,6 +91,10 @@ export class ProbeBuildFixture implements AsyncDisposable {
     "    context.registerCommand(\"probe.callMalformed\", { handleAsync: (values, signal) => context.requestAsync(\"nodot\", null, signal) });",
     "    context.registerCommand(\"probe.callOther\", { handleAsync: (values, signal) => context.requestAsync(\"needy.secret\", null, signal) });",
     "    context.registerCommand(\"probe.throwPlain\", { handleAsync: async () => { throw new Error(\"The probe tripped.\"); } });",
+    "    context.registerCommand(\"probe.callLater\", {",
+    `      handleAsync: async (values, signal) => { writeFileSync(new URL("./${ProbeBuildFixture.CALL_WAITING_MARKER}", import.meta.url), "yes");`,
+    `        await waitForFileAsync("${ProbeBuildFixture.CALL_RELEASE}"); return await context.requestAsync("probe.ping", "late", signal); }`,
+    "    });",
     "    context.registerCommand(\"probe.waitForever\", { handleAsync: () => { writeFileSync(waiting, \"yes\"); return new Promise(() => undefined); } });",
     "    context.registerCommand(\"probe.failWithCode\", {",
     "      handleAsync: async () => { throw new CliCommandException(\"ProbeBroke\", \"The probe's command broke.\", { why: \"asked\" }); }",
@@ -139,7 +156,37 @@ export class ProbeBuildFixture implements AsyncDisposable {
       "  async deactivateAsync() {}",
       "}"
     ].join("\n"),
-    "halfway": "export class CliPart { deactivateAsync = 1; async activateAsync() {} }"
+    "halfway": "export class CliPart { deactivateAsync = 1; async activateAsync() {} }",
+    "slow": [
+      "import { existsSync, writeFileSync } from \"node:fs\";",
+      "import { LoggingPart, waitForFileAsync } from \"./logging-part.mjs\";",
+      "export class CliPart extends LoggingPart {",
+      "  constructor() { super(\"slow\"); }",
+      "  async register(context) {",
+      `    writeFileSync(new URL("./${ProbeBuildFixture.SLOW_MARKER}", import.meta.url), "yes");`,
+      `    await waitForFileAsync("${ProbeBuildFixture.SLOW_RELEASE}");`,
+      "    context.registerCommand(\"slow.run\", { handleAsync: async () => null });",
+      "  }",
+      "  async deactivateAsync() {",
+      "    await super.deactivateAsync();",
+      `    if (existsSync(new URL("./${ProbeBuildFixture.SLOW_STICKS}", import.meta.url))) throw "The slow part would not let go.";`,
+      "  }",
+      "}"
+    ].join("\n"),
+    "tardy": [
+      "import { LoggingPart } from \"./logging-part.mjs\";",
+      "export class CliPart extends LoggingPart {",
+      "  constructor() { super(\"tardy\"); }",
+      "  register(context) { context.registerCommand(\"tardy.run\", { handleAsync: async () => null }); }",
+      "}"
+    ].join("\n"),
+    "distant": [
+      "import { LoggingPart } from \"./logging-part.mjs\";",
+      "export class CliPart extends LoggingPart {",
+      "  constructor() { super(\"distant\"); }",
+      "  register(context) { context.registerCommand(\"distant.run\", { handleAsync: (values, signal) => context.requestAsync(\"probe.ping\", null, signal) }); }",
+      "}"
+    ].join("\n")
   };
 
   private readonly folder: string;
@@ -256,7 +303,7 @@ export class ProbeBuildFixture implements AsyncDisposable {
       echo,
       ProbeBuildFixture.command("probe.callRuntime", [text]),
       ...[
-        "probe.callMissing", "probe.callMalformed", "probe.callOther", "probe.throwPlain", "probe.waitForever", "probe.failWithCode", "probe.refuse", "probe.stayQuiet",
+        "probe.callMissing", "probe.callMalformed", "probe.callOther", "probe.throwPlain", "probe.callLater", "probe.waitForever", "probe.failWithCode", "probe.refuse", "probe.stayQuiet",
         "probe.unregistered"
       ].map(plain)
     ];
@@ -267,6 +314,9 @@ export class ProbeBuildFixture implements AsyncDisposable {
       ...["hollow", "clumsy", "greedy", "doubled", "halfway", "nameless", "inert", "lopsided", "unfinished", "stalled"]
         .map(t => ProbeBuildFixture.declare(t, t, [], [plain(`${t}.run`)], null, cliPackage(t))),
       ProbeBuildFixture.declare("sticky", "Sticky", ["probe"], [plain("sticky.run"), plain("sticky.fail")], null, cliPackage("sticky")),
+      ProbeBuildFixture.declare("distant", "Distant", ["needy"], [plain("distant.run")], null, cliPackage("distant")),
+      ProbeBuildFixture.declare("slow", "Slow", [], [plain("slow.run")], null, cliPackage("slow")),
+      ProbeBuildFixture.declare("tardy", "Tardy", ["slow"], [plain("tardy.run")], null, cliPackage("tardy")),
       ProbeBuildFixture.declare("absent", "Absent", [], [plain("absent.run")], null, pathToFileURL(path.join(folder, "absent-cli.mjs")).href),
       ProbeBuildFixture.declare("failing", "Failing", [], [plain("failing.run")], pathToFileURL(path.join(folder, "missing-runtime.mjs")).href, null),
       ProbeBuildFixture.declare("blocked", "Blocked", ["failing"], [plain("blocked.run")], null, null)

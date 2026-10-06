@@ -15,5 +15,6 @@ export enum ExitCode {
   DataDirectoryUnusable = 5,
   Stopped = 6,
   ModuleNotActive = 7,
-  Updating = 8
+  Updating = 8,
+  PartNotStopped = 9
 }

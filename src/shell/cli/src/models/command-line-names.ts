@@ -27,14 +27,17 @@ export class CommandLineNames {
   public static readonly takeOver: string = "take-over";
   public static readonly timeout: string = "timeout";
   public static readonly argumentsFile: string = "args-file";
-  public static readonly ownOptions: readonly string[] = [
+  public static readonly valueOptions: readonly string[] = [
     CommandLineNames.dataDirectory,
     CommandLineNames.deviceDirectory,
+    CommandLineNames.timeout,
+    CommandLineNames.argumentsFile
+  ];
+  public static readonly switches: readonly string[] = [
     CommandLineNames.json,
     CommandLineNames.noStart,
     CommandLineNames.takeOver,
-    CommandLineNames.timeout,
-    CommandLineNames.argumentsFile,
     CommandLineNames.help
   ];
+  public static readonly ownOptions: readonly string[] = [...CommandLineNames.valueOptions, ...CommandLineNames.switches];
 }

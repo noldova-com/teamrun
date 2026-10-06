@@ -41,9 +41,9 @@ export class CliCommandExceptionTests {
     const json = await fixture.runModuleAsync(build, ["probe", "throw-plain", "--json"]);
 
     Assert.areEqual(1, text.code, text.error);
-    Assert.areEqual("The command failed: Error: The probe tripped.\n", text.error);
+    Assert.areEqual("The command failed: The probe tripped.\n", text.error);
     Assert.areEqual(1, json.code, json.error);
-    Assert.areEqual("{\"code\":\"Failed\",\"message\":\"The command failed: Error: The probe tripped.\"}\n", json.error);
+    Assert.areEqual("{\"code\":\"Failed\",\"message\":\"The command failed: The probe tripped.\"}\n", json.error);
     Assert.areEqual("activate probe\ndeactivate probe\n".repeat(2), await build.readPartsLogAsync());
   }
 

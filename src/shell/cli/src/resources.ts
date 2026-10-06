@@ -79,6 +79,7 @@ export class Resources {
   public static readonly dataDirectoryUnusableCode: string = "DataDirectoryUnusable";
   public static readonly failedCode: string = "Failed";
   public static readonly moduleNotActiveCode: string = "ModuleNotActive";
+  public static readonly partNotStoppedCode: string = "PartNotStopped";
   public static readonly unusableDirectoryErrorCodes: readonly string[] = ["EACCES", "EPERM", "EROFS", "ENOTDIR", "EEXIST"];
 
   public static get usage(): string {
@@ -104,7 +105,8 @@ export class Resources {
       "  --help              Prints the help of the command it follows.",
       String.empty,
       "Exit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,",
-      `5 data directory unusable, 6 timed out or cancelled, 7 module not active, 8 ${Resources.productName} is installing an update.`
+      `5 data directory unusable, 6 timed out or cancelled, 7 module not active, 8 ${Resources.productName} is installing an update,`,
+      "9 a module command ran but a command-line part failed to stop."
     ].join(Resources.lineEnd);
   }
 
@@ -245,6 +247,10 @@ export class Resources {
 
   public static formatModuleNotActive(moduleId: string, reason: string): string {
     return `The module ${moduleId} is not active: ${reason}`;
+  }
+
+  public static formatReason(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   public static formatCliPartFailed(reason: string): string {

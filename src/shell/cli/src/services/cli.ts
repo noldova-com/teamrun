@@ -107,8 +107,12 @@ export class Cli {
       }
     }
     catch (error) {
-      return this.fail(output, this.isUpdating ? new UpdateInProgressException(UpdateBarrierStatus.Held) : error, null);
+      return this.failCommand(output, error);
     }
+  }
+
+  private failCommand(output: CliOutput, error: unknown): number {
+    return this.fail(output, this.isUpdating ? new UpdateInProgressException(UpdateBarrierStatus.Held) : error, null);
   }
 
   private fail(output: CliOutput, error: unknown, usage: string | null): number {
@@ -154,35 +158,44 @@ export class Cli {
     const usage = CliHelp.formatCommand(module, command);
     if (commandLine.isHelp)
       return Cli.help(output, usage);
-    let result: CliCommandResult;
+    let call: ModuleCall;
     try {
-      result = await this.runModuleCommandAsync(commandLine, modules, module, ModuleCall.parse(command, rest));
+      call = ModuleCall.parse(command, rest);
     }
     catch (error) {
-      if (error instanceof UsageException)
-        return this.fail(output, error, usage);
-      throw error;
+      return this.fail(output, error, usage);
     }
-    output.writeCommandResult(result);
-    return ExitCode.Success;
+    return await this.runModuleCommandAsync(commandLine, output, usage, modules, module, call);
   }
 
-  private async runModuleCommandAsync(commandLine: CommandLine, modules: readonly CliModule[], module: CliModule, call: ModuleCall): Promise<CliCommandResult> {
+  private async runModuleCommandAsync(
+    commandLine: CommandLine, output: CliOutput, usage: string, modules: readonly CliModule[], module: CliModule, call: ModuleCall): Promise<number> {
     const client = await this.attachAsync(commandLine, this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
     try {
-      const host = new CliPartHost(modules, (method, payload, signal) => Cli.callAsync(client, method, payload, undefined, signal));
+      const host = new CliPartHost(modules, (method, payload, signal) => Cli.callAsync(client, method, payload, undefined, signal),
+        reason => Cli.writeStopFailure(output, [reason]));
       const outcome = await this.untilStoppedAsync(signal => Cli.runPartsAsync(client, host, module, call, signal), commandLine.timeoutMilliseconds)
         .then(result => ({ result }), (error: unknown) => ({ error }));
       const failures = await host.stopAsync();
+      let code: number;
       if ("error" in outcome)
-        throw outcome.error;
-      if (failures.length > 0)
-        throw new CliCommandException(Resources.failedCode, Resources.formatCliPartStopFailed(failures.join(Resources.reasonSeparator)));
-      return outcome.result;
+        code = outcome.error instanceof UsageException ? this.fail(output, outcome.error, usage) : this.failCommand(output, outcome.error);
+      else {
+        output.writeCommandResult(outcome.result);
+        code = ExitCode.Success;
+      }
+      if (failures.length === 0)
+        return code;
+      Cli.writeStopFailure(output, failures);
+      return code === ExitCode.Success ? ExitCode.PartNotStopped : code;
     }
     finally {
       client.close();
     }
+  }
+
+  private static writeStopFailure(output: CliOutput, reasons: readonly string[]): void {
+    output.writeFailure(new CliFailure(ExitCode.PartNotStopped, Resources.partNotStoppedCode, Resources.formatCliPartStopFailed(reasons.join(Resources.reasonSeparator))), null);
   }
 
   private async untilStoppedAsync<T>(work: (signal: AbortSignal) => Promise<T>, timeout: number | null): Promise<T> {
@@ -209,14 +222,14 @@ export class Cli {
     if (Object.isUndefined(status))
       throw new ModuleNotActiveException(module.id, Resources.moduleNotInRuntime);
     Cli.requireActive(status);
-    const handler = await host.startAsync(module, call.command);
+    const handler = await host.startAsync(module, call.command, signal);
     try {
       return await handler.handleAsync(call.values, signal);
     }
     catch (error) {
-      throw error instanceof UsageException || error instanceof CliCommandException || error instanceof MethodFailureException
+      throw error instanceof UsageException || error instanceof CliCommandException || error instanceof MethodFailureException || error instanceof ConnectionException
         ? error
-        : new CliCommandException(Resources.failedCode, Resources.formatCommandFailed(String(error)));
+        : new CliCommandException(Resources.failedCode, Resources.formatCommandFailed(Resources.formatReason(error)));
     }
   }
 

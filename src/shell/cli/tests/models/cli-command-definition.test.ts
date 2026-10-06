@@ -31,7 +31,7 @@ export class CliCommandDefinitionTests {
   @TestMethod
   public async refusesDeclarationsWhoseCommandLacksASummaryOrHasABlankExample(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
-    const prefix = `The module declarations ${fixture.declarationsFile} hold command-line commands that are not valid: JsonException: notes.cliCommands.0.`;
+    const prefix = `The module declarations ${fixture.declarationsFile} hold command-line commands that are not valid: notes.cliCommands.0.`;
     const command = ProbeBuildFixture.command("notes.add");
     const cases: readonly (readonly [Readonly<Record<string, unknown>>, string])[] = [
       [{ ...command, summary: " " }, "summary: Expected a string that is not blank."],

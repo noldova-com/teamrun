@@ -64,7 +64,13 @@ export declare enum ExitCode {
    * TeamRun is installing an update: the update was still under way after
    * the wait, or one handed to the installer may not have finished.
    */
-  Updating = 8
+  Updating = 8,
+
+  /**
+   * The command succeeded and printed its result, but a command-line part
+   * failed to stop.
+   */
+  PartNotStopped = 9
 }
 
 /**
@@ -543,10 +549,13 @@ export interface ICliPart {
 
   /**
    * Deactivates the part once the command has ended, also when its
-   * activation failed or was stopped: it releases its timers and files.
+   * activation failed: it releases its timers and files. A part still
+   * activating when the command times out or is cancelled is deactivated once
+   * its activation settles.
    *
    * @returns A promise that resolves once the part has released everything; a
-   * rejection ends a command that succeeded with {@link ExitCode.Failed}.
+   * rejection is reported on standard error, and a command that succeeded
+   * then ends with {@link ExitCode.PartNotStopped}.
    * @example
    * ```ts
    * import type { ICliPart } from "@noldova/teamrun-shell-cli";

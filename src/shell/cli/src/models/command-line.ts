@@ -12,10 +12,11 @@ import { ArgumentsSource } from "../enums/arguments-source.js";
 import { CliCommand } from "../enums/cli-command.js";
 import { UsageException } from "../exceptions/usage.exception.js";
 import { Resources } from "../resources.js";
+import { CommandLineNames } from "./command-line-names.js";
 
 export class CommandLine {
-  private static readonly VALUE_OPTIONS: readonly string[] = [Resources.dataDirectoryFlag, Resources.deviceDirectoryFlag, Resources.timeoutFlag, Resources.argumentsFileFlag];
-  private static readonly SWITCHES: readonly string[] = [Resources.jsonFlag, Resources.noStartFlag, Resources.takeOverFlag, Resources.helpFlag];
+  private static readonly VALUE_OPTIONS: readonly string[] = CommandLineNames.valueOptions.map(t => `${Resources.flagPrefix}${t}`);
+  private static readonly SWITCHES: readonly string[] = CommandLineNames.switches.map(t => `${Resources.flagPrefix}${t}`);
   private static readonly ATTACHING: readonly CliCommand[] = [CliCommand.Commands, CliCommand.Run];
 
   public readonly command: CliCommand;

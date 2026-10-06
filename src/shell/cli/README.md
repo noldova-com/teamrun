@@ -50,6 +50,7 @@ The exit codes are stable; scripts may rely on them.
 | 6 | The command timed out or was cancelled. |
 | 7 | The command's module is not active: it failed or is blocked in the runtime, or its command-line part failed to start in this command line. The error names the module, its cause and, for a blocked module, the dependency that blocks it. |
 | 8 | TeamRun is installing an update: the update was still under way after 30 seconds, or one that was handed to the installer may not have finished. Run the command again once TeamRun has restarted, or open TeamRun to settle an update that did not finish. |
+| 9 | A module command succeeded and printed its result, but a command-line part failed to stop; the error names why. Its work is done, so running it again repeats it. |
 
 A failure from the runtime keeps the protocol's code in the JSON error.
 When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1.
@@ -91,11 +92,13 @@ The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how
   A missing required argument or option, an unknown option, a value of the wrong type, a value given to a `Boolean` option or an argument too many exits with code 2 and prints the command's usage, and no runtime starts.
 - **Running.**
   The command line then reaches the runtime as `run` does, starting one unless `--no-start` is given.
-  It runs the command only when the command's module is active, after starting that module's command-line part and those of its dependencies; otherwise it exits with code 7.
+  It runs the command only when the command's module is active, after starting that module's command-line part and those of its dependencies, direct and indirect; otherwise it exits with code 7.
   A part that fails to start also exits with code 7.
-  `--timeout` and an interruption cover starting the parts as well as running the command, and exit with code 6.
-  Every part that started, or began to start, is stopped afterwards in reverse order, even when one fails to stop; a part that fails to stop makes a command that succeeded exit with code 1.
-  A part reaches only the methods of its own module and of the modules it depends on.
+  `--timeout` and an interruption cover starting the parts as well as running the command, and exit with code 6; no part starts after them.
+  Every part that started, or began to start, is stopped afterwards in reverse order, even when one fails to stop; a part still starting then is stopped once its start settles.
+  A part that fails to stop is reported on standard error after the command's result or error, and makes a command that succeeded exit with code 9.
+  Stopping the parts is not bounded by `--timeout`: the command line waits for each part to stop, and an interruption while it waits ends the command line at once.
+  A part reaches only the methods of its own module and of the modules it declares as dependencies, not of their dependencies.
   `teamrun run` exits with code 7 too for a runtime command whose module is not active.
 - **Output.**
   A command prints its text on standard output, and with `--json` exactly its one JSON value instead.
