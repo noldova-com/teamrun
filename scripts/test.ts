@@ -12,6 +12,7 @@ import type { Writable } from "node:stream";
 import AngularProject from "./angular/angular-project.ts";
 import GalleryFile from "./angular/gallery-file.ts";
 import AngularTestCheck from "./checks/angular-test-check.ts";
+import BucketNameCheck from "./checks/bucket-name-check.ts";
 import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
 import FieldOrderCheck from "./checks/field-order-check.ts";
@@ -196,6 +197,7 @@ export default class Test {
       new LicenseHeaderCheck(this.root, files),
       new TestWaitCheck(this.root, files),
       new FieldOrderCheck(this.root, files),
+      new BucketNameCheck(this.root, files),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),

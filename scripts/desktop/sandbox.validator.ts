@@ -10,7 +10,7 @@ import { existsSync, type Stats } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
-export default class SandboxHelper {
+export default class SandboxValidator {
   private static readonly LINUX_PLATFORM: string = "linux";
   private static readonly FILE_NAME: string = "chrome-sandbox";
   private static readonly RESTRICTIONS: readonly (readonly [string, string])[] = [
@@ -43,11 +43,11 @@ export default class SandboxHelper {
   }
 
   public async findProblemAsync(executable: string): Promise<string | null> {
-    if (this.platform !== SandboxHelper.LINUX_PLATFORM || !await this.isRestrictedAsync())
+    if (this.platform !== SandboxValidator.LINUX_PLATFORM || !await this.isRestrictedAsync())
       return null;
-    const helper = path.join(path.dirname(executable), SandboxHelper.FILE_NAME);
+    const helper = path.join(path.dirname(executable), SandboxValidator.FILE_NAME);
     const status = await this.statAsync(helper);
-    if (status === null || status.uid === SandboxHelper.ROOT_USER && (status.mode & SandboxHelper.REQUIRED_MODE) === SandboxHelper.REQUIRED_MODE)
+    if (status === null || status.uid === SandboxValidator.ROOT_USER && (status.mode & SandboxValidator.REQUIRED_MODE) === SandboxValidator.REQUIRED_MODE)
       return null;
     const quoted = `'${helper.replaceAll("'", "'\\''")}'`;
     return [
@@ -59,7 +59,7 @@ export default class SandboxHelper {
   }
 
   private async isRestrictedAsync(): Promise<boolean> {
-    for (const [file, value] of SandboxHelper.RESTRICTIONS)
+    for (const [file, value] of SandboxValidator.RESTRICTIONS)
       if ((await this.readTextAsync(file))?.trim() === value)
         return true;
     return false;

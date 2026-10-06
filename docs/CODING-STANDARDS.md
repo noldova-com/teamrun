@@ -14,7 +14,7 @@ Place behavior with its owner:
 2. One package needs it: use a method of its owning concept.
 3. Several packages need it: place it in the lowest package that owns the concept, preserving dependency direction.
 
-Do not create `helper`, `helpers`, `util`, `utils`, `utility`, `common`, `shared` or `misc` buckets, `Helper`/`Utility` classes, static grab bags or unrelated free functions. Renaming a bucket does not establish ownership; incidental words in precise domain terms are allowed. An independent responsibility becomes a named concept, such as a reader, parser, tracker or policy. Free functions are allowed only where required by a language, framework or platform; their substantive behavior remains class-owned.
+Do not create `helper`, `helpers`, `util`, `utils`, `utility`, `common`, `shared` or `misc` buckets, `Helper`/`Utility` classes, static grab bags or unrelated free functions. Renaming a bucket does not establish ownership; incidental words in precise domain terms are allowed. The Bucket names check refuses a folder, a file name or a part of one, or a type, whose name ends in one of these words. An independent responsibility becomes a named concept, such as a reader, parser, tracker or policy. Free functions are allowed only where required by a language, framework or platform; their substantive behavior remains class-owned.
 
 ### Lifetime and performance
 
