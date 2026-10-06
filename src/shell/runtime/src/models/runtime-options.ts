@@ -23,6 +23,7 @@ export class RuntimeOptions {
   public readonly declarationsFile: string;
   public readonly startLogName: string | null;
   public readonly takeoverMilliseconds: number;
+  public readonly installationFolder: string | null;
 
   public constructor(
     dataDirectory: DataDirectory,
@@ -30,7 +31,8 @@ export class RuntimeOptions {
     serverSettings: ServerSettings = new ServerSettings(),
     declarationsFile: string = RuntimeOptions.locateDeclarations(),
     startLogName: string | null = null,
-    takeoverMilliseconds: number = Resources.takeover) {
+    takeoverMilliseconds: number = Resources.takeover,
+    installationFolder: string | null = null) {
     if (!Object.isNull(startLogName) && !Resources.startLogNamePattern.test(startLogName))
       throw new ArgumentException(Resources.formatStartLogNameInvalid(startLogName), Resources.startLogNameParameterName);
 
@@ -40,12 +42,14 @@ export class RuntimeOptions {
     this.declarationsFile = declarationsFile;
     this.startLogName = startLogName;
     this.takeoverMilliseconds = takeoverMilliseconds;
+    this.installationFolder = installationFolder;
   }
 
   public static parse(entryArguments: readonly string[]): RuntimeOptions {
     let dataDirectory: string | undefined;
     let idleGrace = Resources.idleGrace;
     let startLogName: string | null = null;
+    let installationFolder: string | null = null;
     for (let index = 0; index < entryArguments.length; index += 2) {
       const name = entryArguments[index];
       const value = entryArguments[index + 1];
@@ -57,12 +61,14 @@ export class RuntimeOptions {
         idleGrace = Number(value);
       else if (name === Resources.startLogArgument)
         startLogName = value;
+      else if (name === Resources.installationArgument)
+        installationFolder = value;
       else
         throw new ArgumentException(Resources.formatArgumentInvalid(String(name), value), Resources.argumentsParameterName);
     }
     if (Object.isUndefined(dataDirectory))
       throw new ArgumentException(Resources.dataDirectoryRequired, Resources.argumentsParameterName);
-    return new RuntimeOptions(new DataDirectory(dataDirectory), idleGrace, new ServerSettings(), RuntimeOptions.locateDeclarations(), startLogName);
+    return new RuntimeOptions(new DataDirectory(dataDirectory), idleGrace, new ServerSettings(), RuntimeOptions.locateDeclarations(), startLogName, Resources.takeover, installationFolder);
   }
 
   private static locateDeclarations(): string {

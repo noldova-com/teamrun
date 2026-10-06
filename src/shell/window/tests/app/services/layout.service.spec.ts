@@ -544,4 +544,17 @@ describe("LayoutService", () => {
     expect(write).toHaveBeenCalledTimes(2);
     expect(await store.readAsync()).toEqual(service.layout().toJson());
   });
+
+  it("writes the layout while TeamRun saves for an update", async () => {
+    await loadAsync(prepared());
+    const write = vi.spyOn(store, "writeAsync");
+    bridge.publishStartup({ kind: "Updating", details: ["0.3.0"] });
+    TestBed.tick();
+
+    service.activate(LayoutFixture.plan);
+    service.toggleDock(DockSide.Left);
+    await service.saveAsync();
+
+    expect(write).toHaveBeenCalledTimes(1);
+  });
 });
