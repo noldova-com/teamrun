@@ -16,7 +16,6 @@ import { LayoutMetrics } from "../../models/layout/layout-metrics";
 import { LayoutService } from "../../services/layout.service";
 import { StartupService } from "../../services/startup.service";
 import { TabFocusService } from "../../services/tab-focus.service";
-import { ViewDialogService } from "../../services/view-dialog.service";
 import { WindowPartHostService } from "../../services/window-part-host.service";
 import { DockComponent } from "../dock/dock.component";
 import { DockingGuidesComponent } from "../docking-guides/docking-guides.component";
@@ -48,7 +47,6 @@ export class WorkspaceComponent {
 
   protected readonly startup: StartupService = inject(StartupService);
   protected readonly layout: LayoutService = inject(LayoutService);
-  protected readonly dialogs: ViewDialogService = inject(ViewDialogService);
   protected readonly sides: readonly DockSide[] = Object.values(DockSide);
 
   public constructor() {

@@ -17,18 +17,25 @@ import ModuleException from "./modules/module.exception.ts";
 import PackageException from "./packages/package.exception.ts";
 import RootManifest from "./packages/root-manifest.ts";
 import ElectronDistribution from "./packaging/electron-distribution.ts";
+import type IPackageSigning from "./packaging/interfaces/i-package-signing.ts";
+import MacSigning from "./packaging/mac-signing.ts";
 import PackageConfiguration from "./packaging/package-configuration.ts";
 import PackageLayout from "./packaging/package-layout.ts";
 import PackageStage from "./packaging/package-stage.ts";
 import PackageTarget from "./packaging/package-target.ts";
 import PackagedBuild from "./packaging/packaged-build.ts";
 import PackagingException from "./packaging/packaging.exception.ts";
+import type PinnedPackage from "./packaging/pinned-package.ts";
+import SigningCredentials from "./packaging/signing-credentials.ts";
+import TrustedSigningModule from "./packaging/trusted-signing-module.ts";
+import WindowsSigning from "./packaging/windows-signing.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Package {
-  private static readonly USAGE: string = "Usage: npm run package\n";
+  private static readonly USAGE: string = "Usage: npm run package [-- --signed]\n";
+  private static readonly SIGNED_OPTION: string = "--signed";
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly TOOL_CACHE_MANIFEST: string = "package.json";
   private static readonly COMMONJS_SCOPE: string = `${JSON.stringify({ type: "commonjs" })}\n`;
@@ -50,8 +57,10 @@ export default class Package {
   private readonly runner: ProcessRunner;
   private readonly environment: NodeJS.ProcessEnv;
   private readonly output: Writable;
+  private readonly signingPackages: readonly PinnedPackage[];
 
-  public constructor(root: string, platform: string, architecture: string, stage: PackageStage, runner: ProcessRunner, environment: NodeJS.ProcessEnv, output: Writable) {
+  public constructor(root: string, platform: string, architecture: string, stage: PackageStage, runner: ProcessRunner, environment: NodeJS.ProcessEnv, output: Writable,
+    signingPackages: readonly PinnedPackage[]) {
     this.root = root;
     this.platform = platform;
     this.architecture = architecture;
@@ -59,10 +68,12 @@ export default class Package {
     this.runner = runner;
     this.environment = environment;
     this.output = output;
+    this.signingPackages = signingPackages;
   }
 
   public async runAsync(packageArguments: readonly string[]): Promise<number> {
-    if (packageArguments.length > 0) {
+    const credentials = SigningCredentials.take(this.environment);
+    if (packageArguments.length > 1 || packageArguments.some(t => t !== Package.SIGNED_OPTION)) {
       this.output.write(Package.USAGE);
       return Package.USAGE_EXIT_CODE;
     }
@@ -70,24 +81,18 @@ export default class Package {
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
       const layout = new PackageLayout(this.root);
+      const signing = packageArguments.length === 0 ? null : this.createSigning(target, layout, credentials);
       await this.stage.stageAsync(this.output);
       await rm(layout.output, { recursive: true, force: true });
       const electron = new ElectronDistribution(this.root, layout.electron);
       await electron.copyAsync();
-      const configuration = new PackageConfiguration(this.root, await RootManifest.readAsync(this.root), target, this.stage.folder, layout.output,
-        electron.folder, await electron.readVersionAsync());
-      await configuration.writeAsync(layout.configuration);
-      await mkdir(layout.toolCache, { recursive: true });
-      await writeFile(path.join(layout.toolCache, Package.TOOL_CACHE_MANIFEST), Package.COMMONJS_SCOPE);
-      const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.root, ...Package.BUILDER_SEGMENTS), ...Package.BUILDER_OPTIONS, layout.configuration], this.root,
-        this.createBuilderEnvironment(layout, target));
-      if (exitCode !== 0)
-        throw new PackagingException(`electron-builder failed with exit code ${exitCode}.`);
-      const files = configuration.fileNames.map(t => path.join(layout.output, t));
-      const missing = files.filter(t => !existsSync(t));
-      if (missing.length > 0)
-        throw new PackagingException(`electron-builder finished without making ${missing.join(", ")}.`);
-      this.output.write(`Packages made:\n${files.map(t => `  ${t}\n`).join("")}`);
+      try {
+        await signing?.prepareAsync();
+        await this.buildAsync(target, layout, electron, signing);
+      }
+      finally {
+        await signing?.disposeAsync();
+      }
       return 0;
     }
     catch (error) {
@@ -96,6 +101,37 @@ export default class Package {
       this.output.write(`${error.message}\n`);
       return 1;
     }
+  }
+
+  private createSigning(target: PackageTarget, layout: PackageLayout, credentials: NodeJS.ProcessEnv): IPackageSigning {
+    switch (target.platform) {
+      case PackageTarget.WINDOWS:
+        return new WindowsSigning(this.runner, this.root, layout.signing, layout.output, target, this.environment, credentials, this.signingPackages);
+      case PackageTarget.MACOS:
+        return new MacSigning(this.runner, layout.signing, this.environment, credentials);
+      default:
+        throw new PackagingException(`${Package.SIGNED_OPTION} signs Windows and macOS packages only, so it cannot sign the ${target.id} package.`);
+    }
+  }
+
+  private async buildAsync(target: PackageTarget, layout: PackageLayout, electron: ElectronDistribution, signing: IPackageSigning | null): Promise<void> {
+    const manifest = await RootManifest.readAsync(this.root);
+    const configuration = new PackageConfiguration(this.root, manifest, target, this.stage.folder, layout.output, electron.folder, await electron.readVersionAsync(),
+      signing !== null);
+    await configuration.writeAsync(layout.configuration);
+    await mkdir(layout.toolCache, { recursive: true });
+    await writeFile(path.join(layout.toolCache, Package.TOOL_CACHE_MANIFEST), Package.COMMONJS_SCOPE);
+    const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.root, ...Package.BUILDER_SEGMENTS), ...Package.BUILDER_OPTIONS, layout.configuration], this.root,
+      { ...this.createBuilderEnvironment(layout, target), ...signing?.builderEnvironment });
+    if (exitCode !== 0)
+      throw new PackagingException(`electron-builder failed with exit code ${exitCode}.`);
+    const files = configuration.fileNames.map(t => path.join(layout.output, t));
+    const missing = files.filter(t => !existsSync(t));
+    if (missing.length > 0)
+      throw new PackagingException(`electron-builder finished without making ${missing.join(", ")}.`);
+    this.output.write(`Packages made:\n${files.map(t => `  ${t}\n`).join("")}`);
+    if (signing !== null)
+      this.output.write(`Signatures:\n${await signing.verifyAsync(files, manifest.product)}\n`);
   }
 
   private createBuilderEnvironment(layout: PackageLayout, target: PackageTarget): NodeJS.ProcessEnv {
@@ -115,5 +151,6 @@ if (import.meta.main) {
   const npm = new NpmCommand(runner, process.env);
   const angular = new AngularProject(root, runner, npm);
   const stage = new PackageStage(root, npm, new PackagedBuild(root, runner, new GalleryFile(root), angular));
-  process.exitCode = await new Package(root, process.platform, process.arch, stage, runner, process.env, process.stdout).runAsync(process.argv.slice(2));
+  process.exitCode = await new Package(root, process.platform, process.arch, stage, runner, process.env, process.stdout, TrustedSigningModule.PACKAGES)
+    .runAsync(process.argv.slice(2));
 }

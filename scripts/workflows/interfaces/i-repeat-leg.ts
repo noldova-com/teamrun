@@ -12,4 +12,6 @@ export default interface IRepeatLeg {
   readonly runner: string;
   readonly architecture: string;
   readonly repeats: number;
+  readonly shard: string;
+  readonly hasTests: boolean;
 }

@@ -17,6 +17,7 @@ export default class PackageLayout {
   private static readonly OUTPUT_FOLDER: string = "out";
   private static readonly SMOKE_FOLDER: string = "smoke";
   private static readonly COMMAND_FOLDER: string = "command";
+  private static readonly SIGNING_FOLDER: string = "signing";
   private static readonly CONFIGURATION_FILE: string = "electron-builder.json";
 
   private readonly folder: string;
@@ -51,6 +52,10 @@ export default class PackageLayout {
 
   public get command(): string {
     return path.join(this.folder, PackageLayout.COMMAND_FOLDER);
+  }
+
+  public get signing(): string {
+    return path.join(this.folder, PackageLayout.SIGNING_FOLDER);
   }
 
   public get configuration(): string {

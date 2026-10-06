@@ -36,7 +36,7 @@ class PackageStageTests {
     });
     after(() => PackageStageTests.archives?.disposeAsync());
 
-    test("the stage is built with --packaged, holds the shipped packages from the build's archives without the Electron the desktop runs in, and the identity's files, and leaves the Gallery file as development had it", { timeout: PackageStageTests.TIMEOUT }, async t => {
+    test("the stage is built with --packaged, holds the shipped packages, the modules' runtime and CLI parts among them, from the build's archives without the Electron the desktop runs in, and the identity's files, and leaves the Gallery file as development had it", { timeout: PackageStageTests.TIMEOUT }, async t => {
       const repository = await PackageStageTests.createAsync(t, ["tasks", "notes"]);
       await repository.writeAsync({
         "src/modules/notes/module.json": JSON.stringify({ id: "notes", version: "0.2.0", displayName: "Notes", description: "Used by the tests.", parts: [], dependencies: [], contributes: {} })
@@ -63,13 +63,14 @@ class PackageStageTests {
         dependencies: {
           "@noldova/teamrun-foundation-alpha": "0.0.7",
           "@noldova/teamrun-foundation-beta": "0.0.7",
+          "@noldova/teamrun-modules-tasks-cli": "0.3.0",
           "@noldova/teamrun-modules-tasks-runtime": "0.3.0",
           "@noldova/teamrun-shell-cli": "0.0.7",
           "@noldova/teamrun-shell-desktop": "0.0.7"
         }
       });
       assert.deepEqual((await readdir(path.join(folder, "node_modules", "@noldova"))).sort(), [
-        "teamrun-foundation-alpha", "teamrun-foundation-beta", "teamrun-modules-tasks-runtime", "teamrun-shell-cli", "teamrun-shell-desktop"
+        "teamrun-foundation-alpha", "teamrun-foundation-beta", "teamrun-modules-tasks-cli", "teamrun-modules-tasks-runtime", "teamrun-shell-cli", "teamrun-shell-desktop"
       ]);
       assert.equal(JSON.parse(await readFile(path.join(folder, "node_modules", "@noldova", "teamrun-modules-tasks-runtime", "package.json"), "utf8")).version, "0.3.0");
       assert.equal(existsSync(path.join(folder, "node_modules", "electron")), false);
@@ -78,7 +79,7 @@ class PackageStageTests {
       assert.equal(await readFile(path.join(folder, "assets", "dictionaries", "dictionaries.json"), "utf8"), "{\"dictionaries\":[]}\n");
       assert.equal(await readFile(path.join(folder, "LICENSE"), "utf8"), "Fixture license\n");
       assert.equal(output.text, "The packaged window holds no Gallery.\nPackages in the stage: @noldova/teamrun-foundation-beta, @noldova/teamrun-foundation-alpha, "
-        + "@noldova/teamrun-modules-tasks-runtime, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\n");
+        + "@noldova/teamrun-modules-tasks-runtime, @noldova/teamrun-modules-tasks-cli, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\n");
     });
 
     test("staging again starts from an empty stage, and a module the build does not list is not shipped", { timeout: PackageStageTests.TIMEOUT }, async t => {
@@ -91,6 +92,7 @@ class PackageStageTests {
 
       assert.equal(existsSync(path.join(stage.folder, "left-over")), false);
       assert.equal(existsSync(path.join(stage.folder, "node_modules", "@noldova", "teamrun-modules-tasks-runtime")), false);
+      assert.equal(existsSync(path.join(stage.folder, "node_modules", "@noldova", "teamrun-modules-tasks-cli")), false);
     });
 
     test("a packaged window that still holds the Gallery stops the stage before anything is installed", async t => {

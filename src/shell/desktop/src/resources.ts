@@ -170,6 +170,7 @@ export class Resources {
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
   public static readonly layoutNotObject: string = "The layout must be a JSON object.";
   public static readonly clientName: string = "desktop";
+  public static readonly handoffRole: string = "handoff";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
   public static readonly waitAction: string = "wait";
@@ -202,6 +203,7 @@ export class Resources {
   public static readonly spellingChannel: string = "teamrun:spelling";
   public static readonly fieldMenuChannel: string = "teamrun:fieldMenu";
   public static readonly replaceMisspellingChannel: string = "teamrun:replaceMisspelling";
+  public static readonly addToDictionaryChannel: string = "teamrun:addToDictionary";
   public static readonly dictionaryFolderSegments: readonly string[] = ["assets", "dictionaries"];
   public static readonly dictionariesFile: string = "dictionaries.json";
   public static readonly dictionariesFolder: string = "Dictionaries";
@@ -217,6 +219,7 @@ export class Resources {
   public static readonly spellingTextLimit: number = 100;
   public static readonly languageTagPattern: RegExp = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
   public static readonly dictionaryFilePattern: RegExp = /^[A-Za-z0-9-]+\.bdic$/;
+  public static readonly dictionaryWordPattern: RegExp = /^\S{1,100}$/u;
   public static readonly urlSeparator: string = "/";
   public static readonly listSeparator: string = ", ";
   public static readonly spellingInvalid: string = "The spelling preferences must be whether to check and a list of language tags.";
@@ -369,6 +372,7 @@ export class Resources {
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout and Do not disturb are not kept.";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly isWaitingField: string = "isWaiting";
+  public static readonly isUpdateField: string = "isUpdate";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 480;
   public static readonly windowWidth: number = 1280;

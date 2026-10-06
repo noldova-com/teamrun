@@ -125,14 +125,14 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `description` | A sentence that tells people what the module does |
 | `parts` | Its parts, each once: `runtime`, `window` or `cli`, each with a folder of that name |
 | `dependencies` | The ids of the modules it depends on |
-| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus`, `themes`, `settings` and `settingScopes`, each of the form `<id>.<name>` with a camelCase name |
+| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus`, `themes`, `settings`, `settingScopes` and `cliCommands`, each of the form `<id>.<name>` with a camelCase name |
 
-A module that contributes settings defines them in `settings.json`, and one that contributes menus in `menus.json`, each beside `module.json`, as section 5 describes.
+A module that contributes settings defines them in `settings.json`, one that contributes menus in `menus.json`, and one that contributes command-line commands in `cli.json`, each beside `module.json`, as section 5 describes.
 A module without parts may leave `module.json` out until it gains one, but a module the build lists must have it.
-An id is lowercase kebab-case and never `shell`.
+An id is lowercase kebab-case, never `shell` and never one of the words the [command line's document](../src/shell/cli/README.md#7-module-commands) reserves for its own commands.
 Dependencies form no cycle, and a build refuses a module whose dependency it does not include.
-The build validates the declarations, orders them after their dependencies and writes the runtime's view of them: each module's id, version, display name, description, dependencies, runtime package, contributions and settings, without its parts.
-The runtime reads that from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; a package keeps that layout, as [Packaging](#packaging) describes.
+The build validates the declarations, orders them after their dependencies and writes the runtime's and the command line's view of them: each module's id, version, display name, description, dependencies, runtime package, CLI package, contributions, settings and command-line commands, without its parts.
+The runtime and the command line read that from `_build/modules/declarations.json` in the repository they are installed in, as the desktop finds the window's build there; a package keeps that layout, as [Packaging](#packaging) describes.
 The window's parts and menus reach the window through source the build generates.
 A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
@@ -148,6 +148,7 @@ The runtime decides which modules are active, and the window and the CLI follow 
    Otherwise the runtime records its failure; the shell and unaffected modules continue.
 4. After handshake and reconnection, window/CLI hosts receive active modules and failures before sending module requests: `shell.modules` reports every module of the build in module order, with its version, display name, description, dependencies and declared contributions by kind, and its state: active, failed with its cause, or blocked with its cause and the dependency that blocks it.
    They activate only active modules' parts, in dependency order.
+   The command line activates only the part of the module whose command it runs and the parts of that module's dependencies, and none for its own commands.
    The window restores its saved layout once, after its parts first activate.
    With no saved layout to restore, documents a part opens while activating open as any document does.
    With a saved layout, the layout alone decides which tabs open: a document a part opens while it first activates shows only when the layout holds it, in its saved place, without changing which tab or document group is active.
@@ -233,7 +234,7 @@ The shell has no feature-specific entry lists and registers its own entries, inc
 | Themes | Themes in its declaration: for each, colors for the light and dark modes and a look, as data. The declaration lists only theme names so far; the format of that data is decided when a second theme is built | Offers them in Settings and applies the person's theme and mode before the window paints; uses the default theme when the chosen one is absent |
 | Protocol | Methods and events | Authenticates, routes and delivers them |
 | Storage | Its database's tables and migrations, and its files | Creates, migrates, backs up and closes its database |
-| CLI | Commands | Reads the command line and runs the command |
+| CLI | Commands under its id, from its CLI part, as [command-line commands](#command-line-commands): each with its arguments, options and help | Reads the command line against the declaration, prints the help, runs the command and prints its result |
 
 When two default shortcuts collide, the one registered first keeps the key, Settings shows the collision, and the person's binding decides.
 A saved layout keeps the place of a view or document whose module is absent and shows it again when the module returns.
@@ -245,9 +246,10 @@ A window part asks with `showInDialogAsync(name, { instance, title })` for its o
 The person has no way of their own to open one.
 Asking while any dialog is open is refused.
 
-A view or document already open in a tab moves into the dialog: its tab stays where it is with an empty panel, and its content returns there when the dialog closes, so the saved layout never changes.
+A view or document already open in a tab moves into the dialog, and its tab leaves the tab strip while the dialog shows: its group shows what it would if the tab had closed, but the saved layout keeps the tab in its place, and the view returns there when the dialog closes.
 One that was not open closes with the dialog.
 It moves there as the same live view, as when a tab moves between groups ([Window](#8-window)).
+The dialog's title bar offers Open in main window, which closes the dialog and shows the view in a tab with focus: the tab it came from, made active, or else a new tab at the end of the current group, or of the documents when that group can't hold it.
 The dialog closes when its view's module goes away or the tab it came from closes.
 When a document other than its own opens or is activated while it shows, as when a command run from the view opens one, the dialog closes, the view returns to its place, and the document's tab shows active with focus.
 When it closes and the control that opened it is gone, as when the view showed itself, focus goes to the view's tab.
@@ -346,9 +348,10 @@ The context is merged into each item's arguments, the item's own fields winning,
 The shell's own groups put Close the tab in File, and command search, Left dock, Right dock and Bottom dock as checkbox rows, the bottom dock across the window or between the side docks, and Reset the layout in View, and Settings… in the macOS application menu after About.
 On Windows and Linux, Edit holds Undo, Redo, Cut, Copy, Paste and Select all: each acts on the field that had focus before a menu took it, with the field's selection restored first, and is enabled only when that field allows it, such as Copy only with a selection and Paste only into a field that can be written.
 The text field menu, `shell.field`, holds Cut, Copy, Paste and Select all, acting and enabled the same way, on every platform.
-On a misspelled word it starts with the spell checker's suggestions, each replacing the word.
+On a misspelled word it starts with the spell checker's suggestions, each replacing the word, and Add to dictionary.
 Only the desktop knows the word and its suggestions, from the window's `context-menu` event, so the window leaves a field's right click, menu key and Shift+F10 to the desktop, which sends the word and suggestions back.
 The window opens the menu when that message matches the click or key it noted, or opens the menu without suggestions after 300 ms, so a missing message cannot lose the menu and a late one cannot open it elsewhere.
+Add to dictionary adds the word to the spell checker's user dictionary: on Linux that is TeamRun's own file in the profile, and on Windows and macOS it is the system's, which every program shares.
 It opens as the context menu of a text field or rich text anywhere in the window outside overlays, anchored to the field, unless the field's own context menu has taken the right click or key, and returns focus to the field when it closes.
 The tab menu is built from the shell's groups in `shell.tab` the same way, for the tab it was opened on: Keep open, Move to, Split and Dock, Move left and Move right, then the close commands.
 Rows that can never apply to that tab are left out, such as Keep open on a kept tab and Move to, Split and Dock on a document.
@@ -395,7 +398,7 @@ A window reads them all with `shell.settings`, reads one key's entry, its value 
 A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
 The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals.
-Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear.
+Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear, and About last.
 Keyboard shortcuts lists every command with its owner and key.
 The person records a new key, removes a key, resets a command to its default or resets every shortcut, and each change writes `shell.keyBindings` whole, in one write, built on the window's previous change until the setting reports that change; when two windows change it at the same moment, the later write is kept.
 A key the rules refuse is refused with the reason, and a key another command holds is shown with that command: Use it here gives the key to this command; the other command keeps its other default keys if it has any, and is left without a key otherwise.
@@ -409,6 +412,8 @@ Spelling languages, `shell.spellCheckLanguages`, is a device setting of the kind
 A chosen language that no longer ships is dropped at the next change.
 `[]` checks in the operating system's languages that ship; when none of them ships, the first shipped language is used and the row says which.
 On macOS the system chooses the languages.
+
+About shows TeamRun's name, version, platform and processor and the update's state with its action (section 10), then its Updates group, which holds Check for updates, `shell.updateChecks`, a device setting whose choices are Automatically, the default, Only at start and Only when I ask.
 
 ### Setting scopes
 
@@ -433,7 +438,8 @@ Showing TeamRun's icon in the tray, `shell.trayIcon`, is a device setting whose 
 
 A module declares its notification kinds in `contributes.notifications`.
 A part posts a notification of one of them through its context and gets a handle that updates or dismisses it.
-The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` (section 9): they belong to no module, offer no command, and turning modules' notifications off never mutes them.
+The shell posts kinds of its own: `shell.saveFailed` and `shell.saveUnfinished` (section 9), which offer no command, and `shell.updateReady` (section 10), which runs the shell's command to restart to install the update.
+They belong to no module, and turning modules' notifications off never mutes them.
 
 - Its commands, the one opening it runs and those of its actions, are the module's own or a dependency's.
   A post with an undeclared kind or another module's command is refused.
@@ -462,6 +468,31 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
 - The list and its event carry the modules turned off and whether Do not disturb is on, and the runtime publishes the event again when either setting changes.
   The event carries the devices with Do not disturb on; the desktop adds its own device to its window's `shell.notifications` request and forwards the event as the state for that device, so the device's identity never reaches the window.
   The window changes both settings through `shell.setSetting`, like any other setting.
+
+### Command-line commands
+
+A module's CLI part registers the commands that `contributes.cliCommands` declares, each with its handler, and each runs under its module's id: `notes.addNote` is `teamrun notes add-note`, the kebab-case form of its name.
+A module defines them in `cli.json`, an object whose only field, `commands`, lists them, and the build refuses a file whose commands differ from those `module.json` declares.
+A command has exactly these fields:
+
+| Field | Holds |
+|---|---|
+| `name` | The command's name, `<id>.<name>` |
+| `summary` | One line for the list of commands in the help |
+| `description` | Optional text for the command's own help |
+| `arguments` | Its positional arguments in order, each with a camelCase `name`, a `description`, `required`, true by default, and `variadic`, false by default, for a last argument that takes the rest of the line |
+| `options` | Its options, each with a camelCase `name`, a `description` and a `type`: `Text`, `Number` or `Boolean`. A `Text` or `Number` option also takes `required` and `repeated`, both false by default, and a `default` its type accepts, which a required or repeated option has none of. A `Boolean` option takes no value and is true when given |
+| `examples` | Optional examples, each with `arguments`, the text after `teamrun <id> <command>`, and a `description` |
+
+The command line shows an argument as `<kebab-case>` and an option as `--kebab-case`.
+The build also refuses a command whose arguments and options repeat a name, a required argument after an optional one, a variadic argument that is not last, and an option whose command-line form is one of the command line's global options.
+
+The command line reads the call against the declaration before it starts or reaches a runtime, so a call that does not match starts none.
+It gives the handler the arguments and options as one frozen object keyed by their names, holding the default or nothing for those not given, and a signal that aborts when the command is cancelled or times out.
+A command reaches its module's runtime part only through requests on the command line's connection, never through the module's database or files.
+The handler returns the command's result, a JSON value and the text for people; the command line owns the output, and a part never writes to it.
+Help comes from the declarations alone, without a runtime or module code.
+The [command line's document](../src/shell/cli/README.md#7-module-commands) owns the syntax, the help, the output and the exit codes.
 
 ## 6. Runtime ownership and local protocol
 
@@ -659,7 +690,9 @@ The desktop cuts such text to its first 65,536 characters.
 - The command line runs on TeamRun's own program in Node mode and connects as the client `cli`, so it is always the same build as a runtime it starts.
   [Its document](../src/shell/cli/README.md) owns its commands, options, output and exit codes.
 - It starts a runtime for a command that needs one, unless asked not to.
-  Reporting the runtime's state never starts one.
+  Reporting the runtime's state and printing the help never start one.
+- It hosts modules' [command-line commands](#command-line-commands).
+  A module command or a runtime command that cannot run because its module is not active names that module and why.
 - It refuses another build's runtime and names it, unless asked to take over; it then takes over only an older build's idle runtime, never stopping work.
   The rule that the person is never asked to find and quit another TeamRun is the desktop's.
 - It reports data from before the shell and never moves it.
@@ -820,7 +853,7 @@ Restarting for an update runs the same saves in every window of the installation
 - Exact external dependency versions and lockfiles describe the install inputs.
 - The root manifest declares the product version and, separately, the protocol version.
   The build stamps each module part package's manifest with its module's version and every other package's manifest with the product version ([Modules and versions](#modules-and-versions)).
-- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder and release repository.
+- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder, release repository and the distinguished name its Windows signatures carry.
   Windows' app user model ID, the macOS bundle ID and the Linux desktop name (`<id>.desktop`) derive from the application IDs.
   A packaged build uses the application ID.
   A development build uses `<development application ID>.<checkout hash>`, where the hash is the first eight hexadecimal digits of the SHA-256 of the checkout's absolute path.
@@ -892,7 +925,7 @@ Each target is packaged on its own platform and processor.
 - **Stage.**
   The packaged app mirrors the checkout's layout, so the desktop, the runtime and the command line find their files by the same relative paths as in a checkout:
   - `package.json` names the product, its version, its Linux desktop name and the desktop's entry as `main`.
-  - `node_modules` holds the desktop, the command line and each module's runtime part with their dependencies.
+  - `node_modules` holds the desktop, the command line and each module's runtime and CLI parts with their dependencies.
     They are installed offline from the build's own archives, never from the registry, and without peer dependencies, since the program itself is the desktop's Electron.
   - `_build` holds the window, the module declarations and the product file of `npm run build -- --packaged`.
     The packaging checks the window again for the Gallery.
@@ -959,8 +992,26 @@ Each target is packaged on its own platform and processor.
   | CookieEncryption | off | TeamRun keeps no cookies: the window loads from `file://` and signs in nowhere. With the fuse on, the cookie key would live in the macOS Keychain or the Linux keyring, which can ask the person for access, and again after each update of an unsigned build. It turns on when TeamRun shows web content or signs in. |
   | LoadBrowserProcessSpecificV8Snapshot | off | The program has no snapshot of its own. |
 - **Tools.** electron-builder downloads its packaging tools into `_build/package/tool-cache` and checks each against the SHA-256 it pins.
-  Packages are unsigned; the separate signing step that [#326](https://github.com/noldova-com/teamrun/issues/326) adds will sign the Windows addons along with the program.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
+- **Signing (Windows).**
+  `npm run package` makes unsigned packages; `npm run package -- --signed` signs a Windows or macOS package and refuses a Linux one.
+  It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing endpoint, account and certificate profile in `scripts/packaging/trusted-signing-module.ts`, and checks them before anything is built.
+  Packaging takes them out of its own environment as it starts, so staging, the module's preparation and the signature check run without them; only electron-builder receives them, and only with `--signed`.
+  - It downloads Microsoft's TrustedSigning PowerShell module 0.5.8 from the PowerShell Gallery, and from nuget.org the three packages that module would otherwise install unchecked as it first signs: `Microsoft.Windows.SDK.BuildTools` 10.0.26100.4188, `Microsoft.Trusted.Signing.Client` 1.0.95 and `sign` 0.9.1-beta.24469.1.
+    It checks each package against the SHA-512 its gallery published before expanding any, and expands them into `_build/package/signing`, where signing finds the tools in place and downloads nothing.
+    It loads the module from there by path, asserting its version.
+  - electron-builder signs through `scripts/packaging/windows-sign-hook.ts`, which signs each file with SHA-256 digests and an RFC 3161 timestamp.
+    Besides the program and the installer, it signs the native addons in `app.asar.unpacked`.
+  - Afterwards PowerShell 7 reads the Authenticode signatures of the installer, the unpacked program and every addon.
+    Packaging fails unless each is valid, timestamped and signed by a subject that has every field of `teamrun.product.windowsPublisher`.
+- **Signing (macOS).**
+  `npm run package -- --signed` signs a macOS package with a Developer ID Application certificate and notarizes it with an App Store Connect API key.
+  It needs `MAC_CERTIFICATE` (the certificate and its private key as a base64 PKCS #12), `MAC_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8` (the key's text), `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`, and checks them before anything is built.
+  Packaging takes them out of its environment as it starts, together with the Windows credentials; only electron-builder receives them.
+  - The key is written to a file in `_build/package/signing` that only its owner can read, and that folder is removed once packaging ends, whether it succeeded or not.
+  - electron-builder signs the app and its helpers with the hardened runtime and `assets/macos/entitlements.plist`, which allows only the JIT that V8 needs, then notarizes the app and staples the ticket.
+    A signed package keeps its signature after the fuses are flipped, so it is not signed ad hoc again.
+  - Afterwards packaging opens the disk image and expands the archive, and checks each app: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl` must accept it as notarized; and `stapler` must find its ticket.
 
 ### Publication
 
@@ -1006,15 +1057,56 @@ Each target is packaged on its own platform and processor.
 
 ### Updates
 
-- The installed updater checks the releases of `teamrun.product.releaseRepository` for its platform and CPU, and no other repository's.
-  Every packaged target updates itself: Windows through its installer, macOS through Squirrel.Mac and a Linux AppImage by replacing the file.
-- A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced; an installation that cannot update itself explains why.
-- The GitHub release route is anonymous HTTPS; a private repository is not made reachable by injecting repository or provider credentials.
-- Validate metadata and downloaded bytes before offering installation.
-  Production signing, notarization and trust requirements are distinct from an explicitly authorized unsigned test release.
-  Source builds and incompatible targets do not accidentally use a production update feed.
-- Download and restart/install are explicit user actions; ordinary application close does not install an update.
+The desktop owns the update: it checks, downloads, validates and installs, and gives its windows the update's state, which they show.
+It uses electron-updater, pinned exactly, with a provider that reads TeamRun's file names.
+
+- **Feed.**
+  The desktop reads `latest-<platform>-<arch>.yml` for its own platform and processor from the latest release of `teamrun.product.releaseRepository` on GitHub, then downloads the package that file names from the same release, over anonymous HTTPS.
+  No repository or provider credential is placed in the application or its updater, and a private repository is not made reachable that way.
+  Only the latest release is offered.
+  A release to any other repository is an unsigned test release ([Publication](#publication)), so it never reaches the feed.
+- **Which builds read it.**
+  The build decides, never a setting, a variable or an argument.
+  `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
+  Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
+  A test build, and a package made for a native update check, name instead a local feed given to the build when it is made; `release:assets` refuses a package whose product file names any feed but the production one.
+  The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
+- **Versions.**
+  Only a version higher than the installed one is offered.
+  The same version, a lower one or a version with a prerelease suffix leaves TeamRun up to date.
+- **Checks.**
+  The device setting `shell.updateChecks` chooses when the desktop checks by itself: Automatically, the default, 30 seconds after it starts and then every hour while it runs; Only at start, once, 30 seconds after it starts; or Only when I ask, never.
+  The person can always run Check for updates.
+  The desktop's own checks are skipped while a download runs or an update is ready.
+  A failed automatic check shows only in About and the log, and the next one runs at its time; a failed check the person asked for shows as a failure.
+- **Validation.**
+  Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
+  After downloading, it checks the file's size and SHA-512 against it.
+  On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, and no other.
+  A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher.
+  Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
+- **Downloading.**
+  A newer version a check finds downloads in the background at once, and only About shows its progress.
+  A failed download shows its reason and can be tried again.
+- **The person decides.**
+  Restarting to install is the person's choice, Restart to update.
+  Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed or a newer one replaces it.
+- **Restart to update.**
+  Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.
   Section 9 owns the choice the person makes while work is in progress.
+  The handoff installs the way the platform does: Windows runs the installer quietly in the existing installation's scope, macOS installs through Squirrel.Mac from the ZIP, and Linux replaces the AppImage file in place, keeping its location and launchers.
+- **macOS location.**
+  A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
+  Outside one, the desktop still checks but downloads and installs nothing: About says to move TeamRun to Applications, and so does the update item while a newer version is available.
+- **What the person sees.**
+  - **States:** up to date, checking, downloading with its progress, ready and failed, and on macOS outside an Applications folder, available.
+  - **Status bar:** the update item shows only while an update is ready or failed, or on macOS outside an Applications folder while a newer version is available.
+  - **Notifications:** the shell's notification kind `shell.updateReady`, posted once per version when its update is ready, restarts to install it.
+  - **Commands:** `shell.checkForUpdates` and `shell.restartToUpdate`, each applying only in its state, are in command search.
+    Check for updates is also in Help, or on macOS in the application menu after About.
+  - **About:** Settings' About page shows the version and the update's state with its action, and says why a build that cannot update doesn't.
+
+  [UI-STANDARDS](UI-STANDARDS.md#8-component-metrics-and-behavior) owns the item, the page and their wording.
 
 The updater and the desktop's update stop divide an update at the person's Restart to update:
 
@@ -1067,6 +1159,7 @@ The update stop of the desktop where the person chose Restart to update coordina
 
 1. **Work.**
    It reads `shell.work` from each runtime and, when any work is in progress, asks section 9's question in its window, listing the work by data directory.
+   While the person waits, a runtime that disconnects leaves the list, and step 2 finds it again if it is back.
    Cancelling ends the update with nothing changed.
 2. **Barrier.**
    It creates the barrier as `Preparing`; an existing barrier whose holder runs means another update is under way, and the update fails.
@@ -1081,7 +1174,7 @@ The update stop of the desktop where the person chose Restart to update coordina
    The runtime waits at most 6 seconds for every client, then answers `shell.update` with the outcome and the process id and start time of every client, every program it holds and its AppImage copy's mount; a client that does not answer fails the update.
    The handshake carries no process id, because every build must accept the handshake protocol version 1 defines (section 6).
 4. **Stop.**
-   It reads `shell.work` from each runtime again, and work the person was not asked about in step 1 fails the update.
+   It reads `shell.work` from each runtime again, and work the person did not agree to stop fails the update: what step 1's question listed when they chose to stop the work, and nothing when they waited until none was left.
    It asks each runtime `shell.stop`: with the policy "stop the work" when it still has work the person agreed to stop, otherwise "only if idle".
    The runtime deactivates its parts, ends their programs, flushes and closes its databases, releases ownership and exits.
 5. **Verify.**

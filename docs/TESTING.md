@@ -156,8 +156,10 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
   - It selects, from the change since the merge base, each changed test and UI workflow file, the test that mirrors each changed production file, and every test that imports a changed fixture or other test support file, directly or through another.
     A `Repeat:` line in the pull request's description adds test and UI workflow files by their path from the repository's root, such as the UI workflows a change to the desktop affects.
     The line is read when the label is added and on each push.
-  - Linux x64 and Windows x64 each run the selection in five parallel jobs, one pass each, and macOS ARM64 runs the five passes in one job, since macOS runners are scarce.
-    Each job builds and runs the selected tests through `npm test -- --filter` and the selected UI workflows with `--retries 0`.
+  - Linux x64 and Windows x64 each run the selection in five parallel jobs, one pass each, and macOS ARM64 runs the five passes in as few jobs as its time limit allows, since macOS runners are scarce.
+    It uses one job unless five passes of the selected UI tests, counted in their files, would take more than about 40 minutes there; then two jobs each run a Playwright shard of them five times, and only the first repeats the selected tests.
+    Each job builds and runs the selected tests through `npm test -- --filter` and the selected UI workflows with `--retries 0` and a global timeout that stops them before the job's time limit.
+    Each job's summary counts its UI tests and says when they ran out of time, so a stop for time doesn't read as a failing test.
   - The check "Repeat (all targets)" passes at once without the label and in a merge group, and with the label only when every repeat job passed, so a labelled pull request doesn't merge before its repeats.
   - The repeats show that the selection passes five times on each of those targets, and nothing about tests outside it.
     The [nightly run](#ci-levels) also repeats every test and UI workflow five times on every target, which catches what a change's own repeats miss.

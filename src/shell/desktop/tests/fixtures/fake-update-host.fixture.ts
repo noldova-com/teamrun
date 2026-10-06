@@ -7,7 +7,7 @@
  */
 
 import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
-import { UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+import { UpdateBarrier, UpdateBarrierState, type UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
 
 export class FakeUpdateHost implements IUpdateHost {
@@ -20,6 +20,8 @@ export class FakeUpdateHost implements IUpdateHost {
   public problems: readonly string[] = [];
   public saveCount: number = 0;
   public quitCount: number = 0;
+  public readonly passed: UpdateBarrierStatus[] = [];
+  public passes: boolean = false;
 
   public static barrier(state: UpdateBarrierState, holder: UpdateProcess = FakeUpdateHost.COORDINATOR): UpdateBarrier {
     return new UpdateBarrier(holder, "0.3.0", state, null);
@@ -40,6 +42,11 @@ export class FakeUpdateHost implements IUpdateHost {
   public saveAsync(): Promise<readonly string[]> {
     this.saveCount++;
     return Promise.resolve(this.problems);
+  }
+
+  public passBarrierAsync(status: UpdateBarrierStatus): Promise<boolean> {
+    this.passed.push(status);
+    return Promise.resolve(this.passes);
   }
 
   public quit(): void {

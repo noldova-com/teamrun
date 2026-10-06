@@ -8,6 +8,8 @@ LICENSE file in the root directory of this source tree.
 
 @if (dialogs.shown(); as tab) {
   <tr-dialog [title]="labels.of(tab).title" [size]="large" (dismissed)="dialogs.close()">
+    <button type="button" tr-icon-button trDialogControl class="tr-view-dialog-open" [icon]="resources.openInMainWindowGlyph" [label]="resources.openInMainWindowLabel"
+      [trTooltip]="resources.openInMainWindowLabel" (click)="dialogs.openInMainWindow(tab)"></button>
     <tr-tab-slot class="tr-view-dialog-content" [tab]="tab" />
   </tr-dialog>
 }
