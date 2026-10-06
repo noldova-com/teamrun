@@ -54,14 +54,31 @@ class ModuleDeclarationTests {
         description: "Keeps notes.",
         dependencies: ["tasks", "git-hub2"],
         runtimePackage: "@noldova/teamrun-modules-notes-runtime",
+        cliPackage: null,
         contributes: { methods: ["notes.list"], commands: ["notes.newNote"], notifications: ["notes.saved"], views: ["notes.list", "notes.outlineView"], statusBarItems: ["notes.count"], topBarActions: ["notes.compose"], themes: [] },
-        settings: []
+        settings: [],
+        cliCommands: []
       });
       assert.equal(fixture.isFixture, true);
       assert.equal(fixture.runtimePackage, null);
       assert.equal(fixture.windowEntry, null);
       await repository.writeAsync({ [`${fixtureFolder}/runtime/package.json`]: "{}\n", [`${fixtureFolder}/module.json`]: JSON.stringify({ ...ModuleDeclarationTests.VALID, id: "clock", parts: ["runtime"], contributes: {} }) });
       assert.equal((await ModuleDeclaration.readAsync(repository.directory, fixtureFolder, true)).runtimePackage, "@noldova/teamrun-fixture-clock-runtime");
+    });
+
+    test("a declaration with a cli part names its CLI package and carries the commands its cli.json defines", async t => {
+      const repository = await ModuleDeclarationTests.createAsync(t, ModuleDeclarationTests.FOLDER, { ...ModuleDeclarationTests.VALID, parts: ["cli"], contributes: { cliCommands: ["notes.addNote"] } });
+      const command = { name: "notes.addNote", summary: "Adds a note.", arguments: [], options: [] };
+      await repository.writeAsync({ "src/modules/notes/cli/package.json": "{}\n", "src/modules/notes/cli.json": JSON.stringify({ commands: [command] }) });
+
+      const declaration = await ModuleDeclaration.readAsync(repository.directory, ModuleDeclarationTests.FOLDER, false);
+
+      assert.equal(declaration.cliPackage, "@noldova/teamrun-modules-notes-cli");
+      assert.equal(declaration.runtimePackage, null);
+      assert.deepEqual(declaration.toJson().cliCommands, [{ ...command, description: null, examples: [] }]);
+      await repository.writeAsync({ "src/modules/notes/module.json": JSON.stringify({ ...ModuleDeclarationTests.VALID, parts: [], contributes: { cliCommands: ["notes.addNote"] } }) });
+      await assert.rejects(ModuleDeclaration.readAsync(repository.directory, ModuleDeclarationTests.FOLDER, false),
+        new ModuleException("src/modules/notes/module.json declares command-line commands without a cli part."));
     });
 
     test("a declaration that is no JSON object or has unknown fields is refused", async t => {
@@ -77,7 +94,7 @@ class ModuleDeclarationTests {
     test("an id other than its folder's name, a reserved or invalid id and a blank display name or description are refused", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      const idRule = "must have the id \"notes\", its folder's name: lowercase kebab-case and not \"shell\"";
+      const idRule = "must have the id \"notes\", its folder's name: lowercase kebab-case and none of shell, status, commands, run, open, help";
 
       for (const id of [undefined, 1, "tasks", "Notes"])
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, id }), idRule);
@@ -85,11 +102,11 @@ class ModuleDeclarationTests {
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, displayName }), "must have a display name");
       for (const description of [undefined, 1, " "])
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, description }), "must have a description");
-      await repository.writeAsync({ "src/modules/shell/module.json": JSON.stringify({ ...ModuleDeclarationTests.VALID, id: "shell" }), "src/modules/Notes/module.json": JSON.stringify({ ...ModuleDeclarationTests.VALID, id: "Notes" }) });
-      await assert.rejects(ModuleDeclaration.readAsync(repository.directory, "src/modules/shell", false),
-        new ModuleException("src/modules/shell/module.json must have the id \"shell\", its folder's name: lowercase kebab-case and not \"shell\"."));
-      await assert.rejects(ModuleDeclaration.readAsync(repository.directory, "src/modules/Notes", false),
-        new ModuleException("src/modules/Notes/module.json must have the id \"Notes\", its folder's name: lowercase kebab-case and not \"shell\"."));
+      for (const id of ["shell", "status", "commands", "run", "open", "help", "Notes"]) {
+        await repository.writeAsync({ [`src/modules/${id}/module.json`]: JSON.stringify({ ...ModuleDeclarationTests.VALID, id }) });
+        await assert.rejects(ModuleDeclaration.readAsync(repository.directory, `src/modules/${id}`, false),
+          new ModuleException(`src/modules/${id}/module.json must have the id "${id}", its folder's name: lowercase kebab-case and none of shell, status, commands, run, open, help.`));
+      }
     });
 
     test("a missing version or one other than three numbers without leading zeros is refused", async t => {

@@ -9,7 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import { ShellMethods, StopPolicy, StopRequest, type UpdateProcess, UpdateReady, UpdateRequest, WorkReport } from "@noldova/teamrun-shell-protocol";
-import { type Installation, type ProcessPresence, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+import { ConnectionException, type Installation, type ProcessPresence, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
 
 import { UpdateStopException } from "../exceptions/update-stop.exception.js";
 import type { IUpdateTarget } from "../interfaces/i-update-target.js";
@@ -19,7 +19,7 @@ export class UpdateStop {
   private readonly installation: Installation;
   private readonly presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">;
   private readonly connectAsync: (dataDirectory: string) => Promise<IUpdateTarget | null>;
-  private readonly askAsync: (work: readonly string[]) => Promise<boolean>;
+  private readonly askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<readonly string[] | null>;
   private readonly processId: number;
   private readonly productVersion: string;
   private readonly now: () => number;
@@ -29,7 +29,7 @@ export class UpdateStop {
     installation: Installation,
     presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
     connectAsync: (dataDirectory: string) => Promise<IUpdateTarget | null>,
-    askAsync: (work: readonly string[]) => Promise<boolean>,
+    askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<readonly string[] | null>,
     processId: number,
     productVersion: string,
     now: () => number,
@@ -44,14 +44,17 @@ export class UpdateStop {
     this.wait = wait;
   }
 
-  public async runAsync(version: string, handOffAsync: () => Promise<void>): Promise<boolean> {
+  public async runAsync(version: string, handOffAsync: () => Promise<number | null>): Promise<boolean> {
     const targets: IUpdateTarget[] = [];
     let isHeld = false;
+    let isHandedOff = false;
     try {
       targets.push(...await this.connectAllAsync(await this.installation.listDataDirectoriesAsync()));
       const work = await this.readWorkAsync(targets);
-      if (work.length > 0 && !await this.askAsync(work))
+      const answer = work.length > 0 ? await this.askAsync(work, () => this.rereadWorkAsync(targets)) : [];
+      if (Object.isNull(answer))
         return false;
+      const agreed = new Set(answer);
       const holder = await this.stampSelfAsync();
       isHeld = await this.installation.holdAsync(new UpdateBarrier(holder, version, UpdateBarrierState.Preparing, null), this.productVersion);
       if (!isHeld)
@@ -60,7 +63,6 @@ export class UpdateStop {
       targets.push(...await this.connectAllAsync((await this.installation.listDataDirectoriesAsync()).filter(t => !known.has(t))));
       const processes = (await Promise.all(targets.map(t => this.prepareAsync(t)))).flat();
       const remaining = await Promise.all(targets.map(async (t): Promise<readonly [IUpdateTarget, readonly string[]]> => [t, await this.readTargetWorkAsync(t)]));
-      const agreed = new Set(work);
       const unseen = remaining.flatMap(([, t]) => t).filter(t => !agreed.has(t));
       if (unseen.length > 0)
         throw new UpdateStopException(Resources.formatWorkStartedMeanwhile(unseen.join(Resources.workSeparator)));
@@ -69,11 +71,13 @@ export class UpdateStop {
       await this.installation.replaceAsync(new UpdateBarrier(holder, version, UpdateBarrierState.Closing, null));
       await this.verifyAsync(await this.listOtherDesktopsAsync(processes));
       await this.installation.replaceAsync(new UpdateBarrier(holder, version, UpdateBarrierState.HandedOff, null));
-      await handOffAsync();
+      const successor = await handOffAsync();
+      isHandedOff = true;
+      await this.recordHandoffAsync(holder, version, successor);
       return true;
     }
     catch (error) {
-      if (isHeld)
+      if (isHeld && !isHandedOff)
         await this.installation.releaseAsync();
       throw error instanceof UpdateStopException ? error : new UpdateStopException(error instanceof Error ? error.message : String(error), new ExceptionOptions(error));
     }
@@ -90,6 +94,19 @@ export class UpdateStop {
 
   private async readWorkAsync(targets: readonly IUpdateTarget[]): Promise<readonly string[]> {
     return (await Promise.all(targets.map(t => this.readTargetWorkAsync(t)))).flat();
+  }
+
+  private async rereadWorkAsync(targets: IUpdateTarget[]): Promise<readonly string[]> {
+    const work = await Promise.all(targets.map(t => this.readTargetWorkAsync(t).catch((error: unknown) => {
+      if (error instanceof ConnectionException)
+        return null;
+      throw error;
+    })));
+    for (const target of targets.filter((_, index) => Object.isNull(work[index]))) {
+      target.connection.close();
+      targets.splice(targets.indexOf(target), 1);
+    }
+    return work.filter(t => !Object.isNull(t)).flat();
   }
 
   private async readTargetWorkAsync(target: IUpdateTarget): Promise<readonly string[]> {
@@ -109,6 +126,14 @@ export class UpdateStop {
     if (Object.isUndefined(holder))
       throw new UpdateStopException(Resources.updateHolderNotFound);
     return holder;
+  }
+
+  private async recordHandoffAsync(holder: UpdateProcess, version: string, processId: number | null): Promise<void> {
+    if (Object.isNull(processId))
+      return;
+    const [handoff] = await this.presence.stampAsync([[processId, Resources.handoffRole]]).catch(() => []);
+    if (!Object.isUndefined(handoff))
+      await this.installation.replaceAsync(new UpdateBarrier(holder, version, UpdateBarrierState.HandedOff, handoff)).catch(() => undefined);
   }
 
   private async prepareAsync(target: IUpdateTarget): Promise<readonly UpdateProcess[]> {

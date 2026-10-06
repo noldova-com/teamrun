@@ -86,7 +86,8 @@ export default class PackageStage {
 
   private async listShippedAsync(): Promise<readonly PackageManifest[]> {
     const declarations = await this.modules.listBuildAsync(false, []);
-    const roots = [...PackageStage.ENTRY_PACKAGES, ...declarations.flatMap(t => t.runtimePackage === null ? [] : [t.runtimePackage])];
+    const parts = declarations.flatMap(t => [t.runtimePackage, t.cliPackage]).filter(t => t !== null);
+    const roots = [...PackageStage.ENTRY_PACKAGES, ...parts];
     const packages = await new PackageCatalog(this.root).listPackagesAsync(false);
     const missing = roots.filter(t => !packages.some(u => u.name === t));
     if (missing.length > 0)

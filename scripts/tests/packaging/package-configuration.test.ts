@@ -80,6 +80,27 @@ class PackageConfigurationTests {
       });
     });
 
+    test("a signed Windows target forces code signing through the hook with SHA-256 only, names the product's publisher and also signs the native addons", () => {
+      const hook = path.join(PackageConfigurationTests.ROOT, "scripts", "packaging", "windows-sign-hook.ts");
+      const unsigned = PackageConfigurationTests.create("windows", "arm64").toJson();
+
+      const signed = PackageConfigurationTests.create("windows", "arm64", PackageConfigurationTests.ROOT, hook).toJson();
+
+      assert.deepEqual(signed, {
+        ...unsigned,
+        forceCodeSigning: true,
+        win: {
+          target: [{ target: "nsis", arch: ["arm64"] }],
+          icon: path.join(PackageConfigurationTests.ROOT, "assets", "fixture-icons", "icon-dark.ico"),
+          artifactName: "Fixture Studio-windows-arm64.${ext}",
+          extraFiles: [{ from: path.join(PackageConfigurationTests.ROOT, "_build", "package", "command", "fixture-studio.cmd"), to: "bin/fixture-studio.cmd" }],
+          signtoolOptions: { sign: hook, signingHashAlgorithms: ["sha256"], publisherName: "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US" },
+          signExts: [".node"]
+        }
+      });
+      assert.equal("forceCodeSigning" in unsigned, false);
+    });
+
     test("a macOS target makes a DMG and the ZIP its updater downloads, and a Linux target an AppImage on the runtime that needs no libfuse2, each with only its own platform's section", () => {
       const mac = PackageConfigurationTests.create("macos", "arm64");
       const linux = PackageConfigurationTests.create("linux", "arm64");
@@ -189,7 +210,7 @@ class PackageConfigurationTests {
     return Object.fromEntries(Object.entries(configuration.toJson()).filter(([key]) => ["win", "nsis", "mac", "linux", "toolsets"].includes(key)));
   }
 
-  private static create(platform: string, architecture: string, root: string = PackageConfigurationTests.ROOT): PackageConfiguration {
+  private static create(platform: string, architecture: string, root: string = PackageConfigurationTests.ROOT, signHook: string | null = null): PackageConfiguration {
     return new PackageConfiguration(
       root,
       PackageConfigurationTests.MANIFEST,
@@ -197,7 +218,8 @@ class PackageConfigurationTests {
       PackageConfigurationTests.STAGE,
       PackageConfigurationTests.OUTPUT,
       PackageConfigurationTests.DISTRIBUTION,
-      "44.5.1");
+      "44.5.1",
+      signHook);
   }
 }
 

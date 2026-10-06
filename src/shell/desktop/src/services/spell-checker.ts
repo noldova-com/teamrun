@@ -42,6 +42,10 @@ export class SpellChecker {
       this.choose(chosen);
   }
 
+  public addWord(word: string): boolean {
+    return this.host().addWordToSpellCheckerDictionary(word);
+  }
+
   public toJson(): JsonObject {
     const offered = this.isSystemChecker ? [] : this.languages;
     return {

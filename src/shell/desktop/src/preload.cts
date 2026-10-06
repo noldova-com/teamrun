@@ -103,6 +103,9 @@ contextBridge.exposeInMainWorld("teamrun", {
   replaceMisspelling(text: string): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:replaceMisspelling", text) as Promise<boolean>;
   },
+  addToDictionary(word: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:addToDictionary", word) as Promise<boolean>;
+  },
   edit(action: string): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:edit", action) as Promise<boolean>;
   },

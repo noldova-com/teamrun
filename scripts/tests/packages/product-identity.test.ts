@@ -29,9 +29,10 @@ class ProductIdentityTests {
 
       assert.deepEqual(
         [product.name, product.publisher, product.slug, product.applicationId, product.developmentApplicationId, product.dataFolder,
-          product.windowsDeviceFolder, product.macosDeviceFolder, product.linuxDeviceFolder, product.dataDirectoryVariable, product.icons, product.releaseRepository],
+          product.windowsDeviceFolder, product.macosDeviceFolder, product.linuxDeviceFolder, product.dataDirectoryVariable, product.icons, product.releaseRepository, product.windowsPublisher],
         ["Fixture Studio", "Fixture Works", "fixture-studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
-          "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons", "fixtureworks/studio"]);
+          "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons", "fixtureworks/studio",
+          "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US"]);
       assert.deepEqual(product.literals, [
         "Fixture Studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
         "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"
@@ -98,7 +99,9 @@ class ProductIdentityTests {
         [{ icons: "assets/*" }, "icons must be a relative folder whose segments are separated by /"],
         [{ releaseRepository: "studio" }, "releaseRepository must be a GitHub repository written as owner/name"],
         [{ releaseRepository: "-works/studio" }, "releaseRepository must be a GitHub repository written as owner/name"],
-        [{ releaseRepository: "works/studio/extra" }, "releaseRepository must be a GitHub repository written as owner/name"]
+        [{ releaseRepository: "works/studio/extra" }, "releaseRepository must be a GitHub repository written as owner/name"],
+        ...["O=Fixture Works, CN=Fixture Works", "CN=Fixture Works,O=Fixture Works", "CN=Fixture, Works", "CN=Fixture Works, O=\"Works\""].map((t): [Readonly<Record<string, unknown>>, string] =>
+          [{ windowsPublisher: t }, "windowsPublisher must be the distinguished name of the Windows signing certificate's subject, starting with CN= and with its fields separated by \", \""])
       ];
 
       for (const [overrides, problem] of cases)

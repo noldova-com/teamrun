@@ -13,6 +13,8 @@ export default interface IModuleDeclarationJson {
   readonly description: string;
   readonly dependencies: readonly string[];
   readonly runtimePackage: string | null;
+  readonly cliPackage: string | null;
   readonly contributes: Readonly<Record<string, readonly string[]>>;
   readonly settings: readonly Readonly<Record<string, unknown>>[];
+  readonly cliCommands: readonly Readonly<Record<string, unknown>>[];
 }

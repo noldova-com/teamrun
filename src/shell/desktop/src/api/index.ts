@@ -84,6 +84,7 @@ export { PathCommand } from "../services/path-command.js";
 export { QuitCoordinator } from "../services/quit-coordinator.js";
 export { QuitFlow } from "../services/quit-flow.js";
 export { UpdateStop } from "../services/update-stop.js";
+export { UpdateWorkQuestion } from "../services/update-work-question.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";
 export { RuntimeWindowStateStore } from "../services/runtime-window-state-store.js";
 export { SenderPolicy } from "../services/sender-policy.js";

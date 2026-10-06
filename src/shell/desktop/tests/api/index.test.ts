@@ -59,6 +59,7 @@ export class DesktopApiTests {
         "UpdateSaveCoordinator",
         "UpdateStop",
         "UpdateStopException",
+        "UpdateWorkQuestion",
         "UtilityProcessStarter",
         "WindowAppearance",
         "WindowBoundsKeeper",

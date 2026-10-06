@@ -123,7 +123,7 @@ export class OpenWindowTests {
     gone.destroy();
     const open = new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "win32");
 
-    const shown = open.show(new QuitQuestion(["Indexing the project"], true));
+    const shown = open.show(new QuitQuestion(["Indexing the project"], true, false));
     const cleared = open.show(null);
     const onCrashed = new OpenWindow(crashed, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "win32").show(null);
     const onGone = new OpenWindow(gone, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "win32").show(null);
@@ -131,7 +131,7 @@ export class OpenWindowTests {
     Assert.isTrue(shown && cleared);
     Assert.isFalse(onCrashed || onGone);
     Assert.areEqual(
-      JSON.stringify([["teamrun:quitQuestion", { descriptions: ["Indexing the project"], isWaiting: true }], ["teamrun:quitQuestion", null]]),
+      JSON.stringify([["teamrun:quitQuestion", { descriptions: ["Indexing the project"], isWaiting: true, isUpdate: false }], ["teamrun:quitQuestion", null]]),
       JSON.stringify(window.webContents.sent));
     Assert.areEqual(0, crashed.webContents.sent.length);
   }

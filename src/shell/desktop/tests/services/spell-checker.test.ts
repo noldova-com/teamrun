@@ -49,6 +49,35 @@ export class SpellCheckerTests {
   }
 
   @TestMethod
+  public neverPassesALanguageWithoutAShippedDictionaryToTheSession(): void {
+    const passed = ["win32", "linux"].map(platform => {
+      const session = new FakeSession();
+      const checker = new SpellChecker(() => session, ["en-US", "de-DE"], SpellCheckerTests.ADDRESS, platform, () => ["fr-FR", "es-ES", "de-AT"], () => undefined);
+
+      checker.start();
+      checker.apply(true, ["fr-FR", "xx-XX"]);
+      checker.apply(true, []);
+      checker.apply(true, ["es-ES", "de-DE", "de-AT"]);
+
+      return `${platform} ${session.spellCalls.filter(t => t.startsWith("languages ")).join("|")}`;
+    });
+
+    Assert.areEqual("win32 languages en-US|languages en-US|languages en-US|languages de-DE;linux languages en-US|languages en-US|languages en-US|languages de-DE", passed.join(";"));
+  }
+
+  @TestMethod
+  public addsAWordToTheSessionsDictionaryOnEveryPlatform(): void {
+    const added = ["linux", "win32", "darwin"].map(platform => {
+      const session = new FakeSession();
+      const checker = new SpellChecker(() => session, ["en-US"], SpellCheckerTests.ADDRESS, platform, () => [], () => undefined);
+
+      return `${platform} ${checker.addWord("TeamRun")} ${session.spellCalls.join("|")}`;
+    });
+
+    Assert.areEqual("linux true add TeamRun;win32 true add TeamRun;darwin true add TeamRun", added.join(";"));
+  }
+
+  @TestMethod
   public leavesTheLanguagesToMacOSAndOffersNone(): void {
     const session = new FakeSession();
     const checker = new SpellChecker(() => session, ["en-US"], SpellCheckerTests.ADDRESS, "darwin", () => ["fr-FR"], () => undefined);

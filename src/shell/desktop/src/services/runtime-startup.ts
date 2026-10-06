@@ -16,6 +16,8 @@ import {
   LaunchException,
   PreShellDataFoundException,
   RuntimeHandoverException,
+  type UpdateBarrierStatus,
+  UpdateInProgressException,
   WorkInProgressException
 } from "@noldova/teamrun-shell-runtime";
 
@@ -124,7 +126,7 @@ export class RuntimeStartup {
       }
       catch (error) {
         if (!(error instanceof WorkInProgressException))
-          return this.refuse(error);
+          return await this.refuseAsync(error);
         this.update(StartupState.waitingForWork(error.work.descriptions));
       }
       await this.pauseAsync(this.waitInterval);
@@ -151,7 +153,7 @@ export class RuntimeStartup {
       this.accept(await attach());
     }
     catch (error) {
-      this.refuse(error);
+      await this.refuseAsync(error);
     }
   }
 
@@ -165,8 +167,10 @@ export class RuntimeStartup {
     this.update(StartupState.ready());
   }
 
-  private refuse(error: unknown): void {
-    if (error instanceof PreShellDataFoundException)
+  private async refuseAsync(error: unknown): Promise<void> {
+    if (error instanceof UpdateInProgressException)
+      await this.passBarrierAsync(error.status);
+    else if (error instanceof PreShellDataFoundException)
       this.update(StartupState.preShellData(error.data.location));
     else if (error instanceof WorkInProgressException)
       this.update(StartupState.workInProgress(error.work.descriptions));
@@ -182,6 +186,13 @@ export class RuntimeStartup {
       this.log(Resources.formatRuntimeNotStarted(inspect(error)));
       this.update(StartupState.failed(String(error)));
     }
+  }
+
+  private async passBarrierAsync(status: UpdateBarrierStatus): Promise<void> {
+    if (await this.updates.passBarrierAsync(status))
+      await this.attachAsync(StopPolicy.IfIdle);
+    else
+      this.updates.quit();
   }
 
   private receive(event: Event): void {

@@ -10,7 +10,15 @@ import { setImmediate } from "node:timers/promises";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, PreShellData, QualifiedName, RunningWork, RuntimeHandover, ShellEvents, UpdateSaved } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, LaunchException, PreShellDataFoundException, RuntimeHandoverException, WorkInProgressException } from "@noldova/teamrun-shell-runtime";
+import {
+  ConnectionException,
+  LaunchException,
+  PreShellDataFoundException,
+  RuntimeHandoverException,
+  UpdateBarrierStatus,
+  UpdateInProgressException,
+  WorkInProgressException
+} from "@noldova/teamrun-shell-runtime";
 import { RuntimeStartup, type StartupState } from "@noldova/teamrun-shell-desktop";
 
 import { FakeClock } from "../fixtures/fake-clock.fixture.js";
@@ -481,6 +489,35 @@ export class RuntimeStartupTests {
     Assert.areEqual(JSON.stringify(["attach desktop IfIdle", "attach desktop IfIdle"]), JSON.stringify(launcher.calls));
     Assert.areEqual(0, this.updates.quitCount);
     Assert.areEqual(0, this.clock.pending);
+  }
+
+  @TestMethod
+  public async quitsWhenTheRuntimeStartFindsAnUpdateInstalling(): Promise<void> {
+    const launcher = new FakeRuntimeLauncher(new UpdateInProgressException(UpdateBarrierStatus.Held));
+    const startup = this.create(launcher);
+
+    await startup.startAsync();
+
+    Assert.areEqual(JSON.stringify(["Held"]), JSON.stringify(this.updates.passed));
+    Assert.areEqual(1, this.updates.quitCount);
+    Assert.areEqual(JSON.stringify(["attach desktop IfIdle"]), JSON.stringify(launcher.calls));
+    Assert.areEqual(JSON.stringify(["Connecting"]), JSON.stringify(this.published));
+  }
+
+  @TestMethod
+  public async startsAgainOnceThePersonSettlesAnUnfinishedUpdate(): Promise<void> {
+    const busy = (): WorkInProgressException => new WorkInProgressException(new RunningWork(["A reply"]));
+    const launcher = new FakeRuntimeLauncher(busy(), new UpdateInProgressException(UpdateBarrierStatus.Unfinished));
+    const startup = this.create(launcher);
+    this.updates.passes = true;
+
+    await startup.startAsync();
+    await startup.actAsync("wait");
+
+    Assert.areEqual(JSON.stringify(["Unfinished"]), JSON.stringify(this.updates.passed));
+    Assert.areEqual(0, this.updates.quitCount);
+    Assert.areEqual(JSON.stringify(["attach desktop IfIdle", "attach desktop IfIdle", "attach desktop IfIdle"]), JSON.stringify(launcher.calls));
+    Assert.areEqual("Ready", startup.current.kind);
   }
 
   private async endSoonAsync(launcher: FakeRuntimeLauncher, failure: Failure | null): Promise<void> {

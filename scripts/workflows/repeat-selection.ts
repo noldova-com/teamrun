@@ -15,10 +15,12 @@ export default class RepeatSelection {
 
   public readonly tests: readonly string[];
   public readonly workflows: readonly string[];
+  public readonly workflowTests: number;
 
-  public constructor(tests: readonly string[], workflows: readonly string[]) {
+  public constructor(tests: readonly string[], workflows: readonly string[], workflowTests: number) {
     this.tests = [...tests].sort();
     this.workflows = [...workflows].sort();
+    this.workflowTests = workflowTests;
   }
 
   public get isEmpty(): boolean {
