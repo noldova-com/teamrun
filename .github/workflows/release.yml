@@ -320,6 +320,6 @@ jobs:
           RELEASE_FOLDER: ${{ github.workspace }}/_build/release
           RELEASE_NOTES: >-
             TeamRun ${{ inputs.version }} for Windows, Linux and macOS, each on x64 and ARM64. Its packages are unsigned.
-            Windows x64, Linux x64 and macOS x64 passed their install check natively;
-            Windows ARM64, Linux ARM64 and macOS ARM64 passed it in CI runs only.
+            Each target's package passed its install check on that target's own runner in the run that built it:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/release-publish.ts

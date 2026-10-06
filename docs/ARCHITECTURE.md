@@ -465,6 +465,10 @@ A release still contains the shell and every module in its list, and an update r
   - Run again, it continues the draft, or changes nothing when the published release's files and tag match. Two releases with the tag, a tag without a release or a draft for another revision fails with the reason.
   - A run that fails after creating the tag leaves the tag on the revision beside the draft. Running `release:publish` again continues the draft, and `release:check` refuses a new request for that version.
 - The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder and the release notes from `RELEASE_FOLDER` and `RELEASE_NOTES`.
+- The **Release** workflow, `.github/workflows/release.yml`, releases its own repository. It runs only by hand, from `main`, with a version and a revision, and one release per repository runs at a time:
+  - Its check job runs `release:check`. Until TeamRun's packages are signed, it refuses to release `noldova-com/teamrun`, so a trial runs the workflow in a test repository.
+  - Each target then builds on its own runner, runs `npm test`, makes its packages, installs, starts and quits them as the Package workflow does, and writes its release files with `release:assets`. It keeps them as an artifact of the run, with three tries.
+  - The publish job alone may write to the repository, behind the `publish` environment. It takes every target's files from this run's artifacts, also when only it runs again, and runs `release:publish`. The release notes say that each target's package passed its install check on its own runner, and link the run.
 - Releases use numbered versions such as `0.0.1` and `0.0.2`, without prerelease suffixes or build metadata, and matching `v`-prefixed tags. Each successful publication becomes the latest release.
 - Published application updates must use a version newer than the installed version.
 - Nightly builds, when introduced, remain downloadable pipeline artifacts; they do not create releases or enter the application update feed.

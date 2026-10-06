@@ -42,7 +42,7 @@ class ReleaseWorkflowTests {
 
     test("the check refuses an unsigned release of noldova-com/teamrun and a workflow from another branch than main, then checks the request with the repository's own token", { timeout: ReleaseWorkflowTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(ReleaseWorkflowTests.WORKFLOW);
-      const run = async (step: string, environment: NodeJS.ProcessEnv = {}): Promise<readonly [number | null, string]> => {
+      const run = async (step: string, environment: Readonly<Record<string, string>> = {}): Promise<readonly [number | null, string]> => {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         const result = await doubles.runAsync(workflow.readStepScript(step), environment);
@@ -105,13 +105,16 @@ class ReleaseWorkflowTests {
 
     test("the publish job takes every target's files from this run, also when only it is run again, and publishes them with the release notes", async () => {
       const workflow = await WorkflowFileFixture.readAsync(ReleaseWorkflowTests.WORKFLOW);
-      const download = new WorkflowSimulation(workflow.text, "Take this run's release files", "Take this run's release files").find("Take this run's release files");
+      const download = new WorkflowSimulation(workflow.text, "Take this run's release files", "Publish the release").find("Take this run's release files");
 
       assert.equal(download.uses, "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1");
       assert.deepEqual(download.settings, ["pattern: release-*", "merge-multiple: true", "path: _build/release"]);
       assert.ok(workflow.text.includes(`        env:\n          GH_TOKEN: \${{ github.token }}\n${ReleaseWorkflowTests.REQUEST}`
         + "          RELEASE_FOLDER: ${{ github.workspace }}/_build/release\n          RELEASE_NOTES: >-\n"));
-      assert.ok(workflow.text.includes("            Windows ARM64, Linux ARM64 and macOS ARM64 passed it in CI runs only.\n        run: node scripts/release-publish.ts\n"));
+      assert.ok(workflow.text.includes("            TeamRun ${{ inputs.version }} for Windows, Linux and macOS, each on x64 and ARM64. Its packages are unsigned.\n"
+        + "            Each target's package passed its install check on that target's own runner in the run that built it:\n"
+        + "            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n        run: node scripts/release-publish.ts\n"));
+      assert.ok(workflow.text.includes("    name: Publish the release\n    needs: build\n"));
       assert.ok(workflow.text.indexOf("Take this run's release files") < workflow.text.indexOf("      - name: Publish the release\n"));
     });
   }
