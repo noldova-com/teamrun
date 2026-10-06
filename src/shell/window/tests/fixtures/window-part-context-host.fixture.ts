@@ -10,6 +10,7 @@ import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import { type NotificationPost, QualifiedName, type SettingChange, SettingEntry, type SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import type { IWindowPartHost } from "../../src/app/interfaces/i-window-part-host";
+import type { DocumentHeading } from "../../src/app/models/document-heading";
 import type { MenuItem } from "../../src/app/models/menu-item";
 import type { ViewBadge } from "../../src/app/models/view-badge";
 
@@ -32,12 +33,16 @@ export class WindowPartContextHostFixture implements IWindowPartHost {
     return () => this.listeners.delete(listener);
   }
 
-  public openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
-    this.calls.push(`open ${moduleId} ${name} ${instance} ${title}${isPreview ? " as a preview" : ""}`);
+  public openDocument(moduleId: string, name: string, instance: string, heading: DocumentHeading, isPreview: boolean): void {
+    this.calls.push(`open ${moduleId} ${name} ${instance} ${heading.text}${isPreview ? " as a preview" : ""}`);
   }
 
   public keepDocument(moduleId: string, name: string, instance: string): void {
     this.calls.push(`keep ${moduleId} ${name} ${instance}`);
+  }
+
+  public updateDocument(moduleId: string, name: string, instance: string, title: string | null, breadcrumb: readonly string[] | null): void {
+    this.calls.push(`update ${moduleId} ${name} ${instance} ${title ?? "-"} ${Object.isNull(breadcrumb) ? "-" : `[${breadcrumb.join(", ")}]`}`);
   }
 
   public log(moduleId: string, message: string): void {

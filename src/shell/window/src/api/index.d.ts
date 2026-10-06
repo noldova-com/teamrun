@@ -94,6 +94,31 @@ export interface IDocumentOptions {
    * document opens as an ordinary tab.
    */
   readonly preview?: boolean;
+
+  /**
+   * The segments shown before the title in the window row while the
+   * document is active, such as its project and folder, outermost first;
+   * none when left out. Segments are text and must not be blank.
+   */
+  readonly breadcrumb?: readonly string[];
+}
+
+/**
+ * What {@link IWindowPartContext.updateDocument} changes about an open
+ * document; what is left out stays as it is.
+ */
+export interface IDocumentUpdate {
+  /**
+   * The new title, shown on the tab, in a dialog that shows the document,
+   * and in the window row and the window's title while it is active.
+   */
+  readonly title?: string;
+
+  /**
+   * The new breadcrumb, as {@link IDocumentOptions.breadcrumb} describes
+   * it; an empty list removes it.
+   */
+  readonly breadcrumb?: readonly string[];
 }
 
 /**
@@ -596,15 +621,16 @@ export interface IWindowPartContext {
    * @param name The document's name.
    * @param instance Which of the document's instances, such as a note's id.
    * @param title The tab's title.
-   * @param options Whether it opens as a preview; an ordinary tab when left
-   * out.
-   * @throws Error synchronously when the document belongs to another module.
+   * @param options Whether it opens as a preview, and its breadcrumb; an
+   * ordinary tab with no breadcrumb when left out.
+   * @throws Error synchronously when the document belongs to another module,
+   * or the title or a breadcrumb segment is blank.
    * @example
    * ```ts
    * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
    *
    * export function previewNote(context: IWindowPartContext, note: string, title: string): void {
-   *   context.openDocument("notes.note", note, title, { preview: true });
+   *   context.openDocument("notes.note", note, title, { preview: true, breadcrumb: ["Notes", "Drafts"] });
    * }
    * ```
    */
@@ -627,6 +653,27 @@ export interface IWindowPartContext {
    * ```
    */
   keepDocument(name: string, instance: string): void;
+
+  /**
+   * Changes the title or breadcrumb of one of the module's open documents,
+   * such as after the person renames or moves a note. Nothing shows when
+   * the document is not open.
+   *
+   * @param name The document's name.
+   * @param instance The instance it opened with.
+   * @param update The new title, breadcrumb or both.
+   * @throws Error synchronously when the document belongs to another module,
+   * or the title or a breadcrumb segment is blank.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function renameNote(context: IWindowPartContext, note: string, title: string): void {
+   *   context.updateDocument("notes.note", note, { title });
+   * }
+   * ```
+   */
+  updateDocument(name: string, instance: string, update: IDocumentUpdate): void;
 
   /**
    * Shows a view or document in a large modal dialog. One already open in a

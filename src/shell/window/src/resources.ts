@@ -410,6 +410,10 @@ export class Resources {
   public static readonly countParameter: string = "count";
   public static readonly descriptionParameter: string = "description";
   public static readonly badgeCountInvalid: string = "A badge's count must be a whole number from 1, or null for a dot.";
+  public static readonly breadcrumbParameter: string = "breadcrumb";
+  public static readonly invalidBreadcrumb: string = "A breadcrumb is a list of segments that are not blank.";
+  public static readonly breadcrumbSeparator: string = " › ";
+  public static readonly breadcrumbGlyph: string = "chevron_right";
   public static readonly textParameter: string = "text";
   public static readonly tooltipParameter: string = "tooltip";
   public static readonly commandParameter: string = "command";
@@ -745,6 +749,10 @@ export class Resources {
 
   public static formatPartSaveUnfinished(moduleName: string): string {
     return `${moduleName} didn't finish saving`;
+  }
+
+  public static formatWindowTitle(title: string): string {
+    return `${title} — ${Resources.productName}`;
   }
 
   public static formatMoreWork(count: number): string {
