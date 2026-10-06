@@ -450,6 +450,15 @@ A release still contains the shell and every module in its list, and an update r
 - **Program.** The program is a copy of the installed Electron's distribution without its default app and `version` file, which electron-builder also leaves out of an Electron it downloads. It is named and labelled from the product identity: Windows' `TeamRun.exe` with its icon and version information, the macOS bundle with the application ID, and the Linux executable named after the slug, with its desktop file named `<application ID>.desktop`. A packaged window's Windows taskbar entry takes its icon from `TeamRun.exe`, because the Windows shell cannot read a file inside `app.asar`.
 - **AppImage.** The AppImage uses electron-builder's static AppImage runtime (toolset `1.0.3`, runtime 20251108), which electron-builder still labels beta, because it starts on a stock Ubuntu 24.04. The legacy runtime needs libfuse2, which current Ubuntu does not install, so the download would not start. Where unprivileged user namespaces are restricted, as on current Ubuntu, electron-builder's AppRun launcher starts TeamRun without Chromium's namespace sandbox; the window then loads only TeamRun's own code.
 - **Installation.** The Windows installer installs for the current user without elevation and keeps the data directory when TeamRun is uninstalled.
+- **Command on the PATH (Windows).** The install folder holds `bin\teamrun.cmd`, named after the slug.
+  It runs the installed program in Node mode with the command line's entry, waits for it and returns its exit code, so `teamrun` works from cmd and PowerShell.
+  The installer adds `bin` to the user's `Path` in `HKCU\Environment` when it is missing, and tells running programs that the environment changed.
+  A `Path` that ends in `;` keeps ending in one, so uninstalling gives back the exact value.
+  An update finds the entry and leaves it.
+  Uninstalling removes exactly that entry, and the value itself when nothing else is left.
+  A `Path` that cannot be read, or is too long for the installer's strings, is left unchanged.
+  The [command line's document](../src/shell/cli/README.md#5-installed-teamrun) says what cmd does to its arguments.
+  The installer's include is `assets/installer/command-path.nsh`.
 - **Installer archive.** The Windows ARM64 installer's archive is compressed with 7-Zip's x86 filter.
   The ARM64 7-Zip that packages it would otherwise choose its ARM64 filter, which the installer's older extractor cannot read, so it would skip every `.exe` and `.dll` and still report success.
 - **Licenses.** `resources/licenses` holds TeamRun's license, the fonts' licenses and the window's third-party licenses. Electron's and Chromium's licenses stay beside the program.

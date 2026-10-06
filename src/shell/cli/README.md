@@ -46,6 +46,14 @@ The exit codes are stable; scripts may rely on them.
 
 A failure from the runtime keeps the protocol's code in the JSON error. When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1. A command the runtime leaves unanswered on an open connection reports `Unavailable`.
 
-## 5. Development
+## 5. Installed TeamRun
+
+On Windows the installer puts `teamrun` on the user's `Path`, so a terminal opened after the install runs it directly.
+Terminals that were already open keep their old `Path` until they are restarted.
+The installer leaves the user's `Path` unchanged, without a message, when it cannot read it or when adding the folder would make it about 8,190 characters or longer.
+In that case add `%LOCALAPPDATA%\Programs\teamrun\bin` to the user's `Path` by hand: open Settings, search for "Edit environment variables for your account", select `Path`, choose Edit, then New, and open a new terminal.
+The command passes its arguments through cmd, which can change quotes, `%` and `^` in them; give `run` such JSON with `--args-file` or on standard input with `-` instead.
+
+## 6. Development
 
 In a checkout, `npm run teamrun -- <command> [options]` runs the command line on the development app, with the checkout's own data directory unless `--data-dir` or `TEAMRUN_DATA_DIR` names another. A relative `--data-dir` is resolved from the folder `npm` was started in.

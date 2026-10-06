@@ -10,10 +10,12 @@ export default class InstalledPackage {
   public readonly desktop: string;
   public readonly program: string;
   public readonly resources: string;
+  public readonly command: string | null;
 
-  public constructor(desktop: string, program: string, resources: string) {
+  public constructor(desktop: string, program: string, resources: string, command: string | null) {
     this.desktop = desktop;
     this.program = program;
     this.resources = resources;
+    this.command = command;
   }
 }

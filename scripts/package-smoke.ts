@@ -20,6 +20,7 @@ import PackageInstaller from "./packaging/package-installer.ts";
 import PackageLayout from "./packaging/package-layout.ts";
 import PackageTarget from "./packaging/package-target.ts";
 import PackagingException from "./packaging/packaging.exception.ts";
+import UserPath from "./packaging/user-path.ts";
 import type ProcessResult from "./processes/process-result.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
@@ -59,6 +60,11 @@ export default class PackageSmoke {
   private static readonly PROCESS_OPTION: string = "/PID";
   private static readonly QUIT_SIGNAL: NodeJS.Signals = "SIGTERM";
   private static readonly KILL_SIGNAL: NodeJS.Signals = "SIGKILL";
+  private static readonly COMMAND_SHELL: string = "cmd.exe";
+  private static readonly COMMAND_SHELL_OPTIONS: readonly string[] = ["/d", "/c"];
+  private static readonly POWERSHELL: string = "pwsh";
+  private static readonly POWERSHELL_OPTIONS: readonly string[] = ["-NoProfile", "-NonInteractive", "-Command"];
+  private static readonly PATH_VARIABLE: string = "PATH";
   private static readonly LOGS_FOLDER: string = "logs";
   private static readonly COPY_RECORD: RegExp = /^copy-[0-9a-f-]{36}\.log$/;
   private static readonly MOUNT_RECORD: RegExp = /^teamrun-copy mount \d+ (\d+) .+$/;
@@ -124,9 +130,14 @@ export default class PackageSmoke {
     const manifest = await RootManifest.readAsync(this.root);
     const folder = await this.temporaryFolder.createAsync(this.platform, PackageSmoke.FOLDER_PREFIX);
     this.folder = folder;
+    const installer = new PackageInstaller(this.root, this.runner, this.environment);
+    const userPath = new UserPath(this.runner, folder);
+    const pathBefore = target.platform === PackageTarget.WINDOWS ? await userPath.readAsync() : null;
     const started = Date.now();
-    const installed = await new PackageInstaller(this.root, this.runner, this.environment).installAsync(target, manifest.product, folder);
+    const installed = await installer.installAsync(target, manifest.product, folder);
     this.output.write(`Installed in ${((Date.now() - started) / PackageSmoke.SECOND).toFixed(1)} s: ${installed.desktop}\n`);
+    if (installed.command !== null)
+      await this.requireOnPathAsync(userPath, installed.command, "The user's Path holds");
     const data = path.join(folder, PackageSmoke.DATA_FOLDER);
     await this.requireNoRuntimeAsync(installed, data, folder, "before the start");
     this.output.write("teamrun status before the start: no runtime.\n");
@@ -137,7 +148,9 @@ export default class PackageSmoke {
     let runtime: number;
     let copy: readonly [string, string] | null = null;
     try {
-      this.checkStarted(await this.waitForRuntimeAsync(installed, data, folder, desktop, logs), manifest.productVersion, data);
+      this.checkStarted(await this.waitForRuntimeAsync(installed, data, folder, desktop, logs), manifest.productVersion, data, "after the start");
+      if (installed.command !== null)
+        await this.checkPowerShellAsync(installed.command, manifest.productVersion, data, folder);
       const found = await PackageSmoke.readRuntimeIdAsync(data);
       if (found === null)
         throw new PackagingException(`The runtime's discovery file ${path.join(data, ...PackageSmoke.DISCOVERY_SEGMENTS)} names no process.`);
@@ -169,6 +182,39 @@ export default class PackageSmoke {
     this.output.write("The runtime stopped once idle.\n");
     if (copy !== null)
       await this.requireCopyEndedAsync(copy);
+    if (installed.command === null)
+      return;
+    await installer.installAsync(target, manifest.product, folder);
+    await this.requireOnPathAsync(userPath, installed.command, "Installed again over itself, the user's Path still holds");
+    await installer.uninstallWindowsAsync(manifest.product, folder);
+    const pathAfter = await userPath.readAsync();
+    if (pathAfter !== pathBefore)
+      throw new PackagingException(`After the uninstall the user's Path is ${JSON.stringify(pathAfter)} instead of ${JSON.stringify(pathBefore)}, as it was before the install.`);
+    this.output.write("Uninstalled: the program and its command are gone, and the user's Path is as it was before the install.\n");
+  }
+
+  private async requireOnPathAsync(userPath: UserPath, command: string, intro: string): Promise<void> {
+    const entry = path.dirname(command);
+    const value = await userPath.readAsync();
+    const count = UserPath.count(value, entry);
+    if (count !== 1)
+      throw new PackagingException(`The user's Path holds ${entry} ${count} times instead of once: ${JSON.stringify(value)}`);
+    this.output.write(`${intro} ${entry} once.\n`);
+  }
+
+  private async checkPowerShellAsync(command: string, version: string, data: string, folder: string): Promise<void> {
+    const line = ["&", path.parse(command).name, ...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, `'${data}';`, "exit", "$LASTEXITCODE"].join(" ");
+    const status = await this.runner.captureAsync(PackageSmoke.POWERSHELL, [...PackageSmoke.POWERSHELL_OPTIONS, line], folder, PackageSmoke.COMMAND_LIMIT, this.createCommandEnvironment(command));
+    if (!status.isSuccessful)
+      throw new PackagingException(`teamrun status through PowerShell exited with ${status.exitCode}:\n${status.text}`);
+    this.checkStarted(status.output, version, data, "through PowerShell");
+  }
+
+  private createCommandEnvironment(command: string): NodeJS.ProcessEnv {
+    const isPath = ([name]: readonly [string, unknown]): boolean => name.toUpperCase() === PackageSmoke.PATH_VARIABLE;
+    const paths = Object.entries(this.environment).filter(t => isPath(t)).map(([, value]) => String(value));
+    const others = Object.entries(this.environment).filter(t => !isPath(t));
+    return { ...Object.fromEntries(others), [PackageSmoke.PATH_VARIABLE]: [path.dirname(command), ...paths].join(path.win32.delimiter) };
   }
 
   private async requireCopyAsync(data: string): Promise<readonly [string, string]> {
@@ -278,6 +324,11 @@ export default class PackageSmoke {
   }
 
   private queryStatusAsync(installed: InstalledPackage, data: string, folder: string): Promise<ProcessResult> {
+    if (installed.command !== null) {
+      return this.runner.captureAsync(PackageSmoke.COMMAND_SHELL,
+        [...PackageSmoke.COMMAND_SHELL_OPTIONS, path.parse(installed.command).name, ...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, data],
+        folder, PackageSmoke.COMMAND_LIMIT, this.createCommandEnvironment(installed.command));
+    }
     return this.runner.captureAsync(installed.program,
       [path.join(installed.resources, PackageSmoke.ARCHIVE, ...TeamRunCommand.ENTRY_SEGMENTS), ...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, data],
       folder, PackageSmoke.COMMAND_LIMIT, { ...this.environment, [TeamRunCommand.RUN_AS_NODE_VARIABLE]: TeamRunCommand.RUN_AS_NODE_VALUE });
@@ -303,7 +354,7 @@ export default class PackageSmoke {
     }
   }
 
-  private checkStarted(answer: string, version: string, data: string): void {
+  private checkStarted(answer: string, version: string, data: string, moment: string): void {
     const value = PackageSmoke.parse(answer);
     const reportedVersion = PackageSmoke.readField(PackageSmoke.readField(value, PackageSmoke.BUILD_FIELD), PackageSmoke.VERSION_FIELD);
     const directory = PackageSmoke.readField(value, PackageSmoke.DATA_DIRECTORY_FIELD);
@@ -311,7 +362,7 @@ export default class PackageSmoke {
       throw new PackagingException(`teamrun status --json answered without a build version and a data directory:\n${answer.trim()}`);
     if (reportedVersion !== version || directory !== data)
       throw new PackagingException(`teamrun status reported version ${reportedVersion} in ${directory} instead of ${version} in ${data}.`);
-    this.output.write(`teamrun status after the start: version ${reportedVersion} in ${directory}.\n`);
+    this.output.write(`teamrun status ${moment}: version ${reportedVersion} in ${directory}.\n`);
   }
 
   private async waitForExitAsync(runtime: number, limit: number): Promise<boolean> {
