@@ -18,9 +18,9 @@ import type { Installation, LaunchSettings } from "@noldova/teamrun-shell-runtim
 import { DesktopApplication, DesktopSettings, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "./condition.fixture.js";
-import { FakeAppearanceStore } from "./fake-appearance-store.fixture.js";
 import { FakeDesktopProcess } from "./fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "./fake-desktop-window.fixture.js";
+import { FakeDeviceFiles } from "./fake-device-files.fixture.js";
 import { FakeDeviceIdentity } from "./fake-device-identity.fixture.js";
 import { FakeElectron } from "./fake-electron.fixture.js";
 import { FakePathCommand } from "./fake-path-command.fixture.js";
@@ -40,7 +40,7 @@ export class DesktopStartFixture {
     process: FakeDesktopProcess,
     launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(),
     device: FakeDeviceIdentity = new FakeDeviceIdentity(),
-    appearance: FakeAppearanceStore = new FakeAppearanceStore(),
+    files: FakeDeviceFiles = new FakeDeviceFiles(),
     pathCommand: FakePathCommand = new FakePathCommand(),
     installations: Installation[] = [],
     recordDesktopAsync: (installation: Installation) => Promise<boolean> = () => Promise.resolve(true)): LaunchSettings[] {
@@ -49,7 +49,7 @@ export class DesktopStartFixture {
       settings.push(t);
       installations.push(installation);
       return launcher;
-    }, t => device.readAsync(t), t => appearance.create(t), t => pathCommand.create(t), recordDesktopAsync);
+    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync);
     return settings;
   }
 
@@ -59,8 +59,8 @@ export class DesktopStartFixture {
     electron: FakeElectron = new FakeElectron(),
     device: FakeDeviceIdentity = new FakeDeviceIdentity(),
     process: FakeDesktopProcess = new FakeDesktopProcess(platform),
-    appearance: FakeAppearanceStore = new FakeAppearanceStore()): Promise<FakeElectron> {
-    DesktopStartFixture.start(electron, process, launcher, device, appearance);
+    files: FakeDeviceFiles = new FakeDeviceFiles()): Promise<FakeElectron> {
+    DesktopStartFixture.start(electron, process, launcher, device, files);
     await DesktopStartFixture.openAsync(electron);
     await setImmediate();
     return electron;
@@ -111,7 +111,16 @@ export class DesktopStartFixture {
     return DesktopSettings.fromModule(dirname(fileURLToPath(DesktopStartFixture.MODULE_URL)), platform);
   }
 
-  public static trustedEvent(platform: string): IIpcEvent {
-    return { sender: { id: 1 }, senderFrame: { url: DesktopStartFixture.settings(platform).windowUrl, parent: null } };
+  public static trustedEvent(platform: string, windowId: number = 1): IIpcEvent {
+    return { sender: { id: windowId }, senderFrame: { url: DesktopStartFixture.settings(platform).windowUrl, parent: null } };
+  }
+
+  public static closeRequests(window: FakeDesktopWindow): unknown[] {
+    return window.webContents.sent.filter(t => t[0] === "teamrun:closeRequest").map(t => t[1]);
+  }
+
+  public static async answerSaveAsync(electron: FakeElectron, platform: string, window: FakeDesktopWindow, count: number): Promise<void> {
+    await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length >= count);
+    await electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent(platform, window.id), DesktopStartFixture.closeRequests(window)[count - 1], true);
   }
 }

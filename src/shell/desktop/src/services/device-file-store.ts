@@ -10,19 +10,22 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { type JsonObject, JsonReader } from "@noldova/teamrun-foundation-json";
 
-import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
+import type { IDeviceFileStore } from "../interfaces/i-device-file-store.js";
 import { Resources } from "../resources.js";
 
-export class AppearanceStore implements IAppearanceStore {
+export class DeviceFileStore implements IDeviceFileStore {
   private readonly folder: string;
   private readonly file: string;
   private writing: Promise<void> = Promise.resolve();
 
-  public constructor(folder: string) {
+  public constructor(folder: string, fileName: string) {
+    ArgumentException.throwIfNullOrWhitespace(fileName, Resources.fileNameParameter);
+
     this.folder = folder;
-    this.file = join(folder, Resources.appearanceFile);
+    this.file = join(folder, fileName);
   }
 
   public async readAsync(): Promise<JsonObject | null> {
@@ -31,16 +34,16 @@ export class AppearanceStore implements IAppearanceStore {
     return JsonReader.fromValue(JSON.parse(await readFile(this.file, Resources.textEncoding))).toJson();
   }
 
-  public writeAsync(preferences: JsonObject): Promise<void> {
-    const write = this.writing.catch(() => undefined).then(() => this.writeNowAsync(preferences));
+  public writeAsync(value: JsonObject): Promise<void> {
+    const write = this.writing.catch(() => undefined).then(() => this.writeNowAsync(value));
     this.writing = write;
     return write;
   }
 
-  private async writeNowAsync(preferences: JsonObject): Promise<void> {
+  private async writeNowAsync(value: JsonObject): Promise<void> {
     const temporary = `${this.file}${Resources.temporarySuffix}`;
     await mkdir(this.folder, { recursive: true });
-    await writeFile(temporary, JSON.stringify(preferences), Resources.textEncoding);
+    await writeFile(temporary, JSON.stringify(value), Resources.textEncoding);
     await rename(temporary, this.file);
   }
 }

@@ -16,16 +16,15 @@ import { FakeQuitPrompt } from "../fixtures/fake-quit-prompt.fixture.js";
 @TestClass
 export class QuitCoordinatorTests {
   @TestMethod
-  public async quitsWithoutAskingWhenAnotherWindowStaysOpenTheWorkCannotBeReadOrNoneIsInProgress(): Promise<void> {
+  public async quitsWithoutAskingWhenTheWorkCannotBeReadOrNoneIsInProgress(): Promise<void> {
     const prompt = new FakeQuitPrompt();
     let reads = 0;
     const answers: (WorkReport | null)[] = [null, new WorkReport([], 3)];
-    const other = new QuitCoordinator(() => false, () => Promise.resolve(new WorkReport(["Indexing"], 1)), () => Promise.resolve());
-    const coordinator = new QuitCoordinator(() => true, () => Promise.resolve(answers[reads++] ?? null), () => Promise.resolve());
+    const coordinator = new QuitCoordinator(() => Promise.resolve(answers[reads++] ?? null));
 
-    const outcomes = [await other.confirmAsync(prompt), await coordinator.confirmAsync(prompt), await coordinator.confirmAsync(prompt)];
+    const outcomes = [await coordinator.askAsync(prompt), await coordinator.askAsync(prompt)];
 
-    Assert.areEqual([QuitOutcome.Quit, QuitOutcome.Quit, QuitOutcome.Quit].join(","), outcomes.join(","));
+    Assert.areEqual([QuitOutcome.Quit, QuitOutcome.Quit].join(","), outcomes.join(","));
     Assert.areEqual(2, reads);
     Assert.areEqual(0, prompt.shown.length);
   }
@@ -36,12 +35,12 @@ export class QuitCoordinatorTests {
     const stranger = new FakeQuitPrompt();
     const coordinator = QuitCoordinatorTests.create(new WorkReport(["Indexing the project"], 1));
 
-    const stopping = coordinator.confirmAsync(prompt);
+    const stopping = coordinator.askAsync(prompt);
     await Condition.waitAsync(() => prompt.shown.length === 1);
-    const second = await coordinator.confirmAsync(stranger);
+    const second = await coordinator.askAsync(stranger);
     const taken = [coordinator.answer(stranger, QuitChoice.Stop), coordinator.answer(prompt, "Later"), coordinator.answer(prompt, QuitChoice.Stop)];
     const outcome = await stopping;
-    const cancelling = coordinator.confirmAsync(prompt);
+    const cancelling = coordinator.askAsync(prompt);
     await Condition.waitAsync(() => prompt.shown.length === 3);
     coordinator.answer(prompt, QuitChoice.Cancel);
 
@@ -61,8 +60,8 @@ export class QuitCoordinatorTests {
     const began = QuitCoordinatorTests.createRacing(new WorkReport([], 1), new WorkReport(["Saving"], 2));
     const prompt = new FakeQuitPrompt();
 
-    const outcomes = [await ended.confirmAsync(new FakeQuitPrompt()), await stale.confirmAsync(new FakeQuitPrompt())];
-    const asking = began.confirmAsync(prompt);
+    const outcomes = [await ended.askAsync(new FakeQuitPrompt()), await stale.askAsync(new FakeQuitPrompt())];
+    const asking = began.askAsync(prompt);
     await Condition.waitAsync(() => prompt.shown.length === 1);
     began.receive(new WorkReport([], 3));
 
@@ -77,7 +76,7 @@ export class QuitCoordinatorTests {
     const coordinator = QuitCoordinatorTests.create(new WorkReport(["Indexing"], 1));
     let isSettled = false;
 
-    const waiting = coordinator.confirmAsync(prompt).then(t => {
+    const waiting = coordinator.askAsync(prompt).then(t => {
       isSettled = true;
       return t;
     });
@@ -100,37 +99,50 @@ export class QuitCoordinatorTests {
     const gone = new FakeQuitPrompt();
     gone.canShow = false;
     const prompt = new FakeQuitPrompt();
-    let stops = 0;
-    const coordinator = new QuitCoordinator(() => true, () => Promise.resolve(new WorkReport(["Indexing"], 1)), () => {
-      stops++;
-      return Promise.resolve();
-    });
+    const coordinator = QuitCoordinatorTests.create(new WorkReport(["Indexing"], 1));
 
     coordinator.release();
     coordinator.receive(new WorkReport([], 5));
-    const unshown = await coordinator.confirmAsync(gone);
-    const asking = coordinator.confirmAsync(prompt);
+    const unshown = await coordinator.askAsync(gone);
+    const asking = coordinator.askAsync(prompt);
     await Condition.waitAsync(() => prompt.shown.length === 1);
     coordinator.release();
-    await coordinator.stopWorkAsync();
 
     Assert.areEqual(QuitOutcome.Quit, unshown);
     Assert.areEqual(QuitOutcome.Quit, await asking);
     Assert.areEqual("Indexing,none", gone.shown.join(","));
     Assert.areEqual("Indexing,none", prompt.shown.join(","));
-    Assert.areEqual(1, stops);
+  }
+
+  @TestMethod
+  public async staysWhenTheAskingWindowIsDismissedAndIgnoresAnotherWindow(): Promise<void> {
+    const prompt = new FakeQuitPrompt();
+    const stranger = new FakeQuitPrompt();
+    const coordinator = QuitCoordinatorTests.create(new WorkReport(["Indexing"], 1));
+
+    coordinator.dismiss(prompt);
+    const asking = coordinator.askAsync(prompt);
+    await Condition.waitAsync(() => prompt.shown.length === 1);
+    coordinator.dismiss(stranger);
+    const isAskingAfterStranger = prompt.shown.length === 1;
+    coordinator.dismiss(prompt);
+
+    Assert.isTrue(isAskingAfterStranger);
+    Assert.areEqual(QuitOutcome.Stay, await asking);
+    Assert.areEqual("Indexing,none", prompt.shown.join(","));
+    Assert.areEqual(0, stranger.shown.length);
   }
 
   private static create(report: WorkReport): QuitCoordinator {
-    return new QuitCoordinator(() => true, () => Promise.resolve(report), () => Promise.resolve());
+    return new QuitCoordinator(() => Promise.resolve(report));
   }
 
   private static createRacing(answered: WorkReport, heard: WorkReport): QuitCoordinator {
-    const coordinator: QuitCoordinator = new QuitCoordinator(() => true, () => {
+    const coordinator: QuitCoordinator = new QuitCoordinator(() => {
       coordinator.receive(heard);
       coordinator.receive(new WorkReport(["Older"], 0));
       return Promise.resolve(answered);
-    }, () => Promise.resolve());
+    });
     return coordinator;
   }
 }

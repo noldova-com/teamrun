@@ -168,6 +168,17 @@ export class DesktopBridgeService implements ClipboardWriter {
     return this.bridge.answerQuit(choice);
   }
 
+  public async readTrayAvailableAsync(): Promise<boolean> {
+    return await this.bridge.readTrayAvailable() !== false;
+  }
+
+  public onTrayAvailable(listener: (isAvailable: boolean) => void): () => void {
+    return this.bridge.onTrayAvailable(t => {
+      if (Object.isBoolean(t))
+        listener(t);
+    });
+  }
+
   public logModule(moduleId: string, message: string): void {
     this.bridge.logModule(moduleId, message);
   }
@@ -227,6 +238,8 @@ export class DesktopBridgeService implements ClipboardWriter {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onQuitQuestion))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerQuit))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readTrayAvailable))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onTrayAvailable))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logModule))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logError)));
   }

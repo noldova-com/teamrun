@@ -130,6 +130,14 @@ contextBridge.exposeInMainWorld("teamrun", {
   answerQuit(choice: string): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:quitAnswer", choice) as Promise<boolean>;
   },
+  readTrayAvailable(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readTrayAvailable");
+  },
+  onTrayAvailable(listener: (isAvailable: boolean) => void): () => void {
+    const handler = (_event: IpcRendererEvent, isAvailable: boolean): void => listener(isAvailable);
+    ipcRenderer.on("teamrun:trayAvailable", handler);
+    return () => ipcRenderer.removeListener("teamrun:trayAvailable", handler);
+  },
   logModule(moduleId: string, message: string): void {
     ipcRenderer.send("teamrun:moduleLog", moduleId, message);
   },

@@ -25,6 +25,7 @@ export class TrayController {
   private readonly isMac: boolean;
   private readonly actions: ITrayActions;
   private readonly log: (text: string) => void;
+  private readonly changeShown: (isShown: boolean) => void;
   private tray: ITray | null = null;
   private isEnabled: boolean = false;
   private isHostAvailable: boolean = false;
@@ -36,13 +37,25 @@ export class TrayController {
   private toolTip: string = String.empty;
   private menuKey: string = String.empty;
 
-  public constructor(host: ITrayHost, menu: IMenuHost, icons: AppIcons, platform: string, actions: ITrayActions, log: (text: string) => void) {
+  public constructor(
+    host: ITrayHost,
+    menu: IMenuHost,
+    icons: AppIcons,
+    platform: string,
+    actions: ITrayActions,
+    log: (text: string) => void,
+    changeShown: (isShown: boolean) => void) {
     this.host = host;
     this.menu = menu;
     this.icons = icons;
     this.isMac = platform === Resources.macPlatform;
     this.actions = actions;
     this.log = log;
+    this.changeShown = changeShown;
+  }
+
+  public get isShown(): boolean {
+    return !Object.isNull(this.tray);
   }
 
   public setEnabled(isEnabled: boolean): void {
@@ -88,6 +101,13 @@ export class TrayController {
   }
 
   private update(): void {
+    const wasShown = this.isShown;
+    this.refresh();
+    if (this.isShown !== wasShown)
+      this.changeShown(this.isShown);
+  }
+
+  private refresh(): void {
     if (!this.isEnabled || !this.isHostAvailable || this.isDisposed) {
       this.tray?.destroy();
       this.tray = null;

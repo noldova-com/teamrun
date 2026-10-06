@@ -555,7 +555,7 @@ The [command line's document](../src/shell/cli/README.md#7-module-commands) owns
   It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts.
   An older build that finds a newer runtime hands the person over to the newer build instead of starting; a development build says that a newer one is running instead.
   On Linux the older desktop starts the newer one the way it [launches the runtime](#launching-the-runtime), so the newer desktop keeps none of the older one's descriptors.
-  A second desktop on a data directory, of any build, focuses the first and exits: the single-instance lock allows one desktop per data directory, and the handover is between a desktop and a runtime.
+  A second desktop on a data directory, of any build, brings the first forward and exits; the first opens a window when none is open, once it has passed the update barrier and unless it is quitting: the single-instance lock allows one desktop per data directory, and the handover is between a desktop and a runtime.
   The person is never asked to find and quit another TeamRun.
 - A build is newer when its product version is higher.
   Between two builds of the same product version, such as successive development builds, the build that is starting takes over.
@@ -735,6 +735,7 @@ The ownership database of section 6 is separate.
 | The commands each device last ran from command search | The shell, in its database, the 20 newest per device |
 | The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
 | The data directories an installation's runtimes have owned, the desktops running from it, and its launch barrier | The installation's folder beside the device's identity, outside every data directory ([Stopping for an update](#stopping-for-an-update)) |
+| The one-time hints the device has shown and its last tray setting | The desktop, in `device-state.json` beside the device's identity, outside the data directory; one key for each hint, such as `trayCloseHintShown`, set once the hint has shown, and `trayIcon`, the value of `shell.trayIcon` the desktop follows for the device, written each time it changes |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory; the window keeps the transient state of the shell's own tabs, such as Settings' page, under the tab's key while the tab is open, through moves, and drops it when the tab closes |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |
@@ -809,7 +810,7 @@ It keeps the middle width the person left by dragging a side dock when that is u
 The desktop shows TeamRun's icon in the Windows notification area, the macOS menu bar or the Linux tray while the device setting `shell.trayIcon` is on.
 The runtime declares the setting with its own platform's title and default: "Show TeamRun in the notification area", on by default, on Windows; "in the menu bar", off by default, on macOS; and "in the tray", on by default, elsewhere.
 Both follow the runtime's platform, not the desktop's, so a desktop attached to a runtime on another system would show that system's title and default.
-The desktop reads the setting for its device once the runtime is ready, follows its changes for that device, and until it has read it uses its platform's default.
+The desktop reads the setting for its device once the runtime is ready, follows its changes for that device, and until it has read it uses the value it last followed on this device or, without one, its platform's default.
 On Linux the icon shows only while a StatusNotifierItem host is registered: the desktop asks the session bus through `/usr/bin/gdbus` whether `org.kde.StatusNotifierWatcher` reports `IsStatusNotifierHostRegistered`, and keeps `gdbus monitor` on that name to ask again when its owner changes or a host registers or leaves.
 A missing `gdbus`, no watcher or a failed answer means no host; when the monitor ends, the desktop asks once and starts it again after a wait that begins at a second and doubles up to a minute.
 The desktop starts `gdbus` the way it [launches the runtime](#launching-the-runtime), through Bash that closes inherited descriptors, so it never holds Chromium's channels to the desktop's own processes and they end with the desktop.
@@ -820,8 +821,15 @@ The icon has four images: idle, work running, unread notifications, and both.
 Running work is the runtime's newest `shell.work` report; unread notifications are counted as the bell counts them, leaving out those read and those of modules turned off.
 The desktop reads both once the runtime is ready, follows their events, and shows the idle image while the runtime is not ready.
 Its tooltip names the counts that are not zero.
-Its menu lists Open TeamRun; the titles of up to five pieces of running work and "and N more", or No work running; the three newest unread notifications, each opening TeamRun and running the notification's command as an operating system notification does; Do not disturb for this device, as a checkbox; and Quit TeamRun.
+Its menu lists the titles of up to five pieces of running work and "and N more", or No work running; the three newest unread notifications, each opening TeamRun and running the notification's command as an operating system notification does; Open TeamRun; Do not disturb for this device, as a checkbox; and Quit TeamRun.
 On Windows and Linux a click on the icon brings a window forward, opening one when none is open, and the host shows the menu; on macOS a click opens the menu.
+
+While the icon shows on Windows or Linux, closing the last window leaves TeamRun running behind the icon, as section 9 describes.
+The first time this happens on a device, once the window has saved and closed, an operating system notification says that TeamRun is still running and can be opened again or quit from its icon in the notification area on Windows or the tray on Linux, and a click on it opens TeamRun.
+The desktop keeps the notification while it shows and records the hint in `device-state.json` (section 7) once the operating system has shown it, and does not show it again; a device that cannot show notifications, or whose system refuses this one, records nothing and logs the refusal.
+When the icon goes away while no window is open, the desktop opens a window, so TeamRun never runs without a way back to it.
+From the moment TeamRun starts to quit until it exits or stays open, a window that closes shows no hint, and only the quit's own question opens a window: not the hint, the icon, a second start, the icon going away or, on macOS, the Dock.
+On Linux, while no host is registered, Settings notes on the setting's row that the desktop shows no tray icons, so the icon appears once it does.
 
 ## 9. Active work, closing and shutdown
 
@@ -830,11 +838,16 @@ Window parts report none yet.
 The runtime lists the work with `shell.work` and announces each change with the event of the same name, whose reports carry a sequence so a client keeps the newest.
 Before TeamRun quits, restarts for an update or stops for a newer build (section 6) while work is in progress, it asks the person whether to wait for the work or to stop it, and never interrupts it without that choice.
 
-When the person closes the last window, the desktop reads the runtime's work, waiting at most two seconds; when it cannot read it in that time, the window closes as it would without work.
-Otherwise the window asks, keeping the list current: waiting closes it once no work is left, even work that began while waiting; stopping the work asks the runtime to stop the work and itself once the window has saved; cancelling keeps TeamRun open.
-A window that can no longer ask, or a runtime that goes away, lets closing go ahead.
+Closing the last window quits TeamRun, except on macOS and while the tray icon shows (section 8), where the window closes once it has saved and TeamRun keeps running.
+Quitting, from the last window, the tray icon, the menu or the operating system, first has every window save, then asks the runtime to stop only if idle and to keep running while another client uses it (section 6).
+A runtime that is kept, stops or cannot be reached lets TeamRun quit at once.
+Electron sends no `before-quit` when Windows shuts down or the person signs out, so TeamRun then ends without saving first or asking, and what the windows saved before stands.
+When work is in progress, the desktop reads it, waiting at most two seconds; when it cannot read it in that time, TeamRun quits without asking.
+Otherwise a window asks, opening one when none is open and asking once its page has painted, and keeps the list current: waiting quits once no work is left, even work that began while waiting; stopping the work asks the runtime to stop the work and itself; cancelling keeps TeamRun open.
+After waiting or stopping, every window saves again, because the person may have changed something while the question showed, before the desktop asks the runtime to stop once more, only if idle or stopping the work as chosen.
+A window that closes before it can ask, or a runtime that goes away, lets quitting go ahead.
 
-Closing TeamRun, after that choice and before any work is stopped, waits for each window to save its unsaved state.
+Closing a window, and quitting before it asks the runtime to stop, waits for each window to save its unsaved state.
 The window runs the save steps its parts register through their context together with its own layout save.
 A part whose save fails keeps TeamRun open: the window logs the error and posts `shell.saveFailed` naming the module, and nothing is stopped.
 A part whose steps have not settled after 4 seconds does not block closing: the window logs it and posts `shell.saveUnfinished` naming the module, and logs a failure that comes later.

@@ -22,7 +22,7 @@ test.describe("window state", () => {
   const readLayout = (desktop: DesktopApplicationFixture): Promise<unknown> =>
     desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readLayout(): Promise<unknown> }).readLayout());
   const openings: readonly [string, (desktop: DesktopApplicationFixture) => Promise<void>][] = [
-    ["reopened while its runtime still runs", t => t.reopenAsync()],
+    ["quit and reopened", t => t.reopenAsync()],
     ["restarted after its runtime stopped", t => t.restartAsync()]
   ];
 

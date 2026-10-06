@@ -7,6 +7,7 @@
  */
 
 import type { IDockHost } from "./i-dock-host.js";
+import type { IPreventableEvent } from "./i-preventable-event.js";
 
 export interface IApplicationHost {
   readonly isPackaged: boolean;
@@ -27,4 +28,5 @@ export interface IApplicationHost {
   on(event: "window-all-closed", listener: () => void): unknown;
   on(event: "activate", listener: () => void): unknown;
   on(event: "will-quit", listener: () => void): unknown;
+  on(event: "before-quit", listener: (event: IPreventableEvent) => void): unknown;
 }

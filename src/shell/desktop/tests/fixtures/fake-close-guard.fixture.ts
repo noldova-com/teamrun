@@ -6,22 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type ICloseGuard, type IQuitPrompt, QuitOutcome } from "@noldova/teamrun-shell-desktop";
+import type { ICloseGuard, IQuitPrompt } from "@noldova/teamrun-shell-desktop";
 
 export class FakeCloseGuard implements ICloseGuard {
   public readonly prompts: IQuitPrompt[] = [];
-  public outcome: QuitOutcome = QuitOutcome.Quit;
-  public stops: number = 0;
-  public onStop?: () => void;
+  public canClose: boolean = true;
 
-  public confirmAsync(prompt: IQuitPrompt): Promise<QuitOutcome> {
+  public canCloseAsync(prompt: IQuitPrompt): Promise<boolean> {
     this.prompts.push(prompt);
-    return Promise.resolve(this.outcome);
-  }
-
-  public stopWorkAsync(): Promise<void> {
-    this.stops++;
-    this.onStop?.();
-    return Promise.resolve();
+    return Promise.resolve(this.canClose);
   }
 }

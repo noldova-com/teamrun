@@ -16,10 +16,10 @@ import "@noldova/teamrun-foundation-core";
 import { ChildProcessStarter, ProcessPresence, RuntimeBuild, RuntimeLauncher, SystemCommand } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
-import { AppearanceStore } from "./services/appearance-store.js";
 import { ChildProgramHost } from "./services/child-program-host.js";
 import { DesktopApplication } from "./services/desktop-application.js";
 import { DesktopRecord } from "./services/desktop-record.js";
+import { DeviceFileStore } from "./services/device-file-store.js";
 import { DeviceIdentity } from "./services/device-identity.js";
 import { PathCommand } from "./services/path-command.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
@@ -65,7 +65,7 @@ DesktopApplication.start(
   import.meta.url,
   (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, installation, starter),
   t => DeviceIdentity.readOrCreateAsync(t),
-  t => new AppearanceStore(t),
+  (folder, fileName) => new DeviceFileStore(folder, fileName),
   t => PathCommand.forBundle(t, async (program, args) => {
     await promisify(execFile)(program, [...args]);
   }),

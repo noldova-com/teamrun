@@ -20,11 +20,10 @@ export class TrayMenuTemplate {
   public static build(work: readonly string[], unread: readonly Notification[], isDoNotDisturb: boolean, actions: ITrayActions): MenuItemConstructorOptions[] {
     const notifications = unread.slice(0, Resources.trayNotificationRows).map(t => ({ label: TrayMenuTemplate.labelOf(t.post.title), click: () => actions.openNotification(t.id) }));
     return [
-      { label: Resources.openApplicationLabel, click: () => actions.open() },
-      TrayMenuTemplate.SEPARATOR,
       ...TrayMenuTemplate.workRows(work),
+      ...notifications,
       TrayMenuTemplate.SEPARATOR,
-      ...notifications.length === 0 ? [] : [...notifications, TrayMenuTemplate.SEPARATOR],
+      { label: Resources.openApplicationLabel, click: () => actions.open() },
       { label: Resources.doNotDisturbLabel, type: "checkbox", checked: isDoNotDisturb, click: () => actions.setDoNotDisturb(!isDoNotDisturb) },
       TrayMenuTemplate.SEPARATOR,
       { label: Resources.quitApplicationLabel, click: () => actions.quit() }
