@@ -64,7 +64,7 @@ class ConceptFolderCheckTests {
       t.after(() => repository.disposeAsync());
       const runtime = ConceptFolderCheckTests.RUNTIME;
       await repository.writeAsync({
-        "scripts/Checks/run.ts": "export class Run {}\n",
+        "scripts/Tools/run.ts": "export class Run {}\n",
         "scripts/checks/check-source.ts": "export interface ICheckSource {}\n",
         "scripts/checks/interfaces/check-kind.ts": "export enum CheckKind { One = \"One\" }\n",
         [`${runtime}/components/clock.ts`]: "export class Clock {}\n",
@@ -84,7 +84,7 @@ class ConceptFolderCheckTests {
       const rule = ConceptFolderCheckTests.RULE;
       const category = "is not a concept category of its source tree";
       assert.equal(output.text, [
-        `scripts/Checks: is not lowercase kebab-case${rule}`,
+        `scripts/Tools: is not lowercase kebab-case${rule}`,
         `${runtime}/components: ${category}${rule}`,
         `${runtime}/helpers: ${category}${rule}`,
         `src/shell/ui/src/app/themes: ${category}${rule}`,
