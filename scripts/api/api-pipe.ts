@@ -7,37 +7,39 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
+
+import type TemporaryFolder from "../processes/temporary-folder.ts";
 
 export default class ApiPipe {
   private static readonly WINDOWS_PLATFORM: string = "win32";
   private static readonly WINDOWS_ROOT: string = "\\\\.\\pipe\\";
-  private static readonly SOCKET_ROOT: string = "/tmp";
   private static readonly SOCKET_FOLDER_PREFIX: string = "tr-api-";
   private static readonly SOCKET_NAME: string = "api.sock";
   private static readonly PREFIX: string = "teamrun-api-";
   private static readonly RANDOM_BYTES: number = 6;
 
+  private readonly temporaryFolder: TemporaryFolder;
   private readonly folder: string | null;
 
   public readonly name: string;
 
-  private constructor(name: string, folder: string | null) {
+  private constructor(name: string, temporaryFolder: TemporaryFolder, folder: string | null) {
     this.name = name;
+    this.temporaryFolder = temporaryFolder;
     this.folder = folder;
   }
 
-  public static async createAsync(platform: string, root: string = ApiPipe.SOCKET_ROOT): Promise<ApiPipe> {
+  public static async createAsync(platform: string, temporaryFolder: TemporaryFolder): Promise<ApiPipe> {
     if (platform === ApiPipe.WINDOWS_PLATFORM)
-      return new ApiPipe(`${ApiPipe.WINDOWS_ROOT}${ApiPipe.PREFIX}${process.pid}-${randomBytes(ApiPipe.RANDOM_BYTES).toString("hex")}`, null);
+      return new ApiPipe(`${ApiPipe.WINDOWS_ROOT}${ApiPipe.PREFIX}${process.pid}-${randomBytes(ApiPipe.RANDOM_BYTES).toString("hex")}`, temporaryFolder, null);
 
-    const folder = await mkdtemp(path.join(root, ApiPipe.SOCKET_FOLDER_PREFIX));
-    return new ApiPipe(path.join(folder, ApiPipe.SOCKET_NAME), folder);
+    const folder = await temporaryFolder.createAsync(platform, ApiPipe.SOCKET_FOLDER_PREFIX);
+    return new ApiPipe(path.join(folder, ApiPipe.SOCKET_NAME), temporaryFolder, folder);
   }
 
   public async removeAsync(): Promise<void> {
     if (this.folder !== null)
-      await rm(this.folder, { recursive: true, force: true });
+      await this.temporaryFolder.removeAsync(this.folder);
   }
 }

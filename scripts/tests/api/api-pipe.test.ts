@@ -8,34 +8,40 @@
 
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
 import ApiPipe from "../../api/api-pipe.ts";
+import TemporaryFolder from "../../processes/temporary-folder.ts";
+import TemporaryFolderFixture from "../fixtures/temporary-folder.fixture.ts";
 
 class ApiPipeTests {
   private static readonly SOCKET_PATH_LIMIT: number = 100;
 
   public static register(): void {
     test("Windows uses a named pipe with a unique name and needs no removal", async () => {
-      const first = await ApiPipe.createAsync("win32");
-      const second = await ApiPipe.createAsync("win32");
+      const temporaryFolder = new TemporaryFolderFixture(tmpdir());
+      const first = await ApiPipe.createAsync("win32", temporaryFolder);
+      const second = await ApiPipe.createAsync("win32", temporaryFolder);
 
       assert.match(first.name, new RegExp(`^\\\\\\\\\\.\\\\pipe\\\\teamrun-api-${process.pid}-[0-9a-f]{12}$`));
       assert.notEqual(first.name, second.name);
       await first.removeAsync();
+      assert.deepEqual(temporaryFolder.platforms, []);
     });
 
-    test("Linux and macOS use a socket in a dedicated folder under the given root, removed with it", async t => {
+    test("Linux and macOS use a socket in a dedicated folder made by the temporary folder, removed with it", async t => {
       const root = await mkdtemp(path.join(tmpdir(), "teamrun-pipe-"));
       t.after(() => rm(root, { recursive: true, force: true }));
-      const pipe = await ApiPipe.createAsync("linux", root);
+      const temporaryFolder = new TemporaryFolderFixture(root);
+      const pipe = await ApiPipe.createAsync("linux", temporaryFolder);
       const folder = path.dirname(pipe.name);
       await writeFile(pipe.name, "");
 
-      assert.equal(path.dirname(folder), root);
+      assert.deepEqual(temporaryFolder.platforms, ["linux"]);
+      assert.equal(path.dirname(folder), await realpath(root));
       assert.match(path.basename(folder), /^tr-api-[A-Za-z0-9]{6}$/);
       assert.equal(path.basename(pipe.name), "api.sock");
       await pipe.removeAsync();
@@ -52,7 +58,7 @@ class ApiPipeTests {
         else
           process.env["TMPDIR"] = original;
       });
-      const pipe = await ApiPipe.createAsync("linux");
+      const pipe = await ApiPipe.createAsync("linux", new TemporaryFolder());
       t.after(() => pipe.removeAsync());
 
       assert.ok(pipe.name.length < ApiPipeTests.SOCKET_PATH_LIMIT, pipe.name);
