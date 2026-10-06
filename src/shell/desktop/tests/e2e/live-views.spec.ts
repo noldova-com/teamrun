@@ -96,5 +96,6 @@ test.describe("live views", () => {
     await window.keyboard.press("ControlOrMeta+KeyB");
     await expect(window.locator("[data-fixture-content=notes-list]")).toBeVisible();
     expect(await isSameAsync(listContent(window), "liveList")).toBe(true);
+    await desktop.checkpointAsync("live-views");
   });
 });

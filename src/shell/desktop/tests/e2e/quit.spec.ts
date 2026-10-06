@@ -168,14 +168,14 @@ test.describe("saving before quitting", () => {
     await expect(toast).toHaveAttribute("data-severity", "Error");
     await expect(toast.locator(".tr-toast-meta")).toContainText("TeamRun");
     expect(await desktop.isVisibleAsync()).toBe(true);
-    await expect.poll(() => readDesktopLogAsync(desktop)).toMatch(/Window error in notes: \w+: Its window part failed to save while TeamRun was closing\./);
+    await expect.poll(() => readDesktopLogAsync(desktop)).toMatch(/Window error in notes: [\w$]+: Its window part failed to save while TeamRun was closing\./);
     await desktop.checkpointAsync("quit-save-failed");
     await window.locator("[data-fixture-content=notes-save-saves]:visible").click();
     const exited = waitForExitAsync(desktop);
     await closeWindowAsync(desktop);
 
     expect(await exited).toBe(0);
-    expect(desktop.acceptFailures(/Window error in notes: |^renderer: ERROR \w+: Its window part failed to save while TeamRun was closing\./).length).toBeGreaterThan(0);
+    expect(desktop.acceptFailures(/Window error in notes: |^renderer: ERROR [\w$]+: Its window part failed to save while TeamRun was closing\./).length).toBeGreaterThan(0);
   });
 
   test("quits after 4 seconds without a window part whose save never settles, and logs a warning naming the module", async ({ desktop }) => {
