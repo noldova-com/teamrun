@@ -28,7 +28,7 @@ export class WindowFactoryTests {
     DesktopStartFixture.start(development, new FakeDesktopProcess("win32"));
     const linux = new FakeElectron();
     DesktopStartFixture.start(linux, new FakeDesktopProcess("linux"));
-    await Promise.all([packaged.app.becomeReadyAsync(), development.app.becomeReadyAsync(), linux.app.becomeReadyAsync()]);
+    await Promise.all([DesktopStartFixture.openAsync(packaged), DesktopStartFixture.openAsync(development), DesktopStartFixture.openAsync(linux)]);
     const mainScript = resolve(fileURLToPath(DesktopStartFixture.MODULE_URL));
 
     Assert.areEqual(`"/electron/electron" "--data-dir=${data}"`, DesktopStartFixture.firstWindow(packaged).appDetails?.relaunchCommand);

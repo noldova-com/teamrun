@@ -238,7 +238,7 @@ export class LayoutService {
 
   private async writeLatestAsync(): Promise<void> {
     const layout = this.layoutState();
-    if (Object.isNull(this.saved) || layout === this.saved || this.startup.state().kind !== StartupStateKind.Ready)
+    if (Object.isNull(this.saved) || layout === this.saved || !this.startup.state().canSave)
       return;
     if (await this.store.writeAsync(layout.toJson()))
       this.saved = layout;
