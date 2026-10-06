@@ -528,6 +528,13 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
     Any other request is answered with `BuildMismatch`.
   - When the policy is "only if idle" and work is in progress, `shell.stop` is answered with a `Conflict` failure whose details list the work in progress.
     Otherwise the runtime answers, cancels its work and stops.
+- A client may also ask `shell.stop` to keep the runtime while it is shared, which combines with either policy.
+  It asks this only of a runtime of its own build, because an earlier runtime refuses a field it does not know.
+  The runtime first counts the authenticated connections other than the asking one, whatever names their clients gave, so a second client of the same kind counts too; each client holds one connection to its runtime.
+  While any is open, it neither refuses nor cancels and touches no work: it answers with the number it is kept for and goes on running.
+  Only when none is open does the policy apply as above.
+  Work is shared, so one client's quit never cancels work another client may be using.
+  The desktop's quit asks this way; the command line's stop does not.
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
 - Reconnect from durable records, allowing for missed events.

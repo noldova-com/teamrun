@@ -21,6 +21,18 @@ export class StopRequestTests {
   }
 
   @TestMethod
+  public writesKeepingWhileSharedOnlyWhenAskedAndReadsItAsFalseWhenAbsent(): void {
+    const text = "{\"policy\":\"IfIdle\",\"keepsWhileShared\":true}";
+
+    Assert.areEqual(text, JSON.stringify(new StopRequest(StopPolicy.IfIdle, true).toJson()));
+    Assert.areEqual("{\"policy\":\"StopWork\"}", JSON.stringify(new StopRequest(StopPolicy.StopWork, false).toJson()));
+    Assert.isTrue(StopRequest.fromJson(JSON.parse(text)).keepsWhileShared);
+    Assert.isFalse(StopRequest.fromJson({ policy: "IfIdle", keepsWhileShared: false }).keepsWhileShared);
+    Assert.isFalse(StopRequest.fromJson({ policy: "StopWork" }).keepsWhileShared);
+    Assert.areEqual("$.keepsWhileShared", Assert.throws(() => StopRequest.fromJson({ policy: "IfIdle", keepsWhileShared: "yes" }), JsonException).path);
+  }
+
+  @TestMethod
   public rejectsAnUnknownPolicy(): void {
     Assert.areEqual("$.policy", Assert.throws(() => StopRequest.fromJson({ policy: "Never" }), JsonException).path);
   }
