@@ -443,7 +443,8 @@ class PackageSmokeTests {
     t.after(() => repository.disposeAsync());
     await repository.writeAsync({
       "package.json": JSON.stringify(ProductIdentityFixture.manifest()),
-      [`_build/package/out/${made}`]: "package\n"
+      [`_build/package/out/${made}`]: "package\n",
+      "_build/package/electron/ffmpeg.dll": "program\n"
     });
     return repository;
   }

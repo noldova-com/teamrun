@@ -19,6 +19,7 @@ export default class InstallRunnerFixture extends ProcessRunner {
 
   public localAppData: string = "";
   public installedBeforeTimeout: readonly string[] | null = null;
+  public libraries: readonly string[] = ["ffmpeg.dll", "libEGL.DLL"];
   public readonly calls: (readonly string[])[] = [];
   public readonly limits: number[] = [];
   public readonly installerEnvironments: (NodeJS.ProcessEnv | undefined)[] = [];
@@ -53,8 +54,10 @@ export default class InstallRunnerFixture extends ProcessRunner {
         await InstallRunnerFixture.createAsync(path.join(this.localAppData, "Programs", "fixture-studio", file));
       throw new ProcessTimeoutException(`"${command}" did not finish within ${timeout} ms.`);
     }
-    if (commandArguments[0] === "/S")
-      await InstallRunnerFixture.createAsync(path.join(this.localAppData, "Programs", "fixture-studio", "Fixture Studio.exe"));
+    if (commandArguments[0] === "/S") {
+      for (const file of ["Fixture Studio.exe", ...this.libraries])
+        await InstallRunnerFixture.createAsync(path.join(this.localAppData, "Programs", "fixture-studio", file));
+    }
     if (name === "ditto")
       await InstallRunnerFixture.createAsync(path.join(String(commandArguments[1]), "Contents", "MacOS", "Fixture Studio"));
     return new ProcessResult(0, "", "");

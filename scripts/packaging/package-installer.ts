@@ -23,6 +23,7 @@ export default class PackageInstaller {
   private static readonly LOCAL_APP_DATA: string = "LOCALAPPDATA";
   private static readonly PROGRAMS_FOLDER: string = "Programs";
   private static readonly WINDOWS_PROGRAM_EXTENSION: string = ".exe";
+  private static readonly WINDOWS_LIBRARY_EXTENSION: string = ".dll";
   private static readonly RESOURCES_FOLDER: string = "resources";
   private static readonly SILENT_INSTALL: readonly string[] = ["/S"];
   private static readonly MODULE_PATH: string = "PSModulePath";
@@ -77,9 +78,10 @@ export default class PackageInstaller {
     return [`${installFolder} held ${files.length} files when the installer was stopped:`, ...lines].join("\n");
   }
 
-  private static requireFile(file: string): void {
-    if (!existsSync(file))
-      throw new PackagingException(`The installed package has no ${file}.`);
+  private static requireFiles(files: readonly string[]): void {
+    const missing = files.filter(t => !existsSync(t));
+    if (missing.length > 0)
+      throw new PackagingException(`The installed package has no ${missing.join(", ")}.`);
   }
 
   private static isNamed(variable: string, name: string): boolean {
@@ -116,7 +118,10 @@ export default class PackageInstaller {
       throw new PackagingException(`${error.message}\n${await PackageInstaller.describeAsync(installFolder)}`, { cause: error });
     }
     const program = path.join(installFolder, `${product.name}${PackageInstaller.WINDOWS_PROGRAM_EXTENSION}`);
-    PackageInstaller.requireFile(program);
+    const libraries = (await readdir(new PackageLayout(this.root).electron))
+      .filter(t => path.extname(t).toLowerCase() === PackageInstaller.WINDOWS_LIBRARY_EXTENSION)
+      .map(t => path.join(installFolder, t));
+    PackageInstaller.requireFiles([program, ...libraries]);
     return new InstalledPackage(program, program, path.join(path.dirname(program), PackageInstaller.RESOURCES_FOLDER));
   }
 
@@ -139,7 +144,7 @@ export default class PackageInstaller {
     }
     await this.requireAsync(PackageInstaller.DISK_IMAGES, [...PackageInstaller.DETACH, mount], folder);
     const program = path.join(application, ...PackageInstaller.BUNDLE_SEGMENTS, product.name);
-    PackageInstaller.requireFile(program);
+    PackageInstaller.requireFiles([program]);
     return new InstalledPackage(program, program, path.join(application, ...PackageInstaller.BUNDLE_RESOURCES_SEGMENTS));
   }
 
@@ -148,7 +153,7 @@ export default class PackageInstaller {
     await this.requireAsync(file, PackageInstaller.EXTRACT, folder);
     const extracted = path.join(folder, PackageInstaller.EXTRACTED_FOLDER);
     const program = path.join(extracted, product.slug);
-    PackageInstaller.requireFile(program);
+    PackageInstaller.requireFiles([program]);
     return new InstalledPackage(file, program, path.join(extracted, PackageInstaller.RESOURCES_FOLDER));
   }
 

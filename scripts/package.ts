@@ -39,6 +39,9 @@ export default class Package {
     "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA", "USER", "USERNAME", "LOGNAME",
     "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"
   ]);
+  private static readonly ARM64: string = "arm64";
+  private static readonly COMPRESSION_FILTER: string = "ELECTRON_BUILDER_7Z_FILTER";
+  private static readonly X86_FILTER: string = "BCJ";
 
   private readonly root: string;
   private readonly platform: string;
@@ -77,7 +80,7 @@ export default class Package {
       await mkdir(layout.toolCache, { recursive: true });
       await writeFile(path.join(layout.toolCache, Package.TOOL_CACHE_MANIFEST), Package.COMMONJS_SCOPE);
       const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.root, ...Package.BUILDER_SEGMENTS), ...Package.BUILDER_OPTIONS, layout.configuration], this.root,
-        this.createBuilderEnvironment(layout));
+        this.createBuilderEnvironment(layout, target));
       if (exitCode !== 0)
         throw new PackagingException(`electron-builder failed with exit code ${exitCode}.`);
       const files = configuration.fileNames.map(t => path.join(layout.output, t));
@@ -95,11 +98,13 @@ export default class Package {
     }
   }
 
-  private createBuilderEnvironment(layout: PackageLayout): NodeJS.ProcessEnv {
+  private createBuilderEnvironment(layout: PackageLayout, target: PackageTarget): NodeJS.ProcessEnv {
+    const isWindowsArm64 = target.platform === PackageTarget.WINDOWS && target.architecture === Package.ARM64;
     return {
       ...Object.fromEntries(Object.entries(this.environment).filter(([name]) => Package.BUILDER_VARIABLES.has(name.toUpperCase()))),
       ELECTRON_BUILDER_CACHE: layout.toolCache,
-      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false",
+      ...(isWindowsArm64 ? { [Package.COMPRESSION_FILTER]: Package.X86_FILTER } : {})
     };
   }
 }
