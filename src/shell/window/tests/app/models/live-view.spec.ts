@@ -104,25 +104,6 @@ describe("LiveView", () => {
     expect([...restored, element.scrollTop, list.scrollTop]).toEqual([80, 120, 80, 120]);
   });
 
-  it("keeps the scroll positions it shows when it leaves its slot, though their scroll events have not arrived, unless it left before its restore", () => {
-    const [first, second] = slots as [HTMLElement, HTMLElement];
-    view.enter(first);
-    scroll(element, 80);
-    element.scrollTop = 30;
-
-    view.leave();
-    view.enter(second);
-    view.restore();
-    const restored = element.scrollTop;
-    view.leave();
-    view.enter(first);
-    view.leave();
-    view.enter(second);
-    view.restore();
-
-    expect([restored, element.scrollTop]).toEqual([30, 30]);
-  });
-
   it("forgets the scroll position of an element that has left it and ignores a scroll that comes from no element", () => {
     const list = element.querySelector(".list") as HTMLElement;
     view.enter(slots[0] as HTMLElement);

@@ -39,9 +39,6 @@ export class LiveView {
   }
 
   public leave(): void {
-    if (this.isInPlace && this.element.isConnected)
-      for (const element of this.offsets.keys())
-        this.offsets.set(element, ScrollOffset.of(element));
     const active = this.element.ownerDocument.activeElement;
     this.focused = active instanceof HTMLElement && this.element.contains(active) ? active : null;
     this.element.remove();
