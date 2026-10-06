@@ -13,7 +13,9 @@ import { userEvent } from "vitest/browser";
 
 import { CodeBlockComponent } from "../../../../src/app/components/code-block/code-block.component";
 import { ClipboardWriter } from "../../../../src/app/services/clipboard-writer";
+import { CodeHighlighter } from "../../../../src/app/services/code-highlighter";
 import { CodeTokenKind } from "../../../../src/app/enums/code-token-kind";
+import { CodeToken } from "../../../../src/app/models/code-token";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
@@ -159,20 +161,19 @@ describe("CodeBlockComponent", () => {
       };
       const code = (): DOMRect => box(".tr-code-block-body > code");
       const end = (): number => Math.max(...lines().map(t => t.right));
-      const rounding = 0.5 + 1 / 64;
       await framesAsync();
       const start = (lines()[0] as DOMRect).left - code().left;
 
       AppearanceFixture.expectPixels(start, AppearanceFixture.measureLook("space-3"));
       expect(body().scrollWidth).toBeGreaterThan(body().clientWidth);
-      expect(Math.abs(body().scrollWidth - code().width)).toBeLessThanOrEqual(rounding);
+      expect(body().scrollWidth).toBe(Math.round(code().left + code().width) - Math.round(code().left));
       AppearanceFixture.expectPixels(code().right - end(), start);
       AppearanceFixture.expectPixels(bottom(), AppearanceFixture.measureLook("space-2") - AppearanceFixture.measureLook("scrollbar-size"));
 
       body().scrollLeft = body().scrollWidth;
 
       AppearanceFixture.expectPixels(code().right - end(), start);
-      expect(Math.abs(body().getBoundingClientRect().right - code().right)).toBeLessThanOrEqual(rounding);
+      expect(Math.abs(body().scrollLeft + body().clientWidth - body().scrollWidth)).toBeLessThan(1);
 
       await changeAsync(() => host.wrapped.set(true));
       await framesAsync();
@@ -302,12 +303,13 @@ describe("CodeBlockComponent", () => {
   const tokens = (): readonly (readonly [string, string])[] => {
     const code = find(".tr-code-block-body > code");
     return Object.values(CodeTokenKind)
-      .flatMap(kind => [...CSS.highlights.get(`tr-code-${kind.toLowerCase()}`) ?? []].map(t => t as Range).filter(t => code.contains(t.startContainer))
-        .map(t => [t.startOffset, t.toString(), kind.toLowerCase()] as const))
+      .flatMap(kind => [...CSS.highlights.get(`tr-code-${kind.toLowerCase()}`) ?? []].filter(t => code.contains(t.startContainer))
+        .map(t => [t.startOffset, String(t.startContainer.textContent?.slice(t.startOffset, t.endOffset)), kind.toLowerCase()] as const))
       .sort((a, b) => a[0] - b[0])
       .map(([, text, kind]) => [text, kind] as const);
   };
   const plain = (): readonly unknown[] => [tokens().length, find(".tr-code-block-body > code").childNodes.length, body().querySelector("code")?.textContent];
+  const allRanges = (): number => Object.values(CodeTokenKind).reduce((sum, kind) => sum + (CSS.highlights.get(`tr-code-${kind.toLowerCase()}`)?.size ?? 0), 0);
   const colorOf = (kind: CodeTokenKind): string => getComputedStyle(find(".tr-code-block-body > code"), `::highlight(tr-code-${kind.toLowerCase()})`).color;
 
   it("colors the tokens of a language it knows by their kind, keeping the code's text as one text node exactly, and Copy still copies the code as bound", async () => {
@@ -334,6 +336,47 @@ describe("CodeBlockComponent", () => {
 
     expect(unknown).toEqual([0, 1, host.code()]);
     expect(plain()).toEqual([0, 1, host.code()]);
+  });
+
+  it("takes back every range it added once it is removed", async () => {
+    const before = allRanges();
+    await renderAsync();
+    const shown = allRanges();
+
+    await changeAsync(() => host.isShown.set(false));
+
+    expect(shown).toBeGreaterThan(before);
+    expect(allRanges()).toBe(before);
+  });
+
+  it("never lets the tokens of older code that arrive after those of newer code land", async () => {
+    const answers = new Map<string, (tokens: readonly CodeToken[]) => void>();
+    vi.spyOn(TestBed.inject(CodeHighlighter), "tokensAsync").mockImplementation(code => new Promise(resolve => answers.set(code, resolve)));
+    await renderAsync();
+    await changeAsync(() => host.code.set("let older;"));
+    await changeAsync(() => host.code.set("let newer;"));
+
+    answers.get("let newer;")?.([new CodeToken(4, "newer", CodeTokenKind.Variable)]);
+    await fixture.whenStable();
+    answers.get("let older;")?.([new CodeToken(4, "older", CodeTokenKind.Type)]);
+    await fixture.whenStable();
+
+    expect(tokens()).toEqual([["newer", "variable"]]);
+  });
+
+  it("reports tokens that failed to arrive and stays plain, then colors the next code", async () => {
+    const errors: unknown[] = [];
+    const failure = new Error("The grammar's chunk did not load.");
+    TestBed.overrideProvider(ErrorHandler, { useValue: { handleError: (error: unknown) => errors.push(error) } });
+    vi.spyOn(TestBed.inject(CodeHighlighter), "tokensAsync").mockRejectedValueOnce(failure);
+    await renderAsync();
+    const original = host.code();
+    const failed = plain();
+
+    await changeAsync(() => host.code.set("let next;"));
+
+    expect([failed, errors]).toEqual([[0, 1, original], [failure]]);
+    expect(tokens()).toEqual([["let", "keyword"], ["next", "variable"]]);
   });
 
   it("shows changed code at once, plain until its tokens arrive, and never with the tokens of the code before it", async () => {

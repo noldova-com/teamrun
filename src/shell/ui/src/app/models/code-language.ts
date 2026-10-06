@@ -47,7 +47,7 @@ export class CodeLanguage {
     new CodeLanguage("make", ["makefile"], () => import("@shikijs/langs/make"))
   ];
 
-  private static readonly byName: ReadonlyMap<string, CodeLanguage> = new Map(CodeLanguage.all.flatMap(t => [t.id, ...t.aliases].map(name => [name, t] as const)));
+  private static readonly byName: ReadonlyMap<string, CodeLanguage> = new Map(CodeLanguage.all.flatMap(t => [t.id, ...t.aliases].map((name): [string, CodeLanguage] => [name, t])));
 
   public readonly id: string;
   public readonly aliases: readonly string[];

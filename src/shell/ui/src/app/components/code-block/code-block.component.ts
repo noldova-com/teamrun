@@ -7,8 +7,8 @@
  */
 
 import { LiveAnnouncer } from "@angular/cdk/a11y";
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, type ResourceRef, type Signal, ViewEncapsulation, type WritableSignal, afterRenderEffect,
-  computed, inject, input, model, resource, signal, viewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DOCUMENT, DestroyRef, ElementRef, ErrorHandler, type ResourceRef, type Signal, ViewEncapsulation, type WritableSignal,
+  afterRenderEffect, computed, effect, inject, input, model, resource, signal, viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
@@ -43,6 +43,7 @@ export class CodeBlockComponent {
   private readonly highlighter: CodeHighlighter = inject(CodeHighlighter);
   private readonly highlights: CodeHighlights = inject(CodeHighlights);
   private readonly text: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("text");
+  private readonly codeText: Text = inject(DOCUMENT).createTextNode(String.empty);
   private readonly copyState: WritableSignal<CopyState> = signal(CopyState.Ready);
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -60,14 +61,23 @@ export class CodeBlockComponent {
       const language = CodeLanguage.named(this.language());
       return Object.isNull(language) ? undefined : { code: this.code(), language };
     },
-    loader: ({ params }) => this.highlighter.tokensAsync(params.code, params.language)
+    loader: ({ params, abortSignal }) => this.highlighter.tokensAsync(params.code, params.language, abortSignal)
   });
 
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.clearCopyTimer());
+    effect(() => {
+      const error = this.tokens.error();
+      if (!Object.isUndefined(error))
+        this.errors.handleError(error);
+    });
     afterRenderEffect(onCleanup => {
+      const element = this.text().nativeElement;
+      if (this.codeText.parentNode !== element)
+        element.append(this.codeText);
+      this.codeText.data = this.code();
       if (this.tokens.hasValue())
-        onCleanup(this.highlights.add(this.text().nativeElement.firstChild as Text, this.tokens.value()));
+        onCleanup(this.highlights.add(this.codeText, this.tokens.value()));
     });
   }
 

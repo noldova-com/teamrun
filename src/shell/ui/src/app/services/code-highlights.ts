@@ -38,16 +38,15 @@ export class CodeHighlights {
   }
 
   public add(text: Text, tokens: readonly CodeToken[]): () => void {
-    const added = tokens.map(t => {
-      const range = new Range();
-      range.setStart(text, t.start);
-      range.setEnd(text, t.end);
-      this.highlights[t.kind].add(range);
-      return [this.highlights[t.kind], range] as const;
+    const removals = tokens.map(t => {
+      const highlight = this.highlights[t.kind];
+      const range = new StaticRange({ startContainer: text, startOffset: t.start, endContainer: text, endOffset: t.end });
+      highlight.add(range);
+      return (): boolean => highlight.delete(range);
     });
     return () => {
-      for (const [highlight, range] of added)
-        highlight.delete(range);
+      for (const remove of removals)
+        remove();
     };
   }
 

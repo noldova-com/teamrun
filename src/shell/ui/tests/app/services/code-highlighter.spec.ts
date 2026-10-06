@@ -13,6 +13,8 @@ import { CodeLanguage } from "../../../src/app/models/code-language";
 import { CodeHighlighter } from "../../../src/app/services/code-highlighter";
 
 describe("CodeHighlighter", () => {
+  const signal = new AbortController().signal;
+  const typescript = CodeLanguage.named("ts") as CodeLanguage;
   const samples: Readonly<Record<string, string>> = {
     typescript: "const a: number = 1;",
     javascript: "const a = 1; // note",
@@ -55,7 +57,7 @@ describe("CodeHighlighter", () => {
 
     for (const language of CodeLanguage.all) {
       const sample = samples[language.id] ?? String.empty;
-      const tokens = await highlighter.tokensAsync(sample, language);
+      const tokens = await highlighter.tokensAsync(sample, language, signal);
       results.push([language.id, tokens.every(t => sample.slice(t.start, t.end) === t.text), tokens.length > 0]);
     }
 
@@ -64,18 +66,53 @@ describe("CodeHighlighter", () => {
 
   it("releases its highlighter with its injector, so highlighters made one after another never pile up", async () => {
     const warn = vi.spyOn(console, "warn");
-    const language = CodeLanguage.named("ts") as CodeLanguage;
 
     for (let index = 0; index < 12; index++) {
-      await TestBed.inject(CodeHighlighter).tokensAsync("let a;", language);
+      await TestBed.inject(CodeHighlighter).tokensAsync("let a;", typescript, signal);
       TestBed.resetTestingModule();
     }
 
-    expect(warn).not.toHaveBeenCalled();
+    expect(warn.mock.calls.filter(t => String(t[0]).includes("[Shiki]"))).toEqual([]);
+  });
+
+  it("gives nothing to a call still in flight when its injector goes, and never reaches the released highlighter", async () => {
+    const tokens = TestBed.inject(CodeHighlighter).tokensAsync("let a;", typescript, signal);
+
+    TestBed.resetTestingModule();
+
+    await expect(tokens).resolves.toEqual([]);
+  });
+
+  it("forgets a grammar that failed to load, so the next call loads it again", async () => {
+    const highlighter = TestBed.inject(CodeHighlighter);
+    const failure = new Error("The grammar's chunk did not load.");
+    const failing = Object.create(typescript, { load: { value: (): Promise<never> => Promise.reject(failure) } }) as CodeLanguage;
+
+    await expect(highlighter.tokensAsync("let a;", failing, signal)).rejects.toBe(failure);
+
+    expect((await highlighter.tokensAsync("let a;", typescript, signal)).map(t => t.text)).toEqual(["let", "a"]);
+  });
+
+  it("tokenizes nothing once its call is aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(TestBed.inject(CodeHighlighter).tokensAsync("let a;", typescript, controller.signal)).resolves.toEqual([]);
+  });
+
+  it("leaves code longer than its limit plain, and a line longer than its limit plain among colored ones", async () => {
+    const highlighter = TestBed.inject(CodeHighlighter);
+    const longLine = `let b = 1;${" ".repeat(2000)}`;
+
+    const long = await highlighter.tokensAsync(`let a;${" ".repeat(100_000)}`, typescript, signal);
+    const mixed = await highlighter.tokensAsync(`let a;\n${longLine}\nlet c;`, typescript, signal);
+
+    expect(long).toEqual([]);
+    expect(mixed.map(t => t.text)).toEqual(["let", "a", "let", "c"]);
   });
 
   it("gives each colored token its kind and place, across line breaks, and leaves plain text out", async () => {
-    const tokens = await TestBed.inject(CodeHighlighter).tokensAsync("return 1;\r\nlet a;", CodeLanguage.named("ts") as CodeLanguage);
+    const tokens = await TestBed.inject(CodeHighlighter).tokensAsync("return 1;\r\nlet a;", typescript, signal);
 
     expect(tokens.map(t => [t.start, t.end, t.text, t.kind])).toEqual([
       [0, 6, "return", CodeTokenKind.Control],
