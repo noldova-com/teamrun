@@ -17,6 +17,8 @@ import ModuleException from "./module.exception.ts";
 import ToolbarPlacement from "./toolbar-placement.ts";
 
 export default class ModuleMenus {
+  public static readonly SHELL_PLACES: readonly string[] = ["shell.file", "shell.edit", "shell.view", "shell.window", "shell.help", "shell.tab"];
+
   private static readonly FILE_NAME: string = "menus.json";
   private static readonly FIELDS: readonly string[] = ["places", "groups"];
   private static readonly PLACE_FIELDS: readonly string[] = ["name", "title", "shows", "shown", "after", "before", "newRow"];
@@ -29,7 +31,6 @@ export default class ModuleMenus {
   private static readonly QUALIFIED_NAME: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.[a-z][a-zA-Z0-9]*$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
 
-  public static readonly SHELL_PLACES: readonly string[] = ["shell.file", "shell.edit", "shell.view", "shell.window", "shell.help", "shell.tab"];
   public static readonly EMPTY: ModuleMenus = new ModuleMenus([], []);
 
   public readonly places: readonly MenuPlace[];

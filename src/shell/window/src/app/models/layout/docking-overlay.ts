@@ -14,9 +14,9 @@ import type { GroupFrame } from "./group-frame";
 import type { LayoutGeometry } from "./layout-geometry";
 
 export class DockingOverlay {
-  private readonly geometry: LayoutGeometry;
-
   public static readonly plateSize: number = 3 * Resources.dockingGuideSize + 2 * Resources.dockingPlateGap;
+
+  private readonly geometry: LayoutGeometry;
 
   public constructor(geometry: LayoutGeometry) {
     this.geometry = geometry;
