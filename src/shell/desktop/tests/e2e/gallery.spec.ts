@@ -337,7 +337,7 @@ test.describe("gallery", () => {
     }
   });
 
-  test("a configuration table shows its heading and Add above its explanation and separated rows, grows a row for long text and scrolls sideways only when narrow, in light and in dark", async ({ desktop }) => {
+  test("a configuration table shows its heading and Add above its explanation and separated rows, or without a heading its explanation beside Add, grows a row for long text and scrolls sideways only when narrow, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
 
@@ -352,13 +352,14 @@ test.describe("gallery", () => {
       await expect(table.getByRole("columnheader")).toHaveText(["Name", "Value", "Scope", ""]);
       await expect(table.getByRole("columnheader").last()).toHaveAttribute("aria-label", "Actions");
       await expect(table.getByRole("button", { name: "Remove NOTES_HOME" })).toBeVisible();
-      await expect(areas).toHaveCount(2);
+      await expect(areas).toHaveCount(3);
       await expect(narrow.getByRole("row")).toHaveCount(3);
-      const [wide, small] = [areas.first(), areas.last()];
+      const [wide, small] = [areas.first(), areas.filter({ has: window.getByRole("table", { name: "Narrow environment variables" }) })];
+      const unheaded = specimen.locator("tr-configuration-table").filter({ has: window.getByRole("table", { name: "Global environment variables" }) });
       const [heading, add, explanation, grid] = await Promise.all([
         specimen.locator(".tr-configuration-table-heading").boundingBox(),
-        specimen.locator(".tr-configuration-table-actions button").boundingBox(),
-        specimen.locator(".tr-configuration-table-explanation").boundingBox(),
+        specimen.locator(".tr-configuration-table-actions button").first().boundingBox(),
+        specimen.locator(".tr-configuration-table-explanation").first().boundingBox(),
         table.boundingBox()
       ]);
       const measured = await wide.evaluate((t: HTMLElement) => {
@@ -400,6 +401,25 @@ test.describe("gallery", () => {
         token.selectNodeContents(cell);
         return { tokenLines: token.getClientRects().length, overflow: t.scrollWidth - t.clientWidth };
       });
+      await expect(unheaded.getByRole("table", { name: "Global environment variables" })).toBeVisible();
+      await expect(unheaded.locator(".tr-configuration-table-header .tr-configuration-table-explanation")).toHaveText("These apply to every project, before the project's own variables.");
+      const leading = await unheaded.evaluate((t: HTMLElement) => {
+        const text = t.querySelector<HTMLElement>(".tr-configuration-table-explanation");
+        const button = t.querySelector<HTMLElement>(".tr-configuration-table-actions button");
+        const label = button === null ? null : button.querySelector<HTMLElement>("[data-truncates]");
+        if (text === null || button === null || label === null)
+          throw new Error("The configuration table without a heading has no explanation or Add.");
+        const baseline = (host: Element): number => {
+          const probe = document.createElement("span");
+          probe.style.display = "inline-block";
+          host.prepend(probe);
+          const bottom = probe.getBoundingClientRect().bottom;
+          probe.remove();
+          return bottom;
+        };
+        return { isBeside: text.getBoundingClientRect().right < button.getBoundingClientRect().left, baseline: Math.round(baseline(text) - baseline(label)) };
+      });
+      expect(leading).toEqual({ isBeside: true, baseline: 0 });
       if (heading === null || add === null || explanation === null || grid === null)
         throw new Error("The configuration table's heading, Add, explanation or table is not shown.");
 

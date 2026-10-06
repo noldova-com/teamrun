@@ -47,6 +47,7 @@ export default class SourceScanner {
   private readonly imports: SourceLiteral[] = [];
   private readonly selectors: SourceLiteral[] = [];
   private readonly texts: SourceLiteral[] = [];
+  private readonly comments: number[] = [];
   private readonly substitutionDepths: number[] = [];
   private position: number = 0;
   private line: number = 1;
@@ -62,7 +63,7 @@ export default class SourceScanner {
   public scan(): ScannedSource {
     while (this.position < this.text.length)
       this.scanNext(this.text.charAt(this.position));
-    return new ScannedSource(this.imports, this.selectors, this.texts, this.hasFunctionBody);
+    return new ScannedSource(this.imports, this.selectors, this.texts, this.comments, this.hasFunctionBody);
   }
 
   private scanNext(character: string): void {
@@ -92,11 +93,13 @@ export default class SourceScanner {
   }
 
   private skipLineComment(): void {
+    this.comments.push(this.line);
     const end = this.text.indexOf(SourceScanner.LINE_FEED, this.position);
     this.position = end < 0 ? this.text.length : end;
   }
 
   private skipBlockComment(): void {
+    this.comments.push(this.line);
     const end = this.text.indexOf(SourceScanner.BLOCK_COMMENT_END, this.position + SourceScanner.BLOCK_COMMENT_START.length);
     const next = end < 0 ? this.text.length : end + SourceScanner.BLOCK_COMMENT_END.length;
     this.line += this.text.slice(this.position, next).split(SourceScanner.LINE_FEED).length - 1;
