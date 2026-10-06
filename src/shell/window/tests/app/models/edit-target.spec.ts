@@ -22,6 +22,16 @@ describe("EditTarget", () => {
     expect([".field", ".count", ".rich", ".box", ".plain", ".elsewhere"].map(t => EditTarget.isEditable(page.find(t, HTMLElement)))).toEqual([true, true, true, false, false, false]);
   });
 
+  it("finds the field an element belongs to: a text field itself, or the outermost rich text around it", () => {
+    const rich = page.find(".rich", HTMLElement);
+    rich.innerHTML = "<p><b class=\"bold\">Rich</b> text</p>";
+
+    expect(EditTarget.fieldOf(page.find(".field", HTMLElement))).toBe(page.find(".field", HTMLElement));
+    expect(EditTarget.fieldOf(page.find(".bold", HTMLElement))).toBe(rich);
+    expect(EditTarget.fieldOf(rich)).toBe(rich);
+    expect([".box", ".plain", ".elsewhere"].map(t => EditTarget.fieldOf(page.find(t, HTMLElement)))).toEqual([null, null, null]);
+  });
+
   it("captures a field's selection and whether it can be written, and restores the focus and the selection", () => {
     const field = page.find(".field", HTMLInputElement);
     field.focus();

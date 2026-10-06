@@ -23,6 +23,7 @@ import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
   template: `
     <div class="area" tabindex="0" style="position: fixed; top: 100px; left: 100px; width: 200px; height: 100px;"
       [trContextMenuTriggerFor]="isEnabled() ? context : null"></div>
+    <input class="target" style="position: fixed; top: 400px; left: 50px; width: 120px; height: 24px;">
     <button type="button" class="other" style="position: fixed; top: 300px; left: 600px;" [trMenuTriggerFor]="otherMenu">Other</button>
     <ng-template #context>
       <tr-menu class="context">
@@ -255,6 +256,54 @@ describe("ContextMenuTriggerDirective", () => {
     expect(menu("submenu")).toBeNull();
     expect(menu()).not.toBeNull();
     expect(document.activeElement?.classList.contains("more")).toBe(true);
+  });
+
+  it("opens as a target's context menu at the pointer and from its keys, below the target's start, and returns focus to it", async () => {
+    const target: HTMLInputElement = fixture.nativeElement.querySelector(".target");
+    const trigger = fixture.debugElement.query(t => t.nativeElement === area()).injector.get(ContextMenuTriggerDirective);
+    const pointer = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 90, clientY: 410, button: 2 });
+    trigger.openAtPointer(pointer, target);
+    await settledAsync();
+    const atPointer = menu()?.getBoundingClientRect();
+    document.body.dispatchEvent(new MouseEvent("auxclick", { bubbles: true, button: 2 }));
+    const isOpenAfterEcho = menu() !== null;
+    await userEvent.keyboard("{Escape}");
+    await settledAsync();
+    const focusAfterEscape = document.activeElement;
+    const other = new KeyboardEvent("keydown", { key: "a", cancelable: true });
+    trigger.openFromKeyboard(other, target);
+    await settledAsync();
+    const isOpenAfterOther = menu() !== null;
+    const shifted = new KeyboardEvent("keydown", { key: "F10", shiftKey: true, cancelable: true });
+    trigger.openFromKeyboard(shifted, target);
+    await settledAsync();
+    const fromKey = menu()?.getBoundingClientRect();
+    const bounds = target.getBoundingClientRect();
+    const isRowFocused = document.activeElement?.classList.contains("alpha");
+    target.style.top = "420px";
+    fixture.nativeElement.dispatchEvent(new Event("scroll"));
+    await settledAsync();
+
+    expect([pointer.defaultPrevented, pointer.cancelBubble]).toEqual([true, true]);
+    expect([atPointer?.left, atPointer?.top]).toEqual([90, 410]);
+    expect(isOpenAfterEcho).toBe(true);
+    expect(focusAfterEscape).toBe(target);
+    expect([other.defaultPrevented, isOpenAfterOther]).toEqual([false, false]);
+    expect([shifted.defaultPrevented, isRowFocused]).toEqual([true, true]);
+    expect([fromKey?.left, fromKey?.top]).toEqual([bounds.left, bounds.bottom]);
+    expect(menu()).toBeNull();
+  });
+
+  it("opens at a given point and returns focus to its host on Escape", async () => {
+    const trigger = fixture.debugElement.query(t => t.nativeElement === area()).injector.get(ContextMenuTriggerDirective);
+    trigger.open(new DOMRect(200, 220, 0, 0), "keyboard");
+    await settledAsync();
+    const box = menu()?.getBoundingClientRect();
+    await userEvent.keyboard("{Escape}");
+    await settledAsync();
+
+    expect([box?.left, box?.top]).toEqual([200, 220]);
+    expect(document.activeElement).toBe(area());
   });
 
   it("opens nothing without a menu", async () => {
