@@ -62,7 +62,7 @@ describe("ViewDialogComponent", () => {
   });
 
   for (const mode of AppearanceFixture.modes)
-    it(`keeps focus on the close button for a view without controls and lays the view out on the panel surface filling the body, in ${mode} mode`, async () => {
+    it(`ends its title bar with Open in main window, Maximize and Close, keeps focus on Close for a view without controls and lays the view out on the panel surface filling the body, in ${mode} mode`, async () => {
       AppearanceFixture.apply(DefaultTheme.theme, mode);
       void dialogs.showAsync(changes);
       await vi.waitFor(() => expect(document.querySelector(".tr-test-changes")).not.toBeNull());
@@ -71,6 +71,10 @@ describe("ViewDialogComponent", () => {
       const body = (document.querySelector(".tr-dialog-body") as HTMLElement).getBoundingClientRect();
       const bounds = (document.querySelector("tr-tab-content") as HTMLElement).getBoundingClientRect();
 
+      const open = document.querySelector(".tr-dialog-header .tr-view-dialog-open") as HTMLElement;
+
+      expect([...document.querySelectorAll(".tr-dialog-header button")].map(t => t.getAttribute("aria-label"))).toEqual(["Open in main window", "Maximize", "Close"]);
+      expect(document.getElementById(open.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Open in main window");
       expect(document.activeElement?.classList.contains("tr-dialog-close")).toBe(true);
       expect(getComputedStyle(slot).backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "editor.background"));
       AppearanceFixture.expectPixels(bounds.width, body.width);

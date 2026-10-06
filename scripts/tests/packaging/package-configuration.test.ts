@@ -84,7 +84,7 @@ class PackageConfigurationTests {
       const hook = path.join(PackageConfigurationTests.ROOT, "scripts", "packaging", "windows-sign-hook.ts");
       const unsigned = PackageConfigurationTests.create("windows", "arm64").toJson();
 
-      const signed = PackageConfigurationTests.create("windows", "arm64", PackageConfigurationTests.ROOT, hook).toJson();
+      const signed = PackageConfigurationTests.create("windows", "arm64", PackageConfigurationTests.ROOT, true).toJson();
 
       assert.deepEqual(signed, {
         ...unsigned,
@@ -99,6 +99,30 @@ class PackageConfigurationTests {
         }
       });
       assert.equal("forceCodeSigning" in unsigned, false);
+    });
+
+    test("a signed macOS target forces code signing with the hardened runtime and the entitlements file for the app and its helpers, notarizes, and is not signed ad hoc again", () => {
+      const entitlements = path.join(PackageConfigurationTests.ROOT, "assets", "macos", "entitlements.plist");
+      const unsigned = PackageConfigurationTests.create("macos", "x64").toJson();
+
+      const signed = PackageConfigurationTests.create("macos", "x64", PackageConfigurationTests.ROOT, true).toJson();
+
+      assert.deepEqual(signed, {
+        ...unsigned,
+        electronFuses: PackageConfigurationTests.create("windows", "x64").toJson()["electronFuses"],
+        forceCodeSigning: true,
+        mac: {
+          target: [{ target: "dmg", arch: ["x64"] }, { target: "zip", arch: ["x64"] }],
+          icon: path.join(PackageConfigurationTests.ROOT, "assets", "fixture-icons", "icon-dock-512.png"),
+          category: "public.app-category.developer-tools",
+          artifactName: "Fixture Studio-macos-x64.${ext}",
+          extraResources: [{ from: path.join(PackageConfigurationTests.ROOT, "_build", "package", "command", "fixture-studio"), to: "bin/fixture-studio" }],
+          hardenedRuntime: true,
+          entitlements,
+          entitlementsInherit: entitlements,
+          notarize: true
+        }
+      });
     });
 
     test("a macOS target makes a DMG and the ZIP its updater downloads, and a Linux target an AppImage on the runtime that needs no libfuse2, each with only its own platform's section", () => {
@@ -131,7 +155,7 @@ class PackageConfigurationTests {
       });
     });
 
-    test("only a macOS target signs the program ad hoc again after its fuses are flipped, so that Apple silicon still starts it", () => {
+    test("only an unsigned macOS target signs the program ad hoc again after its fuses are flipped, so that Apple silicon still starts it", () => {
       const fuses = ["macos", "windows", "linux"].map(t => PackageConfigurationTests.create(t, "arm64").toJson()["electronFuses"]);
       const windowsFuses = PackageConfigurationTests.create("windows", "x64").toJson()["electronFuses"];
 
@@ -210,7 +234,7 @@ class PackageConfigurationTests {
     return Object.fromEntries(Object.entries(configuration.toJson()).filter(([key]) => ["win", "nsis", "mac", "linux", "toolsets"].includes(key)));
   }
 
-  private static create(platform: string, architecture: string, root: string = PackageConfigurationTests.ROOT, signHook: string | null = null): PackageConfiguration {
+  private static create(platform: string, architecture: string, root: string = PackageConfigurationTests.ROOT, isSigned: boolean = false): PackageConfiguration {
     return new PackageConfiguration(
       root,
       PackageConfigurationTests.MANIFEST,
@@ -219,7 +243,7 @@ class PackageConfigurationTests {
       PackageConfigurationTests.OUTPUT,
       PackageConfigurationTests.DISTRIBUTION,
       "44.5.1",
-      signHook);
+      isSigned);
   }
 }
 

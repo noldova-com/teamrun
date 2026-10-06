@@ -17,8 +17,8 @@ import PinnedPackage from "./pinned-package.ts";
 export default class TrustedSigningModule {
   public static readonly NAME: string = "TrustedSigning";
   public static readonly VERSION: string = "0.5.8";
+  public static readonly CREDENTIALS: readonly string[] = ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"];
 
-  private static readonly CREDENTIALS: readonly string[] = ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"];
   private static readonly MODULE_FOLDER: string = "module";
   private static readonly TOOLS_FOLDER: string = "tools";
   private static readonly TOOLS_VARIABLE: string = "LOCALAPPDATA";
@@ -88,13 +88,6 @@ export default class TrustedSigningModule {
     if (!path.isAbsolute(folder))
       throw new PackagingException(`${TrustedSigningModule.FOLDER_VARIABLE} must name the folder that holds the prepared ${TrustedSigningModule.NAME} module, not "${folder}".`);
     return new TrustedSigningModule(runner, folder, environment);
-  }
-
-  public static takeCredentials(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-    const credentials = Object.fromEntries(TrustedSigningModule.CREDENTIALS.filter(t => environment[t] !== undefined).map(t => [t, environment[t]]));
-    for (const name of TrustedSigningModule.CREDENTIALS)
-      Reflect.deleteProperty(environment, name);
-    return credentials;
   }
 
   public describeEnvironment(credentials: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

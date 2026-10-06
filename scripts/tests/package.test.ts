@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { after, before, test, type TestContext } from "node:test";
 
@@ -19,6 +19,7 @@ import Package from "../package.ts";
 import PackageStage from "../packaging/package-stage.ts";
 import PackagedBuild from "../packaging/packaged-build.ts";
 import type PinnedPackage from "../packaging/pinned-package.ts";
+import SigningCredentials from "../packaging/signing-credentials.ts";
 import TrustedSigningModule from "../packaging/trusted-signing-module.ts";
 import ProcessResult from "../processes/process-result.ts";
 import ProcessRunner from "../processes/process-runner.ts";
@@ -56,12 +57,10 @@ class BuilderFixture extends ProcessRunnerFixture {
 }
 
 class CredentialWitnessFixture extends ProcessRunner {
-  public static readonly NAMES: readonly string[] = ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"];
-
   public readonly seen: (readonly string[])[] = [];
 
   public static find(environment: NodeJS.ProcessEnv | undefined): readonly string[] {
-    return Object.keys(environment ?? {}).filter(t => CredentialWitnessFixture.NAMES.includes(t.toUpperCase()));
+    return Object.keys(environment ?? {}).filter(t => SigningCredentials.NAMES.includes(t.toUpperCase()));
   }
 
   public override captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
@@ -70,7 +69,20 @@ class CredentialWitnessFixture extends ProcessRunner {
   }
 }
 
+class KeyWitnessFixture extends BuilderFixture {
+  private static readonly PERMISSIONS: number = 0o777;
+
+  public readonly keys: ([string, number] | null)[] = [];
+
+  public override async runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
+    const key = String(environment?.["APPLE_API_KEY"]);
+    this.keys.push(existsSync(key) ? [await readFile(key, "utf8"), (await stat(key)).mode & KeyWitnessFixture.PERMISSIONS] : null);
+    return super.runAsync(command, commandArguments, directory, environment);
+  }
+}
+
 class PackageTests {
+
   private static readonly TIMEOUT: number = 120_000;
   private static readonly USAGE: string = "Usage: npm run package [-- --signed]\n";
   private static readonly GALLERY: readonly PinnedPackage[] = TrustedSigningModule.PACKAGES;
@@ -79,6 +91,14 @@ class PackageTests {
     AZURE_CLIENT_ID: "fixture-client",
     AZURE_CLIENT_SECRET: "fixture-secret"
   };
+  private static readonly MAC_CREDENTIALS: Readonly<Record<string, string>> = {
+    MAC_CERTIFICATE: "fixture-certificate",
+    MAC_CERTIFICATE_PASSWORD: "fixture-password",
+    APPLE_API_KEY_P8: "fixture-key",
+    APPLE_API_KEY_ID: "fixture-key-id",
+    APPLE_API_ISSUER: "fixture-issuer"
+  };
+  private static readonly APPLE_DETAILS: string = "Authority=Developer ID Application: Fixture Works (FIXTURE123)\nTeamIdentifier=FIXTURE123\n";
   private static readonly APP_IMAGE: string = "Fixture Studio-linux-x64.AppImage";
   private static readonly STAGED: string = "The packaged window holds no Gallery.\nPackages in the stage: @noldova/teamrun-foundation-beta, "
     + "@noldova/teamrun-foundation-alpha, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\n";
@@ -201,9 +221,9 @@ class PackageTests {
         const builder = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(0, "Every file is signed.\r\n", "")]);
         const npm = new CredentialWitnessFixture();
         const output = new TextOutputFixture();
-        Object.assign(process.env, PackageTests.CREDENTIALS);
+        Object.assign(process.env, PackageTests.CREDENTIALS, PackageTests.MAC_CREDENTIALS);
         t.after(() => {
-          for (const name of CredentialWitnessFixture.NAMES)
+          for (const name of SigningCredentials.NAMES)
             Reflect.deleteProperty(process.env, name);
         });
 
@@ -220,7 +240,7 @@ class PackageTests {
         assert.deepEqual(builder.captureEnvironments.map(t => CredentialWitnessFixture.find(t)), [[], []]);
         assert.deepEqual(CredentialWitnessFixture.find(process.env), []);
         assert.deepEqual(builder.environments.map(t => Object.fromEntries(Object.entries(t ?? {})
-          .filter(([name]) => CredentialWitnessFixture.NAMES.includes(name) || name.startsWith("TEAMRUN_")))), [{
+          .filter(([name]) => [...SigningCredentials.NAMES, "CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_API_KEY"].includes(name) || name.startsWith("TEAMRUN_")))), [{
           ...PackageTests.CREDENTIALS,
           TEAMRUN_SIGNING_FOLDER: path.join(folder, "signing")
         }]);
@@ -234,6 +254,89 @@ class PackageTests {
         assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], files.join("\n"));
         assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_WINDOWS_PUBLISHER"], "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US");
         assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n  ${files[0]}\nSignatures:\nEvery file is signed.\n`);
+      });
+
+    test("--signed signs and notarizes a macOS package with the certificate and the App Store Connect key that only electron-builder receives, the key in a private file "
+      + "that is removed afterwards, then checks the app in the disk image and in the archive", { timeout: PackageTests.TIMEOUT }, async t => {
+        const repository = await PackageTests.createAsync(t);
+        const made = ["Fixture Studio-macos-arm64.dmg", "Fixture Studio-macos-arm64.zip"];
+        const succeeded = new ProcessResult(0, "", "");
+        const checks = [
+          new ProcessResult(0, "valid on disk\n", ""),
+          new ProcessResult(0, PackageTests.APPLE_DETAILS, ""),
+          new ProcessResult(0, "accepted\nsource=Notarized Developer ID\n", ""),
+          new ProcessResult(0, "The validate action worked!\n", "")
+        ];
+        const builder = new KeyWitnessFixture(made, [], null, [succeeded, ...checks, succeeded, succeeded, ...checks]);
+        const output = new TextOutputFixture();
+        const environment: NodeJS.ProcessEnv = { ...PackageTests.CREDENTIALS, ...PackageTests.MAC_CREDENTIALS, HOME: "fixture-home" };
+
+        const exitCode = await new Package(repository.directory, "darwin", "arm64", PackageTests.createStage(repository), builder, environment, output, PackageTests.GALLERY)
+          .runAsync(["--signed"]);
+
+        const folder = path.join(repository.directory, "_build", "package");
+        const signing = path.join(folder, "signing");
+        const check = path.join(signing, "check");
+        const files = made.map(t => path.join(folder, "out", t));
+        const app = (index: number): string => path.join(check, String(index), "Fixture Studio.app");
+        const configuration = JSON.parse(await readFile(path.join(folder, "electron-builder.json"), "utf8")) as { readonly mac: Readonly<Record<string, unknown>> };
+        assert.equal(exitCode, 0, output.text);
+        assert.deepEqual(environment, { HOME: "fixture-home" });
+        assert.deepEqual(builder.environments, [{
+          HOME: "fixture-home",
+          ELECTRON_BUILDER_CACHE: path.join(folder, "tool-cache"),
+          CSC_IDENTITY_AUTO_DISCOVERY: "false",
+          CSC_LINK: "fixture-certificate",
+          CSC_KEY_PASSWORD: "fixture-password",
+          APPLE_API_KEY: path.join(signing, "notarization-key.p8"),
+          APPLE_API_KEY_ID: "fixture-key-id",
+          APPLE_API_ISSUER: "fixture-issuer"
+        }]);
+        assert.deepEqual(builder.keys, [["fixture-key", process.platform === "win32" ? builder.keys[0]?.[1] : 0o600]]);
+        assert.equal(existsSync(signing), false);
+        assert.equal(configuration.mac["notarize"], true);
+        assert.deepEqual(builder.captured, [
+          ["hdiutil", check, "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", path.join(check, "0"), files[0] ?? ""],
+          ["codesign", check, "--verify", "--deep", "--strict", "--verbose=2", app(0)],
+          ["codesign", check, "--display", "--verbose=2", app(0)],
+          ["spctl", check, "--assess", "--type", "execute", "--verbose=2", app(0)],
+          ["xcrun", check, "stapler", "validate", app(0)],
+          ["hdiutil", check, "detach", path.join(check, "0"), "-force"],
+          ["ditto", check, "-x", "-k", files[1] ?? "", path.join(check, "1")],
+          ["codesign", check, "--verify", "--deep", "--strict", "--verbose=2", app(1)],
+          ["codesign", check, "--display", "--verbose=2", app(1)],
+          ["spctl", check, "--assess", "--type", "execute", "--verbose=2", app(1)],
+          ["xcrun", check, "stapler", "validate", app(1)]
+        ]);
+        assert.deepEqual(builder.captureEnvironments.map(t => CredentialWitnessFixture.find(t)), Array.from({ length: 11 }, () => []));
+        assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n${files.map(t => `  ${t}\n`).join("")}Signatures:\n`
+          + files.map(t => `${t}: a valid Developer ID Application signature, notarized and stapled.\n`).join(""));
+      });
+
+    test("--signed is refused for macOS without every certificate and key credential before anything is staged, and a failed check still removes the key",
+      { timeout: PackageTests.TIMEOUT }, async t => {
+        const repository = await PackageTests.createAsync(t);
+        const made = ["Fixture Studio-macos-x64.dmg", "Fixture Studio-macos-x64.zip"];
+        const builder = new BuilderFixture(made, [], null, [new ProcessResult(1, "hdiutil: attach failed\n", "")]);
+        const uncredentialed = new TextOutputFixture();
+        const unchecked = new TextOutputFixture();
+        const empty = new BuilderFixture([]);
+
+        const exitCodes = [
+          await new Package(repository.directory, "darwin", "x64", PackageTests.createStage(repository), empty, { MAC_CERTIFICATE: "fixture-certificate", APPLE_API_KEY_ID: "" },
+            uncredentialed, PackageTests.GALLERY).runAsync(["--signed"]),
+          await new Package(repository.directory, "darwin", "x64", PackageTests.createStage(repository), builder, { ...PackageTests.MAC_CREDENTIALS }, unchecked, PackageTests.GALLERY)
+            .runAsync(["--signed"])
+        ];
+
+        const out = path.join(repository.directory, "_build", "package", "out");
+        assert.deepEqual(exitCodes, [1, 1]);
+        assert.deepEqual(empty.runs, []);
+        assert.equal(uncredentialed.text, "Signing macOS packages needs MAC_CERTIFICATE_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER, "
+          + "the Developer ID Application certificate and the App Store Connect key that notarizes.\n");
+        assert.ok(unchecked.text.endsWith(`hdiutil attach -readonly -nobrowse -noautoopen -mountpoint ${path.join(repository.directory, "_build", "package", "signing", "check", "0")} `
+          + `${path.join(out, made[0] ?? "")} failed with exit code 1:\nhdiutil: attach failed\n`), unchecked.text);
+        assert.equal(existsSync(path.join(repository.directory, "_build", "package", "signing")), false);
       });
 
     test("--signed is refused for other platforms and without every Azure credential before anything is staged, and an ARM64 package without addons checks its installer and program",
@@ -261,7 +364,7 @@ class PackageTests {
 
         const out = path.join(repository.directory, "_build", "package", "out");
         assert.deepEqual(exitCodes, [1, 1, 2, 0, 1, 1]);
-        assert.equal(linux.text, "--signed signs Windows packages only, so it cannot sign the linux-x64 package.\n");
+        assert.equal(linux.text, "--signed signs Windows and macOS packages only, so it cannot sign the linux-x64 package.\n");
         assert.equal(uncredentialed.text, "Signing Windows packages needs AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with noldova-signing.\n");
         assert.equal(twice.text, PackageTests.USAGE);
         assert.equal(signed.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], made.map(t => path.join(out, t)).join("\n"));

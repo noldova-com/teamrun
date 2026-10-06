@@ -1303,13 +1303,16 @@ export declare class DefaultTheme {
 /**
  * The kit's modal dialog, `tr-dialog`: a title, a body of the content
  * projected into it, and a row of the elements marked `trDialogAction`,
- * left out when there are none. It is the root of a component opened with
- * {@link DialogService.open}, which names the dialog by its title and
- * supplies {@link DialogTokens.titleId}; created anywhere else it fails for
- * want of that token. It never closes itself: Escape, unless a control
- * inside already handled it, and a large dialog's Close button ask its owner
- * through {@link DialogComponent.dismissed}, and a click on the backdrop
- * does nothing.
+ * left out when there are none. A large dialog's title bar ends with the
+ * elements marked `trDialogControl`, then Maximize, which toggles it
+ * between its large size and the whole window for as long as it is open and
+ * reads Restore while it is maximized, and then Close. It is the root of a
+ * component opened with {@link DialogService.open}, which names the dialog
+ * by its title and supplies {@link DialogTokens.titleId}; created anywhere
+ * else it fails for want of that token. It never closes itself: Escape,
+ * unless a control inside already handled it, and a large dialog's Close
+ * button ask its owner through {@link DialogComponent.dismissed}, and a
+ * click on the backdrop does nothing.
  *
  * @example
  * ```ts
@@ -1353,8 +1356,8 @@ export declare class DialogComponent {
   /**
    * The dialog's size; normal when not bound. A normal dialog takes its
    * preferred width within the window and scrolls its body; a large one
-   * takes most of the window, with a title bar and a Close button, and a
-   * body without padding that lays itself out.
+   * takes most of the window, with a title bar that ends with its controls,
+   * Maximize and Close, and a body without padding that lays itself out.
    */
   public readonly size: InputSignal<DialogSize>;
 
