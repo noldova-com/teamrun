@@ -48,10 +48,7 @@ export class PathCommand {
         return PathCommandOutcome.Occupied;
       if (!Object.isNull(stats) && await readlink(this.link) === this.target)
         return PathCommandOutcome.AlreadyInstalled;
-      if (!Object.isNull(stats))
-        await rm(this.link);
-      await mkdir(dirname(this.link), { recursive: true });
-      await symlink(this.target, this.link);
+      await this.writeLinkAsync(!Object.isNull(stats));
       return PathCommandOutcome.Installed;
     }
     catch (error) {
@@ -69,6 +66,13 @@ export class PathCommand {
     }
   }
 
+  protected async writeLinkAsync(isReplacing: boolean): Promise<void> {
+    if (isReplacing)
+      await rm(this.link);
+    await mkdir(dirname(this.link), { recursive: true });
+    await symlink(this.target, this.link);
+  }
+
   private static hasCode(error: unknown, codes: readonly string[]): boolean {
     return Object.isObject(error) && Resources.errorCodeField in error && codes.includes(String(error[Resources.errorCodeField]));
   }
@@ -77,10 +81,8 @@ export class PathCommand {
     try {
       return await lstat(file);
     }
-    catch (error) {
-      if (PathCommand.hasCode(error, [Resources.missingErrorCode]))
-        return null;
-      throw error;
+    catch {
+      return null;
     }
   }
 }

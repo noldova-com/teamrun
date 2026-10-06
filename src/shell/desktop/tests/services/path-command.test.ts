@@ -6,13 +6,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { chmod, mkdir, mkdtemp, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { PathCommand, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
+
+import { RefusedPathCommand } from "../fixtures/refused-path-command.fixture.js";
 
 @TestClass
 export class PathCommandTests {
@@ -64,64 +66,62 @@ export class PathCommandTests {
 
   @TestMethod
   public asksForAnAdministratorWhenTheFolderCannotBeWrittenAndReportsACancelledPrompt(): Promise<void> {
-    if (process.platform === "win32" || process.getuid?.() === 0)
-      return Promise.resolve();
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
-      const locked = path.join(folder, "locked");
-      await mkdir(locked);
-      await chmod(locked, 0o555);
-      const link = path.join(locked, "bin", "teamrun");
+      const link = path.join(folder, "bin", "teamrun");
       const ran: (readonly string[])[] = [];
-      const answers = [(): Promise<void> => Promise.resolve(), (): Promise<void> => Promise.reject(new Error("Command failed: /usr/bin/osascript\n0:200: execution error: User canceled. (-128)"))];
+      const answers = [
+        ["EACCES", (): Promise<void> => Promise.resolve()],
+        ["EPERM", (): Promise<void> => Promise.reject(new Error("Command failed: /usr/bin/osascript\n0:200: execution error: User canceled. (-128)"))]
+      ] as const;
 
-      try {
-        const outcomes = [];
-        for (const answer of answers)
-          outcomes.push(await new PathCommand(target, link, (program, args) => {
-            ran.push([program, ...args]);
-            return answer();
-          }).installAsync());
+      const outcomes = [];
+      for (const [code, answer] of answers)
+        outcomes.push(await new RefusedPathCommand(target, link, (program, args) => {
+          ran.push([program, ...args]);
+          return answer();
+        }, code).installAsync());
 
-        Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.Cancelled].join(), outcomes.join());
-        Assert.areEqual("/usr/bin/osascript", ran[0]?.[0]);
-        Assert.areEqual([target, path.join(locked, "bin"), link].join(), ran[0]?.slice(-4, -1).join());
-        Assert.areEqual(`TeamRun wants to link ${link} to its teamrun command, so that terminals can run it.`, ran[0]?.at(-1));
-        Assert.isTrue(ran[0]?.some(t => t.includes("with administrator privileges")) === true);
-      }
-      finally {
-        await chmod(locked, 0o755);
-      }
+      Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.Cancelled].join(), outcomes.join());
+      Assert.areEqual("/usr/bin/osascript", ran[0]?.[0]);
+      Assert.areEqual([target, path.join(folder, "bin"), link].join(), ran[0]?.slice(-4, -1).join());
+      Assert.areEqual(`TeamRun wants to link ${link} to its teamrun command, so that terminals can run it.`, ran[0]?.at(-1));
+      Assert.isTrue(ran[0]?.some(t => t.includes("with administrator privileges")) === true);
     });
   }
 
   @TestMethod
   public failsWithTheReasonWhenTheLinkCannotBeMadeOrTheAdministratorPromptFails(): Promise<void> {
-    if (process.platform === "win32" || process.getuid?.() === 0)
-      return Promise.resolve();
+    return PathCommandTests.runInFolderAsync(async (folder, target) => {
+      const link = path.join(folder, "bin", "teamrun");
+      const messages: string[] = [];
+
+      for (const command of [
+        new RefusedPathCommand(target, link, () => Promise.resolve(), "ENOTDIR"),
+        new RefusedPathCommand(target, link, () => Promise.reject(new Error("Command failed: /usr/bin/osascript\nThe administrator user name or password was incorrect.")), "EACCES")
+      ]) {
+        const error = await command.installAsync().then(() => null, (t: unknown) => t);
+        Assert.isTrue(error instanceof PathCommandException);
+        messages.push(String((error as PathCommandException).message));
+      }
+
+      Assert.areEqual([
+        `The teamrun command could not be linked at ${link}: Error: ENOTDIR: the link could not be made`,
+        `The teamrun command could not be linked at ${link}: Error: Command failed: /usr/bin/osascript\nThe administrator user name or password was incorrect.`
+      ].join("|"), messages.join("|"));
+    });
+  }
+
+  @TestMethod
+  public findsNoLinkWhereItsFolderCannotBeReadAndFailsWithTheReasonTheLinkCannotBeMade(): Promise<void> {
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
       const file = path.join(folder, "file");
       await writeFile(file, "not a folder\n");
-      const locked = path.join(folder, "locked");
-      await mkdir(locked);
-      await chmod(locked, 0o555);
-      const messages: string[] = [];
+      const link = path.join(file, "bin", "teamrun");
 
-      try {
-        for (const command of [
-          new PathCommand(target, path.join(file, "teamrun"), () => Promise.resolve()),
-          new PathCommand(target, path.join(locked, "teamrun"), () => Promise.reject(new Error("Command failed: /usr/bin/osascript\nThe administrator user name or password was incorrect.")))
-        ]) {
-          const error = await command.installAsync().then(() => null, (t: unknown) => t);
-          Assert.isTrue(error instanceof PathCommandException);
-          messages.push(String((error as PathCommandException).message));
-        }
-      }
-      finally {
-        await chmod(locked, 0o755);
-      }
+      const error = await new PathCommand(target, link, () => Promise.reject(new Error("No administrator is asked."))).installAsync().then(() => null, (t: unknown) => t);
 
-      Assert.isTrue(messages[0]?.startsWith(`The teamrun command could not be linked at ${path.join(file, "teamrun")}: Error: ENOTDIR`) === true, messages[0]);
-      Assert.areEqual(`The teamrun command could not be linked at ${path.join(locked, "teamrun")}: Error: Command failed: /usr/bin/osascript\nThe administrator user name or password was incorrect.`, messages[1]);
+      Assert.isTrue(error instanceof PathCommandException);
+      Assert.isTrue(String((error as PathCommandException).message).startsWith(`The teamrun command could not be linked at ${link}: Error: `));
     });
   }
 

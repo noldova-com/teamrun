@@ -208,7 +208,6 @@ export class Resources {
   public static readonly userCancelledCode: string = "(-128)";
   public static readonly errorCodeField: "code" = "code";
   public static readonly deniedErrorCodes: readonly string[] = ["EACCES", "EPERM"];
-  public static readonly missingErrorCode: string = "ENOENT";
   public static get commandInstalled(): string {
     return `The ${Resources.commandName} command is installed.`;
   }

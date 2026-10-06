@@ -3362,6 +3362,25 @@ export declare class PathCommand {
    * ```
    */
   public installAsync(): Promise<PathCommandOutcome>;
+
+  /**
+   * Makes the link, making its folder when needed, after removing the link that is there when one is.
+   *
+   * @param isReplacing Whether a link to elsewhere is there to remove first.
+   * @returns A promise that settles once the link is made, or rejects with the file system's error, whose `code` of
+   * `EACCES` or `EPERM` makes {@link PathCommand.installAsync} ask for an administrator.
+   * @example
+   * ```ts
+   * import { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export class LockedPathCommand extends PathCommand {
+   *   protected override writeLinkAsync(): Promise<void> {
+   *     return Promise.reject(Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" }));
+   *   }
+   * }
+   * ```
+   */
+  protected writeLinkAsync(isReplacing: boolean): Promise<void>;
 }
 
 /**
