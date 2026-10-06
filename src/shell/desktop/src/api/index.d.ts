@@ -3511,8 +3511,6 @@ export declare class DesktopApplication {
  * Records a desktop in its installation, so an update can find it while it has no runtime connection.
  */
 export declare class DesktopRecord {
-  private constructor();
-
   /**
    * Stamps the desktop's process with its start time and records it in the installation.
    *
