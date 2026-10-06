@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export interface IDocumentOptions {
-  readonly preview?: boolean;
+export interface IDocumentUpdate {
+  readonly title?: string;
   readonly breadcrumb?: readonly string[];
 }

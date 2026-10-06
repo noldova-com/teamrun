@@ -11,6 +11,7 @@ import { Injectable, inject } from "@angular/core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
 import { Resources } from "../../resources";
+import type { DocumentHeading } from "../models/document-heading";
 import { DocumentTab } from "../models/layout/document-tab";
 import { LayoutService } from "./layout.service";
 import { TabLabelService } from "./tab-label.service";
@@ -20,16 +21,16 @@ export class DocumentOpenerService {
   private readonly layout: LayoutService = inject(LayoutService);
   private readonly labels: TabLabelService = inject(TabLabelService);
 
-  public open(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
-    this.layout.openDocument(this.titled(moduleId, name, instance, title), isPreview);
+  public open(moduleId: string, name: string, instance: string, heading: DocumentHeading, isPreview: boolean): void {
+    this.layout.openDocument(this.titled(moduleId, name, instance, heading), isPreview);
   }
 
-  public restore(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
-    this.layout.restoreDocument(this.titled(moduleId, name, instance, title), isPreview);
+  public restore(moduleId: string, name: string, instance: string, heading: DocumentHeading, isPreview: boolean): void {
+    this.layout.restoreDocument(this.titled(moduleId, name, instance, heading), isPreview);
   }
 
-  public restoreSaved(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void {
-    const tab = this.titled(moduleId, name, instance, title);
+  public restoreSaved(moduleId: string, name: string, instance: string, heading: DocumentHeading, isPreview: boolean): void {
+    const tab = this.titled(moduleId, name, instance, heading);
     if (this.layout.layout().isOpen(tab))
       this.layout.restoreDocument(tab, isPreview);
   }
@@ -39,11 +40,17 @@ export class DocumentOpenerService {
     this.layout.keep(new DocumentTab(name, instance));
   }
 
-  private titled(moduleId: string, name: string, instance: string, title: string): DocumentTab {
+  public update(moduleId: string, name: string, instance: string, title: string | null, breadcrumb: readonly string[] | null): void {
     this.requireOwnDocument(moduleId, name);
-    ArgumentException.throwIfNullOrWhitespace(title, "title");
     const tab = new DocumentTab(name, instance);
-    this.labels.setTitle(tab, title);
+    if (this.layout.layout().isOpen(tab))
+      this.labels.setHeading(tab, this.labels.headingOf(tab).with(title, breadcrumb));
+  }
+
+  private titled(moduleId: string, name: string, instance: string, heading: DocumentHeading): DocumentTab {
+    this.requireOwnDocument(moduleId, name);
+    const tab = new DocumentTab(name, instance);
+    this.labels.setHeading(tab, heading);
     return tab;
   }
 

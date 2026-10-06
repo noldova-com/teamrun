@@ -36,7 +36,8 @@ export class DesktopBridgeFixture implements IDesktopBridge {
     ["shell.commands", { payload: { commands: [], sequence: 0 } }],
     ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false, mutedModules: [], sequence: 0 } }],
     ["shell.settings", { payload: { definitions: [], entries: [] } }],
-    ["shell.recentCommands", { payload: { ids: [] } }]
+    ["shell.recentCommands", { payload: { ids: [] } }],
+    ["shell.programs", { payload: { programs: [], sequence: 0 } }]
   ]);
   public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
   public readonly copied: string[] = [];
