@@ -7,7 +7,8 @@
  */
 
 import type { IPermissionHost } from "./i-permission-host.js";
+import type { ISpellCheckHost } from "./i-spell-check-host.js";
 
 export interface ISessionHost {
-  readonly defaultSession: IPermissionHost;
+  readonly defaultSession: IPermissionHost & ISpellCheckHost;
 }

@@ -11,7 +11,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { setImmediate } from "node:timers/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
@@ -77,8 +77,8 @@ export class DesktopApplicationTests {
   public async deniesEveryPermission(): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
 
-    Assert.isTrue(electron.permissions.request("media") === false);
-    Assert.isTrue(electron.permissions.check() === false);
+    Assert.isTrue(electron.defaultSession.request("media") === false);
+    Assert.isTrue(electron.defaultSession.check() === false);
   }
 
   @TestMethod
@@ -1356,6 +1356,60 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(JSON.stringify(RuntimeBuild.identity.toJson()), JSON.stringify(build));
     Assert.isNull(refused);
+  }
+
+  @TestMethod
+  public async pointsTheDictionaryDownloadAtItsProfilesOwnFolderAtReadyAndTakesSpellingPreferencesOnlyFromItsOwnWindow(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+    const untrusted = { sender: { id: 1 }, senderFrame: null };
+
+    const offer = electron.ipcMain.invoke("teamrun:readSpelling", trusted);
+    const refused = electron.ipcMain.invoke("teamrun:readSpelling", untrusted);
+    electron.ipcMain.send("teamrun:spelling", trusted, false, ["en-US"]);
+    electron.ipcMain.send("teamrun:spelling", untrusted, true, []);
+    electron.ipcMain.send("teamrun:spelling", trusted, "yes", []);
+    electron.ipcMain.send("teamrun:spelling", trusted, true, "en-US");
+    electron.ipcMain.send("teamrun:spelling", trusted, true, [1]);
+    electron.defaultSession.refusal = new Error("Refused.");
+    electron.ipcMain.send("teamrun:spelling", trusted, true, []);
+
+    const profile = electron.app.calls.find(t => t.startsWith("setPath userData "))?.slice("setPath userData ".length) ?? "";
+
+    Assert.areEqual(`url ${pathToFileURL(join(profile, "Dictionaries")).href}/|languages |enabled false|languages |enabled true`, electron.defaultSession.spellCalls.join("|"));
+    Assert.isTrue(electron.defaultSession.spellCalls[0]?.startsWith("url file:///") === true, electron.defaultSession.spellCalls.join("|"));
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The spell checker refused the languages : Error: Refused.").length);
+    Assert.areEqual("{\"languages\":[],\"fallback\":null}", JSON.stringify(offer));
+    Assert.isNull(refused);
+    Assert.areEqual(3, DesktopStartFixture.readErrors(process, "The window's spelling preferences were rejected: ").length);
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The list of shipped dictionaries could not be read, so no spelling language is offered: ").length);
+  }
+
+  @TestMethod
+  public async forwardsEachMenuOfItsOwnWindowAndReplacesAWordOnlyForIt(): Promise<void> {
+    const electron = await DesktopStartFixture.startReadyAsync("linux");
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+    const untrusted = { sender: { id: 1 }, senderFrame: null };
+    const contents = electron.windows[0]?.webContents ?? null;
+    Assert.isNotNull(contents);
+
+    contents.askForMenu({ x: 10, y: 20, misspelledWord: "wrold", dictionarySuggestions: ["world", "wold"], menuSourceType: "mouse" });
+    contents.askForMenu({ x: 3, y: 4, misspelledWord: "", dictionarySuggestions: [], menuSourceType: "keyboard" });
+    const answers = [
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, "world"),
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", untrusted, "world"),
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, ""),
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, 5),
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, "x".repeat(101))
+    ];
+
+    Assert.areEqual(JSON.stringify([
+      ["teamrun:fieldMenu", { x: 10, y: 20, isKeyboard: false, word: "wrold", suggestions: ["world", "wold"] }],
+      ["teamrun:fieldMenu", { x: 3, y: 4, isKeyboard: true, word: "", suggestions: [] }]
+    ]), JSON.stringify(contents.sent.filter(t => t[0] === "teamrun:fieldMenu")));
+    Assert.areEqual("true,false,false,false,false", answers.join(","));
+    Assert.areEqual("replaceMisspelling world", contents.calls.filter(t => t.startsWith("replace")).join("|"));
   }
 
   @TestMethod
