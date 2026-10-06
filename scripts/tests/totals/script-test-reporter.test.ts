@@ -102,7 +102,28 @@ class ScriptTestReporterTests {
       });
     });
 
-    test("a test its parent cancelled counts as unreached, events without a file are ignored, and a test that never started has no name", async () => {
+    test("each test is named by its parents and its own name, even when a sibling started after it and before it finished", async () => {
+      const reporter = new ScriptTestReporter(path.resolve("root"));
+      const file = path.resolve("root", "a.test.ts");
+      const finish = (name: string, nesting: number, skip: string): void => {
+        reporter.write({ type: "test:pass", data: { name, nesting, file, skip, details: { type: "test" } } });
+      };
+
+      for (const [name, nesting] of [["outer", 0], ["first", 1], ["second", 1], ["inner", 2]] as const)
+        reporter.write({ type: "test:start", data: { name, nesting, file } });
+      finish("inner", 2, "c");
+      finish("first", 1, "a");
+      finish("second", 1, "b");
+      reporter.end();
+
+      assert.deepEqual(JSON.parse(await text(reporter)).skips, [
+        { file: "a.test.ts", names: ["outer", "second", "inner"], reason: "c" },
+        { file: "a.test.ts", names: ["outer", "first"], reason: "a" },
+        { file: "a.test.ts", names: ["outer", "second"], reason: "b" }
+      ]);
+    });
+
+    test("a test its parent cancelled counts as unreached, events without a file are ignored, and a test that never started is named without its parents", async () => {
       const reporter = new ScriptTestReporter(path.resolve("root"));
       const file = path.resolve("root", "a.test.ts");
 
@@ -113,7 +134,7 @@ class ScriptTestReporterTests {
       reporter.write({ type: "test:fail", data: { name: "cut short", nesting: 1, file, details: { type: "test", error: Object.assign(new Error("cancelled"), { failureType: "cancelledByParent" }) } } });
       reporter.end();
 
-      assert.deepEqual(JSON.parse(await text(reporter)), { passed: 0, failed: 0, skipped: 1, unreached: 1, skips: [{ file: "a.test.ts", names: [], reason: "No reason given." }], files: [] });
+      assert.deepEqual(JSON.parse(await text(reporter)), { passed: 0, failed: 0, skipped: 1, unreached: 1, skips: [{ file: "a.test.ts", names: ["unstarted"], reason: "No reason given." }], files: [] });
     });
 
     test("without a root, files are named relative to the working directory", async () => {

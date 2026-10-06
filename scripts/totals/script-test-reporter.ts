@@ -53,14 +53,14 @@ export default class ScriptTestReporter extends Transform {
 
   private count(event: TestEvent & { type: "test:pass" | "test:fail" }, file: string): void {
     const data = event.data;
-    const names = (this.names.get(file) ?? []).slice(0, data.nesting + 1);
+    const names = [...(this.names.get(file) ?? []).slice(0, data.nesting), data.name];
     if (data.todo !== undefined)
       this.skip(file, names, data.todo === true ? `${ScriptTestReporter.TODO}.` : `${ScriptTestReporter.TODO}: ${String(data.todo)}`);
     else if (data.skip !== undefined)
       this.skip(file, names, data.skip === true ? ScriptTestReporter.NO_REASON : String(data.skip));
     else if (event.type === "test:pass")
       this.passed += Number(data.nesting > 0 || data.name !== file);
-    else if (Reflect.get(event.data.details.error, "failureType") === ScriptTestReporter.CANCELLED)
+    else if ("failureType" in event.data.details.error && event.data.details.error.failureType === ScriptTestReporter.CANCELLED)
       this.unreached++;
     else
       this.failed++;
