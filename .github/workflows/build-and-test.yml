@@ -39,7 +39,6 @@ jobs:
       target-table: ${{ steps.scope.outputs.target-table }}
       ui-targets: ${{ steps.scope.outputs.ui-targets }}
       deferred: ${{ steps.scope.outputs.deferred }}
-      ui-deferred: ${{ steps.scope.outputs.ui-deferred }}
     steps:
       - name: Check out the change history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -399,13 +398,10 @@ jobs:
           TOTALS_RESULT: ${{ needs.totals.result }}
           UI_TARGETS: ${{ needs.changes.outputs.ui-targets }}
           DEFERRED: ${{ needs.changes.outputs.deferred }}
-          UI_DEFERRED: ${{ needs.changes.outputs.ui-deferred }}
         run: |
           set -euo pipefail
           if [ -n "$DEFERRED" ]; then
-            covered="every target this run covers. Skipped here and run on every push to main and in manual runs: $DEFERRED."
-          elif [ -n "$UI_DEFERRED" ]; then
-            covered="every target, with the UI workflows of $UI_DEFERRED left to manual and nightly runs."
+            covered="every target this run covers. Skipped here: $DEFERRED."
           else
             covered='every target.'
           fi

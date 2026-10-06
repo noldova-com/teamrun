@@ -10,11 +10,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import BuildMatrix from "../../workflows/build-matrix.ts";
-import type BuildTarget from "../../workflows/build-target.ts";
 
 class BuildMatrixTests {
   public static register(): void {
-    test("pushes and manual runs build every target, and pull requests defer the slowest and scarcest", () => {
+    test("manual runs build every target, pushes every target but macOS x64, and pull requests defer the slowest and scarcest", () => {
       const full = new BuildMatrix("workflow_dispatch");
       const pullRequest = new BuildMatrix("pull_request");
 
@@ -29,26 +28,25 @@ class BuildMatrixTests {
       assert.deepEqual(full.deferred, []);
       assert.deepEqual(pullRequest.targets.map(t => t.name), ["Linux x64", "Linux ARM64", "Windows x64", "macOS ARM64"]);
       assert.deepEqual(pullRequest.deferred.map(t => t.name), ["Windows ARM64", "macOS x64"]);
-      assert.deepEqual([new BuildMatrix("push").targets, new BuildMatrix("push").deferred], [full.targets, []]);
+      assert.deepEqual([new BuildMatrix("push").targets.map(t => t.name), new BuildMatrix("push").deferred.map(t => t.name)],
+        [["Linux x64", "Linux ARM64", "Windows x64", "Windows ARM64", "macOS ARM64"], ["macOS x64"]]);
     });
 
     test("a merge group runs what a pull request runs", () => {
-      const describe = (matrix: BuildMatrix): string[] => [...matrix.targets, ...matrix.deferred, ...matrix.uiTargets, ...matrix.uiDeferred].map(t =>
+      const describe = (matrix: BuildMatrix): string[] => [...matrix.targets, ...matrix.deferred].map(t =>
         `${t.name}: ${matrix.uiShards(t).map(s => `${s.index}/${s.count} ${s.grep} ${s.isPrebuilt}`).join(", ")}`);
 
       assert.deepEqual(describe(new BuildMatrix("merge_group")), describe(new BuildMatrix("pull_request")));
       assert.deepEqual(new BuildMatrix("merge_group").targets.map(t => t.name), ["Linux x64", "Linux ARM64", "Windows x64", "macOS ARM64"]);
     });
 
-    test("pushes run the UI workflows on every target but macOS x64, which builds and tests and leaves them to manual and nightly runs", () => {
-      const names = (targets: readonly BuildTarget[]): string[] => targets.map(t => t.name);
-      const push = new BuildMatrix("push");
-      const manual = new BuildMatrix("workflow_dispatch");
-      const pullRequest = new BuildMatrix("pull_request");
+    test("only a target that runs its tests in one job and only the smoke set folds its UI workflows into that job", () => {
+      const folded = (matrix: BuildMatrix): string[] => matrix.targets.filter(t => matrix.foldsUi(t)).map(t => t.name);
 
-      assert.deepEqual([names(push.uiTargets), names(push.uiDeferred)], [["Linux x64", "Linux ARM64", "Windows x64", "Windows ARM64", "macOS ARM64"], ["macOS x64"]]);
-      assert.deepEqual([manual.uiTargets, manual.uiDeferred], [manual.targets, []]);
-      assert.deepEqual([pullRequest.uiTargets, pullRequest.uiDeferred], [pullRequest.targets, []]);
+      assert.deepEqual(folded(new BuildMatrix("pull_request")), ["macOS ARM64"]);
+      assert.deepEqual(folded(new BuildMatrix("merge_group")), ["macOS ARM64"]);
+      assert.deepEqual(folded(new BuildMatrix("push")), []);
+      assert.deepEqual(folded(new BuildMatrix("workflow_dispatch")), []);
     });
 
     test("Windows and macOS x64 run their UI workflows in three shards, macOS ARM64 in two, Linux in five", () => {

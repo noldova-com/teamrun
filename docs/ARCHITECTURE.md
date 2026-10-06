@@ -1043,8 +1043,9 @@ Each target is packaged on its own platform and processor.
   Incomplete uploads remain unpublished, and published tags and assets are not silently replaced.
 - A release carries, for each target, its packages, a checksum file `<package>.sha256` in `sha256sum`'s format, and its update information in electron-updater's format: the version; each package's name, SHA-512 in base64 and size; the package the updater downloads, again as `path` with its SHA-512; and the release date.
   After `npm run package`, `npm run release:assets` writes the checksums and the metadata beside the machine's packages, with the root manifest's version.
-- `npm run release:check` checks a requested release before anything is built: the version is the root manifest's, follows the versioning below and has no tag yet, and the revision is a full commit SHA that `main` contains and whose latest **Build and test** run on `main` passed, which covers the full UI workflows that a release's own builds don't repeat.
+- `npm run release:check` checks a requested release before anything is built: the version is the root manifest's, follows the versioning below and has no tag yet, and the revision is a full commit SHA that `main` contains and whose latest **Build and test** run on `main` passed.
   It names the platforms the release signs, and writes them as the step's `signed` output, separated by spaces, when `GITHUB_OUTPUT` is set.
+  That run on `main` covers the tests and the full UI workflows of every target but macOS x64, which the nightly run covers; a release's own builds run each target's tests again, macOS x64's included, but not its UI workflows.
 - `npm run release:publish` publishes every target's files from one folder:
   - It first checks the package reports in `RELEASE_REPORTS`, one folder per target with its `package-report.json`: every target needs exactly one, and each must say signed and checked for a platform the release signs, and neither for any other.
     A missing, extra, unreadable or differing report stops the release before anything is published, naming each problem.
