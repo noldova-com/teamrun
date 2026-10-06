@@ -57,6 +57,7 @@ export { SettingsQuery } from "../models/settings-query.js";
 export { SettingsSnapshot } from "../models/settings-snapshot.js";
 export { ShellEvents } from "../models/shell-events.js";
 export { ShellMethods } from "../models/shell-methods.js";
+export { ShellNotifications } from "../models/shell-notifications.js";
 export { StopRequest } from "../models/stop-request.js";
 export { WindowStateKey } from "../models/window-state-key.js";
 export { WindowStateValue } from "../models/window-state-value.js";

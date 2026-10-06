@@ -27,6 +27,8 @@ export class NoteComponent {
 
   protected readonly runtime: Signal<string> = NotesState.runtime;
   protected readonly continued: Signal<number> = NotesState.continued;
+  protected readonly saving: Signal<string> = NotesState.saving;
+  protected readonly savings: readonly ["saves" | "fails" | "hangs", string][] = [["saves", "Save normally"], ["fails", "Fail saving"], ["hangs", "Never finish saving"]];
   protected readonly sections: readonly string[] = ["Context", "Goals", "Decisions", "Open questions", "Risks", "Timeline", "Owners", "Dependencies", "Testing", "Rollout", "Follow-ups", "Notes from review"];
   protected readonly wrapping: WritableSignal<string> = signal("");
   private readonly context: IWindowPartContext = inject(WindowPartTokens.context);
@@ -52,6 +54,10 @@ export class NoteComponent {
 
   protected resetInbox(): void {
     void this.context.resetSettingAsync(NoteComponent.WRAPS_LINES, NoteComponent.INBOX);
+  }
+
+  protected saveBy(saving: "saves" | "fails" | "hangs"): void {
+    NotesState.saving.set(saving);
   }
 
   private readWrapping(note: SettingScope): void {

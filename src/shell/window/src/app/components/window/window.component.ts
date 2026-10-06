@@ -6,13 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, DestroyRef, ErrorHandler, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, inject } from "@angular/core";
 
 import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
 import { AppearanceSettingsService } from "../../services/appearance-settings.service";
+import { ClosingService } from "../../services/closing.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
-import { LayoutService } from "../../services/layout.service";
 import { QuitService } from "../../services/quit.service";
 import { RecentCommandsService } from "../../services/recent-commands.service";
 import { StartupService } from "../../services/startup.service";
@@ -33,8 +33,7 @@ import { WorkspaceComponent } from "../workspace/workspace.component";
 })
 export class WindowComponent {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
-  private readonly layout: LayoutService = inject(LayoutService);
-  private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly closing: ClosingService = inject(ClosingService);
 
   protected readonly startup: StartupService = inject(StartupService);
 
@@ -49,12 +48,6 @@ export class WindowComponent {
   }
 
   private async closeAsync(requestId: string): Promise<void> {
-    try {
-      await this.layout.saveAsync();
-    }
-    catch (error) {
-      this.errors.handleError(error);
-    }
-    await this.bridge.answerCloseAsync(requestId, true);
+    await this.bridge.answerCloseAsync(requestId, await this.closing.saveAsync());
   }
 }

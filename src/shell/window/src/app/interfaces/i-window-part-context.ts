@@ -28,6 +28,7 @@ export interface IWindowPartContext {
   registerCommand(command: CommandContribution): void;
   registerStatusBarItem(item: StatusBarItemContribution): StatusBarItem;
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
+  registerSave(save: () => Promise<void>): () => void;
   provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void;
   setViewBadge(view: string, badge: ViewBadge | null): void;
   isAllowed(name: string): boolean;
