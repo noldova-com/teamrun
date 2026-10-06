@@ -30,11 +30,11 @@ test.describe("200% zoom", () => {
     await desktop.zoomAsync(2, 960);
   });
 
-  test("the window row, the status bar and the tab bars keep every control inside the window and uncovered, and nothing scrolls sideways", async ({ desktop }) => {
+  test("the window row, the status bar and the tab bars keep every control inside the window, uncovered and at least 24 × 24 px or spaced as large, and nothing scrolls sideways", async ({ desktop }) => {
     const window = desktop.window;
 
     expect(await window.evaluate(() => document.documentElement.scrollWidth)).toBe(960);
-    expect(await LayoutFixture.findProblemsAsync(window.locator("tr-window-row, tr-status-bar, tr-tab-group"))).toEqual([]);
+    expect(await LayoutFixture.findProblemsAsync(window.locator("tr-window-row, tr-status-bar, .tr-tab-group-bar"))).toEqual([]);
     await desktop.checkpointAsync("zoom-window");
   });
 
@@ -68,12 +68,11 @@ test.describe("200% zoom", () => {
     const window = desktop.window;
     await SettingsFixture.openAsync(window);
     const settings = window.locator("tr-settings");
-    const fields = await settings.locator("tr-setting-row").count();
 
     expect(await window.evaluate(() => document.documentElement.scrollWidth)).toBe(960);
     expect(await LayoutFixture.findProblemsAsync(settings)).toEqual([]);
     await settings.click({ position: { x: 4, y: 4 } });
-    expect(await LayoutFixture.findFocusProblemsAsync(window, "Tab", fields + 4)).toEqual([]);
+    expect(await LayoutFixture.findFocusProblemsAsync(window, "Tab", await LayoutFixture.countTabStopsAsync(settings))).toEqual([]);
     await desktop.checkpointAsync("zoom-settings");
   });
 });

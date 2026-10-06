@@ -435,9 +435,12 @@ export default class DesktopApplicationFixture {
 
   private async captureZoomedAsync(): Promise<Buffer> {
     const session = await this.window.context().newCDPSession(this.window);
-    const image = await session.send("Page.captureScreenshot", { format: "png" });
-    await session.detach();
-    return Buffer.from(image.data, "base64");
+    try {
+      return Buffer.from((await session.send("Page.captureScreenshot", { format: "png" })).data, "base64");
+    }
+    finally {
+      await session.detach();
+    }
   }
 
   private async readAppearanceAsync(zoom: number): Promise<object> {

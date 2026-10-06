@@ -135,7 +135,7 @@ test.describe("the workflows' checkpoints", () => {
 });
 
 test.describe("the layout checks", () => {
-  test("report a control cut off, outside the window or covered, a region that scrolls sideways or shows no control, and the focus out of view, but not a control scrolled out of its scroll area", async ({ desktop }) => {
+  test("report a control cut off, outside the window, covered or under 24 × 24 px beside another, a region that scrolls sideways or shows no control, and the focus out of view, but not a control scrolled out of its scroll area or a small one spaced as large", async ({ desktop }) => {
     const window = desktop.window;
     await window.evaluate(() => {
       const region = document.createElement("div");
@@ -147,7 +147,10 @@ test.describe("the layout checks", () => {
         "<button style=\"position: absolute; left: -40px; top: 40px; width: 30px; height: 30px\">Outside</button>",
         "<div style=\"position: absolute; left: 0; top: 0; width: 60px; height: 30px; overflow: hidden\"><button style=\"position: absolute; left: 70px; top: 0\">Cut</button></div>",
         "<div style=\"position: absolute; left: 200px; top: 0; width: 50px; height: 30px; overflow-x: auto\"><div style=\"width: 200px\">Wide</div></div>",
-        "<div style=\"position: absolute; left: 300px; top: 0; width: 60px; height: 20px; overflow-y: auto\"><div style=\"height: 40px\"></div><button style=\"width: 50px\">Away</button></div>"
+        "<div style=\"position: absolute; left: 300px; top: 0; width: 60px; height: 20px; overflow-y: auto\"><div style=\"height: 40px\"></div><button style=\"width: 50px\">Away</button></div>",
+        "<button aria-label=\"Small\" style=\"position: absolute; left: 300px; top: 60px; width: 16px; height: 16px; padding: 0\"></button>",
+        "<button aria-label=\"Near\" style=\"position: absolute; left: 316px; top: 60px; width: 30px; height: 30px; padding: 0\"></button>",
+        "<button aria-label=\"Spaced\" style=\"position: absolute; left: 370px; top: 96px; width: 16px; height: 16px; padding: 0\"></button>"
       ].join("");
       const empty = document.createElement("div");
       empty.id = "layout-empty";
@@ -160,6 +163,7 @@ test.describe("the layout checks", () => {
       "button \"Covered\" is covered by div \"\".",
       "button \"Outside\" is outside the window.",
       "button \"Cut\" is cut off by div \"Cut\".",
+      "button \"Small\" is 16 × 16 px, under 24 × 24, and too close to button \"Near\".",
       "div \"\" shows no control."
     ]);
     await window.getByRole("button", { name: "Covered" }).focus();
