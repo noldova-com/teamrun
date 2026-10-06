@@ -119,15 +119,15 @@ export class SettingType {
   public accepts(value: JsonValue): boolean {
     switch (this.kind) {
       case SettingKind.Boolean:
-        return typeof value === "boolean";
+        return Object.isBoolean(value);
       case SettingKind.Choice:
-        return typeof value === "string" && this.options.some(t => t.value === value);
+        return Object.isString(value) && this.options.some(t => t.value === value);
       case SettingKind.Number:
-        return typeof value === "number" && this.isInRange(value);
+        return Object.isNumber(value) && this.isInRange(value);
       case SettingKind.Text:
-        return typeof value === "string" && value.length <= Number(this.maxLength);
+        return Object.isString(value) && value.length <= Number(this.maxLength);
       case SettingKind.Modules:
-        return Array.isArray(value) && value.every(t => typeof t === "string" && !String.isNullOrWhitespace(t)) && new Set(value).size === value.length;
+        return Array.isArray(value) && value.every(t => Object.isString(t) && !String.isNullOrWhitespace(t)) && new Set(value).size === value.length;
       case SettingKind.Action:
         return Object.isNull(value);
       default:

@@ -48,7 +48,7 @@ export class CliOutput {
       return this.writeJson({ commands: list.commands.map(t => ({ name: t.name.text, title: t.title, module: t.name.owner })) });
     const width = Math.max(0, ...list.commands.map(t => t.name.text.length));
     const lines = list.commands.length === 0 ? [Resources.noCommands] : list.commands.map(t => `${t.name.text.padEnd(width)}  ${t.title}`);
-    this.writeLines([...lines, "", Resources.windowCommandsNote]);
+    this.writeLines([...lines, String.empty, Resources.windowCommandsNote]);
   }
 
   public writeResult(value: JsonValue): void {

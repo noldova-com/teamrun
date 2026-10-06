@@ -8,6 +8,8 @@
 
 import { appendFileSync, renameSync, writeFileSync } from "node:fs";
 
+import "@noldova/teamrun-foundation-core";
+
 import { Resources } from "../../resources.js";
 import type { DiagnosticRedactor } from "./diagnostic-redactor.js";
 
@@ -44,7 +46,7 @@ export class LogFile {
 
   public open(): void {
     this.replacePrevious();
-    writeFileSync(this.file, "", { mode: Resources.privateFileMode });
+    writeFileSync(this.file, String.empty, { mode: Resources.privateFileMode });
     this.size = 0;
   }
 

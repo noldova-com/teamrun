@@ -8,6 +8,7 @@
 
 import type { MenuItemConstructorOptions } from "electron";
 
+import "@noldova/teamrun-foundation-core";
 import type { KeyChord } from "@noldova/teamrun-shell-protocol";
 
 import { MenuBarRowType } from "../enums/menu-bar-row-type.js";
