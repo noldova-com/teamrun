@@ -86,6 +86,16 @@ class ScriptTestStateTests {
       ]);
     });
 
+    test("a state written on Windows, whose keys use its separator, names the file with forward slashes and finds its failure", () => {
+      const key = `${path.win32.join("scripts", "tests", "a.test.ts")}:5:5`;
+      const state = JSON.stringify([{ [key]: { name: "fails once", children: [], passed_on_attempt: 1 } }]);
+      const report = `not ok 1 - fails once\n  ---\n  location: '${ScriptTestStateTests.FILE}:5:5'\n  ...`;
+
+      assert.deepEqual(ScriptTestState.readTests(ScriptTestStateTests.ROOT, state, report), [
+        new FlakyTest("Script tests", "scripts/tests/a.test.ts", "fails once", `not ok 1 - fails once\n  ---\n  location: '${ScriptTestStateTests.FILE}:5:5'\n  ...`)
+      ]);
+    });
+
     test("a state that is not JSON, not a list of attempts or has entries that are not tests names no test", () => {
       const entries = { "a:1:1": null, "b:1:1": { name: "no children", passed_on_attempt: 1 }, "c:1:1": { name: "unknown attempt", children: [] }, "d:1:1": { children: [7], passed_on_attempt: 1 } };
 
