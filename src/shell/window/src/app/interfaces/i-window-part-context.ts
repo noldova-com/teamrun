@@ -39,6 +39,7 @@ export interface IWindowPartContext {
   keepDocument(name: string, instance: string): void;
   showInDialogAsync(name: string, options?: IViewDialogOptions): Promise<void>;
   log(message: string): void;
+  openLinkAsync(url: string): Promise<void>;
   requestAsync(method: string, parameters: JsonValue): Promise<JsonValue>;
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
   readSetting(name: string): JsonValue | undefined;

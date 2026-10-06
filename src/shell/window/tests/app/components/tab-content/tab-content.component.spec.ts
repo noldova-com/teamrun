@@ -100,6 +100,7 @@ describe("TabContentComponent", () => {
     showInDialogAsync: () => Promise.resolve(),
     log: () => undefined,
     setTabWorking: () => undefined,
+    openLinkAsync: () => Promise.resolve(),
     isCommandRegistered: () => false,
     runCommandAsync: () => Promise.resolve(null),
     postNotificationAsync: () => Promise.resolve("1"),

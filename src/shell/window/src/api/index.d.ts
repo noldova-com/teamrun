@@ -666,6 +666,27 @@ export interface IWindowPartContext {
   log(message: string): void;
 
   /**
+   * Opens a link in the system's own application, such as a web page in the
+   * person's browser or a new message in their mail app. TeamRun opens only
+   * well-formed http, https and mailto links without credentials, and never
+   * asks first. A click on such a link in the window's content opens it the
+   * same way, unless the part handled the click itself.
+   *
+   * @param url The link to open.
+   * @returns A promise that settles once the system has taken the link; it
+   * rejects when TeamRun refuses the link or the system cannot open it.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function openHelp(context: IWindowPartContext): Promise<void> {
+   *   return context.openLinkAsync("https://example.com/help");
+   * }
+   * ```
+   */
+  openLinkAsync(url: string): Promise<void>;
+
+  /**
    * Calls a method of the module's runtime part or a dependency's.
    *
    * @param method The method's name.

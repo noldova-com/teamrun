@@ -22,6 +22,7 @@ import { FakeDesktopProcess } from "./fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "./fake-desktop-window.fixture.js";
 import { FakeDeviceIdentity } from "./fake-device-identity.fixture.js";
 import { FakeElectron } from "./fake-electron.fixture.js";
+import { FakePathCommand } from "./fake-path-command.fixture.js";
 import { FakeRuntimeLauncher } from "./fake-runtime-launcher.fixture.js";
 
 export class DesktopStartFixture {
@@ -38,12 +39,13 @@ export class DesktopStartFixture {
     process: FakeDesktopProcess,
     launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(),
     device: FakeDeviceIdentity = new FakeDeviceIdentity(),
-    appearance: FakeAppearanceStore = new FakeAppearanceStore()): LaunchSettings[] {
+    appearance: FakeAppearanceStore = new FakeAppearanceStore(),
+    pathCommand: FakePathCommand = new FakePathCommand()): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
     DesktopApplication.start(electron, process, DesktopStartFixture.MODULE_URL, t => {
       settings.push(t);
       return launcher;
-    }, t => device.readAsync(t), t => appearance.create(t));
+    }, t => device.readAsync(t), t => appearance.create(t), t => pathCommand.create(t));
     return settings;
   }
 

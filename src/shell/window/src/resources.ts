@@ -61,12 +61,16 @@ export class Resources {
   public static readonly leadingEdges: readonly PanelEdge[] = [PanelEdge.Left, PanelEdge.Top];
   public static readonly layoutSaveDelay: number = 500;
   public static readonly primaryButton: number = 0;
+  public static readonly middleButton: number = 1;
   public static readonly escapeKey: string = "Escape";
   public static readonly pointerMoveEvent: "pointermove" = "pointermove";
   public static readonly pointerUpEvent: "pointerup" = "pointerup";
   public static readonly pointerCancelEvent: "pointercancel" = "pointercancel";
   public static readonly keyDownEvent: "keydown" = "keydown";
   public static readonly blurEvent: "blur" = "blur";
+  public static readonly clickEvent: "click" = "click";
+  public static readonly auxClickEvent: "auxclick" = "auxclick";
+  public static readonly linkSelector: string = "a[href]";
   public static readonly draggingClass: string = "tr-tab-dragging";
   public static readonly dropGroupSelector: string = "[data-drop-group]";
   public static readonly dropGroupData: string = "dropGroup";
@@ -206,6 +210,9 @@ export class Resources {
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
+  public static readonly installCommandCommand: string = "shell.installCommand";
+  public static readonly installCommandTitle: string = "Install command in PATH";
+  public static readonly installCommandGlyph: string = "terminal";
   public static readonly openModulesCommand: string = "shell.openModules";
   public static readonly openModulesTitle: string = "Modules…";
   public static readonly modulesDocument: string = "shell.modules";
@@ -242,6 +249,7 @@ export class Resources {
   public static readonly noKey: string = "No key";
   public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
+  public static readonly noLanguagesNote: string = "No spelling languages are offered on this device.";
   public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
@@ -606,6 +614,7 @@ export class Resources {
   public static readonly toolbarMenuKey: string = "ContextMenu";
   public static readonly toolbarMenuShiftKey: string = "F10";
   public static readonly settingsGroup: string = "shell.settings";
+  public static readonly commandLineGroup: string = "shell.commandLine";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";
   public static readonly contextInput: string = "context";
@@ -613,6 +622,7 @@ export class Resources {
   public static readonly invalidModuleId: string = "A module id is lowercase kebab-case.";
   public static readonly windowPartLoadFailed: string = "Its window part could not be loaded.";
   public static readonly windowPartActivationFailed: string = "Its window part failed to activate.";
+  public static readonly linkNotOpened: string = `${productName} did not open the link: it opens only well-formed http, https and mailto links, in the system's own application.`;
   public static readonly windowPartReconnectionFailed: string = "Its window part failed to continue after the runtime started again.";
   public static readonly windowPartSaveFailed: string = `Its window part failed to save while ${productName} was closing.`;
   public static readonly windowPartSaveFailedLate: string = `Its window part failed to save after ${productName} stopped waiting for it.`;

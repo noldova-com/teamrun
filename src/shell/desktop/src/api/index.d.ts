@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Stats } from "node:fs";
 import type { Writable } from "node:stream";
 
 import type {
@@ -76,6 +77,36 @@ export declare enum QuitChoice {
    * Keep TeamRun open.
    */
   Cancel = "Cancel"
+}
+
+/**
+ * What installing the command on the macOS PATH did.
+ */
+export declare enum PathCommandOutcome {
+  /**
+   * The link now points to the command inside the app.
+   */
+  Installed = "Installed",
+
+  /**
+   * The link already pointed to the command inside this app, so nothing changed.
+   */
+  AlreadyInstalled = "AlreadyInstalled",
+
+  /**
+   * A file that is not a link has the link's name; it is left alone.
+   */
+  Occupied = "Occupied",
+
+  /**
+   * This build has no command to link, as in a development start.
+   */
+  Missing = "Missing",
+
+  /**
+   * The person cancelled the system's administrator prompt.
+   */
+  Cancelled = "Cancelled"
 }
 
 /**
@@ -1036,7 +1067,7 @@ export interface IClipboardHost {
 }
 
 /**
- * Opens files and folders in the system's own application, as Electron's `shell` provides it.
+ * Opens files, folders and links in the system's own application, as Electron's `shell` provides it.
  */
 export interface IShellHost {
   /**
@@ -1054,6 +1085,23 @@ export interface IShellHost {
    * ```
    */
   openPath(path: string): Promise<string>;
+
+  /**
+   * Opens a link in the system's own application, such as a web page in the browser.
+   *
+   * @param url The link to open, one that `LinkPolicy.findAllowed` allowed.
+   * @returns A promise that settles once the system has taken the link.
+   * @throws Error asynchronously when the system cannot open it.
+   * @example
+   * ```ts
+   * import type { IShellHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function openDocsAsync(host: IShellHost): Promise<void> {
+   *   await host.openExternal("https://example.com/docs");
+   * }
+   * ```
+   */
+  openExternal(url: string): Promise<void>;
 }
 
 /**
@@ -1890,6 +1938,94 @@ export interface IParentPort {
 }
 
 /**
+ * The file operations {@link PathCommand} links the command with, as Node.js's `fs/promises` provides them.
+ */
+export interface IPathCommandFiles {
+  /**
+   * Reads a file's own status, without following a link.
+   *
+   * @param file The file to read.
+   * @returns Its status; rejects with an error whose `code` is `ENOENT` when nothing is there.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isLinkAsync(files: IPathCommandFiles, file: string): Promise<boolean> {
+   *   return (await files.lstat(file)).isSymbolicLink();
+   * }
+   * ```
+   */
+  lstat(file: string): Promise<Stats>;
+
+  /**
+   * Reads where a link points.
+   *
+   * @param link The link to read.
+   * @returns The path it points to.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function targetAsync(files: IPathCommandFiles): Promise<string> {
+   *   return files.readlink("/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  readlink(link: string): Promise<string>;
+
+  /**
+   * Removes a file or a link.
+   *
+   * @param file The file to remove.
+   * @returns A promise that settles once it is removed.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function unlinkAsync(files: IPathCommandFiles): Promise<void> {
+   *   return files.rm("/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  rm(file: string): Promise<void>;
+
+  /**
+   * Makes a folder and any folders above it that are missing.
+   *
+   * @param folder The folder to make.
+   * @param options Always recursive.
+   * @returns The first folder it made, or `undefined` when all were there.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function prepareAsync(files: IPathCommandFiles): Promise<void> {
+   *   await files.mkdir("/usr/local/bin", { recursive: true });
+   * }
+   * ```
+   */
+  mkdir(folder: string, options: { readonly recursive: true }): Promise<string | undefined>;
+
+  /**
+   * Makes a link.
+   *
+   * @param target The path the link points to.
+   * @param link The link to make.
+   * @returns A promise that settles once the link is made; rejects with an error whose `code` of `EACCES` or `EPERM`
+   * makes {@link PathCommand.installAsync} ask for an administrator.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function linkAsync(files: IPathCommandFiles): Promise<void> {
+   *   return files.symlink("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  symlink(target: string, link: string): Promise<void>;
+}
+
+/**
  * An Electron utility process, as the desktop uses one.
  */
 export interface IUtilityProcess {
@@ -1980,7 +2116,7 @@ export interface IElectron {
   readonly clipboard: IClipboardHost;
 
   /**
-   * The system's file manager, for opening the log folder.
+   * The system's file manager and browser, for opening the log folder and links.
    */
   readonly shell: IShellHost;
 
@@ -2898,10 +3034,12 @@ export declare class DesktopApplication {
    * @param createAppearanceStore Creates the store of this device's last appearance preferences in the same folder. The
    * desktop reads them before it opens a window, so the window's first frame already has them, and keeps those the
    * window reports.
+   * @param createPathCommand Creates the service that links the command line on the macOS PATH for the program the
+   * desktop runs from; the window's "Install command in PATH" command runs it and shows what happened.
    * @example
    * ```ts
    * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
-   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron } from "@noldova/teamrun-shell-desktop";
+   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
    *
    * export function launch(electron: IElectron, process: IDesktopProcess): void {
    *   DesktopApplication.start(
@@ -2910,7 +3048,8 @@ export declare class DesktopApplication {
    *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
    *     t => new RuntimeLauncher(t, RuntimeBuild.identity),
    *     t => DeviceIdentity.readOrCreateAsync(t),
-   *     t => new AppearanceStore(t));
+   *     t => new AppearanceStore(t),
+   *     t => PathCommand.forBundle(t, () => Promise.resolve()));
    * }
    * ```
    */
@@ -2920,7 +3059,8 @@ export declare class DesktopApplication {
     moduleUrl: string,
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
-    createAppearanceStore: (folder: string) => IAppearanceStore): void;
+    createAppearanceStore: (folder: string) => IAppearanceStore,
+    createPathCommand: (executablePath: string) => PathCommand): void;
 }
 
 /**
@@ -3115,6 +3255,26 @@ export declare class RuntimeStartup {
 }
 
 /**
+ * Decides which links TeamRun opens in the system's own application: well-formed http, https and mailto links without
+ * credentials, at most 32768 characters long.
+ */
+export declare class LinkPolicy {
+  /**
+   * Finds the link to open for a URL the window asked to open.
+   *
+   * @param url The URL as the window sent it; any value.
+   * @returns The link in its normalized form, or `null` for any other value, scheme or a URL that does not parse.
+   * @example
+   * ```ts
+   * import { LinkPolicy } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const link: string | null = LinkPolicy.findAllowed("https://example.com/docs");
+   * ```
+   */
+  public static findAllowed(url: unknown): string | null;
+}
+
+/**
  * Decides which frames may use the bridge: only the main frame of the window's own page.
  */
 export declare class SenderPolicy {
@@ -3256,6 +3416,102 @@ export declare class SystemNotifier {
    * ```
    */
   public receive(broadcast: NotificationBroadcast): void;
+}
+
+/**
+ * Puts the command line on the macOS PATH by linking a folder on it, `/usr/local/bin`, to the command inside the app
+ * bundle. When the folder cannot be written, it asks for an administrator through the system's prompt.
+ */
+export declare class PathCommand {
+  /**
+   * Creates the service for one command and one link.
+   *
+   * @param target The command inside the app bundle.
+   * @param link The link to make on the PATH.
+   * @param files The file operations it links with.
+   * @param runProgramAsync Runs a program to its end, for the system's administrator prompt, and rejects with an error
+   * whose message holds the program's standard error when it fails; `(-128)` in it means the person cancelled.
+   * @example
+   * ```ts
+   * import { lstat, mkdir, readlink, rm, symlink } from "node:fs/promises";
+   *
+   * import { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const command: PathCommand = new PathCommand("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun",
+   *   { lstat, readlink, rm, mkdir, symlink }, () => Promise.resolve());
+   * ```
+   */
+  public constructor(target: string, link: string, files: IPathCommandFiles, runProgramAsync: (program: string, args: readonly string[]) => Promise<void>);
+
+  /**
+   * The link this service makes.
+   *
+   * @example
+   * ```ts
+   * import type { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(command: PathCommand): string {
+   *   return `The command line is linked at ${command.linkPath}.`;
+   * }
+   * ```
+   */
+  public get linkPath(): string;
+
+  /**
+   * Creates the service for the bundle the desktop runs from, with Node.js's file operations: the command is
+   * `Contents/Resources/bin/teamrun` and the link `/usr/local/bin/teamrun`.
+   *
+   * @param executablePath The program the desktop runs from, in `Contents/MacOS`.
+   * @param runProgramAsync Runs a program to its end, for the system's administrator prompt, and rejects with an error
+   * whose message holds the program's standard error when it fails; `(-128)` in it means the person cancelled.
+   * @returns The service.
+   * @example
+   * ```ts
+   * import { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const command: PathCommand = PathCommand.forBundle("/Applications/TeamRun.app/Contents/MacOS/TeamRun", () => Promise.resolve());
+   * ```
+   */
+  public static forBundle(executablePath: string, runProgramAsync: (program: string, args: readonly string[]) => Promise<void>): PathCommand;
+
+  /**
+   * Links the command on the PATH. A link to elsewhere is replaced; a file that is not a link is left alone. When the
+   * link's folder cannot be written or read, the system's administrator prompt makes the folder and the link, and
+   * leaves alone a file that is not a link, which it finds there with administrator rights.
+   *
+   * @returns A promise of what happened.
+   * @throws PathCommandException, through the promise, when the link cannot be read or made, or the administrator
+   * prompt fails for another reason than the person cancelling it.
+   * @example
+   * ```ts
+   * import { type PathCommand, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isLinkedAsync(command: PathCommand): Promise<boolean> {
+   *   const outcome = await command.installAsync();
+   *   return outcome === PathCommandOutcome.Installed || outcome === PathCommandOutcome.AlreadyInstalled;
+   * }
+   * ```
+   */
+  public installAsync(): Promise<PathCommandOutcome>;
+}
+
+/**
+ * The exception thrown when the command cannot be linked on the macOS PATH.
+ */
+export declare class PathCommandException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { PathCommandException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: PathCommandException = new PathCommandException("The teamrun command could not be linked at /usr/local/bin/teamrun.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
 }
 
 /**

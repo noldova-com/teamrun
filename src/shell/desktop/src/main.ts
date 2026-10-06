@@ -6,8 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { homedir } from "node:os";
+import { promisify } from "node:util";
 
 import { BrowserWindow, Menu, Notification, app, clipboard, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
 
@@ -18,6 +19,7 @@ import { Resources } from "./resources.js";
 import { AppearanceStore } from "./services/appearance-store.js";
 import { DesktopApplication } from "./services/desktop-application.js";
 import { DeviceIdentity } from "./services/device-identity.js";
+import { PathCommand } from "./services/path-command.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
 
 const starter = process.platform === Resources.windowsPlatform ? new UtilityProcessStarter(utilityProcess) : new ChildProcessStarter();
@@ -58,4 +60,7 @@ DesktopApplication.start(
   import.meta.url,
   t => new RuntimeLauncher(t, RuntimeBuild.identity, starter),
   t => DeviceIdentity.readOrCreateAsync(t),
-  t => new AppearanceStore(t));
+  t => new AppearanceStore(t),
+  t => PathCommand.forBundle(t, async (program, args) => {
+    await promisify(execFile)(program, [...args]);
+  }));

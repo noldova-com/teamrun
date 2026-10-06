@@ -37,6 +37,8 @@ export { NotificationState } from "../models/notification-state.js";
 export { NotificationUpdate } from "../models/notification-update.js";
 export { NotificationsQuery } from "../models/notifications-query.js";
 export { PreShellData } from "../models/pre-shell-data.js";
+export { ProgramStatus } from "../models/program-status.js";
+export { ProgramStatusList } from "../models/program-status-list.js";
 export { QualifiedName } from "../models/qualified-name.js";
 export { RecentCommandUse } from "../models/recent-command-use.js";
 export { RecentCommands } from "../models/recent-commands.js";
