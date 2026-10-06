@@ -8,6 +8,7 @@
 
 export default interface IBuildTargetOptions {
   readonly runsOnPullRequests: boolean;
+  readonly runsInMergeGroups: boolean;
   readonly runsSmokeOnPullRequests: boolean;
   readonly runsUiOnPushes: boolean;
   readonly uiShardCount: number;

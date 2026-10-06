@@ -17,6 +17,7 @@ export default class BuildTarget {
   public readonly runner: string;
   public readonly architecture: string;
   public readonly runsOnPullRequests: boolean;
+  public readonly runsInMergeGroups: boolean;
   public readonly runsSmokeOnPullRequests: boolean;
   public readonly runsUiOnPushes: boolean;
   public readonly uiShardCount: number;
@@ -26,6 +27,7 @@ export default class BuildTarget {
     this.runner = runner;
     this.architecture = architecture;
     this.runsOnPullRequests = options.runsOnPullRequests;
+    this.runsInMergeGroups = options.runsInMergeGroups;
     this.runsSmokeOnPullRequests = options.runsSmokeOnPullRequests;
     this.runsUiOnPushes = options.runsUiOnPushes;
     this.uiShardCount = options.uiShardCount;
