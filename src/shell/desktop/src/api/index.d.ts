@@ -507,16 +507,17 @@ export interface IDesktopProcess {
    * @param executablePath The program.
    * @param args Its arguments: the start's data directory, user data and
    * device directory arguments, so the newer build opens the same data.
+   * @param onFailure Called with the reason when the program cannot be started.
    * @example
    * ```ts
    * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
    *
-   * export function handOver(process: IDesktopProcess): void {
-   *   process.startDetached("/opt/teamrun/teamrun", ["--data-dir=/home/person/work-data"]);
+   * export function handOver(process: IDesktopProcess, log: (text: string) => void): void {
+   *   process.startDetached("/opt/teamrun/teamrun", ["--data-dir=/home/person/work-data"], t => log(String(t)));
    * }
    * ```
    */
-  startDetached(executablePath: string, args: readonly string[]): void;
+  startDetached(executablePath: string, args: readonly string[], onFailure: (error: Error) => void): void;
 
   /**
    * Ends another process at once, for a window's page that did not stop when asked.
@@ -4446,18 +4447,20 @@ export declare class ChildProgramHost implements IProgramHost {
    * @param file The program, by its full path.
    * @param programArguments The program's arguments.
    * @param environment The program's environment.
+   * @param onFailure Called with the reason when the program cannot be started: a `LaunchException` on Linux when
+   * `/bin/bash` is not executable or `/proc/self/fd` cannot be read, or the error the system gives elsewhere. On Linux
+   * the program starts through Bash, which reports nothing back when the program itself is missing.
    * @throws {ArgumentException} When the program's path is empty or whitespace.
-   * @throws {LaunchException} On Linux, when `/bin/bash` is not executable or `/proc/self/fd` cannot be read.
    * @example
    * ```ts
    * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
    *
-   * export function handOver(programs: ChildProgramHost, executablePath: string): void {
-   *   programs.startDetached(executablePath, ["--data-dir=/home/person/work-data"], process.env);
+   * export function handOver(programs: ChildProgramHost, executablePath: string, log: (text: string) => void): void {
+   *   programs.startDetached(executablePath, ["--data-dir=/home/person/work-data"], process.env, t => log(String(t)));
    * }
    * ```
    */
-  public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): void;
+  public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onFailure: (error: Error) => void): void;
 }
 
 /**

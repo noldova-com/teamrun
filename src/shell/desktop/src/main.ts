@@ -57,7 +57,7 @@ DesktopApplication.start(
     errorOutput: process.stderr,
     processId: process.pid,
     programs,
-    startDetached: (path, args) => programs.startDetached(path, args, process.env),
+    startDetached: (path, args, onFailure) => programs.startDetached(path, args, process.env, onFailure),
     endProcess: t => process.kill(t, "SIGKILL"),
     onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),
     onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)

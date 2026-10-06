@@ -64,9 +64,13 @@ export class ChildProgramHost implements IProgramHost {
     return new StartedProgram(() => child.kill());
   }
 
-  public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): void {
-    const command = new ProcessLaunchCommand(this.platform, file, programArguments, environment, null);
-    spawn(command.executable, [...command.arguments], { env: environment, detached: true, stdio: "ignore" }).unref();
+  public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onFailure: (error: Error) => void): void {
+    const command = this.commandFor(file, programArguments, environment, onFailure);
+    if (Object.isNull(command))
+      return;
+    const child = spawn(command.executable, [...command.arguments], { env: environment, detached: true, stdio: "ignore" });
+    child.on(Resources.errorEvent, onFailure);
+    child.unref();
   }
 
   private commandFor(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onFailure: (error: LaunchException) => void): ProcessLaunchCommand | null {

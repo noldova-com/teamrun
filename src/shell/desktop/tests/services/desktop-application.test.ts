@@ -797,6 +797,20 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async logsAHandOverWhoseNewerBuildCannotStartAndQuits(): Promise<void> {
+    const handover = new RuntimeHandoverException(new RuntimeHandover(new BuildIdentity("2.0.0", 1, "newer"), "/opt/teamrun/teamrun"));
+    const process = new FakeDesktopProcess("linux", ["/opt/teamrun/teamrun-1", "--data-dir=/work/data"]);
+    process.startFailure = new Error("spawn /opt/teamrun/teamrun ENOENT");
+    const electron = new FakeElectron(true, true);
+    DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(handover));
+    await DesktopStartFixture.openAsync(electron);
+    await Condition.waitAsync(() => electron.app.calls.includes("quit"));
+
+    Assert.areEqual(JSON.stringify(["The newer TeamRun could not be started for the hand-over, so this one quits without it: Error: spawn /opt/teamrun/teamrun ENOENT"]),
+      JSON.stringify(DesktopStartFixture.readErrors(process, "The newer TeamRun")));
+  }
+
+  @TestMethod
   public saysANewerBuildRunsWhenADevelopmentBuildCannotHandOver(): Promise<void> {
     const handover = new RuntimeHandoverException(new RuntimeHandover(new BuildIdentity("2.0.0", 1, "newer"), "/electron/electron"));
     return DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(handover)).then(electron => {

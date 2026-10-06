@@ -32,7 +32,7 @@ export class ChildProgramHostTests {
     "let started = '';",
     "await new Promise(resolve => host.start('/bin/ls', ['/proc/self/fd'], process.env, t => started += t, resolve));",
     "const { existsSync, readFileSync } = await import('node:fs');",
-    "host.startDetached('/bin/sh', ['-c', 'ls /proc/self/fd > \"$0.part\" && mv \"$0.part\" \"$0\"', process.argv[3]], process.env);",
+    "host.startDetached('/bin/sh', ['-c', 'ls /proc/self/fd > \"$0.part\" && mv \"$0.part\" \"$0\"', process.argv[3]], process.env, () => undefined);",
     "for (let i = 0; i < 250 && !existsSync(process.argv[3]); i++) await new Promise(resolve => setTimeout(resolve, 20));",
     "const detached = readFileSync(process.argv[3], 'utf8');",
     "process.stdout.write([ran, started, detached].map(t => t.trim().split(/\\s+/).join(',')).join('|'));"
@@ -80,7 +80,7 @@ export class ChildProgramHostTests {
     const folder = await mkdtemp(path.join(tmpdir(), "teamrun-detached-"));
     const file = path.join(folder, "started");
     try {
-      new ChildProgramHost(process.platform, 5000).startDetached(process.execPath, ["-e", "require('node:fs').writeFileSync(process.argv[1], process.env.HANDOVER_ANSWER)", file], { ...process.env, HANDOVER_ANSWER: "handed over" });
+      new ChildProgramHost(process.platform, 5000).startDetached(process.execPath, ["-e", "require('node:fs').writeFileSync(process.argv[1], process.env.HANDOVER_ANSWER)", file], { ...process.env, HANDOVER_ANSWER: "handed over" }, () => undefined);
 
       await Condition.waitAsync(() => existsSync(file) && readFileSync(file, "utf8").length > 0);
       Assert.areEqual("handed over", readFileSync(file, "utf8"));
@@ -88,6 +88,20 @@ export class ChildProgramHostTests {
     finally {
       await rm(folder, { recursive: true, force: true });
     }
+  }
+
+  @TestMethod
+  public async reportsADetachedProgramThatCannotStart(): Promise<void> {
+    const failures: Error[] = [];
+    {
+      using _bash = new MissingBashFixture();
+      new ChildProgramHost("linux", 5000).startDetached("/opt/teamrun/teamrun", [], process.env, t => failures.push(t));
+    }
+    new ChildProgramHost("win32", 5000).startDetached(MISSING, [], process.env, t => failures.push(t));
+
+    await Condition.waitAsync(() => failures.length === 2);
+    Assert.areEqual("Starting a program on Linux requires executable Bash at /bin/bash. Install Bash or restore its execute permissions.", failures[0]?.message);
+    Assert.areEqual(`spawn ${MISSING} ENOENT`, failures[1]?.message);
   }
 
   @PlatformFixture.linuxOnly()

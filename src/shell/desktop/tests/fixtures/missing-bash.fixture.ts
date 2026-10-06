@@ -19,7 +19,7 @@ export class MissingBashFixture implements Disposable {
     fs.accessSync = (target: fs.PathLike, mode?: number): void => {
       if (String(target) === MissingBashFixture.BASH)
         throw Object.assign(new Error(`EACCES: permission denied, access '${MissingBashFixture.BASH}'`), { code: "EACCES" });
-      Reflect.apply(accessSync, fs, [target, mode]);
+      accessSync(target, mode);
     };
     syncBuiltinESMExports();
   }
