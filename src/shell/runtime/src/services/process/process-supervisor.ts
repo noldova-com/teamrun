@@ -65,9 +65,9 @@ export class ProcessSupervisor {
     environment: NodeJS.ProcessEnv,
     command: SystemCommand,
     diagnostics: Writable,
+    windows: IWindowsProcessApi,
     settings: ProcessSettings = new ProcessSettings(),
-    clock: ProcessClock = ProcessClock.create(process.platform),
-    windows: IWindowsProcessApi = new WindowsProcessApi()) {
+    clock: ProcessClock = ProcessClock.create(process.platform)) {
     this.platform = platform;
     this.environment = environment;
     this.records = new ProcessRecordStore(database);
@@ -76,6 +76,17 @@ export class ProcessSupervisor {
     this.ender = ProcessEnderFactory.create(platform, command, windows, settings, clock);
     this.diagnostics = diagnostics;
     this.seenMilliseconds = settings.seenMilliseconds;
+  }
+
+  public static create(
+    database: ShellDatabase,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    command: SystemCommand,
+    diagnostics: Writable,
+    settings: ProcessSettings = new ProcessSettings(),
+    clock: ProcessClock = ProcessClock.create(process.platform)): ProcessSupervisor {
+    return new ProcessSupervisor(database, platform, environment, command, diagnostics, new WindowsProcessApi(), settings, clock);
   }
 
   public get programs(): readonly RunningProgram[] {

@@ -75,7 +75,7 @@ Production behavior belongs to classes representing named concepts under section
   A dispatcher is permitted only at a genuine runtime-dynamic boundary (parsing an external tool's events, decoding wire messages) and is narrow, named, and tested as such.
 - Declaration merging and prototype additions are confined to `src/foundation`.
   Reuse its existing behavior; review and test additions here, without requiring an external private repository.
-- Production packages use the foundation Core's additions to the global `Object` and `String` constructors: value checks are `Object.isUndefined`, `Object.isNull`, `Object.isNullOrUndefined`, `Object.isString`, `Object.isNumber`, `Object.isBoolean`, `Object.isObject`, `Object.isFunction`, `String.isNullOrEmpty`, and `String.isNullOrWhitespace`; the empty string is `String.empty`.
+- Production packages use the foundation Core's additions to the global `Object` and `String` constructors: value checks are `Object.isUndefined`, `Object.isNull`, `Object.isNullOrUndefined`, `Object.isString`, `Object.isNumber`, `Object.isBigInt`, `Object.isBoolean`, `Object.isObject`, `Object.isFunction`, `String.isNullOrEmpty`, and `String.isNullOrWhitespace`; the empty string is `String.empty`.
   Production consumers use these instead of `=== undefined`, `=== null`, `typeof x === "..."`, or `""`.
   A file that uses them imports `@noldova/teamrun-foundation-core`, usually as `import "@noldova/teamrun-foundation-core";`, and not with `import type`.
   The foundation implementations themselves use the host language's operations, and their declarations must preserve TypeScript narrowing.

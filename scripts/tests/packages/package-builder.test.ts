@@ -59,7 +59,7 @@ class PackageBuilderTests {
       await repository.writeAsync({ "src/foundation/alpha/src/native/probe.c": "probe source\n" });
       const layout = new BuildLayout(repository.directory);
       const manifest = new PackageManifest("src/foundation/alpha", "@noldova/teamrun-foundation-alpha", [], "[]", ["probe"]);
-      const addons = new WindowsAddonBuilder(layout, new NodeGypFixture(), "win32");
+      const addons = new WindowsAddonBuilder(layout, new NodeGypFixture(), "win32", "x64");
 
       await PackageBuilderTests.createBuilder(layout, new NpmCommand(new ProcessRunner(), process.env), addons).buildSourceAsync(manifest, [layout.locateArchive(manifest, "0.0.7")]);
 
@@ -164,7 +164,7 @@ class PackageBuilderTests {
     return repository;
   }
 
-  private static createBuilder(layout: BuildLayout, npm: NpmCommand, addons: WindowsAddonBuilder = new WindowsAddonBuilder(layout, new NodeGypFixture(), "linux")): PackageBuilder {
+  private static createBuilder(layout: BuildLayout, npm: NpmCommand, addons: WindowsAddonBuilder = new WindowsAddonBuilder(layout, new NodeGypFixture(), "linux", "x64")): PackageBuilder {
     return new PackageBuilder(layout, PackageBuilderTests.ROOT, new PackageVersions("0.0.7", new Map()), new ProcessRunner(), npm, addons);
   }
 }

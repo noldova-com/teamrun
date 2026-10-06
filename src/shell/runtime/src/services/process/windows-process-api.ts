@@ -20,31 +20,38 @@ export class WindowsProcessApi implements IWindowsProcessApi {
   private addon: IWindowsProcessApi | null = null;
 
   public listProcesses(): readonly (readonly [number, number])[] {
-    return this.load().listProcesses();
+    return WindowsProcessApi.expect(this.load().listProcesses(), t => Array.isArray(t)
+      && t.every(row => Array.isArray(row) && row.length === Resources.windowsProcessRowLength && row.every(id => Object.isNumber(id))));
   }
 
   public openProcess(processId: number, access: number): bigint | number {
-    return this.load().openProcess(processId, access);
+    return WindowsProcessApi.expect(this.load().openProcess(processId, access), t => Object.isBigInt(t) || Object.isNumber(t));
   }
 
   public readCreationTime(handle: bigint): bigint | null {
-    return this.load().readCreationTime(handle);
+    return WindowsProcessApi.expect(this.load().readCreationTime(handle), t => Object.isBigInt(t) || Object.isNull(t));
   }
 
   public readImagePath(handle: bigint): string | null {
-    return this.load().readImagePath(handle);
+    return WindowsProcessApi.expect(this.load().readImagePath(handle), t => Object.isString(t) || Object.isNull(t));
   }
 
   public terminateProcess(handle: bigint): boolean {
-    return this.load().terminateProcess(handle);
+    return WindowsProcessApi.expect(this.load().terminateProcess(handle), t => Object.isBoolean(t));
   }
 
   public hasExited(handle: bigint): boolean {
-    return this.load().hasExited(handle);
+    return WindowsProcessApi.expect(this.load().hasExited(handle), t => Object.isBoolean(t));
   }
 
   public closeHandle(handle: bigint): void {
-    this.load().closeHandle(handle);
+    WindowsProcessApi.expect(this.load().closeHandle(handle), t => Object.isUndefined(t));
+  }
+
+  private static expect<T>(value: T, isExpected: (value: unknown) => boolean): T {
+    if (!isExpected(value))
+      throw new AddonLoadException(Resources.addonUnexpected);
+    return value;
   }
 
   private static require(): IWindowsProcessApi {

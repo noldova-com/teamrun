@@ -9,9 +9,11 @@
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 
+import { ProcessClockFixture } from "../../fixtures/process-clock.fixture.js";
 import { ProcessSupervisorFixture } from "../../fixtures/process-supervisor.fixture.js";
 import { SettingsFixture } from "../../fixtures/settings.fixture.js";
 import { SimulatedProcessesFixture } from "../../fixtures/simulated-processes.fixture.js";
+import { SystemCommandFixture } from "../../fixtures/system-command.fixture.js";
 import { WindowsProcessApiFixture } from "../../fixtures/windows-process-api.fixture.js";
 
 @TestClass
@@ -44,5 +46,26 @@ export class WindowsProcessTableReaderTests {
       `900402 ${WindowsProcessApiFixture.QUERY},900403 ${WindowsProcessApiFixture.QUERY},900404 ${WindowsProcessApiFixture.QUERY},900405 ${WindowsProcessApiFixture.QUERY}`,
       windows.opened.slice(0, 4).join(","));
     Assert.areEqual("The module notes's program tool (process 900401): An earlier runtime left processes 900405 running, so they were ended.\n", settings.diagnostics.text);
+  }
+
+  @TestMethod
+  public async leavesOutAProcessCreatedAfterItReadTheClockEvenWhenTheListEndsLaterOnWindows(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    using simulated = new SimulatedProcessesFixture();
+    const now = 1_000_000;
+    const clock = new ProcessClockFixture(now);
+    settings.database.run(ProcessSupervisorFixture.INSERT, "notes", 900_401, "tool", "C:\\Tools\\tool.exe", clock.boot, now - 10_000, now - 10_000, now - 1_000, clock.offset());
+    simulated.add(900_402, 0);
+    const windows = new WindowsProcessApiFixture([() => {
+      clock.time = now + 10;
+      return `900402\t900401\t${now + 5}\tC:\\Tools\\reused.exe`;
+    }]);
+    const processes = ProcessSupervisorFixture.create(settings, "win32", { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, new SystemCommandFixture([]), clock, windows);
+
+    await processes.cleanUpAsync();
+
+    Assert.areEqual("", simulated.signals.join(","));
+    Assert.isTrue(simulated.isAlive(900_402));
+    Assert.areEqual(0, windows.openHandles);
   }
 }

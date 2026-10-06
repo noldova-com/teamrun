@@ -23,19 +23,22 @@ export default class WindowsAddonBuilder {
   private static readonly PROJECT_FILE: string = "binding.gyp";
   private static readonly BUILT_SEGMENTS: readonly string[] = ["build", "Release"];
   private static readonly NODE_API_VERSION: number = 8;
-  private static readonly REBUILD_ARGUMENTS: readonly string[] = ["rebuild", "--loglevel=error", "--devdir"];
+  private static readonly REBUILD_ARGUMENTS: readonly string[] = ["rebuild", "--loglevel=error", "--enable-lto=false", "--enable-thin-lto=false", "--devdir"];
   private static readonly NO_TOOLCHAIN: string = "Could not find any Visual Studio installation to use";
   private static readonly NAME_SEPARATOR: string = "-";
   private static readonly TARGET_SEPARATOR: string = "_";
+  private static readonly ARM64: string = "arm64";
 
   private readonly layout: BuildLayout;
   private readonly nodeGyp: NodeGyp;
   private readonly platform: string;
+  private readonly architecture: string;
 
-  public constructor(layout: BuildLayout, nodeGyp: NodeGyp, platform: string) {
+  public constructor(layout: BuildLayout, nodeGyp: NodeGyp, platform: string, architecture: string) {
     this.layout = layout;
     this.nodeGyp = nodeGyp;
     this.platform = platform;
+    this.architecture = architecture;
   }
 
   public async buildAsync(manifest: PackageManifest, output: string): Promise<void> {
@@ -59,12 +62,17 @@ export default class WindowsAddonBuilder {
     const result = await this.nodeGyp.runAsync([...WindowsAddonBuilder.REBUILD_ARGUMENTS, this.layout.nodeGypFolder], work);
     if (!result.isSuccessful)
       throw new PackageException(result.text.includes(WindowsAddonBuilder.NO_TOOLCHAIN)
-        ? `Building ${manifest.name}'s Windows addon ${addon} needs the "Desktop development with C++" workload of Visual Studio or the Visual Studio Build Tools, 2022 or later, and node-gyp found no Visual Studio with it. Install the workload and run npm run build again.`
+        ? `Building ${manifest.name}'s Windows addon ${addon} needs ${this.describeToolchain()}, and node-gyp found no Visual Studio with it. Install it and run npm run build again.`
         : `Building ${manifest.name}'s Windows addon ${addon} failed with exit code ${result.exitCode}:\n${result.text}`);
 
     await mkdir(path.join(output, WindowsAddonBuilder.OUTPUT_FOLDER), { recursive: true });
     await copyFile(
       path.join(work, ...WindowsAddonBuilder.BUILT_SEGMENTS, `${target}${WindowsAddonBuilder.ADDON_EXTENSION}`),
       path.join(output, WindowsAddonBuilder.OUTPUT_FOLDER, `${addon}${WindowsAddonBuilder.ADDON_EXTENSION}`));
+  }
+
+  private describeToolchain(): string {
+    const workload = "the \"Desktop development with C++\" workload of Visual Studio or the Visual Studio Build Tools, 2022 or later";
+    return this.architecture === WindowsAddonBuilder.ARM64 ? `${workload}, with its C++ ARM64 build tools component` : workload;
   }
 }

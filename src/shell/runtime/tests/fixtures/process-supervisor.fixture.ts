@@ -72,7 +72,7 @@ export class ProcessSupervisorFixture {
   }
 
   public static createSeeing(settings: SettingsFixture): ProcessSupervisor {
-    return new ProcessSupervisor(settings.database, process.platform, process.env, new SystemCommand(), settings.diagnostics, new ProcessSettings(300, 500, 20));
+    return ProcessSupervisor.create(settings.database, process.platform, process.env, new SystemCommand(), settings.diagnostics, new ProcessSettings(300, 500, 20));
   }
 
   public static create(
@@ -82,6 +82,8 @@ export class ProcessSupervisorFixture {
     command: SystemCommand = new SystemCommand(),
     clock: ProcessClock = ProcessClock.create(process.platform),
     windows?: WindowsProcessApiFixture): ProcessSupervisor {
-    return new ProcessSupervisor(settings.database, platform, environment, command, settings.diagnostics, new ProcessSettings(300, 500), clock, windows);
+    return Object.isUndefined(windows)
+      ? ProcessSupervisor.create(settings.database, platform, environment, command, settings.diagnostics, new ProcessSettings(300, 500), clock)
+      : new ProcessSupervisor(settings.database, platform, environment, command, settings.diagnostics, windows, new ProcessSettings(300, 500), clock);
   }
 }

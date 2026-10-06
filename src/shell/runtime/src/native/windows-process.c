@@ -9,13 +9,14 @@
 #define WIN32_LEAN_AND_MEAN
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <windows.h>
 #include <tlhelp32.h>
 #include <node_api.h>
 
 #define IMAGE_PATH_LENGTH 32768
 #define MESSAGE_LENGTH 160
-#define TERMINATED_EXIT_CODE 1
+#define TERMINATED_EXIT_CODE 0xFFFFFFFF
 
 static napi_value fail(napi_env env) {
   bool is_pending = false;
@@ -149,14 +150,22 @@ static napi_value read_creation_time(napi_env env, napi_callback_info info) {
 
 static napi_value read_image_path(napi_env env, napi_callback_info info) {
   HANDLE handle;
-  WCHAR path[IMAGE_PATH_LENGTH];
+  WCHAR *path;
   DWORD length = IMAGE_PATH_LENGTH;
-  napi_value result;
+  napi_value result = NULL;
   if (!read_handle(env, info, &handle))
     return NULL;
+  path = malloc(IMAGE_PATH_LENGTH * sizeof(WCHAR));
+  if (path == NULL) {
+    napi_throw_error(env, NULL, "The Windows process addon could not allocate memory for an executable's path.");
+    return NULL;
+  }
   if (!QueryFullProcessImageNameW(handle, 0, path, &length))
-    return to_null(env);
-  return napi_create_string_utf16(env, (const char16_t *)path, length, &result) == napi_ok ? result : fail(env);
+    result = to_null(env);
+  else if (napi_create_string_utf16(env, (const char16_t *)path, length, &result) != napi_ok)
+    result = fail(env);
+  free(path);
+  return result;
 }
 
 static napi_value terminate_process(napi_env env, napi_callback_info info) {

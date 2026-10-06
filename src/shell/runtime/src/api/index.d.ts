@@ -2068,8 +2068,11 @@ export interface IProcessStarter {
 }
 
 /**
- * The Windows functions the runtime reads the process table and ends processes with. Each call returns at once, and creating an implementation loads
- * nothing, so a supervisor can be created on any platform.
+ * The system calls a {@link ProcessSupervisor} makes on Windows to read the
+ * process table and end processes. {@link ProcessSupervisor.create} passes
+ * the system's own functions, called through the runtime's Windows addon.
+ * Each call returns at once, and creating an implementation loads nothing, so
+ * a supervisor can be created on any platform.
  */
 export interface IWindowsProcessApi {
   /**
@@ -6296,20 +6299,20 @@ export declare class ProcessSupervisor {
    * @param command Reads the process table on macOS and Linux.
    * @param diagnostics The runtime's log, which receives the programs that
    * had to be killed or could not be ended.
+   * @param windows The system calls the supervisor makes on Windows to read
+   * the process table and end processes. {@link ProcessSupervisor.create}
+   * passes the system's own functions, called through the runtime's Windows
+   * addon.
    * @param settings How long programs may take to end.
    * @param clock The clock that times programs' starts and names the boot;
    * {@link ProcessClock.create} for the platform this process runs on by
    * default.
-   * @param windows Reads the process table and ends processes on Windows.
-   * Defaults to the system's own functions, called through the runtime's
-   * Windows addon, which loads at its first use and throws an
-   * {@link AddonLoadException} when it cannot.
    * @example
    * ```ts
-   * import { ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { type IWindowsProcessApi, ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
    *
-   * export function createSupervisor(database: ShellDatabase): ProcessSupervisor {
-   *   return new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), process.stderr, new ProcessSettings());
+   * export function createSupervisor(database: ShellDatabase, windows: IWindowsProcessApi): ProcessSupervisor {
+   *   return new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), process.stderr, windows, new ProcessSettings());
    * }
    * ```
    */
@@ -6319,9 +6322,45 @@ export declare class ProcessSupervisor {
     environment: NodeJS.ProcessEnv,
     command: SystemCommand,
     diagnostics: Writable,
+    windows: IWindowsProcessApi,
     settings?: ProcessSettings,
-    clock?: ProcessClock,
-    windows?: IWindowsProcessApi);
+    clock?: ProcessClock);
+
+  /**
+   * Creates the supervisor the runtime runs with, which on Windows reads the
+   * process table and ends processes through the system's own functions,
+   * called through the runtime's Windows addon. The addon loads at its first
+   * use, and a call throws an {@link AddonLoadException} when it cannot load
+   * or returns a value this runtime does not expect.
+   *
+   * @param database The shell's database, which holds the records.
+   * @param platform The platform, as in `process.platform`.
+   * @param environment The runtime's environment, which programs inherit from.
+   * @param command Reads the process table on macOS and Linux.
+   * @param diagnostics The runtime's log, which receives the programs that
+   * had to be killed or could not be ended.
+   * @param settings How long programs may take to end.
+   * @param clock The clock that times programs' starts and names the boot;
+   * {@link ProcessClock.create} for the platform this process runs on by
+   * default.
+   * @returns The supervisor.
+   * @example
+   * ```ts
+   * import { ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createSupervisor(database: ShellDatabase): ProcessSupervisor {
+   *   return ProcessSupervisor.create(database, process.platform, process.env, new SystemCommand(), process.stderr);
+   * }
+   * ```
+   */
+  public static create(
+    database: ShellDatabase,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    command: SystemCommand,
+    diagnostics: Writable,
+    settings?: ProcessSettings,
+    clock?: ProcessClock): ProcessSupervisor;
 
   /**
    * The programs running, in the order they started, then the programs that

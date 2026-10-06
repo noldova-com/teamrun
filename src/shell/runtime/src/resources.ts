@@ -570,6 +570,8 @@ export class Resources {
   public static readonly windowsAddonFunctions: readonly string[] = ["listProcesses", "openProcess", "readCreationTime", "readImagePath", "terminateProcess", "hasExited", "closeHandle"];
   public static readonly addonLoadFailed: string = "The runtime could not load its Windows addon, native/windows-process.node.";
   public static readonly addonIncomplete: string = "The runtime's Windows addon, native/windows-process.node, lacks functions this runtime calls; it comes from another build.";
+  public static readonly addonUnexpected: string = "The runtime's Windows addon, native/windows-process.node, returned a value this runtime does not expect; it comes from another build.";
+  public static readonly windowsProcessRowLength: number = 2;
   public static readonly fileTimeUnitsPerMillisecond: bigint = 10_000n;
   public static readonly fileTimeEpochMilliseconds: number = 11_644_473_600_000;
   public static readonly processGraceMilliseconds: number = 3_000;

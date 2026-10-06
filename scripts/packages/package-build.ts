@@ -46,14 +46,18 @@ export default class PackageBuild {
   private readonly modules: ModuleCatalog;
   private readonly runner: ProcessRunner;
   private readonly environment: NodeJS.ProcessEnv;
+  private readonly platform: string;
+  private readonly architecture: string;
 
-  public constructor(root: string, runner: ProcessRunner, environment: NodeJS.ProcessEnv) {
+  public constructor(root: string, runner: ProcessRunner, environment: NodeJS.ProcessEnv, platform: string, architecture: string) {
     this.layout = new BuildLayout(root);
     this.catalog = new PackageCatalog(root);
     this.product = new BuildProduct(root);
     this.modules = new ModuleCatalog(root);
     this.runner = runner;
     this.environment = environment;
+    this.platform = platform;
+    this.architecture = architecture;
   }
 
   public async buildAsync(output: Writable, variant: BuildVariant, outputFolder: string | null = null): Promise<readonly PackageManifest[]> {
@@ -65,7 +69,7 @@ export default class PackageBuild {
     const versions = await PackageVersions.readAsync(this.modules, rootManifest.productVersion, packages);
     const archives = packages.map(t => this.layout.locateArchive(t, versions.of(t.name)));
     const common = await this.hashCommonInputsAsync();
-    const addons = new WindowsAddonBuilder(this.layout, new NodeGyp(this.runner, this.environment), process.platform);
+    const addons = new WindowsAddonBuilder(this.layout, new NodeGyp(this.runner, this.environment), this.platform, this.architecture);
     const builder = new PackageBuilder(this.layout, rootManifest, versions, this.runner, new NpmCommand(this.runner, this.environment), addons);
     const archiveHashes = new Map<string, string>();
     for (const manifest of packages) {
@@ -179,7 +183,7 @@ export default class PackageBuild {
   }
 
   private async hashCommonInputsAsync(): Promise<string> {
-    const parts: string[] = [];
+    const parts: string[] = [this.platform, this.architecture];
     for (const folder of PackageBuild.TOOL_FOLDERS)
       parts.push(await ContentHash.ofTreeAsync(folder));
     for (const file of PackageBuild.ROOT_INPUTS)

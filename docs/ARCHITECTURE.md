@@ -789,10 +789,12 @@ The window's own layout is the exception: a failed save of the layout is logged 
   [Packaging](#packaging) describes the packaged layout.
 - Compile, package and install through one reproducible path.
   Tests and the window consume fresh installed artifacts, detecting stale inputs.
+  The platform and the processor are inputs too, because a package's archive can differ by both.
 - On Windows, `npm run build` compiles each Windows addon a package's manifest lists, with the node-gyp that npm bundles, for the machine's own processor, and puts it in the package's archive as `native/<name>.node`; other platforms build none.
   node-gyp downloads the headers of the Node.js that runs the build once into `_build/node-gyp` and checks them against Node.js's published checksums.
+  The build turns off the link-time optimization that Node.js's own release build records, which node-gyp would otherwise pass on to Visual Studio's compiler and linker, and which they reject.
   An addon uses only Node-API, whose interface stays the same across Node.js and Electron versions, and node-gyp's delay-load hook binds it to the program that loads it, so the same file runs under Node.js in the tests and under TeamRun's program.
-  The build needs Visual Studio's "Desktop development with C++" workload, and stops with a message naming it when node-gyp finds no Visual Studio with it.
+  The build needs Visual Studio's "Desktop development with C++" workload, with its C++ ARM64 build tools on an ARM64 machine, and stops with a message naming them when node-gyp finds no Visual Studio with them.
   The [coding standards](CODING-STANDARDS.md#package-organization) own an addon's source.
   The coding standards own public declarations and documentation.
 - The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires.
@@ -904,7 +906,7 @@ Each target is packaged on its own platform and processor.
   | CookieEncryption | off | TeamRun keeps no cookies: the window loads from `file://` and signs in nowhere. With the fuse on, the cookie key would live in the macOS Keychain or the Linux keyring, which can ask the person for access, and again after each update of an unsigned build. It turns on when TeamRun shows web content or signs in. |
   | LoadBrowserProcessSpecificV8Snapshot | off | The program has no snapshot of its own. |
 - **Tools.** electron-builder downloads its packaging tools into `_build/package/tool-cache` and checks each against the SHA-256 it pins.
-  Packages are unsigned; signing is a separate step, which signs the Windows addons along with the program.
+  Packages are unsigned; the separate signing step that [#326](https://github.com/noldova-com/teamrun/issues/326) adds will sign the Windows addons along with the program.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
 
 ### Publication

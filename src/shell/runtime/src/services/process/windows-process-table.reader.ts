@@ -29,8 +29,8 @@ export class WindowsProcessTableReader implements IProcessTableReader {
   }
 
   public async readAsync(): Promise<ProcessTable> {
-    const listed = this.api.listProcesses();
     const taken = this.clock.now();
+    const listed = this.api.listProcesses();
     return new ProcessTable(listed.flatMap(([processId, parentId]) => {
       const entry = this.read(processId, parentId);
       return Object.isNull(entry) || entry.started > taken ? [] : [entry];
