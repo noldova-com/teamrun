@@ -7,14 +7,16 @@ LICENSE file in the root directory of this source tree.
 -->
 
 @if (hasHeader()) {
-  <div class="tr-configuration-table-header">
+  <div class="tr-configuration-table-header" [class.tr-configuration-table-header-explained]="isExplanationLeading()">
     @if (heading()) {
       <div class="tr-configuration-table-heading" role="heading" [attr.aria-level]="level()">{{ heading() }}</div>
+    } @else if (isExplanationLeading()) {
+      <p class="tr-configuration-table-explanation">{{ explanation() }}</p>
     }
     <div class="tr-configuration-table-actions"><ng-content select="[trConfigurationTableAction]" /></div>
   </div>
 }
-@if (explanation()) {
+@if (explanation() && !isExplanationLeading()) {
   <p class="tr-configuration-table-explanation">{{ explanation() }}</p>
 }
 <div class="tr-configuration-table-scroll"><ng-content /></div>

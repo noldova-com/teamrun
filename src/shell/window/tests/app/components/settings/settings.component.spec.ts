@@ -344,7 +344,7 @@ describe("SettingsComponent", () => {
       await edges("Appearance", "tr-setting-row"),
       await edges("Appearance", ".tr-settings-group-title"),
       await edges("Clock", "tr-setting-row"),
-      await edges("Keyboard shortcuts", "tr-shortcuts table"),
+      await edges("Keyboard shortcuts", "tr-shortcuts tr-configuration-table"),
       await edges("Gallery", ".fake-gallery")
     ];
     const lists = widths.map(t => {
