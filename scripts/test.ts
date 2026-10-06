@@ -51,6 +51,7 @@ import TestOptions from "./test-options.ts";
 import TestOptionsException from "./test-options.exception.ts";
 import TestPart from "./test-part.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
+import RunnerTotals from "./totals/runner-totals.ts";
 
 export default class Test {
   private static readonly USAGE: string = "Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] [--rerun-failed] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] [--rerun-failed] | [--part <part>] --checks-only [--repeat <count>]]\n";
@@ -62,6 +63,7 @@ export default class Test {
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
   private static readonly API_TIMEOUT: number = 300_000;
   private static readonly API_PARTS: readonly string[] = ["src/shell/ui", "src/shell/window"];
+  private static readonly RUNNERS: readonly string[] = [PackageTestCheck.RUNNER, ScriptTestCheck.RUNNER, AngularTestCheck.RUNNER];
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
@@ -113,6 +115,7 @@ export default class Test {
     if (notice !== null)
       this.output.write(notice);
 
+    await RunnerTotals.clearAsync(this.root);
     let summary = Test.SUMMARY_HEADER;
     let failures = 0;
     for (const check of checks) {
@@ -124,6 +127,11 @@ export default class Test {
         failures++;
     }
 
+    const totals = await RunnerTotals.readAllAsync(this.root, Test.RUNNERS);
+    if (totals.length > 0) {
+      this.output.write(`\nTest totals\n${totals.map(t => t.formatLine()).join("")}`);
+      summary += `\n${RunnerTotals.formatTable(totals)}`;
+    }
     this.output.write(`\n${checks.length - failures} of ${checks.length} checks passed.\n`);
     await this.writeSummaryAsync(summary);
     return failures === 0 ? 0 : 1;

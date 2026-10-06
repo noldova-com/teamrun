@@ -41,7 +41,8 @@
               "modules/*/window/src/**/*.ts"
             ],
             "coverageReporters": [
-              "text"
+              "text",
+              "json-summary"
             ],
             "coverageThresholds": {
               "statements": 100,
