@@ -172,6 +172,7 @@ export default class Test {
     const { default: ApiCatalog } = await import("./api/api-catalog.ts");
     const { default: ApiServer } = await import("./api/api-server.ts");
     const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
+    const { default: ApiDocumentationCheck } = await import("./checks/api-documentation-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
@@ -196,6 +197,7 @@ export default class Test {
       new PackageTestCheck(this.root, build, this.runner, this.environment),
       new TypeCheck(this.root, this.runner),
       new ApiDeclarationCheck(this.root, apis, server, Test.API_TIMEOUT),
+      new ApiDocumentationCheck(this.root, apis, server, Test.API_TIMEOUT),
       new ApiExampleCheck(this.root, apis, this.runner, server, Test.API_TIMEOUT),
       new ScriptTestCheck(this.root, build, this.runner, this.environment),
       new AngularTestCheck(angular),

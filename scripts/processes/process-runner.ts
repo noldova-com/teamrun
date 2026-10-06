@@ -7,18 +7,22 @@
  */
 
 import { spawn } from "node:child_process";
-import { createWriteStream } from "node:fs";
+import { closeSync, createWriteStream, openSync } from "node:fs";
+import path from "node:path";
 import type { Writable } from "node:stream";
 
 import ProcessResult from "./process-result.ts";
 import ProcessException from "./process.exception.ts";
+import StartedProcess from "./started-process.ts";
 
 export default class ProcessRunner {
   private static readonly OUTPUT_LIMIT: number = 16 * 1024 * 1024;
+  private static readonly MISSING_PROCESS_CODE: string = "ESRCH";
+  private static readonly KILL_SIGNAL: NodeJS.Signals = "SIGKILL";
 
-  public captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number): Promise<ProcessResult> {
+  public captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
     return new Promise<ProcessResult>((resolve, reject) => {
-      const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+      const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, env: environment ?? process.env });
       const output: Buffer[] = [];
       const errorOutput: Buffer[] = [];
       let size = 0;
@@ -48,12 +52,36 @@ export default class ProcessRunner {
     });
   }
 
+  public async requireAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<void> {
+    const result = await this.captureAsync(command, commandArguments, directory, timeout, environment);
+    if (!result.isSuccessful)
+      throw new ProcessException(`${path.basename(command)} ${commandArguments.join(" ")} failed with exit code ${result.exitCode}:\n${result.text}`);
+  }
+
   public runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
     return new Promise<number | null>((resolve, reject) => {
       const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: "inherit", env: environment ?? process.env });
       child.on("error", t => reject(new ProcessException(`"${command}" could not start.`, { cause: t })));
       child.on("close", t => resolve(t));
     });
+  }
+
+  public startAsync(command: string, commandArguments: readonly string[], directory: string, log: string): Promise<StartedProcess> {
+    return new Promise<StartedProcess>((resolve, reject) => {
+      const file = openSync(log, "w");
+      const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: ["ignore", file, file] });
+      closeSync(file);
+      child.once("error", t => reject(new ProcessException(`"${command}" could not start.`, { cause: t })));
+      child.once("spawn", () => resolve(new StartedProcess(child)));
+    });
+  }
+
+  public isRunning(processId: number): boolean {
+    return ProcessRunner.signal(processId, 0);
+  }
+
+  public kill(processId: number): void {
+    ProcessRunner.signal(processId, ProcessRunner.KILL_SIGNAL);
   }
 
   public runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string, output: Writable, errorOutput: Writable): Promise<number | null> {
@@ -70,5 +98,17 @@ export default class ProcessRunner {
       child.on("error", t => failure = new ProcessException(`"${command}" could not start.`, { cause: t }));
       child.on("close", t => file.end(() => failure === null ? resolve(t) : reject(failure)));
     });
+  }
+
+  private static signal(processId: number, signal: NodeJS.Signals | 0): boolean {
+    try {
+      process.kill(processId, signal);
+      return true;
+    }
+    catch (error) {
+      if (error instanceof Error && "code" in error && error.code === ProcessRunner.MISSING_PROCESS_CODE)
+        return false;
+      throw error;
+    }
   }
 }

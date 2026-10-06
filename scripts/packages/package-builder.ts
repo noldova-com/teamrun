@@ -92,7 +92,7 @@ export default class PackageBuilder {
 
   private static require(result: ProcessResult, operation: string): void {
     if (!result.isSuccessful)
-      throw new PackageException(`${operation} failed with exit code ${result.exitCode}:\n${`${result.output}${result.errorOutput}`.trim()}`);
+      throw new PackageException(`${operation} failed with exit code ${result.exitCode}:\n${result.text}`);
   }
 
   private async compileAsync(manifest: PackageManifest, folder: string, output: string): Promise<void> {

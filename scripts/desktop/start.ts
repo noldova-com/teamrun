@@ -13,10 +13,10 @@ import type { Writable } from "node:stream";
 import ProcessRunner from "../processes/process-runner.ts";
 import DevelopmentBinary from "./development-binary.ts";
 import SandboxHelper from "./sandbox-helper.ts";
+import TeamRunCommand from "./teamrun.ts";
 
 export default class Start {
   public static readonly MAIN_SEGMENTS: readonly string[] = ["node_modules", "@noldova", "teamrun-shell-desktop", "main.js"];
-  private static readonly RUN_AS_NODE_VARIABLE: string = "ELECTRON_RUN_AS_NODE";
   private static readonly FAILURE_EXIT_CODE: number = 1;
 
   private readonly root: string;
@@ -38,7 +38,7 @@ export default class Start {
       report.write(problem);
       return Start.FAILURE_EXIT_CODE;
     }
-    const launched = Object.fromEntries(Object.entries(environment).filter(([name]) => name !== Start.RUN_AS_NODE_VARIABLE));
+    const launched = Object.fromEntries(Object.entries(environment).filter(([name]) => name !== TeamRunCommand.RUN_AS_NODE_VARIABLE));
     const exitCode = await this.runner.runAsync(executable, [path.join(this.root, ...Start.MAIN_SEGMENTS), ...commandArguments], this.root, launched);
     return exitCode ?? Start.FAILURE_EXIT_CODE;
   }

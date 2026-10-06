@@ -55,6 +55,9 @@ jobs:
           macOS x64|macos-15-intel|x64
           macOS ARM64|macos-15|arm64
           TARGETS
+          for target in 'Linux x64' 'Windows x64'; do
+            labels="$labels,\"packaging $target\""
+          done
           echo "legs=[$legs]" >> "$GITHUB_OUTPUT"
           echo "labels=[$labels]" >> "$GITHUB_OUTPUT"
 
@@ -254,9 +257,15 @@ jobs:
           if-no-files-found: ignore
           overwrite: true
 
+  package:
+    name: Package
+    uses: ./.github/workflows/package.yml
+    with:
+      nightly: true
+
   report:
     name: Report the failures
-    needs: [plan, repeat]
+    needs: [plan, repeat, package]
     if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

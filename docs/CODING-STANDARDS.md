@@ -154,7 +154,7 @@ The Angular parts are not packages, but the kit and the window are APIs other pa
 Every public callable signature documents:
 
 - `@param` for each parameter: purpose, accepted inputs, constraints, units, defaults and callback obligations as applicable, beyond its name/type.
-- `@returns` for non-void results: meaning, ownership, ordering, absence and asynchronous completion as applicable; omitted for constructors.
+- `@returns` for non-void results: meaning, ownership, ordering, absence and asynchronous completion as applicable; omitted for constructors. A `never` result or an `asserts` signature needs a `@throws` instead, and may also have a `@returns`.
 - `@throws` for contractual failures: type, trigger and synchronous throw versus promise rejection; no invented contracts or empty tags.
 - `@example` for normal and boundary usage. Overloads of one callable share their examples; examples compile or run during verification. Each `@example` is a ```` ```ts ```` code block that imports the package by name, as a consumer does; an expected-error example marks the line that must fail with `// @ts-expect-error`. `npm test` compiles every example, including those of classes, interfaces and types, and requires one for each public callable.
 
@@ -170,7 +170,7 @@ External references may establish behavior; their prose is not copied. Every JSD
  */
 ```
 
-Automated checks compare packaged declarations with implementation: exports, constructors, parameter/property types, optionality/nullability, generic constraints, overloads, visibility and returns. Check documentation, links and drift; humans review meaning. Compile positive and expected-error consumer examples against the package and test its installed runtime behavior. Breaking changes require an explicit version/compatibility decision.
+Automated checks compare packaged declarations with implementation: exports, constructors, parameter/property types, optionality/nullability, generic constraints, overloads, visibility and returns. `npm test` checks each declaration file against this section's JSDoc presence, `@param`, `@returns` and form rules, and also refuses an empty JSDoc, an empty tag and a `{@link}` that doesn't resolve. Humans review meaning. Compile positive and expected-error consumer examples against the package and test its installed runtime behavior. Breaking changes require an explicit version/compatibility decision.
 
 ## 10. Naming and formatting
 

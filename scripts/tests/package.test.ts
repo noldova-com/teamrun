@@ -122,17 +122,21 @@ class PackageTests {
       assert.equal(unmade.text, `${PackageTests.STAGED}electron-builder finished without making ${path.join(repository.directory, "_build", "package", "out", PackageTests.APP_IMAGE)}.\n`);
     });
 
-    test("a host without packages or a failed packaged build stops packaging before electron-builder runs", async t => {
+    test("a host without packages, a failed packaged build or a module list the build refuses stops packaging before electron-builder runs", async t => {
       const repository = await PackageTests.createAsync(t);
+      const unlisted = await PackageTests.createAsync(t, ["absent"]);
       const builder = new BuilderFixture([PackageTests.APP_IMAGE]);
       const host = new TextOutputFixture();
       const staged = new TextOutputFixture();
+      const modules = new TextOutputFixture();
 
       assert.equal(await new Package(repository.directory, "freebsd", "x64", PackageTests.createStage(repository), builder, {}, host).runAsync([]), 1);
       assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository, [2]), builder, {}, staged).runAsync([]), 1);
+      assert.equal(await new Package(unlisted.directory, "linux", "x64", PackageTests.createStage(unlisted), builder, {}, modules).runAsync([]), 1);
 
       assert.equal(host.text, "Packages are made for windows, macos and linux on x64 and arm64, not for freebsd on x64.\n");
       assert.equal(staged.text, "The packaged build failed with exit code 2.\n");
+      assert.equal(modules.text, "The packaged window holds no Gallery.\nThe build lists the module absent, but src/modules/absent has no module.json.\n");
       assert.deepEqual(builder.runs, []);
     });
 
@@ -168,11 +172,11 @@ class PackageTests {
     return new PackageStage(repository.directory, npm, new PackagedBuild(repository.directory, new PackagedBuildFixture(gallery, exitCodes), gallery, angular));
   }
 
-  private static async createAsync(t: TestContext): Promise<RepositoryFixture> {
+  private static async createAsync(t: TestContext, modules: readonly string[] = []): Promise<RepositoryFixture> {
     const repository = await RepositoryFixture.createAsync();
     t.after(() => repository.disposeAsync());
     assert.ok(PackageTests.archives !== null);
-    await PackageTests.archives.writeSourcesAsync(repository, []);
+    await PackageTests.archives.writeSourcesAsync(repository, modules);
     await repository.writeAsync({
       "node_modules/electron/package.json": JSON.stringify({ name: "electron", version: "44.5.1" }),
       "node_modules/electron/dist/electron": "program\n"

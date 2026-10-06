@@ -20,4 +20,8 @@ export default class ProcessResult {
   public get isSuccessful(): boolean {
     return this.exitCode === 0;
   }
+
+  public get text(): string {
+    return `${this.output}${this.errorOutput}`.trim();
+  }
 }
