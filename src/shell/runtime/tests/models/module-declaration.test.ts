@@ -8,6 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
+import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { DeclarationsFormatException, ModuleDeclaration } from "@noldova/teamrun-shell-runtime";
 
@@ -38,6 +39,25 @@ export class ModuleDeclarationTests {
     Assert.areEqual(0, declaration.listContributions("events").length);
     Assert.areEqual(0, declaration.listContributions("views").length);
     Assert.isNull(windowOnly.runtimePackage);
+  }
+
+  @TestMethod
+  public readsItsCommandLinePackageAndCommandsOrNoneWhenTheyAreLeftOut(): void {
+    const add = { name: "notes.add", summary: "Adds a note.", arguments: [], options: [] };
+    const declaration = ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, cliPackage: "@noldova/teamrun-modules-notes-cli", cliCommands: [add] });
+    const without = ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, cliPackage: null });
+    const commands: JsonValue[] = [add];
+
+    const constructed = new ModuleDeclaration("notes", "1.2.3", "Notes", "Keeps notes.", [], null, new Map(), [], "@noldova/teamrun-modules-notes-cli", commands);
+    commands.push(add);
+
+    Assert.areEqual("@noldova/teamrun-modules-notes-cli", declaration.cliPackage);
+    Assert.areEqual(JSON.stringify([add]), JSON.stringify(declaration.cliCommands));
+    Assert.isNull(without.cliPackage);
+    Assert.areEqual(0, without.cliCommands.length);
+    Assert.isNull(ModuleDeclaration.fromJson(ModuleDeclarationTests.VALID).cliPackage);
+    Assert.areEqual(1, constructed.cliCommands.length);
+    Assert.isNull(new ModuleDeclaration("notes", "1.2.3", "Notes", "Keeps notes.", [], null, new Map()).cliPackage);
   }
 
   @TestMethod
@@ -115,7 +135,9 @@ export class ModuleDeclarationTests {
       [ModuleDeclarationTests.without("dependencies"), "A module declaration's dependencies is missing or invalid."],
       [{ ...ModuleDeclarationTests.VALID, dependencies: [1] }, "A module declaration's dependencies is missing or invalid."],
       [ModuleDeclarationTests.without("runtimePackage"), "A module declaration's runtimePackage is missing or invalid."],
-      [{ ...ModuleDeclarationTests.VALID, runtimePackage: "" }, "A module declaration's runtimePackage is missing or invalid."]
+      [{ ...ModuleDeclarationTests.VALID, runtimePackage: "" }, "A module declaration's runtimePackage is missing or invalid."],
+      [{ ...ModuleDeclarationTests.VALID, cliPackage: " " }, "A module declaration's cliPackage is missing or invalid."],
+      [{ ...ModuleDeclarationTests.VALID, cliCommands: {} }, "A module declaration's cliCommands is missing or invalid."]
     ];
     for (const [value, message] of cases)
       Assert.areEqual(message, Assert.throws(() => ModuleDeclaration.fromJson(value), DeclarationsFormatException).message);

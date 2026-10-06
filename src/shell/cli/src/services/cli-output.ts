@@ -12,6 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type { CommandList } from "@noldova/teamrun-shell-protocol";
 
+import type { CliCommandResult } from "../models/cli-command-result.js";
 import type { CliFailure } from "../models/cli-failure.js";
 import type { StatusReport } from "../models/status-report.js";
 import { Resources } from "../resources.js";
@@ -27,8 +28,10 @@ export class CliOutput {
     this.isJson = isJson;
   }
 
-  public writeUsage(): void {
-    this.output.write(`${Resources.usage}\n`);
+  public writeHelp(help: string): void {
+    if (this.isJson)
+      return this.writeJson({ help });
+    this.output.write(`${help}${Resources.lineEnd}`);
   }
 
   public writeStatus(report: StatusReport): void {
@@ -58,25 +61,33 @@ export class CliOutput {
       this.writeLines([JSON.stringify(value, null, Resources.jsonIndent)]);
   }
 
+  public writeCommandResult(result: CliCommandResult): void {
+    if (this.isJson)
+      return this.writeJson(result.value);
+    if (result.text.length > 0)
+      this.output.write(result.text.endsWith(Resources.lineEnd) ? result.text : `${result.text}${Resources.lineEnd}`);
+  }
+
   public writeOpened(root: string): void {
     if (this.isJson)
       return this.writeJson({ dataDirectory: root });
     this.writeLines([Resources.formatOpened(root)]);
   }
 
-  public writeFailure(failure: CliFailure, withUsage: boolean): void {
+  public writeFailure(failure: CliFailure, usage: string | null): void {
     if (this.isJson) {
-      this.error.write(`${JSON.stringify(failure.toJson())}\n`);
+      this.error.write(`${JSON.stringify(failure.toJson())}${Resources.lineEnd}`);
       return;
     }
-    this.error.write(withUsage ? `${failure.message}\n\n${Resources.usage}\n` : `${failure.message}\n`);
+    const lines = Object.isNull(usage) ? [failure.message] : [failure.message, String.empty, usage];
+    this.error.write(`${lines.join(Resources.lineEnd)}${Resources.lineEnd}`);
   }
 
   private writeJson(value: JsonValue): void {
-    this.output.write(`${JSON.stringify(value)}\n`);
+    this.output.write(`${JSON.stringify(value)}${Resources.lineEnd}`);
   }
 
   private writeLines(lines: readonly string[]): void {
-    this.output.write(`${lines.join("\n")}\n`);
+    this.output.write(`${lines.join(Resources.lineEnd)}${Resources.lineEnd}`);
   }
 }
