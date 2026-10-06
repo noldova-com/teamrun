@@ -9,6 +9,8 @@
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 export class PathCommandException extends Exception {
+  public override readonly name: string = "PathCommandException";
+
   public constructor(message: string, options?: ExceptionOptions) {
     super(message, options);
   }

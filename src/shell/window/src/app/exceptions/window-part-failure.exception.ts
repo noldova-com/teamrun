@@ -9,6 +9,7 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class WindowPartFailureException extends Exception {
+  public override readonly name: string = "WindowPartFailureException";
   public readonly moduleId: string;
 
   public constructor(moduleId: string, message: string, cause: unknown) {

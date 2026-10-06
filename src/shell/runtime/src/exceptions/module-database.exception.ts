@@ -10,6 +10,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class ModuleDatabaseException extends Exception {
+  public override readonly name: string = "ModuleDatabaseException";
+
   public constructor(message: string) {
     super(message);
   }
