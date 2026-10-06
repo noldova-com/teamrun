@@ -9,7 +9,7 @@
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import { ThemeMode } from "../../../src/app/enums/theme-mode";
-import { TreeNode } from "../../../src/app/models/tree-node";
+import { TreeNode } from "../../../src/app/models/tree.node";
 import { AppearanceFixture } from "../../fixtures/appearance.fixture";
 import { MovableTreeHostComponent } from "../../fixtures/movable-tree-host.component";
 import { TreeHarness } from "../../fixtures/tree-harness.fixture";

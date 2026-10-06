@@ -16,7 +16,7 @@ import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
 import RetriedDownload from "../processes/retried-download.ts";
 import type NpmCommand from "../toolchain/npm-command.ts";
-import type ICoverageCount from "../totals/interfaces/coverage-count.ts";
+import type ICoverageCount from "../totals/interfaces/i-coverage-count.ts";
 import JsonFields from "../totals/json-fields.ts";
 import AngularTestReport from "./angular-test-report.ts";
 import AngularTestRun from "./angular-test-run.ts";

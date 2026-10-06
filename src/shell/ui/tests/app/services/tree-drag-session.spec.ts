@@ -11,7 +11,7 @@ import { userEvent } from "vitest/browser";
 
 import { ThemeMode } from "../../../src/app/enums/theme-mode";
 import { DragGesture } from "../../../src/app/models/drag-gesture";
-import { TreeNode } from "../../../src/app/models/tree-node";
+import { TreeNode } from "../../../src/app/models/tree.node";
 import { AppearanceFixture } from "../../fixtures/appearance.fixture";
 import { MotionFixture } from "../../fixtures/motion.fixture";
 import { MovableTreeHostComponent } from "../../fixtures/movable-tree-host.component";

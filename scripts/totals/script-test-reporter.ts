@@ -10,7 +10,7 @@ import path from "node:path";
 import { Transform, type TransformCallback } from "node:stream";
 import type { TestEvent } from "node:test/reporters";
 
-import type IRunnerSkip from "./interfaces/runner-skip.ts";
+import type IRunnerSkip from "./interfaces/i-runner-skip.ts";
 import TestNames from "./test-names.ts";
 
 export default class ScriptTestReporter extends Transform {

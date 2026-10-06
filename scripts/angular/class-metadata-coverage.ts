@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type IVitestPlugin from "./interfaces/vitest-plugin.ts";
-import type IVitestPluginContext from "./interfaces/vitest-plugin-context.ts";
+import type IVitestPlugin from "./interfaces/i-vitest-plugin.ts";
+import type IVitestPluginContext from "./interfaces/i-vitest-plugin-context.ts";
 import MarkedModule from "./marked-module.ts";
 
 export default class ClassMetadataCoverage implements IVitestPlugin {

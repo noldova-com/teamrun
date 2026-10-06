@@ -12,7 +12,7 @@ import type { Readable, Writable } from "node:stream";
 import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
 import { ChildProcessStarter, type IProcessStarter } from "@noldova/teamrun-shell-runtime";
 
-import type { IDesktopOpener } from "../interfaces/desktop-opener.js";
+import type { IDesktopOpener } from "../interfaces/i-desktop-opener.js";
 import { DesktopOpener } from "../services/desktop-opener.js";
 
 export class CliContext {

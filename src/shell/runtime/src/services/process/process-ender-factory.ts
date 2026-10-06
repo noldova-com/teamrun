@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IProcessEnder } from "../../interfaces/process-ender.js";
+import type { IProcessEnder } from "../../interfaces/i-process-ender.js";
 import type { ProcessSettings } from "../../models/process-settings.js";
 import { Resources } from "../../resources.js";
 import type { SystemCommand } from "../commands/system-command.js";

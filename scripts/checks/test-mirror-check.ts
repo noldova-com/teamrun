@@ -15,7 +15,7 @@ import type SourceTree from "../structure/source-tree.ts";
 import TestMirror from "../structure/test-mirror.ts";
 import TypeStripException from "../structure/type-strip.exception.ts";
 import TypeStripper from "../structure/type-stripper.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class TestMirrorCheck implements ICheck {
   private static readonly FIXTURES_FOLDER: string = "fixtures";

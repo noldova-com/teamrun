@@ -11,7 +11,7 @@ import { ModifierFlags, type Project, type Symbol, SymbolFlags } from "typescrip
 import ApiValue from "./api-value.ts";
 import type ApiVisibility from "./api-visibility.ts";
 import ApiException from "./api.exception.ts";
-import type IApiSymbolVisitor from "./interfaces/api-symbol-visitor.ts";
+import type IApiSymbolVisitor from "./interfaces/i-api-symbol-visitor.ts";
 
 export default class ApiSymbolWalker {
   private static readonly CONTAINERS: number = SymbolFlags.Class | SymbolFlags.Interface | SymbolFlags.Module | SymbolFlags.Enum;

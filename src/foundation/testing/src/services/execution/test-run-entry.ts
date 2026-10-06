@@ -20,7 +20,7 @@ import { TestProject } from "../../models/discovery/test-project.js";
 import type { TestRunResult } from "../../models/results/test-run-result.js";
 import { Resources } from "../../resources.js";
 import { TestDiscovery } from "../discovery/test-discovery.js";
-import { GitHubSummaryWriter } from "../reporting/git-hub-summary-writer.js";
+import { GitHubSummaryWriter } from "../reporting/github-summary-writer.js";
 import { TestReportWriter } from "../reporting/test-report-writer.js";
 import { TestExecutor } from "./test-executor.js";
 import { TestRunner } from "./test-runner.js";

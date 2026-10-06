@@ -13,7 +13,7 @@ import ModuleException from "../modules/module.exception.ts";
 import type PackageBuild from "../packages/package-build.ts";
 import PackageException from "../packages/package.exception.ts";
 import ProcessException from "../processes/process.exception.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class PackageCheck implements ICheck {
   private static readonly NO_PACKAGES: string = "No packages under src/.\n";

@@ -9,8 +9,8 @@
 import "@noldova/teamrun-foundation-core";
 
 import { ModuleLoadException } from "../../exceptions/module-load.exception.js";
-import type { IRuntimePart } from "../../interfaces/runtime-part.js";
-import type { IRuntimePartLoader } from "../../interfaces/runtime-part-loader.js";
+import type { IRuntimePart } from "../../interfaces/i-runtime-part.js";
+import type { IRuntimePartLoader } from "../../interfaces/i-runtime-part-loader.js";
 import { Resources } from "../../resources.js";
 
 export class PackageRuntimePartLoader implements IRuntimePartLoader {

@@ -10,7 +10,7 @@ import "@noldova/teamrun-foundation-core";
 import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/teamrun-foundation-exceptions";
 
 import { DiscoveryFormatException } from "../exceptions/discovery-format.exception.js";
-import type { IRuntimeDiscoveryJson } from "../interfaces/runtime-discovery-json.js";
+import type { IRuntimeDiscoveryJson } from "../interfaces/i-runtime-discovery-json.js";
 import { Resources } from "../resources.js";
 
 export class RuntimeDiscovery {

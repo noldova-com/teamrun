@@ -39,6 +39,13 @@ export default class JsonFields {
     return value;
   }
 
+  public number(name: string): number {
+    const value: unknown = Reflect.get(this.value, name);
+    if (typeof value !== "number" || !Number.isFinite(value))
+      throw new TotalsException(`${this.subject} has no number ${name}.`);
+    return value;
+  }
+
   public text(name: string): string {
     const value: unknown = Reflect.get(this.value, name);
     if (typeof value !== "string")

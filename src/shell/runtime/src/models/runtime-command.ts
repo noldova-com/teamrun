@@ -10,7 +10,7 @@ import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { CommandInfo, KeyChord, QualifiedName } from "@noldova/teamrun-shell-protocol";
 
-import type { IMethodHandler } from "../interfaces/method-handler.js";
+import type { IMethodHandler } from "../interfaces/i-method-handler.js";
 import { Resources } from "../resources.js";
 import { Registration } from "./registration.js";
 

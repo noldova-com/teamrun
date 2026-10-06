@@ -10,8 +10,8 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 
-import type { IProcessEnder } from "../../interfaces/process-ender.js";
-import type { IProcessTableReader } from "../../interfaces/process-table-reader.js";
+import type { IProcessEnder } from "../../interfaces/i-process-ender.js";
+import type { IProcessTableReader } from "../../interfaces/i-process-table.reader.js";
 import { ProcessEnding } from "../../models/process-ending.js";
 import type { ProcessRecord } from "../../models/process-record.js";
 import type { ProcessSettings } from "../../models/process-settings.js";

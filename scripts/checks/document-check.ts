@@ -15,7 +15,7 @@ import GitAttributesValidator from "../documents/git-attributes.validator.ts";
 import MarkdownDocument from "../documents/markdown-document.ts";
 import TextFormatValidator from "../documents/text-format.validator.ts";
 import type RepositoryFiles from "../repository/repository-files.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class DocumentCheck implements ICheck {
   private static readonly MARKDOWN_EXTENSION: string = ".md";

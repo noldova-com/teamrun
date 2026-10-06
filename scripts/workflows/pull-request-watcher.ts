@@ -9,7 +9,7 @@
 import ProcessException from "../processes/process.exception.ts";
 import type GitHubApi from "../repository/github-api.ts";
 import GitHubException from "../repository/github.exception.ts";
-import type IWait from "./interfaces/wait.ts";
+import type IWait from "./interfaces/i-wait.ts";
 import type MergeConflictReader from "./merge-conflict.reader.ts";
 import type OpenPullRequest from "./open-pull-request.ts";
 import type PullRequestEvaluator from "./pull-request-evaluator.ts";
