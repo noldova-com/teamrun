@@ -11,6 +11,8 @@ import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
+import type { MessageBoxOptions } from "electron";
+
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
@@ -19,6 +21,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
+import { PathCommandException } from "../exceptions/path-command.exception.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
 import type { IElectron } from "../interfaces/i-electron.js";
@@ -27,6 +30,7 @@ import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
+import { PathCommandOutcome } from "../enums/path-command-outcome.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
 import { WindowErrorAdmission } from "../enums/window-error-admission.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
@@ -45,6 +49,7 @@ import { MenuBarTemplate } from "./menu-bar-template.js";
 import { DeviceIdentity } from "./device-identity.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
 import { OpenWindow } from "./open-window.js";
+import type { PathCommand } from "./path-command.js";
 import { QuitCoordinator } from "./quit-coordinator.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
@@ -80,6 +85,7 @@ export class DesktopApplication {
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly deviceFolder: string;
   private readonly appearanceStore: IAppearanceStore;
+  private readonly createPathCommand: (executablePath: string) => PathCommand;
   private appearance: JsonObject | null = null;
   private readonly windows: Map<number, OpenWindow> = new Map();
   private readonly restored: WeakSet<OpenWindow> = new WeakSet();
@@ -97,8 +103,10 @@ export class DesktopApplication {
     launcher: IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
+    createPathCommand: (executablePath: string) => PathCommand,
     icons: AppIcons) {
     this.electron = electron;
+    this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
     this.deviceFolder = DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument)
       ?? DeviceIdentity.locateFolder(process.platform, process.env, process.homeFolder);
@@ -123,7 +131,8 @@ export class DesktopApplication {
     moduleUrl: string,
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
-    createAppearanceStore: (folder: string) => IAppearanceStore): void {
+    createAppearanceStore: (folder: string) => IAppearanceStore,
+    createPathCommand: (executablePath: string) => PathCommand): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
@@ -149,7 +158,7 @@ export class DesktopApplication {
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
     const application = new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, icons);
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, createPathCommand, icons);
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -199,6 +208,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.readBuildChannel, event => Object.isNull(this.findTrusted(event)) ? null : RuntimeBuild.identity.toJson());
     this.electron.ipcMain.handle(Resources.copyTextChannel, (event, text) => Object.isNull(this.findTrusted(event)) ? false : this.copyText(text));
     this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
+    this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
     this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
       if (this.windows.size === 0)
@@ -511,6 +521,41 @@ export class DesktopApplication {
     if (failure.length > 0)
       this.log.write(Resources.formatLogFolderNotOpened(failure));
     return failure.length === 0;
+  }
+
+  private async installCommandAsync(event: IIpcEvent): Promise<boolean> {
+    const open = this.findTrusted(event);
+    if (Object.isNull(open) || this.process.platform !== Resources.macPlatform)
+      return false;
+    const command = this.createPathCommand(this.process.execPath);
+    let outcome: PathCommandOutcome;
+    try {
+      outcome = await command.installAsync();
+    }
+    catch (error) {
+      if (!(error instanceof PathCommandException))
+        throw error;
+      this.log.write(error.message);
+      await this.electron.dialog.showMessageBox(open.window.id, { type: Resources.warningBoxType, message: Resources.commandNotInstalled, detail: error.message, noLink: true });
+      return false;
+    }
+    if (outcome === PathCommandOutcome.Cancelled)
+      return false;
+    await this.electron.dialog.showMessageBox(open.window.id, DesktopApplication.describeCommand(outcome, command.linkPath));
+    return outcome === PathCommandOutcome.Installed || outcome === PathCommandOutcome.AlreadyInstalled;
+  }
+
+  private static describeCommand(outcome: PathCommandOutcome, link: string): MessageBoxOptions {
+    switch (outcome) {
+      case PathCommandOutcome.Installed:
+        return { type: Resources.infoBoxType, message: Resources.commandInstalled, detail: Resources.formatCommandInstalledDetail(link), noLink: true };
+      case PathCommandOutcome.AlreadyInstalled:
+        return { type: Resources.infoBoxType, message: Resources.commandAlreadyInstalled, detail: Resources.formatCommandAlreadyInstalledDetail(link), noLink: true };
+      case PathCommandOutcome.Occupied:
+        return { type: Resources.warningBoxType, message: Resources.commandNotInstalled, detail: Resources.formatCommandOccupiedDetail(link), noLink: true };
+      default:
+        return { type: Resources.warningBoxType, message: Resources.commandNotInstalled, detail: Resources.commandMissingDetail, noLink: true };
+    }
   }
 
   private createBoundsStore(device: string): RuntimeWindowStateStore {

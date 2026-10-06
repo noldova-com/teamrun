@@ -459,6 +459,12 @@ A release still contains the shell and every module in its list, and an update r
   A `Path` that cannot be read, or is too long for the installer's strings, is left unchanged.
   The [command line's document](../src/shell/cli/README.md#5-installed-teamrun) says what cmd does to its arguments.
   The installer's include is `assets/installer/command-path.nsh`.
+- **Command on the PATH (macOS).** The bundle holds `Contents/Resources/bin/teamrun`, named after the slug.
+  The script follows the links to itself back to the bundle and runs the bundle's program in Node mode with the command line's entry.
+  Nothing is linked at install. The window's `shell.installCommand` command, "Install command in PATH", offered on macOS only and in the app menu, links `/usr/local/bin/teamrun` to it.
+  A link to elsewhere is replaced, and a file that is not a link is left alone.
+  When `/usr/local/bin` cannot be written, the system's administrator prompt makes the folder and the link, and cancelling it changes nothing.
+  The desktop tells the person what happened in a message box.
 - **Installer archive.** The Windows ARM64 installer's archive is compressed with 7-Zip's x86 filter.
   The ARM64 7-Zip that packages it would otherwise choose its ARM64 filter, which the installer's older extractor cannot read, so it would skip every `.exe` and `.dll` and still report success.
 - **Licenses.** `resources/licenses` holds TeamRun's license, the fonts' licenses and the window's third-party licenses. Electron's and Chromium's licenses stay beside the program.

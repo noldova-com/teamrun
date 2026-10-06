@@ -80,7 +80,8 @@ export class ShellMenus {
       Object.values(PanelEdge).map(t => MenuItem.ofCommand(Resources.splitTabCommands[t], {}, Resources.splitLabels[t]))),
     new MenuGroup(Resources.tabDockGroup, Resources.tabDockMenu, false,
       Object.values(DockSide).map(t => MenuItem.ofCommand(Resources.dockTabCommands[t], {}, Resources.dockLabels[t]))),
-    new MenuGroup(Resources.settingsGroup, Resources.appMenu, false, [MenuItem.ofCommand(Resources.openSettingsCommand)])
+    new MenuGroup(Resources.settingsGroup, Resources.appMenu, false, [MenuItem.ofCommand(Resources.openSettingsCommand)]),
+    new MenuGroup(Resources.commandLineGroup, Resources.appMenu, false, [MenuItem.ofCommand(Resources.installCommandCommand)])
   ];
 
   public static of(isMac: boolean): MenuDeclarations {

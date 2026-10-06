@@ -206,6 +206,9 @@ export class Resources {
   public static readonly settingsDocument: string = "shell.settings";
   public static readonly settingsTitle: string = "Settings";
   public static readonly settingsGlyph: string = "settings";
+  public static readonly installCommandCommand: string = "shell.installCommand";
+  public static readonly installCommandTitle: string = "Install command in PATH";
+  public static readonly installCommandGlyph: string = "terminal";
   public static readonly openModulesCommand: string = "shell.openModules";
   public static readonly openModulesTitle: string = "Modules…";
   public static readonly modulesDocument: string = "shell.modules";
@@ -605,6 +608,7 @@ export class Resources {
   public static readonly toolbarMenuKey: string = "ContextMenu";
   public static readonly toolbarMenuShiftKey: string = "F10";
   public static readonly settingsGroup: string = "shell.settings";
+  public static readonly commandLineGroup: string = "shell.commandLine";
   public static readonly windowPartMenusToken: string = "The build's module menus";
   public static readonly placeInput: string = "place";
   public static readonly contextInput: string = "context";
