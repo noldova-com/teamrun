@@ -73,7 +73,7 @@ class TestTests {
         ["Package tests and coverage"],
         ["Script tests and coverage"],
         [
-          "Documents", "License headers", "Test waits", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages",
+          "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages",
           "Script types", "API declarations", "API documentation", "API examples", "Angular tests and coverage", "Packaged build leaves out the Gallery"
         ]
       ]);
