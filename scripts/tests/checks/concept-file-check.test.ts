@@ -96,13 +96,14 @@ class ConceptFileCheckTests {
       ].join("\n"));
     });
 
-    test("a package.json that is missing, not JSON or without a scripts object fails the check before it reads any script", async t => {
+    test("a package.json that is missing, not a JSON object or with scripts that are not an object fails the check before it reads any script, and one without scripts exempts no file", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({ "scripts/shapes/pair.ts": "class Pair {}\ninterface IPair {}\n" });
-      const expected = `package.json: could not be read as JSON with a scripts object, which names the files that keep their own names${ConceptFileCheckTests.RULE}\n`;
+      const rule = ConceptFileCheckTests.RULE;
+      const expected = `package.json: is not a JSON object whose scripts, if any, are an object, which name the files that keep their own names${rule}\n`;
 
-      for (const manifest of [null, "not JSON", "null", "[]", "{}", "{ \"scripts\": null }", "{ \"scripts\": \"build\" }", "{ \"scripts\": [] }"]) {
+      for (const manifest of [null, "not JSON", "null", "[]", "{ \"scripts\": null }", "{ \"scripts\": \"build\" }", "{ \"scripts\": [] }"]) {
         if (manifest === null)
           await rm(path.join(repository.directory, "package.json"), { force: true });
         else
@@ -112,6 +113,11 @@ class ConceptFileCheckTests {
         assert.equal(await ConceptFileCheckTests.createCheck(repository).runAsync(output), false, String(manifest));
         assert.equal(output.text, expected, String(manifest));
       }
+      await repository.writeAsync({ "package.json": "{}\n" });
+      const output = new TextOutputFixture();
+
+      assert.equal(await ConceptFileCheckTests.createCheck(repository).runAsync(output), false);
+      assert.equal(output.text, `scripts/shapes/pair.ts: declares 2 concepts, Pair, IPair${rule}\nChecked the concepts and file names of 1 production scripts.\n`);
     });
 
     test("a TypeScript API that cannot start fails the check with its reason, and any other error reaches the caller", async t => {

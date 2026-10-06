@@ -51,7 +51,7 @@ export default class ConceptFileCheck implements ICheck {
   public async runAsync(output: Writable): Promise<boolean> {
     const commands = await this.readCommandsAsync();
     if (commands === null) {
-      output.write(`${ConceptFileCheck.MANIFEST}: has no scripts object, which names the files that keep their own names; ${ConceptFileCheck.RULE}\n`);
+      output.write(`${ConceptFileCheck.MANIFEST}: is not a JSON object whose scripts, if any, are an object, which name the files that keep their own names; ${ConceptFileCheck.RULE}\n`);
       return false;
     }
 
@@ -121,7 +121,11 @@ export default class ConceptFileCheck implements ICheck {
     catch {
       return null;
     }
-    const scripts = typeof manifest === "object" && manifest !== null && ConceptFileCheck.SCRIPTS in manifest ? Reflect.get(manifest, ConceptFileCheck.SCRIPTS) : null;
+    if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest))
+      return null;
+    if (!(ConceptFileCheck.SCRIPTS in manifest))
+      return [];
+    const scripts: unknown = Reflect.get(manifest, ConceptFileCheck.SCRIPTS);
     if (typeof scripts !== "object" || scripts === null || Array.isArray(scripts))
       return null;
     return Object.values(scripts).filter(t => typeof t === "string").map(t => String(t));
