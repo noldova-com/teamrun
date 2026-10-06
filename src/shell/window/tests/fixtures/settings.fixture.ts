@@ -27,6 +27,8 @@ export class SettingsFixture {
   public static readonly updateChecks: SettingDefinition = SettingsFixture.define("shell.updateChecks", "Check for updates", "When this device looks for a newer version.",
     SettingType.choice([new SettingOption("Automatic", "Automatically"), new SettingOption("AtStart", "Only at start"), new SettingOption("OnRequest", "Only when I ask")]), "Automatic",
     "About", "Updates");
+  public static readonly trayIcon: SettingDefinition = SettingsFixture.define("shell.trayIcon", "Show TeamRun in the tray",
+    "An icon that shows when work is running or notifications are unread.", SettingType.boolean(), true, "Notifications", "In the background");
   public static readonly greeting: SettingDefinition = SettingsFixture.define("clock.greeting", "Greeting", "What the clock says at noon.",
     SettingType.text(20), "Noon", "Clock", "Words");
   public static readonly tickStep: SettingDefinition = SettingsFixture.define("clock.tickStep", "Tick step", "How far each tick moves the clock.",

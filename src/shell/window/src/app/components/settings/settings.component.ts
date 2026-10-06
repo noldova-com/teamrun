@@ -7,7 +7,8 @@
  */
 
 import { NgComponentOutlet, NgTemplateOutlet } from "@angular/common";
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, type Signal, type Type, type WritableSignal, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, PendingTasks, type Signal, type Type, type WritableSignal, afterNextRender, computed, effect, inject, signal,
+  untracked, viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
@@ -53,6 +54,7 @@ export class SettingsComponent {
   private readonly pageTree: Signal<TreeComponent> = viewChild.required(TreeComponent);
   private readonly pageSelect: Signal<ElementRef<HTMLElement>> = viewChild.required("pageSelect", { read: ElementRef<HTMLElement> });
   private readonly pageChooser: Signal<SelectComponent> = viewChild.required("pageSelect", { read: SelectComponent });
+  private readonly isTrayAvailable: WritableSignal<boolean> = signal(true);
   private focusedControl: HTMLElement | null = null;
 
   protected readonly resources: typeof Resources = Resources;
@@ -113,6 +115,8 @@ export class SettingsComponent {
         this.select(page);
       });
     });
+    destroyRef.onDestroy(this.bridge.onTrayAvailable(t => this.isTrayAvailable.set(t)));
+    void inject(PendingTasks).run(() => this.bridge.readTrayAvailableAsync().then(t => this.isTrayAvailable.set(t), (error: unknown) => this.errors.handleError(error)));
     afterNextRender(() => {
       const switched = new ResizeObserver(() => this.keepFocus());
       switched.observe(this.pageList().nativeElement);
@@ -144,6 +148,12 @@ export class SettingsComponent {
 
   protected isMutedModules(definition: SettingDefinition): boolean {
     return definition.name.text === Resources.mutedModulesSetting;
+  }
+
+  protected noteFor(definition: SettingDefinition): string | null {
+    if (definition.type.kind === SettingKind.Languages)
+      return this.spelling.noteFor(this.values().get(definition.name.text));
+    return definition.name.text === Resources.trayIconSetting && !this.isTrayAvailable() ? Resources.noTrayHostNote : null;
   }
 
   protected change(definition: SettingDefinition, value: JsonValue): void {

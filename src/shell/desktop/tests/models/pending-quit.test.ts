@@ -18,9 +18,9 @@ export class PendingQuitTests {
   @TestMethod
   public async asksWithItsNewestWorkWaitingOnlyOnceChosenAndIsAnsweredWhenNoWorkIsLeft(): Promise<void> {
     const prompt = new FakeQuitPrompt();
-    const coordinator = new QuitCoordinator(() => true, () => Promise.resolve(new WorkReport(["Indexing"], 1)), () => Promise.resolve());
+    const coordinator = new QuitCoordinator(() => Promise.resolve(new WorkReport(["Indexing"], 1)));
 
-    const asking = coordinator.confirmAsync(prompt);
+    const asking = coordinator.askAsync(prompt);
     await Condition.waitAsync(() => prompt.shown.length === 1);
     coordinator.receive(new WorkReport(["Indexing", "Saving"], 2));
     coordinator.answer(prompt, QuitChoice.Wait);

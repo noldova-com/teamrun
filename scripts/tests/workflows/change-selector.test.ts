@@ -19,6 +19,8 @@ import SourceTreeFixture from "../fixtures/source-tree.fixture.ts";
 
 class ChangeSelectorTests {
   private static readonly PREFIX: string = "@noldova/teamrun-";
+  private static readonly RELATIVE_IMPORT: RegExp = /(?:\bfrom |^import )"(\.[^"]+)"/gm;
+  private static readonly ANY_IMPORT: RegExp = /(?:\bfrom |^import |\bimport\()["']/m;
   private static readonly PACKAGE_IMPORT: RegExp = /(?:\bfrom |^import )"(@noldova\/teamrun-[a-z-]+)"/gm;
   private static readonly GRAPH: readonly (readonly [string, readonly string[]])[] = [
     ["foundation/core", []],
@@ -78,6 +80,12 @@ class ChangeSelectorTests {
       ChangeSelectorTests.assertSelection(selector.select(["src/shell/cli/tests/models/command.test.ts"], [".gitignore"]), ["shell-cli"], false, true, []);
     });
 
+    test("a source file the build scripts import selects the script tests beside its package's", () => {
+      const selector = ChangeSelectorTests.createSelector();
+
+      ChangeSelectorTests.assertSelection(selector.select(["src/shell/cli/src/models/command-line-names.ts"], []), ["shell-cli"], false, true, undefined);
+    });
+
     test("whatever the selection cannot narrow selects everything with the reason, wherever it is among the changes", () => {
       const selector = ChangeSelectorTests.createSelector();
       const narrow = "src/shell/cli/tests/models/command.test.ts";
@@ -124,6 +132,22 @@ class ChangeSelectorTests {
 
       assert.deepEqual([...imported].filter(t => packages.includes(t)).sort(), ChangeSelector.WINDOW_DEPENDENCIES);
       assert.deepEqual([...imported].filter(t => !packages.includes(t)).sort(), ["@noldova/teamrun-shell-ui", "@noldova/teamrun-shell-window"]);
+    });
+
+    test("the script sources are the source files the build scripts import, and they import nothing themselves", async () => {
+      const directory = path.join(SourceTreeFixture.root, "scripts");
+      const files = (await readdir(directory, { recursive: true })).filter(t => t.endsWith(".ts") && !t.split(path.sep).includes("node_modules"));
+      const imported = new Set<string>();
+      for (const file of files)
+        for (const match of (await readFile(path.join(directory, file), "utf8")).matchAll(ChangeSelectorTests.RELATIVE_IMPORT)) {
+          const target = path.relative(SourceTreeFixture.root, path.resolve(path.dirname(path.join(directory, file)), match[1] ?? "")).split(path.sep).join("/");
+          if (target.startsWith("src/"))
+            imported.add(target);
+        }
+      const sources = await Promise.all(ChangeSelector.SCRIPT_SOURCES.map(t => readFile(path.join(SourceTreeFixture.root, t), "utf8")));
+
+      assert.deepEqual([...imported].sort(), ChangeSelector.SCRIPT_SOURCES);
+      assert.deepEqual(sources.filter(t => ChangeSelectorTests.ANY_IMPORT.test(t)), []);
     });
   }
 

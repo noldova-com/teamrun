@@ -238,6 +238,7 @@ export class Resources {
   public static readonly modeSetting: string = "shell.mode";
   public static readonly spellCheckSetting: string = "shell.spellCheck";
   public static readonly spellCheckLanguagesSetting: string = "shell.spellCheckLanguages";
+  public static readonly trayIconSetting: string = "shell.trayIcon";
   public static readonly languagesField: string = "languages";
   public static readonly fallbackField: string = "fallback";
   public static readonly xField: string = "x";
@@ -271,6 +272,8 @@ export class Resources {
   public static readonly choicePillLimit: number = 4;
   public static readonly noLanguagesNote: string = "No spelling languages are offered on this device.";
   public static readonly macSpellingNote: string = "On macOS the system chooses the spelling languages.";
+  public static readonly noTrayHostNote: string =
+    "This desktop shows no tray icons right now, so the icon appears once it does. On GNOME, turning on the AppIndicator extension adds them.";
 
   public static formatSpellingFallback(language: string): string {
     return `None of this device's languages has a dictionary here, so words are checked in ${language}.`;

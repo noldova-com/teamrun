@@ -8,7 +8,7 @@
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 
-export interface IAppearanceStore {
+export interface IDeviceFileStore {
   readAsync(): Promise<JsonObject | null>;
-  writeAsync(preferences: JsonObject): Promise<void>;
+  writeAsync(value: JsonObject): Promise<void>;
 }

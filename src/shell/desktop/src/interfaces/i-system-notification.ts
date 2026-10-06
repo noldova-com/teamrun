@@ -9,6 +9,7 @@
 export interface ISystemNotification {
   show(): void;
   close(): void;
+  on(event: "show", listener: () => void): unknown;
   on(event: "click", listener: () => void): unknown;
   on(event: "close", listener: () => void): unknown;
   on(event: "failed", listener: (event: unknown, error: string) => void): unknown;

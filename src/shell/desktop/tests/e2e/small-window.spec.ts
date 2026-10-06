@@ -38,7 +38,7 @@ test.describe("the smallest window", () => {
     await ClockWorkFixture.beginAsync(desktop);
     const asking = window.getByRole("dialog", { name: "Work is still running" });
 
-    await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close());
+    await desktop.application.evaluate(({ app }) => app.quit());
     await expect(asking).toBeVisible();
 
     expect(await LayoutFixture.findProblemsAsync(window.locator("tr-dialog"), LayoutFixture.OVERLAY_INSET)).toEqual([]);

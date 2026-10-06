@@ -55,7 +55,7 @@ LICENSE file in the root directory of this source tree.
         @for (definition of group.definitions; track definition.name.text) {
           <tr-setting-row [definition]="definition" [value]="values().get(definition.name.text)" [isSet]="setFlags().get(definition.name.text)?.() ?? false"
             [query]="query()" [modules]="isMutedModules(definition) ? notifyingModules() : modules()" [isInverse]="isMutedModules(definition)" [canRun]="canRun(definition)"
-            [languages]="spelling.options()" [languagesNote]="spelling.noteFor(values().get(definition.name.text))"
+            [languages]="spelling.options()" [note]="noteFor(definition)"
             (changed)="change(definition, $event)" (reset)="reset(definition)" (run)="run(definition)" />
         }
       </section>

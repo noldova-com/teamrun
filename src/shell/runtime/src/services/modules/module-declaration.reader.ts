@@ -7,6 +7,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -16,6 +17,10 @@ import { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Resources } from "../../resources.js";
 
 export class ModuleDeclarationReader {
+  public static locate(runtimeEntryPath: string): string {
+    return path.join(path.dirname(runtimeEntryPath), ...Resources.installRootSegments, ...Resources.declarationsFileSegments);
+  }
+
   public static async readAsync(file: string): Promise<readonly ModuleDeclaration[]> {
     try {
       return ModuleDeclarationReader.parse(JSON.parse(await readFile(file, Resources.utf8Encoding)));

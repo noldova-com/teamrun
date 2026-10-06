@@ -21,7 +21,7 @@ export class TrayMenuTemplateTests {
     fixture.send("notifications", { notifications: [TrayFixture.notification(1, "Read", "clock", true)], quietDevices: [], mutedModules: [], sequence: 1 });
 
     Assert.areEqual(
-      JSON.stringify(["Open TeamRun", "-", "One (disabled)", "Two (disabled)", "Three (disabled)", "Four (disabled)", "Five (disabled)", "-", "Do not disturb [ ]", "-", "Quit TeamRun"]),
+      JSON.stringify(["One (disabled)", "Two (disabled)", "Three (disabled)", "Four (disabled)", "Five (disabled)", "-", "Open TeamRun", "Do not disturb [ ]", "-", "Quit TeamRun"]),
       JSON.stringify(fixture.rows));
   }
 
@@ -35,9 +35,9 @@ export class TrayMenuTemplateTests {
     fixture.send("notifications", { notifications: [TrayFixture.notification(1, "Q&A & more")], quietDevices: [], mutedModules: [], sequence: 1 });
 
     const rows = fixture.rows;
-    Assert.areEqual("Run the tests (disabled)", rows[2]);
-    Assert.areEqual(`${long.slice(0, 59).trimEnd()}… (disabled)`, rows[3]);
-    Assert.areEqual(60, (rows[3] ?? "").replace(" (disabled)", "").length);
-    Assert.areEqual("Q&&A && more", rows[5]);
+    Assert.areEqual("Run the tests (disabled)", rows[0]);
+    Assert.areEqual(`${long.slice(0, 59).trimEnd()}… (disabled)`, rows[1]);
+    Assert.areEqual(60, (rows[1] ?? "").replace(" (disabled)", "").length);
+    Assert.areEqual("Q&&A && more", rows[2]);
   }
 }

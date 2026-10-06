@@ -126,6 +126,8 @@ export class Resources {
   public static readonly updateActionChannel: string = "teamrun:updateAction";
   public static readonly notificationOpenedChannel: string = "teamrun:notificationOpened";
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
+  public static readonly readTrayAvailableChannel: string = "teamrun:readTrayAvailable";
+  public static readonly trayAvailableChannel: string = "teamrun:trayAvailable";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
   public static readonly windowErrorChannel: string = "teamrun:windowError";
@@ -202,6 +204,10 @@ export class Resources {
   public static readonly createOnlyFlag: string = "wx";
   public static readonly textEncoding: BufferEncoding = "utf8";
   public static readonly appearanceFile: string = "appearance.json";
+  public static readonly deviceStateFile: string = "device-state.json";
+  public static readonly trayCloseHintKey: string = "trayCloseHintShown";
+  public static readonly trayIconStateKey: string = "trayIcon";
+  public static readonly fileNameParameter: string = "fileName";
   public static readonly temporarySuffix: string = ".tmp";
   public static readonly appearanceArgument: string = "--teamrun-appearance=";
   public static readonly appearanceLimit: number = 4096;
@@ -270,6 +276,7 @@ export class Resources {
   public static readonly closeEvent: "close" = "close";
   public static readonly closedEvent: "closed" = "closed";
   public static readonly clickEvent: "click" = "click";
+  public static readonly showEvent: "show" = "show";
   public static readonly failedEvent: "failed" = "failed";
   public static readonly dataEvent: "data" = "data";
   public static readonly errorEvent: "error" = "error";
@@ -277,6 +284,7 @@ export class Resources {
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
   public static readonly willQuitEvent: "will-quit" = "will-quit";
+  public static readonly beforeQuitEvent: "before-quit" = "before-quit";
   public static readonly resizeEvent: "resize" = "resize";
   public static readonly moveEvent: "move" = "move";
   public static readonly willMoveEvent: "will-move" = "will-move";
@@ -533,8 +541,28 @@ export class Resources {
     return `The runtime's work could not be read before quitting, so ${Resources.applicationName} quits without asking: ${reason}`;
   }
 
-  public static formatWorkNotStopped(reason: string): string {
-    return `The runtime's work could not be stopped: ${reason}`;
+  public static formatRuntimeNotStopped(reason: string): string {
+    return `The runtime could not be stopped as ${Resources.applicationName} quits: ${reason}`;
+  }
+
+  public static get trayCloseHintTitle(): string {
+    return `${Resources.applicationName} is still running`;
+  }
+
+  public static formatTrayCloseHintBody(platform: string): string {
+    return `Open it again or quit it from its icon in the ${platform === Resources.windowsPlatform ? "notification area" : "tray"}.`;
+  }
+
+  public static formatTrayCloseHintFailed(reason: string): string {
+    return `The operating system did not show the hint that ${Resources.applicationName} is still running, so it counts as not shown: ${reason}`;
+  }
+
+  public static formatDeviceStateNotRead(reason: string): string {
+    return `The device's state could not be read, so its hints count as not shown and the tray icon follows its default until the runtime answers: ${reason}`;
+  }
+
+  public static formatDeviceStateUnsaved(key: string, reason: string): string {
+    return `The device could not record ${key} in its state: ${reason}`;
   }
 
   public static formatModuleLogLine(moduleId: string, line: string): string {

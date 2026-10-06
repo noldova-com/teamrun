@@ -9,6 +9,7 @@
 import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
 
 import type { FakeDockHost } from "./fake-dock-host.fixture.js";
+import { FakePreventableEvent } from "./fake-preventable-event.fixture.js";
 import { ListenerRegistry } from "./listener-registry.fixture.js";
 
 export class FakeApplicationHost implements IApplicationHost {
@@ -56,7 +57,9 @@ export class FakeApplicationHost implements IApplicationHost {
   }
 
   public quit(): void {
-    this.calls.push("quit");
+    const event = new FakePreventableEvent();
+    this.listeners.emit("before-quit", event);
+    this.calls.push(event.isPrevented ? "quit prevented" : "quit");
   }
 
   public relaunch(): void {
@@ -71,7 +74,7 @@ export class FakeApplicationHost implements IApplicationHost {
     return this.readiness.promise;
   }
 
-  public on(event: string, listener: () => void): this {
+  public on(event: string, listener: (event: FakePreventableEvent) => void): this {
     this.listeners.add(event, listener);
     return this;
   }

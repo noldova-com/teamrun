@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { writeFile } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
-import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestMethod, Wait } from "@noldova/teamrun-foundation-testing";
 
 import { CliFixture } from "../fixtures/cli.fixture.js";
 import { ProbeBuildFixture } from "../fixtures/probe-build.fixture.js";
@@ -110,5 +110,56 @@ export class CliTests {
     Assert.areEqual(JSON.stringify({ dataDirectory: fixture.dataDirectory }), installed.output.trim());
     Assert.areEqual(1, failed.code);
     Assert.areEqual("TeamRun could not be started.\n", failed.error);
+  }
+
+  @TestMethod
+  public async stopsAModuleCommandAtItsTimeoutOrAnInterruptionAndThenItsParts(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
+    await fixture.startHostAsync(build.declarationsFile);
+    const marker = build.locate(ProbeBuildFixture.CLI_WAITING_MARKER);
+
+    const timedOut = await fixture.runModuleAsync(build, ["probe", "wait-forever", "--timeout", "1", "--json"]);
+    const isSettled = await Wait.untilAsync(async () => await build.readPartsLogAsync() !== "activate probe\n", 15_000);
+    const afterTimeout = await build.readPartsLogAsync();
+    await rm(marker, { force: true });
+    await rm(build.locate(ProbeBuildFixture.PARTS_LOG), { force: true });
+    const running = fixture.runModuleAsync(build, ["probe", "wait-forever", "--json"]);
+    await ProbeBuildFixture.waitUntilWaitingAsync(marker);
+    fixture.signals.emit("SIGINT");
+    const interrupted = await running;
+
+    Assert.areEqual(6, timedOut.code, timedOut.error);
+    Assert.areEqual("DeadlineExceeded", (JSON.parse(timedOut.error) as { code: string }).code);
+    Assert.isTrue(isSettled && ["", "activate probe\ndeactivate probe\n"].includes(afterTimeout), afterTimeout);
+    Assert.areEqual(6, interrupted.code, interrupted.error);
+    Assert.areEqual("Cancelled", (JSON.parse(interrupted.error) as { code: string }).code);
+    Assert.areEqual(0, fixture.signals.listenerCount("SIGINT"));
+    Assert.areEqual("activate probe\ndeactivate probe\n", await build.readPartsLogAsync());
+  }
+
+  @TestMethod
+  public async stopsAModuleCommandWhosePartNeverFinishesStartingWithoutWaitingForThatPart(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
+    await fixture.startHostAsync(build.declarationsFile);
+    const marker = build.locate(ProbeBuildFixture.STALLED_MARKER);
+
+    const timedOut = await fixture.runModuleAsync(build, ["stalled", "run", "--timeout", "1", "--json"]);
+    const afterTimeout = await build.readPartsLogAsync();
+    await rm(marker, { force: true });
+    await rm(build.locate(ProbeBuildFixture.PARTS_LOG), { force: true });
+    const running = fixture.runModuleAsync(build, ["stalled", "run", "--json"]);
+    await ProbeBuildFixture.waitUntilWaitingAsync(marker);
+    fixture.signals.emit("SIGINT");
+    const interrupted = await running;
+
+    Assert.areEqual(6, timedOut.code, timedOut.error);
+    Assert.areEqual("DeadlineExceeded", (JSON.parse(timedOut.error) as { code: string }).code);
+    Assert.areEqual(6, interrupted.code, interrupted.error);
+    Assert.areEqual("Cancelled", (JSON.parse(interrupted.error) as { code: string }).code);
+    Assert.isTrue(["", "activate stalled\n"].includes(afterTimeout), afterTimeout);
+    Assert.areEqual(0, fixture.signals.listenerCount("SIGINT"));
+    Assert.areEqual("activate stalled\n", await build.readPartsLogAsync());
   }
 }

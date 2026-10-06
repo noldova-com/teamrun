@@ -8,6 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException, ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import { SettingDefinition, SettingKind } from "@noldova/teamrun-shell-protocol";
 
 import { DeclarationsFormatException } from "../exceptions/declarations-format.exception.js";
@@ -24,6 +25,8 @@ export class ModuleDeclaration {
   public readonly runtimePackage: string | null;
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
   public readonly settings: readonly SettingDefinition[];
+  public readonly cliPackage: string | null;
+  public readonly cliCommands: readonly JsonValue[];
 
   public constructor(
     id: string,
@@ -33,7 +36,9 @@ export class ModuleDeclaration {
     dependencies: readonly string[],
     runtimePackage: string | null,
     contributions: ReadonlyMap<string, readonly string[]>,
-    settings: readonly SettingDefinition[] = []) {
+    settings: readonly SettingDefinition[] = [],
+    cliPackage: string | null = null,
+    cliCommands: readonly JsonValue[] = []) {
     if (!Resources.moduleIdPattern.test(id) || id === Resources.reservedModuleId)
       throw new ArgumentException(Resources.moduleIdInvalid, Resources.idParameterName);
     if (!Resources.moduleVersionPattern.test(version))
@@ -62,6 +67,8 @@ export class ModuleDeclaration {
     this.runtimePackage = runtimePackage;
     this.contributions = new Map([...contributions].map(([kind, names]) => [kind, [...names]]));
     this.settings = [...settings];
+    this.cliPackage = cliPackage;
+    this.cliCommands = [...cliCommands];
   }
 
   public static fromJson(value: unknown): ModuleDeclaration {
@@ -75,6 +82,7 @@ export class ModuleDeclaration {
       throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.versionParameterName));
 
     const runtimePackage = "runtimePackage" in value ? value.runtimePackage : undefined;
+    const cliPackage = "cliPackage" in value ? value.cliPackage : null;
     const contributes = "contributes" in value ? value.contributes : undefined;
     if (!Object.isObject(contributes) || Array.isArray(contributes))
       throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.contributesParameterName));
@@ -86,7 +94,9 @@ export class ModuleDeclaration {
       ModuleDeclaration.readNames("dependencies" in value ? value.dependencies : undefined, Resources.dependenciesParameterName),
       Object.isNull(runtimePackage) ? null : ModuleDeclaration.readText(runtimePackage, Resources.runtimePackageParameterName),
       new Map(Object.entries(contributes).map(([kind, names]) => [kind, ModuleDeclaration.readNames(names, Resources.contributesParameterName)])),
-      ModuleDeclaration.readSettings("settings" in value ? value.settings : []));
+      ModuleDeclaration.readSettings("settings" in value ? value.settings : []),
+      Object.isNull(cliPackage) ? null : ModuleDeclaration.readText(cliPackage, Resources.cliPackageField),
+      ModuleDeclaration.readValues("cliCommands" in value ? value.cliCommands : [], Resources.cliCommandsField));
   }
 
   public listContributions(kind: string): readonly string[] {
@@ -102,6 +112,12 @@ export class ModuleDeclaration {
     catch (error) {
       throw new DeclarationsFormatException(Resources.formatDeclarationField(Resources.settingsField), new ExceptionOptions(error));
     }
+  }
+
+  private static readValues(value: unknown, name: string): readonly JsonValue[] {
+    if (!Array.isArray(value))
+      throw new DeclarationsFormatException(Resources.formatDeclarationField(name));
+    return value.map(t => JsonReader.toJsonValue(t));
   }
 
   private static readText(value: unknown, name: string): string {

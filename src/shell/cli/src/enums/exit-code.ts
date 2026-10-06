@@ -14,5 +14,7 @@ export enum ExitCode {
   BuildMismatch = 4,
   DataDirectoryUnusable = 5,
   Stopped = 6,
-  Updating = 8
+  ModuleNotActive = 7,
+  Updating = 8,
+  PartNotStopped = 9
 }
