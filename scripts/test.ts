@@ -214,6 +214,7 @@ export default class Test {
     const { default: ApiDocumentationCheck } = await import("./checks/api-documentation-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
     const { default: BucketNameCheck } = await import("./checks/bucket-name-check.ts");
+    const { default: FoundationValueCheck } = await import("./checks/foundation-value-check.ts");
     const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
@@ -231,6 +232,7 @@ export default class Test {
       new FieldOrderCheck(this.root, files),
       new BucketNameCheck(files, syntax),
       new AngularFileCheck(files, syntax),
+      new FoundationValueCheck(files, new PackageCatalog(this.root), syntax),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),

@@ -8,6 +8,8 @@
 
 import type { Writable } from "node:stream";
 
+import "@noldova/teamrun-foundation-core";
+
 import type { IModuleLog } from "../../interfaces/module-log.js";
 import { Resources } from "../../resources.js";
 import type { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
@@ -26,6 +28,6 @@ export class ModuleLog implements IModuleLog {
 
   public write(message: string): void {
     const lines = LogText.lines(this.redactor.redact(message));
-    this.output.write(lines.map(t => Resources.formatModuleLogLine(this.moduleId, t)).join(""));
+    this.output.write(lines.map(t => Resources.formatModuleLogLine(this.moduleId, t)).join(String.empty));
   }
 }
