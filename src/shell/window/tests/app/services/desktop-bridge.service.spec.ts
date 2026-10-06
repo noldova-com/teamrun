@@ -53,6 +53,7 @@ describe("DesktopBridgeService", () => {
     keepSpelling: (): void => undefined,
     onFieldMenu: (): (() => void) => () => undefined,
     replaceMisspelling: (): Promise<boolean> => Promise.resolve(true),
+    addToDictionary: (): Promise<boolean> => Promise.resolve(true),
     onNotificationOpened: (): (() => void) => () => undefined,
     onQuitQuestion: (): (() => void) => () => undefined,
     answerQuit: (): Promise<boolean> => Promise.resolve(true),
@@ -90,6 +91,7 @@ describe("DesktopBridgeService", () => {
     ["no keepSpelling", { ...complete, keepSpelling: null }],
     ["no onFieldMenu", { ...complete, onFieldMenu: null }],
     ["no replaceMisspelling", { ...complete, replaceMisspelling: null }],
+    ["no addToDictionary", { ...complete, addToDictionary: null }],
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
     ["no onQuitQuestion", { ...complete, onQuitQuestion: null }],
     ["no answerQuit", { ...complete, answerQuit: null }],
@@ -319,7 +321,7 @@ describe("DesktopBridgeService", () => {
     expect(bridge.keptSpellings).toEqual([[true, ["en-US"]]]);
   });
 
-  it("passes on the desktop's field menus as requests, and replaces a word through the desktop", async () => {
+  it("passes on the desktop's field menus as requests, and replaces or adds a word through the desktop", async () => {
     const bridge = DesktopBridgeFixture.install();
     const service = TestBed.inject(DesktopBridgeService);
     const requests: FieldMenuRequest[] = [];
@@ -328,11 +330,11 @@ describe("DesktopBridgeService", () => {
     bridge.publishFieldMenu({ x: 10, y: 20, isKeyboard: false, word: "wrold", suggestions: ["world"] });
     stop();
     bridge.publishFieldMenu({ x: 1, y: 2, isKeyboard: true, word: "", suggestions: [] });
-    const answer = await service.replaceMisspellingAsync("world");
+    const answers = [await service.replaceMisspellingAsync("world"), await service.addToDictionaryAsync("TeamRun")];
 
     expect(requests.map(t => [t.x, t.y, t.isKeyboard, t.toContext()])).toEqual([[10, 20, false, { word: "wrold", suggestions: ["world"] }]]);
-    expect(answer).toBe(true);
-    expect(bridge.replacements).toEqual(["world"]);
+    expect(answers).toEqual([true, true]);
+    expect([bridge.replacements, bridge.addedWords]).toEqual([["world"], ["TeamRun"]]);
   });
 
   it("passes on the question about work in progress or its end, answers it and writes a module's log lines through the desktop", async () => {
@@ -341,7 +343,7 @@ describe("DesktopBridgeService", () => {
     const questions: (QuitQuestion | null)[] = [];
 
     const stop = service.onQuitQuestion(t => questions.push(t));
-    bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true });
+    bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true, isUpdate: false });
     bridge.askToQuit(null);
     stop();
     bridge.askToQuit(null);

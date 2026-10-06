@@ -13,13 +13,15 @@ import { Resources } from "../resources.js";
 export class QuitQuestion {
   public readonly descriptions: readonly string[];
   public readonly isWaiting: boolean;
+  public readonly isUpdate: boolean;
 
-  public constructor(descriptions: readonly string[], isWaiting: boolean) {
+  public constructor(descriptions: readonly string[], isWaiting: boolean, isUpdate: boolean) {
     this.descriptions = [...descriptions];
     this.isWaiting = isWaiting;
+    this.isUpdate = isUpdate;
   }
 
   public toJson(): JsonObject {
-    return { [Resources.descriptionsField]: [...this.descriptions], [Resources.isWaitingField]: this.isWaiting };
+    return { [Resources.descriptionsField]: [...this.descriptions], [Resources.isWaitingField]: this.isWaiting, [Resources.isUpdateField]: this.isUpdate };
   }
 }

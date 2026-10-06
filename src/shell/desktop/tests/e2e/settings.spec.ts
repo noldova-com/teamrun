@@ -261,8 +261,10 @@ test.describe("settings", () => {
       }, { message: `${where}: the scrollbar's width to 0.375rem` }).toBeLessThan(0.5);
     };
     for (const [key, page] of [["view/notes.list", "tr-notes-list"], ["document/notes.note/1", "tr-notes-note"]] as const) {
-      await window.locator(`tr-tab[data-tab-key='${key}']`).click();
+      const tab = window.locator(`tr-tab[data-tab-key='${key}']`);
+      await tab.click();
       const area = window.locator(`tr-tab-group:has(tr-tab[data-tab-key='${key}']) tr-tab-content`);
+      await expect(tab).toHaveAttribute("aria-selected", "true");
       await expect(area.locator(page)).toBeVisible();
       await expectAtEdgeAsync(area, key);
     }

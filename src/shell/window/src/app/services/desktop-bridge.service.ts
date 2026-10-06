@@ -167,6 +167,10 @@ export class DesktopBridgeService implements ClipboardWriter {
     return this.bridge.replaceMisspelling(text);
   }
 
+  public addToDictionaryAsync(word: string): Promise<boolean> {
+    return this.bridge.addToDictionary(word);
+  }
+
   public onNotificationOpened(listener: (id: string) => void): () => void {
     return this.bridge.onNotificationOpened(t => {
       if (Object.isString(t) && !String.isNullOrWhitespace(t))
@@ -241,6 +245,7 @@ export class DesktopBridgeService implements ClipboardWriter {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.keepSpelling))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onFieldMenu))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.replaceMisspelling))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.addToDictionary))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onQuitQuestion))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerQuit))) &&

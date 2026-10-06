@@ -98,6 +98,8 @@ export class ShellCommandsService {
       () => this.editAsync(action), () => this.edits.canRun(action))),
     new CommandContribution(Resources.replaceMisspellingCommand, Resources.replaceMisspellingTitle, null, null,
       commandArguments => this.replaceMisspellingAsync(commandArguments), commandArguments => !Object.isNull(ShellCommandsService.textOf(commandArguments, Resources.textArgument))),
+    new CommandContribution(Resources.addToDictionaryCommand, Resources.addToDictionaryTitle, Resources.addToDictionaryGlyph, null,
+      commandArguments => this.addToDictionaryAsync(commandArguments), commandArguments => !Object.isNull(ShellCommandsService.textOf(commandArguments, Resources.wordArgument))),
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
       () => this.done(() => this.search.open())),
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
@@ -317,6 +319,14 @@ export class ShellCommandsService {
     const text = ShellCommandsService.textOf(commandArguments, Resources.textArgument);
     if (!Object.isNull(text) && await this.edits.restoreAsync())
       await this.bridge.replaceMisspellingAsync(text);
+    return null;
+  }
+
+  private async addToDictionaryAsync(commandArguments: JsonValue): Promise<JsonValue> {
+    const word = ShellCommandsService.textOf(commandArguments, Resources.wordArgument);
+    if (!Object.isNull(word))
+      await this.bridge.addToDictionaryAsync(word);
+    await this.edits.restoreAsync();
     return null;
   }
 

@@ -19,7 +19,8 @@ export class PreloadTests {
     Assert.areEqual([
       "platform", "processor", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "onUpdateSaveRequest", "answerUpdateSave", "readStartup", "onStartup", "actOnStartup",
       "readLayout", "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "readUpdate", "onUpdate", "actOnUpdate", "keepAppearance",
-      "readSpelling", "keepSpelling", "onFieldMenu", "replaceMisspelling", "edit", "setMenuBar", "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "answerQuit", "logModule", "logError"
+      "readSpelling", "keepSpelling", "onFieldMenu", "replaceMisspelling", "addToDictionary", "edit", "setMenuBar", "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "answerQuit", "logModule",
+      "logError"
     ].join(","), Object.keys(api).join(","));
     Assert.areEqual(process.platform, api["platform"]);
     Assert.areEqual(process.arch, api["processor"]);
@@ -79,6 +80,7 @@ export class PreloadTests {
       PreloadTests.invoke(api["actOnUpdate"], "Check"),
       PreloadTests.invoke(api["readSpelling"]),
       PreloadTests.invoke(api["replaceMisspelling"], "world"),
+      PreloadTests.invoke(api["addToDictionary"], "TeamRun"),
       PreloadTests.invoke(api["edit"], "Copy"),
       PreloadTests.invoke(api["answerQuit"], "wait")
     ]);
@@ -100,6 +102,7 @@ export class PreloadTests {
       ["teamrun:updateAction", "Check"],
       ["teamrun:readSpelling"],
       ["teamrun:replaceMisspelling", "world"],
+      ["teamrun:addToDictionary", "TeamRun"],
       ["teamrun:edit", "Copy"],
       ["teamrun:quitAnswer", "wait"]
     ]), JSON.stringify(electron.invoked));
