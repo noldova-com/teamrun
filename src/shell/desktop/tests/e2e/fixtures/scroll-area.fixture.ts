@@ -14,9 +14,12 @@ export default class ScrollAreaFixture {
   private static readonly DRAG_STEPS: number = 5;
   private static readonly FRAME: number = 16;
 
-  public static scrollbarSizesAsync(area: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
-    return area.evaluate(t => {
-      const element = t as HTMLElement;
+  public static async scrollbarSizesAsync(area: Locator): Promise<Readonly<Record<"vertical" | "horizontal" | "rem", number>>> {
+    await expect(area).toHaveCount(1);
+    return await area.evaluateAll(all => {
+      if (all.length !== 1)
+        throw new Error(`${all.length} elements match the scroll area, so its scrollbars can't be measured.`);
+      const element = all[0] as HTMLElement;
       const style = getComputedStyle(element);
       return {
         vertical: element.offsetWidth - element.clientWidth - Number.parseFloat(style.borderLeftWidth) - Number.parseFloat(style.borderRightWidth),
@@ -51,8 +54,12 @@ export default class ScrollAreaFixture {
     return window.screenshot({ clip });
   }
 
-  public static panelEdgeGapAsync(area: Locator): Promise<number> {
-    return area.evaluate(t => {
+  public static async panelEdgeGapAsync(area: Locator): Promise<number> {
+    await expect(area).toHaveCount(1);
+    return await area.evaluateAll(all => {
+      if (all.length !== 1)
+        throw new Error(`${all.length} elements match the scroll area, so its gap to the panel's edge can't be measured.`);
+      const t = all[0] as HTMLElement;
       const panel = t.closest("tr-panel-card") as HTMLElement;
       const panelEnd = panel.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(panel).borderRightWidth);
       const areaEnd = t.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(t).borderRightWidth);
