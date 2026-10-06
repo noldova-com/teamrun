@@ -59,7 +59,7 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 - **Flakiness is a bug.** A flaky or racy failure seen anywhere, locally or in CI, gets its own bug issue and a small fix PR right away, never folded into other work.
 - **Stop the line.** Merging stops only while `main` itself fails, or while a flaky failure blocks merging in practice: it failed in two or more pull request runs in a day, or a passing run is rare. A stop that lasts longer than an hour is reassessed, and the reason it continues is recorded on its issue. A pull request held by a stop doesn't hold its author, who moves to their next task.
 - **Other flaky failures.** A flaky failure that doesn't block merging, such as one seen once in CI or only under artificial load, gets its own bug issue and a fix with priority, and merging continues. Once the issue is filed, the failed CI job may run again once so the affected pull request can merge, and never a second time.
-- **Repeated runs.** A change to startup, shutdown, processes, windows or inter-process messages, a fix for a flaky test, and a new or changed test of processes, timing or platform behavior pass their affected tests five times in a row on Linux and Windows test machines, and on macOS when the behavior is macOS-specific. The repeats start once the change is pushed, and their results are on the pull request before it merges. The [nightly run](#ci-levels) also repeats every test and UI workflow five times on every target, which catches what a change's own repeats miss.
+- **Repeated runs.** A change to startup, shutdown, processes, windows or inter-process messages, a fix for a flaky test, and a new or changed test of processes, timing or platform behavior pass their affected tests five times in a row in CI, on Linux and Windows, and on macOS when the behavior is macOS-specific. The repeats run on the pushed head, and their green results are on the pull request before it merges. The [nightly run](#ci-levels) also repeats every test and UI workflow five times on every target, which catches what a change's own repeats miss.
 
 | Test file | Why it pauses |
 |---|---|
@@ -116,16 +116,14 @@ The aggregate check reports documentation-only and UI-free scopes and fails on c
 
 Every run builds and tests in full and reuses no earlier run's result; only a target's UI shards share that target's build from the same run. A push to `main` always builds and tests every target and runs every UI workflow on every target but macOS x64. Packaging runs by hand and each night, as [CI levels](#ci-levels) describes, never on a pull request or a push; releases remain explicit manual or tag-triggered operations with complete verification.
 
-Build, pack and install the selected source before testing its package API; dependencies must resolve to those fresh artifacts. Use targeted checks during development and the complete applicable gate before handoff. Repeat successful checks only after a change, failure or unresolved concern.
+Build, pack and install the selected source before testing its package API; dependencies must resolve to those fresh artifacts. Use targeted checks during development. CI is the gate: the complete gate, the UI workflows and the repeats [Flakiness and races](#flakiness-and-races) requires run on the pushed head, and green required checks at the pull request's head are the evidence. Repeat successful checks locally only after a change, failure or unresolved concern.
 
 Before pushing for review:
 
-- Merge the current `main` into the branch and run the gate on the result, natively on Linux.
-- Run the UI workflows a change affects, natively on Linux. A change that does not touch the UI skips this step.
-- Plan the repeats [Flakiness and races](#flakiness-and-races) requires before merge: five times in a row on Linux and Windows, and on macOS for macOS-specific behavior, for a change to startup, shutdown, processes, windows or inter-process messages, a fix for a flaky test, and a new or changed test of processes, timing or platform behavior. One pass does not show it is stable.
+- Run the tests of what the change touches, natively on Linux, and the UI workflows it affects. A change that does not touch the UI skips the workflows.
 - Check a configuration change, such as a workflow, with the tool that reads it.
 
-CI's run on every target is the evidence for "natively on Windows, Linux and macOS"; link it. Native runs on Windows or macOS before review are kept for what CI can't show: elevated Windows, the real cursor, OS notifications, macOS-only behavior, and reproducing a CI failure. Name each machine's OS and CPU in the report.
+The complete gate, the other UI workflows and the repeats are not run locally before review. A full run on a machine is for debugging a failure and for the native checks CI can't cover: elevated Windows, the real cursor, OS notifications, macOS-only behavior, and reproducing a CI failure. CI's run on every target is the evidence for "natively on Windows, Linux and macOS"; link it. Name each machine's OS and CPU in the report of a native run.
 
 Name additional evidence according to the claim:
 
