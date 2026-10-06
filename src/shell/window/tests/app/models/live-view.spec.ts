@@ -82,6 +82,28 @@ describe("LiveView", () => {
     expect(element.scrollTop).toBe(80);
   });
 
+  it("ignores a scroll reported while it is out of the page or between moving to a slot and being restored there", () => {
+    const [first, second] = slots as [HTMLElement, HTMLElement];
+    const list = element.querySelector(".list") as HTMLElement;
+    view.enter(first);
+    scroll(element, 80);
+    scroll(list, 120);
+
+    view.leave();
+    element.dispatchEvent(new Event("scroll"));
+    view.enter(second);
+    list.dispatchEvent(new Event("scroll", { bubbles: true }));
+    view.restore();
+    const restored = [element.scrollTop, list.scrollTop];
+    second.remove();
+    element.dispatchEvent(new Event("scroll"));
+    view.leave();
+    view.enter(first);
+    view.restore();
+
+    expect([...restored, element.scrollTop, list.scrollTop]).toEqual([80, 120, 80, 120]);
+  });
+
   it("forgets the scroll position of an element that has left it and ignores a scroll that comes from no element", () => {
     const list = element.querySelector(".list") as HTMLElement;
     view.enter(slots[0] as HTMLElement);
