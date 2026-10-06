@@ -16,6 +16,8 @@ export default class BuildLayout {
   private static readonly TESTS_FOLDER: string = "tests";
   private static readonly ARCHIVES_FOLDER: string = "archives";
   private static readonly RECORDS_FOLDER: string = "records";
+  private static readonly ADDONS_FOLDER: string = "native";
+  private static readonly NODE_GYP_FOLDER: string = "node-gyp";
   private static readonly DEPENDENCY_FOLDER: string = "node_modules";
   private static readonly SCOPE_PATTERN: RegExp = /^@([^/]+)\/(.+)$/;
 
@@ -29,12 +31,20 @@ export default class BuildLayout {
     return path.join(this.root, BuildLayout.BUILD_FOLDER, BuildLayout.ARCHIVES_FOLDER);
   }
 
+  public get nodeGypFolder(): string {
+    return path.join(this.root, BuildLayout.BUILD_FOLDER, BuildLayout.NODE_GYP_FOLDER);
+  }
+
   public locateSource(manifest: PackageManifest, ...segments: readonly string[]): string {
     return path.join(this.root, ...manifest.directory.split("/"), ...segments);
   }
 
   public locateOutput(manifest: PackageManifest): string {
     return path.join(this.root, BuildLayout.BUILD_FOLDER, BuildLayout.PACKAGES_FOLDER, manifest.id);
+  }
+
+  public locateAddonWork(manifest: PackageManifest, addon: string): string {
+    return path.join(this.root, BuildLayout.BUILD_FOLDER, BuildLayout.ADDONS_FOLDER, manifest.id, addon);
   }
 
   public locateTestOutput(manifest: PackageManifest): string {

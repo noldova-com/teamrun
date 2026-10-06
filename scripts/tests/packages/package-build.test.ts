@@ -45,7 +45,7 @@ class PackageBuildTests {
     test("a tree without packages builds nothing and is current", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       const output = new TextOutputFixture();
 
       assert.deepEqual(await build.buildAsync(output, BuildVariant.REGULAR), []);
@@ -56,7 +56,7 @@ class PackageBuildTests {
     test("packages build after their dependencies, otherwise in path order, and then their tests; an unchanged tree reuses everything", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
 
       const packages = await build.buildAsync(new TextOutputFixture(), BuildVariant.REGULAR);
       const output = await PackageBuildTests.buildAsync(build);
@@ -71,9 +71,20 @@ class PackageBuildTests {
       ]);
     });
 
+    test("a build for another platform or processor is stale and rebuilds every package and all tests", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
+      const repository = await PackageBuildTests.createAsync(t);
+      await PackageBuildTests.buildAsync(new PackageBuild(repository.directory, new ProcessRunner(), process.env, "win32", "x64"));
+
+      for (const [platform, architecture] of [["win32", "arm64"], ["linux", "x64"]] as const) {
+        const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, platform, architecture);
+        await assert.rejects(build.requireCurrentAsync(BuildVariant.REGULAR), PackageBuildTests.ALL_STALE);
+        assert.deepEqual(await PackageBuildTests.buildAsync(build), PackageBuildTests.ALL_BUILT);
+      }
+    });
+
     test("a changed source rebuilds its package, its dependants and all tests", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       const first = await PackageBuildTests.buildAsync(build);
 
       await repository.writeAsync({ "src/foundation/alpha/src/resources.ts": "export default class Resources {\n  public static readonly version: string = \"changed\";\n  public static readonly protocol: string = \"\";\n}\n" });
@@ -86,7 +97,7 @@ class PackageBuildTests {
     test("any source change gives the build another fingerprint, yet rebuilds only the changed package and what depends on it", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       await PackageTreeFixture.writePackageAsync(repository, "shell-gamma", [], false, false);
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       await PackageBuildTests.buildAsync(build);
       const first = await build.hashFingerprintAsync(BuildVariant.REGULAR);
 
@@ -107,7 +118,7 @@ class PackageBuildTests {
 
     test("a changed test recompiles only that package's tests", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       await PackageBuildTests.buildAsync(build);
 
       await repository.writeAsync({ "src/shell/beta/tests/api/index.test.ts": "export const changed: boolean = true;\n" });
@@ -123,7 +134,7 @@ class PackageBuildTests {
 
     test("a changed installed package is refused, with everything that depends on it, until the build replaces it", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       await PackageBuildTests.buildAsync(build);
 
       await appendFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-foundation-alpha", "api", "index.js"), "\n");
@@ -136,7 +147,7 @@ class PackageBuildTests {
 
     test("missing installed packages are refused until the build reinstalls them", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       await PackageBuildTests.buildAsync(build);
 
       await rm(path.join(repository.directory, "node_modules"), { recursive: true, force: true });
@@ -150,7 +161,7 @@ class PackageBuildTests {
     test("a test build adds fixture modules' packages without making the other packages' tests stale", { timeout: PackageBuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await PackageBuildTests.createAsync(t);
       await PackageTreeFixture.writePackageAsync(repository, "fixture-notes-runtime", ["shell-beta"], false, true, `${ModuleCatalog.FIXTURE_FOLDER}/notes/runtime`);
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       const fixture = "@noldova/teamrun-fixture-notes-runtime";
 
       const regular = await PackageBuildTests.buildAsync(build);
@@ -190,7 +201,7 @@ class PackageBuildTests {
         "src/modules/tasks/module.json": declare("tasks", "Tasks"),
         [`${ModuleCatalog.FIXTURE_FOLDER}/notes/module.json`]: declare("notes", "Notes")
       });
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       const built = async (variant: BuildVariant): Promise<readonly string[]> => {
         const output = new TextOutputFixture();
         await build.buildAsync(output, variant);
@@ -223,7 +234,7 @@ class PackageBuildTests {
         "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", version, displayName: "Tasks", description: "Used by the tests.", parts: ["runtime"], dependencies: [], contributes: {} })
       });
       await repository.writeAsync(declare("0.3.0"));
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       const installed = async (): Promise<Readonly<Record<string, unknown>>> =>
         JSON.parse(await readFile(path.join(repository.directory, "node_modules", "@noldova", "teamrun-modules-tasks-runtime", "package.json"), "utf8")) as Readonly<Record<string, unknown>>;
       await PackageBuildTests.buildAsync(build);
@@ -252,7 +263,7 @@ class PackageBuildTests {
       const directory = `${ModuleCatalog.FIXTURE_FOLDER}/notes/runtime`;
       await PackageTreeFixture.writePackageAsync(repository, "fixture-notes-runtime", [], false, true, directory);
       await repository.writeAsync({ [`${directory}/src/api/index.ts`]: "export const count: number = \"many\";\n" });
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
 
       await assert.rejects(build.buildAsync(new TextOutputFixture(), BuildVariant.REGULAR), new RegExp(`^PackageException: Type-checking ${directory}/src failed with exit code \\d+:`));
     });

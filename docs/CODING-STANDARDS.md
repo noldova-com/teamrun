@@ -75,7 +75,7 @@ Production behavior belongs to classes representing named concepts under section
   A dispatcher is permitted only at a genuine runtime-dynamic boundary (parsing an external tool's events, decoding wire messages) and is narrow, named, and tested as such.
 - Declaration merging and prototype additions are confined to `src/foundation`.
   Reuse its existing behavior; review and test additions here, without requiring an external private repository.
-- Production packages use the foundation Core's additions to the global `Object` and `String` constructors: value checks are `Object.isUndefined`, `Object.isNull`, `Object.isNullOrUndefined`, `Object.isString`, `Object.isNumber`, `Object.isBoolean`, `Object.isObject`, `Object.isFunction`, `String.isNullOrEmpty`, and `String.isNullOrWhitespace`; the empty string is `String.empty`.
+- Production packages use the foundation Core's additions to the global `Object` and `String` constructors: value checks are `Object.isUndefined`, `Object.isNull`, `Object.isNullOrUndefined`, `Object.isString`, `Object.isNumber`, `Object.isBigInt`, `Object.isBoolean`, `Object.isObject`, `Object.isFunction`, `String.isNullOrEmpty`, and `String.isNullOrWhitespace`; the empty string is `String.empty`.
   Production consumers use these instead of `=== undefined`, `=== null`, `typeof x === "..."`, or `""`.
   A file that uses them imports `@noldova/teamrun-foundation-core`, usually as `import "@noldova/teamrun-foundation-core";`, and not with `import type`.
   The foundation implementations themselves use the host language's operations, and their declarations must preserve TypeScript narrowing.
@@ -149,6 +149,11 @@ Purpose-specific icons use a descriptive variant, such as `icon-dock-512.png`; I
 A package's `package.json` sits at the package root, with the `src/` and `tests/` folders beside it.
 Each folder has its own TypeScript configuration at its root, and `resources.ts` sits at the root of `src/`; tests mirror the full path.
 The Package layout check enforces this for every package except the test fixture packages, which section 13 owns.
+
+A package's Windows addons are C sources in its `src/native/`, one file per addon named in kebab-case, such as `windows-process.c`, and its manifest lists their names under `teamrun.windowsAddons`.
+An addon includes only `node_api.h`, the C standard headers and the system's headers, uses no C++ and no other library, and gives every function except its registration internal linkage.
+It exposes only what one interface declares; a single class implements that interface by loading the addon on its first call, and tests drive the interface through a fake.
+The [architecture](ARCHITECTURE.md#build-inputs) owns how addons are built, shipped and loaded.
 
 Package source trees use the concept categories `api`, `decorators`, `enums`, `exceptions`, `extensions`, `interfaces`, `intrinsics`, `models`, `services`, and `types`; create only those the package uses.
 Domain subfolders are optional and added only when they make current navigation clearer.
@@ -295,7 +300,7 @@ Avoid repetitive prose without omitting argument documentation.
 
 Source, tests, scripts and styles carry only the license header, with no JSDoc, rationale or summary comments.
 Rename or restructure code that needs explanation; put rationale in the issue, PR or owning document.
-The Comments check refuses any other comment in scripts, styles and templates; the handwritten `src/api/index.d.ts` declarations are its only exception.
+The Comments check refuses any other comment in scripts, C sources, styles and templates; the handwritten `src/api/index.d.ts` declarations are its only exception.
 
 External references may establish behavior; their prose is not copied.
 Every JSDoc uses the multiline form with separate opening and closing lines; parameter tags use `@param name description`, without a hyphen after the name:
@@ -424,7 +429,7 @@ Do not substitute PowerShell, `cmd.exe`, or batch for repository operations, and
 TeamRun's own code is intended for distribution under the MIT license.
 The root `LICENSE` file must contain that license before distribution and is the license authority; this standards document does not replace it.
 Every repository-owned source, test, script, style, template, workflow and generated file that supports comments begins with this exact notice, in the comment form of its format; generators emit it themselves, and formats without comments (such as JSON) are excluded.
-TypeScript, JavaScript, CSS and SCSS use the block comment:
+TypeScript, JavaScript, C, CSS and SCSS use the block comment:
 
 ```ts
 /**

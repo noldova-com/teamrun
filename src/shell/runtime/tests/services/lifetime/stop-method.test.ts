@@ -39,4 +39,50 @@ export class StopMethodTests {
       Assert.isTrue((await readFile(fixture.dataDirectory.runtimeLog, "utf8")).includes("clock: Ticking began\n"));
     });
   }
+
+  @TestMethod
+  public keepsTheRuntimeAndItsWorkForAClientThatConnectedFirstWhileTheCliStopStaysUnchanged(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostFixture.createWorkPart()]]));
+      const [cli] = await fixture.handshakeAsync("cli", RuntimeBuild.identity);
+      const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+
+      desktop.sendMessages(new Request("desktop:1", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.tick"), null).toJson()));
+      await RuntimeHostFixture.readMessagesAsync(desktop, 2);
+      const kept = await RuntimeHostFixture.callAsync(desktop, "desktop:2", ShellMethods.stop, new StopRequest(StopPolicy.StopWork, true).toJson());
+      const descriptions = [...host.work.descriptions];
+      cli.sendMessages(new Request("cli:1", ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson()));
+      const [responses, events] = await RuntimeHostFixture.readMessagesAsync(cli, 3);
+      await host.waitForStopAsync();
+
+      Assert.areEqual("{\"keptFor\":1}", JSON.stringify(kept.payload));
+      Assert.areEqual("[\"Ticking\"]", JSON.stringify(descriptions));
+      Assert.areEqual("null", JSON.stringify(responses.get("cli:1")?.payload));
+      Assert.areEqual("[{\"descriptions\":[\"Ticking\"],\"sequence\":1},{\"descriptions\":[],\"sequence\":2}]", JSON.stringify(events.map(t => t.payload)));
+      Assert.isTrue(existsSync(path.join(fixture.dataDirectory.locateWorkFolder("clock"), "aborted")));
+    });
+  }
+
+  @TestMethod
+  public appliesThePolicyToAClientAloneAndKeepsTheRuntimeOnceAnotherConnectsEvenOfTheSameName(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      const host = await fixture.startAsync(30_000, await fixture.writeModulesAsync([["clock", RuntimeHostFixture.createWorkPart()]]));
+      const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+
+      desktop.sendMessages(new Request("desktop:1", ShellMethods.runCommand, new CommandRun(QualifiedName.parse("clock.tick"), null).toJson()));
+      await RuntimeHostFixture.readMessagesAsync(desktop, 2);
+      const refused = await RuntimeHostFixture.callAsync(desktop, "desktop:2", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle, true).toJson());
+      await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const kept = await RuntimeHostFixture.callAsync(desktop, "desktop:3", ShellMethods.stop, new StopRequest(StopPolicy.StopWork, true).toJson());
+      const descriptions = [...host.work.descriptions];
+      desktop.sendMessages(new Request("desktop:4", ShellMethods.stop, new StopRequest(StopPolicy.StopWork).toJson()));
+      const [responses] = await RuntimeHostFixture.readMessagesAsync(desktop, 2);
+      await host.waitForStopAsync();
+
+      Assert.areEqual(`${FailureCode.Conflict}|{"descriptions":["Ticking"]}`, `${refused.failure?.code}|${JSON.stringify(refused.failure?.details)}`);
+      Assert.areEqual("{\"keptFor\":1}", JSON.stringify(kept.payload));
+      Assert.areEqual("[\"Ticking\"]", JSON.stringify(descriptions));
+      Assert.areEqual("null", JSON.stringify(responses.get("desktop:4")?.payload));
+    });
+  }
 }

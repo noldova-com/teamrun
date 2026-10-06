@@ -11,6 +11,7 @@ import { Resources } from "../resources.js";
 
 declare global {
   interface ObjectConstructor {
+    isBigInt(value: unknown): value is bigint;
     isBoolean(value: unknown): value is boolean;
     isFunction(value: unknown): value is Function;
     isNull(value: unknown): value is null;
@@ -20,6 +21,10 @@ declare global {
     isString(value: unknown): value is string;
     isUndefined(value: unknown): value is undefined;
   }
+}
+
+function isBigInt(value: unknown): value is bigint {
+  return typeof value === Resources.typeofBigInt;
 }
 
 function isBoolean(value: unknown): value is boolean {
@@ -59,6 +64,7 @@ Object.defineProperties(Object, {
   isString: { value: isString, writable: false, enumerable: false, configurable: false },
   isUndefined: { value: isUndefined, writable: false, enumerable: false, configurable: false }
 });
+Object.defineProperty(Object, nameof<ObjectConstructor>(t => t.isBigInt), { value: isBigInt, writable: false, enumerable: false, configurable: false });
 Object.defineProperty(Object, nameof<ObjectConstructor>(t => t.isBoolean), { value: isBoolean, writable: false, enumerable: false, configurable: false });
 Object.defineProperty(Object, nameof<ObjectConstructor>(t => t.isNull), { value: isNull, writable: false, enumerable: false, configurable: false });
 Object.defineProperty(Object, nameof<ObjectConstructor>(t => t.isNullOrUndefined), { value: isNullOrUndefined, writable: false, enumerable: false, configurable: false });

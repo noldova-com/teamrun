@@ -1594,6 +1594,34 @@ export declare class LaunchException extends Exception {
 }
 
 /**
+ * The exception thrown when the runtime cannot load one of its addons, or loads
+ * one that lacks the functions the runtime calls.
+ */
+export declare class AddonLoadException extends Exception {
+  /**
+   * The exception's name, `"AddonLoadException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message Which addon failed to load, and from where.
+   * @param options The error that loading it raised, if any.
+   * @example
+   * ```ts
+   * import { AddonLoadException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(file: string): never {
+   *   throw new AddonLoadException(`The runtime could not load its Windows addon from ${file}.`);
+   * }
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
  * The exception thrown when a module's program is not found or cannot be started.
  */
 export declare class ProcessStartException extends Exception {
@@ -2037,6 +2065,132 @@ export interface IProcessStarter {
    * ```
    */
   startAsync(executable: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, errorFile: string): Promise<number>;
+}
+
+/**
+ * The system calls a {@link ProcessSupervisor} makes on Windows to read the
+ * process table and end processes. {@link ProcessSupervisor.create} passes
+ * the system's own functions, called through the runtime's Windows addon.
+ * Each call returns at once, and creating an implementation loads nothing, so
+ * a supervisor can be created on any platform.
+ */
+export interface IWindowsProcessApi {
+  /**
+   * Lists the processes running now, as `CreateToolhelp32Snapshot` sees them.
+   *
+   * @returns Each process's id and its parent's id.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function listChildren(api: IWindowsProcessApi, parentId: number): number[] {
+   *   return api.listProcesses().filter(([, parent]) => parent === parentId).map(([processId]) => processId);
+   * }
+   * ```
+   */
+  listProcesses(): readonly (readonly [number, number])[];
+
+  /**
+   * Opens a process, as `OpenProcess` does.
+   *
+   * @param processId The process to open.
+   * @param access The access rights asked for.
+   * @returns The process's handle, or the Windows error code when it could not be opened: 87 when no process has the id.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isOpenable(api: IWindowsProcessApi, processId: number): boolean {
+   *   const handle = api.openProcess(processId, 0x1000);
+   *   if (typeof handle === "number")
+   *     return false;
+   *   api.closeHandle(handle);
+   *   return true;
+   * }
+   * ```
+   */
+  openProcess(processId: number, access: number): bigint | number;
+
+  /**
+   * Reads when a process was created, as `GetProcessTimes` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}.
+   * @returns The creation time in 100-nanosecond units since 1601, or `null` when it could not be read.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readCreated(api: IWindowsProcessApi, handle: bigint): number | null {
+   *   const created = api.readCreationTime(handle);
+   *   return created === null ? null : Number(created / 10_000n) - 11_644_473_600_000;
+   * }
+   * ```
+   */
+  readCreationTime(handle: bigint): bigint | null;
+
+  /**
+   * Reads the full path of the executable a process runs, as `QueryFullProcessImageNameW` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}.
+   * @returns The path, or `null` when it could not be read.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function runs(api: IWindowsProcessApi, handle: bigint, executable: string): boolean {
+   *   return api.readImagePath(handle)?.toLowerCase() === executable.toLowerCase();
+   * }
+   * ```
+   */
+  readImagePath(handle: bigint): string | null;
+
+  /**
+   * Ends a process, as `TerminateProcess` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess} with the right to terminate.
+   * @returns Whether the process was told to end.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function end(api: IWindowsProcessApi, handle: bigint): string {
+   *   return api.terminateProcess(handle) ? "ending" : "refused";
+   * }
+   * ```
+   */
+  terminateProcess(handle: bigint): boolean;
+
+  /**
+   * Checks whether a process has exited, as `WaitForSingleObject` does with no wait.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess} with the right to synchronize.
+   * @returns Whether the process has exited.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function countRunning(api: IWindowsProcessApi, handles: readonly bigint[]): number {
+   *   return handles.filter(t => !api.hasExited(t)).length;
+   * }
+   * ```
+   */
+  hasExited(handle: bigint): boolean;
+
+  /**
+   * Closes a handle, as `CloseHandle` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}, which is not used again.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function closeAll(api: IWindowsProcessApi, handles: readonly bigint[]): void {
+   *   for (const handle of handles)
+   *     api.closeHandle(handle);
+   * }
+   * ```
+   */
+  closeHandle(handle: bigint): void;
 }
 
 /**
@@ -4287,6 +4441,22 @@ export declare class RuntimeServer implements IEventSink {
   public get sessionCount(): number;
 
   /**
+   * Counts the authenticated connections other than the one that made a request, whatever names their clients gave.
+   *
+   * @param context The request's context, as the server passed it to the method handler.
+   * @returns The number of such connections; every authenticated connection when the server did not make the context.
+   * @example
+   * ```ts
+   * import type { RequestContext, RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isShared(server: RuntimeServer, context: RequestContext): boolean {
+   *   return server.countOtherClients(context) > 0;
+   * }
+   * ```
+   */
+  public countOtherClients(context: RequestContext): number;
+
+  /**
    * Listens on a loopback port the system assigns.
    *
    * @returns A promise of the endpoint.
@@ -6254,19 +6424,23 @@ export declare class ProcessSupervisor {
    * @param database The shell's database, which holds the records.
    * @param platform The platform, as in `process.platform`.
    * @param environment The runtime's environment, which programs inherit from.
-   * @param command Reads the process table.
+   * @param command Reads the process table on macOS and Linux.
    * @param diagnostics The runtime's log, which receives the programs that
    * had to be killed or could not be ended.
+   * @param windows The system calls the supervisor makes on Windows to read
+   * the process table and end processes. {@link ProcessSupervisor.create}
+   * passes the system's own functions, called through the runtime's Windows
+   * addon.
    * @param settings How long programs may take to end.
    * @param clock The clock that times programs' starts and names the boot;
    * {@link ProcessClock.create} for the platform this process runs on by
    * default.
    * @example
    * ```ts
-   * import { ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { type IWindowsProcessApi, ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
    *
-   * export function createSupervisor(database: ShellDatabase): ProcessSupervisor {
-   *   return new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), process.stderr, new ProcessSettings());
+   * export function createSupervisor(database: ShellDatabase, windows: IWindowsProcessApi): ProcessSupervisor {
+   *   return new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), process.stderr, windows, new ProcessSettings());
    * }
    * ```
    */
@@ -6276,8 +6450,45 @@ export declare class ProcessSupervisor {
     environment: NodeJS.ProcessEnv,
     command: SystemCommand,
     diagnostics: Writable,
+    windows: IWindowsProcessApi,
     settings?: ProcessSettings,
     clock?: ProcessClock);
+
+  /**
+   * Creates the supervisor the runtime runs with, which on Windows reads the
+   * process table and ends processes through the system's own functions,
+   * called through the runtime's Windows addon. The addon loads at its first
+   * use, and a call throws an {@link AddonLoadException} when it cannot load
+   * or returns a value this runtime does not expect.
+   *
+   * @param database The shell's database, which holds the records.
+   * @param platform The platform, as in `process.platform`.
+   * @param environment The runtime's environment, which programs inherit from.
+   * @param command Reads the process table on macOS and Linux.
+   * @param diagnostics The runtime's log, which receives the programs that
+   * had to be killed or could not be ended.
+   * @param settings How long programs may take to end.
+   * @param clock The clock that times programs' starts and names the boot;
+   * {@link ProcessClock.create} for the platform this process runs on by
+   * default.
+   * @returns The supervisor.
+   * @example
+   * ```ts
+   * import { ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createSupervisor(database: ShellDatabase): ProcessSupervisor {
+   *   return ProcessSupervisor.create(database, process.platform, process.env, new SystemCommand(), process.stderr);
+   * }
+   * ```
+   */
+  public static create(
+    database: ShellDatabase,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    command: SystemCommand,
+    diagnostics: Writable,
+    settings?: ProcessSettings,
+    clock?: ProcessClock): ProcessSupervisor;
 
   /**
    * The programs running, in the order they started, then the programs that

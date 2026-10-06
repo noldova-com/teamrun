@@ -135,6 +135,7 @@ Decorative borders may remain subtle; boundaries needed to identify controls mus
 | `--tr-added-background`, `--tr-removed-background` | Respective semantic foreground mixed over the local surface | 12% foreground | 12% foreground | Diff backgrounds; normal code text remains readable |
 
 Muted text inside a selected surface takes the surface's normal text color, and the kit's `selected-surface` mixin sets the fill and that color together, so every selected state uses it.
+Selection, and a keyboard-active option, show by their fill alone, without a bar or other marker; the fill needs no 3:1 against its surface, since the part's semantics convey the state and forced colors give it the Highlight fill.
 Use another validated token when muted text loses contrast on any other surface.
 Sections 6 and 7 distinguish readable secondary text from disabled controls.
 
@@ -342,6 +343,13 @@ The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
 - Enlarged text, zoom, high-contrast/forced-color modes and reduced motion remain usable.
   Do not hide focus or selection cues when a custom theme or color preference changes.
   Provide text alternatives for images and meaningful status announcements without repeatedly stealing focus.
+- When the system forces its colors (`forced-colors: active`), the system's palette replaces the theme's, fills and shadows drop away, and every state keeps a cue in system colors through the kit's forced-colors partial:
+  - Selected, current, checked, pressed and chosen parts, such as a selected tab, the current tree or list row, a checked pill, the active result or option, a pressed button, the chosen docking guide and a view badge, take the Highlight fill, with their text and icons in HighlightText.
+  - A hovered control or row takes a dashed Highlight outline.
+  - Focus is a Highlight ring at twice the border width, including on fields, selects and keys being recorded, whose focus is otherwise a border color.
+  - Progress, the spinner's arc, the sash's bar and drop lines are drawn in Highlight, and grips and separators in CanvasText.
+  - Overlays keep their borders, which identify them once their shadows are gone, and scroll areas show the system's own scrollbars.
+  - Error, success, added and removed keep their icon, sign or text, never color alone.
 
 ## 8. Component metrics and behavior
 

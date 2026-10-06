@@ -1,0 +1,54 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@mixin forced-colors {
+  @media (forced-colors: active) {
+    @content;
+  }
+}
+
+@mixin forced-selected($part: null) {
+  @include forced-colors {
+    --tr-text: HighlightText;
+    --tr-text-muted: HighlightText;
+    --tr-menu-text: HighlightText;
+    --tr-icon-color: HighlightText;
+    --tr-list-highlight: HighlightText;
+    --tr-list-active-text: HighlightText;
+
+    color: HighlightText;
+    forced-color-adjust: none;
+
+    @if $part {
+      &#{$part} {
+        background-color: Highlight;
+      }
+    } @else {
+      background-color: Highlight;
+    }
+  }
+}
+
+@mixin forced-hover {
+  @include forced-colors {
+    outline: var(--tr-border-width) dashed Highlight;
+    outline-offset: calc(var(--tr-border-width) * -1);
+  }
+}
+
+@mixin forced-focus {
+  @include forced-colors {
+    outline: calc(var(--tr-border-width) * 2) solid Highlight;
+  }
+}
+
+@mixin forced-line {
+  @include forced-colors {
+    background-color: CanvasText;
+  }
+}

@@ -23,6 +23,7 @@ export { CommandRun } from "../models/command-run.js";
 export { Event } from "../models/event.js";
 export { Failure } from "../models/failure.js";
 export { Handshake } from "../models/handshake.js";
+export { KeptRuntime } from "../models/kept-runtime.js";
 export { KeyChord } from "../models/key-chord.js";
 export { KeyName } from "../models/key-name.js";
 export { ModuleStatus } from "../models/module-status.js";

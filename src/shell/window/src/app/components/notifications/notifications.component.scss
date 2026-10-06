@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 :host {
   display: flex;
   height: var(--tr-status-bar-item-height);
@@ -27,11 +29,15 @@
 
 .tr-notifications-item:hover {
   background-color: var(--tr-toolbar-hover);
+
+  @include forced-hover;
 }
 
 .tr-notifications-item:focus-visible {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
+
+  @include forced-focus;
 }
 
 .tr-notifications-icon {
