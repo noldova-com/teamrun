@@ -59,7 +59,7 @@ export default class ScriptTestReporter extends Transform {
     else if (data.skip !== undefined)
       this.skip(file, names, data.skip === true ? ScriptTestReporter.NO_REASON : String(data.skip));
     else if (event.type === "test:pass")
-      this.passed += Number(data.nesting > 0 || data.name !== file);
+      this.passed += Number(data.nesting > 0 || this.relate(path.resolve(this.root, data.name)) !== file);
     else if ("failureType" in event.data.details.error && event.data.details.error.failureType === ScriptTestReporter.CANCELLED)
       this.unreached++;
     else

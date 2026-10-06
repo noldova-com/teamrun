@@ -67,7 +67,7 @@ class ScriptTestReporterTests {
       });
     });
 
-    test("the runner's events count each test by its outcome, leave suites and a file's own passing wrapper out, and count a wrapper that fails", async () => {
+    test("the runner's events count each test by its outcome, leave suites and a file's own passing wrapper out, named by its path in either form, and count a wrapper that fails", async () => {
       const reporter = new ScriptTestReporter(path.resolve("root"));
       const file = path.resolve("root", "a.test.ts");
       const run = (type: string, name: string, nesting: number, options: object = {}, at: string = file): void => {
@@ -84,6 +84,8 @@ class ScriptTestReporterTests {
       run("test:fail", "fails", 1);
       reporter.write({ type: "test:pass", data: { name: "outer", nesting: 0, file, details: { type: "suite" } } });
       run("test:pass", "empty.test.ts", 0, {}, path.resolve("root", "empty.test.ts"));
+      run("test:pass", path.join("deep", "empty.test.ts"), 0, {}, path.resolve("root", "deep", "empty.test.ts"));
+      run("test:pass", path.resolve("root", "other.test.ts"), 0, {}, path.resolve("root", "other.test.ts"));
       run("test:fail", "broken.test.ts", 0, {}, path.resolve("root", "broken.test.ts"));
       reporter.end();
 
@@ -98,7 +100,7 @@ class ScriptTestReporterTests {
           { file: "a.test.ts", names: ["outer", "later"], reason: "To do: Waits for the API." },
           { file: "a.test.ts", names: ["outer", "someday"], reason: "To do." }
         ],
-        files: ["a.test.ts", "broken.test.ts", "empty.test.ts"]
+        files: ["a.test.ts", "broken.test.ts", "deep/empty.test.ts", "empty.test.ts", "other.test.ts"]
       });
     });
 
