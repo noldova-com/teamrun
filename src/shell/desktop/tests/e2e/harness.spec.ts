@@ -78,6 +78,21 @@ test.describe("the harness's viewport and cursor guard", () => {
   });
 });
 
+test.describe("the harness's fonts", () => {
+  test("every workflow starts with each face the window declares loaded, and again after a restart, so text measures in its fonts", async ({ desktop }) => {
+    const readFaces = (): Promise<readonly [number, readonly string[]]> => desktop.window.evaluate(() =>
+      [document.fonts.size, [...document.fonts].filter(t => t.status !== "loaded").map(t => `${t.family} ${t.weight} ${t.style}`)] as const);
+    const first = await readFaces();
+
+    await desktop.restartAsync();
+    const restarted = await readFaces();
+
+    expect([first[0] > 0, first[1]]).toEqual([true, []]);
+    expect([restarted[0] > 0, restarted[1]]).toEqual([true, []]);
+    await desktop.checkpointAsync("harness-fonts");
+  });
+});
+
 test.describe("the workflows' checkpoints", () => {
   test("every workflow file that opens TeamRun takes a named checkpoint, and each name is taken in one place only", async ({}, testInfo) => {
     const folder = path.dirname(testInfo.file);
