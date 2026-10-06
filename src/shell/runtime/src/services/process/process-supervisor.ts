@@ -13,9 +13,11 @@ import { inspect } from "node:util";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+import { ProgramStatusList } from "@noldova/teamrun-shell-protocol";
 
 import { ProcessStartException } from "../../exceptions/process-start.exception.js";
 import type { IProcessEnder } from "../../interfaces/i-process-ender.js";
+import type { IWindowsProcessApi } from "../../interfaces/i-windows-process-api.js";
 import { KeptProgram } from "../../models/kept-program.js";
 import { OwnedProcess } from "../../models/owned-process.js";
 import type { ProcessEnding } from "../../models/process-ending.js";
@@ -24,6 +26,7 @@ import { ProcessLaunch } from "../../models/process-launch.js";
 import type { ProcessRecord } from "../../models/process-record.js";
 import type { ProcessRequest } from "../../models/process-request.js";
 import { ProcessSettings } from "../../models/process-settings.js";
+import { Registration } from "../../models/registration.js";
 import { RunningProcess } from "../../models/running-process.js";
 import { RunningProgram } from "../../models/running-program.js";
 import { Resources } from "../../resources.js";
@@ -35,6 +38,7 @@ import { ProcessEnderFactory } from "./process-ender-factory.js";
 import { ProcessEnvironment } from "./process-environment.js";
 import { ProcessRecordStore } from "./process-record-store.js";
 import { ProgramLocator } from "./program-locator.js";
+import { WindowsProcessApi } from "./windows-process-api.js";
 
 export class ProcessSupervisor {
   private readonly platform: string;
@@ -50,7 +54,9 @@ export class ProcessSupervisor {
   private readonly pending: Map<Promise<void>, string> = new Map();
   private readonly stopping: Set<string> = new Set();
   private readonly unrenewed: Set<ProcessRecord> = new Set();
+  private readonly listeners: Set<() => void> = new Set();
   private isStopping: boolean = false;
+  private sequence: number = 0;
   private seeing: NodeJS.Timeout | undefined;
 
   public constructor(
@@ -59,6 +65,7 @@ export class ProcessSupervisor {
     environment: NodeJS.ProcessEnv,
     command: SystemCommand,
     diagnostics: Writable,
+    windows: IWindowsProcessApi,
     settings: ProcessSettings = new ProcessSettings(),
     clock: ProcessClock = ProcessClock.create(process.platform)) {
     this.platform = platform;
@@ -66,9 +73,20 @@ export class ProcessSupervisor {
     this.records = new ProcessRecordStore(database);
     this.locator = new ProgramLocator(platform);
     this.clock = clock;
-    this.ender = ProcessEnderFactory.create(platform, command, environment, settings, clock);
+    this.ender = ProcessEnderFactory.create(platform, command, windows, settings, clock);
     this.diagnostics = diagnostics;
     this.seenMilliseconds = settings.seenMilliseconds;
+  }
+
+  public static create(
+    database: ShellDatabase,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    command: SystemCommand,
+    diagnostics: Writable,
+    settings: ProcessSettings = new ProcessSettings(),
+    clock: ProcessClock = ProcessClock.create(process.platform)): ProcessSupervisor {
+    return new ProcessSupervisor(database, platform, environment, command, diagnostics, new WindowsProcessApi(), settings, clock);
   }
 
   public get programs(): readonly RunningProgram[] {
@@ -76,6 +94,16 @@ export class ProcessSupervisor {
       ...[...this.running.values()].map(t => new RunningProgram(t.record.moduleId, t.record.program, t.record.processId, t.process.started, false)),
       ...[...this.kept].map(([kept, process]) => new RunningProgram(kept.record.moduleId, kept.record.program, kept.record.processId, process.started, true))
     ];
+  }
+
+  public get status(): ProgramStatusList {
+    return new ProgramStatusList(this.programs.map(t => t.toStatus()), this.sequence);
+  }
+
+  public onChanged(listener: () => void): Registration {
+    const entry = (): void => listener();
+    this.listeners.add(entry);
+    return new Registration(() => this.listeners.delete(entry));
   }
 
   public startAsync(moduleId: string, request: ProcessRequest): Promise<OwnedProcess> {
@@ -146,6 +174,7 @@ export class ProcessSupervisor {
     child.stdin.on(Resources.errorEvent, (error: Error) => this.report(record, error));
     this.running.set(owned, new RunningProcess(owned, record, ending.then(([, t]) => t)));
     this.watch();
+    this.publish();
     if (!Object.isUndefined(request.signal)) {
       const listener = addAbortListener(request.signal, () => void owned.stopAsync());
       void exited.then(() => listener[Symbol.dispose]());
@@ -205,6 +234,7 @@ export class ProcessSupervisor {
       this.kept.set(new KeptProgram(record, []), owned);
       this.report(record, error);
     }
+    this.publish();
   }
 
   private async endAsync(running: readonly RunningProcess[], kept: readonly KeptProgram[]): Promise<void> {
@@ -217,6 +247,7 @@ export class ProcessSupervisor {
     this.watch();
     for (const item of kept)
       this.kept.delete(item);
+    this.publish();
     try {
       this.finishAll(await this.ender.stopAsync(running, kept));
     }
@@ -224,6 +255,12 @@ export class ProcessSupervisor {
       for (const record of [...running, ...kept].map(t => t.record))
         this.report(record, error);
     }
+  }
+
+  private publish(): void {
+    this.sequence++;
+    for (const listener of [...this.listeners])
+      listener();
   }
 
   private watch(): void {

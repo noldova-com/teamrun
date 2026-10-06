@@ -11,6 +11,7 @@ import path from "node:path";
 
 import TeamRunCommand from "../desktop/teamrun.ts";
 import ProductIdentity from "../packages/product-identity.ts";
+import WindowsAddonBuilder from "../packages/windows-addon-builder.ts";
 import type RootManifest from "../packages/root-manifest.ts";
 import PackageLayout from "./package-layout.ts";
 import PackageTarget from "./package-target.ts";
@@ -21,14 +22,16 @@ export default class PackageConfiguration {
   private static readonly LICENSE_FILE: string = "LICENSE";
   private static readonly FONTS_FOLDER: string = "assets/fonts";
   private static readonly FONT_LICENSE_FILTER: readonly string[] = ["*.txt"];
+  private static readonly DICTIONARIES_FOLDER: string = "assets/dictionaries";
   private static readonly WINDOW_LICENSES_SEGMENTS: readonly string[] = ["_build", "window", "3rdpartylicenses.txt"];
   private static readonly LICENSES_FOLDER: string = "licenses";
   private static readonly WINDOW_LICENSES_FILE: string = "window-third-party.txt";
   private static readonly EXTENSION_MACRO: string = "${ext}";
+  private static readonly ADDONS_PATTERN: string = `**/*${WindowsAddonBuilder.ADDON_EXTENSION}`;
   private static readonly MAC_CATEGORY: string = "public.app-category.developer-tools";
   private static readonly LINUX_CATEGORY: string = "Development";
   private static readonly APPIMAGE_TOOLSET: string = "1.0.3";
-  private static readonly INSTALLER_INCLUDE_SEGMENTS: readonly string[] = ["assets", "installer", "command-path.nsh"];
+  private static readonly INSTALLER_INCLUDE_SEGMENTS: readonly string[] = ["assets", "installer", "installer.nsh"];
   private static readonly WINDOWS_PROGRAM_EXTENSION: string = ".exe";
   private static readonly WINDOWS_COMMAND_FOLDER: string = "%~dp0..";
   private static readonly RESOURCES_FOLDER: string = "resources";
@@ -92,6 +95,7 @@ export default class PackageConfiguration {
       electronDist: this.electronDistribution,
       electronVersion: this.electronVersion,
       asar: { smartUnpack: false },
+      asarUnpack: [PackageConfiguration.ADDONS_PATTERN],
       npmRebuild: false,
       nodeGypRebuild: false,
       buildDependenciesFromSource: false,
@@ -202,6 +206,7 @@ export default class PackageConfiguration {
     return [
       { from: path.join(this.root, PackageConfiguration.LICENSE_FILE), to: `${PackageConfiguration.LICENSES_FOLDER}/${PackageConfiguration.LICENSE_FILE}` },
       { from: path.join(this.root, PackageConfiguration.FONTS_FOLDER), to: PackageConfiguration.LICENSES_FOLDER, filter: PackageConfiguration.FONT_LICENSE_FILTER },
+      { from: path.join(this.root, PackageConfiguration.DICTIONARIES_FOLDER), to: PackageConfiguration.LICENSES_FOLDER, filter: PackageConfiguration.FONT_LICENSE_FILTER },
       { from: path.join(this.stage, ...PackageConfiguration.WINDOW_LICENSES_SEGMENTS), to: `${PackageConfiguration.LICENSES_FOLDER}/${PackageConfiguration.WINDOW_LICENSES_FILE}` }
     ];
   }

@@ -18,9 +18,8 @@ export class PreloadTests {
 
     Assert.areEqual([
       "platform", "processor", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "readStartup", "onStartup", "actOnStartup", "readLayout",
-      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "installCommand", "readUpdate", "onUpdate", "actOnUpdate", "keepAppearance", "edit", "setMenuBar",
-      "onMenuCommand", "onNotificationOpened",
-      "onQuitQuestion", "answerQuit", "logModule", "logError"
+      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "readUpdate", "onUpdate", "actOnUpdate", "keepAppearance",
+      "readSpelling", "keepSpelling", "onFieldMenu", "replaceMisspelling", "edit", "setMenuBar", "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "answerQuit", "logModule", "logError"
     ].join(","), Object.keys(api).join(","));
     Assert.areEqual(process.platform, api["platform"]);
     Assert.areEqual(process.arch, api["processor"]);
@@ -42,6 +41,7 @@ export class PreloadTests {
     PreloadTests.invoke(api["notifyReady"], "ready");
     PreloadTests.invoke(api["notifyAppearance"], "appearance");
     PreloadTests.invoke(api["keepAppearance"], "preferences");
+    PreloadTests.invoke(api["keepSpelling"], true, ["en-US"]);
     PreloadTests.invoke(api["setMenuBar"], "menus");
     PreloadTests.invoke(api["logModule"], "clock", "line");
     PreloadTests.invoke(api["logError"], null, "error");
@@ -50,6 +50,7 @@ export class PreloadTests {
       ["teamrun:ready", "ready"],
       ["teamrun:appearance", "appearance"],
       ["teamrun:keepAppearance", "preferences"],
+      ["teamrun:spelling", true, ["en-US"]],
       ["teamrun:menuBar", "menus"],
       ["teamrun:moduleLog", "clock", "line"],
       ["teamrun:windowError", null, "error"]
@@ -71,9 +72,12 @@ export class PreloadTests {
       PreloadTests.invoke(api["readBuild"]),
       PreloadTests.invoke(api["copyText"], "text"),
       PreloadTests.invoke(api["openLogFolder"]),
+      PreloadTests.invoke(api["openLink"], "https://example.com/"),
       PreloadTests.invoke(api["installCommand"]),
       PreloadTests.invoke(api["readUpdate"]),
       PreloadTests.invoke(api["actOnUpdate"], "Check"),
+      PreloadTests.invoke(api["readSpelling"]),
+      PreloadTests.invoke(api["replaceMisspelling"], "world"),
       PreloadTests.invoke(api["edit"], "Copy"),
       PreloadTests.invoke(api["answerQuit"], "wait")
     ]);
@@ -88,9 +92,12 @@ export class PreloadTests {
       ["teamrun:readBuild"],
       ["teamrun:copyText", "text"],
       ["teamrun:openLogFolder"],
+      ["teamrun:openLink", "https://example.com/"],
       ["teamrun:installCommand"],
       ["teamrun:readUpdate"],
       ["teamrun:updateAction", "Check"],
+      ["teamrun:readSpelling"],
+      ["teamrun:replaceMisspelling", "world"],
       ["teamrun:edit", "Copy"],
       ["teamrun:quitAnswer", "wait"]
     ]), JSON.stringify(electron.invoked));
@@ -102,6 +109,7 @@ export class PreloadTests {
   @TestData("onStartup", "teamrun:startupState", 1)
   @TestData("onEvent", "teamrun:runtimeEvent", 2)
   @TestData("onMenuCommand", "teamrun:menuCommand", 1)
+  @TestData("onFieldMenu", "teamrun:fieldMenu", 1)
   @TestData("onNotificationOpened", "teamrun:notificationOpened", 1)
   @TestData("onQuitQuestion", "teamrun:quitQuestion", 1)
   @TestData("onUpdate", "teamrun:updateState", 1)

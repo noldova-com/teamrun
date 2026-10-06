@@ -24,9 +24,10 @@ describe("ShellMenus", () => {
     expect([mac.groups[0]?.name, mac.groups[0]?.place, mac.groups[0]?.items.map(t => t.command)]).toEqual(["shell.updates", "shell.app", ["shell.checkForUpdates"]]);
     expect([other.groups[1]?.name, other.groups[1]?.place, other.groups[1]?.items.map(t => t.command)])
       .toEqual(["shell.editing", "shell.edit", ["shell.undo", "shell.redo", "shell.cut", "shell.copy", "shell.paste", "shell.selectAll"]]);
-    expect([mac.groups[1]?.name, mac.groups[1]?.place, mac.groups[1]?.items.map(t => t.command)])
+    expect([mac.groups[1]?.name, mac.groups[1]?.place, mac.groups[1]?.isDynamic]).toEqual(["shell.fieldSpelling", "shell.field", true]);
+    expect([mac.groups[2]?.name, mac.groups[2]?.place, mac.groups[2]?.items.map(t => t.command)])
       .toEqual(["shell.fieldEditing", "shell.field", ["shell.cut", "shell.copy", "shell.paste", "shell.selectAll"]]);
     expect(mac.groups.filter(t => t.place === "shell.app").map(t => t.name)).toEqual(["shell.updates", "shell.settings", "shell.commandLine"]);
-    expect(mac.groups.filter(t => t.isDynamic).length).toBe(2);
+    expect(mac.groups.filter(t => t.isDynamic).length).toBe(3);
   });
 });

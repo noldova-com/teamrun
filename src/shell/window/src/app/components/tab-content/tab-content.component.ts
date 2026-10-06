@@ -37,13 +37,15 @@ export class TabContentComponent {
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly injector: Injector = inject(Injector);
   private readonly revision: Signal<number> = computed(() => this.host.revisionOf(this.tab()));
+  private readonly stableTab: Signal<Tab> = computed(() => this.tab(), { equal: (a, b) => a.equals(b) });
 
   public readonly element: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   public readonly tab: InputSignal<Tab> = input.required<Tab>();
   public readonly isDocked: InputSignal<boolean> = input<boolean>(false);
+  public readonly isShown: InputSignal<boolean> = input<boolean>(true);
 
   protected readonly content: ResourceRef<TabContent | null | undefined> = resource({
-    params: () => ({ tab: this.tab(), revision: this.revision() }),
+    params: () => ({ tab: this.stableTab(), revision: this.revision() }),
     loader: ({ params }) => this.loadAsync(params.tab)
   });
   protected readonly isPadded: Signal<boolean> = computed(() => {
@@ -62,10 +64,10 @@ export class TabContentComponent {
     }
 
     const component = await match.loadComponent();
-    const page = { provide: WindowPartTokens.contentPadding, useValue: pagePadding };
+    const page = [{ provide: WindowPartTokens.contentPadding, useValue: pagePadding }, { provide: WindowPartTokens.shown, useValue: this.isShown }];
     if (Object.isNull(match.context))
-      return new TabContent(component, Injector.create({ providers: [page], parent: this.injector }), {}, match.padding, pagePadding);
-    const injector = Injector.create({ providers: [{ provide: WindowPartTokens.context, useValue: match.context }, page], parent: this.injector });
+      return new TabContent(component, Injector.create({ providers: page, parent: this.injector }), {}, match.padding, pagePadding);
+    const injector = Injector.create({ providers: [{ provide: WindowPartTokens.context, useValue: match.context }, ...page], parent: this.injector });
     const inputs = tab instanceof DocumentTab ? { instance: tab.instance, title: this.labels.of(tab).title } : {};
     return new TabContent(component, injector, inputs, match.padding, pagePadding);
   }

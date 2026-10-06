@@ -12,6 +12,7 @@ import { Resources } from "../resources.js";
 import { TestingException } from "./testing.exception.js";
 
 export class AssertFailedException extends TestingException {
+  public override readonly name: string = "AssertFailedException";
   public readonly expected: unknown;
   public readonly actual: unknown;
 

@@ -9,9 +9,9 @@
 import type { ExceptionOptions } from "../models/exception-options.js";
 
 export abstract class Exception extends Error {
+  public abstract override readonly name: string;
+
   protected constructor(message: string, options?: ExceptionOptions) {
     super(message, options);
-
-    this.name = new.target.name;
   }
 }

@@ -9,6 +9,8 @@
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 export class DiscoveryFormatException extends Exception {
+  public override readonly name: string = "DiscoveryFormatException";
+
   public constructor(message: string, options?: ExceptionOptions) {
     super(message, options);
   }

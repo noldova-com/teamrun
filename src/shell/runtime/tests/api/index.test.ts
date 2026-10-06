@@ -14,6 +14,7 @@ export class RuntimeApiTests {
   @TestMethod
   public exportsTheCompleteCatalog(): void {
     const exportNames = [
+      "AddonLoadException",
       "AppImageCopyCleanup",
       "AppImageSource",
       "AttachOptions",
@@ -104,6 +105,7 @@ export class RuntimeApiTests {
       "SettingsService",
       "ShellDatabase",
       "ShellMigrations",
+      "ShellSettings",
       "SystemCommand",
       "SystemCommandException",
       "UnknownSchemaException",

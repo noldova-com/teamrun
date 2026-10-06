@@ -9,6 +9,8 @@
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 export class SampleException extends Exception {
+  public override readonly name: string = "SampleException";
+
   public constructor(message: string, options?: ExceptionOptions) {
     super(message, options);
   }

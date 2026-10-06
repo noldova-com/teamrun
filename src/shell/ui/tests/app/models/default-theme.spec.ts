@@ -132,10 +132,10 @@ describe("DefaultTheme contrast", () => {
     ["scrollbar", "Scrollbar thumb, kept as a standard scrollbar by decision; the wheel, the keys and touch scroll without it."],
     ["scrollbar-active", "Scrollbar thumb while dragged, kept as a standard scrollbar by decision; the wheel, the keys and touch scroll without it."]
   ]);
-  const pendingCues: readonly (readonly [string, string, string])[] = [
-    ["selected", "window", "#222: the selection cue waits on the maintainer's choice of a second cue."],
-    ["selected", "panel", "#222: the selection cue waits on the maintainer's choice of a second cue."],
-    ["list-active", "dropdown-list", "#222: the keyboard-active option's cue waits on the same choice as selection."]
+  const fillCues: readonly (readonly [string, string, string])[] = [
+    ["selected", "window", "Selection shows by its fill alone, by decision; its semantics and forced colors' Highlight fill convey it."],
+    ["selected", "panel", "Selection shows by its fill alone, by decision; its semantics and forced colors' Highlight fill convey it."],
+    ["list-active", "dropdown-list", "The keyboard-active option shows by its fill alone, by the same decision as selection."]
   ];
 
   function channels(theme: Theme, mode: ThemeMode, name: string): readonly number[] {
@@ -177,16 +177,16 @@ describe("DefaultTheme contrast", () => {
 
   it("checks or exempts every color of the theme, each exemption with its reason", () => {
     const checked = new Set(pairs.flatMap(([foreground, grounds]) => [foreground, ...grounds]));
-    const pending = new Set(pendingCues.map(([color]) => color));
-    const unaccounted = Resources.colorTokens.map(t => t.variable.slice("--tr-".length)).filter(t => !checked.has(t) && !exempt.has(t) && !pending.has(t));
+    const fills = new Set(fillCues.map(([color]) => color));
+    const unaccounted = Resources.colorTokens.map(t => t.variable.slice("--tr-".length)).filter(t => !checked.has(t) && !exempt.has(t) && !fills.has(t));
 
     expect(unaccounted).toEqual([]);
     expect([...exempt.keys()].filter(t => checked.has(t))).toEqual([]);
-    expect([...exempt.values(), ...pendingCues.map(([, , reason]) => reason)].every(t => t.length > 0)).toBe(true);
+    expect([...exempt.values(), ...fillCues.map(([, , reason]) => reason)].every(t => t.length > 0)).toBe(true);
   });
 
-  it("keeps the state cues still waiting on their decision in #222 listed while they stay under 3:1", () => {
-    const passing = themes.flatMap(theme => modes.flatMap(mode => pendingCues
+  it("lists the selected and active-list fills as cues shown by their fill alone, which need no 3:1 against their surface, only while they stand under it", () => {
+    const passing = themes.flatMap(theme => modes.flatMap(mode => fillCues
       .filter(([cue, surface]) => ratio(theme, mode, cue, [surface]) >= partRatio)
       .map(([cue, surface]) => `${theme.id} ${mode}: ${cue} on ${surface}`)));
 

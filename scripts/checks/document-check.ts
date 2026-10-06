@@ -13,6 +13,7 @@ import type { Writable } from "node:stream";
 import DocumentLinkValidator from "../documents/document-link.validator.ts";
 import GitAttributesValidator from "../documents/git-attributes.validator.ts";
 import MarkdownDocument from "../documents/markdown-document.ts";
+import SentenceBreaker from "../documents/sentence-breaker.ts";
 import TextFormatValidator from "../documents/text-format.validator.ts";
 import type RepositoryFiles from "../repository/repository-files.ts";
 import type ICheck from "./interfaces/i-check.ts";
@@ -33,6 +34,7 @@ export default class DocumentCheck implements ICheck {
   public async runAsync(output: Writable): Promise<boolean> {
     const files = await this.files.listAsync();
     const formatValidator = new TextFormatValidator();
+    const breaker = new SentenceBreaker();
     const findings: string[] = [];
     const documents: MarkdownDocument[] = [];
     let attributes: string | null = null;
@@ -41,8 +43,11 @@ export default class DocumentCheck implements ICheck {
       findings.push(...formatValidator.validate(file, content));
       if (file === GitAttributesValidator.FILE)
         attributes = content.toString("utf8");
-      if (file.endsWith(DocumentCheck.MARKDOWN_EXTENSION))
-        documents.push(new MarkdownDocument(file, content.toString("utf8")));
+      if (file.endsWith(DocumentCheck.MARKDOWN_EXTENSION)) {
+        const text = content.toString("utf8");
+        documents.push(new MarkdownDocument(file, text));
+        findings.push(...breaker.findCrowdedLines(text).map(t => `${file}:${t}: holds more than one sentence; put each sentence on its own line, as npm run format:documents does.`));
+      }
     }
 
     findings.push(...new GitAttributesValidator().validate(attributes));

@@ -17,11 +17,15 @@ import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey,
-  ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
+  SettingValue, ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import {
+  ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry, ShellSettings
+} from "@noldova/teamrun-shell-runtime";
 
 import { PathCommandException } from "../exceptions/path-command.exception.js";
+import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
+import type { IContextMenuParams } from "../interfaces/i-context-menu-params.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
 import type { IElectron } from "../interfaces/i-electron.js";
@@ -45,8 +49,10 @@ import { Resources } from "../resources.js";
 import { AppIcons } from "./app-icons.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
+import { DeviceSettingFollower } from "./device-setting-follower.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { DeviceIdentity } from "./device-identity.js";
+import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
 import { OpenWindow } from "./open-window.js";
 import type { PathCommand } from "./path-command.js";
@@ -54,7 +60,11 @@ import { QuitCoordinator } from "./quit-coordinator.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
+import { SpellChecker } from "./spell-checker.js";
+import { SpellingDictionaries } from "./spelling-dictionaries.js";
 import { SystemNotifier } from "./system-notifier.js";
+import { TrayController } from "./tray-controller.js";
+import { TrayHostWatcher } from "./tray-host-watcher.js";
 import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
 
@@ -90,6 +100,10 @@ export class DesktopApplication {
   private readonly startup: RuntimeStartup;
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
+  private readonly tray: TrayController;
+  private readonly trayHosts: TrayHostWatcher;
+  private readonly trayIcon: DeviceSettingFollower;
+  private readonly spelling: SpellChecker;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly deviceFolder: string;
   private readonly appearanceStore: IAppearanceStore;
@@ -112,7 +126,8 @@ export class DesktopApplication {
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
     createPathCommand: (executablePath: string) => PathCommand,
-    icons: AppIcons) {
+    icons: AppIcons,
+    spelling: SpellChecker) {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
@@ -131,6 +146,12 @@ export class DesktopApplication {
     this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }));
     this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
+    this.tray = new TrayController(electron.tray, electron.menu, icons, process.platform,
+      { open: () => this.reopen(), openNotification: t => this.openNotification(t), setDoNotDisturb: t => void this.setDoNotDisturbAsync(t), quit: () => electron.app.quit() }, t => this.log.write(t));
+    this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.tray.setHostAvailable(t));
+    this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
+      t => this.tray.setEnabled(t === true), t => this.log.write(t));
+    this.spelling = spelling;
   }
 
   public static start(
@@ -154,7 +175,8 @@ export class DesktopApplication {
       process.homeFolder,
       join(moduleDirectory, ...Resources.repositoryRootSegments),
       DesktopApplication.readArgument(process.argv, Resources.dataDirectoryArgument));
-    if (Object.isUndefined(DesktopApplication.readArgument(process.argv, Resources.userDataArgument)))
+    const userData = DesktopApplication.readArgument(process.argv, Resources.userDataArgument);
+    if (Object.isUndefined(userData))
       electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
     const launchSettings = new LaunchSettings(
       dataDirectory,
@@ -165,8 +187,15 @@ export class DesktopApplication {
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
+    const profileFolder = userData ?? dataDirectory.profileFolder;
+    const languages = process.platform === Resources.macPlatform
+      ? []
+      : SpellingDictionaries.install(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.dictionaryFolderSegments), profileFolder, t => log.write(t));
+    const spelling = new SpellChecker(
+      () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, createPathCommand, icons);
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, createPathCommand, icons,
+      spelling);
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -183,11 +212,16 @@ export class DesktopApplication {
     app.enableSandbox();
     app.on(Resources.secondInstanceEvent, () => this.focus());
     app.on(Resources.windowAllClosedEvent, () => app.quit());
-    app.on(Resources.willQuitEvent, () => this.startup.close());
+    app.on(Resources.willQuitEvent, () => {
+      this.trayHosts.stop();
+      this.tray.dispose();
+      this.startup.close();
+    });
     void app.whenReady().then(() => this.ready());
   }
 
   private ready(): void {
+    this.spelling.start();
     const session = this.electron.session.defaultSession;
     ApplicationMenu.install(this.electron.menu, this.settings);
     this.electron.app.dock?.setIcon(this.icons.dock);
@@ -203,6 +237,9 @@ export class DesktopApplication {
     this.electron.ipcMain.on(Resources.readyChannel, (event, appearance) => this.show(event, appearance));
     this.electron.ipcMain.on(Resources.appearanceChannel, (event, appearance) => this.repaint(event, appearance));
     this.electron.ipcMain.on(Resources.keepAppearanceChannel, (event, preferences) => this.keepAppearance(event, preferences));
+    this.electron.ipcMain.handle(Resources.readSpellingChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.spelling.toJson());
+    this.electron.ipcMain.on(Resources.spellingChannel, (event, isChecking, languages) => this.keepSpelling(event, isChecking, languages));
+    this.electron.ipcMain.handle(Resources.replaceMisspellingChannel, (event, text) => this.replaceMisspelling(event, text));
     this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
@@ -216,6 +253,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.readBuildChannel, event => Object.isNull(this.findTrusted(event)) ? null : RuntimeBuild.identity.toJson());
     this.electron.ipcMain.handle(Resources.copyTextChannel, (event, text) => Object.isNull(this.findTrusted(event)) ? false : this.copyText(text));
     this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
+    this.electron.ipcMain.handle(Resources.openLinkChannel, (event, url) => Object.isNull(this.findTrusted(event)) ? false : this.openLinkAsync(url));
     this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
     this.electron.ipcMain.handle(Resources.readUpdateChannel, event => Object.isNull(this.findTrusted(event)) ? null : DesktopApplication.UPDATES_OFF);
     this.electron.ipcMain.handle(Resources.updateActionChannel, () => false);
@@ -224,6 +262,9 @@ export class DesktopApplication {
       if (this.windows.size === 0)
         this.open();
     });
+    this.tray.setHostAvailable(this.trayHosts.isAvailable);
+    this.tray.setEnabled(this.trayIcon.value === true);
+    this.trayHosts.start();
     void this.readAppearanceAsync().then(() => {
       this.open();
       void this.startup.startAsync();
@@ -258,11 +299,40 @@ export class DesktopApplication {
     this.appearanceStore.writeAsync(json).catch((error: unknown) => this.log.write(Resources.formatAppearanceUnsaved(String(error))));
   }
 
+  private keepSpelling(event: IIpcEvent, isChecking: unknown, languages: unknown): void {
+    if (Object.isNull(this.findTrusted(event)))
+      return;
+    if (!Object.isBoolean(isChecking) || !Array.isArray(languages) || !languages.every(t => Object.isString(t))) {
+      this.log.write(Resources.formatSpellingRejected(Resources.spellingInvalid));
+      return;
+    }
+    this.spelling.apply(isChecking, languages);
+  }
+
+  private replaceMisspelling(event: IIpcEvent, text: unknown): boolean {
+    const open = this.findTrusted(event);
+    if (Object.isNull(open) || !Object.isString(text) || text.length === 0 || text.length > Resources.spellingTextLimit)
+      return false;
+    open.window.webContents.replaceMisspelling(text);
+    return true;
+  }
+
+  private forwardFieldMenu(open: OpenWindow, params: IContextMenuParams): void {
+    open.window.webContents.send(Resources.fieldMenuChannel, {
+      [Resources.xField]: params.x,
+      [Resources.yField]: params.y,
+      [Resources.isKeyboardField]: params.menuSourceType === Resources.keyboardMenuSource,
+      [Resources.wordField]: params.misspelledWord,
+      [Resources.suggestionsField]: [...params.dictionarySuggestions]
+    });
+  }
+
   private open(): void {
     const window = this.factory.create(WindowState.createDefault(ScreenArea.of(this.electron.screen.getPrimaryDisplay().workArea)), this.appearance);
     const contentsId = window.webContents.id;
     const open = new OpenWindow(window, this.electron.screen, this.log, this.quit, this.settings.platform);
     window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());
+    window.webContents.on(Resources.contextMenuEvent, (_event, params) => this.forwardFieldMenu(open, params));
     new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
     window.once(Resources.closedEvent, () => this.windows.delete(contentsId));
@@ -279,6 +349,10 @@ export class DesktopApplication {
       this.notifier.reset();
     if (!isReady)
       this.quit.release();
+    if (isReady && !this.isReady)
+      void this.refreshTrayAsync();
+    else if (!isReady)
+      this.tray.clear();
     this.isReady = isReady;
     for (const open of this.windows.values())
       if (!open.window.isDestroyed()) {
@@ -302,7 +376,9 @@ export class DesktopApplication {
 
   private receiveWork(event: Event): void {
     try {
-      this.quit.receive(WorkReport.fromJson(event.payload));
+      const report = WorkReport.fromJson(event.payload);
+      this.quit.receive(report);
+      this.tray.receiveWork(report);
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -398,6 +474,7 @@ export class DesktopApplication {
   private readSettingForDevice(event: Event): JsonValue | undefined {
     try {
       const change = SettingChange.fromJson(event.payload);
+      this.trayIcon.receive(change, this.knownDevice);
       if (Object.isNull(change.key.device))
         return event.payload;
       return change.key.device === this.knownDevice ? new SettingChange(new SettingKey(change.key.name, change.key.scope), change.value, change.isSet).toJson() : undefined;
@@ -421,7 +498,9 @@ export class DesktopApplication {
     try {
       const broadcast = NotificationBroadcast.fromJson(event.payload);
       this.notifier.receive(broadcast);
-      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
+      const state = Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice);
+      this.tray.receiveNotifications(state);
+      return state.toJson();
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -438,6 +517,45 @@ export class DesktopApplication {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
       return undefined;
     }
+  }
+
+  private async refreshTrayAsync(): Promise<void> {
+    const epoch = this.notifier.epoch;
+    const device = await this.device;
+    if (Object.isNull(device))
+      return;
+    const [work, notifications] = await Promise.all([
+      this.callAsync(ShellMethods.work, null),
+      this.callAsync(ShellMethods.notifications, new NotificationsQuery(device).toJson()),
+      this.trayIcon.refreshAsync(device)
+    ]);
+    if (epoch !== this.notifier.epoch)
+      return;
+    try {
+      if (!work.hasFailed)
+        this.tray.receiveWork(WorkReport.fromJson(work.payload));
+      if (!notifications.hasFailed)
+        this.tray.receiveNotifications(NotificationState.fromJson(notifications.payload));
+    }
+    catch (error) {
+      this.log.write(Resources.formatTrayStateNotRead(String(error)));
+    }
+  }
+
+  private async setDoNotDisturbAsync(isOn: boolean): Promise<void> {
+    const device = await this.device;
+    const failure = Object.isNull(device)
+      ? new Failure(FailureCode.Unavailable, Resources.deviceNotIdentified)
+      : (await this.callAsync(ShellMethods.setSetting, new SettingValue(new SettingKey(ShellSettings.doNotDisturb, null, device), isOn).toJson())).failure;
+    if (Object.isUndefined(failure))
+      return;
+    this.log.write(Resources.formatDoNotDisturbNotSet(failure.message));
+    this.tray.rebuildMenu();
+  }
+
+  private reopen(): void {
+    if (Object.isNull(this.focus()))
+      this.open();
   }
 
   private async readNotificationsAsync(name: QualifiedName): Promise<JsonObject> {
@@ -469,12 +587,20 @@ export class DesktopApplication {
     if (kind === StartupStateKind.Connecting)
       return;
     if (kind === StartupStateKind.Ready && this.restored.has(open))
-      await open.bounds.saveUnsavedAsync().catch((error: unknown) => this.log.write(Resources.formatBoundsUnsaved(String(error))));
+      await open.bounds.saveUnsavedAsync().catch((error: unknown) => {
+        if (!(error instanceof WindowStateUnavailableException))
+          this.log.write(Resources.formatBoundsUnsaved(String(error)));
+      });
     else if (kind === StartupStateKind.Ready) {
       this.restored.add(open);
       const device = await this.device;
       if (!Object.isNull(device))
-        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => this.log.write(Resources.formatBoundsNotRestored(String(error))));
+        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => {
+          if (error instanceof WindowStateUnavailableException)
+            this.restored.delete(open);
+          else
+            this.log.write(Resources.formatBoundsNotRestored(String(error)));
+        });
     }
     open.settle();
   }
@@ -531,6 +657,22 @@ export class DesktopApplication {
     if (failure.length > 0)
       this.log.write(Resources.formatLogFolderNotOpened(failure));
     return failure.length === 0;
+  }
+
+  private async openLinkAsync(url: unknown): Promise<boolean> {
+    const link = LinkPolicy.findAllowed(url);
+    if (Object.isNull(link)) {
+      this.log.write(Resources.linkRefused);
+      return false;
+    }
+    try {
+      await this.electron.shell.openExternal(link);
+      return true;
+    }
+    catch (error) {
+      this.log.write(Resources.formatLinkNotOpened(String(error)));
+      return false;
+    }
   }
 
   private async installCommandAsync(event: IIpcEvent): Promise<boolean> {

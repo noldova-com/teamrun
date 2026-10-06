@@ -37,6 +37,7 @@ export class ShellMenus {
     Object.values(EditAction).map(t => MenuItem.ofCommand(Resources.editCommands[t])));
   private static readonly FIELD_EDITING: MenuGroup = new MenuGroup(Resources.fieldEditingGroup, Resources.fieldMenu, false,
     Resources.fieldEditActions.map(t => MenuItem.ofCommand(Resources.editCommands[t])));
+  private static readonly FIELD_SPELLING: MenuGroup = MenuGroup.dynamic(Resources.fieldSpellingGroup, Resources.fieldMenu, false);
   private static readonly GROUPS: readonly MenuGroup[] = [
     new MenuGroup(Resources.closeGroup, Resources.fileMenu, false, [MenuItem.ofCommand(Resources.closeTabCommand)]),
     new MenuGroup(Resources.searchGroup, Resources.viewMenu, false, [MenuItem.ofCommand(Resources.showCommandsCommand)]),
@@ -86,7 +87,8 @@ export class ShellMenus {
 
   public static of(isMac: boolean): MenuDeclarations {
     const updates = new MenuGroup(Resources.updatesGroup, isMac ? Resources.appMenu : Resources.helpMenu, false, [MenuItem.ofCommand(Resources.checkForUpdatesCommand)]);
-    return new MenuDeclarations(Resources.shellOwner, ShellMenus.PLACES,
-      isMac ? [updates, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS] : [updates, ShellMenus.EDITING, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS]);
+    return new MenuDeclarations(Resources.shellOwner, ShellMenus.PLACES, isMac
+      ? [updates, ShellMenus.FIELD_SPELLING, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS]
+      : [updates, ShellMenus.EDITING, ShellMenus.FIELD_SPELLING, ShellMenus.FIELD_EDITING, ...ShellMenus.GROUPS]);
   }
 }

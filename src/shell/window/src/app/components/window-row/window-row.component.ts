@@ -15,11 +15,15 @@ import { AppearanceService, DialogService, IconButtonComponent, MenuBarComponent
 import { Resources } from "../../../resources";
 import { MenuBarStyle } from "../../enums/menu-bar-style";
 import { WindowAppearance } from "../../models/window-appearance";
+import type { DocumentHeading } from "../../models/document-heading";
+import { DocumentTab } from "../../models/layout/document-tab";
 import { BarItemsService } from "../../services/bar-items.service";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
+import { LayoutService } from "../../services/layout.service";
 import { MenuBarService } from "../../services/menu-bar.service";
 import { SettingsService } from "../../services/settings.service";
+import { TabLabelService } from "../../services/tab-label.service";
 import { PlaceMenuComponent } from "../place-menu/place-menu.component";
 
 @Component({
@@ -41,6 +45,8 @@ export class WindowRowComponent {
   private readonly commands: CommandService = inject(CommandService);
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly labels: TabLabelService = inject(TabLabelService);
+  private readonly layout: LayoutService = inject(LayoutService);
   private readonly settings: SettingsService = inject(SettingsService);
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly foldedValue: WritableSignal<boolean> = signal(false);
@@ -55,6 +61,10 @@ export class WindowRowComponent {
   protected readonly bars: BarItemsService = inject(BarItemsService);
   protected readonly menuBar: MenuBarService = inject(MenuBarService);
   protected readonly below: OverlaySide = OverlaySide.below;
+  protected readonly heading: Signal<DocumentHeading | null> = computed(() => {
+    const active = this.layout.layout().documents.active;
+    return active instanceof DocumentTab ? this.labels.headingOf(active) : null;
+  });
   protected readonly isFolded: Signal<boolean> = this.foldedValue.asReadonly();
   protected readonly style: Signal<MenuBarStyle> = computed(() => {
     const value = this.settings.values().get(Resources.menuBarSetting);
@@ -77,6 +87,9 @@ export class WindowRowComponent {
       if (isReported)
         this.bridge.notifyAppearance(WindowAppearance.read(host));
       isReported = true;
+    });
+    effect(() => {
+      host.ownerDocument.title = this.heading()?.windowTitle ?? Resources.productName;
     });
     const observer = new ResizeObserver(() => this.measure());
     afterRenderEffect(() => {

@@ -16,7 +16,8 @@ export default class ProductIdentityFixture {
     dataFolder: ".fixtureworks/studio",
     deviceFolders: { windows: "Fixture Works/Studio", macos: "Fixture Works/Studio Mac", linux: "fixtureworks/studio" },
     dataDirectoryVariable: "FIXTURE_STUDIO_DATA_DIR",
-    icons: "assets/fixture-icons"
+    icons: "assets/fixture-icons",
+    releaseRepository: "fixtureworks/studio"
   };
 
   public static manifest(overrides: Readonly<Record<string, unknown>> = {}, modules: readonly string[] = []): Readonly<Record<string, unknown>> {

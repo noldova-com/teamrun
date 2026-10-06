@@ -94,6 +94,31 @@ export interface IDocumentOptions {
    * document opens as an ordinary tab.
    */
   readonly preview?: boolean;
+
+  /**
+   * The segments shown before the title in the window row while the
+   * document is active, such as its project and folder, outermost first;
+   * none when left out. Segments are text and must not be blank.
+   */
+  readonly breadcrumb?: readonly string[];
+}
+
+/**
+ * What {@link IWindowPartContext.updateDocument} changes about an open
+ * document; what is left out stays as it is.
+ */
+export interface IDocumentUpdate {
+  /**
+   * The new title, shown on the tab, in a dialog that shows the document,
+   * and in the window row and the window's title while it is active.
+   */
+  readonly title?: string;
+
+  /**
+   * The new breadcrumb, as {@link IDocumentOptions.breadcrumb} describes
+   * it; an empty list removes it.
+   */
+  readonly breadcrumb?: readonly string[];
 }
 
 /**
@@ -498,6 +523,36 @@ export interface IWindowPartContext {
   setViewBadge(view: string, badge: ViewBadge | null): void;
 
   /**
+   * Marks the tab of one of the module's views or documents as working. The
+   * tab shows a spinner in place of its close glyph, reveals Close when hovered
+   * or focused, and is marked busy for assistive technology, until every mark
+   * on it is cleared or the part is withdrawn. Real work that should hold up
+   * quitting is reported by the module's runtime part, not by this mark.
+   *
+   * @param name The view's or document's name, which the module declares in
+   * `contributes.views` or `contributes.documents`.
+   * @param instance The tab's instance, if it has one.
+   * @returns A function that clears this mark; calling it again does nothing.
+   * @throws Error synchronously when the name belongs to another module, the
+   * module declares no such view or document, or the instance is not valid.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export async function syncNoteAsync(context: IWindowPartContext, note: string, sync: () => Promise<void>): Promise<void> {
+   *   const clear = context.markWorking("notes.note", note);
+   *   try {
+   *     await sync();
+   *   }
+   *   finally {
+   *     clear();
+   *   }
+   * }
+   * ```
+   */
+  markWorking(name: string, instance?: string): () => void;
+
+  /**
    * Tells whether a name belongs to the module or one of its dependencies,
    * which is what the part may reach.
    *
@@ -566,15 +621,16 @@ export interface IWindowPartContext {
    * @param name The document's name.
    * @param instance Which of the document's instances, such as a note's id.
    * @param title The tab's title.
-   * @param options Whether it opens as a preview; an ordinary tab when left
-   * out.
-   * @throws Error synchronously when the document belongs to another module.
+   * @param options Whether it opens as a preview, and its breadcrumb; an
+   * ordinary tab with no breadcrumb when left out.
+   * @throws Error synchronously when the document belongs to another module,
+   * or the title or a breadcrumb segment is blank.
    * @example
    * ```ts
    * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
    *
    * export function previewNote(context: IWindowPartContext, note: string, title: string): void {
-   *   context.openDocument("notes.note", note, title, { preview: true });
+   *   context.openDocument("notes.note", note, title, { preview: true, breadcrumb: ["Notes", "Drafts"] });
    * }
    * ```
    */
@@ -597,6 +653,27 @@ export interface IWindowPartContext {
    * ```
    */
   keepDocument(name: string, instance: string): void;
+
+  /**
+   * Changes the title or breadcrumb of one of the module's open documents,
+   * such as after the person renames or moves a note. Nothing shows when
+   * the document is not open.
+   *
+   * @param name The document's name.
+   * @param instance The instance it opened with.
+   * @param update The new title, breadcrumb or both.
+   * @throws Error synchronously when the document belongs to another module,
+   * or the title or a breadcrumb segment is blank.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function renameNote(context: IWindowPartContext, note: string, title: string): void {
+   *   context.updateDocument("notes.note", note, { title });
+   * }
+   * ```
+   */
+  updateDocument(name: string, instance: string, update: IDocumentUpdate): void;
 
   /**
    * Shows a view or document in a large modal dialog. One already open in a
@@ -634,6 +711,27 @@ export interface IWindowPartContext {
    * ```
    */
   log(message: string): void;
+
+  /**
+   * Opens a link in the system's own application, such as a web page in the
+   * person's browser or a new message in their mail app. TeamRun opens only
+   * well-formed http, https and mailto links without credentials, and never
+   * asks first. A click on such a link in the window's content opens it the
+   * same way, unless the part handled the click itself.
+   *
+   * @param url The link to open.
+   * @returns A promise that settles once the system has taken the link; it
+   * rejects when TeamRun refuses the link or the system cannot open it.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function openHelp(context: IWindowPartContext): Promise<void> {
+   *   return context.openLinkAsync("https://example.com/help");
+   * }
+   * ```
+   */
+  openLinkAsync(url: string): Promise<void>;
 
   /**
    * Calls a method of the module's runtime part or a dependency's.
@@ -1515,6 +1613,15 @@ export declare class WindowPartTokens {
    * The {@link ContentPaddingRef} of the page the component is shown on.
    */
   public static readonly contentPadding: InjectionToken<ContentPaddingRef>;
+
+  /**
+   * Whether the page the component is shown on is in view.
+   * @remarks The window keeps a tab's page while the tab is open. A hidden
+   * page is taken out of the document and gets no change detection until it
+   * shows again, so a component reads this signal to pause work of its own,
+   * such as timers, while it is hidden.
+   */
+  public static readonly shown: InjectionToken<Signal<boolean>>;
 }
 
 /**

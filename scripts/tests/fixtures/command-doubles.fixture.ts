@@ -86,7 +86,7 @@ export default class CommandDoublesFixture {
     return readFile(path.join(this.directory, name), "utf8");
   }
 
-  public async runAsync(script: string, environment: Readonly<Record<string, string>> = {}): Promise<CommandResult> {
+  public async runAsync(script: string, environment: Readonly<Record<string, string>> = {}): Promise<ICommandResult> {
     for (const [command, responses] of this.responses)
       await this.writeDoubleAsync(command, ["case \"$*\" in", ...responses, "esac", "echo \"Unexpected call: $0 $*\" >&2", "exit 127"]);
     for (const command of this.forwarded)
@@ -150,7 +150,7 @@ export default class CommandDoublesFixture {
   }
 }
 
-export interface CommandResult {
+export interface ICommandResult {
   readonly status: number | null;
   readonly stdout: string;
   readonly stderr: string;

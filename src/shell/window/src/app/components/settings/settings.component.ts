@@ -17,16 +17,15 @@ import { SelectComponent, SelectOption, TextFieldComponent, TreeComponent, TreeN
 import { UpdateStateKind } from "../../enums/update-state-kind";
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
-import { SettingsView } from "../../models/settings/settings-view";
 import { ShortcutRow } from "../../models/settings/shortcut-row";
 import { TextMatch } from "../../models/settings/text-match";
-import { ShellDocuments } from "../../models/shell-documents";
 import { Resources } from "../../../resources";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { ModuleStatusService } from "../../services/module-status.service";
 import { SettingsPageService } from "../../services/settings-page.service";
 import { SettingsService } from "../../services/settings.service";
+import { SpellingService } from "../../services/spelling.service";
 import { UpdateService } from "../../services/update.service";
 import { ViewStateService } from "../../services/view-state.service";
 import { AboutComponent } from "../about/about.component";
@@ -50,22 +49,20 @@ export class SettingsComponent {
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
-  private readonly viewStates: ViewStateService = inject(ViewStateService);
-  private readonly kept: SettingsView = this.viewStates.find(ShellDocuments.settingsTab.key, SettingsView) ?? SettingsView.initial;
-  private readonly selected: WritableSignal<string> = signal(this.kept.page);
+  private readonly selected: WritableSignal<string> = signal(Resources.appearancePage);
   private readonly pageList: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("pageList");
   private readonly pageTree: Signal<TreeComponent> = viewChild.required(TreeComponent);
   private readonly pageSelect: Signal<ElementRef<HTMLElement>> = viewChild.required("pageSelect", { read: ElementRef<HTMLElement> });
   private readonly pageChooser: Signal<SelectComponent> = viewChild.required("pageSelect", { read: SelectComponent });
-  private readonly content: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("content");
   private focusedControl: HTMLElement | null = null;
 
   protected readonly resources: typeof Resources = Resources;
-  protected readonly query: WritableSignal<string> = signal(this.kept.query);
+  protected readonly query: WritableSignal<string> = signal(String.empty);
   private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
   private readonly updates: UpdateService = inject(UpdateService);
 
   protected readonly gallery: Type<unknown> | null = inject(GalleryTokens.component);
+  protected readonly spelling: SpellingService = inject(SpellingService);
 
   protected readonly modules: Signal<readonly SelectOption[]> = computed(() => this.statuses.modules().map(t => new SelectOption(t.id, t.displayName)));
   protected readonly notifyingModules: Signal<readonly SelectOption[]> = computed(() =>
@@ -118,8 +115,6 @@ export class SettingsComponent {
       });
     });
     afterNextRender(() => {
-      this.pageList().nativeElement.scrollTop = this.kept.pageListTop;
-      this.content().nativeElement.scrollTop = this.kept.contentTop;
       const switched = new ResizeObserver(() => this.keepFocus());
       switched.observe(this.pageList().nativeElement);
       switched.observe(this.pageSelect().nativeElement);
@@ -137,22 +132,15 @@ export class SettingsComponent {
       this.focusedControl = null;
   }
 
-  protected keep(): void {
-    this.viewStates.keep(ShellDocuments.settingsTab.key,
-      new SettingsView(this.selected(), this.query(), this.pageList().nativeElement.scrollTop, this.content().nativeElement.scrollTop));
-  }
-
   protected search(event: Event): void {
     if (!(event.target instanceof HTMLInputElement))
       return;
     this.query.set(event.target.value);
-    this.keep();
   }
 
   protected select(title: string): void {
     this.query.set("");
     this.selected.set(title);
-    this.keep();
   }
 
   protected isMutedModules(definition: SettingDefinition): boolean {

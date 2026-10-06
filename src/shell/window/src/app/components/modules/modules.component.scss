@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "selected-surface" as *;
 
 :host {
@@ -71,6 +72,8 @@
 
 .tr-modules-row:hover {
   background-color: var(--tr-hover);
+
+  @include forced-hover;
 }
 
 .tr-modules-row-current,
@@ -91,13 +94,18 @@
   min-width: 0;
 }
 
-.tr-modules-row-version {
+.tr-modules-row-version,
+.tr-modules-row-programs,
+.tr-modules-program-state,
+.tr-modules-program-process {
   flex: none;
 }
 
 .tr-modules-row-meta,
 .tr-modules-detail-id,
-.tr-modules-contribution-name {
+.tr-modules-contribution-name,
+.tr-modules-program-meta,
+.tr-modules-program-state {
   color: var(--tr-text-muted);
   font-size: var(--tr-text-label);
   line-height: var(--tr-line-label);
@@ -208,6 +216,7 @@
   line-height: var(--tr-line-label);
 }
 
+.tr-modules-programs,
 .tr-modules-contributions {
   display: flex;
   flex-direction: column;
@@ -215,6 +224,31 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.tr-modules-programs {
+  gap: var(--tr-space-2);
+}
+
+.tr-modules-program {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tr-space-1);
+  min-width: 0;
+}
+
+.tr-modules-program-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 var(--tr-space-2);
+  min-width: 0;
+}
+
+.tr-modules-program-meta {
+  display: flex;
+  gap: var(--tr-space-2);
+  min-width: 0;
 }
 
 .tr-modules-contribution {

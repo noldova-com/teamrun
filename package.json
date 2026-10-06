@@ -17,8 +17,10 @@
         "linux": "noldova/teamrun"
       },
       "dataDirectoryVariable": "TEAMRUN_DATA_DIR",
-      "icons": "assets/icons"
-    }
+      "icons": "assets/icons",
+      "releaseRepository": "noldova-com/teamrun"
+    },
+    "supportedTargets": []
   },
   "private": true,
   "type": "module",
@@ -30,6 +32,7 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
+    "format:documents": "node scripts/format-documents.ts",
     "package": "node scripts/package.ts",
     "package:smoke": "node scripts/package-smoke.ts",
     "release:assets": "node scripts/release-assets.ts",

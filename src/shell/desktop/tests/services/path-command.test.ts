@@ -15,10 +15,12 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { PathCommand, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
 
 import { PathCommandFilesFixture } from "../fixtures/path-command-files.fixture.js";
+import { PlatformFixture } from "../fixtures/platform.fixture.js";
 
 @TestClass
 export class PathCommandTests {
   @TestMethod
+  @PlatformFixture.posixOnly()
   public linksTheBundleCommandInTheFolderItMakesAndKeepsALinkThatIsAlreadyRight(): Promise<void> {
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
       const link = path.join(folder, "usr", "local", "bin", "teamrun");
@@ -38,6 +40,7 @@ export class PathCommandTests {
   }
 
   @TestMethod
+  @PlatformFixture.posixOnly()
   public replacesALinkToElsewhereAndLeavesAFileThatIsNotALink(): Promise<void> {
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
       const stale = path.join(folder, "stale");
@@ -52,6 +55,28 @@ export class PathCommandTests {
 
       Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.Occupied].join(), outcomes.join());
       Assert.areEqual(target, await readlink(stale));
+    });
+  }
+
+  @TestMethod
+  public replacesALinkToElsewhereKeepsALinkThatIsAlreadyRightAndLeavesAFileThroughTheLinkCalls(): Promise<void> {
+    return PathCommandTests.runInFolderAsync(async (folder, target) => {
+      const link = path.join(folder, "bin", "teamrun");
+      const file = path.join(folder, "file");
+      await writeFile(file, "someone else's teamrun");
+      const ran: (readonly string[])[] = [];
+      const files = new PathCommandFilesFixture();
+      files.linkStubs = new Map([[link, path.join(folder, "old", "teamrun")]]);
+      const command = new PathCommand(target, link, files, (program, args) => {
+        ran.push([program, ...args]);
+        return Promise.resolve();
+      });
+
+      const outcomes = [await command.installAsync(), await command.installAsync(), await new PathCommand(target, file, files, () => Promise.resolve()).installAsync()];
+
+      Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.AlreadyInstalled, PathCommandOutcome.Occupied].join(), outcomes.join());
+      Assert.areEqual(target, files.linkStubs.get(link));
+      Assert.areEqual(0, ran.length);
     });
   }
 

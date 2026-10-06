@@ -37,6 +37,8 @@ export class Resources {
   public static readonly detailsField: string = "details";
   public static readonly executablePathField: string = "executablePath";
   public static readonly policyField: string = "policy";
+  public static readonly keepsWhileSharedField: string = "keepsWhileShared";
+  public static readonly keptForField: string = "keptFor";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly locationField: string = "location";
   public static readonly stateField: string = "state";
@@ -81,6 +83,12 @@ export class Resources {
   public static readonly mutedModulesField: string = "mutedModules";
   public static readonly idsField: string = "ids";
   public static readonly sequenceField: string = "sequence";
+  public static readonly moduleField: string = "module";
+  public static readonly programField: string = "program";
+  public static readonly processIdField: string = "processId";
+  public static readonly startedAtField: string = "startedAt";
+  public static readonly hasExitedField: string = "hasExited";
+  public static readonly programsField: string = "programs";
   public static readonly keyParameterName: string = "key";
   public static readonly commandTitleInvalid: string = "A command's title must not be blank.";
   public static readonly commandIconInvalid: string = "A command's icon, when it has one, must not be blank.";
@@ -98,7 +106,11 @@ export class Resources {
   public static readonly notificationSequenceInvalid: string = "A notification's sequence must be a whole number from 1.";
   public static readonly currentSequenceInvalid: string = "The notifications' sequence must be a whole number from 0.";
   public static readonly workSequenceInvalid: string = "The work's sequence must be a whole number from 0.";
+  public static readonly keptForInvalid: string = "The number of other clients a runtime is kept for must be a whole number from 1.";
   public static readonly commandSequenceInvalid: string = "The commands' sequence must be a whole number from 0.";
+  public static readonly processIdInvalid: string = "A running program's process id must be a whole number from 1.";
+  public static readonly programStartInvalid: string = "A running program's start must be a date and time.";
+  public static readonly programSequenceInvalid: string = "The programs' sequence must be a whole number from 0.";
   public static readonly macPlatform: string = "darwin";
   public static readonly standardPlatform: string = "win32";
   public static readonly keySeparator: string = "+";
@@ -166,6 +178,7 @@ export class Resources {
   public static readonly moveAsideMember: string = "moveAside";
   public static readonly modulesMember: string = "modules";
   public static readonly workMember: string = "work";
+  public static readonly programsMember: string = "programs";
   public static readonly readWindowBoundsMember: string = "readWindowBounds";
   public static readonly writeWindowBoundsMember: string = "writeWindowBounds";
   public static readonly readWindowLayoutMember: string = "readWindowLayout";
@@ -178,6 +191,7 @@ export class Resources {
   public static readonly recordCommandMember: string = "recordCommand";
   public static readonly settingsChangedMember: string = "settingsChanged";
   public static readonly commandsChangedMember: string = "commandsChanged";
+  public static readonly programsChangedMember: string = "programsChanged";
   public static readonly recentCommandsChangedMember: string = "recentCommandsChanged";
   public static readonly saveFailedMember: string = "saveFailed";
   public static readonly saveUnfinishedMember: string = "saveUnfinished";

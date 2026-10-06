@@ -151,7 +151,7 @@ export default class Test {
 
   private async runFilteredAsync(filters: readonly string[], flaky: FlakyRecord | null): Promise<number> {
     this.output.write(`Filtered run: ${filters.map(t => JSON.stringify(t)).join(", ")}. A filtered run is not the complete gate.\n`);
-    const build = new PackageBuild(this.root, this.runner, this.environment);
+    const build = new PackageBuild(this.root, this.runner, this.environment, process.platform, process.arch);
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const checks: readonly ISelectableCheck[] = [
       new PackageTestCheck(this.root, build, this.runner, this.environment, flaky),
@@ -217,10 +217,12 @@ export default class Test {
     const { default: ConceptFileCheck } = await import("./checks/concept-file-check.ts");
     const { default: ConceptFolderCheck } = await import("./checks/concept-folder-check.ts");
     const { default: EnumValueCheck } = await import("./checks/enum-value-check.ts");
+    const { default: ExceptionNameCheck } = await import("./checks/exception-name-check.ts");
     const { default: FoundationValueCheck } = await import("./checks/foundation-value-check.ts");
+    const { default: InterfaceNameCheck } = await import("./checks/interface-name-check.ts");
     const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
-    const build = new PackageBuild(this.root, this.runner, this.environment);
+    const build = new PackageBuild(this.root, this.runner, this.environment, process.platform, process.arch);
     const modules = new ModuleCatalog(this.root);
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const apis = new ApiCatalog(this.root, new PackageCatalog(this.root), new BuildLayout(this.root), angular, Test.API_PARTS);
@@ -234,9 +236,11 @@ export default class Test {
       new TestWaitCheck(this.root, files),
       new FieldOrderCheck(this.root, files),
       new BucketNameCheck(files, syntax),
+      new InterfaceNameCheck(files, syntax),
       new AngularFileCheck(files, syntax),
       new FoundationValueCheck(files, new PackageCatalog(this.root), syntax),
       new EnumValueCheck(files, syntax),
+      new ExceptionNameCheck(files, syntax),
       new ConceptFileCheck(this.root, files, syntax),
       new ConceptFolderCheck(files, syntax),
       new GitHubConfigurationCheck(this.root, files),

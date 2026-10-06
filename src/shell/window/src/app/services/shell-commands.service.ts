@@ -96,6 +96,8 @@ export class ShellCommandsService {
       () => this.done(() => this.layout.toggleDock(side)), () => true, () => this.layout.layout().dock(side).isExpanded && !this.layout.geometry().closedSides.has(side))),
     ...Object.values(EditAction).map(action => new CommandContribution(Resources.editCommands[action], Resources.editTitles[action], Resources.editGlyphs[action], null,
       () => this.editAsync(action), () => this.edits.canRun(action))),
+    new CommandContribution(Resources.replaceMisspellingCommand, Resources.replaceMisspellingTitle, null, null,
+      commandArguments => this.replaceMisspellingAsync(commandArguments), commandArguments => !Object.isNull(ShellCommandsService.textOf(commandArguments, Resources.textArgument))),
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
       () => this.done(() => this.search.open())),
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
@@ -311,6 +313,13 @@ export class ShellCommandsService {
     this.tabFocus.focus(tab);
   }
 
+  private async replaceMisspellingAsync(commandArguments: JsonValue): Promise<JsonValue> {
+    const text = ShellCommandsService.textOf(commandArguments, Resources.textArgument);
+    if (!Object.isNull(text) && await this.edits.restoreAsync())
+      await this.bridge.replaceMisspellingAsync(text);
+    return null;
+  }
+
   private async editAsync(action: EditAction): Promise<JsonValue> {
     if (this.edits.canRun(action) && await this.edits.restoreAsync())
       await this.bridge.editAsync(action);
@@ -320,5 +329,10 @@ export class ShellCommandsService {
   private done(action: () => void): Promise<JsonValue> {
     action();
     return Promise.resolve(null);
+  }
+
+  private static textOf(commandArguments: JsonValue, name: string): string | null {
+    const text = Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(name);
+    return Object.isUndefined(text) || text.length === 0 ? null : text;
   }
 }

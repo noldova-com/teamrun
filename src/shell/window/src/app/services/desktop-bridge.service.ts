@@ -21,7 +21,9 @@ import { RuntimeDisconnectedException } from "../exceptions/runtime-disconnected
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
 import type { IDesktopBridge } from "../interfaces/i-desktop-bridge";
 import { BuildInfo } from "../models/build-info";
+import { FieldMenuRequest } from "../models/field-menu-request";
 import { QuitQuestion } from "../models/quit-question";
+import { SpellingOffer } from "../models/spelling-offer";
 import { StartupState } from "../models/startup-state";
 import { UpdateState } from "../models/update-state";
 import type { WindowAppearance } from "../models/window-appearance";
@@ -117,6 +119,10 @@ export class DesktopBridgeService implements ClipboardWriter {
     return this.bridge.openLogFolder();
   }
 
+  public openLinkAsync(url: string): Promise<boolean> {
+    return this.bridge.openLink(url);
+  }
+
   public installCommandAsync(): Promise<boolean> {
     return this.bridge.installCommand();
   }
@@ -135,6 +141,22 @@ export class DesktopBridgeService implements ClipboardWriter {
 
   public keepAppearance(preferences: JsonObject): void {
     this.bridge.keepAppearance(preferences);
+  }
+
+  public async readSpellingAsync(): Promise<SpellingOffer> {
+    return SpellingOffer.fromJson(await this.bridge.readSpelling());
+  }
+
+  public keepSpelling(isChecking: boolean, languages: readonly string[]): void {
+    this.bridge.keepSpelling(isChecking, languages);
+  }
+
+  public onFieldMenu(listener: (request: FieldMenuRequest) => void): () => void {
+    return this.bridge.onFieldMenu(t => listener(FieldMenuRequest.fromJson(t)));
+  }
+
+  public replaceMisspellingAsync(text: string): Promise<boolean> {
+    return this.bridge.replaceMisspelling(text);
   }
 
   public onNotificationOpened(listener: (id: string) => void): () => void {
@@ -199,11 +221,16 @@ export class DesktopBridgeService implements ClipboardWriter {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readBuild))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.copyText))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLogFolder))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLink))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.installCommand))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readUpdate))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onUpdate))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.actOnUpdate))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.keepAppearance))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readSpelling))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.keepSpelling))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onFieldMenu))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.replaceMisspelling))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onQuitQuestion))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerQuit))) &&

@@ -11,7 +11,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { setImmediate } from "node:timers/promises";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
@@ -77,8 +77,8 @@ export class DesktopApplicationTests {
   public async deniesEveryPermission(): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
 
-    Assert.isTrue(electron.permissions.request("media") === false);
-    Assert.isTrue(electron.permissions.check() === false);
+    Assert.isTrue(electron.defaultSession.request("media") === false);
+    Assert.isTrue(electron.defaultSession.check() === false);
   }
 
   @TestMethod
@@ -246,7 +246,7 @@ export class DesktopApplicationTests {
       { descriptions: ["Indexing the project", "Saving the notes"], isWaiting: true },
       null
     ]), JSON.stringify(DesktopApplicationTests.quitQuestions(window)));
-    Assert.areEqual(2000, connection.timeouts[connection.calls.indexOf("shell.work")]);
+    Assert.areEqual(2000, connection.timeouts[connection.calls.lastIndexOf("shell.work")]);
     Assert.isFalse(connection.calls.includes("shell.stop"));
   }
 
@@ -300,7 +300,7 @@ export class DesktopApplicationTests {
     await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(second).length === 1);
 
     Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length);
-    Assert.areEqual(2000, slow.timeouts[slow.calls.indexOf("shell.work")]);
+    Assert.areEqual(2000, slow.timeouts[slow.calls.lastIndexOf("shell.work")]);
     Assert.areEqual(
       1,
       DesktopStartFixture.readErrors(process, "The runtime's work could not be read before quitting, so TeamRun quits without asking: ConnectionException: The runtime did not answer shell.work in time.").length);
@@ -665,6 +665,32 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async restoresTheSavedBoundsTheNextTimeTheRuntimeIsReadyWhenTheConnectionEndsDuringTheRead(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    first.deferred.set("shell.readWindowBounds", () => {
+      first.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const second = new FakeRuntimeConnection();
+    second.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const reconnection = Promise.withResolvers<FakeRuntimeConnection>();
+    const launcher = new FakeRuntimeLauncher(first, reconnection.promise);
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+    launcher.listener?.onDisconnected(null);
+    reconnection.resolve(second);
+    await Condition.waitAsync(() => window.calls.some(t => t.startsWith("setBounds")));
+
+    Assert.areEqual(JSON.stringify(["show", "setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}"]), JSON.stringify(window.calls));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's saved bounds").length);
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
   public async readsTheDeviceIdentityFromTheFolderItIsGivenOrTheOperatingSystemsOne(): Promise<void> {
     const given = new FakeDeviceIdentity();
     const located = new FakeDeviceIdentity();
@@ -773,6 +799,7 @@ export class DesktopApplicationTests {
     connection.answers.set("shell.modules", Response.success("r", { modules: [] }));
     connection.answers.set("shell.commands", Response.success("r", { commands: [] }));
     connection.answers.set("shell.runCommand", Response.success("r", 3));
+    connection.answers.set("shell.programs", Response.success("r", { programs: [], sequence: 2 }));
     for (const name of DesktopApplicationTests.NOTIFICATION_METHODS)
       connection.answers.set(name, Response.success("r", name));
     connection.answers.set("notes.missing", Response.failure("r", new Failure(FailureCode.NotFound, "There is no such note.")));
@@ -783,6 +810,7 @@ export class DesktopApplicationTests {
     const modules = await DesktopApplicationTests.requestAsync(electron, event, "shell.modules", null);
     const commands = await DesktopApplicationTests.requestAsync(electron, event, "shell.commands", null);
     const ran = await DesktopApplicationTests.requestAsync(electron, event, "shell.runCommand", { name: "clock.tick", arguments: null });
+    const programs = await DesktopApplicationTests.requestAsync(electron, event, "shell.programs", null);
     const notifications = [];
     for (const name of DesktopApplicationTests.NOTIFICATION_METHODS)
       notifications.push((await DesktopApplicationTests.requestAsync(electron, event, name, null)).payload);
@@ -792,6 +820,7 @@ export class DesktopApplicationTests {
     Assert.areEqual(JSON.stringify({ modules: [] }), JSON.stringify(modules.payload));
     Assert.areEqual(JSON.stringify({ commands: [] }), JSON.stringify(commands.payload));
     Assert.areEqual("3", JSON.stringify(ran.payload));
+    Assert.areEqual(JSON.stringify({ programs: [], sequence: 2 }), JSON.stringify(programs.payload));
     Assert.areEqual(DesktopApplicationTests.NOTIFICATION_METHODS.join(","), notifications.join(","));
     Assert.areEqual(JSON.stringify({ code: "NotFound", message: "There is no such note." }), JSON.stringify(missing.failure?.toJson()));
   }
@@ -803,6 +832,8 @@ export class DesktopApplicationTests {
       connection.answers.set(name, Response.success("r", name));
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopStartFixture.trustedEvent("linux");
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const answers = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", {}),
@@ -810,7 +841,7 @@ export class DesktopApplicationTests {
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", { name: "shell.panelSize", value: 15 }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.resetSetting", { name: "shell.panelSize", device: "another" })
     ];
-    const sent = connection.calls.flatMap((t, index) => t.includes("Setting") || t === "shell.settings" ? [connection.payloads[index]] : []);
+    const sent = connection.calls.flatMap((t, index) => index >= start && (t.includes("Setting") || t === "shell.settings") ? [connection.payloads[index]] : []);
 
     Assert.areEqual("shell.settings,shell.readSetting,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
     Assert.areEqual(JSON.stringify([
@@ -829,6 +860,8 @@ export class DesktopApplicationTests {
     device.failure = new Error("The identity file is not JSON.");
     const anonymous = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), device);
     const event = DesktopStartFixture.trustedEvent("linux");
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const failures = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", null),
@@ -845,7 +878,7 @@ export class DesktopApplicationTests {
       { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." },
       { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." }
     ]), JSON.stringify(failures));
-    Assert.isFalse(connection.calls.some(t => t.includes("etting") || t.includes("ommand")));
+    Assert.isFalse(connection.calls.slice(start).some(t => t.includes("etting") || t.includes("ommand")));
   }
 
   @TestMethod
@@ -867,7 +900,7 @@ export class DesktopApplicationTests {
       answers.push(String((await DesktopApplicationTests.requestAsync(electron, event, method, payload)).failure?.code));
 
     Assert.areEqual(JSON.stringify(["Unauthorized", "InvalidMessage", "InvalidMessage", "InvalidMessage", "Unauthorized", "Unauthorized"]), JSON.stringify(answers));
-    Assert.areEqual(JSON.stringify(["shell.readWindowBounds"]), JSON.stringify(connection.calls));
+    Assert.areEqual(JSON.stringify(["shell.readWindowBounds"]), JSON.stringify(connection.calls.filter(t => !["shell.work", "shell.notifications", "shell.readSetting"].includes(t))));
   }
 
   @TestMethod
@@ -901,12 +934,14 @@ export class DesktopApplicationTests {
     const unidentified = new FakeDeviceIdentity();
     unidentified.failure = new Error("The identity file is not JSON.");
     const lost = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), unidentified);
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const state = await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     const quiet = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: true });
     const noDevice = await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
 
-    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
+    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).slice(start).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
     Assert.areEqual(JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`]), JSON.stringify(sent));
     Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"mutedModules\":[\"notes\"],\"sequence\":2}", JSON.stringify(state.payload));
     Assert.areEqual(FailureCode.Unauthorized, quiet.failure?.code);
@@ -1150,6 +1185,41 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async writesWhereThePersonPlacedAWindowToTheNextConnectionWhenTheFirstClosesDuringTheRestore(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    first.deferred.set("shell.writeWindowBounds", () => {
+      first.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const second = new FakeRuntimeConnection();
+    second.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const connections = [Promise.withResolvers<FakeRuntimeConnection>(), Promise.withResolvers<FakeRuntimeConnection>()];
+    const launcher = new FakeRuntimeLauncher(...connections.map(t => t.promise));
+    const process = new FakeDesktopProcess("win32");
+    const electron = await DesktopStartFixture.startReadyAsync("win32", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("win32"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("will-move");
+    connections[0]?.resolve(first);
+    await Condition.waitAsync(() => first.calls.includes("shell.writeWindowBounds"));
+    await setImmediate();
+    launcher.listener?.onDisconnected(null);
+    connections[1]?.resolve(second);
+    await Condition.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
+
+    Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
+    Assert.isFalse(second.calls.includes("shell.readWindowBounds"));
+    Assert.areEqual(
+      JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }),
+      JSON.stringify(second.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's saved bounds").length);
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
   @TestData("linux")
   @TestData("darwin")
   public async restoresTheSavedBoundsOfAWindowMovedBeforeTheRuntimeWasReadyWhereTheSystemAlsoMovesIt(platform: string): Promise<void> {
@@ -1319,6 +1389,39 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async keepsBoundsWhoseConnectionClosesAsItBecomesReadyForTheNextConnection(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    const second = new FakeRuntimeConnection();
+    const third = new FakeRuntimeConnection();
+    second.deferred.set("shell.writeWindowBounds", () => {
+      second.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const reconnections = [Promise.withResolvers<FakeRuntimeConnection>(), Promise.withResolvers<FakeRuntimeConnection>()];
+    const launcher = new FakeRuntimeLauncher(first, ...reconnections.map(t => t.promise));
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown && first.calls.includes("shell.readWindowBounds"));
+
+    launcher.listener?.onDisconnected(null);
+    const readsBeforeTheMove = window.boundsReads;
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("move");
+    await Condition.waitAsync(() => window.boundsReads > readsBeforeTheMove);
+    reconnections[0]?.resolve(second);
+    await Condition.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
+    await setImmediate();
+    launcher.listener?.onDisconnected(null);
+    reconnections[1]?.resolve(third);
+    await Condition.waitAsync(() => third.calls.includes("shell.writeWindowBounds"));
+
+    Assert.areEqual(JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }), JSON.stringify(third.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
   public async reportsBoundsTheRuntimeRefusesOnceItIsReadyAgain(): Promise<void> {
     const first = new FakeRuntimeConnection();
     const second = new FakeRuntimeConnection();
@@ -1369,6 +1472,60 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async pointsTheDictionaryDownloadAtItsProfilesOwnFolderAtReadyAndTakesSpellingPreferencesOnlyFromItsOwnWindow(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+    const untrusted = { sender: { id: 1 }, senderFrame: null };
+
+    const offer = electron.ipcMain.invoke("teamrun:readSpelling", trusted);
+    const refused = electron.ipcMain.invoke("teamrun:readSpelling", untrusted);
+    electron.ipcMain.send("teamrun:spelling", trusted, false, ["en-US"]);
+    electron.ipcMain.send("teamrun:spelling", untrusted, true, []);
+    electron.ipcMain.send("teamrun:spelling", trusted, "yes", []);
+    electron.ipcMain.send("teamrun:spelling", trusted, true, "en-US");
+    electron.ipcMain.send("teamrun:spelling", trusted, true, [1]);
+    electron.defaultSession.refusal = new Error("Refused.");
+    electron.ipcMain.send("teamrun:spelling", trusted, true, []);
+
+    const profile = electron.app.calls.find(t => t.startsWith("setPath userData "))?.slice("setPath userData ".length) ?? "";
+
+    Assert.areEqual(`url ${pathToFileURL(join(profile, "Dictionaries")).href}/|languages |enabled false|languages |enabled true`, electron.defaultSession.spellCalls.join("|"));
+    Assert.isTrue(electron.defaultSession.spellCalls[0]?.startsWith("url file:///") === true, electron.defaultSession.spellCalls.join("|"));
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The spell checker refused the languages : Error: Refused.").length);
+    Assert.areEqual("{\"languages\":[],\"fallback\":null}", JSON.stringify(offer));
+    Assert.isNull(refused);
+    Assert.areEqual(3, DesktopStartFixture.readErrors(process, "The window's spelling preferences were rejected: ").length);
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The list of shipped dictionaries could not be read, so no spelling language is offered: ").length);
+  }
+
+  @TestMethod
+  public async forwardsEachMenuOfItsOwnWindowAndReplacesAWordOnlyForIt(): Promise<void> {
+    const electron = await DesktopStartFixture.startReadyAsync("linux");
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+    const untrusted = { sender: { id: 1 }, senderFrame: null };
+    const contents = electron.windows[0]?.webContents ?? null;
+    Assert.isNotNull(contents);
+
+    contents.askForMenu({ x: 10, y: 20, misspelledWord: "wrold", dictionarySuggestions: ["world", "wold"], menuSourceType: "mouse" });
+    contents.askForMenu({ x: 3, y: 4, misspelledWord: "", dictionarySuggestions: [], menuSourceType: "keyboard" });
+    const answers = [
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, "world"),
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", untrusted, "world"),
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, ""),
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, 5),
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, "x".repeat(101))
+    ];
+
+    Assert.areEqual(JSON.stringify([
+      ["teamrun:fieldMenu", { x: 10, y: 20, isKeyboard: false, word: "wrold", suggestions: ["world", "wold"] }],
+      ["teamrun:fieldMenu", { x: 3, y: 4, isKeyboard: true, word: "", suggestions: [] }]
+    ]), JSON.stringify(contents.sent.filter(t => t[0] === "teamrun:fieldMenu")));
+    Assert.areEqual("true,false,false,false,false", answers.join(","));
+    Assert.areEqual("replaceMisspelling world", contents.calls.filter(t => t.startsWith("replace")).join("|"));
+  }
+
+  @TestMethod
   public async copiesOnlyTextFromItsOwnWindowUpToTheLimit(): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
     const trusted = DesktopStartFixture.trustedEvent("linux");
@@ -1384,6 +1541,45 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(JSON.stringify([true, true, false, false, false]), JSON.stringify(answers));
     Assert.areEqual(JSON.stringify(["clock: Failed", longest]), JSON.stringify(electron.clipboard.texts));
+  }
+
+  @TestMethod
+  public async opensOnlyAllowedLinksFromItsOwnWindowAndLogsTheOnesItDoesNotOpen(): Promise<void> {
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+    const open = (url: unknown, event: IIpcEvent = trusted): Promise<boolean> => electron.ipcMain.invoke("teamrun:openLink", event, url) as Promise<boolean>;
+
+    const answers = [
+      await open("https://example.com/docs?page=2#top"),
+      await open("HTTP://Example.com"),
+      await open("mailto:support@example.com?subject=TeamRun"),
+      await open(`https://example.com/${"x".repeat(32748)}`),
+      await open(`https://example.com/${"x".repeat(32749)}`),
+      await open("file:///etc/passwd"),
+      await open("javascript:alert(1)"),
+      await open("teamrun://open"),
+      await open("https://user:secret@example.com/"),
+      await open("not a link"),
+      await open(5),
+      await open("https://example.com/", { sender: { id: 1 }, senderFrame: null })
+    ];
+    electron.shell.linkFailure = new Error("No browser is installed.");
+    answers.push(await open("https://example.com/"));
+
+    Assert.areEqual(JSON.stringify([true, true, true, true, false, false, false, false, false, false, false, false, false]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify([
+      "https://example.com/docs?page=2#top",
+      "http://example.com/",
+      "mailto:support@example.com?subject=TeamRun",
+      `https://example.com/${"x".repeat(32748)}`,
+      "https://example.com/"
+    ]), JSON.stringify(electron.shell.links));
+    const lines = process.errors.split("\n").filter(t => t.includes("link")).map(t => t.slice(t.indexOf(" ") + 1));
+    Assert.areEqual(JSON.stringify([
+      ...Array.from({ length: 7 }, () => "A link was not opened: only well-formed http, https and mailto links without credentials open."),
+      "A link could not be opened: Error: No browser is installed."
+    ]), JSON.stringify(lines));
   }
 
   @TestMethod
