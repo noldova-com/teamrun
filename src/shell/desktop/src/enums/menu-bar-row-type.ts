@@ -7,7 +7,7 @@
  */
 
 export enum MenuBarRowType {
-  Command = "command",
-  Submenu = "submenu",
-  Separator = "separator"
+  Command = "Command",
+  Submenu = "Submenu",
+  Separator = "Separator"
 }

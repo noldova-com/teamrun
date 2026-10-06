@@ -148,7 +148,7 @@ describe("ShellCommandsService", () => {
     expect(disabledBefore).toBe(false);
     expect(enabledInMenu).toEqual([true, true, true, true, true, true]);
     expect(restored).toEqual([true, 0, 7]);
-    expect(bridge.edits).toEqual(["copy"]);
+    expect(bridge.edits).toEqual(["Copy"]);
   });
 
   it("acts on the current tab without arguments: the active tab of the group last focused or activated, else the documents' active tab", async () => {

@@ -7,9 +7,9 @@
  */
 
 export enum CliCommand {
-  Status = "status",
-  Commands = "commands",
-  Run = "run",
-  Open = "open",
-  Help = "help"
+  Status = "Status",
+  Commands = "Commands",
+  Run = "Run",
+  Open = "Open",
+  Help = "Help"
 }
