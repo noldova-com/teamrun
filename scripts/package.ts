@@ -21,6 +21,7 @@ import type IPackageSigning from "./packaging/interfaces/i-package-signing.ts";
 import MacSigning from "./packaging/mac-signing.ts";
 import PackageConfiguration from "./packaging/package-configuration.ts";
 import PackageLayout from "./packaging/package-layout.ts";
+import PackageReport from "./packaging/package-report.ts";
 import PackageStage from "./packaging/package-stage.ts";
 import PackageTarget from "./packaging/package-target.ts";
 import PackagedBuild from "./packaging/packaged-build.ts";
@@ -81,6 +82,7 @@ export default class Package {
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
       const layout = new PackageLayout(this.root);
+      await rm(layout.report, { force: true });
       const signing = packageArguments.length === 0 ? null : this.createSigning(target, layout, credentials);
       await this.stage.stageAsync(this.output);
       await rm(layout.output, { recursive: true, force: true });
@@ -132,6 +134,7 @@ export default class Package {
     this.output.write(`Packages made:\n${files.map(t => `  ${t}\n`).join("")}`);
     if (signing !== null)
       this.output.write(`Signatures:\n${await signing.verifyAsync(files, manifest.product)}\n`);
+    await new PackageReport(target.id, signing !== null, signing !== null).writeAsync(layout.report);
   }
 
   private createBuilderEnvironment(layout: PackageLayout, target: PackageTarget): NodeJS.ProcessEnv {

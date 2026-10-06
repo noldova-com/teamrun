@@ -28,25 +28,50 @@ class PackageWorkflowTests {
   private static readonly RESULTS: readonly [string, string, string] = ["Keep the nightly result", "Keep the nightly result again", "Keep the nightly result a last time"];
   private static readonly STATUS: string = "-W -f=${Status} ";
   private static readonly NIGHTLY_TARGETS: readonly string[] = ["Linux x64", "Windows x64"];
+  private static readonly JQ_ARGUMENTS: string = "-r .teamrun.signedPlatforms // [] | join(\" \") package.json";
+  private static readonly CREDENTIALS: readonly (readonly [string, string])[] = [
+    ["windows", "AZURE_TENANT_ID"], ["windows", "AZURE_CLIENT_ID"], ["windows", "AZURE_CLIENT_SECRET"], ["macos", "MAC_CERTIFICATE"], ["macos", "MAC_CERTIFICATE_PASSWORD"],
+    ["macos", "APPLE_API_KEY_P8"], ["macos", "APPLE_API_KEY_ID"], ["macos", "APPLE_API_ISSUER"]
+  ];
 
   public static register(): void {
     test("packaging runs by hand or when the nightly run calls it, one nightly and one run by hand at a time, never for a push or a pull request, and only reads the repository", async () => {
       const text = (await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW)).text;
 
       assert.ok(text.includes("on:\n  workflow_call:\n    inputs:\n      nightly:\n"));
-      assert.ok(text.includes("        type: boolean\n        required: true\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\n"));
+      assert.ok(text.includes("        type: boolean\n        required: true\n  workflow_dispatch:\n    inputs:\n      signed:\n"));
+      assert.ok(text.includes("        type: boolean\n        default: false\n\npermissions:\n  contents: read\n\n"));
       assert.ok(text.includes("concurrency:\n  group: package-${{ inputs.nightly && 'nightly' || 'manual' }}\n  cancel-in-progress: false\n"));
       assert.equal(text.match(/^\s+\w[\w-]*: write$/gm), null);
-      assert.deepEqual([...text.matchAll(/\$\{\{ ([^}]+) \}\}/g)].map(t => t[1] ?? "").filter(t => t.startsWith("secrets.")), []);
-      assert.equal(text.match(/persist-credentials: false/g)?.length, 1);
+      assert.equal(text.match(/persist-credentials: false/g)?.length, 2);
+    });
+
+    test("only a signed run by hand enters the release environment, for the declared platforms' jobs, and gives each its own platform's credentials in the packaging step alone", async () => {
+      const workflow = await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW);
+      const release = await WorkflowFileFixture.readAsync("release.yml");
+      const signed = "matrix.signed == 'true'";
+
+      assert.deepEqual([...workflow.text.matchAll(/\$\{\{ ([^}]+) \}\}/g)].map(t => t[1] ?? "").filter(t => t.includes("secrets.")),
+        PackageWorkflowTests.CREDENTIALS.map(([platform, name]) => `${signed} && matrix.platform == '${platform}' && secrets.${name} || ''`));
+      assert.ok(workflow.text.includes(`      - name: Make the package\n        id: package\n        timeout-minutes: 40\n        env:\n          SIGNED: \${{ matrix.signed }}\n`
+        + PackageWorkflowTests.CREDENTIALS.map(([platform, name]) => `          ${name}: \${{ ${signed} && matrix.platform == '${platform}' && secrets.${name} || '' }}\n`).join("")
+        + "        run: |\n"));
+      assert.ok(workflow.text.includes(`    runs-on: \${{ matrix.runner }}\n    environment: \${{ ${signed} && 'release' || '' }}\n    timeout-minutes: 75\n`));
+      assert.ok(workflow.text.includes("      - name: Read the platforms to sign\n        if: github.event_name == 'workflow_dispatch' && inputs.signed\n"));
+      assert.ok(workflow.text.includes("          sparse-checkout: package.json\n          sparse-checkout-cone-mode: false\n"));
+      assert.ok(workflow.text.includes("          SIGNED: ${{ github.event_name == 'workflow_dispatch' && inputs.signed }}\n          REFERENCE: ${{ github.ref }}\n"));
+      assert.equal(workflow.text.match(/^ {4}env:$/gm), null);
+      assert.equal(workflow.text.match(/environment: /g)?.length, 1);
+      assert.equal(workflow.readStepScript("Make the package"), release.readStepScript("Make the package"));
     });
 
     test("a run by hand packages every target and keeps the packages two weeks, and the nightly run packages Windows x64 and Linux x64 for three days, whose results its report expects", { timeout: PackageWorkflowTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW);
       const nightly = await WorkflowFileFixture.readAsync("nightly.yml");
-      const targets = new BuildMatrix("workflow_dispatch").targets.map(t => ({ target: t.name, runner: t.runner, architecture: t.architecture }));
+      const targets = new BuildMatrix("workflow_dispatch").targets
+        .map(t => ({ target: t.name, runner: t.runner, architecture: t.architecture, platform: t.name.split(" ")[0]?.toLowerCase(), signed: "false" }));
       const nightlyTargets = targets.filter(t => PackageWorkflowTests.NIGHTLY_TARGETS.includes(t.target));
-      const listed = (value: string): Promise<unknown> => PackageWorkflowTests.readOutputAsync(t, workflow.readStepScript(PackageWorkflowTests.PLAN_STEP), { NIGHTLY: value }, "targets");
+      const listed = (value: string): Promise<unknown> => PackageWorkflowTests.readOutputAsync(t, workflow.readStepScript(PackageWorkflowTests.PLAN_STEP), { NIGHTLY: value, SIGNED: "false", REFERENCE: "refs/heads/main" }, "targets");
 
       const labels = await PackageWorkflowTests.readOutputAsync(t, nightly.readStepScript(PackageWorkflowTests.NIGHTLY_PLAN_STEP), {}, "labels") as readonly string[];
 
@@ -56,7 +81,7 @@ class PackageWorkflowTests {
       assert.deepEqual(await listed("true"), nightlyTargets.map(t => ({ ...t, nightly: "true", retention: 3 })));
       assert.deepEqual(labels.filter(t => t.startsWith("packaging ")), nightlyTargets.map(t => `packaging ${t.target}`));
       assert.ok(workflow.text.includes("    needs: plan\n    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.plan.outputs.targets) }}\n"
-        + "    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 60\n"));
+        + "    runs-on: ${{ matrix.runner }}\n"));
       assert.ok(nightly.text.includes("  package:\n    name: Package\n    uses: ./.github/workflows/package.yml\n    with:\n      nightly: true\n\n"));
       assert.ok(nightly.text.includes("    needs: [plan, repeat, package]\n"));
     });
@@ -68,7 +93,6 @@ class PackageWorkflowTests {
       assert.ok(workflow.text.includes("      - name: Stop Spotlight indexing\n        if: runner.os == 'macOS'\n        timeout-minutes: 2\n        run: sudo mdutil -i off /System/Volumes/Data\n"));
       assert.ok(workflow.text.includes("      - name: Prepare the job\n        timeout-minutes: 15\n        uses: ./.github/actions/prepare\n        with:\n          architecture: ${{ matrix.architecture }}\n"));
       assert.ok(workflow.text.includes(`      - name: ${PackageWorkflowTests.LIBFUSE_STEP}\n        if: runner.os == 'Linux'\n`));
-      assert.equal(workflow.readStepScript("Make the package"), "npm run package\n");
       assert.ok(workflow.text.includes(`      - name: ${PackageWorkflowTests.SMOKE_STEP}\n        id: smoke\n        timeout-minutes: 15\n`));
       assert.equal(workflow.readStepScript(PackageWorkflowTests.SMOKE_STEP), [
         "if [ \"$RUNNER_OS\" = Linux ]; then",
@@ -79,8 +103,33 @@ class PackageWorkflowTests {
         "fi",
         ""
       ].join("\n"));
-      assert.equal(steps.length, 18);
+      assert.equal(steps.length, 19);
       assert.deepEqual(steps.filter(t => !/\n {8}timeout-minutes: \d+\n/.test(t)), []);
+    });
+
+    test("a signed run by hand marks the declared platforms' targets signed, and is refused off main before reading anything", { timeout: PackageWorkflowTests.SCRIPT_TIMEOUT }, async t => {
+      const script = (await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW)).readStepScript(PackageWorkflowTests.PLAN_STEP);
+      const run = async (reference: string, declared: string): Promise<{ readonly status: number | null; readonly stdout: string; readonly outputs: string; readonly calls: readonly string[] }> => {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        await writeFile(path.join(doubles.directory, "outputs.txt"), "");
+        doubles.respond("jq", PackageWorkflowTests.JQ_ARGUMENTS, declared);
+        const result = await doubles.runAsync(script, { GITHUB_OUTPUT: "outputs.txt", NIGHTLY: "", SIGNED: "true", REFERENCE: reference });
+        return { status: result.status, stdout: result.stdout, outputs: await doubles.readFileAsync("outputs.txt"), calls: await doubles.readCallsAsync() };
+      };
+
+      const signed = await run("refs/heads/main", "windows macos");
+      const none = await run("refs/heads/main", "");
+      const branch = await run("refs/heads/rr/1-signing", "windows macos");
+
+      const listed = JSON.parse(signed.outputs.slice("targets=".length)) as readonly Readonly<Record<string, string>>[];
+      assert.equal(signed.status, 0);
+      assert.equal(signed.stdout, "Signing the packages of: windows macos.\n");
+      assert.deepEqual(listed.map(t => [t["target"], t["signed"]]), [
+        ["Linux x64", "false"], ["Linux ARM64", "false"], ["Windows x64", "true"], ["Windows ARM64", "true"], ["macOS x64", "true"], ["macOS ARM64", "true"]
+      ]);
+      assert.deepEqual([none.status, none.stdout, none.outputs.includes("\"signed\":\"true\"")], [0, "Signing the packages of: no platform.\n", false]);
+      assert.deepEqual([branch.status, branch.stdout, branch.outputs, branch.calls], [1, "::error::A signed package run starts from main, not from refs/heads/rr/1-signing.\n", "", []]);
     });
 
     test("an installed libfuse2 is removed before the package starts, and the job fails when it is still there", { timeout: PackageWorkflowTests.SCRIPT_TIMEOUT }, async t => {
@@ -120,6 +169,7 @@ class PackageWorkflowTests {
         "  _build/package/out/TeamRun-*.zip",
         "  _build/package/out/TeamRun-*.AppImage",
         "  _build/package/smoke/*.png",
+        "  _build/package/package-report.json",
         "retention-days: ${{ matrix.retention }}",
         "if-no-files-found: error",
         "overwrite: true"

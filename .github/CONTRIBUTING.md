@@ -152,6 +152,22 @@ Preserve all applicable co-author trailers when squashing commits; do not credit
 The squash commit takes the PR's title and description, and GitHub adds the co-author trailers from the branch's commits.
 Don't repeat them in the PR description.
 
+## Releases
+
+Only the maintainer starts the **Release** workflow or a signed **Package** run, and only the maintainer approves their environments; a passing check or an approved pull request never does.
+[ARCHITECTURE.md](../docs/ARCHITECTURE.md#publication) owns how a release is built, signed, checked and published.
+
+- The `release` environment holds the signing credentials.
+  The jobs that sign wait in it for the maintainer's approval.
+  It allows only `main` and `v*` tags, requires the maintainer's review and cannot be bypassed by administrators.
+- The `publish` environment guards the publish job, the only job that may write to the repository, and waits for the maintainer's approval the same way.
+- The `release` environment's secrets, named here and nowhere given a value:
+  - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`: the service principal that signs Windows packages with the Artifact Signing values in the code.
+  - `MAC_CERTIFICATE` and `MAC_CERTIFICATE_PASSWORD`: the Developer ID Application certificate with its private key, as a base64 PKCS #12, and its password.
+  - `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`: the App Store Connect API key's text, its ID and its issuer, which notarize macOS packages.
+
+Their values never appear in issues, pull requests, logs or artifacts.
+
 ## Verification
 
 Use the revision's documented toolchain and commands in their required order.

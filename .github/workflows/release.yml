@@ -37,6 +37,8 @@ jobs:
     permissions:
       actions: read
       contents: read
+    outputs:
+      signed: ${{ steps.check.outputs.signed }}
     steps:
       - name: Require the workflow from main
         timeout-minutes: 1
@@ -93,6 +95,7 @@ jobs:
           package-manager-cache: false
 
       - name: Check the version and the revision
+        id: check
         timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
@@ -108,14 +111,15 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - { target: Linux x64, runner: ubuntu-24.04, architecture: x64 }
-          - { target: Linux ARM64, runner: ubuntu-24.04-arm, architecture: arm64 }
-          - { target: Windows x64, runner: windows-2025, architecture: x64 }
-          - { target: Windows ARM64, runner: windows-11-arm, architecture: arm64 }
-          - { target: macOS x64, runner: macos-15-intel, architecture: x64 }
-          - { target: macOS ARM64, runner: macos-15, architecture: arm64 }
+          - { target: Linux x64, runner: ubuntu-24.04, architecture: x64, platform: linux }
+          - { target: Linux ARM64, runner: ubuntu-24.04-arm, architecture: arm64, platform: linux }
+          - { target: Windows x64, runner: windows-2025, architecture: x64, platform: windows }
+          - { target: Windows ARM64, runner: windows-11-arm, architecture: arm64, platform: windows }
+          - { target: macOS x64, runner: macos-15-intel, architecture: x64, platform: macos }
+          - { target: macOS ARM64, runner: macos-15, architecture: arm64, platform: macos }
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    environment: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && 'release' || '' }}
+    timeout-minutes: 105
     steps:
       - name: Stop Spotlight indexing
         if: runner.os == 'macOS'
@@ -159,8 +163,23 @@ jobs:
         run: npm test
 
       - name: Make the package
-        timeout-minutes: 25
-        run: npm run package
+        timeout-minutes: 40
+        env:
+          SIGNED: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) }}
+          AZURE_TENANT_ID: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'windows' && secrets.AZURE_TENANT_ID || '' }}
+          AZURE_CLIENT_ID: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'windows' && secrets.AZURE_CLIENT_ID || '' }}
+          AZURE_CLIENT_SECRET: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          MAC_CERTIFICATE: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE || '' }}
+          MAC_CERTIFICATE_PASSWORD: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_P8: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.APPLE_API_KEY_P8 || '' }}
+          APPLE_API_KEY_ID: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER: ${{ contains(fromJSON(needs.check.outputs.signed), matrix.platform) && matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+        run: |
+          if [ "$SIGNED" = true ]; then
+            npm run package -- --signed
+          else
+            npm run package
+          fi
 
       - name: Install, start and quit the package
         timeout-minutes: 15
@@ -240,6 +259,52 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
+      - name: Keep the package report
+        id: keep-report
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: report-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: _build/package/package-report.json
+          retention-days: 14
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the package report again
+        if: steps.keep-report.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Keep the package report again
+        id: keep-report-again
+        if: steps.keep-report.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: report-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: _build/package/package-report.json
+          retention-days: 14
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the package report a last time
+        if: steps.keep-report-again.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Keep the package report a last time
+        if: steps.keep-report-again.outcome == 'failure'
+        timeout-minutes: 10
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: report-${{ matrix.runner }}-${{ matrix.architecture }}
+          path: _build/package/package-report.json
+          retention-days: 14
+          if-no-files-found: error
+          overwrite: true
+
   publish:
     name: Publish the release
     needs: build
@@ -304,6 +369,13 @@ jobs:
           merge-multiple: true
           path: _build/release
 
+      - name: Take this run's package reports
+        timeout-minutes: 10
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: report-*
+          path: _build/release-reports
+
       - name: Publish the release
         timeout-minutes: 20
         env:
@@ -312,5 +384,6 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_REVISION: ${{ inputs.revision }}
           RELEASE_FOLDER: ${{ github.workspace }}/_build/release
+          RELEASE_REPORTS: ${{ github.workspace }}/_build/release-reports
           RELEASE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/release-publish.ts

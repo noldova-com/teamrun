@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { appendFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
 
 import PackageException from "./packages/package.exception.ts";
@@ -14,6 +15,7 @@ import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
 import ReleaseException from "./release/release.exception.ts";
 import ReleaseRequest from "./release/release-request.ts";
+import ReleaseSigning from "./release/release-signing.ts";
 import ReleaseVersion from "./release/release-version.ts";
 import GitHubApi from "./repository/github-api.ts";
 import GitHubException from "./repository/github.exception.ts";
@@ -26,6 +28,8 @@ export default class ReleaseCheck {
   private static readonly ON_MAIN: readonly string[] = ["identical", "ahead"];
   private static readonly BUILD_RUNS: string = "/actions/workflows/build-and-test.yml/runs?event=push&branch=main&per_page=1&head_sha=";
   private static readonly SUCCESS: string = "success";
+  private static readonly OUTPUT_VARIABLE: string = "GITHUB_OUTPUT";
+  private static readonly SIGNED_OUTPUT: string = "signed";
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
@@ -59,9 +63,7 @@ export default class ReleaseCheck {
   private async checkAsync(): Promise<void> {
     const request = ReleaseRequest.read(this.environment);
     const manifest = await RootManifest.readAsync(this.root);
-    if (manifest.product.isReleaseRepository(request.repository))
-      throw new ReleaseException(`${manifest.product.name} publishes no unsigned release to ${request.repository}, its update feed, so its releases there start once its packages are signed. `
-        + "Run a trial in a test repository.");
+    const signed = (await ReleaseSigning.readAsync(this.root)).listSignedPlatforms(manifest.product, request.repository);
     if (manifest.productVersion !== request.version.text)
       throw new ReleaseException(`The root manifest's version is ${manifest.productVersion}, not ${request.version.text}; raise it on main first.`);
 
@@ -91,8 +93,11 @@ export default class ReleaseCheck {
     if (conclusion !== ReleaseCheck.SUCCESS)
       throw new ReleaseException(`The Build and test run on ${ReleaseCheck.MAIN} for ${request.revision} is ${conclusion}, not ${ReleaseCheck.SUCCESS}; `
         + `release a revision whose run on ${ReleaseCheck.MAIN} passed.`);
+    const output = this.environment[ReleaseCheck.OUTPUT_VARIABLE];
+    if (output !== undefined)
+      await appendFile(output, `${ReleaseCheck.SIGNED_OUTPUT}=${JSON.stringify(signed)}\n`);
     this.output.write(`${request.version.tag} of ${request.repository} from ${request.revision}: the version is new, the revision is on ${ReleaseCheck.MAIN} `
-      + `and its Build and test run there passed.\n`);
+      + `and its Build and test run there passed. Signed platforms: ${signed.length === 0 ? "none" : signed.join(", ")}.\n`);
   }
 }
 

@@ -8,6 +8,8 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { test, type TestContext } from "node:test";
 
 import ReleaseCheck from "../release-check.ts";
@@ -41,10 +43,15 @@ class ReleaseCheckTests {
       first.answer(ReleaseCheckTests.COMPARE, { status: "identical" });
       first.answer(ReleaseCheckTests.RUNS, ReleaseCheckTests.PASSED);
 
-      const exitCodes = [await ReleaseCheckTests.checkAsync(repository, github, output), await ReleaseCheckTests.checkAsync(repository, first, new TextOutputFixture())];
+      const outputs = path.join(repository.directory, "outputs");
+
+      const exitCodes = [await ReleaseCheckTests.checkAsync(repository, github, output, "0.0.7", { GITHUB_OUTPUT: outputs }),
+        await ReleaseCheckTests.checkAsync(repository, first, new TextOutputFixture())];
 
       assert.deepEqual(exitCodes, [0, 0]);
-      assert.equal(output.text, `v0.0.7 of noldova-com/teamrun from ${ReleaseCheckTests.REVISION}: the version is new, the revision is on main and its Build and test run there passed.\n`);
+      assert.equal(output.text, `v0.0.7 of noldova-com/teamrun from ${ReleaseCheckTests.REVISION}: the version is new, the revision is on main and its Build and test run there passed. `
+        + "Signed platforms: none.\n");
+      assert.equal(await readFile(outputs, "utf8"), "signed=[]\n");
       assert.deepEqual(github.requests, ["GET /releases/latest", `GET ${ReleaseCheckTests.TAG}`, `GET ${ReleaseCheckTests.COMPARE}`, `GET ${ReleaseCheckTests.RUNS}`]);
     });
 
@@ -104,19 +111,42 @@ class ReleaseCheckTests {
       }
     });
 
-    test("an unsigned release to the product's own repository, its update feed, is refused before GitHub is asked anything, whatever the case it is written in", async t => {
+    test("a release to the product's own repository, its update feed, signs the declared Windows and macOS packages and tells the workflow so", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest({ releaseRepository: GitHubApiFixture.REPOSITORY })) });
+      await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest({ releaseRepository: GitHubApiFixture.REPOSITORY }, [],
+        { signedPlatforms: ["macos", "windows"] })) });
+      const github = new GitHubApiFixture();
+      const output = new TextOutputFixture();
+      const outputs = path.join(repository.directory, "outputs");
+      github.fail("/releases/latest", ReleaseCheckTests.NOT_FOUND);
+      github.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
+      github.answer(ReleaseCheckTests.COMPARE, { status: "identical" });
+      github.answer(ReleaseCheckTests.RUNS, ReleaseCheckTests.PASSED);
 
-      for (const requested of [GitHubApiFixture.REPOSITORY, "NOLDOVA-COM/teamrun"]) {
+      assert.equal(await ReleaseCheckTests.checkAsync(repository, github, output, "0.0.7", { GITHUB_OUTPUT: outputs }), 0, output.text);
+
+      assert.ok(output.text.endsWith("passed. Signed platforms: windows, macos.\n"), output.text);
+      assert.equal(await readFile(outputs, "utf8"), "signed=[\"windows\",\"macos\"]\n");
+    });
+
+    test("a release to the update feed whose declaration leaves Windows or macOS unsigned is refused before GitHub is asked anything, whatever the case it is written in", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const cases: readonly (readonly [Readonly<Record<string, unknown>>, string, string])[] = [
+        [{}, GitHubApiFixture.REPOSITORY, "windows and macos"],
+        [{ signedPlatforms: ["windows"] }, "NOLDOVA-COM/teamrun", "macos"]
+      ];
+
+      for (const [settings, requested, unsigned] of cases) {
+        await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest({ releaseRepository: GitHubApiFixture.REPOSITORY }, [], settings)) });
         const github = new GitHubApiFixture();
         const output = new TextOutputFixture();
         const environment = { RELEASE_REPOSITORY: requested, RELEASE_VERSION: "0.0.7", RELEASE_REVISION: ReleaseCheckTests.REVISION };
 
         assert.equal(await new ReleaseCheck(repository.directory, github, environment, output).runAsync([]), 1, requested);
-        assert.equal(output.text, `Fixture Studio publishes no unsigned release to ${requested}, its update feed, so its releases there start once its packages are signed. `
-          + "Run a trial in a test repository.\n", requested);
+        assert.equal(output.text, `${requested} is Fixture Studio's update feed, which gets only signed windows and macos packages, `
+          + `but teamrun.signedPlatforms leaves out ${unsigned}.\n`, requested);
         assert.deepEqual(github.requests, [], requested);
       }
     });
@@ -151,8 +181,9 @@ class ReleaseCheckTests {
     return repository;
   }
 
-  private static checkAsync(repository: RepositoryFixture, github: GitHubApiFixture, output: TextOutputFixture, version: string = "0.0.7"): Promise<number> {
-    const environment = { RELEASE_REPOSITORY: GitHubApiFixture.REPOSITORY, RELEASE_VERSION: version, RELEASE_REVISION: ReleaseCheckTests.REVISION };
+  private static checkAsync(repository: RepositoryFixture, github: GitHubApiFixture, output: TextOutputFixture, version: string = "0.0.7",
+    outputs: NodeJS.ProcessEnv = {}): Promise<number> {
+    const environment = { RELEASE_REPOSITORY: GitHubApiFixture.REPOSITORY, RELEASE_VERSION: version, RELEASE_REVISION: ReleaseCheckTests.REVISION, ...outputs };
     return new ReleaseCheck(repository.directory, github, environment, output).runAsync([]);
   }
 }
