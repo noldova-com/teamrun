@@ -44,7 +44,7 @@ class ReportRunnerFixture extends ProcessRunnerFixture {
 }
 
 class RerunRunnerFixture extends ProcessRunnerFixture {
-  private static readonly RESULT: string = JSON.stringify({ passed: 0, failed: 0, skipped: 0, unreached: 0, skips: [], files: [] });
+  private static readonly RESULT: string = JSON.stringify({ passed: 0, failed: 0, skipped: 0, unreached: 0, skips: [], files: ["scripts/tests/alpha.test.ts", "scripts/tests/beta.test.ts", "scripts/tests/deep/gamma.test.ts"] });
 
   private readonly written: readonly { report?: string; state?: string }[];
 

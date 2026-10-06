@@ -111,7 +111,7 @@ class AngularTestCheckTests {
         duplicates: [{ file: "a.spec.ts", names: ["A", "same"] }],
         empty: ["b.spec.ts"]
       }), "report");
-      const check = new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(1, result, null), ["a.spec.ts", "b.spec.ts"], await AngularTestCheckTests.createRootAsync(t)));
+      const check = new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(1, result, null, []), ["a.spec.ts", "b.spec.ts"], await AngularTestCheckTests.createRootAsync(t)), null);
 
       assert.equal(await check.runAsync(output), false);
       assert.equal(output.text, `Angular tests name more than one test the same:\n  a.spec.ts › A › same\nAngular tests found no tests in these files:\n  b.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
