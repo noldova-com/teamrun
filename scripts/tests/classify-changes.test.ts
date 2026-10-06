@@ -41,7 +41,7 @@ class ClassifyChangesTests {
       assert.equal(await classify.runAsync({ GITHUB_OUTPUT: outputPath, GITHUB_STEP_SUMMARY: summaryPath }), 0);
 
       const outputs = (await readFile(outputPath, "utf8")).split("\n");
-      assert.deepEqual(outputs.filter(t => /^(run-code|run-ui|deferred)=/.test(t)), ["run-code=false", "run-ui=false", "deferred=Windows ARM64, macOS x64", "run-code=true", "run-ui=true", "deferred="]);
+      assert.deepEqual(outputs.filter(t => /^(run-code|run-ui|deferred)=/.test(t)), ["run-code=false", "run-ui=false", "deferred=Windows ARM64 (on every push to main and in manual runs), macOS x64 (every night and in manual runs)", "run-code=true", "run-ui=true", "deferred="]);
       const skipped = `Code builds and tests are not required; the document checks still run. Only Markdown documentation changed since the merge base ${base}.`;
       const none = "Selection: every check other than the tests, no tests, and no UI workflow. This run does not narrow its jobs to the selection yet.";
       const full = "Full build and test verification selected. Events other than pull requests and merge groups verify everything.";
@@ -50,7 +50,7 @@ class ClassifyChangesTests {
       assert.equal(log.text, `${skipped}\n${none}\n${full}\n${everything}\n`);
     });
 
-    test("a push plans the UI workflows of every target but macOS x64 and names it, and a manual run plans every target's", async t => {
+    test("a push plans every target but macOS x64 and names it, and a manual run plans every target", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.commitAsync({ "src/index.ts": "export {};\n" });
@@ -63,15 +63,15 @@ class ClassifyChangesTests {
       };
       const describe = (outputs: ReadonlyMap<string, string>): readonly unknown[] => {
         const targets: readonly { target: string; ui: unknown }[] = JSON.parse(outputs.get("targets") ?? "");
-        return [targets.length, outputs.get("ui-targets"), targets.filter(t => t.ui !== null).map(t => t.target).join(", "), outputs.get("ui-deferred")];
+        return [targets.length, outputs.get("ui-targets"), targets.filter(t => t.ui !== null).map(t => t.target).join(", "), outputs.get("deferred")];
       };
 
       const push = await classifyAsync("push");
       const manual = await classifyAsync("workflow_dispatch");
 
-      assert.deepEqual(describe(push), [6, "linux-x64 linux-arm64 windows-x64 windows-arm64 macos-arm64", "Linux x64, Linux ARM64, Windows x64, Windows ARM64, macOS ARM64", "macOS x64"]);
+      assert.deepEqual(describe(push), [5, "linux-x64 linux-arm64 windows-x64 windows-arm64 macos-arm64", "Linux x64, Linux ARM64, Windows x64, Windows ARM64, macOS ARM64", "macOS x64 (every night and in manual runs)"]);
       assert.deepEqual(describe(manual), [6, "linux-x64 linux-arm64 windows-x64 windows-arm64 macos-x64 macos-arm64", "Linux x64, Linux ARM64, Windows x64, Windows ARM64, macOS x64, macOS ARM64", ""]);
-      assert.equal(push.has("ui-plan"), false);
+      assert.deepEqual([push.has("ui-plan"), push.has("ui-deferred")], [false, false]);
     });
 
     test("a split target's Build job makes the builds its UI shards reuse, and any other target's UI workflows build their own", async t => {
@@ -90,9 +90,9 @@ class ClassifyChangesTests {
       const macOs = { target: "macOS ARM64", runner: "macos-15", architecture: "arm64" };
       const shards = (target: object, count: number): readonly object[] => Array.from({ length: count }, (_, i) => ({ ...target, shard: i + 1, shards: count, grep: "", prebuilt: true }));
       const counts = new Map(new BuildMatrix("push").targets.map(u => [u.name, u.uiShards.length]));
-      assert.deepEqual(plans.get("Windows x64"), { shared: true, build: [], shards: shards(windows, counts.get("Windows x64") ?? 0) });
-      assert.deepEqual(plans.get("macOS ARM64"), { shared: false, build: [macOs], shards: shards(macOs, counts.get("macOS ARM64") ?? 0) });
-      assert.equal(plans.get("macOS x64"), null);
+      assert.deepEqual(plans.get("Windows x64"), { shared: true, folded: false, build: [], shards: shards(windows, counts.get("Windows x64") ?? 0) });
+      assert.deepEqual(plans.get("macOS ARM64"), { shared: false, folded: false, build: [macOs], shards: shards(macOs, counts.get("macOS ARM64") ?? 0) });
+      assert.equal(plans.has("macOS x64"), false);
     });
 
     test("every event plans UI workflows only for targets it builds, since a target's UI workflows run inside its build and test jobs", async t => {
@@ -161,7 +161,7 @@ class ClassifyChangesTests {
       const outputs = new Map((await readFile(environment.GITHUB_OUTPUT, "utf8")).trim().split("\n").map(t => [t.slice(0, t.indexOf("=")), t.slice(t.indexOf("=") + 1)]));
       assert.equal(outputs.get("run-code"), "true");
       assert.equal(outputs.get("run-ui"), "false");
-      assert.equal(outputs.get("deferred"), "Windows ARM64, macOS x64");
+      assert.equal(outputs.get("deferred"), "Windows ARM64 (on every push to main and in manual runs), macOS x64 (every night and in manual runs)");
       const parts = [
         { part: "packages", name: "Package tests", prebuilt: true, build: false, angular: false },
         { part: "scripts", name: "Script tests", prebuilt: true, build: false, angular: false },
@@ -174,18 +174,19 @@ class ClassifyChangesTests {
       const matrix = new BuildMatrix("pull_request");
       const prebuilt = (target: { target: string }): object => {
         const count = matrix.targets.find(u => u.name === target.target)?.uiShards.length ?? 0;
-        return { shared: true, build: [], shards: Array.from({ length: count }, (_, i) => ({ ...target, shard: i + 1, shards: count, grep: "", prebuilt: true })) };
+        return { shared: true, folded: false, build: [], shards: Array.from({ length: count }, (_, i) => ({ ...target, shard: i + 1, shards: count, grep: "", prebuilt: true })) };
       };
-      const smoke = (target: object): object => ({ shared: false, build: [], shards: [{ ...target, shard: 1, shards: 1, grep: "@smoke", prebuilt: false }] });
+      const smoke = (target: object, folded: boolean): object => ({ shared: false, folded, build: [], shards: [{ ...target, shard: 1, shards: 1, grep: "@smoke", prebuilt: false }] });
       assert.deepEqual(JSON.parse(outputs.get("targets") ?? ""), [
         { ...linux, jobs: parts, ui: prebuilt(linux) },
         { ...linuxArm, jobs: parts, ui: prebuilt(linuxArm) },
-        { ...windows, jobs: parts, ui: smoke(windows) },
-        { ...macOs, jobs: [{ part: "", name: "Build and test", prebuilt: false, build: true, angular: true }], ui: smoke(macOs) }
+        { ...windows, jobs: parts, ui: smoke(windows, false) },
+        { ...macOs, jobs: [{ part: "", name: "Build and test", prebuilt: false, build: true, angular: true }], ui: smoke(macOs, true) }
       ]);
-      assert.equal(outputs.get("target-table"), "Linux x64|ubuntu-24.04|Linux|x64;Linux ARM64|ubuntu-24.04-arm|Linux|arm64;Windows x64|windows-2025|Windows|x64;macOS ARM64|macos-15|macOS|arm64");
+      assert.equal(outputs.get("target-table"), "Linux x64|ubuntu-24.04|Linux|x64;Linux ARM64|ubuntu-24.04-arm|Linux|arm64;Windows x64|windows-2025|Windows|x64;" +
+        "Windows ARM64|windows-11-arm|Windows|arm64;macOS x64|macos-15-intel|macOS|x64;macOS ARM64|macos-15|macOS|arm64");
       assert.equal(outputs.get("ui-targets"), "linux-x64 linux-arm64 windows-x64 macos-arm64");
-      assert.equal(outputs.get("ui-deferred"), "");
+      assert.equal(outputs.has("ui-deferred"), false);
       assert.equal(refused.status, 1);
     });
   }
