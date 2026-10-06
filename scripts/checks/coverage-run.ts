@@ -11,13 +11,13 @@ import path from "node:path";
 import type ProcessRunner from "../processes/process-runner.ts";
 
 export default class CoverageRun {
+  public static readonly NO_EXCLUSIONS: string = "[]";
+  public static readonly NO_TEST_FOLDERS: readonly string[] = [];
+
   private static readonly SERVICES_SEGMENTS: readonly string[] = ["node_modules", "@noldova", "teamrun-foundation-testing", "services"];
   private static readonly ENTRY_SEGMENTS: readonly string[] = ["coverage", "coverage-run-entry.js"];
   private static readonly COVERAGE_VARIABLE: string = "NODE_V8_COVERAGE";
   private static readonly NO_EXPERIMENTAL_WARNINGS: string = "--disable-warning=ExperimentalWarning";
-
-  public static readonly NO_EXCLUSIONS: string = "[]";
-  public static readonly NO_TEST_FOLDERS: readonly string[] = [];
 
   private readonly root: string;
   private readonly runner: ProcessRunner;

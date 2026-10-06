@@ -17,14 +17,14 @@ import ModuleMenus from "./module-menus.ts";
 import ModuleException from "./module.exception.ts";
 
 export default class ModuleCatalog {
+  public static readonly FIXTURE_FOLDER: string = "src/shell/desktop/tests/e2e/fixtures/modules";
+
   private static readonly MODULES_FOLDER: string = "src/modules";
   private static readonly ROOT_MANIFEST: string = "package.json";
   private static readonly COMMANDS_KIND: string = "commands";
   private static readonly LIST_REQUIRED: string = "The root package.json must list the build's modules once each in teamrun.modules.";
 
   private readonly root: string;
-
-  public static readonly FIXTURE_FOLDER: string = "src/shell/desktop/tests/e2e/fixtures/modules";
 
   public constructor(root: string) {
     this.root = root;

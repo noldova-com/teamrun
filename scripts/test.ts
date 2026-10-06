@@ -14,6 +14,7 @@ import GalleryFile from "./angular/gallery-file.ts";
 import AngularTestCheck from "./checks/angular-test-check.ts";
 import DeclaredDependencyCheck from "./checks/declared-dependency-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
+import FieldOrderCheck from "./checks/field-order-check.ts";
 import GitHubConfigurationCheck from "./checks/github-configuration-check.ts";
 import LicenseHeaderCheck from "./checks/license-header-check.ts";
 import type ICheck from "./checks/interfaces/check.ts";
@@ -184,6 +185,7 @@ export default class Test {
       documents,
       new LicenseHeaderCheck(this.root, files),
       new TestWaitCheck(this.root, files),
+      new FieldOrderCheck(this.root, files),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),

@@ -16,6 +16,8 @@ import ModuleException from "./module.exception.ts";
 import ModuleSettings from "./module-settings.ts";
 
 export default class ModuleDeclaration {
+  public static readonly PARTS: readonly string[] = ["runtime", "window", "cli"];
+
   private static readonly FILE_NAME: string = "module.json";
   private static readonly ID_PATTERN: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   private static readonly VERSION_PATTERN: RegExp = /^(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})$/;
@@ -29,8 +31,6 @@ export default class ModuleDeclaration {
   private static readonly WINDOW_PART: string = "window";
   private static readonly WINDOW_ENTRY: string = "window/src/api/index";
   private static readonly MENUS_KIND: string = "menus";
-
-  public static readonly PARTS: readonly string[] = ["runtime", "window", "cli"];
 
   public readonly folder: string;
   public readonly id: string;
