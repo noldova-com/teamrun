@@ -34,6 +34,9 @@ export default class PackageConfiguration {
   private static readonly RESOURCES_FOLDER: string = "resources";
   private static readonly ARCHIVE: string = "app.asar";
   private static readonly WINDOWS_LINE_SEPARATOR: string = "\r\n";
+  private static readonly MAC_RESOURCES_VARIABLE: string = "$resources";
+  private static readonly MAC_PROGRAM_SEGMENTS: readonly string[] = ["..", "MacOS"];
+  private static readonly EXECUTABLE_MODE: number = 0o755;
   private static readonly FUSES: Readonly<Record<string, boolean>> = {
     runAsNode: true,
     enableCookieEncryption: false,
@@ -71,6 +74,10 @@ export default class PackageConfiguration {
     return `${this.manifest.product.slug}${PackageConfiguration.WINDOWS_COMMAND_EXTENSION}`;
   }
 
+  private get macCommand(): string {
+    return path.join(new PackageLayout(this.root).command, this.manifest.product.slug);
+  }
+
   private get windowsCommand(): string {
     return path.join(new PackageLayout(this.root).command, this.windowsCommandName);
   }
@@ -98,10 +105,14 @@ export default class PackageConfiguration {
   public async writeAsync(file: string): Promise<void> {
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, `${JSON.stringify(this.toJson(), null, 2)}\n`);
-    if (this.target.platform !== PackageTarget.WINDOWS)
-      return;
-    await mkdir(path.dirname(this.windowsCommand), { recursive: true });
-    await writeFile(this.windowsCommand, this.describeWindowsCommand());
+    if (this.target.platform === PackageTarget.WINDOWS) {
+      await mkdir(path.dirname(this.windowsCommand), { recursive: true });
+      await writeFile(this.windowsCommand, this.describeWindowsCommand());
+    }
+    if (this.target.platform === PackageTarget.MACOS) {
+      await mkdir(path.dirname(this.macCommand), { recursive: true });
+      await writeFile(this.macCommand, this.describeMacCommand(), { mode: PackageConfiguration.EXECUTABLE_MODE });
+    }
   }
 
   private describePlatform(): Record<string, unknown> {
@@ -129,7 +140,15 @@ export default class PackageConfiguration {
           }
         };
       case PackageTarget.MACOS:
-        return { mac: { target, icon: path.join(icons, ProductIdentity.MAC_ICON_FILE), category: PackageConfiguration.MAC_CATEGORY, artifactName } };
+        return {
+          mac: {
+            target,
+            icon: path.join(icons, ProductIdentity.MAC_ICON_FILE),
+            category: PackageConfiguration.MAC_CATEGORY,
+            artifactName,
+            extraResources: [{ from: this.macCommand, to: `${PackageConfiguration.COMMAND_FOLDER}/${product.slug}` }]
+          }
+        };
       default:
         return {
           toolsets: { appimage: PackageConfiguration.APPIMAGE_TOOLSET },
@@ -157,6 +176,26 @@ export default class PackageConfiguration {
       `"${program}" "${entry}" %*`,
       "exit /b %ERRORLEVEL%"
     ].map(t => `${t}${PackageConfiguration.WINDOWS_LINE_SEPARATOR}`).join("");
+  }
+
+  private describeMacCommand(): string {
+    const resources = PackageConfiguration.MAC_RESOURCES_VARIABLE;
+    const program = [resources, ...PackageConfiguration.MAC_PROGRAM_SEGMENTS, this.manifest.product.name].join(path.posix.sep);
+    const entry = path.posix.join(resources, PackageConfiguration.ARCHIVE, ...TeamRunCommand.ENTRY_SEGMENTS);
+    return [
+      "#!/bin/sh",
+      "link=\"$0\"",
+      "while [ -h \"$link\" ]; do",
+      "  target=$(readlink \"$link\")",
+      "  case \"$target\" in",
+      "    /*) link=\"$target\" ;;",
+      "    *) link=\"$(dirname \"$link\")/$target\" ;;",
+      "  esac",
+      "done",
+      "resources=$(cd -P \"$(dirname \"$link\")/..\" && pwd)",
+      `export ${TeamRunCommand.RUN_AS_NODE_VARIABLE}=${TeamRunCommand.RUN_AS_NODE_VALUE}`,
+      `exec "${program}" "${entry}" "$@"`
+    ].map(t => `${t}\n`).join("");
   }
 
   private listLicenses(): readonly Record<string, unknown>[] {

@@ -7,8 +7,9 @@
  */
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -88,7 +89,8 @@ class PackageConfigurationTests {
           target: [{ target: "dmg", arch: ["arm64"] }, { target: "zip", arch: ["arm64"] }],
           icon: path.join(icons, "icon-dock-512.png"),
           category: "public.app-category.developer-tools",
-          artifactName: "Fixture Studio-macos-arm64.${ext}"
+          artifactName: "Fixture Studio-macos-arm64.${ext}",
+          extraResources: [{ from: path.join(PackageConfigurationTests.ROOT, "_build", "package", "command", "fixture-studio"), to: "bin/fixture-studio" }]
         }
       });
       assert.deepEqual(linux.fileNames, ["Fixture Studio-linux-arm64.AppImage"]);
@@ -114,7 +116,7 @@ class PackageConfigurationTests {
       assert.equal(Object.hasOwn(Object(windowsFuses), "resetAdHocDarwinSignature"), false);
     });
 
-    test("the configuration is written as JSON, creating its folder, and a target other than Windows writes no command", async t => {
+    test("the configuration is written as JSON, creating its folder, and a Linux target writes no command", async t => {
       const folder = await mkdtemp(path.join(tmpdir(), "teamrun-package-configuration-"));
       t.after(() => rm(folder, { recursive: true, force: true }));
       const configuration = PackageConfigurationTests.create("linux", "x64", folder);
@@ -142,6 +144,42 @@ class PackageConfigurationTests {
         "exit /b %ERRORLEVEL%",
         ""
       ].join("\r\n"));
+    });
+
+    test("a macOS target also writes the executable command the bundle carries, which follows its links to the bundle and runs the program as Node with the command line's entry", async t => {
+      const root = await mkdtemp(path.join(tmpdir(), "teamrun-package-configuration-"));
+      t.after(() => rm(root, { recursive: true, force: true }));
+      const configuration = PackageConfigurationTests.create("macos", "arm64", root);
+      const command = path.join(root, "_build", "package", "command", "fixture-studio");
+
+      await configuration.writeAsync(path.join(root, "_build", "package", "electron-builder.json"));
+
+      const text = await readFile(command, "utf8");
+      assert.ok(text.startsWith("#!/bin/sh\n"));
+      assert.ok(text.endsWith("exec \"$resources/../MacOS/Fixture Studio\" \"$resources/app.asar/node_modules/@noldova/teamrun-shell-cli/services/cli-entry.js\" \"$@\"\n"));
+      if (process.platform !== "win32")
+        assert.equal((await stat(command)).mode & 0o777, 0o755);
+    });
+
+    test("the macOS command runs the bundle's program through a chain of absolute and relative links, passing its arguments unchanged", { skip: process.platform === "win32" }, async t => {
+      const root = await realpath(await mkdtemp(path.join(tmpdir(), "teamrun-package-configuration-")));
+      t.after(() => rm(root, { recursive: true, force: true }));
+      await PackageConfigurationTests.create("macos", "arm64", root).writeAsync(path.join(root, "_build", "package", "electron-builder.json"));
+      const contents = path.join(root, "Fixture Studio.app", "Contents");
+      await mkdir(path.join(contents, "Resources", "bin"), { recursive: true });
+      await mkdir(path.join(contents, "MacOS"), { recursive: true });
+      await copyFile(path.join(root, "_build", "package", "command", "fixture-studio"), path.join(contents, "Resources", "bin", "fixture-studio"));
+      await chmod(path.join(contents, "Resources", "bin", "fixture-studio"), 0o755);
+      await writeFile(path.join(contents, "MacOS", "Fixture Studio"), "#!/bin/sh\nprintf '%s\\n' \"$ELECTRON_RUN_AS_NODE\" \"$@\"\n", { mode: 0o755 });
+      await mkdir(path.join(root, "usr", "local", "bin"), { recursive: true });
+      await mkdir(path.join(root, "links"), { recursive: true });
+      await symlink(path.join(contents, "Resources", "bin", "fixture-studio"), path.join(root, "links", "fixture-studio"));
+      await symlink(path.join("..", "..", "..", "links", "fixture-studio"), path.join(root, "usr", "local", "bin", "fixture-studio"));
+
+      const result = spawnSync(path.join(root, "usr", "local", "bin", "fixture-studio"), ["status", "a b", "--json"], { encoding: "utf8", env: { PATH: process.env["PATH"] } });
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(result.stdout.split("\n"), ["1", path.join(contents, "Resources", "app.asar", "node_modules", "@noldova", "teamrun-shell-cli", "services", "cli-entry.js"), "status", "a b", "--json", ""]);
     });
   }
 

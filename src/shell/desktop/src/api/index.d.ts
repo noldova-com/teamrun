@@ -79,6 +79,36 @@ export declare enum QuitChoice {
 }
 
 /**
+ * What installing the command on the macOS PATH did.
+ */
+export declare enum PathCommandOutcome {
+  /**
+   * The link now points to the command inside the app.
+   */
+  Installed = "Installed",
+
+  /**
+   * The link already pointed to the command inside this app, so nothing changed.
+   */
+  AlreadyInstalled = "AlreadyInstalled",
+
+  /**
+   * A file that is not a link has the link's name; it is left alone.
+   */
+  Occupied = "Occupied",
+
+  /**
+   * This build has no command to link, as in a development start.
+   */
+  Missing = "Missing",
+
+  /**
+   * The person cancelled the system's administrator prompt.
+   */
+  Cancelled = "Cancelled"
+}
+
+/**
  * Whether closing the last window may go ahead.
  */
 export declare enum QuitOutcome {
@@ -2898,10 +2928,12 @@ export declare class DesktopApplication {
    * @param createAppearanceStore Creates the store of this device's last appearance preferences in the same folder. The
    * desktop reads them before it opens a window, so the window's first frame already has them, and keeps those the
    * window reports.
+   * @param createPathCommand Creates the service that links the command line on the macOS PATH for the program the
+   * desktop runs from; the window's "Install command in PATH" command runs it and shows what happened.
    * @example
    * ```ts
    * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
-   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron } from "@noldova/teamrun-shell-desktop";
+   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
    *
    * export function launch(electron: IElectron, process: IDesktopProcess): void {
    *   DesktopApplication.start(
@@ -2910,7 +2942,8 @@ export declare class DesktopApplication {
    *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
    *     t => new RuntimeLauncher(t, RuntimeBuild.identity),
    *     t => DeviceIdentity.readOrCreateAsync(t),
-   *     t => new AppearanceStore(t));
+   *     t => new AppearanceStore(t),
+   *     t => PathCommand.forBundle(t, () => Promise.resolve()));
    * }
    * ```
    */
@@ -2920,7 +2953,8 @@ export declare class DesktopApplication {
     moduleUrl: string,
     createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
-    createAppearanceStore: (folder: string) => IAppearanceStore): void;
+    createAppearanceStore: (folder: string) => IAppearanceStore,
+    createPathCommand: (executablePath: string) => PathCommand): void;
 }
 
 /**
@@ -3256,6 +3290,97 @@ export declare class SystemNotifier {
    * ```
    */
   public receive(broadcast: NotificationBroadcast): void;
+}
+
+/**
+ * Puts the command line on the macOS PATH by linking a folder on it, `/usr/local/bin`, to the command inside the app
+ * bundle. When the folder cannot be written, it asks for an administrator through the system's prompt.
+ */
+export declare class PathCommand {
+  /**
+   * Creates the service for one command and one link.
+   *
+   * @param target The command inside the app bundle.
+   * @param link The link to make on the PATH.
+   * @param runProgramAsync Runs a program to its end, for the system's administrator prompt, and rejects with an error
+   * whose message holds the program's standard error when it fails; `(-128)` in it means the person cancelled.
+   * @example
+   * ```ts
+   * import { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const command: PathCommand = new PathCommand("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun", () => Promise.resolve());
+   * ```
+   */
+  public constructor(target: string, link: string, runProgramAsync: (program: string, args: readonly string[]) => Promise<void>);
+
+  /**
+   * The link this service makes.
+   *
+   * @example
+   * ```ts
+   * import type { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(command: PathCommand): string {
+   *   return `The command line is linked at ${command.linkPath}.`;
+   * }
+   * ```
+   */
+  public get linkPath(): string;
+
+  /**
+   * Creates the service for the bundle the desktop runs from: the command is `Contents/Resources/bin/teamrun` and the
+   * link `/usr/local/bin/teamrun`.
+   *
+   * @param executablePath The program the desktop runs from, in `Contents/MacOS`.
+   * @param runProgramAsync Runs a program to its end, for the system's administrator prompt, and rejects with an error
+   * whose message holds the program's standard error when it fails; `(-128)` in it means the person cancelled.
+   * @returns The service.
+   * @example
+   * ```ts
+   * import { PathCommand } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const command: PathCommand = PathCommand.forBundle("/Applications/TeamRun.app/Contents/MacOS/TeamRun", () => Promise.resolve());
+   * ```
+   */
+  public static forBundle(executablePath: string, runProgramAsync: (program: string, args: readonly string[]) => Promise<void>): PathCommand;
+
+  /**
+   * Links the command on the PATH. A link to elsewhere is replaced; a file that is not a link is left alone. When the
+   * link's folder cannot be written, the system's administrator prompt makes the folder and the link.
+   *
+   * @returns A promise of what happened.
+   * @throws PathCommandException, through the promise, when the link cannot be read or made, or the administrator
+   * prompt fails for another reason than the person cancelling it.
+   * @example
+   * ```ts
+   * import { type PathCommand, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isLinkedAsync(command: PathCommand): Promise<boolean> {
+   *   const outcome = await command.installAsync();
+   *   return outcome === PathCommandOutcome.Installed || outcome === PathCommandOutcome.AlreadyInstalled;
+   * }
+   * ```
+   */
+  public installAsync(): Promise<PathCommandOutcome>;
+}
+
+/**
+ * The exception thrown when the command cannot be linked on the macOS PATH.
+ */
+export declare class PathCommandException extends Exception {
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { PathCommandException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: PathCommandException = new PathCommandException("The teamrun command could not be linked at /usr/local/bin/teamrun.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
 }
 
 /**

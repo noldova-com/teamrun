@@ -72,6 +72,9 @@ contextBridge.exposeInMainWorld("teamrun", {
   openLogFolder(): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:openLogFolder") as Promise<boolean>;
   },
+  installCommand(): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:installCommand") as Promise<boolean>;
+  },
   keepAppearance(preferences: unknown): void {
     ipcRenderer.send("teamrun:keepAppearance", preferences);
   },
