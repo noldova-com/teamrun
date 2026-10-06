@@ -28,7 +28,7 @@ class BrokenGitHubFixture extends ReleaseGitHubFixture {
 class ReleasePublishTests {
   private static readonly REVISION: string = "0123456789abcdef0123456789abcdef01234567";
   private static readonly USAGE: string = "Usage: RELEASE_REPOSITORY=<owner/name> RELEASE_VERSION=<N.N.N> RELEASE_REVISION=<commit> RELEASE_FOLDER=<folder> "
-    + "RELEASE_NOTES=<text> npm run release:publish\n";
+    + "RELEASE_RUN_URL=<url> npm run release:publish\n";
 
   public static register(): void {
     test("the release's files are checked and published to the requested repository with the notes", async t => {
@@ -40,11 +40,14 @@ class ReleasePublishTests {
 
       assert.equal(exitCode, 0, output.text);
       assert.ok(output.text.endsWith(`Published v0.0.7 from ${ReleasePublishTests.REVISION} with 22 files.\n`), output.text);
-      assert.ok(github.fields.includes("body=TeamRun 0.0.7."));
+      assert.ok(github.fields.includes("body=Unsigned test release of Fixture Studio, published in noldova-com/teamrun; an installed Fixture Studio never updates from it.\n\n"
+        + "Fixture Studio 0.0.7 for Windows, Linux and macOS, each on x64 and ARM64. Its packages are unsigned.\n\n"
+        + "No target has passed its native acceptance yet, so every target was accepted by a CI run only.\n\n"
+        + "Each target's package passed its install check on that target's own runner in the run that built it: https://github.com/noldova-com/teamrun/actions/runs/7"), github.fields.join("\n"));
       assert.deepEqual(github.releases.map(t => [t.tag, t.isDraft, t.assets.length]), [["v0.0.7", false, 22]]);
     });
 
-    test("a relative, missing or #-marked folder, missing notes, files that differ from the release or a GitHub failure fails with the reason, and an unexpected error reaches the caller", async t => {
+    test("a relative, missing or #-marked folder, a run address that is missing or not https, files that differ from the release or a GitHub failure fails with the reason, and an unexpected error reaches the caller", async t => {
       const [repository, release] = await ReleasePublishTests.createAsync(t);
       const refusing = new ReleaseGitHubFixture();
       refusing.upload("Fixture Studio-windows-x64.exe", ["is refused"]);
@@ -54,8 +57,9 @@ class ReleasePublishTests {
         [{ RELEASE_FOLDER: release.locate("out#1") }, new ReleaseGitHubFixture(),
           `RELEASE_FOLDER must not contain #, which gh release upload reads as the start of a file's label: "${release.locate("out#1")}".\n`],
         [{ RELEASE_FOLDER: release.locate("missing") }, new ReleaseGitHubFixture(), `The release's folder ${release.locate("missing")} does not exist.\n`],
-        [{ RELEASE_NOTES: " " }, new ReleaseGitHubFixture(), "RELEASE_NOTES must hold the release's notes.\n"],
-        [{ RELEASE_NOTES: undefined }, new ReleaseGitHubFixture(), "RELEASE_NOTES must hold the release's notes.\n"],
+        [{ RELEASE_RUN_URL: undefined }, new ReleaseGitHubFixture(), "RELEASE_RUN_URL must be the https address of the run that built the release, not \"\".\n"],
+        [{ RELEASE_RUN_URL: "http://github.com/runs/7" }, new ReleaseGitHubFixture(),
+          "RELEASE_RUN_URL must be the https address of the run that built the release, not \"http://github.com/runs/7\".\n"],
         [{ RELEASE_VERSION: "0.0.8" }, new ReleaseGitHubFixture(), "latest-windows-x64.yml does not describe version 0.0.8 with Fixture Studio-windows-x64.exe as they are.\n"],
         [{}, refusing, `Creating the draft release v0.0.7 for ${ReleasePublishTests.REVISION}.\n"gh release upload v0.0.7 ${release.locate("Fixture Studio-windows-x64.exe")} `
           + `--repo ${ReleaseGitHubFixture.REPOSITORY}" failed with exit code 1: HTTP 422: Validation Failed (https://uploads.github.com/)\n`]
@@ -85,7 +89,7 @@ class ReleasePublishTests {
   private static describe(release: ReleaseFolderFixture): NodeJS.ProcessEnv {
     return {
       RELEASE_REPOSITORY: ReleaseGitHubFixture.REPOSITORY, RELEASE_VERSION: "0.0.7", RELEASE_REVISION: ReleasePublishTests.REVISION, RELEASE_FOLDER: release.folder,
-      RELEASE_NOTES: "TeamRun 0.0.7."
+      RELEASE_RUN_URL: "https://github.com/noldova-com/teamrun/actions/runs/7"
     };
   }
 

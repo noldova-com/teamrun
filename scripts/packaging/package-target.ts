@@ -50,6 +50,10 @@ export default class PackageTarget {
     return new PackageTarget(PackageTarget.PLATFORMS.get(platform) ?? platform, architecture);
   }
 
+  public get id(): string {
+    return `${this.platform}-${this.architecture}`;
+  }
+
   public static listAll(): readonly PackageTarget[] {
     return [...PackageTarget.FORMATS.keys()].flatMap(t => PackageTarget.ARCHITECTURES.map(architecture => new PackageTarget(t, architecture)));
   }

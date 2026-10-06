@@ -780,7 +780,7 @@ The window's own layout is the exception: a failed save of the layout is logged 
 - Exact external dependency versions and lockfiles describe the install inputs.
 - The root manifest declares the product version and, separately, the protocol version.
   The build stamps each module part package's manifest with its module's version and every other package's manifest with the product version ([Modules and versions](#modules-and-versions)).
-- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable and icons folder.
+- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder and release repository.
   Windows' app user model ID, the macOS bundle ID and the Linux desktop name (`<id>.desktop`) derive from the application IDs.
   A packaged build uses the application ID.
   A development build uses `<development application ID>.<checkout hash>`, where the hash is the first eight hexadecimal digits of the SHA-256 of the checkout's absolute path.
@@ -838,6 +838,7 @@ Module directories, compatibility ranges and separate module updates remain [def
 
 - The target matrix is Windows, Linux and macOS, each on x64 and ARM64.
   Declare support for a target only after its build and native acceptance are verified.
+  The root manifest's `teamrun.supportedTargets` declares them by id, such as `windows-x64`, and lists no target before its native acceptance.
 - Formats: Windows NSIS, macOS DMG plus the ZIP its updater downloads, and Linux AppImage.
 - Release downloads are named `TeamRun-<platform>-<arch>.<ext>` and each target's update information `latest-<platform>-<arch>.yml`.
   No file name contains the version, so an AppImage update replaces the installed file in place and keeps its location and launchers.
@@ -940,16 +941,21 @@ Each target is packaged on its own platform and processor.
     Two releases with the tag, a tag without a release or a draft for another revision fails with the reason.
   - A run that fails after creating the tag leaves the tag on the revision beside the draft.
     Running `release:publish` again continues the draft, and `release:check` refuses a new request for that version.
-- The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder and the release notes from `RELEASE_FOLDER` and `RELEASE_NOTES`.
+- The release scripts take the repository, version and revision from `RELEASE_REPOSITORY`, `RELEASE_VERSION` and `RELEASE_REVISION`, so a trial can publish to another repository; `release:publish` also takes the folder from `RELEASE_FOLDER` and the address of the run that built the release from `RELEASE_RUN_URL`.
+- `release:publish` writes the release notes.
+  They name the supported targets and the targets a CI run alone accepted, say whether the packages are signed, and link the run whose install checks the packages passed.
+- `teamrun.product.releaseRepository` names the repository whose releases are the update feed.
+  Like GitHub, the release scripts compare repository names without regard to case.
+  A release published to any other repository is an unsigned test release: its notes open by saying so and that an installed TeamRun never updates from it.
+  It follows every other rule here, including the versions and becoming that repository's latest release.
 - The **Release** workflow, `.github/workflows/release.yml`, releases its own repository.
   It runs only by hand, from `main`, with a version and a revision, and one release per repository runs at a time:
   - Its check job runs `release:check`.
-    Until TeamRun's packages are signed, it refuses to release `noldova-com/teamrun`, so a trial runs the workflow in a test repository.
+    Until TeamRun's packages are signed, `release:check` refuses a release to `releaseRepository`, so a trial runs the workflow in a test repository.
   - Each target then builds on its own runner, runs `npm test`, makes its packages, installs, starts and quits them as the Package workflow does, and writes its release files with `release:assets`.
     It keeps them as an artifact of the run, with three tries.
   - The publish job alone may write to the repository, behind the `publish` environment.
-    It takes every target's files from this run's artifacts, also when only it runs again, and runs `release:publish`.
-    The release notes say that each target's package passed its install check on its own runner, and link the run.
+    It takes every target's files from this run's artifacts, also when only it runs again, and runs `release:publish` with the run's address.
 - Releases use numbered versions such as `0.0.1` and `0.0.2`, without prerelease suffixes or build metadata, and matching `v`-prefixed tags.
   Each successful publication becomes the latest release.
 - Published application updates must use a version newer than the installed version.
@@ -957,7 +963,7 @@ Each target is packaged on its own platform and processor.
 
 ### Updates
 
-- The installed updater checks an approved release feed for its platform and CPU.
+- The installed updater checks the releases of `teamrun.product.releaseRepository` for its platform and CPU, and no other repository's.
   Every packaged target updates itself: Windows through its installer, macOS through Squirrel.Mac and a Linux AppImage by replacing the file.
 - A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced; an installation that cannot update itself explains why.
 - The GitHub release route is anonymous HTTPS; a private repository is not made reachable by injecting repository or provider credentials.
