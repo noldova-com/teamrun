@@ -23,6 +23,7 @@ export class CoreApiTests {
   @TestMethod
   public installsTheCompleteObjectExtensionSurface(): void {
     const extensionNames = [
+      api.nameof<ObjectConstructor>(t => t.isBigInt),
       api.nameof<ObjectConstructor>(t => t.isBoolean),
       api.nameof<ObjectConstructor>(t => t.isFunction),
       api.nameof<ObjectConstructor>(t => t.isNull),

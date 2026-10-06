@@ -558,7 +558,7 @@ The runtime owns the process and ends it; the part does not.
 - **Identity.**
   A process is a record's when its id matches and its start can fall between the request and the return of the call that started it.
   Start times are compared on the clock the process table uses: on Linux, time since boot; on macOS and Windows, the wall clock.
-  They are compared with the table's precision: on Windows the table gives each process's creation time to the millisecond, compared within 50 ms; on macOS and Linux `ps` gives whole seconds, so a start is known only within a second on each side, widened by the time `ps` takes.
+  They are compared with the table's precision: on Windows the table gives each process's creation time to the millisecond, compared within 50 ms, and leaves out a process created after the table was read; on macOS and Linux `ps` gives whole seconds, so a start is known only within a second on each side, widened by the time `ps` takes.
   On Windows, which reuses process ids quickly, a process an earlier runtime left must also run the recorded executable.
   Any other process is left alone.
   The boot is the kernel's boot id on Linux and the system's start time elsewhere.
@@ -566,7 +566,9 @@ The runtime owns the process and ends it; the part does not.
   On macOS and Linux each program leads its own process group, and stopping it sends the group SIGTERM; on Windows stopping closes the program's standard input.
   Whatever still runs after the grace period of 3 seconds is killed.
   On macOS and Linux the whole group is killed at once.
-  On Windows the program and the descendants that started after it, found in the process table, are killed from the top down; each is opened, checked against the start time the table showed and killed through that handle, so a process that took the id since is left alone.
+  On Windows the runtime reads the process table and ends processes through the system's own functions, which its Windows addon calls, and starts no other program.
+  It loads the addon at its first use; when the addon cannot be loaded, the ending fails, the record stays for the next start and the runtime's log names the addon.
+  The program and the descendants that started after it, found in the process table, are killed from the top down; each is opened, checked against the start time the table showed and killed through that handle, so a process that took the id since is left alone.
   The same call then reads the table again, which finds the children that the killed processes started before they ended, and waits on the handles; a further call kills those children the same way.
   A process or group that cannot be signalled does not stop the others: on macOS and Linux its record stays and the error is logged; on Windows it counts as still running.
   The runtime's log names what had to be killed and what still ran 5 seconds later.
@@ -796,6 +798,13 @@ The window's own layout is the exception: a failed save of the layout is logged 
   [Packaging](#packaging) describes the packaged layout.
 - Compile, package and install through one reproducible path.
   Tests and the window consume fresh installed artifacts, detecting stale inputs.
+  The platform and the processor are inputs too, because a package's archive can differ by both.
+- On Windows, `npm run build` compiles each Windows addon a package's manifest lists, with the node-gyp that npm bundles, for the machine's own processor, and puts it in the package's archive as `native/<name>.node`; other platforms build none.
+  node-gyp downloads the headers of the Node.js that runs the build once into `_build/node-gyp` and checks them against Node.js's published checksums.
+  The build turns off the link-time optimization that Node.js's own release build records, which node-gyp would otherwise pass on to Visual Studio's compiler and linker, and which they reject.
+  An addon uses only Node-API, whose interface stays the same across Node.js and Electron versions, and node-gyp's delay-load hook binds it to the program that loads it, so the same file runs under Node.js in the tests and under TeamRun's program.
+  The build needs Visual Studio's "Desktop development with C++" workload, with its C++ ARM64 build tools on an ARM64 machine, and stops with a message naming them when node-gyp finds no Visual Studio with them.
+  The [coding standards](CODING-STANDARDS.md#package-organization) own an addon's source.
   The coding standards own public declarations and documentation.
 - The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires.
   The build installs it from its lockfile, separately from the packages, and the Angular CLI builds and tests the Angular parts.
@@ -848,7 +857,9 @@ Each target is packaged on its own platform and processor.
     The packaging checks the window again for the Gallery.
   - The identity's icons, `LICENSE` and `assets/dictionaries`.
 
-  The stage becomes `resources/app.asar`, and nothing is unpacked: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
+  The stage becomes `resources/app.asar`: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
+  Only the Windows addons are unpacked, into `resources/app.asar.unpacked`, because Windows loads a library only from a file of its own; code loads an addon by its path inside `app.asar`, and Electron reads it from the unpacked copy.
+  The program's check of `app.asar` does not cover that copy, which lies in the same per-user install folder as `TeamRun.exe` and can be changed by the same user.
 - **Program.**
   The program is a copy of the installed Electron's distribution without its default app and `version` file, which electron-builder also leaves out of an Electron it downloads.
   It is named and labelled from the product identity: Windows' `TeamRun.exe` with its icon and version information, the macOS bundle with the application ID, and the Linux executable named after the slug, with its desktop file named `<application ID>.desktop`.
@@ -904,7 +915,7 @@ Each target is packaged on its own platform and processor.
   | CookieEncryption | off | TeamRun keeps no cookies: the window loads from `file://` and signs in nowhere. With the fuse on, the cookie key would live in the macOS Keychain or the Linux keyring, which can ask the person for access, and again after each update of an unsigned build. It turns on when TeamRun shows web content or signs in. |
   | LoadBrowserProcessSpecificV8Snapshot | off | The program has no snapshot of its own. |
 - **Tools.** electron-builder downloads its packaging tools into `_build/package/tool-cache` and checks each against the SHA-256 it pins.
-  Packages are unsigned; signing is a separate step.
+  Packages are unsigned; the separate signing step that [#326](https://github.com/noldova-com/teamrun/issues/326) adds will sign the Windows addons along with the program.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
 
 ### Publication

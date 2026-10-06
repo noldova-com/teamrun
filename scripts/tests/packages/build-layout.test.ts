@@ -22,6 +22,8 @@ class BuildLayoutTests {
 
       assert.equal(layout.root, root);
       assert.equal(layout.archivesFolder, path.join(root, "_build", "archives"));
+      assert.equal(layout.nodeGypFolder, path.join(root, "_build", "node-gyp"));
+      assert.equal(layout.locateAddonWork(manifest, "windows-process"), path.join(root, "_build", "native", "modules-terminal-window", "windows-process"));
       assert.equal(layout.locateSource(manifest), path.join(root, "src", "modules", "terminal", "window"));
       assert.equal(layout.locateSource(manifest, "src", "api", "index.d.ts"), path.join(root, "src", "modules", "terminal", "window", "src", "api", "index.d.ts"));
       assert.equal(layout.locateOutput(manifest), path.join(root, "_build", "packages", "modules-terminal-window"));

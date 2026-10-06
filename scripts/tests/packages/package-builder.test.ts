@@ -19,9 +19,11 @@ import PackageVersions from "../../packages/package-versions.ts";
 import PackageException from "../../packages/package.exception.ts";
 import ProductIdentity from "../../packages/product-identity.ts";
 import RootManifest from "../../packages/root-manifest.ts";
+import WindowsAddonBuilder from "../../packages/windows-addon-builder.ts";
 import ProcessResult from "../../processes/process-result.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import NpmCommand from "../../toolchain/npm-command.ts";
+import NodeGypFixture from "../fixtures/node-gyp.fixture.ts";
 import PackageTreeFixture from "../fixtures/package-tree.fixture.ts";
 import ProductIdentityFixture from "../fixtures/product-identity.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
@@ -50,6 +52,18 @@ class PackageBuilderTests {
       assert.match(await readFile(path.join(installed, "resources.js"), "utf8"), /version = "0\.0\.7";\s+static protocol = "3";/);
       assert.ok(existsSync(archive));
       assert.ok(existsSync(path.join(layout.locateTestOutput(PackageBuilderTests.ALPHA), "api", "index.test.js")));
+    });
+
+    test("a package's Windows addons are built into its native folder before it is packed and installed", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
+      const repository = await PackageBuilderTests.createAsync(t, true);
+      await repository.writeAsync({ "src/foundation/alpha/src/native/probe.c": "probe source\n" });
+      const layout = new BuildLayout(repository.directory);
+      const manifest = new PackageManifest("src/foundation/alpha", "@noldova/teamrun-foundation-alpha", [], "[]", ["probe"]);
+      const addons = new WindowsAddonBuilder(layout, new NodeGypFixture(), "win32", "x64");
+
+      await PackageBuilderTests.createBuilder(layout, new NpmCommand(new ProcessRunner(), process.env), addons).buildSourceAsync(manifest, [layout.locateArchive(manifest, "0.0.7")]);
+
+      assert.equal(await readFile(path.join(layout.locateInstalled(manifest), "native", "probe.node"), "utf8"), "built probe source\n");
     });
 
     test("the installed package's source maps resolve to the package's real source files", { timeout: PackageBuilderTests.BUILD_TIMEOUT }, async t => {
@@ -150,8 +164,8 @@ class PackageBuilderTests {
     return repository;
   }
 
-  private static createBuilder(layout: BuildLayout, npm: NpmCommand): PackageBuilder {
-    return new PackageBuilder(layout, PackageBuilderTests.ROOT, new PackageVersions("0.0.7", new Map()), new ProcessRunner(), npm);
+  private static createBuilder(layout: BuildLayout, npm: NpmCommand, addons: WindowsAddonBuilder = new WindowsAddonBuilder(layout, new NodeGypFixture(), "linux", "x64")): PackageBuilder {
+    return new PackageBuilder(layout, PackageBuilderTests.ROOT, new PackageVersions("0.0.7", new Map()), new ProcessRunner(), npm, addons);
   }
 }
 

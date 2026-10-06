@@ -563,22 +563,17 @@ export class Resources {
   public static readonly processTableCommand: string = "/bin/ps";
   public static readonly processTableArguments: readonly string[] = ["-A", "-o", "pid=,ppid=,pgid=,etime="];
   public static readonly processTableRowPattern: RegExp = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+)\s*$/;
-  public static readonly windowsShellSegments: readonly string[] = ["System32", "WindowsPowerShell", "v1.0", "powershell.exe"];
-  public static readonly windowsShellArguments: readonly string[] = ["-NoProfile", "-NonInteractive", "-EncodedCommand"];
-  public static readonly windowsProcessTableScript: string =
-    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $starts = @{}; " +
-    "foreach ($p in [System.Diagnostics.Process]::GetProcesses()) { try { $starts[$p.Id] = [long][Math]::Floor($p.StartTime.ToFileTimeUtc() / 10000) - 11644473600000 } catch { } }; " +
-    "foreach ($w in Microsoft.PowerShell.Management\\Get-WmiObject -Query 'SELECT ProcessId, ParentProcessId, ExecutablePath FROM Win32_Process' -ErrorAction Stop) { $started = $starts[[int]$w.ProcessId]; " +
-    "if ($null -ne $started) { \"{0}`t{1}`t{2}`t{3}\" -f $w.ProcessId, $w.ParentProcessId, $started, $w.ExecutablePath } }";
-  public static readonly windowsScriptEncoding: BufferEncoding = "utf16le";
-  public static readonly base64Encoding: BufferEncoding = "base64";
-  public static readonly windowsProcessTableRowPattern: RegExp = /^(\d+)\t(\d+)\t(\d+)\t(.*)$/;
-  public static readonly windowsKillRowPattern: RegExp = /^(\d+)\t([a-z]+)$/;
-  public static readonly killedState: string = "killed";
-  public static readonly replacedState: string = "other";
-  public static readonly runningState: string = "running";
-  public static readonly deniedState: string = "denied";
-  public static readonly moduleSearchPathVariable: string = "PSModulePath";
+  public static readonly windowsQueryAccess: number = 0x1000;
+  public static readonly windowsEndAccess: number = 0x1000 | 0x0001 | 0x100000;
+  public static readonly windowsGoneError: number = 87;
+  public static readonly windowsAddonPath: string = "../../native/windows-process.node";
+  public static readonly windowsAddonFunctions: readonly string[] = ["listProcesses", "openProcess", "readCreationTime", "readImagePath", "terminateProcess", "hasExited", "closeHandle"];
+  public static readonly addonLoadFailed: string = "The runtime could not load its Windows addon, native/windows-process.node.";
+  public static readonly addonIncomplete: string = "The runtime's Windows addon, native/windows-process.node, lacks functions this runtime calls; it comes from another build.";
+  public static readonly addonUnexpected: string = "The runtime's Windows addon, native/windows-process.node, returned a value this runtime does not expect; it comes from another build.";
+  public static readonly windowsProcessRowLength: number = 2;
+  public static readonly fileTimeUnitsPerMillisecond: bigint = 10_000n;
+  public static readonly fileTimeEpochMilliseconds: number = 11_644_473_600_000;
   public static readonly processGraceMilliseconds: number = 3_000;
   public static readonly processEndMilliseconds: number = 5_000;
   public static readonly processSeenMilliseconds: number = 5_000;
@@ -957,20 +952,6 @@ export class Resources {
 
   public static formatProcessesLeft(processIds: readonly number[]): string {
     return `It was no longer running, and nothing showed that processes ${processIds.join(", ")} were what it started, so they were left running.`;
-  }
-
-  public static formatWindowsKillScript(targets: readonly number[], milliseconds: number, lists: boolean): string {
-    return `$targets = @(${targets.join(",")}); $deadline = [DateTime]::UtcNow.AddMilliseconds(${milliseconds}); ` +
-      "$held = [System.Collections.Generic.List[System.Diagnostics.Process]]::new(); " +
-      "for ($i = 0; $i -lt $targets.Length; $i += 2) { $id = $targets[$i]; " +
-      "try { $p = [System.Diagnostics.Process]::GetProcessById($id) } catch { \"$id`tgone\"; continue }; " +
-      "try { $null = $p.Handle; $started = [long][Math]::Floor($p.StartTime.ToFileTimeUtc() / 10000) - 11644473600000 } catch { \"$id`tdenied\"; continue }; " +
-      "if ($started -ne $targets[$i + 1]) { \"$id`tother\"; continue }; " +
-      "try { $p.Kill(); \"$id`tkilled\" } catch { \"$id`tfailed\" }; " +
-      "$held.Add($p) }; " +
-      (lists ? `${Resources.windowsProcessTableScript}; ` : String.empty) +
-      "foreach ($p in $held) { $left = [int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds); " +
-      "if ($p.WaitForExit($left)) { \"$($p.Id)`tended\" } else { \"$($p.Id)`trunning\" } }";
   }
 
   public static formatModuleStopping(moduleId: string, program: string): string {
