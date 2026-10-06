@@ -73,6 +73,16 @@ declare global {
    */
   interface ObjectConstructor {
     /**
+     * Checks for a primitive BigInt value.
+     *
+     * @param value Any value.
+     * @returns True for every primitive bigint; false for everything else,
+     * including numbers and `Object(1n)`. A true result narrows the value to
+     * `bigint`.
+     */
+    isBigInt(value: unknown): value is bigint;
+
+    /**
      * Checks for a primitive Boolean value.
      *
      * @param value Any value.
