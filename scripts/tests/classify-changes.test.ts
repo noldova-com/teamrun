@@ -39,7 +39,7 @@ class ClassifyChangesTests {
       const outputs = (await readFile(outputPath, "utf8")).split("\n");
       assert.deepEqual(outputs.filter(t => /^(run-code|run-ui|deferred)=/.test(t)), ["run-code=false", "run-ui=false", "deferred=Windows ARM64, macOS x64", "run-code=true", "run-ui=true", "deferred="]);
       const skipped = `Code builds and tests are not required; the document checks still run. Only Markdown documentation changed since the merge base ${base}.`;
-      const full = "Full build and test verification selected. Events other than pull requests verify everything.";
+      const full = "Full build and test verification selected. Events other than pull requests and merge groups verify everything.";
       assert.equal(await readFile(summaryPath, "utf8"), `${skipped}\n${full}\n`);
       assert.equal(log.text, `${skipped}\n${full}\n`);
     });

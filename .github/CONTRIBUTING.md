@@ -63,7 +63,11 @@ Use the [PR template](PULL_REQUEST_TEMPLATE.md). Fill `## Summary` with what cha
 
 Keep the change small enough to review coherently. A PR that changes the appearance links its before and after [screenshots](../docs/TESTING.md#ui-screenshots-and-reports), using disposable data. Commit messages describe the concrete change.
 
-An authorized maintainer, or an agent the maintainer designates, reviews each change. Once it is approved, auto-merge squashes it into `main` when its required checks pass: the linked-issue check and **Build and test (all targets)**. The branch need not be up to date with `main`. The push run on `main` is the first run of the combined code and of the targets that pull requests skip; a failure there belongs to the pull request that caused it, and merging stops until it is fixed ([stop the line](../docs/TESTING.md#flakiness-and-races)). A passing check does not authorize a release or establish that behavior outside the check's scope works.
+An authorized maintainer, or an agent the maintainer designates, reviews each change. Once it is approved, auto-merge adds it to the merge queue when its required checks pass: the linked-issue check and **Build and test (all targets)**. The branch need not be up to date with `main`.
+
+The queue tests each pull request together with `main` and the pull requests ahead of it, in a merge group that runs the same required checks, and squashes them into `main` in order once their group passes. A group holds one to three pull requests and starts without waiting for more; up to three groups test at once. When a group fails, or its checks don't finish within 45 minutes, the queue removes the pull request that failed and tests the ones behind it again without it. Its author fixes the failure and pushes, and the pull request enters the queue again the same way.
+
+The push run on `main` is the first run of the targets and UI workflows that pull requests and merge groups skip; a failure there belongs to the pull request that caused it, and merging stops until it is fixed ([stop the line](../docs/TESTING.md#flakiness-and-races)). A passing check does not authorize a release or establish that behavior outside the check's scope works.
 
 ### The pull request watch
 

@@ -22,7 +22,7 @@ class ChangeClassifierTests {
   private static readonly RELATIVE_IMPORT: RegExp = /(?:\bfrom |^import )"(\.{1,2}\/[^"]+)";$/gm;
 
   public static register(): void {
-    test("pushes and events other than pull requests verify everything", async t => {
+    test("pushes and events other than pull requests and merge groups verify everything", async t => {
       const repository = await ChangeClassifierTests.createRepositoryAsync(t);
       const classifier = ChangeClassifierTests.createClassifier(repository);
       const base = ChangeClassifierTests.readHead(repository);
@@ -32,8 +32,25 @@ class ChangeClassifierTests {
       assert.deepEqual([push.runCode, push.runUi, push.reason], [true, true, "A push to main verifies everything."]);
       for (const eventName of ["workflow_dispatch", "schedule", undefined]) {
         const scope = await classifier.classifyAsync(eventName, base, documents);
-        assert.deepEqual([scope.runCode, scope.runUi, scope.reason], [true, true, "Events other than pull requests verify everything."]);
+        assert.deepEqual([scope.runCode, scope.runUi, scope.reason], [true, true, "Events other than pull requests and merge groups verify everything."]);
       }
+    });
+
+    test("a merge group compares its queued changes with the main it was built on", async t => {
+      const repository = await ChangeClassifierTests.createRepositoryAsync(t);
+      const classifier = ChangeClassifierTests.createClassifier(repository);
+      const main = await repository.commitAsync({ "src/index.ts": "export {};\n" });
+      repository.git(["switch", "--quiet", "--create", "gh-readonly-queue/main/pr-7"]);
+      const documents = await repository.commitAsync({ "docs/guide.md": "# Guide\n" });
+      const tooling = await repository.commitAsync({ ".github/workflows/check.yml": "name: Check\n" });
+
+      const documentsScope = await classifier.classifyAsync("merge_group", main, documents);
+      const toolingScope = await classifier.classifyAsync("merge_group", main, tooling);
+      const unavailable = await classifier.classifyAsync("merge_group", main, undefined);
+
+      assert.deepEqual([documentsScope.runCode, documentsScope.runUi, documentsScope.reason], [false, false, `Only Markdown documentation changed since the merge base ${main}.`]);
+      assert.deepEqual([toolingScope.runCode, toolingScope.runUi], [true, false]);
+      assert.deepEqual([unavailable.runCode, unavailable.runUi, unavailable.reason], [true, true, "The revisions to compare are unavailable."]);
     });
 
     test("missing, malformed or unknown revisions verify everything", async t => {
