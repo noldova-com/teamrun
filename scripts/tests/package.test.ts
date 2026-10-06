@@ -16,15 +16,15 @@ import { after, before, test, type TestContext } from "node:test";
 import AngularProject from "../angular/angular-project.ts";
 import GalleryFile from "../angular/gallery-file.ts";
 import Package from "../package.ts";
-import type ModulePackage from "../packaging/module-package.ts";
 import PackageStage from "../packaging/package-stage.ts";
 import PackagedBuild from "../packaging/packaged-build.ts";
+import type PinnedPackage from "../packaging/pinned-package.ts";
 import TrustedSigningModule from "../packaging/trusted-signing-module.ts";
 import ProcessResult from "../processes/process-result.ts";
 import ProcessRunner from "../processes/process-runner.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
 import PackageArchivesFixture from "./fixtures/package-archives.fixture.ts";
-import ModuleGalleryFixture from "./fixtures/module-gallery.fixture.ts";
+import PackageGalleryFixture from "./fixtures/package-gallery.fixture.ts";
 import PackagedBuildFixture from "./fixtures/packaged-build.fixture.ts";
 import ProcessRunnerFixture from "./fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
@@ -55,10 +55,19 @@ class BuilderFixture extends ProcessRunnerFixture {
   }
 }
 
+class CredentialWitnessFixture extends ProcessRunner {
+  public readonly seen: (readonly string[])[] = [];
+
+  public override captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
+    this.seen.push(Object.keys(environment ?? process.env).filter(t => t.startsWith("AZURE_")));
+    return super.captureAsync(command, commandArguments, directory, timeout, environment);
+  }
+}
+
 class PackageTests {
   private static readonly TIMEOUT: number = 120_000;
   private static readonly USAGE: string = "Usage: npm run package [-- --signed]\n";
-  private static readonly GALLERY: ModulePackage = TrustedSigningModule.GALLERY_PACKAGE;
+  private static readonly GALLERY: readonly PinnedPackage[] = TrustedSigningModule.PACKAGES;
   private static readonly CREDENTIALS: Readonly<Record<string, string>> = {
     AZURE_TENANT_ID: "fixture-tenant",
     AZURE_CLIENT_ID: "fixture-client",
@@ -175,28 +184,36 @@ class PackageTests {
       assert.deepEqual(builder.runs, []);
     });
 
-    test("--signed signs a Windows package through the hook with the pinned module and the Azure credentials, then checks the installer's, the program's and the addons' signatures",
+    test("--signed takes the Azure credentials out of the environment before staging, signs a Windows package through the hook with the pinned packages and only electron-builder "
+      + "holding the credentials, then checks the installer's, the program's and the addons' signatures",
       { timeout: PackageTests.TIMEOUT }, async t => {
         const repository = await PackageTests.createAsync(t);
-        const gallery = await ModuleGalleryFixture.createAsync();
+        const gallery = await PackageGalleryFixture.createAsync();
         t.after(() => gallery.disposeAsync());
         const addon = path.join("win-unpacked", "resources", "app.asar.unpacked", "node_modules", "@noldova", "teamrun-shell-runtime", "addon", "windows.node");
         const made = ["Fixture Studio-windows-x64.exe", path.join("win-unpacked", "Fixture Studio.exe"), addon];
         const builder = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(0, "Every file is signed.\r\n", "")]);
+        const npm = new CredentialWitnessFixture();
         const output = new TextOutputFixture();
+        Object.assign(process.env, PackageTests.CREDENTIALS);
+        t.after(() => {
+          for (const name of Object.keys(PackageTests.CREDENTIALS))
+            Reflect.deleteProperty(process.env, name);
+        });
 
-        const exitCode = await new Package(repository.directory, "win32", "x64", PackageTests.createStage(repository), builder, { PATH: "fixture-path", ...PackageTests.CREDENTIALS },
-          output, gallery.package).runAsync(["--signed"]);
+        const exitCode = await new Package(repository.directory, "win32", "x64", PackageTests.createStage(repository, [], npm), builder, process.env, output, gallery.packages)
+          .runAsync(["--signed"]);
 
         const folder = path.join(repository.directory, "_build", "package");
         const files = made.map(t => path.join(folder, "out", t));
         const configuration = JSON.parse(await readFile(path.join(folder, "electron-builder.json"), "utf8")) as { readonly forceCodeSigning: boolean; readonly win: Readonly<Record<string, unknown>> };
         assert.equal(exitCode, 0, output.text);
-        assert.deepEqual(gallery.requests, ["/package"]);
-        assert.deepEqual(builder.environments, [{
-          PATH: "fixture-path",
-          ELECTRON_BUILDER_CACHE: path.join(folder, "tool-cache"),
-          CSC_IDENTITY_AUTO_DISCOVERY: "false",
+        assert.deepEqual(gallery.requests, ["/module", "/tool"]);
+        assert.ok(npm.seen.length > 0);
+        assert.deepEqual(npm.seen.filter(t => t.length > 0), []);
+        assert.deepEqual(builder.captureEnvironments.map(t => Object.keys(t ?? {}).filter(name => name.startsWith("AZURE_"))), [[], []]);
+        assert.deepEqual(Object.keys(process.env).filter(t => t.startsWith("AZURE_")), []);
+        assert.deepEqual(builder.environments.map(t => Object.fromEntries(Object.entries(t ?? {}).filter(([name]) => name.startsWith("AZURE_") || name.startsWith("TEAMRUN_")))), [{
           ...PackageTests.CREDENTIALS,
           TEAMRUN_SIGNING_FOLDER: path.join(folder, "signing")
         }]);
@@ -206,7 +223,7 @@ class PackageTests {
           signingHashAlgorithms: ["sha256"],
           publisherName: "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US"
         });
-        assert.deepEqual(builder.captured.map(t => [t[0], t[1]]), [["pwsh", folder], ["pwsh", repository.directory]]);
+        assert.deepEqual(builder.captured.map(t => [t[0], t[1]]), [["pwsh", path.join(folder, "signing")], ["pwsh", repository.directory]]);
         assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], files.join("\n"));
         assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_WINDOWS_PUBLISHER"], "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US");
         assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n  ${files[0]}\nSignatures:\nEvery file is signed.\n`);
@@ -215,7 +232,7 @@ class PackageTests {
     test("--signed is refused for other platforms and without every Azure credential before anything is staged, and an ARM64 package without addons checks its installer and program",
       { timeout: PackageTests.TIMEOUT }, async t => {
         const repository = await PackageTests.createAsync(t);
-        const gallery = await ModuleGalleryFixture.createAsync();
+        const gallery = await PackageGalleryFixture.createAsync();
         t.after(() => gallery.disposeAsync());
         const made = ["Fixture Studio-windows-arm64.exe", path.join("win-arm64-unpacked", "Fixture Studio.exe")];
         const signed = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(0, "Signed.", "")]);
@@ -223,7 +240,7 @@ class PackageTests {
         const programless = new BuilderFixture([made[0] ?? ""], [], null, [new ProcessResult(0, "", "")]);
         const [linux, uncredentialed, twice, arm64, unverified, missing] = [1, 2, 3, 4, 5, 6].map(() => new TextOutputFixture());
         const runAsync = (platform: string, architecture: string, builder: BuilderFixture, environment: NodeJS.ProcessEnv, output: TextOutputFixture, options: readonly string[] = ["--signed"]): Promise<number> =>
-          new Package(repository.directory, platform, architecture, PackageTests.createStage(repository), builder, environment, output, gallery.package).runAsync(options);
+          new Package(repository.directory, platform, architecture, PackageTests.createStage(repository), builder, { ...environment }, output, gallery.packages).runAsync(options);
         assert.ok(linux !== undefined && uncredentialed !== undefined && twice !== undefined && arm64 !== undefined && unverified !== undefined && missing !== undefined);
 
         const exitCodes = [
@@ -273,9 +290,9 @@ class PackageTests {
     });
   }
 
-  private static createStage(repository: RepositoryFixture, exitCodes: readonly number[] = []): PackageStage {
+  private static createStage(repository: RepositoryFixture, exitCodes: readonly number[] = [], npmRunner: ProcessRunner = new ProcessRunner()): PackageStage {
     const gallery = new GalleryFile(repository.directory);
-    const npm = new NpmCommand(new ProcessRunner(), process.env);
+    const npm = new NpmCommand(npmRunner, process.env);
     const angular = new AngularProject(repository.directory, new ProcessRunner(), npm);
     return new PackageStage(repository.directory, npm, new PackagedBuild(repository.directory, new PackagedBuildFixture(gallery, exitCodes), gallery, angular));
   }

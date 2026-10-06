@@ -19,13 +19,13 @@ import RootManifest from "./packages/root-manifest.ts";
 import WindowsAddonBuilder from "./packages/windows-addon-builder.ts";
 import AuthenticodeCheck from "./packaging/authenticode-check.ts";
 import ElectronDistribution from "./packaging/electron-distribution.ts";
-import type ModulePackage from "./packaging/module-package.ts";
 import PackageConfiguration from "./packaging/package-configuration.ts";
 import PackageLayout from "./packaging/package-layout.ts";
 import PackageStage from "./packaging/package-stage.ts";
 import PackageTarget from "./packaging/package-target.ts";
 import PackagedBuild from "./packaging/packaged-build.ts";
 import PackagingException from "./packaging/packaging.exception.ts";
+import type PinnedPackage from "./packaging/pinned-package.ts";
 import TrustedSigningModule from "./packaging/trusted-signing-module.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
@@ -61,10 +61,10 @@ export default class Package {
   private readonly runner: ProcessRunner;
   private readonly environment: NodeJS.ProcessEnv;
   private readonly output: Writable;
-  private readonly signingPackage: ModulePackage;
+  private readonly signingPackages: readonly PinnedPackage[];
 
   public constructor(root: string, platform: string, architecture: string, stage: PackageStage, runner: ProcessRunner, environment: NodeJS.ProcessEnv, output: Writable,
-    signingPackage: ModulePackage) {
+    signingPackages: readonly PinnedPackage[]) {
     this.root = root;
     this.platform = platform;
     this.architecture = architecture;
@@ -72,10 +72,11 @@ export default class Package {
     this.runner = runner;
     this.environment = environment;
     this.output = output;
-    this.signingPackage = signingPackage;
+    this.signingPackages = signingPackages;
   }
 
   public async runAsync(packageArguments: readonly string[]): Promise<number> {
+    const credentials = TrustedSigningModule.takeCredentials(this.environment);
     if (packageArguments.length > 1 || packageArguments.some(t => t !== Package.SIGNED_OPTION)) {
       this.output.write(Package.USAGE);
       return Package.USAGE_EXIT_CODE;
@@ -85,12 +86,12 @@ export default class Package {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
       const layout = new PackageLayout(this.root);
       const signing = packageArguments.length === 0 ? null : this.createSigning(target, layout);
-      const signingEnvironment = signing?.describeEnvironment() ?? {};
+      const signingEnvironment = signing?.describeEnvironment(credentials) ?? {};
       await this.stage.stageAsync(this.output);
       await rm(layout.output, { recursive: true, force: true });
       const electron = new ElectronDistribution(this.root, layout.electron);
       await electron.copyAsync();
-      await signing?.prepareAsync(this.signingPackage);
+      await signing?.prepareAsync(this.signingPackages);
       const manifest = await RootManifest.readAsync(this.root);
       const configuration = new PackageConfiguration(this.root, manifest, target, this.stage.folder, layout.output, electron.folder, await electron.readVersionAsync(),
         signing === null ? null : path.join(this.root, ...Package.SIGN_HOOK_SEGMENTS));
@@ -156,6 +157,6 @@ if (import.meta.main) {
   const npm = new NpmCommand(runner, process.env);
   const angular = new AngularProject(root, runner, npm);
   const stage = new PackageStage(root, npm, new PackagedBuild(root, runner, new GalleryFile(root), angular));
-  process.exitCode = await new Package(root, process.platform, process.arch, stage, runner, process.env, process.stdout, TrustedSigningModule.GALLERY_PACKAGE)
+  process.exitCode = await new Package(root, process.platform, process.arch, stage, runner, process.env, process.stdout, TrustedSigningModule.PACKAGES)
     .runAsync(process.argv.slice(2));
 }

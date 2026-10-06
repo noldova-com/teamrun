@@ -942,8 +942,10 @@ Each target is packaged on its own platform and processor.
 - **Signing (Windows).**
   `npm run package` makes unsigned packages; `npm run package -- --signed` signs a Windows package and refuses any other target.
   It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing account `noldova-signing` and its certificate profile `TeamRun`, and checks them before anything is built.
-  Only electron-builder receives them, and only with `--signed`.
-  - It downloads Microsoft's TrustedSigning PowerShell module 0.5.8 from the PowerShell Gallery, checks the package against the SHA-512 the gallery published for it before expanding anything, and loads it from `_build/package/signing` by path, asserting its version.
+  Packaging takes them out of its own environment as it starts, so staging, the module's preparation and the signature check run without them; only electron-builder receives them, and only with `--signed`.
+  - It downloads Microsoft's TrustedSigning PowerShell module 0.5.8 from the PowerShell Gallery, and from nuget.org the three packages that module would otherwise install unchecked as it first signs: `Microsoft.Windows.SDK.BuildTools` 10.0.26100.4188, `Microsoft.Trusted.Signing.Client` 1.0.95 and `sign` 0.9.1-beta.24469.1.
+    It checks each package against the SHA-512 its gallery published before expanding any, and expands them into `_build/package/signing`, where signing finds the tools in place and downloads nothing.
+    It loads the module from there by path, asserting its version.
   - electron-builder signs through `scripts/packaging/windows-sign-hook.ts`, which signs each file with SHA-256 digests and an RFC 3161 timestamp.
     Besides the program and the installer, it signs the native addons in `app.asar.unpacked`.
   - Afterwards PowerShell 7 reads the Authenticode signatures of the installer, the unpacked program and every addon.
