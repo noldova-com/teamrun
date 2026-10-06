@@ -31,6 +31,7 @@ export class NoteComponent {
   protected readonly wrapping: WritableSignal<string> = signal("");
   private readonly context: IWindowPartContext = inject(WindowPartTokens.context);
   private readonly note: Signal<SettingScope> = computed(() => new SettingScope(QualifiedName.parse("notes.entry"), this.instance()));
+  private reads: number = 0;
 
   public constructor() {
     effect(() => this.readWrapping(this.note()));
@@ -54,8 +55,13 @@ export class NoteComponent {
   }
 
   private readWrapping(note: SettingScope): void {
+    const read = ++this.reads;
+    const show = (text: string): void => {
+      if (read === this.reads)
+        this.wrapping.set(text);
+    };
     this.context.readSettingAsync(NoteComponent.WRAPS_LINES, note).then(
-      t => this.wrapping.set(`Wraps lines: ${t.value === true ? "yes" : "no"}, ${t.isSet ? "set for this note" : "not set for this note"}`),
-      (error: unknown) => this.wrapping.set(`The runtime did not answer: ${String(error)}`));
+      t => show(`Wraps lines: ${t.value === true ? "yes" : "no"}, ${t.isSet ? "set for this note" : "not set for this note"}`),
+      (error: unknown) => show(`The runtime did not answer: ${String(error)}`));
   }
 }
