@@ -59,6 +59,9 @@ export default class ReleaseCheck {
   private async checkAsync(): Promise<void> {
     const request = ReleaseRequest.read(this.environment);
     const manifest = await RootManifest.readAsync(this.root);
+    if (manifest.product.isReleaseRepository(request.repository))
+      throw new ReleaseException(`${manifest.product.name} publishes no unsigned release to ${request.repository}, its update feed, so its releases there start once its packages are signed. `
+        + "Run a trial in a test repository.");
     if (manifest.productVersion !== request.version.text)
       throw new ReleaseException(`The root manifest's version is ${manifest.productVersion}, not ${request.version.text}; raise it on main first.`);
 
