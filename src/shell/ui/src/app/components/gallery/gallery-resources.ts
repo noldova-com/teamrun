@@ -205,7 +205,28 @@ export class GalleryResources {
     dockingPlate: "A plate with the center chosen",
     dockingGuideCaption: "Guide",
     dockingChosenCaption: "Chosen guide",
-    dockingPlateCaption: "Plate, center chosen"
+    dockingPlateCaption: "Plate, center chosen",
+    card: "Card",
+    cardTitle: "Sync is paused",
+    cardBody: "Changes stay on this computer until you resume.",
+    cardLong: "A card wraps a name too long for its width, such as shell.notifications.fromModules.notesReminderSchedule, inside it.",
+    codeBlock: "Code block",
+    codeLanguage: "TypeScript",
+    codeSample: "export function greet(name: string): string {\n  const message = \"Hello, \" + name + \". This line runs past the block's edge, so it scrolls sideways until Word wrap is on.\";\n  return message;\n}",
+    codeWrappedCaption: "Word wrap on",
+    codeNoLanguageCaption: "No language",
+    codeRefusedCaption: "Copy refused",
+    codeShell: "Shell",
+    codeCommand: "npm install --save-exact @noldova/teamrun-shell-ui",
+    codeLongLanguage: "A language name far too long to fit the header",
+    codeLongLine: "https://example.com/teamrun/modules/notes/settings/reminders/schedule/weekly/monday",
+    inlineCode: "Inline code",
+    inlinePanelCaption: "Panel text",
+    inlineMessageCaption: "Message text",
+    inlineBefore: "Set ",
+    inlineName: "EDITOR",
+    inlineAfter: " to choose the editor.",
+    inlineLongName: "shell.notifications.fromModules.notesReminderSchedule"
   } as const;
 
   public static formatMissingPart(part: string): string {
