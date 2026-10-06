@@ -22,6 +22,10 @@
   gap: var(--tr-space-2) var(--tr-space-4);
 }
 
+.tr-configuration-table-header-explained {
+  align-items: baseline;
+}
+
 .tr-configuration-table-heading {
   flex: 1 1 auto;
   min-width: 0;
@@ -40,6 +44,11 @@
 .tr-configuration-table-explanation {
   margin: 0;
   color: var(--tr-text);
+}
+
+.tr-configuration-table-header > .tr-configuration-table-explanation {
+  flex: 1 1 var(--tr-text-field-width);
+  min-width: 0;
 }
 
 .tr-configuration-table-scroll {

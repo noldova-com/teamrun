@@ -95,6 +95,9 @@ LICENSE file in the root directory of this source tree.
   <tr-gallery-cell long [caption]="text.longCaption">
     <ng-container [ngTemplateOutlet]="configurationTable" [ngTemplateOutletContext]="{ $implicit: narrowTable }" />
   </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.noHeadingCaption">
+    <ng-container [ngTemplateOutlet]="configurationTable" [ngTemplateOutletContext]="{ $implicit: unheadedTable }" />
+  </tr-gallery-cell>
 </tr-gallery-specimen>
 
 <ng-template #configurationTable let-table>

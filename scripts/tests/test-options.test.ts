@@ -17,15 +17,17 @@ class TestOptionsTests {
     test("no arguments select the complete gate once", () => {
       const options = TestOptions.parse([]);
 
-      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.part, options.selection], [false, [], 1, null, undefined]);
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.part, options.isRerunningFailed, options.selection], [false, [], 1, null, false, undefined]);
     });
 
-    test("a part selects its checks, once or repeated", () => {
+    test("a part selects its checks, once, repeated or rerunning its failed tests", () => {
       const once = TestOptions.parse(["--part", "packages"]);
       const repeated = TestOptions.parse(["--repeat", "3", "--part", "angular-and-checks"]);
+      const rerunning = TestOptions.parse(["--part", "scripts", "--rerun-failed"]);
 
-      assert.deepEqual([once.isDocuments, once.filters, once.repeat, once.part], [false, [], 1, "packages"]);
+      assert.deepEqual([once.isDocuments, once.filters, once.repeat, once.part, once.isRerunningFailed], [false, [], 1, "packages", false]);
       assert.deepEqual([repeated.isDocuments, repeated.filters, repeated.repeat, repeated.part], [false, [], 3, "angular-and-checks"]);
+      assert.deepEqual([rerunning.filters, rerunning.repeat, rerunning.part, rerunning.isRerunningFailed], [[], 1, "scripts", true]);
     });
 
     test("packages, the Angular tests and the script tests select a run of every check with only those tests, which a repeat count applies to", () => {
@@ -53,13 +55,31 @@ class TestOptionsTests {
     test("documents alone selects the document checks", () => {
       const options = TestOptions.parse(["documents"]);
 
-      assert.deepEqual([options.isDocuments, options.filters, options.repeat], [true, [], 1]);
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.isRerunningFailed], [true, [], 1, false]);
     });
 
     test("filters accumulate in the order given and a repeat count applies to the selection", () => {
       const options = TestOptions.parse(["--filter", "alpha", "--repeat", "5", "--filter", "category:fast"]);
 
       assert.deepEqual([options.isDocuments, options.filters, options.repeat], [false, ["alpha", "category:fast"], 5]);
+    });
+
+    test("--rerun-failed takes no value and goes with the complete gate or a selection, wherever it is given", () => {
+      const alone = TestOptions.parse(["--rerun-failed"]);
+      const between = TestOptions.parse(["--filter", "alpha", "--rerun-failed", "--repeat", "2"]);
+
+      assert.deepEqual([alone.filters, alone.repeat, alone.isRerunningFailed], [[], 1, true]);
+      assert.deepEqual([between.filters, between.repeat, between.isRerunningFailed], [["alpha"], 2, true]);
+    });
+
+    test("--rerun-failed goes with a part and its selected tests, and with a run of the checks only", () => {
+      const selected = TestOptions.parse(["--part", "packages", "--package", "@noldova/teamrun-foundation-core", "--rerun-failed"]);
+      const tests = TestOptions.parse(["--rerun-failed", "--script-tests", "--angular-tests"]);
+      const checksOnly = TestOptions.parse(["--part", "angular-and-checks", "--checks-only", "--rerun-failed"]);
+
+      assert.deepEqual([selected.part, selected.selection?.packages, selected.isRerunningFailed], ["packages", ["@noldova/teamrun-foundation-core"], true]);
+      assert.deepEqual([tests.part, tests.selection?.runsScriptTests, tests.selection?.runsAngularTests, tests.isRerunningFailed], [null, true, true, true]);
+      assert.deepEqual([checksOnly.part, checksOnly.selection?.packages, checksOnly.isRerunningFailed], ["angular-and-checks", [], true]);
     });
 
     test("documents after the first argument is a filter's text, not the document checks", () => {
@@ -82,6 +102,8 @@ class TestOptionsTests {
         [["--repeat", "2.5"], "--repeat takes a whole number from 1."],
         [["--repeat", "two"], "--repeat takes a whole number from 1."],
         [["--repeat", "2", "--repeat", "3"], "--repeat may be given only once."],
+        [["--rerun-failed", "--rerun-failed"], "--rerun-failed may be given only once."],
+        [["documents", "--rerun-failed"], "documents takes no other option."],
         [["--part"], "--part takes one of packages, scripts, angular-and-checks."],
         [["--part", "ui"], "--part takes one of packages, scripts, angular-and-checks."],
         [["--part", "scripts", "--part", "packages"], "--part may be given only once."],

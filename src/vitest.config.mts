@@ -19,5 +19,11 @@ export default defineConfig({
   plugins: [new ClassMetadataCoverage()],
   resolve: {
     alias: Object.fromEntries(Object.entries(compilerOptions.paths).map(([name, targets]) => [name, fileURLToPath(new URL(String(targets[0]), import.meta.url))]))
+  },
+  test: {
+    coverage: {
+      reportsDirectory: fileURLToPath(new URL("../_build/angular-coverage", import.meta.url))
+    },
+    retry: process.env["TEAMRUN_TEST_RETRY"] === "1" ? 1 : 0
   }
 });
