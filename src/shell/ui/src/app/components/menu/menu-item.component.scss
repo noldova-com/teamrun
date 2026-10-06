@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "selected-surface" as *;
 @use "states";
 
@@ -42,6 +43,12 @@
 
 :host(:not([aria-disabled="true"]):is(#{states.$hover}, #{states.$focus-visible}, [aria-expanded="true"]))::before {
   background-color: var(--tr-hover);
+
+  @include forced-hover;
+}
+
+:host(:not([aria-disabled="true"]):is(#{states.$focus-visible}, [aria-expanded="true"]))::before {
+  @include forced-focus;
 }
 
 :host-context(.tr-menu-pointer-still):hover:not(#{states.$focus-visible}, [aria-expanded="true"])::before {

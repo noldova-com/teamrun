@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 :host {
   display: flex;
   min-width: 0;
@@ -33,11 +35,15 @@
 
 button.tr-status-bar-item:enabled:hover {
   background-color: var(--tr-toolbar-hover);
+
+  @include forced-hover;
 }
 
 button.tr-status-bar-item:focus-visible {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
+
+  @include forced-focus;
 }
 
 button.tr-status-bar-item:disabled {

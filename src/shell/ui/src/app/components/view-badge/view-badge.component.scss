@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 :host {
   display: inline-flex;
   align-items: center;
@@ -22,6 +24,12 @@
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
+
+  @include forced-colors {
+    background-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
 }
 
 :host(.tr-view-badge-dot) {
