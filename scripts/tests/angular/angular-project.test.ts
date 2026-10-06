@@ -11,21 +11,20 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { test, type TestContext } from "node:test";
+import { test } from "node:test";
 
 import AngularProject from "../../angular/angular-project.ts";
 import ProcessResult from "../../processes/process-result.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import NpmCommand from "../../toolchain/npm-command.ts";
 import AngularReportRunnerFixture from "../fixtures/angular-report-runner.fixture.ts";
+import MockPausesFixture from "../fixtures/mock-pauses.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class AngularProjectTests {
   private static readonly NPM: string = "/tools/npm/bin/npm-cli.js";
-  private static readonly PAUSE: number = 15_000;
-  private static readonly POLLS: number = 1_000;
   private static readonly INSTALLED: ProcessResult = new ProcessResult(0, "", "");
   private static readonly FAILED: ProcessResult = new ProcessResult(1, "", "Error: Download failed\n");
 
@@ -127,7 +126,7 @@ class AngularProjectTests {
       const runner = new ProcessRunnerFixture([], [AngularProjectTests.FAILED, AngularProjectTests.FAILED, AngularProjectTests.INSTALLED]);
       const output = new TextOutputFixture();
 
-      await AngularProjectTests.settleAsync(t, AngularProjectTests.create(repository, runner).prepareAsync(output));
+      await MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(output), () => `${runner.captured.length} attempts started`);
 
       assert.equal(runner.captured.length, 3);
       assert.equal(output.text, `Installing the browser for the Angular tests...\n${AngularProjectTests.pausing(1)}${AngularProjectTests.pausing(2)}`);
@@ -140,7 +139,7 @@ class AngularProjectTests {
       const runner = new ProcessRunnerFixture([], attempts);
 
       await assert.rejects(
-        AngularProjectTests.settleAsync(t, AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture())),
+        MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture()), () => `${runner.captured.length} attempts started`),
         new ProcessException("The browser for the Angular tests could not be installed in 4 attempts; the last failed with exit code 1: Error: Download failed: attempt 4."));
 
       assert.equal(runner.captured.length, 4);
@@ -318,27 +317,7 @@ class AngularProjectTests {
   }
 
   private static pausing(attempt: number): string {
-    return `The browser for the Angular tests could not be installed (attempt ${attempt} of 4); trying again in ${AngularProjectTests.PAUSE / 1000} seconds.\n`;
-  }
-
-  private static async settleAsync(t: TestContext, run: Promise<void>): Promise<void> {
-    t.mock.timers.enable({ apis: ["setTimeout"] });
-    try {
-      let isDone = false;
-      const finish = (): void => {
-        isDone = true;
-      };
-      run.then(finish, finish);
-      for (let poll = 0; !isDone; poll++) {
-        assert.ok(poll < AngularProjectTests.POLLS, "the preparation did not settle");
-        await new Promise(resolve => setImmediate(resolve));
-        t.mock.timers.tick(AngularProjectTests.PAUSE);
-      }
-      await run;
-    }
-    finally {
-      t.mock.timers.reset();
-    }
+    return `The browser for the Angular tests could not be installed (attempt ${attempt} of 4); trying again in ${MockPausesFixture.PAUSE / 1000} seconds.\n`;
   }
 
   private static async createProjectAsync(t: { after: (callback: () => Promise<void>) => void }): Promise<RepositoryFixture> {
