@@ -554,6 +554,7 @@ The [command line's document](../src/shell/cli/README.md#7-module-commands) owns
 - A newer build takes over a directory an older build's runtime owns by itself.
   It asks the older runtime to stop; if work is in progress, the person makes section 9's choice to wait for it or stop it; then the older runtime exits and the newer one starts.
   An older build that finds a newer runtime hands the person over to the newer build instead of starting; a development build says that a newer one is running instead.
+  On Linux the older desktop starts the newer one the way it [launches the runtime](#launching-the-runtime), so the newer desktop keeps none of the older one's descriptors.
   A second desktop on a data directory, of any build, focuses the first and exits: the single-instance lock allows one desktop per data directory, and the handover is between a desktop and a runtime.
   The person is never asked to find and quit another TeamRun.
 - A build is newer when its product version is higher.
@@ -811,6 +812,7 @@ Both follow the runtime's platform, not the desktop's, so a desktop attached to 
 The desktop reads the setting for its device once the runtime is ready, follows its changes for that device, and until it has read it uses its platform's default.
 On Linux the icon shows only while a StatusNotifierItem host is registered: the desktop asks the session bus through `/usr/bin/gdbus` whether `org.kde.StatusNotifierWatcher` reports `IsStatusNotifierHostRegistered`, and keeps `gdbus monitor` on that name to ask again when its owner changes or a host registers or leaves.
 A missing `gdbus`, no watcher or a failed answer means no host; when the monitor ends, the desktop asks once and starts it again after a wait that begins at a second and doubles up to a minute.
+The desktop starts `gdbus` the way it [launches the runtime](#launching-the-runtime), through Bash that closes inherited descriptors, so it never holds Chromium's channels to the desktop's own processes and they end with the desktop.
 Windows and macOS always have a place for the icon.
 When the operating system cannot show the icon, the desktop logs it once and shows none.
 
