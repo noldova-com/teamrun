@@ -83,45 +83,80 @@ describe("AboutComponent", () => {
     const off = [text(fixture, ".tr-about-status"), buttons(fixture).length];
     state.set(of(UpdateStateKind.Available, { version: "1.3.0", reason: "Hidden", mustMove: true }));
     await fixture.whenStable();
-    const away = [text(fixture, ".tr-about-status"), buttons(fixture).length];
-    state.set(of(UpdateStateKind.Available, { version: "1.3.0" }));
-    await fixture.whenStable();
 
     expect(off).toEqual(["Updates are turned off in this build.", 0]);
-    expect(away).toEqual(["Move TeamRun to Applications to get updates.", 0]);
     expect([text(fixture, ".tr-about-status"), buttons(fixture).length]).toEqual(["Move TeamRun to Applications to get updates.", 0]);
   });
 
-  it("shows each state's line with its action, and the reason when there is one", async () => {
-    const checkedAt = new Date(2026, 9, 6, 10, 42).getTime();
-    const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(checkedAt);
+  it("shows each state's line with its action, then the last check, the reason or the move to Applications, the details muted", async () => {
+    AppearanceFixture.apply();
+    const today = new Date();
+    today.setHours(10, 42, 0, 0);
+    const earlier = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 3, 10, 42).getTime();
+    const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(today);
+    const dayAndTime = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(earlier);
     const fixture = await renderAsync();
+    const probe = (fixture.nativeElement as HTMLElement).appendChild(document.createElement("span"));
+    probe.style.color = "var(--tr-text-muted)";
+    const mutedColor = getComputedStyle(probe).color;
+    probe.remove();
     const shown: string[] = [];
+    const muted: (readonly boolean[])[] = [];
     for (const next of [
       of(UpdateStateKind.UpToDate),
-      of(UpdateStateKind.UpToDate, { checkedAt }),
+      of(UpdateStateKind.UpToDate, { checkedAt: today.getTime() }),
+      of(UpdateStateKind.UpToDate, { checkedAt: earlier }),
       of(UpdateStateKind.Checking),
       of(UpdateStateKind.Downloading, { version: "1.3.0", progress: 42 }),
       of(UpdateStateKind.Ready, { version: "1.3.0", reason: "Notes couldn't save." }),
-      of(UpdateStateKind.Failed, { reason: "The download doesn't match the release." })
+      of(UpdateStateKind.Failed, { reason: "The download doesn't match the release." }),
+      of(UpdateStateKind.Failed, { reason: "The release's information is invalid.", mustMove: true })
     ]) {
       state.set(next);
       await fixture.whenStable();
-      shown.push(`${[...(fixture.nativeElement as HTMLElement).querySelectorAll(".tr-about-status span")].map(t => t.textContent?.trim()).join(" ")} | ${buttons(fixture).map(t => t.textContent?.trim()).join(",")}`);
+      const lines = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(".tr-about-status > span")];
+      shown.push(`${lines.map(t => t.textContent).join(" / ")} | ${buttons(fixture).map(t => t.textContent?.trim()).join(",")}`);
+      muted.push(lines.map(t => getComputedStyle(t).color === mutedColor));
       for (const button of buttons(fixture))
         button.click();
     }
 
     expect(shown).toEqual([
-      "TeamRun is up to date | Check for updates",
-      `TeamRun is up to date, checked ${time} | Check for updates`,
+      "TeamRun is up to date. | Check for updates",
+      `TeamRun is up to date. / Last checked ${time}. | Check for updates`,
+      `TeamRun is up to date. / Last checked ${dayAndTime}. | Check for updates`,
       "Checking for updates… | ",
-      "Downloading TeamRun 1.3.0, 42% | ",
-      "TeamRun 1.3.0 is ready to install Notes couldn't save. | Restart to update",
-      "The update failed The download doesn't match the release. | Try again"
+      "Downloading TeamRun 1.3.0… 42% | ",
+      "TeamRun 1.3.0 is ready to install. / Notes couldn't save. | Restart to update",
+      "The update failed. / The download doesn't match the release. | Try again",
+      "The update failed. / The release's information is invalid. / Move TeamRun to Applications to get updates. | Try again"
     ]);
-    expect(calls).toEqual(["Check", "Check", "Restart", "Check"]);
+    expect(muted).toEqual([[false], [false, true], [false, true], [false], [false], [false, true], [false, true], [false, true, false]]);
+    expect(calls).toEqual(["Check", "Check", "Check", "Restart", "Check", "Check"]);
   });
+
+  it("keeps the download's percentage out of its polite status, since the progress bar carries it", async () => {
+    state.set(of(UpdateStateKind.Downloading, { version: "1.3.0", progress: 42 }));
+    const fixture = await renderAsync();
+    const status = (fixture.nativeElement as HTMLElement).querySelector(".tr-about-status") as HTMLElement;
+    const hidden = [...status.querySelectorAll("[aria-hidden=true]")].map(t => t.textContent);
+
+    expect([status.getAttribute("role"), hidden]).toEqual(["status", [" 42%"]]);
+  });
+
+  for (const [kind, label] of [[UpdateStateKind.UpToDate, "Check for updates"], [UpdateStateKind.Failed, "Try again"]] as const)
+    it(`keeps focus on the update's status once ${label} is chosen and its button goes away`, async () => {
+      state.set(of(kind));
+      const fixture = await renderAsync();
+      const button = buttons(fixture)[0] as HTMLButtonElement;
+      button.focus();
+
+      button.click();
+      state.set(of(UpdateStateKind.Checking));
+      await fixture.whenStable();
+
+      expect([button.textContent?.trim(), buttons(fixture).length, document.activeElement?.className, calls]).toEqual([label, 0, "tr-about-status", ["Check"]]);
+    });
 
   it("shows the download's progress below its line and as wide as it, named for the download, and an unknown amount while it has none", async () => {
     AppearanceFixture.apply();

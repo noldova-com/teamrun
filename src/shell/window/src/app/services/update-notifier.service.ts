@@ -43,7 +43,7 @@ export class UpdateNotifierService {
     this.posted.add(version);
     const action = new NotificationAction(Resources.restartToUpdateLabel, new CommandRun(QualifiedName.parse(Resources.restartToUpdateCommand), null));
     const open = new CommandRun(QualifiedName.parse(Resources.openSettingsCommand), { [Resources.pageArgument]: Resources.aboutPage });
-    const post = new NotificationPost(ShellNotifications.updateReady, version, Resources.formatUpdateReady(version), null, NotificationSeverity.Info, open, [action], null);
+    const post = new NotificationPost(ShellNotifications.updateReady, version, Resources.formatUpdateReadyTitle(version), null, NotificationSeverity.Info, open, [action], null);
     this.bridge.requestAsync(ShellMethods.postNotification.text, post.toJson()).catch((error: unknown) => this.errors.handleError(error));
   }
 }

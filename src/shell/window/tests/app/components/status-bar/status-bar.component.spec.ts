@@ -63,7 +63,7 @@ describe("StatusBarComponent", () => {
     const fixture = TestBed.createComponent(StatusBarComponent);
     fixture.detectChanges();
     const shown: (readonly string[])[] = [];
-    for (const [kind, mustMove] of [["Downloading", false], ["Ready", false], ["Failed", false], ["UpToDate", true], ["Available", true]] as const) {
+    for (const [kind, mustMove] of [["Downloading", false], ["Ready", false], ["Failed", false], ["UpToDate", false], ["Available", true], ["Failed", true]] as const) {
       bridge.publishUpdate({ kind, version: "1.3.0", progress: null, checkedAt: null, reason: null, mustMove });
       await fixture.whenStable();
       shown.push([...(fixture.nativeElement as HTMLElement).querySelectorAll(".tr-status-bar-right > *")].map(t => t.tagName.toLowerCase()));
@@ -71,7 +71,7 @@ describe("StatusBarComponent", () => {
 
     const withItem = ["tr-update-item", "tr-notifications", "tr-module-failures"];
     const withoutItem = ["tr-notifications", "tr-module-failures"];
-    expect(shown).toEqual([withoutItem, withItem, withItem, withoutItem, withItem]);
+    expect(shown).toEqual([withoutItem, withItem, withItem, withoutItem, withItem, withItem]);
   });
 
   for (const mode of AppearanceFixture.modes)

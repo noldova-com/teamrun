@@ -389,7 +389,7 @@ A setting has exactly these fields, and the build refuses a file whose settings 
 | `default` | A value its type accepts |
 | `locality` | `Shared`, one value for every device that shares the data directory, or `Device`, a value per device |
 | `scopes` | The setting scopes that may override it, its module's own or a dependency's; a device setting has none |
-| `page`, `group` | Where Settings shows it |
+| `page`, `group` | Where Settings shows it; Keyboard shortcuts and About are the shell's own pages, which a module cannot use |
 
 The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset.
 Setting a value equal to the setting's default, compared by value, is a reset when the setting would otherwise take its default, so every way of changing a setting removes the stored value and the setting follows its default from then on; a scope whose enclosing scope holds another value keeps the value it is given.
@@ -1096,9 +1096,10 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The handoff installs the way the platform does: Windows runs the installer quietly in the existing installation's scope, macOS installs through Squirrel.Mac from the ZIP, and Linux replaces the AppImage file in place, keeping its location and launchers.
 - **macOS location.**
   A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
-  Outside one, the desktop still checks but downloads and installs nothing: About says to move TeamRun to Applications, and so does the update item while a newer version is available.
+  Outside one, the desktop still checks but downloads and installs nothing: a newer version stays available, and About and the update item say to move TeamRun to Applications; a failed check gives its reason, then the same hint.
 - **What the person sees.**
-  - **States:** up to date, checking, downloading with its progress, ready and failed, and on macOS outside an Applications folder, available.
+  - **States:** up to date, checking, downloading with its progress as a whole percentage, ready and failed, and on macOS outside an Applications folder, available.
+    An available, downloading or ready update names its version, and only an available or failed one says TeamRun must move to Applications, an available one always; the window refuses any other state.
   - **Status bar:** the update item shows only while an update is ready or failed, or on macOS outside an Applications folder while a newer version is available.
   - **Notifications:** the shell's notification kind `shell.updateReady`, posted once per version when its update is ready, restarts to install it.
   - **Commands:** `shell.checkForUpdates` and `shell.restartToUpdate`, each applying only in its state, are in command search.

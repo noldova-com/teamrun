@@ -835,6 +835,10 @@ export class Resources {
     return `The module ${moduleId} declares the setting ${name} of the kind ${kind}, which only the shell declares.`;
   }
 
+  public static formatSettingPageReserved(moduleId: string, name: string, page: string): string {
+    return `The module ${moduleId} puts the setting ${name} on the page ${page}, which only the shell fills.`;
+  }
+
   public static formatNotContributed(moduleId: string, kind: string, name: string): string {
     return `The module ${moduleId} does not declare ${name} among its ${kind}.`;
   }

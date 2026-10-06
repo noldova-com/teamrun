@@ -15,6 +15,7 @@ import { Resources } from "../resources.js";
 
 export class ModuleDeclaration {
   private static readonly SHELL_ONLY_KINDS: readonly SettingKind[] = [SettingKind.KeyBindings, SettingKind.Languages];
+  private static readonly SHELL_ONLY_PAGES: readonly string[] = ["Keyboard shortcuts", "About"];
 
   public readonly id: string;
   public readonly version: string;
@@ -46,6 +47,9 @@ export class ModuleDeclaration {
     const shellOnly = settings.find(t => ModuleDeclaration.SHELL_ONLY_KINDS.includes(t.type.kind));
     if (!Object.isUndefined(shellOnly))
       throw new ArgumentException(Resources.formatSettingKindReserved(id, shellOnly.name.text, shellOnly.type.kind), Resources.settingsField);
+    const shellPage = settings.find(t => ModuleDeclaration.SHELL_ONLY_PAGES.includes(t.page));
+    if (!Object.isUndefined(shellPage))
+      throw new ArgumentException(Resources.formatSettingPageReserved(id, shellPage.name.text, shellPage.page), Resources.settingsField);
     const commands = contributions.get(Resources.commandsKind) ?? [];
     const action = settings.find(t => t.type.kind === SettingKind.Action && !commands.includes(String(t.type.command)));
     if (!Object.isUndefined(action))

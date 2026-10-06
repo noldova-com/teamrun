@@ -758,6 +758,8 @@ export class Resources {
   public static readonly unknownStartupState: string = "The startup state is not one the window knows.";
   public static readonly unknownUpdateState: string = "The update state is not one the window knows.";
   public static readonly invalidUpdateProgress: string = "An update's progress is a percentage from 0 to 100.";
+  public static readonly missingUpdateVersion: string = "An update that is available, downloading or ready names its version.";
+  public static readonly invalidUpdateMove: string = "Only an available or failed update says TeamRun must move to Applications, and an available one always does.";
   public static readonly progressField: string = "progress";
   public static readonly checkedAtField: string = "checkedAt";
   public static readonly reasonField: string = "reason";
@@ -830,17 +832,28 @@ export class Resources {
     return `${displayName} didn't start`;
   }
 
-  public static formatUpdateReady(version: string): string {
+  public static formatUpdateReadyTitle(version: string): string {
     return `${Resources.productName} ${version} is ready to install`;
   }
 
-  public static formatDownloadingVersion(version: string | null, progress: number | null = null): string {
-    const download = Object.isNull(version) ? `Downloading ${Resources.productName}` : `Downloading ${Resources.productName} ${version}`;
-    return Object.isNull(progress) ? download : `${download}, ${progress}%`;
+  public static formatUpdateReady(version: string): string {
+    return `${Resources.formatUpdateReadyTitle(version)}.`;
   }
 
-  public static formatUpToDate(checkedAt: string | null): string {
-    return Object.isNull(checkedAt) ? `${Resources.productName} is up to date` : `${Resources.productName} is up to date, checked ${checkedAt}`;
+  public static formatDownloadingVersion(version: string | null): string {
+    return Object.isNull(version) ? `Downloading ${Resources.productName}` : `Downloading ${Resources.productName} ${version}`;
+  }
+
+  public static formatDownloadingLine(version: string | null): string {
+    return `${Resources.formatDownloadingVersion(version)}…`;
+  }
+
+  public static formatDownloadPercent(progress: number): string {
+    return ` ${progress}%`;
+  }
+
+  public static formatLastChecked(checkedAt: string): string {
+    return `Last checked ${checkedAt}.`;
   }
 
   public static formatPlatform(platform: string, processor: string): string {
@@ -908,18 +921,16 @@ export class Resources {
   }
 
   public static readonly notificationsGlyph: string = "notifications";
-  public static readonly restartToUpdateItem: string = "Restart to update";
   public static readonly updateFailedItem: string = "Update failed";
   public static readonly moveToUpdateItem: string = "Move to Applications to update";
   public static readonly updateAvailableGlyph: string = "deployed_code_update";
   public static readonly updateFailedGlyph: string = "error";
   public static readonly checkingForUpdates: string = "Checking for updates…";
-  public static readonly updateFailed: string = "The update failed";
+  public static readonly updateFailed: string = "The update failed.";
+  public static readonly upToDate: string = `${Resources.productName} is up to date.`;
   public static readonly updatesOff: string = "Updates are turned off in this build.";
   public static readonly moveToApplications: string = `Move ${Resources.productName} to Applications to get updates.`;
-  public static readonly tryAgainLabel: string = "Try again";
   public static readonly aboutLabel: string = `About ${Resources.productName}`;
-  public static readonly updateLabel: string = "Update";
   public static readonly platformTitles: Readonly<Record<string, string>> = { win32: "Windows", darwin: "macOS", linux: "Linux" };
   public static readonly processorTitles: Readonly<Record<string, string>> = { x64: "x64", arm64: "ARM64" };
   public static readonly notificationsOffGlyph: string = "notifications_off";

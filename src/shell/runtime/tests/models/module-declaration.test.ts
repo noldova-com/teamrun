@@ -137,6 +137,10 @@ export class ModuleDeclarationTests {
       Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "notes.keys", type: { kind: "KeyBindings" }, default: {} }] }), ArgumentException).message);
     Assert.areEqual("The module notes declares the setting notes.languages of the kind Languages, which only the shell declares. (Parameter 'settings')",
       Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, name: "notes.languages", type: { kind: "Languages" }, default: [] }] }), ArgumentException).message);
+    for (const page of ["Keyboard shortcuts", "About"])
+      Assert.areEqual(`The module notes puts the setting notes.sortBy on the page ${page}, which only the shell fills. (Parameter 'settings')`,
+        Assert.throws(() => ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, page }] }), ArgumentException).message);
+    Assert.areEqual("Appearance", ModuleDeclaration.fromJson({ ...ModuleDeclarationTests.VALID, settings: [{ ...setting, page: "Appearance" }] }).settings[0]?.page);
   }
 
   @TestMethod

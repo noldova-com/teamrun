@@ -29,8 +29,27 @@ describe("UpdateState", () => {
     expect(() => UpdateState.fromJson(json("Downloading", { progress: -1 }))).toThrowError(JsonException);
     expect(() => UpdateState.fromJson({ kind: "Off" })).toThrowError(JsonException);
     expect(() => UpdateState.fromJson("Off")).toThrowError(JsonException);
-    expect(UpdateState.fromJson(json("Downloading", { progress: 0 })).progress).toBe(0);
-    expect(UpdateState.fromJson(json("Downloading", { progress: 100 })).progress).toBe(100);
+    expect(UpdateState.fromJson(json("Downloading", { version: "1.3.0", progress: 0 })).progress).toBe(0);
+    expect(UpdateState.fromJson(json("Downloading", { version: "1.3.0", progress: 100 })).progress).toBe(100);
+  });
+
+  it("needs a version for an update that is available, downloading or ready, and says TeamRun must move only for an available or failed one, always for an available one", () => {
+    const reads = (kind: string, fields: object): boolean => {
+      try {
+        UpdateState.fromJson(json(kind, fields));
+        return true;
+      } catch (error) {
+        if (!(error instanceof JsonException))
+          throw error;
+        return false;
+      }
+    };
+
+    expect(["Available", "Downloading", "Ready"].map(t => reads(t, { mustMove: t === "Available" }))).toEqual([false, false, false]);
+    expect(["Off", "UpToDate", "Checking", "Failed"].map(t => reads(t, {}))).toEqual([true, true, true, true]);
+    expect(["Off", "UpToDate", "Checking", "Available", "Downloading", "Ready", "Failed"].map(t => reads(t, { version: "1.3.0", mustMove: true })))
+      .toEqual([false, false, false, true, false, false, true]);
+    expect(["Available", "Failed"].map(t => reads(t, { version: "1.3.0", mustMove: false }))).toEqual([false, true]);
   });
 
   it("knows which actions apply in each state", () => {
@@ -48,10 +67,9 @@ describe("UpdateState", () => {
   });
 
   it("shows the status bar's item only for an update that is ready or failed, or one TeamRun must move to Applications for", () => {
-    const of = (kind: UpdateStateKind, mustMove: boolean = false): UpdateState => new UpdateState(kind, "1.3.0", null, null, null, mustMove);
+    const of = (kind: UpdateStateKind): UpdateState => new UpdateState(kind, "1.3.0", null, null, null, kind === UpdateStateKind.Available);
 
     expect([UpdateStateKind.Off, UpdateStateKind.UpToDate, UpdateStateKind.Checking, UpdateStateKind.Available, UpdateStateKind.Downloading, UpdateStateKind.Ready,
-      UpdateStateKind.Failed].map(t => of(t).showsItem)).toEqual([false, false, false, false, false, true, true]);
-    expect([UpdateStateKind.Available, UpdateStateKind.UpToDate].map(t => of(t, true).showsItem)).toEqual([true, false]);
+      UpdateStateKind.Failed].map(t => of(t).showsItem)).toEqual([false, false, false, true, false, true, true]);
   });
 });

@@ -10,27 +10,28 @@ LICENSE file in the root directory of this source tree.
 <p class="tr-about-platform">{{ platform }}</p>
 <div class="tr-about-state">
 <div class="tr-about-update">
-  <p class="tr-about-status" role="status">
-    <span>{{ status() }}</span>
-    @if (canUpdate() && state().reason; as reason) {
-      <span class="tr-about-reason">{{ reason }}</span>
+  <p #status class="tr-about-status" role="status" tabindex="-1">
+    <span>{{ status() }}@if (percent(); as percent) {<span aria-hidden="true">{{ percent }}</span>}</span>
+    @for (detail of details(); track $index) {
+      <span class="tr-about-detail">{{ detail }}</span>
+    }
+    @if (showsMoveHint()) {
+      <span>{{ resources.moveToApplications }}</span>
     }
   </p>
-  @if (canUpdate()) {
-    @switch (state().kind) {
-      @case (kinds.UpToDate) {
-        <button type="button" tr-button [variant]="secondary" (click)="check()">{{ resources.checkForUpdatesTitle }}</button>
-      }
-      @case (kinds.Ready) {
-        <button type="button" tr-button (click)="restart()">{{ resources.restartToUpdateLabel }}</button>
-      }
-      @case (kinds.Failed) {
-        <button type="button" tr-button [variant]="secondary" (click)="check()">{{ resources.tryAgainLabel }}</button>
-      }
+  @switch (state().kind) {
+    @case (kinds.UpToDate) {
+      <button type="button" tr-button [variant]="secondary" (click)="check()">{{ resources.checkForUpdatesTitle }}</button>
+    }
+    @case (kinds.Ready) {
+      <button type="button" tr-button (click)="restart()">{{ resources.restartToUpdateLabel }}</button>
+    }
+    @case (kinds.Failed) {
+      <button type="button" tr-button [variant]="secondary" (click)="check()">{{ resources.tryAgain }}</button>
     }
   }
 </div>
-@if (canUpdate() && state().kind === kinds.Downloading) {
+@if (state().kind === kinds.Downloading) {
   <tr-progress class="tr-about-progress" [label]="progressLabel()" [value]="share()" />
 }
 </div>

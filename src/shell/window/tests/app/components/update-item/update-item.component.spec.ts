@@ -49,17 +49,16 @@ describe("UpdateItemComponent", () => {
     return (fixture.nativeElement as HTMLElement).querySelector("button.tr-update-item");
   }
 
-  it("shows nothing while updates are off, while checking or downloading, while TeamRun is up to date, and for an update it may download", async () => {
+  it("shows nothing while updates are off, while checking or downloading, and while TeamRun is up to date", async () => {
     const fixture = await renderAsync(of(UpdateStateKind.Off));
     const texts = [(fixture.nativeElement as HTMLElement).textContent];
-    for (const next of [of(UpdateStateKind.Checking), of(UpdateStateKind.UpToDate), of(UpdateStateKind.Downloading, { version: "1.3.0", progress: 42 }),
-      of(UpdateStateKind.Available, { version: "1.3.0" })]) {
+    for (const next of [of(UpdateStateKind.Checking), of(UpdateStateKind.UpToDate), of(UpdateStateKind.Downloading, { version: "1.3.0", progress: 42 })]) {
       state.set(next);
       await fixture.whenStable();
       texts.push((fixture.nativeElement as HTMLElement).textContent);
     }
 
-    expect(texts).toEqual(["", "", "", "", ""]);
+    expect(texts).toEqual(["", "", "", ""]);
   });
 
   it("shows each state that needs the person, with its icon and text, and runs what the state offers", async () => {
@@ -68,7 +67,8 @@ describe("UpdateItemComponent", () => {
     for (const next of [
       of(UpdateStateKind.Available, { version: "1.3.0", mustMove: true }),
       of(UpdateStateKind.Ready, { version: "1.3.0" }),
-      of(UpdateStateKind.Failed)
+      of(UpdateStateKind.Failed),
+      of(UpdateStateKind.Failed, { mustMove: true })
     ]) {
       state.set(next);
       await fixture.whenStable();
@@ -80,9 +80,10 @@ describe("UpdateItemComponent", () => {
     expect(shown).toEqual([
       "deployed_code_update Move to Applications to update",
       "restart_alt Restart to update",
+      "error Update failed",
       "error Update failed"
     ]);
-    expect(calls).toEqual(["About", "Restart", "About"]);
+    expect(calls).toEqual(["About", "Restart", "About", "About"]);
     expect(item(fixture)?.querySelector(".tr-update-item-error")).not.toBeNull();
   });
 

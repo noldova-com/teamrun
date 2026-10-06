@@ -9,6 +9,9 @@
 import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 
+import { JsonException } from "@noldova/teamrun-foundation-json";
+
+
 import { UpdateAction } from "../../../src/app/enums/update-action";
 import { UpdateStateKind } from "../../../src/app/enums/update-state-kind";
 import { SettingsPageService } from "../../../src/app/services/settings-page.service";
@@ -75,6 +78,16 @@ describe("UpdateService", () => {
     await settleAsync(() => errors.length === 1);
 
     expect(errors.length).toBe(1);
+  });
+
+  it("refuses a state the desktop pushes that it cannot read, keeping the state it had", async () => {
+    bridge.update = update("Ready", { version: "1.3.0" });
+    const service = start();
+    await settleAsync(() => service.state().kind === UpdateStateKind.Ready);
+
+    expect(() => bridge.publishUpdate(update("Ready"))).toThrowError(JsonException);
+    expect(() => bridge.publishUpdate(update("UpToDate", { mustMove: true }))).toThrowError(JsonException);
+    expect([service.state().kind, service.state().version]).toEqual([UpdateStateKind.Ready, "1.3.0"]);
   });
 
   it("asks the desktop to act and opens About", async () => {

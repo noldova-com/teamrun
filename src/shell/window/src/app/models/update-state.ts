@@ -40,8 +40,13 @@ export class UpdateState {
     const progress = json.readNullableInteger(Resources.progressField);
     if (!Object.isNull(progress) && (progress < 0 || progress > 100))
       throw new JsonException(Resources.invalidUpdateProgress, `${json.path}.${Resources.progressField}`);
-    return new UpdateState(known, json.readNullableString(Resources.versionField), progress, json.readNullableInteger(Resources.checkedAtField),
-      json.readNullableString(Resources.reasonField), json.readBoolean(Resources.mustMoveField));
+    const version = json.readNullableString(Resources.versionField);
+    if (Object.isNull(version) && [UpdateStateKind.Available, UpdateStateKind.Downloading, UpdateStateKind.Ready].includes(known))
+      throw new JsonException(Resources.missingUpdateVersion, `${json.path}.${Resources.versionField}`);
+    const mustMove = json.readBoolean(Resources.mustMoveField);
+    if (mustMove !== (known === UpdateStateKind.Available) && known !== UpdateStateKind.Failed)
+      throw new JsonException(Resources.invalidUpdateMove, `${json.path}.${Resources.mustMoveField}`);
+    return new UpdateState(known, version, progress, json.readNullableInteger(Resources.checkedAtField), json.readNullableString(Resources.reasonField), mustMove);
   }
 
   public get canCheck(): boolean {
@@ -53,6 +58,6 @@ export class UpdateState {
   }
 
   public get showsItem(): boolean {
-    return this.kind === UpdateStateKind.Ready || this.kind === UpdateStateKind.Failed || this.kind === UpdateStateKind.Available && this.mustMove;
+    return [UpdateStateKind.Available, UpdateStateKind.Ready, UpdateStateKind.Failed].includes(this.kind);
   }
 }
