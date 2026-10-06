@@ -71,12 +71,13 @@ export default class AppleSignatureCheck {
     const details = await this.captureAsync("codesign", ["--display", "--verbose=2", app]);
     const assessed = await this.captureAsync("spctl", ["--assess", "--type", "execute", "--verbose=2", app]);
     const stapled = await this.captureAsync("xcrun", ["stapler", "validate", app]);
-    const failed = ([
+    const requirements: readonly (readonly [string, boolean])[] = [
       ["a valid signature", verified.isSuccessful],
       ["a Developer ID Application signature", details.isSuccessful && AppleSignatureCheck.DEVELOPER_ID.test(details.text)],
       ["notarization", assessed.isSuccessful && AppleSignatureCheck.NOTARIZED.test(assessed.text)],
       ["a stapled ticket", stapled.isSuccessful]
-    ] as const).filter(([, isMet]) => !isMet).map(([requirement]) => requirement);
+    ];
+    const failed = requirements.filter(([, isMet]) => !isMet).map(([requirement]) => requirement);
     if (failed.length > 0)
       throw new PackagingException(`The app in ${source} lacks ${failed.join(", ")}:\n${[verified, details, assessed, stapled].map(t => t.text).join(AppleSignatureCheck.LINE_SEPARATOR)}`);
     return `${source}: a valid Developer ID Application signature, notarized and stapled.`;
