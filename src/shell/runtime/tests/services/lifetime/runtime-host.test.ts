@@ -18,6 +18,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
 
+import { PlatformFixture } from "../../fixtures/platform.fixture.js";
 import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 
@@ -76,6 +77,23 @@ export class RuntimeHostTests {
         refused);
       Assert.areEqual("{\"kind\":\"Response\",\"id\":\"other:3\",\"payload\":null}", stopped);
       Assert.isTrue(work.signal.aborted);
+      Assert.areEqual("request", await host.waitForStopAsync());
+    });
+  }
+
+  @PlatformFixture.posixOnly()
+  @TestMethod
+  public namesTheAppImageItRunsFromAsItsProgram(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      const environment = { ...process.env, APPIMAGE: "/home/ada/TeamRun.AppImage", APPDIR: path.dirname(process.execPath) };
+      const host = await fixture.startAsync(30_000, undefined, undefined, environment);
+      const discovery = await fixture.readDiscoveryAsync();
+
+      const [connection, answer] = await fixture.handshakeAsync("other", RuntimeHostTests.OTHER);
+      connection.send("{\"kind\":\"Request\",\"id\":\"other:1\",\"method\":\"shell.stop\",\"payload\":{\"policy\":\"IfIdle\"}}\n");
+
+      Assert.areEqual("/home/ada/TeamRun.AppImage", discovery.executablePath);
+      Assert.isTrue(answer.toText().includes("\"executablePath\":\"/home/ada/TeamRun.AppImage\""), answer.toText());
       Assert.areEqual("request", await host.waitForStopAsync());
     });
   }

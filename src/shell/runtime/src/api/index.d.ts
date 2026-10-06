@@ -2581,6 +2581,72 @@ export declare class CapabilityToken {
 }
 
 /**
+ * The Linux AppImage a program runs from, as the AppImage runtime names it in `APPIMAGE` and `APPDIR`.
+ */
+export declare class AppImageSource {
+  /**
+   * The AppImage file.
+   */
+  public readonly file: string;
+
+  /**
+   * The folder the program runs from: the AppImage's mount point, or the folder it was extracted to.
+   */
+  public readonly folder: string;
+
+  /**
+   * Whether the folder is a mount point, as `/proc/self/mountinfo` lists it; otherwise the program runs from an extraction.
+   *
+   * @throws {Error} When `/proc/self/mountinfo` cannot be read.
+   * @example
+   * ```ts
+   * import { AppImageSource } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isMounted(): boolean {
+   *   return AppImageSource.find(process.env, process.execPath)?.isMounted ?? false;
+   * }
+   * ```
+   */
+  public get isMounted(): boolean;
+
+  private constructor();
+
+  /**
+   * Finds the AppImage a program runs from.
+   *
+   * @param environment The environment the AppImage runtime set.
+   * @param executablePath The program.
+   * @returns The AppImage, or `null` when `APPIMAGE` or `APPDIR` is not an absolute path or the program is not inside `APPDIR`.
+   * @example
+   * ```ts
+   * import { AppImageSource } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function findFile(): string | null {
+   *   return AppImageSource.find(process.env, process.execPath)?.file ?? null;
+   * }
+   * ```
+   */
+  public static find(environment: NodeJS.ProcessEnv, executablePath: string): AppImageSource | null;
+
+  /**
+   * Names the file that starts a program again: its AppImage when it runs from one, since the AppImage's folder ends with the process that holds it, and the program otherwise.
+   *
+   * @param environment The environment the AppImage runtime set.
+   * @param executablePath The program.
+   * @returns The AppImage or the program.
+   * @example
+   * ```ts
+   * import { AppImageSource } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function locate(): string {
+   *   return AppImageSource.locateProgram(process.env, process.execPath);
+   * }
+   * ```
+   */
+  public static locateProgram(environment: NodeJS.ProcessEnv, executablePath: string): string;
+}
+
+/**
  * How {@link RuntimeLauncher.attachAsync} treats a missing runtime and
  * another build's runtime.
  */
@@ -2881,7 +2947,7 @@ export declare class LaunchSettings {
 }
 
 /**
- * The program and arguments that start a detached runtime. On Linux it wraps the program in Bash that closes inherited descriptors above standard error, without startup files or inherited options.
+ * The program and arguments that start a detached runtime. On Linux it wraps the program in Bash that closes inherited descriptors above standard error, without startup files or inherited options. A program inside an AppImage runs from the runtime's own copy of it instead, which that Bash holds for as long as the program runs: a mount of the AppImage when the program's folder is mounted, or else an extraction in a `teamrun-runtime-` folder of the temporary folder. Bash records the copy in its standard error, which is the start log, and passes an end signal on to the program.
  */
 export declare class ProcessLaunchCommand {
   /**
@@ -2900,6 +2966,7 @@ export declare class ProcessLaunchCommand {
    * @param platform The platform, as in `process.platform`.
    * @param executablePath The program that runs the runtime.
    * @param launchArguments Its arguments; the array is copied.
+   * @param environment The environment the program is started with, whose `APPIMAGE` and `APPDIR` name the AppImage it runs from; empty by default.
    * @throws {ArgumentException} When the program's path is empty or whitespace.
    * @throws {LaunchException} On Linux, when `/bin/bash` is not executable or `/proc/self/fd` cannot be read.
    * @example
@@ -2914,7 +2981,7 @@ export declare class ProcessLaunchCommand {
    * }
    * ```
    */
-  public constructor(platform: string, executablePath: string, launchArguments: readonly string[]);
+  public constructor(platform: string, executablePath: string, launchArguments: readonly string[], environment?: NodeJS.ProcessEnv);
 }
 
 /**
@@ -4175,6 +4242,31 @@ export interface IEventSink {
    * ```
    */
   broadcast(event: Event): void;
+}
+
+/**
+ * Ends the AppImage copies that runtimes started by launchers left behind on Linux, as their start logs record them.
+ */
+export declare class AppImageCopyCleanup {
+  private constructor();
+
+  /**
+   * Reads the start logs other than the runtime's own. A recorded mount ends when the Bash that held it no longer runs and the recorded process is still the mount of the recorded AppImage; a recorded extraction is removed when that Bash no longer runs and the folder is a `teamrun-runtime-` folder directly in the temporary folder. Logs, processes and folders that cannot be read or ended are left. The logs folder is created when it is missing.
+   *
+   * @param directory The data directory, whose ownership the runtime holds.
+   * @param ownStartLogName The start log of the launcher that started this runtime, which is not read, or `null`.
+   * @returns A promise that resolves once the leftover copies are ended.
+   * @throws {Error} Rejected when the logs folder cannot be created or listed.
+   * @example
+   * ```ts
+   * import { AppImageCopyCleanup, type OwnershipLock } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function cleanAsync(lock: OwnershipLock): Promise<void> {
+   *   return AppImageCopyCleanup.removeAsync(lock.dataDirectory, null);
+   * }
+   * ```
+   */
+  public static removeAsync(directory: DataDirectory, ownStartLogName: string | null): Promise<void>;
 }
 
 /**

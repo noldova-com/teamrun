@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -16,8 +16,8 @@ import type { DataDirectory } from "../data-directory/data-directory.js";
 
 export class AppImageCopyCleanup {
   public static async removeAsync(directory: DataDirectory, ownStartLogName: string | null): Promise<void> {
-    const names = await readdir(directory.logsFolder).catch(() => []);
-    const stale = names.filter(t => Resources.startLogNamePattern.test(t) && t !== ownStartLogName);
+    await mkdir(directory.logsFolder, { recursive: true });
+    const stale = (await readdir(directory.logsFolder)).filter(t => Resources.startLogNamePattern.test(t) && t !== ownStartLogName);
     const texts = await Promise.allSettled(stale.map(t => readFile(path.join(directory.logsFolder, t), Resources.utf8Encoding)));
     const records = texts.flatMap(t => t.status === "fulfilled" ? t.value.split("\n") : []);
     await Promise.allSettled(records.map(t => AppImageCopyCleanup.endAsync(t)));
@@ -27,8 +27,9 @@ export class AppImageCopyCleanup {
     const mount = Resources.copyMountRecord.exec(record);
     if (!Object.isNull(mount)) {
       const [, holder = "", mounter = "", image = ""] = mount;
-      const expected = [image, Resources.appImageMountOption, ""].join(Resources.commandLineSeparator);
-      if (!await AppImageCopyCleanup.isHolderRunningAsync(holder) && await AppImageCopyCleanup.readCommandLineAsync(mounter) === expected)
+      const separator = Resources.commandLineSeparator;
+      const mounting = `${separator}${await AppImageCopyCleanup.readCommandLineAsync(mounter)}`;
+      if (!await AppImageCopyCleanup.isHolderRunningAsync(holder) && mounting.endsWith(`${separator}${image}${separator}${Resources.appImageMountOption}${separator}`))
         process.kill(Number(mounter), Resources.copyEndSignal);
       return;
     }

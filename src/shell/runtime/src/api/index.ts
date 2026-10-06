@@ -46,6 +46,7 @@ export type { IModuleSettings } from "../interfaces/module-settings.js";
 export type { IRuntimePart } from "../interfaces/runtime-part.js";
 export type { IRuntimePartContext } from "../interfaces/runtime-part-context.js";
 export type { IRuntimePartLoader } from "../interfaces/runtime-part-loader.js";
+export { AppImageSource } from "../models/app-image-source.js";
 export { AttachOptions } from "../models/attach-options.js";
 export { CapabilityToken } from "../models/capability-token.js";
 export { ClientSettings } from "../models/client-settings.js";
@@ -94,6 +95,7 @@ export { FolderProtectorFactory } from "../services/discovery/folder-protector-f
 export { PosixFolderProtector } from "../services/discovery/posix-folder-protector.js";
 export { WindowsFolderProtector } from "../services/discovery/windows-folder-protector.js";
 export { RuntimeServer } from "../services/endpoint/runtime-server.js";
+export { AppImageCopyCleanup } from "../services/lifetime/app-image-copy-cleanup.js";
 export { IdleMonitor } from "../services/lifetime/idle-monitor.js";
 export { RuntimeHost } from "../services/lifetime/runtime-host.js";
 export { RuntimeLog } from "../services/lifetime/runtime-log.js";
