@@ -157,15 +157,22 @@ describe("CodeBlockComponent", () => {
         range.selectNodeContents(find(".tr-code-block-body > code"));
         return [...range.getClientRects()];
       };
-      const start = (lines()[0] as DOMRect).left - body().getBoundingClientRect().left;
+      const code = (): DOMRect => box(".tr-code-block-body > code");
+      const end = (): number => Math.max(...lines().map(t => t.right));
+      const rounding = 0.5 + 1 / 64;
       await framesAsync();
+      const start = (lines()[0] as DOMRect).left - code().left;
 
+      AppearanceFixture.expectPixels(start, AppearanceFixture.measureLook("space-3"));
       expect(body().scrollWidth).toBeGreaterThan(body().clientWidth);
+      expect(Math.abs(body().scrollWidth - code().width)).toBeLessThanOrEqual(rounding);
+      AppearanceFixture.expectPixels(code().right - end(), start);
       AppearanceFixture.expectPixels(bottom(), AppearanceFixture.measureLook("space-2") - AppearanceFixture.measureLook("scrollbar-size"));
 
       body().scrollLeft = body().scrollWidth;
 
-      AppearanceFixture.expectPixels(body().getBoundingClientRect().right - Math.max(...lines().map(t => t.right)), start);
+      AppearanceFixture.expectPixels(code().right - end(), start);
+      expect(Math.abs(body().getBoundingClientRect().right - code().right)).toBeLessThanOrEqual(rounding);
 
       await changeAsync(() => host.wrapped.set(true));
       await framesAsync();
