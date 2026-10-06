@@ -38,7 +38,6 @@ jobs:
       targets: ${{ steps.scope.outputs.targets }}
       target-table: ${{ steps.scope.outputs.target-table }}
       ui-targets: ${{ steps.scope.outputs.ui-targets }}
-      ui-plan: ${{ steps.scope.outputs.ui-plan }}
       deferred: ${{ steps.scope.outputs.deferred }}
       ui-deferred: ${{ steps.scope.outputs.ui-deferred }}
     steps:
@@ -104,54 +103,7 @@ jobs:
       runner: ${{ matrix.runner }}
       architecture: ${{ matrix.architecture }}
       jobs: ${{ toJSON(matrix.jobs) }}
-
-  ui-linux-x64:
-    name: UI workflows (Linux x64)
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' linux-x64 ') }}
-    uses: ./.github/workflows/ui-workflows.yml
-    with:
-      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['linux-x64']) }}
-
-  ui-linux-arm64:
-    name: UI workflows (Linux ARM64)
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' linux-arm64 ') }}
-    uses: ./.github/workflows/ui-workflows.yml
-    with:
-      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['linux-arm64']) }}
-
-  ui-windows-x64:
-    name: UI workflows (Windows x64)
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' windows-x64 ') }}
-    uses: ./.github/workflows/ui-workflows.yml
-    with:
-      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['windows-x64']) }}
-
-  ui-windows-arm64:
-    name: UI workflows (Windows ARM64)
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' windows-arm64 ') }}
-    uses: ./.github/workflows/ui-workflows.yml
-    with:
-      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['windows-arm64']) }}
-
-  ui-macos-x64:
-    name: UI workflows (macOS x64)
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' macos-x64 ') }}
-    uses: ./.github/workflows/ui-workflows.yml
-    with:
-      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['macos-x64']) }}
-
-  ui-macos-arm64:
-    name: UI workflows (macOS ARM64)
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-ui == 'true' && contains(format(' {0} ', needs.changes.outputs.ui-targets), ' macos-arm64 ') }}
-    uses: ./.github/workflows/ui-workflows.yml
-    with:
-      plan: ${{ toJSON(fromJSON(needs.changes.outputs.ui-plan)['macos-arm64']) }}
+      ui: ${{ needs.changes.outputs.run-ui == 'true' && toJSON(matrix.ui) || 'null' }}
 
   cache-plan:
     name: Find the missing dependency caches
@@ -350,7 +302,7 @@ jobs:
 
   result:
     name: Build and test (all targets)
-    needs: [changes, validate, ui-linux-x64, ui-linux-arm64, ui-windows-x64, ui-windows-arm64, ui-macos-x64, ui-macos-arm64]
+    needs: [changes, validate]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -362,13 +314,6 @@ jobs:
           RUN_UI: ${{ needs.changes.outputs.run-ui }}
           VALIDATION_RESULT: ${{ needs.validate.result }}
           UI_TARGETS: ${{ needs.changes.outputs.ui-targets }}
-          UI_RESULTS: >-
-            linux-x64=${{ needs.ui-linux-x64.result }}
-            linux-arm64=${{ needs.ui-linux-arm64.result }}
-            windows-x64=${{ needs.ui-windows-x64.result }}
-            windows-arm64=${{ needs.ui-windows-arm64.result }}
-            macos-x64=${{ needs.ui-macos-x64.result }}
-            macos-arm64=${{ needs.ui-macos-arm64.result }}
           DEFERRED: ${{ needs.changes.outputs.deferred }}
           UI_DEFERRED: ${{ needs.changes.outputs.ui-deferred }}
         run: |
@@ -380,23 +325,13 @@ jobs:
           else
             covered='every target.'
           fi
-          planned=skipped
+          ui=skipped
           if [ "$RUN_UI" = true ]; then
-            planned=success
-          fi
-          ui=$planned
-          if [ -z "$UI_TARGETS" ]; then
-            ui=failure
-          fi
-          for entry in $UI_RESULTS; do
-            case " $UI_TARGETS " in
-              *" ${entry%%=*} "*) expected=$planned ;;
-              *) expected=skipped ;;
-            esac
-            if [ "${entry#*=}" != "$expected" ]; then
+            ui=$VALIDATION_RESULT
+            if [ -z "$UI_TARGETS" ]; then
               ui=failure
             fi
-          done
+          fi
           case "$CHANGES_RESULT:$RUN_CODE:$RUN_UI:$VALIDATION_RESULT:$ui" in
             success:false:false:skipped:skipped)
               echo 'Only Markdown documentation changed: the document checks passed, and the build and test targets were skipped.' >> "$GITHUB_STEP_SUMMARY"
