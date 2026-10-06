@@ -192,6 +192,13 @@ A hover or selected fill around a label in a bar or a group of pills, such as a 
 - Pointer targets are at least 24 by 24 CSS pixels or meet a documented spacing/equivalent-control exception. A target sized in rem keeps this minimum when the root is small. Visual glyphs, hover pads and hit regions can differ, but hit regions must not overlap adjacent controls. A narrow resize sash needs adequate hit spacing or an equivalent adequately sized pointer control, plus keyboard operation. Do not restore large framework hit regions that obscure neighboring controls. See [target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
 - Tooltips open on focus as well as hover, can be dismissed without moving focus and stay available while the user moves the pointer over them. Place it 0.5rem above the visible anchor unless its component names another side, flip when needed and keep it within the overlay bounds of section 5. Reposition or dismiss it when the anchor scrolls or becomes clipped. Tooltips contain descriptions; use a popover or dialog for interactive content. See [hover/focus content](https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html).
 - Enlarged text, zoom, high-contrast/forced-color modes and reduced motion remain usable. Do not hide focus or selection cues when a custom theme or color preference changes. Provide text alternatives for images and meaningful status announcements without repeatedly stealing focus.
+- When the system forces its colors (`forced-colors: active`), the system's palette replaces the theme's, fills and shadows drop away, and every state keeps a cue in system colors through the kit's forced-colors partial:
+  - Selected, current, checked, pressed and chosen parts, such as a selected tab, the current tree or list row, a checked pill, the active result or option, a pressed button, the chosen docking guide and a view badge, take the Highlight fill, with their text and icons in HighlightText.
+  - A hovered control or row takes a dashed Highlight outline.
+  - Focus is a Highlight ring at twice the border width, including on fields, selects and keys being recorded, whose focus is otherwise a border color.
+  - Progress, the spinner's arc, the sash's bar and drop lines are drawn in Highlight, and grips and separators in CanvasText.
+  - Overlays keep their borders, which identify them once their shadows are gone, and scroll areas show the system's own scrollbars.
+  - Error, success, added and removed keep their icon, sign or text, never color alone.
 
 ## 8. Component metrics and behavior
 

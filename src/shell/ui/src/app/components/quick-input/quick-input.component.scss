@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "selected-surface" as *;
 @use "states";
 
@@ -48,6 +49,8 @@
 
 .tr-quick-input-field#{states.$focus} {
   border-color: var(--tr-accent);
+
+  @include forced-focus;
 }
 
 .tr-quick-input-list {
@@ -74,6 +77,8 @@
 
 .tr-quick-input-option#{states.$hover} {
   background-color: var(--tr-hover);
+
+  @include forced-hover;
 }
 
 .tr-quick-input-option[aria-selected="true"] {

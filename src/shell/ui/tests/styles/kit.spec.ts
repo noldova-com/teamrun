@@ -17,6 +17,8 @@ import { MenuComponent } from "../../src/app/components/menu/menu.component";
 import { ThemeMode } from "../../src/app/enums/theme-mode";
 import { DefaultTheme } from "../../src/app/themes/default-theme";
 import { AppearanceFixture } from "../fixtures/appearance.fixture";
+import { ForcedColorsFixture } from "../fixtures/forced-colors.fixture";
+import { GalleryFixture } from "../fixtures/gallery.fixture";
 import { MotionFixture } from "../fixtures/motion.fixture";
 
 @Component({
@@ -216,4 +218,113 @@ describe("kit styles", () => {
       AppearanceFixture.expectRem(getComputedStyle(item).minHeight, 1.625, panelSize);
       AppearanceFixture.expectRem(getComputedStyle(item).fontSize, 0.8125, panelSize);
     });
+});
+
+describe("kit styles in forced colors", () => {
+  let frame: HTMLElement;
+
+  beforeEach(async () => {
+    const fixture = await GalleryFixture.showAsync();
+    frame = GalleryFixture.frames(fixture)[0] as HTMLElement;
+    await ForcedColorsFixture.activateAsync();
+  });
+
+  afterEach(async () => {
+    await ForcedColorsFixture.resetAsync();
+    AppearanceFixture.reset();
+  });
+
+  const one = (selector: string): HTMLElement => {
+    const element = frame.querySelector<HTMLElement>(selector);
+    if (element === null)
+      throw new Error(`The Gallery shows no ${selector}.`);
+    return element;
+  };
+
+  function outline(element: HTMLElement): readonly [string, string, string] {
+    const styles = [getComputedStyle(element), getComputedStyle(element, "::before"), ...[...element.querySelectorAll(".tr-tab-pill")].map(t => getComputedStyle(t))];
+    const style = styles.find(t => t.outlineStyle !== "none") ?? (styles[0] as CSSStyleDeclaration);
+    return [style.outlineStyle, style.outlineColor, style.outlineWidth];
+  }
+
+  function doubled(): string {
+    const probe = frame.appendChild(document.createElement("div"));
+    probe.style.outline = "calc(var(--tr-border-width) * 2) solid";
+    const width = getComputedStyle(probe).outlineWidth;
+    probe.remove();
+    return width;
+  }
+
+  it("fills a selected tab, the current tree row, a checked pill, the active result, pressed buttons, the chosen guide and a badge with the highlight, their text and icons in the highlighted text without the backplate the system draws behind text", () => {
+    const highlight = ForcedColorsFixture.resolve("Highlight");
+    const text = ForcedColorsFixture.resolve("HighlightText");
+    const filled: readonly (readonly [string, string | null])[] = [
+      [".tr-tab.tr-tab-selected .tr-tab-pill", null],
+      [".tr-tree-row-current", null],
+      [".tr-choice-pill-selected", null],
+      [".tr-quick-input-option[aria-selected=\"true\"]", null],
+      ["button[tr-toolbar-button][aria-pressed=\"true\"]", null],
+      ["button[tr-icon-button][aria-pressed=\"true\"]", "::before"],
+      [".tr-docking-guide-chosen", null],
+      ["tr-view-badge", null]
+    ];
+
+    const shown = filled.map(([selector, part]) => [selector, getComputedStyle(one(selector), part).backgroundColor, getComputedStyle(one(selector)).color, getComputedStyle(one(selector)).forcedColorAdjust]);
+    const labels = [".tr-tree-row-current .tr-tree-label", ".tr-tab.tr-tab-selected .tr-tab-label", ".tr-quick-input-option[aria-selected=\"true\"] .tr-quick-input-detail"].map(t => getComputedStyle(one(t)).color);
+
+    expect(shown).toEqual(filled.map(([selector]) => [selector, highlight, text, "none"]));
+    expect(labels).toEqual([text, text, text]);
+  });
+
+  it("outlines every hovered control with a dashed highlight, since the hover fill is forced away", () => {
+    const highlight = ForcedColorsFixture.resolve("Highlight");
+    const hovered = [...frame.querySelectorAll<HTMLElement>("[data-tr-state=\"Hover\"]")];
+
+    expect(hovered.length).toBeGreaterThan(6);
+    expect(hovered.map(t => [t.className, ...outline(t).slice(0, 2)])).toEqual(hovered.map(t => [t.className, "dashed", highlight]));
+  });
+
+  it("rings every focused control with the highlight at twice the border width, a field and a select included", () => {
+    const ring = ["solid", ForcedColorsFixture.resolve("Highlight"), doubled()];
+    const focused = [...frame.querySelectorAll<HTMLElement>("[data-tr-state=\"Focus\"]")];
+
+    expect(focused.length).toBeGreaterThan(8);
+    expect(focused.map(t => [t.className, ...outline(t)])).toEqual(focused.map(t => [t.className, ...ring]));
+  });
+
+  it("draws progress, the spinner's arc, the sash's bar and the drop line in the highlight, and grips and separators in the text color, where they were drawn with fills alone", () => {
+    const highlight = ForcedColorsFixture.resolve("Highlight");
+    const canvas = ForcedColorsFixture.resolve("Canvas");
+    const text = ForcedColorsFixture.resolve("CanvasText");
+    const line = document.body.appendChild(document.createElement("div"));
+    line.className = "tr-drop-line";
+    const ring = getComputedStyle(one(".tr-spinner-ring"));
+
+    const shown = [
+      getComputedStyle(one(".tr-progress-bar")).backgroundColor,
+      getComputedStyle(one("tr-progress")).backgroundColor,
+      ring.borderTopColor,
+      ring.borderBottomColor,
+      getComputedStyle(one("tr-sash[data-tr-state=\"Focus\"] .tr-sash-bar")).backgroundColor,
+      getComputedStyle(line).backgroundColor,
+      getComputedStyle(one(".tr-sash-dot")).backgroundColor,
+      getComputedStyle(one("tr-menu-separator")).backgroundColor
+    ];
+    line.remove();
+
+    expect(shown).toEqual([highlight, canvas, highlight, canvas, highlight, highlight, text, text]);
+  });
+
+  it("gives scroll areas the system's scrollbars, since the thin thumb is drawn with a shadow that forced colors drop", async () => {
+    AppearanceFixture.apply();
+    const area = document.body.appendChild(document.createElement("div"));
+    area.style.cssText = "width: 10rem; height: 4rem; overflow: scroll";
+    const forced = getComputedStyle(area, "::-webkit-scrollbar").width;
+    await ForcedColorsFixture.resetAsync();
+    const thin = getComputedStyle(area, "::-webkit-scrollbar").width;
+    area.remove();
+
+    AppearanceFixture.expectLook(thin, DefaultTheme.theme, "scrollbar-size", "width");
+    expect(forced).not.toBe(thin);
+  });
 });
