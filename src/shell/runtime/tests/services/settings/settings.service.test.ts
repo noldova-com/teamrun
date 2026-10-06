@@ -165,6 +165,39 @@ export class SettingsServiceTests {
   }
 
   @TestMethod
+  public async readsTheEntryForAKeyThroughItsEnclosingScopesAndSaysWhetherTheKeyItselfHoldsIt(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
+    const conversation = new SettingScope(SettingsServiceTests.CONVERSATION, "c1");
+    const project = new SettingScope(SettingsServiceTests.PROJECT, "p1");
+    const read = (key: SettingKey): string => {
+      const entry = settings.service.readEntry(key);
+      return `${entry.name.text}=${String(entry.value)}/${String(entry.isSet)}`;
+    };
+    const send = new SettingKey(SettingsServiceTests.SEND, conversation);
+    settings.service.setScopeParent(conversation, project);
+    const results: string[] = [read(send)];
+
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND), false));
+    results.push(read(send), read(new SettingKey(SettingsServiceTests.SEND)));
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND, project), true));
+    results.push(read(send));
+    settings.service.write(new SettingValue(send, false));
+    results.push(read(send));
+    settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.QUIET, null, "d1"), true));
+    results.push(read(new SettingKey(SettingsServiceTests.QUIET, null, "d1")), read(new SettingKey(SettingsServiceTests.QUIET, null, "d2")));
+
+    Assert.areEqual([
+      "chat.sendWithEnter=true/false", "chat.sendWithEnter=false/false", "chat.sendWithEnter=false/true", "chat.sendWithEnter=true/false",
+      "chat.sendWithEnter=false/true", "chat.quiet=true/true", "chat.quiet=false/false"
+    ].join(","), results.join(","));
+    Assert.areEqual("NotFound,InvalidParams,InvalidParams", [
+      Assert.throws(() => settings.service.readEntry(new SettingKey(QualifiedName.parse("chat.speed"))), SettingException),
+      Assert.throws(() => settings.service.readEntry(new SettingKey(SettingsServiceTests.SEND, new SettingScope(QualifiedName.parse("chat.thread"), "t1"))), SettingException),
+      Assert.throws(() => settings.service.readEntry(new SettingKey(SettingsServiceTests.QUIET)), SettingException)
+    ].map(t => t.failure.code).join(","));
+  }
+
+  @TestMethod
   public async stopsAtAScopeCycleAndSkipsScopesASettingDoesNotList(): Promise<void> {
     await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
     const conversation = new SettingScope(SettingsServiceTests.CONVERSATION, "c1");
@@ -180,16 +213,21 @@ export class SettingsServiceTests {
   public async refusesAnUnknownSettingAValueItsTypeRefusesAndAScopeItDoesNotList(): Promise<void> {
     await using settings = await SettingsFixture.createAsync(SettingsServiceTests.DEFINITIONS);
     const unknown = QualifiedName.parse("chat.speed");
+    const thread = new SettingScope(QualifiedName.parse("chat.thread"), "t1");
 
     const failures = [
       Assert.throws(() => settings.service.read(new SettingKey(unknown)), SettingException),
       Assert.throws(() => settings.service.readDevices(unknown), SettingException),
       Assert.throws(() => settings.service.write(new SettingValue(new SettingKey(SettingsServiceTests.SEND), "yes")), SettingException),
-      Assert.throws(() => settings.service.reset(new SettingKey(SettingsServiceTests.SEND, new SettingScope(QualifiedName.parse("chat.thread"), "t1"))), SettingException)
+      Assert.throws(() => settings.service.reset(new SettingKey(SettingsServiceTests.SEND, thread)), SettingException),
+      Assert.throws(() => settings.service.read(new SettingKey(SettingsServiceTests.SEND, thread)), SettingException),
+      Assert.throws(() => settings.service.read(new SettingKey(SettingsServiceTests.QUIET, thread, "d1")), SettingException)
     ];
 
-    Assert.areEqual("NotFound,NotFound,InvalidParams,InvalidParams", failures.map(t => t.failure.code).join(","));
+    Assert.areEqual("NotFound,NotFound,InvalidParams,InvalidParams,InvalidParams,InvalidParams", failures.map(t => t.failure.code).join(","));
     Assert.areEqual("No setting named chat.speed is declared.", failures[0]?.message);
+    Assert.areEqual("The setting chat.sendWithEnter does not list the scope chat.thread.", failures[4]?.message);
+    Assert.areEqual("The setting chat.quiet does not list the scope chat.thread.", failures[5]?.message);
   }
 
   @TestMethod

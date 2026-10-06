@@ -12,11 +12,12 @@ import { DockYield } from "../../../../src/app/models/layout/dock-yield";
 import { LayoutFit } from "../../../../src/app/models/layout/layout-fit";
 import { TabGroup } from "../../../../src/app/models/layout/tab-group";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("LayoutFit", () => {
   const left = new Dock(DockSide.Left, new TabGroup(1, [LayoutFixture.files], LayoutFixture.files), null, false);
   const right = new Dock(DockSide.Right, new TabGroup(2, [LayoutFixture.changes], LayoutFixture.changes), null, false);
-  const across = (width: number, docks: readonly Dock[] = [left, right]): LayoutFit => LayoutFit.of(width, 0.5, docks, 13.75);
+  const across = (width: number, docks: readonly Dock[] = [left, right]): LayoutFit => LayoutFit.of(width, 0.5, docks, 13.75, LayoutMetricsFixture.standard);
   const tracks = (fit: LayoutFit): readonly number[] => [fit.track(DockSide.Left), fit.track(DockSide.Right), fit.middle];
 
   it("gives each dock its preferred size and the middle the rest when everything fits", () => {
@@ -45,7 +46,7 @@ describe("LayoutFit", () => {
   });
 
   it("keeps the middle at its preferred size by shrinking the docks to their minimums before collapsing either", () => {
-    const yielding = (width: number): LayoutFit => LayoutFit.of(width, 0.5, [left, right], 13.75, new Set(), new DockYield(30, new Set(), null));
+    const yielding = (width: number): LayoutFit => LayoutFit.of(width, 0.5, [left, right], 13.75, LayoutMetricsFixture.standard, new Set(), new DockYield(30, new Set(), null));
 
     expect(tracks(yielding(100))).toEqual([26.25, 25.25, 48]);
     expect(yielding(100).maximumSize(DockSide.Left)).toBe(60.25);
@@ -58,7 +59,7 @@ describe("LayoutFit", () => {
   });
 
   it("reopens a dock it closed only once the middle keeps its preferred size and the reopen margin", () => {
-    const after = (width: number, closed: readonly DockSide[]): LayoutFit => LayoutFit.of(width, 0.5, [left, right], 13.75, new Set(), new DockYield(30, new Set(closed), null));
+    const after = (width: number, closed: readonly DockSide[]): LayoutFit => LayoutFit.of(width, 0.5, [left, right], 13.75, LayoutMetricsFixture.standard, new Set(), new DockYield(30, new Set(closed), null));
 
     expect(tracks(after(52, [DockSide.Right]))).toEqual([18.5, 3, 30]);
     expect(tracks(after(53, [DockSide.Right]))).toEqual([12.25, 10.25, 30]);
@@ -67,7 +68,7 @@ describe("LayoutFit", () => {
   });
 
   it("keeps a dock the person opened while the others collapse, down to the document's own minimum", () => {
-    const kept = (width: number): LayoutFit => LayoutFit.of(width, 0.5, [left, right], 13.75, new Set(), new DockYield(30, new Set([DockSide.Left, DockSide.Right]), DockSide.Left));
+    const kept = (width: number): LayoutFit => LayoutFit.of(width, 0.5, [left, right], 13.75, LayoutMetricsFixture.standard, new Set(), new DockYield(30, new Set([DockSide.Left, DockSide.Right]), DockSide.Left));
 
     expect(tracks(kept(40))).toEqual([10.25, 3, 26.25]);
     expect(kept(40).isKeeping).toBe(true);
@@ -76,7 +77,7 @@ describe("LayoutFit", () => {
   });
 
   it("stops keeping a dock once it would stay open by the margin anyway, also beside a dock the person hid", () => {
-    const kept = (width: number, docks: readonly Dock[]): LayoutFit => LayoutFit.of(width, 0.5, docks, 13.75, new Set(), new DockYield(30, new Set(), DockSide.Left));
+    const kept = (width: number, docks: readonly Dock[]): LayoutFit => LayoutFit.of(width, 0.5, docks, 13.75, LayoutMetricsFixture.standard, new Set(), new DockYield(30, new Set(), DockSide.Left));
     const hidden = [left, right.withCollapsed(true)];
 
     expect(tracks(kept(40, hidden))).toEqual([10.25, 3, 26.25]);

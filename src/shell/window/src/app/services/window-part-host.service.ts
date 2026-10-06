@@ -12,7 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type CommandInfo, CommandList, CommandRun, FailureCode, ModuleState, ModuleStatus, ModuleStatusList, type NotificationPost, NotificationReference, NotificationUpdate,
-  type SettingScope, type SettingChange, ShellEvents, ShellMethods
+  type SettingChange, type SettingEntry, type SettingScope, ShellEvents, ShellMethods
 } from "@noldova/teamrun-shell-protocol";
 
 import { ContentPadding } from "../enums/content-padding";
@@ -130,6 +130,10 @@ export class WindowPartHostService implements IWindowPartHost {
 
   public readSetting(name: string): JsonValue | undefined {
     return this.settings.read(name);
+  }
+
+  public readSettingAsync(name: string, scope: SettingScope | null): Promise<SettingEntry> {
+    return this.settings.readAsync(name, scope);
   }
 
   public writeSettingAsync(name: string, value: JsonValue, scope: SettingScope | null): Promise<void> {

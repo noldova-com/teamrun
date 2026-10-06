@@ -49,7 +49,15 @@ export class SettingsService {
   }
 
   public read(key: SettingKey): JsonValue {
-    return this.resolve(this.define(key.name), key)?.value ?? this.define(key.name).defaultValue;
+    const definition = this.define(key.name);
+    SettingsService.requireListedScope(definition, key);
+    return this.resolve(definition, key)?.value ?? definition.defaultValue;
+  }
+
+  public readEntry(key: SettingKey): SettingEntry {
+    const definition = this.define(key.name);
+    const stored = this.resolve(definition, this.normalize(definition, key));
+    return new SettingEntry(definition.name, stored?.value ?? definition.defaultValue, stored?.isOwn === true);
   }
 
   public readDevices(name: QualifiedName): ReadonlyMap<string, JsonValue> {
@@ -113,29 +121,32 @@ export class SettingsService {
     return [key.name.text, key.scope?.name.text ?? Resources.applicationScope, key.scope?.id ?? Resources.applicationScope, key.device ?? Resources.sharedDevice];
   }
 
+  private static requireListedScope(definition: SettingDefinition, key: SettingKey): void {
+    if (!Object.isNull(key.scope) && !definition.isScopedBy(key.scope.name))
+      throw new SettingException(Resources.formatSettingScopeNotAllowed(key.name.text, key.scope.name.text), FailureCode.InvalidParams);
+  }
+
   private normalize(definition: SettingDefinition, key: SettingKey): SettingKey {
-    if (definition.locality === SettingLocality.Shared) {
-      if (!Object.isNull(key.scope) && !definition.isScopedBy(key.scope.name))
-        throw new SettingException(Resources.formatSettingScopeNotAllowed(key.name.text, key.scope.name.text), FailureCode.InvalidParams);
+    SettingsService.requireListedScope(definition, key);
+    if (definition.locality === SettingLocality.Shared)
       return new SettingKey(key.name, key.scope);
-    }
-    if (Object.isNull(key.device) || !Object.isNull(key.scope))
+    if (Object.isNull(key.device))
       throw new SettingException(Resources.formatSettingNeedsDevice(key.name.text), FailureCode.InvalidParams);
     return key;
   }
 
-  private resolve(definition: SettingDefinition, key: SettingKey, inherited: boolean = false): { readonly value: JsonValue } | undefined {
+  private resolve(definition: SettingDefinition, key: SettingKey, inherited: boolean = false): { readonly value: JsonValue; readonly isOwn: boolean } | undefined {
     const device = definition.locality === SettingLocality.Device ? key.device : null;
     if (definition.locality === SettingLocality.Device && Object.isNull(device))
       return undefined;
-    for (const scope of this.chain(definition.locality === SettingLocality.Device ? null : key.scope).slice(inherited ? 1 : 0)) {
+    for (const [index, scope] of this.chain(definition.locality === SettingLocality.Device ? null : key.scope).slice(inherited ? 1 : 0).entries()) {
       if (!Object.isNull(scope) && !definition.isScopedBy(scope.name))
         continue;
       const columns = SettingsService.columns(new SettingKey(definition.name, scope, device));
       const text = this.database.read(Resources.readSettingStatement, ...columns)?.[Resources.valueColumn];
       const value = Object.isString(text) ? this.accept(definition, text, Object.isNull(scope) ? Resources.applicationScope : `${scope.name.text} ${scope.id}`, columns[3]) : undefined;
       if (!Object.isUndefined(value))
-        return { value };
+        return { value, isOwn: !inherited && index === 0 };
     }
     return undefined;
   }

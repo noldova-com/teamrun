@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
+import { QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
 import type { IRuntimePart, IRuntimePartContext } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
@@ -23,6 +24,9 @@ export class RuntimePart implements IRuntimePart {
     const isLongCount = existsSync(path.join(context.moduleFolder, Resources.longCountMarker));
     this.isHolding = existsSync(path.join(context.moduleFolder, Resources.holdFirstOptionsMarker));
     const runtime = randomUUID();
+    const inbox = new SettingScope(QualifiedName.parse(Resources.folderScope), Resources.inbox);
+    for (const note of Resources.inboxNotes)
+      context.settings.setScopeParent(new SettingScope(QualifiedName.parse(Resources.noteScope), note), inbox);
     context.registerMethod(Resources.optionsMethod, {
       handleAsync: async () => {
         if (this.isHolding) {

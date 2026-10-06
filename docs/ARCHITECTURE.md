@@ -232,13 +232,13 @@ A module adds settings only through the fields below, never with a screen of its
 | `scopes` | The setting scopes that may override it, its module's own or a dependency's; a device setting has none |
 | `page`, `group` | Where Settings shows it |
 
-The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset. Setting a value equal to the setting's default, compared by value, is a reset when the setting would otherwise take its default, so every way of changing a setting removes the stored value and the setting follows its default from then on; a scope whose enclosing scope holds another value keeps the value it is given. A part reads the settings of its module, its dependencies and the shell, and changes only its own module's. A window reads them all with `shell.settings` and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows. A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
+The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset. Setting a value equal to the setting's default, compared by value, is a reset when the setting would otherwise take its default, so every way of changing a setting removes the stored value and the setting follows its default from then on; a scope whose enclosing scope holds another value keeps the value it is given. A part reads the settings of its module, its dependencies and the shell, for the application or for one of the scopes a setting lists, and changes only its own module's. A window reads them all with `shell.settings`, reads one key's entry, its value in effect and whether the key itself holds it, with `shell.readSetting`, and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows. A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
 The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals. Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear. Keyboard shortcuts lists every command with its owner and key. The person records a new key, removes a key, resets a command to its default or resets every shortcut, and each change writes `shell.keyBindings` whole, in one write, built on the window's previous change until the setting reports that change; when two windows change it at the same moment, the later write is kept. A key the rules refuse is refused with the reason, and a key another command holds is shown with that command: Use it here gives the key to this command; the other command keeps its other default keys if it has any, and is left without a key otherwise. [UI-STANDARDS](UI-STANDARDS.md#8-component-metrics-and-behavior) describes the row. The window applies the appearance settings as soon as they load and on every change. The desktop keeps the device's last appearance preferences outside the data directory and gives them to the window before its first frame, so a restart paints in the chosen theme and mode without a flash.
 
 ### Setting scopes
 
-The application scope belongs to the shell. A module that owns a kind of object, such as a project or a conversation, contributes a scope for it and tells the shell which object encloses each one, such as a conversation's project; an object with none falls under the application scope. A setting declares which scopes may override it. Its effective value comes from the most specific scope that sets it, then each enclosing scope, then the application scope, then the default. When an object is deleted, the scope's owner asks the shell to remove the values stored for it.
+The application scope belongs to the shell. A module that owns a kind of object, such as a project or a conversation, contributes a scope for it and tells the shell which object encloses each one, such as a conversation's project; an object with none falls under the application scope. A setting declares which scopes may override it. Its effective value comes from the most specific scope that sets it, then each enclosing scope, then the application scope, then the default. A change is reported for the key that changed only, so a part that shows a value read for a scope reads it again when an enclosing scope or the application changes. When an object is deleted, the scope's owner asks the shell to remove the values stored for it.
 
 ### Notifications
 
@@ -318,6 +318,19 @@ A runtime part starts an external program only through its context's `startProce
 The runtime must not keep the files, sockets or pipes of the client that started it.
 
 - **Linux:** starting a detached runtime requires executable Bash at `/bin/bash` and a readable, searchable `/proc/self/fd` from a mounted `/proc`. The launcher checks these before spawning and reports a missing requirement immediately. In the child, before executing the runtime, Bash closes inherited descriptors above standard input, output and error, with its startup files and inherited shell options disabled.
+- **Linux AppImage:** an AppImage runs from a mount, or from an extraction, that ends when the process it started exits, so a runtime started from it would lose its files once its client quits.
+  When the launcher's program runs from an AppImage, the Bash step gives the runtime its own copy:
+  - It mounts the AppImage again with `--appimage-mount`, the way the client got its files.
+    When the client runs from an extraction (`APPIMAGE_EXTRACT_AND_RUN`, or no FUSE), or the mount fails, it extracts the AppImage into a `teamrun-runtime-` folder of its own in the operating system's temporary folder, never in the data directory.
+  - It starts the runtime there as its child, running the program directly, since the AppImage's launcher would put `--no-sandbox` before Node's arguments.
+  - Once the runtime exits, it ends the mount or removes the extraction.
+  - When neither a mount nor an extraction works, the start fails with the reason in the start log.
+  - The Bash step writes each mount's process and each extraction's folder to its copy record, `logs/copy-<UUID>.log` beside the start log, and removes the record once the copy ends.
+    The launcher removes its start log once it connects, so the start log cannot keep them.
+    A runtime that owns the data directory ends any mount an earlier Bash step left running when that Bash no longer runs, and removes any extraction it left.
+    It matches a mount by process id, command line and the AppImage's path, never by name alone.
+    It does this once its log is open, and writes each record it cannot settle there with the reason, leaving the record; the runtime still starts.
+  - A runtime started this way names the AppImage file, not its copy, as the program it runs from.
 - **Windows:** Electron's main process keeps its standard handles inheritable, and Node.js starts every child with handle inheritance on. The desktop therefore starts the runtime through a short-lived Electron utility process, which Chromium starts with only the handles it lists; the utility process starts the runtime, answers with its process id, and ends only once the desktop acknowledges the answer, so its exit never arrives before the answer.
 - **macOS, and the CLI on Windows:** the host's direct process launch.
 
@@ -499,7 +512,9 @@ Before replacing application files, coordinate every runtime and desktop using t
 3. Stop the processes modules own, flush and close databases, and verify process exit.
 4. Create verified recovery backups.
 
-Failure before installer handoff resumes surviving clients safely; uncertainty must not be treated as successful shutdown. After an AppImage update, the new version starts only once the old process has exited, from outside the old AppImage and without its open descriptors; a process holding the old version's files keeps the replaced AppImage mounted.
+Failure before installer handoff resumes surviving clients safely; uncertainty must not be treated as successful shutdown.
+A runtime of the old version keeps working from its own copy of the replaced AppImage until the new version takes it over, and its copy ends with it ([Launching the runtime](#launching-the-runtime)).
+After an AppImage update, the new version starts only once the old process has exited, from outside the old AppImage and without its open descriptors; a process holding the old version's files keeps the replaced AppImage mounted.
 
 ### Installation scope
 

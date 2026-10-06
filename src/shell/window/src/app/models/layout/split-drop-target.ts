@@ -29,7 +29,7 @@ export class SplitDropTarget extends DropTarget {
   }
 
   public override preview(geometry: LayoutGeometry): Bounds | null {
-    return geometry.frameOf(this.groupId)?.bounds.edgeHalf(this.edge) ?? null;
+    return geometry.frameOf(this.groupId)?.bounds.edgeHalf(this.edge, geometry.metrics.gap) ?? null;
   }
 
   public override equals(other: DropTarget | null): boolean {

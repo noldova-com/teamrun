@@ -70,6 +70,7 @@ export class Resources {
     ShellMethods.markNotificationsRead.text,
     ShellMethods.clearNotifications.text,
     ShellMethods.settings.text,
+    ShellMethods.readSetting.text,
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text,
     ShellMethods.recentCommands.text,
@@ -77,6 +78,7 @@ export class Resources {
   ];
   public static readonly deviceMethods: readonly string[] = [
     ShellMethods.settings.text,
+    ShellMethods.readSetting.text,
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text,
     ShellMethods.recentCommands.text,
