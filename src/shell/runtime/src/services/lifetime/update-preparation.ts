@@ -21,7 +21,7 @@ import type { ProcessSupervisor } from "../process/process-supervisor.js";
 
 export class UpdatePreparation implements Disposable {
   private readonly server: RuntimeServer;
-  private readonly presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">;
+  private readonly presence: ProcessPresence;
   private readonly processes: ProcessSupervisor;
   private readonly updating: EventChannel;
   private readonly ended: EventChannel;
@@ -36,7 +36,7 @@ export class UpdatePreparation implements Disposable {
 
   public constructor(
     server: RuntimeServer,
-    presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
+    presence: ProcessPresence,
     processes: ProcessSupervisor,
     updating: EventChannel,
     ended: EventChannel,

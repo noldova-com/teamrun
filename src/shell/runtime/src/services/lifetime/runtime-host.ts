@@ -44,7 +44,7 @@ import { ShellMigrations } from "../database/shell-migrations.js";
 import { DiscoveryPublisher } from "../discovery/discovery-publisher.js";
 import { FolderProtectorFactory } from "../discovery/folder-protector-factory.js";
 import { Installation } from "../installation/installation.js";
-import { ProcessPresence } from "../installation/process-presence.js";
+import type { ProcessPresence } from "../installation/process-presence.js";
 import { RuntimeServer } from "../endpoint/runtime-server.js";
 import { ModuleDeclarationReader } from "../modules/module-declaration.reader.js";
 import { CommandsMethod } from "../modules/commands-method.js";
@@ -97,7 +97,7 @@ export class RuntimeHost implements IIdleParticipant {
   private readonly idle: IdleMonitor;
   private readonly stopped: PromiseWithResolvers<string> = Promise.withResolvers<string>();
   private readonly platform: string;
-  private readonly presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">;
+  private readonly presence: ProcessPresence;
   private readonly environment: NodeJS.ProcessEnv;
   private database: ShellDatabase | null;
   private settings: SettingsService | null = null;
@@ -127,7 +127,7 @@ export class RuntimeHost implements IIdleParticipant {
     options: RuntimeOptions,
     platform: string,
     environment: NodeJS.ProcessEnv,
-    presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
+    presence: ProcessPresence,
     lock: OwnershipLock,
     log: RuntimeLog,
     database: ShellDatabase | null,
@@ -188,8 +188,7 @@ export class RuntimeHost implements IIdleParticipant {
     return this.server.sessionCount === 0 && this.work.isEmpty;
   }
 
-  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv,
-    presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync"> = ProcessPresence.create(platform, new SystemCommand())): Promise<RuntimeHost> {
+  public static async startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv, presence: ProcessPresence): Promise<RuntimeHost> {
     const declarations = await ModuleDeclarationReader.readAsync(options.declarationsFile);
     const lock = await RuntimeHost.acquireAsync(options);
     let log: RuntimeLog | null = null;
@@ -237,7 +236,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.idle.check();
   }
 
-  private static async joinInstallationAsync(options: RuntimeOptions, lock: OwnershipLock, presence: Pick<ProcessPresence, "isRunningAsync">): Promise<void> {
+  private static async joinInstallationAsync(options: RuntimeOptions, lock: OwnershipLock, presence: ProcessPresence): Promise<void> {
     if (Object.isNull(options.installationFolder))
       return;
     const installation = new Installation(options.installationFolder, t => presence.isRunningAsync(t));

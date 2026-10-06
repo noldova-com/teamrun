@@ -8,7 +8,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import "@noldova/teamrun-foundation-core";
 import { Assert } from "@noldova/teamrun-foundation-testing";
 import type { BuildIdentity, Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
 import {
@@ -28,11 +27,9 @@ export class UpdateBarrierFixture {
     return new RuntimeLauncher(settings, identity, UpdateBarrierFixture.open(path.dirname(settings.dataDirectory.root)), starter);
   }
 
-  public static async holdAsync(installation: Installation, processId: number = process.pid, state: UpdateBarrierState = UpdateBarrierState.Preparing): Promise<void> {
-    const deadline = Date.now() + 1_000;
-    let [holder] = await UpdateBarrierFixture.PRESENCE.stampAsync([[processId, "desktop"]]);
-    while (Object.isUndefined(holder) && Date.now() < deadline)
-      [holder] = await UpdateBarrierFixture.PRESENCE.stampAsync([[processId, "desktop"]]);
+  public static async holdAsync(installation: Installation, processId: number = process.pid, state: UpdateBarrierState = UpdateBarrierState.Preparing,
+    presence: ProcessPresence = UpdateBarrierFixture.PRESENCE): Promise<void> {
+    const [holder] = await presence.stampAsync([[processId, "desktop"]]);
     Assert.isDefined(holder);
     await mkdir(installation.folder, { recursive: true });
     await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", state, null).toJson()));

@@ -26,6 +26,7 @@ export class WindowsProcessApiFixture implements IWindowsProcessApi {
   public readonly unreadable: Map<number, number> = new Map();
   public readonly replaced: Map<number, number> = new Map();
   public listings: number = 0;
+  public rest: () => string = () => "";
 
   public constructor(tables: readonly (string | Error | (() => string))[] = []) {
     this.tables = [...tables];
@@ -41,7 +42,7 @@ export class WindowsProcessApiFixture implements IWindowsProcessApi {
 
   public listProcesses(): readonly (readonly [number, number])[] {
     this.listings++;
-    const table = this.tables.shift() ?? "";
+    const table = this.tables.shift() ?? this.rest;
     if (table instanceof Error)
       throw table;
     const rows = (typeof table === "function" ? table() : table).split("\n").filter(t => t !== "").map(t => t.split("\t"));
