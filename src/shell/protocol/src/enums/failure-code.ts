@@ -21,5 +21,6 @@ export enum FailureCode {
   DeadlineExceeded = "DeadlineExceeded",
   Unavailable = "Unavailable",
   Disconnected = "Disconnected",
+  Updating = "Updating",
   Internal = "Internal"
 }

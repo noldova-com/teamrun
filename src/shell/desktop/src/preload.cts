@@ -39,6 +39,14 @@ contextBridge.exposeInMainWorld("teamrun", {
   answerClose(requestId: string, isSaved: boolean): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:closeAnswer", requestId, isSaved) as Promise<boolean>;
   },
+  onUpdateSaveRequest(listener: (requestId: string) => void): () => void {
+    const handler = (_event: IpcRendererEvent, requestId: string): void => listener(requestId);
+    ipcRenderer.on("teamrun:updateSaveRequest", handler);
+    return () => ipcRenderer.removeListener("teamrun:updateSaveRequest", handler);
+  },
+  answerUpdateSave(requestId: string, problems: readonly string[]): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:updateSaveAnswer", requestId, problems) as Promise<boolean>;
+  },
   readStartup(): Promise<unknown> {
     return ipcRenderer.invoke("teamrun:readStartup");
   },

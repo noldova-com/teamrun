@@ -130,6 +130,7 @@ export class Resources {
   public static readonly logSizeLimit: number = 1048576;
   public static readonly logRecordShare: number = 4;
   public static readonly missingFileErrorCode: string = "ENOENT";
+  public static readonly existingFileErrorCode: string = "EEXIST";
   public static readonly utf8ContinuationMask: number = 0xC0;
   public static readonly utf8ContinuationBits: number = 0x80;
   public static readonly privateFolderMode: number = 0o700;
@@ -153,6 +154,10 @@ export class Resources {
   public static readonly dataDirectoryVariableField: string = "dataDirectoryVariable";
   public static readonly iconsField: string = "icons";
   public static readonly versionField: string = "version";
+  public static readonly holderField: string = "holder";
+  public static readonly stateField: string = "state";
+  public static readonly handoffField: string = "handoff";
+  public static readonly dataDirectoryField: string = "dataDirectory";
   public static readonly buildField: string = "build";
   public static readonly installRootSegments: readonly string[] = ["..", "..", "..", ".."];
   public static readonly utf8Encoding: BufferEncoding = "utf8";
@@ -354,10 +359,24 @@ export class Resources {
   public static readonly versionPartWidth: number = 9;
   public static readonly versionPadding: string = "0";
   public static readonly dataDirectoryArgument: string = "--data-dir";
+  public static readonly installationArgument: string = "--installation-dir";
+  public static readonly installationsFolderName: string = "installations";
+  public static readonly dataDirectoriesFolderName: string = "data-directories";
+  public static readonly desktopsFolderName: string = "desktops";
+  public static readonly barrierFileName: string = "barrier.json";
+  public static readonly jsonExtension: string = ".json";
+  public static readonly installationIdLength: number = 16;
+  public static readonly localAppDataVariable: string = "LOCALAPPDATA";
+  public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
+  public static readonly macApplicationSupport: readonly string[] = ["Library", "Application Support"];
+  public static readonly xdgStateVariable: string = "XDG_STATE_HOME";
+  public static readonly xdgStateDefault: readonly string[] = [".local", "state"];
   public static readonly idleGraceArgument: string = "--idle-grace";
   public static readonly stopSignals: readonly NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
   public static readonly usageExitCode: number = 2;
   public static readonly ownedExitCode: number = 3;
+  public static readonly updatingExitCode: number = 4;
+  public static readonly programRole: string = "program";
   public static readonly failureExitCode: number = 1;
   public static readonly launchShell: string = "/bin/bash";
   public static readonly launchDescriptors: string = "/proc/self/fd";
@@ -459,6 +478,8 @@ export class Resources {
   public static readonly handshakeTimeoutParameterName: string = "handshakeTimeout";
   public static readonly defaultRequestTimeoutParameterName: string = "defaultRequestTimeout";
   public static readonly maximumRequestTimeoutParameterName: string = "maximumRequestTimeout";
+  public static readonly updateSaveWaitParameterName: string = "updateSaveWait";
+  public static readonly updateBarrierIntervalParameterName: string = "updateBarrierInterval";
   public static readonly callTimeoutParameterName: string = "callTimeout";
   public static readonly timeoutMillisecondsParameterName: string = "timeoutMilliseconds";
   public static readonly answerGraceParameterName: string = "answerGrace";
@@ -487,6 +508,11 @@ export class Resources {
   public static readonly deadlineExceeded: string = "The request did not finish within its time limit.";
   public static readonly cancelled: string = "The request was cancelled.";
   public static readonly workInProgress: string = "Work is in progress; stopping now would interrupt it.";
+  public static readonly updateNotPreparing: string = "The runtime is not preparing for an update.";
+  public static readonly installationNotAbsolute: string = "The installation's folder must be an absolute path.";
+  public static readonly installationNotThisRuntimes: string = "The update names another installation than the one this runtime belongs to.";
+  public static readonly updateSaveWait: number = 6000;
+  public static readonly updateBarrierInterval: number = 1000;
   public static readonly clientClosed: string = "The connection to the runtime is closed.";
   public static readonly handshakeTimedOut: string = "The runtime did not answer the handshake in time.";
   public static readonly handshakeRefused: string = "The runtime closed the connection during the handshake.";
@@ -513,7 +539,7 @@ export class Resources {
   public static readonly launchShellUnavailable: string = "Starting a program on Linux requires executable Bash at /bin/bash. Install Bash or restore its execute permissions.";
   public static readonly launchDescriptorsUnavailable: string = "Starting a program on Linux requires access to /proc/self/fd. Ensure procfs is mounted at /proc and this process can read and traverse its descriptor directory.";
   public static readonly dataDirectoryRequired: string = "The --data-dir argument is required.";
-  public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>]";
+  public static readonly usage: string = "Usage: runtime-entry --data-dir <absolute path> [--idle-grace <milliseconds>] [--start-log <start log name>] [--installation-dir <folder>]";
   public static readonly recentCommandsMigration: string = "recent-commands";
   public static readonly createRecentCommandsStatement: string =
     "CREATE TABLE recent_commands (device TEXT NOT NULL, id TEXT NOT NULL, used INTEGER NOT NULL, PRIMARY KEY (device, id)) STRICT";
@@ -871,6 +897,22 @@ export class Resources {
     return `No runtime is running for ${root}.`;
   }
 
+  public static formatUpdating(productName: string): string {
+    return `${productName} is preparing to install an update.`;
+  }
+
+  public static formatClientNotAnswered(client: string): string {
+    return `A ${client} client did not answer in time.`;
+  }
+
+  public static formatUpdateInProgress(productName: string): string {
+    return `${productName} is installing an update.`;
+  }
+
+  public static formatUpdateUnfinished(productName: string): string {
+    return `An update of ${productName} may still be installing, or it did not finish. Open ${productName} to settle it.`;
+  }
+
   public static formatBuildMismatch(productName: string, productVersion: string, executablePath: string): string {
     return `${productName} ${productVersion} at ${executablePath} owns this data directory; it is another build, and taking it over was not asked for.`;
   }
@@ -977,6 +1019,10 @@ export class Resources {
 
   public static formatModuleStopping(moduleId: string, program: string): string {
     return `${program} was not started, because the module ${moduleId} is stopping.`;
+  }
+
+  public static formatUpdatePreparing(moduleId: string, program: string): string {
+    return `${program} was not started for the module ${moduleId}, because the runtime is preparing for an update.`;
   }
 
   public static formatProcessDiagnostic(moduleId: string, program: string, processId: number, text: string): string {

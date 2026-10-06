@@ -44,6 +44,10 @@ export class StartupState {
     return new StartupState(StartupStateKind.Failed, [message]);
   }
 
+  public static updating(version: string): StartupState {
+    return new StartupState(StartupStateKind.Updating, [version]);
+  }
+
   public static ready(): StartupState {
     return new StartupState(StartupStateKind.Ready, []);
   }

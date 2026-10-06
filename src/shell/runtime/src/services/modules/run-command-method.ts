@@ -30,6 +30,6 @@ export class RunCommandMethod implements IMethodHandler {
       throw new MethodFailureException(new Failure(FailureCode.NotFound, Resources.formatCommandNotFound(run.name.text)));
     if (!command.info.isEnabled)
       throw new MethodFailureException(new Failure(FailureCode.Unavailable, Resources.formatCommandNotEnabled(run.name.text)));
-    return command.handler.handleAsync(new RequestContext(context.client, run.commandArguments, context.signal));
+    return command.handler.handleAsync(new RequestContext(context.client, run.commandArguments, context.signal, context.connection));
   }
 }

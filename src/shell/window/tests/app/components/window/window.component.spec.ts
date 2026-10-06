@@ -121,6 +121,18 @@ describe("WindowComponent", () => {
     expect(root.querySelector("tr-startup")).toBeNull();
   });
 
+  it("answers an update's save request with what did not save and stops listening when destroyed", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const fixture = TestBed.createComponent(WindowComponent);
+    await fixture.whenStable();
+
+    bridge.requestUpdateSave("request");
+    await vi.waitFor(() => expect(bridge.updateSaveAnswers).toEqual(["request:"]));
+    fixture.destroy();
+
+    expect(bridge.updateSaveListenerCount).toBe(0);
+  });
+
   it("answers close requests as saved and stops listening when destroyed", async () => {
     const bridge = DesktopBridgeFixture.install();
     const fixture = TestBed.createComponent(WindowComponent);

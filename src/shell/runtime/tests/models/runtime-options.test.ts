@@ -49,6 +49,16 @@ export class RuntimeOptionsTests {
   }
 
   @TestMethod
+  public readsTheInstallationsFolder(): void {
+    const folder = "/home/person/.local/state/noldova/teamrun/installations/0123456789abcdef";
+
+    const options = RuntimeOptions.parse(["--data-dir", RuntimeOptionsTests.ROOT, "--installation-dir", folder]);
+
+    Assert.areEqual(folder, options.installationFolder);
+    Assert.isNull(RuntimeOptions.parse(["--data-dir", RuntimeOptionsTests.ROOT]).installationFolder);
+  }
+
+  @TestMethod
   public rejectsAStartLogNameThatIsNotOne(): void {
     for (const name of ["../start-0f8b2c1e-6a4d-4e2b-9c3f-1a2b3c4d5e6f.log", "start-1.log", "runtime.log", "start-0F8B2C1E-6A4D-4E2B-9C3F-1A2B3C4D5E6F.log"]) {
       const exception = Assert.throws(() => RuntimeOptions.parse(["--data-dir", RuntimeOptionsTests.ROOT, "--start-log", name]), ArgumentException, name);

@@ -21,6 +21,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly quitListeners: Set<(question: unknown) => void> = new Set();
   private readonly updateListeners: Set<(state: unknown) => void> = new Set();
   private readonly fieldMenuListeners: Set<(request: unknown) => void> = new Set();
+  private readonly updateSaveListeners: Set<(requestId: string) => void> = new Set();
 
   public platform: string;
   public processor: string = "x64";
@@ -34,6 +35,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly appearances: JsonObject[] = [];
   public readonly changes: JsonObject[] = [];
   public readonly answers: string[] = [];
+  public readonly updateSaveAnswers: string[] = [];
   public readonly actions: string[] = [];
   public startup: unknown = { kind: "Ready", details: [] };
   public layout: unknown = null;
@@ -91,6 +93,10 @@ export class DesktopBridgeFixture implements IDesktopBridge {
     return this.listeners.size;
   }
 
+  public get updateSaveListenerCount(): number {
+    return this.updateSaveListeners.size;
+  }
+
   public notifyReady(appearance: JsonObject): void {
     this.appearances.push(appearance);
   }
@@ -106,6 +112,16 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public answerClose(requestId: string, isSaved: boolean): Promise<boolean> {
     this.answers.push(`${requestId}:${isSaved}`);
+    return Promise.resolve(true);
+  }
+
+  public onUpdateSaveRequest(listener: (requestId: string) => void): () => void {
+    this.updateSaveListeners.add(listener);
+    return () => this.updateSaveListeners.delete(listener);
+  }
+
+  public answerUpdateSave(requestId: string, problems: readonly string[]): Promise<boolean> {
+    this.updateSaveAnswers.push(`${requestId}:${problems.join("|")}`);
     return Promise.resolve(true);
   }
 
@@ -273,6 +289,11 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public publishStartup(state: unknown): void {
     for (const listener of this.startupListeners)
       listener(state);
+  }
+
+  public requestUpdateSave(requestId: string): void {
+    for (const listener of this.updateSaveListeners)
+      listener(requestId);
   }
 
   public requestClose(requestId: string): void {

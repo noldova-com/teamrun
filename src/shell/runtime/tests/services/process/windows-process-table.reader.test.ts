@@ -49,23 +49,24 @@ export class WindowsProcessTableReaderTests {
   }
 
   @TestMethod
-  public async leavesOutAProcessCreatedAfterItReadTheClockEvenWhenTheListEndsLaterOnWindows(): Promise<void> {
+  public async keepsAProcessCreatedWithinItsMarginOfTheClockReadAndLeavesOutOneCreatedLaterEvenWhenTheListEndsLaterOnWindows(): Promise<void> {
     await using settings = await SettingsFixture.createAsync();
     using simulated = new SimulatedProcessesFixture();
     const now = 1_000_000;
     const clock = new ProcessClockFixture(now);
-    settings.database.run(ProcessSupervisorFixture.INSERT, "notes", 900_401, "tool", "C:\\Tools\\tool.exe", clock.boot, now - 10_000, now - 10_000, now - 1_000, clock.offset());
+    settings.database.run(ProcessSupervisorFixture.INSERT, "notes", 900_401, "tool", "C:\\Tools\\tool.exe", clock.boot, now - 10_000, now - 10_000, now + 1_000, clock.offset());
     simulated.add(900_402, 0);
+    simulated.add(900_403, 0);
     const windows = new WindowsProcessApiFixture([() => {
-      clock.time = now + 10;
-      return `900402\t900401\t${now + 5}\tC:\\Tools\\reused.exe`;
+      clock.time = now + 100;
+      return [`900402\t900401\t${now + 40}\tC:\\Tools\\child.exe`, `900403\t900401\t${now + 60}\tC:\\Tools\\later.exe`].join("\n");
     }]);
     const processes = ProcessSupervisorFixture.create(settings, "win32", { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, new SystemCommandFixture([]), clock, windows);
 
     await processes.cleanUpAsync();
 
-    Assert.areEqual("", simulated.signals.join(","));
-    Assert.isTrue(simulated.isAlive(900_402));
+    Assert.areEqual("900402 SIGKILL", simulated.signals.join(","));
+    Assert.isTrue(simulated.isAlive(900_403));
     Assert.areEqual(0, windows.openHandles);
   }
 }
