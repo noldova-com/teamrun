@@ -38,17 +38,12 @@ export class Resources {
   public static readonly maximumTimeoutSeconds: number = 3_600;
   public static readonly jsonIndent: number = 2;
 
-  public static readonly statusCommand: string = "status";
-  public static readonly commandsCommand: string = "commands";
-  public static readonly runCommand: string = "run";
-  public static readonly openCommand: string = "open";
-  public static readonly helpCommand: string = "help";
   public static readonly commandWords: Readonly<Record<CliCommand, string>> = {
     [CliCommand.Status]: "status",
     [CliCommand.Commands]: "commands",
     [CliCommand.Run]: "run",
     [CliCommand.Open]: "open",
-    [CliCommand.Help]: Resources.helpCommand
+    [CliCommand.Help]: "help"
   };
   public static readonly dataDirectoryFlag: string = "--data-dir";
   public static readonly jsonFlag: string = "--json";

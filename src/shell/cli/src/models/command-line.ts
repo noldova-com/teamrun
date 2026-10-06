@@ -71,7 +71,7 @@ export class CommandLine {
       else
         throw new UsageException(Resources.formatUnknownOption(argument));
     }
-    if (options.has(Resources.helpFlag) || positional[0] === Resources.helpCommand)
+    if (options.has(Resources.helpFlag) || positional[0] === Resources.commandWords[CliCommand.Help])
       return new CommandLine(CliCommand.Help);
     return CommandLine.create(positional, options);
   }
