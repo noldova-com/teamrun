@@ -220,10 +220,6 @@ export class Resources {
   public static readonly checkForUpdatesCommand: string = "shell.checkForUpdates";
   public static readonly checkForUpdatesTitle: string = "Check for updates";
   public static readonly checkForUpdatesGlyph: string = "update";
-  public static readonly downloadUpdateCommand: string = "shell.downloadUpdate";
-  public static readonly downloadUpdateTitle: string = "Download update";
-  public static readonly downloadUpdateLabel: string = "Download";
-  public static readonly downloadUpdateGlyph: string = "download";
   public static readonly restartToUpdateCommand: string = "shell.restartToUpdate";
   public static readonly restartToUpdateTitle: string = "Restart to update";
   public static readonly restartToUpdateLabel: string = "Restart to update";
@@ -834,16 +830,8 @@ export class Resources {
     return `${displayName} didn't start`;
   }
 
-  public static formatUpdateAvailable(version: string): string {
-    return `${Resources.productName} ${version} is available`;
-  }
-
   public static formatUpdateReady(version: string): string {
     return `${Resources.productName} ${version} is ready to install`;
-  }
-
-  public static formatDownloadingUpdate(progress: number | null): string {
-    return Object.isNull(progress) ? "Downloading update" : `Downloading update ${progress}%`;
   }
 
   public static formatDownloadingVersion(version: string | null, progress: number | null = null): string {
@@ -920,7 +908,6 @@ export class Resources {
   }
 
   public static readonly notificationsGlyph: string = "notifications";
-  public static readonly updateAvailableItem: string = "Update available";
   public static readonly restartToUpdateItem: string = "Restart to update";
   public static readonly updateFailedItem: string = "Update failed";
   public static readonly moveToUpdateItem: string = "Move to Applications to update";

@@ -33,7 +33,7 @@ describe("AboutComponent", () => {
     bridge.processor = "arm64";
     TestBed.configureTestingModule({
       providers: [
-        { provide: UpdateService, useValue: { state, act: (action: string) => calls.push(action), retry: () => calls.push("Retry") } },
+        { provide: UpdateService, useValue: { state, act: (action: string) => calls.push(action) } },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
     });
@@ -83,8 +83,12 @@ describe("AboutComponent", () => {
     const off = [text(fixture, ".tr-about-status"), buttons(fixture).length];
     state.set(of(UpdateStateKind.Available, { version: "1.3.0", reason: "Hidden", mustMove: true }));
     await fixture.whenStable();
+    const away = [text(fixture, ".tr-about-status"), buttons(fixture).length];
+    state.set(of(UpdateStateKind.Available, { version: "1.3.0" }));
+    await fixture.whenStable();
 
     expect(off).toEqual(["Updates are turned off in this build.", 0]);
+    expect(away).toEqual(["Move TeamRun to Applications to get updates.", 0]);
     expect([text(fixture, ".tr-about-status"), buttons(fixture).length]).toEqual(["Move TeamRun to Applications to get updates.", 0]);
   });
 
@@ -97,7 +101,6 @@ describe("AboutComponent", () => {
       of(UpdateStateKind.UpToDate),
       of(UpdateStateKind.UpToDate, { checkedAt }),
       of(UpdateStateKind.Checking),
-      of(UpdateStateKind.Available, { version: "1.3.0" }),
       of(UpdateStateKind.Downloading, { version: "1.3.0", progress: 42 }),
       of(UpdateStateKind.Ready, { version: "1.3.0", reason: "Notes couldn't save." }),
       of(UpdateStateKind.Failed, { reason: "The download doesn't match the release." })
@@ -113,12 +116,11 @@ describe("AboutComponent", () => {
       "TeamRun is up to date | Check for updates",
       `TeamRun is up to date, checked ${time} | Check for updates`,
       "Checking for updates… | ",
-      "TeamRun 1.3.0 is available | Download",
-      "Downloading TeamRun 1.3.0, 42% | Cancel",
+      "Downloading TeamRun 1.3.0, 42% | ",
       "TeamRun 1.3.0 is ready to install Notes couldn't save. | Restart to update",
       "The update failed The download doesn't match the release. | Try again"
     ]);
-    expect(calls).toEqual(["Check", "Check", "Download", "Cancel", "Restart", "Retry"]);
+    expect(calls).toEqual(["Check", "Check", "Restart", "Check"]);
   });
 
   it("shows the download's progress below its line and as wide as it, named for the download, and an unknown amount while it has none", async () => {

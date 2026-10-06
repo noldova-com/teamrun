@@ -5812,7 +5812,7 @@ export declare class ShellSettings {
   public static readonly spellCheckLanguages: QualifiedName;
 
   /**
-   * Whether the desktop checks for updates by itself, a device setting, `shell.updateChecks`.
+   * When the desktop checks for updates by itself, a device setting, `shell.updateChecks`: `Automatic`, the default, `AtStart` or `OnRequest`.
    */
   public static readonly updateChecks: QualifiedName;
 

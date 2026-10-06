@@ -8,7 +8,5 @@
 
 export enum UpdateAction {
   Check = "Check",
-  Download = "Download",
-  Cancel = "Cancel",
   Restart = "Restart"
 }

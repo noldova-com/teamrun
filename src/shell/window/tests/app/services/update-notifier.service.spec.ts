@@ -58,8 +58,8 @@ describe("UpdateNotifierService", () => {
 
   afterEach(() => DesktopBridgeFixture.remove());
 
-  it("posts once per version that an update is available and that it is ready, after the window first read the notifications", async () => {
-    bridge.update = update("Available", { version: "1.3.0" });
+  it("posts once per version that an update is ready, after the window first read the notifications", async () => {
+    bridge.update = update("Ready", { version: "1.3.0" });
     start();
     await settleAsync(() => true);
 
@@ -68,25 +68,24 @@ describe("UpdateNotifierService", () => {
     firstRead.set(new NotificationState([], false, [], 0));
     await settleAsync(() => posts().length === 1);
     bridge.publishUpdate(update("Checking"));
-    bridge.publishUpdate(update("Available", { version: "1.3.0" }));
-    bridge.publishUpdate(update("Downloading", { version: "1.3.0", progress: 50 }));
-    bridge.publishUpdate(update("Ready", { version: "1.3.0" }));
+    bridge.publishUpdate(update("Downloading", { version: "1.4.0", progress: 50 }));
     bridge.publishUpdate(update("Ready", { version: "1.3.0", reason: "A module's save failed." }));
+    bridge.publishUpdate(update("Ready", { version: "1.4.0" }));
     await settleAsync(() => posts().length === 2);
 
     expect(posts()).toEqual([
-      ["shell.updateAvailable", "1.3.0", "TeamRun 1.3.0 is available", "shell.openSettings About", "Download: shell.downloadUpdate"],
-      ["shell.updateReady", "1.3.0", "TeamRun 1.3.0 is ready to install", "shell.openSettings About", "Restart to update: shell.restartToUpdate"]
+      ["shell.updateReady", "1.3.0", "TeamRun 1.3.0 is ready to install", "shell.openSettings About", "Restart to update: shell.restartToUpdate"],
+      ["shell.updateReady", "1.4.0", "TeamRun 1.4.0 is ready to install", "shell.openSettings About", "Restart to update: shell.restartToUpdate"]
     ]);
   });
 
-  it("posts nothing while TeamRun must move, for a state without a version, or for a version the list already holds", async () => {
+  it("posts nothing for an update that isn't ready, for a state without a version, or for a version the list already holds", async () => {
     firstRead.set(new NotificationState([], false, [], 0));
     notifications.set(new NotificationState([existing("shell.updateReady", "1.4.0")], false, [], 1));
     bridge.update = update("Available", { version: "1.3.0", mustMove: true });
     start();
     await settleAsync(() => true);
-    for (const state of [update("Available"), update("Ready", { version: "1.4.0" }), update("Failed", { version: "1.4.0" }), update("Ready", { version: "1.4.0" })]) {
+    for (const state of [update("Ready"), update("Ready", { version: "1.4.0" }), update("Failed", { version: "1.4.0" }), update("Ready", { version: "1.4.0" })]) {
       bridge.publishUpdate(state);
       await settleAsync(() => true);
     }

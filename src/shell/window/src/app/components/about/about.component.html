@@ -21,17 +21,11 @@ LICENSE file in the root directory of this source tree.
       @case (kinds.UpToDate) {
         <button type="button" tr-button [variant]="secondary" (click)="check()">{{ resources.checkForUpdatesTitle }}</button>
       }
-      @case (kinds.Available) {
-        <button type="button" tr-button (click)="download()">{{ resources.downloadUpdateLabel }}</button>
-      }
-      @case (kinds.Downloading) {
-        <button type="button" tr-button [variant]="secondary" (click)="cancel()">{{ resources.cancelLabel }}</button>
-      }
       @case (kinds.Ready) {
         <button type="button" tr-button (click)="restart()">{{ resources.restartToUpdateLabel }}</button>
       }
       @case (kinds.Failed) {
-        <button type="button" tr-button [variant]="secondary" (click)="retry()">{{ resources.tryAgainLabel }}</button>
+        <button type="button" tr-button [variant]="secondary" (click)="check()">{{ resources.tryAgainLabel }}</button>
       }
     }
   }

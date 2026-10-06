@@ -34,17 +34,16 @@ describe("UpdateState", () => {
   });
 
   it("knows which actions apply in each state", () => {
-    const actions = (state: UpdateState): readonly boolean[] => [state.canCheck, state.canDownload, state.canCancel, state.canRestart];
+    const actions = (state: UpdateState): readonly boolean[] => [state.canCheck, state.canRestart];
     const of = (kind: UpdateStateKind, version: string | null = null, mustMove: boolean = false): UpdateState => new UpdateState(kind, version, null, null, null, mustMove);
 
-    expect(actions(of(UpdateStateKind.Off))).toEqual([false, false, false, false]);
-    expect(actions(of(UpdateStateKind.UpToDate))).toEqual([true, false, false, false]);
-    expect(actions(of(UpdateStateKind.Checking))).toEqual([false, false, false, false]);
-    expect(actions(of(UpdateStateKind.Available, "1.3.0"))).toEqual([true, true, false, false]);
-    expect(actions(of(UpdateStateKind.Available, "1.3.0", true))).toEqual([true, false, false, false]);
-    expect(actions(of(UpdateStateKind.Downloading, "1.3.0"))).toEqual([false, false, true, false]);
-    expect(actions(of(UpdateStateKind.Ready, "1.3.0"))).toEqual([false, false, false, true]);
-    expect(actions(of(UpdateStateKind.Failed))).toEqual([true, false, false, false]);
-    expect(actions(of(UpdateStateKind.Failed, "1.3.0"))).toEqual([true, true, false, false]);
+    expect(actions(of(UpdateStateKind.Off))).toEqual([false, false]);
+    expect(actions(of(UpdateStateKind.UpToDate))).toEqual([true, false]);
+    expect(actions(of(UpdateStateKind.Checking))).toEqual([false, false]);
+    expect(actions(of(UpdateStateKind.Available, "1.3.0", true))).toEqual([true, false]);
+    expect(actions(of(UpdateStateKind.Downloading, "1.3.0"))).toEqual([false, false]);
+    expect(actions(of(UpdateStateKind.Ready, "1.3.0"))).toEqual([false, true]);
+    expect(actions(of(UpdateStateKind.Failed))).toEqual([true, false]);
+    expect(actions(of(UpdateStateKind.Failed, "1.3.0"))).toEqual([true, false]);
   });
 });

@@ -110,8 +110,6 @@ export class ShellCommandsService {
     new CommandContribution(Resources.checkForUpdatesCommand, Resources.checkForUpdatesTitle, Resources.checkForUpdatesGlyph, null,
       () => this.done(() => this.updates.act(UpdateAction.Check)), () => this.updates.state().canCheck, null,
       () => this.updates.state().kind !== UpdateStateKind.Off),
-    new CommandContribution(Resources.downloadUpdateCommand, Resources.downloadUpdateTitle, Resources.downloadUpdateGlyph, null,
-      () => this.done(() => this.updates.act(UpdateAction.Download)), () => this.updates.state().canDownload, null, () => this.updates.state().canDownload),
     new CommandContribution(Resources.restartToUpdateCommand, Resources.restartToUpdateTitle, Resources.restartToUpdateGlyph, null,
       () => this.done(() => this.updates.act(UpdateAction.Restart)), () => this.updates.state().canRestart, null, () => this.updates.state().canRestart),
     new CommandContribution(Resources.openModulesCommand, Resources.openModulesTitle, Resources.modulesGlyph, null,

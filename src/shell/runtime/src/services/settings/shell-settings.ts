@@ -76,7 +76,7 @@ export class ShellSettings {
       new SettingDefinition(ShellSettings.keyBindings, Resources.keyBindingsTitle, Resources.keyBindingsDescription,
         SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup),
       new SettingDefinition(ShellSettings.updateChecks, Resources.updateChecksTitle, Resources.updateChecksDescription,
-        SettingType.boolean(), true, SettingLocality.Device, [], Resources.aboutPage, Resources.updatesGroup)
+        ShellSettings.choiceOf(Resources.updateChecksOptions), Resources.defaultUpdateChecks, SettingLocality.Device, [], Resources.aboutPage, Resources.updatesGroup)
     ];
   }
 

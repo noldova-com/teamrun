@@ -49,26 +49,24 @@ describe("UpdateItemComponent", () => {
     return (fixture.nativeElement as HTMLElement).querySelector("button.tr-update-item");
   }
 
-  it("shows nothing while updates are off, while checking and while TeamRun is up to date", async () => {
+  it("shows nothing while updates are off, while checking or downloading, while TeamRun is up to date, and for an update it may download", async () => {
     const fixture = await renderAsync(of(UpdateStateKind.Off));
     const texts = [(fixture.nativeElement as HTMLElement).textContent];
-    for (const kind of [UpdateStateKind.Checking, UpdateStateKind.UpToDate]) {
-      state.set(of(kind));
+    for (const next of [of(UpdateStateKind.Checking), of(UpdateStateKind.UpToDate), of(UpdateStateKind.Downloading, { version: "1.3.0", progress: 42 }),
+      of(UpdateStateKind.Available, { version: "1.3.0" })]) {
+      state.set(next);
       await fixture.whenStable();
       texts.push((fixture.nativeElement as HTMLElement).textContent);
     }
 
-    expect(texts).toEqual(["", "", ""]);
+    expect(texts).toEqual(["", "", "", "", ""]);
   });
 
   it("shows each state that needs the person, with its icon and text, and runs what the state offers", async () => {
-    const fixture = await renderAsync(of(UpdateStateKind.Available, { version: "1.3.0" }));
+    const fixture = await renderAsync(of(UpdateStateKind.Off));
     const shown: string[] = [];
     for (const next of [
-      of(UpdateStateKind.Available, { version: "1.3.0" }),
       of(UpdateStateKind.Available, { version: "1.3.0", mustMove: true }),
-      of(UpdateStateKind.Downloading, { version: "1.3.0", progress: 42 }),
-      of(UpdateStateKind.Downloading, { version: "1.3.0" }),
       of(UpdateStateKind.Ready, { version: "1.3.0" }),
       of(UpdateStateKind.Failed)
     ]) {
@@ -80,14 +78,11 @@ describe("UpdateItemComponent", () => {
     }
 
     expect(shown).toEqual([
-      "deployed_code_update Update available",
       "deployed_code_update Move to Applications to update",
-      "download Downloading update 42%",
-      "download Downloading update",
       "restart_alt Restart to update",
       "error Update failed"
     ]);
-    expect(calls).toEqual(["Download", "About", "About", "About", "Restart", "About"]);
+    expect(calls).toEqual(["About", "Restart", "About"]);
     expect(item(fixture)?.querySelector(".tr-update-item-error")).not.toBeNull();
   });
 

@@ -102,7 +102,7 @@ describe("ShellCommandsService", () => {
       "shell.dockTabBottom", "shell.moveTabToGroup", "shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
       "shell.copy", "shell.paste", "shell.selectAll", "shell.replaceMisspelling", "shell.addToDictionary", "shell.showCommands", "shell.openSettings", "shell.installCommand", "shell.checkForUpdates",
-      "shell.downloadUpdate", "shell.restartToUpdate", "shell.openModules", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft",
+      "shell.restartToUpdate", "shell.openModules", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft",
       "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
       "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
@@ -133,13 +133,13 @@ describe("ShellCommandsService", () => {
     expect([requested, pages.requested(), layout.layout().documents.active?.key]).toEqual(["About", null, settings.key]);
   });
 
-  it("checks for, downloads and restarts to install an update through the desktop, each offered and enabled only in its state", async () => {
+  it("checks for and restarts to install an update through the desktop, each offered and enabled only in its state", async () => {
     const updates = TestBed.inject(UpdateService);
-    const names = ["shell.checkForUpdates", "shell.downloadUpdate", "shell.restartToUpdate"];
+    const names = ["shell.checkForUpdates", "shell.restartToUpdate"];
     const offers = (): readonly string[] => names.map(t => `${command(t).isApplicable(null)}/${enabled(t)}`);
     const update = (kind: string, version: string | null = null, mustMove: boolean = false): object => ({ kind, version, progress: null, checkedAt: null, reason: null, mustMove });
     const seen: (readonly string[])[] = [offers()];
-    for (const state of [update("UpToDate"), update("Checking"), update("Available", "1.3.0"), update("Available", "1.3.0", true), update("Downloading", "1.3.0"),
+    for (const state of [update("UpToDate"), update("Checking"), update("Available", "1.3.0", true), update("Downloading", "1.3.0"),
       update("Ready", "1.3.0"), update("Failed", "1.3.0")]) {
       bridge.publishUpdate(state);
       seen.push(offers());
@@ -147,21 +147,20 @@ describe("ShellCommandsService", () => {
 
     for (const name of names)
       await runAsync(name);
-    await vi.waitFor(() => expect(bridge.updateActions.length).toBe(3));
+    await vi.waitFor(() => expect(bridge.updateActions.length).toBe(2));
 
     expect(updates.state().kind).toBe("Failed");
     expect(seen).toEqual([
-      ["false/false", "false/false", "false/false"],
-      ["true/true", "false/false", "false/false"],
-      ["true/false", "false/false", "false/false"],
-      ["true/true", "true/true", "false/false"],
-      ["true/true", "false/false", "false/false"],
-      ["true/false", "false/false", "false/false"],
-      ["true/false", "false/false", "true/true"],
-      ["true/true", "true/true", "false/false"]
+      ["false/false", "false/false"],
+      ["true/true", "false/false"],
+      ["true/false", "false/false"],
+      ["true/true", "false/false"],
+      ["true/false", "false/false"],
+      ["true/false", "true/true"],
+      ["true/true", "false/false"]
     ]);
-    expect(bridge.updateActions).toEqual(["Check", "Download", "Restart"]);
-    expect(names.map(t => command(t).title)).toEqual(["Check for updates", "Download update", "Restart to update"]);
+    expect(bridge.updateActions).toEqual(["Check", "Restart"]);
+    expect(names.map(t => command(t).title)).toEqual(["Check for updates", "Restart to update"]);
   });
 
   it("opens Modules as one kept document, revealing the open one, and is enabled only while the document is registered", async () => {

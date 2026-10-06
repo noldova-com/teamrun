@@ -77,19 +77,17 @@ describe("UpdateService", () => {
     expect(errors.length).toBe(1);
   });
 
-  it("asks the desktop to act, tries again by what failed and opens About", async () => {
+  it("asks the desktop to act and opens About", async () => {
     bridge.update = update("Failed", { reason: "Offline" });
     const service = start();
     await settleAsync(() => service.state().kind === UpdateStateKind.Failed);
 
     service.act(UpdateAction.Restart);
-    service.retry();
-    bridge.publishUpdate(update("Failed", { version: "1.3.0" }));
-    service.retry();
+    service.act(UpdateAction.Check);
     service.openAbout();
-    await settleAsync(() => bridge.updateActions.length === 3);
+    await settleAsync(() => bridge.updateActions.length === 2);
 
-    expect(bridge.updateActions).toEqual(["Restart", "Check", "Download"]);
+    expect(bridge.updateActions).toEqual(["Restart", "Check"]);
     expect(opened).toEqual(["About"]);
   });
 

@@ -565,9 +565,9 @@ describe("SettingsComponent", () => {
     await searchAsync("updates");
 
     expect(pages).toEqual(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "About"]);
-    expect(about).toEqual([["About"], ["TeamRun 1.2.3"], ["Updates"], ["Check for updates automatically"]]);
+    expect(about).toEqual([["About"], ["TeamRun 1.2.3"], ["Updates"], ["Check for updates"]]);
     expect([requested, again]).toEqual([null, ["About"]]);
-    expect([texts(".tr-settings-result-title"), texts(".tr-setting-row-title"), element().querySelector("tr-about")]).toEqual([["Keyboard shortcuts", "About"], ["Check for updates automatically"], null]);
+    expect([texts(".tr-settings-result-title"), texts(".tr-setting-row-title"), element().querySelector("tr-about")]).toEqual([["Keyboard shortcuts", "About"], ["Check for updates"], null]);
   });
 
   it("leaves the Updates group out of About and out of a search while the build turns updates off", async () => {

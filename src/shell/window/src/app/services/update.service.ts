@@ -10,7 +10,7 @@ import { DestroyRef, ErrorHandler, Injectable, type Signal, type WritableSignal,
 
 import "@noldova/teamrun-foundation-core";
 
-import { UpdateAction } from "../enums/update-action";
+import type { UpdateAction } from "../enums/update-action";
 import { UpdateState } from "../models/update-state";
 import { Resources } from "../../resources";
 import { DesktopBridgeService } from "./desktop-bridge.service";
@@ -40,10 +40,6 @@ export class UpdateService {
 
   public act(action: UpdateAction): void {
     this.bridge.actOnUpdateAsync(action).catch((error: unknown) => this.errors.handleError(error));
-  }
-
-  public retry(): void {
-    this.act(Object.isNull(this.stateValue().version) ? UpdateAction.Check : UpdateAction.Download);
   }
 
   public openAbout(): void {

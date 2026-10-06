@@ -13,18 +13,7 @@ LICENSE file in the root directory of this source tree.
         <span class="material-symbols-rounded tr-update-item-icon" aria-hidden="true">{{ resources.updateAvailableGlyph }}</span>
         <span>{{ resources.moveToUpdateItem }}</span>
       </button>
-    } @else {
-      <button type="button" class="tr-update-item" (click)="download()">
-        <span class="material-symbols-rounded tr-update-item-icon" aria-hidden="true">{{ resources.updateAvailableGlyph }}</span>
-        <span>{{ resources.updateAvailableItem }}</span>
-      </button>
     }
-  }
-  @case (kinds.Downloading) {
-    <button type="button" class="tr-update-item" (click)="openAbout()">
-      <span class="material-symbols-rounded tr-update-item-icon" aria-hidden="true">{{ resources.downloadUpdateGlyph }}</span>
-      <span>{{ resources.formatDownloadingUpdate(state().progress) }}</span>
-    </button>
   }
   @case (kinds.Ready) {
     <button type="button" class="tr-update-item" (click)="restart()">

@@ -305,8 +305,10 @@ export class Resources {
   public static readonly spellCheckTitle: string = "Check spelling";
   public static readonly spellCheckDescription: string = "Underline misspelled words in the text you type and offer corrections in the text field's menu. Code is never checked.";
   public static readonly spellCheckLanguagesTitle: string = "Spelling languages";
-  public static readonly updateChecksTitle: string = "Check for updates automatically";
-  public static readonly updateChecksDescription: string = "Look for a newer version shortly after starting and every four hours on this device. Downloading and installing always wait for you.";
+  public static readonly updateChecksTitle: string = "Check for updates";
+  public static readonly updateChecksDescription: string = "When this device looks for a newer version: shortly after starting and then every hour, only shortly after starting, or only when you choose Check for updates. A newer version downloads by itself; installing it waits for you.";
+  public static readonly updateChecksOptions: readonly (readonly [string, string])[] = [["Automatic", "Automatically"], ["AtStart", "Only at start"], ["OnRequest", "Only when I ask"]];
+  public static readonly defaultUpdateChecks: string = "Automatic";
   public static readonly spellCheckLanguagesDescription: string = "The languages words are checked in on this device. With none chosen, the operating system's languages that have a dictionary are used, or else the first language offered. On macOS the system chooses the languages.";
   public static readonly recentCommandCountTitle: string = "Recent commands";
   public static readonly recentCommandCountDescription: string = "How many commands you recently ran from command search are listed first. 0 lists none.";

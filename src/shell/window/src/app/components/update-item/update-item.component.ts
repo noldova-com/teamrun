@@ -27,10 +27,6 @@ export class UpdateItemComponent {
   protected readonly kinds: typeof UpdateStateKind = UpdateStateKind;
   protected readonly state: Signal<UpdateState> = this.updates.state;
 
-  protected download(): void {
-    this.updates.act(UpdateAction.Download);
-  }
-
   protected restart(): void {
     this.updates.act(UpdateAction.Restart);
   }

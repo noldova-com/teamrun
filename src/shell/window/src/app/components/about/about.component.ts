@@ -68,7 +68,7 @@ export class AboutComponent {
       case UpdateStateKind.Checking:
         return Resources.checkingForUpdates;
       case UpdateStateKind.Available:
-        return Resources.formatUpdateAvailable(version);
+        return Resources.moveToApplications;
       case UpdateStateKind.Downloading:
         return Resources.formatDownloadingVersion(state.version, state.progress);
       case UpdateStateKind.Ready:
@@ -82,19 +82,7 @@ export class AboutComponent {
     this.updates.act(UpdateAction.Check);
   }
 
-  protected download(): void {
-    this.updates.act(UpdateAction.Download);
-  }
-
-  protected cancel(): void {
-    this.updates.act(UpdateAction.Cancel);
-  }
-
   protected restart(): void {
     this.updates.act(UpdateAction.Restart);
-  }
-
-  protected retry(): void {
-    this.updates.retry();
   }
 }

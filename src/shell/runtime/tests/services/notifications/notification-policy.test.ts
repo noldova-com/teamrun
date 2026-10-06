@@ -61,15 +61,15 @@ export class NotificationPolicyTests {
   }
 
   @TestMethod
-  public letsTheUpdateKindsRunOnlyTheShellsCommands(): void {
+  public letsTheUpdateKindRunOnlyTheShellsCommands(): void {
     const policy = new NotificationPolicy([], () => true);
 
-    Assert.isNull(policy.findRefusal(NotificationPolicyTests.post("shell.updateAvailable", "shell.openSettings", ["shell.downloadUpdate"])));
+    Assert.isNull(policy.findRefusal(NotificationPolicyTests.post("shell.updateReady", "shell.openSettings", ["shell.restartToUpdate"])));
     Assert.isNull(policy.findRefusal(NotificationPolicyTests.post("shell.updateReady", null, [])));
     Assert.areEqual("The shell's notification kind shell.updateReady runs only the shell's commands, not notes.open.",
       policy.findRefusal(NotificationPolicyTests.post("shell.updateReady", "shell.openSettings", ["notes.open"])));
-    Assert.areEqual("The shell's notification kind shell.updateAvailable runs only the shell's commands, not notes.open.",
-      policy.findRefusal(NotificationPolicyTests.post("shell.updateAvailable", "notes.open", [])));
+    Assert.areEqual("The shell's notification kind shell.updateReady runs only the shell's commands, not notes.open.",
+      policy.findRefusal(NotificationPolicyTests.post("shell.updateReady", "notes.open", [])));
   }
 
   private static post(kind: string, open: string | null, actions: readonly string[]): NotificationPost {

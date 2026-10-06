@@ -48,14 +48,6 @@ export class UpdateState {
     return [UpdateStateKind.UpToDate, UpdateStateKind.Available, UpdateStateKind.Failed].includes(this.kind);
   }
 
-  public get canDownload(): boolean {
-    return !this.mustMove && (this.kind === UpdateStateKind.Available || this.kind === UpdateStateKind.Failed && !Object.isNull(this.version));
-  }
-
-  public get canCancel(): boolean {
-    return this.kind === UpdateStateKind.Downloading;
-  }
-
   public get canRestart(): boolean {
     return this.kind === UpdateStateKind.Ready;
   }

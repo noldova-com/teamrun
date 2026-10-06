@@ -24,8 +24,9 @@ export class SettingsFixture {
     SettingType.modules(), [], "Notifications", "Notifications");
   public static readonly spellCheckLanguages: SettingDefinition = SettingsFixture.define("shell.spellCheckLanguages", "Spelling languages", "The languages words are checked in.",
     SettingType.languages(), [], "Appearance", "Spelling");
-  public static readonly updateChecks: SettingDefinition = SettingsFixture.define("shell.updateChecks", "Check for updates automatically", "Look for a newer version on this device.",
-    SettingType.boolean(), true, "About", "Updates");
+  public static readonly updateChecks: SettingDefinition = SettingsFixture.define("shell.updateChecks", "Check for updates", "When this device looks for a newer version.",
+    SettingType.choice([new SettingOption("Automatic", "Automatically"), new SettingOption("AtStart", "Only at start"), new SettingOption("OnRequest", "Only when I ask")]), "Automatic",
+    "About", "Updates");
   public static readonly greeting: SettingDefinition = SettingsFixture.define("clock.greeting", "Greeting", "What the clock says at noon.",
     SettingType.text(20), "Noon", "Clock", "Words");
   public static readonly tickStep: SettingDefinition = SettingsFixture.define("clock.tickStep", "Tick step", "How far each tick moves the clock.",
