@@ -19,16 +19,16 @@ export default class TarballFixture {
     return TarballFixture.pack(Object.entries(files).map(([name, content]) => ({ name: `package/${name}`, content })));
   }
 
-  public static pack(entries: readonly { readonly name: string; readonly content: string; readonly type?: string; readonly prefix?: string }[]): Buffer {
+  public static pack(entries: readonly { readonly name: string; readonly content: string; readonly type?: string; readonly prefix?: string; readonly isGnu?: boolean }[]): Buffer {
     const blocks = entries.flatMap(t => {
       const content = Buffer.from(t.content);
       const padding = Buffer.alloc((TarballFixture.BLOCK_SIZE - content.length % TarballFixture.BLOCK_SIZE) % TarballFixture.BLOCK_SIZE);
-      return [TarballFixture.createHeader(t.name, content.length, t.type ?? TarballFixture.FILE, t.prefix ?? ""), content, padding];
+      return [TarballFixture.createHeader(t.name, content.length, t.type ?? TarballFixture.FILE, t.prefix ?? "", t.isGnu ?? false), content, padding];
     });
     return gzipSync(Buffer.concat([...blocks, Buffer.alloc(TarballFixture.BLOCK_SIZE * 2)]));
   }
 
-  private static createHeader(name: string, size: number, type: string, prefix: string): Buffer {
+  private static createHeader(name: string, size: number, type: string, prefix: string, isGnu: boolean): Buffer {
     const header = Buffer.alloc(TarballFixture.BLOCK_SIZE);
     header.write(name, 0, 100);
     header.write("0000644", 100);
@@ -38,8 +38,9 @@ export default class TarballFixture {
     header.write("00000000000", 136);
     header.write(" ".repeat(8), 148);
     header.write(type, 156);
-    header.write("ustar", 257);
-    header.write("00", 263);
+    header.write(isGnu ? "ustar  " : "ustar", 257);
+    if (!isGnu)
+      header.write("00", 263);
     header.write(prefix, 345, 155);
     const checksum = header.reduce((sum, value) => sum + value, 0);
     header.write(`${checksum.toString(TarballFixture.OCTAL).padStart(6, "0")}`, 148);

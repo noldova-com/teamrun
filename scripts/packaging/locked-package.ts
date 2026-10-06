@@ -33,6 +33,10 @@ export default class LockedPackage {
     const { version, resolved, integrity } = entry;
     if (!LockedPackage.NAME.test(name) || typeof version !== "string" || !LockedPackage.VERSION.test(version))
       throw new PackagingException(`${location} in package-lock.json has no valid package name and version.`);
+    if (entry["inBundle"] === true)
+      throw new PackagingException(`${name}@${version} at ${location} in package-lock.json is bundled inside its parent's tarball; bundled dependencies are not supported, so it cannot ship.`);
+    if (entry["name"] !== undefined && entry["name"] !== name)
+      throw new PackagingException(`${location} in package-lock.json installs ${String(entry["name"])} under the alias ${name}; aliases are not supported, so it cannot ship.`);
     if (typeof resolved !== "string" || !URL.canParse(resolved) || !LockedPackage.SCHEMES.includes(new URL(resolved).protocol))
       throw new PackagingException(`${name}@${version} at ${location} in package-lock.json is not resolved to a registry tarball, so it cannot ship.`);
     const sha512 = typeof integrity === "string"

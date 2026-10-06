@@ -175,7 +175,7 @@ class PackageStageTests {
       assert.match(output.text, /\nThird-party packages in the stage: fixture-left@1\.0\.0 \(MIT\), fixture-right@2\.0\.0 \(ISC\)\.\n$/);
     });
 
-    test("installing never reaches the registry: a dependency missing from the build's archives fails the stage",{ timeout: PackageStageTests.TIMEOUT }, async t => {
+    test("installing never reaches the registry: a dependency missing from the build's archives fails the stage", { timeout: PackageStageTests.TIMEOUT }, async t => {
       const repository = await PackageStageTests.createAsync(t, [], PackageArchivesFixture.OUTSIDE);
       const gallery = new GalleryFile(repository.directory);
       const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery), gallery);

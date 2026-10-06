@@ -14,10 +14,13 @@ export default class TarArchive {
   private static readonly SIZE_START: number = 124;
   private static readonly SIZE_END: number = 136;
   private static readonly TYPE_START: number = 156;
+  private static readonly MAGIC_START: number = 257;
+  private static readonly MAGIC_END: number = 263;
   private static readonly PREFIX_START: number = 345;
   private static readonly PREFIX_END: number = 500;
   private static readonly OCTAL: number = 8;
   private static readonly NUL: string = String.fromCharCode(0);
+  private static readonly USTAR_MAGIC: string = `ustar${TarArchive.NUL}`;
   private static readonly FILE_TYPES: readonly string[] = ["0", ""];
   private static readonly SEPARATOR: string = "/";
   private static readonly TOP_LEVEL_FILE: RegExp = /^[^/]+\/([^/]+)$/;
@@ -36,8 +39,8 @@ export default class TarArchive {
       const header = archive.subarray(offset, offset + TarArchive.BLOCK_SIZE);
       const size = Number.parseInt(TarArchive.readText(header, TarArchive.SIZE_START, TarArchive.SIZE_END).trim(), TarArchive.OCTAL);
       const start = offset + TarArchive.BLOCK_SIZE;
-      const name = [TarArchive.readText(header, TarArchive.PREFIX_START, TarArchive.PREFIX_END), TarArchive.readText(header, 0, TarArchive.NAME_END)]
-        .filter(t => t.length > 0).join(TarArchive.SEPARATOR);
+      const prefix = header.toString("latin1", TarArchive.MAGIC_START, TarArchive.MAGIC_END) === TarArchive.USTAR_MAGIC ? TarArchive.readText(header, TarArchive.PREFIX_START, TarArchive.PREFIX_END) : "";
+      const name = [prefix, TarArchive.readText(header, 0, TarArchive.NAME_END)].filter(t => t.length > 0).join(TarArchive.SEPARATOR);
       const topLevel = TarArchive.TOP_LEVEL_FILE.exec(name);
       if (topLevel !== null && TarArchive.FILE_TYPES.includes(TarArchive.readText(header, TarArchive.TYPE_START, TarArchive.TYPE_START + 1)))
         files.set(String(topLevel[1]), archive.subarray(start, start + size));

@@ -38,6 +38,15 @@ export default class TarballServerFixture {
     return fixture;
   }
 
+  public static async locateClosedAsync(file: string): Promise<string> {
+    const server = createServer();
+    await new Promise<void>(resolve => server.listen(0, TarballServerFixture.HOST, resolve));
+    const address: AddressInfo | string | null = server.address();
+    const port = address !== null && typeof address === "object" ? address.port : 0;
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    return `http://${TarballServerFixture.HOST}:${port}/${file}`;
+  }
+
   public static hash(data: Buffer): string {
     return createHash("sha512").update(data).digest("base64");
   }

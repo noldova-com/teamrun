@@ -23,7 +23,7 @@ class LockedPackageTests {
       const nested = new LockedPackage("node_modules/outer/node_modules/@scope/inner", {
         version: "1.2.3-beta.1", resolved: LockedPackageTests.RESOLVED, integrity: `sha1-AAAA sha512-${LockedPackageTests.SHA512}`
       });
-      const plain = new LockedPackage("node_modules/fixture", { version: "1.2.3", resolved: "http://127.0.0.1:9/fixture.tgz", integrity: `sha512-${LockedPackageTests.SHA512}` });
+      const plain = new LockedPackage("node_modules/fixture", { name: "fixture", version: "1.2.3", inBundle: false, resolved: "http://127.0.0.1:9/fixture.tgz", integrity: `sha512-${LockedPackageTests.SHA512}` });
 
       assert.equal(nested.location, "node_modules/outer/node_modules/@scope/inner");
       assert.equal(nested.name, "@scope/inner");
@@ -48,6 +48,16 @@ class LockedPackageTests {
       for (const resolved of [undefined, "not a URL", "file:../fixture-1.2.3.tgz", "git+ssh://git@example.invalid/fixture.git"])
         assert.throws(() => new LockedPackage("node_modules/fixture", { version: "1.2.3", resolved, integrity: `sha512-${LockedPackageTests.SHA512}` }),
           new PackagingException("fixture@1.2.3 at node_modules/fixture in package-lock.json is not resolved to a registry tarball, so it cannot ship."));
+    });
+
+    test("a bundled entry and an alias are refused and named", () => {
+      const fields = { version: "1.2.3", resolved: LockedPackageTests.RESOLVED, integrity: `sha512-${LockedPackageTests.SHA512}` };
+
+      assert.throws(() => new LockedPackage("node_modules/outer/node_modules/fixture", { ...fields, inBundle: true }),
+        new PackagingException("fixture@1.2.3 at node_modules/outer/node_modules/fixture in package-lock.json is bundled inside its parent's tarball; bundled dependencies are not supported, "
+          + "so it cannot ship."));
+      assert.throws(() => new LockedPackage("node_modules/fixture", { ...fields, name: "real-fixture" }),
+        new PackagingException("node_modules/fixture in package-lock.json installs real-fixture under the alias fixture; aliases are not supported, so it cannot ship."));
     });
 
     test("an entry without a SHA-512 integrity is refused", () => {

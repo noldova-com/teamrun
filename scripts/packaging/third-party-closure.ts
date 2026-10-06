@@ -23,6 +23,7 @@ export default class ThirdPartyClosure {
   private static readonly NEGATION: string = "!";
   private static readonly PLATFORMS: ReadonlyMap<string, string> = new Map([[PackageTarget.WINDOWS, "win32"], [PackageTarget.MACOS, "darwin"], [PackageTarget.LINUX, "linux"]]);
   private static readonly LINUX_LIBRARY: string = "glibc";
+  private static readonly ELECTRON: string = "electron";
 
   private readonly packages: Readonly<Record<string, unknown>>;
   private readonly target: PackageTarget;
@@ -46,13 +47,11 @@ export default class ThirdPartyClosure {
   }
 
   public collect(manifests: readonly PackageManifest[]): readonly LockedPackage[] {
-    const pins = ThirdPartyClosure.readRecord(this.readEntry(ThirdPartyClosure.ROOT), "dependencies");
     const found = new Map<string, LockedPackage>();
     for (const manifest of manifests)
-      for (const [name, version] of manifest.externalDependencies) {
-        if (pins[name] !== version || this.readEntry(path.posix.join(ThirdPartyClosure.FOLDER, name))["version"] !== version)
-          throw new PackagingException(`${manifest.directory}/package.json pins ${name} to ${version}, so the root package.json must pin the same version and `
-            + `${ThirdPartyClosure.LOCKFILE} must lock it; pin it there and run npm install.`);
+      for (const name of manifest.externalDependencies.keys()) {
+        if (this.resolve(ThirdPartyClosure.ROOT, name) === null)
+          throw new PackagingException(`${manifest.directory}/package.json needs ${name}, which the root ${ThirdPartyClosure.LOCKFILE} does not lock; pin it in the root package.json and run npm install.`);
         this.visit(found, ThirdPartyClosure.ROOT, name, false);
       }
 
@@ -63,6 +62,14 @@ export default class ThirdPartyClosure {
         shipped.set(locked.name, locked);
       else if (other.version !== locked.version)
         throw new PackagingException(`The stage installs one version of each third-party package, but the shipped packages need ${other.id} at ${other.location} and ${locked.id} at ${locked.location}.`);
+    }
+    for (const locked of found.values()) {
+      const entry = this.readEntry(locked.location);
+      const optional = ThirdPartyClosure.readRecord(entry, "peerDependenciesMeta");
+      const missing = Object.keys(ThirdPartyClosure.readRecord(entry, "peerDependencies"))
+        .find(t => t !== ThirdPartyClosure.ELECTRON && !shipped.has(t) && ThirdPartyClosure.readRecord(optional, t)["optional"] !== true);
+      if (missing !== undefined)
+        throw new PackagingException(`${locked.id} at ${locked.location} needs the peer dependency ${missing}, which no shipped package brings and Electron does not provide, so it would fail at runtime.`);
     }
     return [...shipped.values()].sort((left, right) => left.name.localeCompare(right.name));
   }

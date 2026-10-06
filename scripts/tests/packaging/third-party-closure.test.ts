@@ -31,7 +31,9 @@ class ThirdPartyClosureTests {
     }),
     "node_modules/alpha/node_modules/beta": ThirdPartyClosureTests.lock("beta", "2.0.0", { dependencies: { delta: "1.0.0" } }),
     "node_modules/beta": ThirdPartyClosureTests.lock("beta", "1.0.0", { dev: true }),
-    "node_modules/gamma": ThirdPartyClosureTests.lock("gamma", "1.0.0", { dependencies: { alpha: "1.0.0", delta: "1.0.0" } }),
+    "node_modules/gamma": ThirdPartyClosureTests.lock("gamma", "1.0.0", {
+      dependencies: { alpha: "1.0.0", delta: "1.0.0" }, peerDependencies: { alpha: "^1.0.0", theme: "1.0.0" }, peerDependenciesMeta: { theme: { optional: true } }
+    }),
     "node_modules/gamma/node_modules/delta": ThirdPartyClosureTests.lock("delta", "1.0.0", { cpu: ["x64", "arm64"] }),
     "node_modules/delta": ThirdPartyClosureTests.lock("delta", "1.0.0", { cpu: ["x64", "arm64"] }),
     "node_modules/native-linux": ThirdPartyClosureTests.lock("native-linux", "1.0.0", { os: ["linux"], cpu: ["x64"], libc: ["glibc"] }),
@@ -60,17 +62,16 @@ class ThirdPartyClosureTests {
       assert.deepEqual(await ThirdPartyClosureTests.collectAsync(t, { "": {} }, [ThirdPartyClosureTests.createManifest("src/shell/desktop", {})]), []);
     });
 
-    test("a package pinned differently from the root package.json, or locked at another version, is refused", async t => {
-      const cases: readonly (readonly [Readonly<Record<string, unknown>>, PackageManifest, string])[] = [
-        [ThirdPartyClosureTests.PACKAGES, ThirdPartyClosureTests.createManifest("src/shell/desktop", { alpha: "1.0.1" }), "src/shell/desktop/package.json pins alpha to 1.0.1"],
-        [ThirdPartyClosureTests.PACKAGES, ThirdPartyClosureTests.createManifest("src/shell/cli", { delta: "1.0.0" }), "src/shell/cli/package.json pins delta to 1.0.0"],
-        [{ ...ThirdPartyClosureTests.PACKAGES, "node_modules/alpha": ThirdPartyClosureTests.lock("alpha", "1.0.2", {}) }, ThirdPartyClosureTests.DESKTOP,
-          "src/shell/desktop/package.json pins alpha to 1.0.0"],
-        [{ "node_modules/alpha": ThirdPartyClosureTests.lock("alpha", "1.0.0", {}) }, ThirdPartyClosureTests.DESKTOP, "src/shell/desktop/package.json pins alpha to 1.0.0"]
-      ];
-      for (const [packages, manifest, start] of cases)
-        await assert.rejects(ThirdPartyClosureTests.collectAsync(t, packages, [manifest]), new PackagingException(`${start}, so the root package.json must pin the same version `
-          + "and package-lock.json must lock it; pin it there and run npm install."));
+    test("a pinned package that the root lockfile does not lock is refused and its manifest named", async t => {
+      await assert.rejects(ThirdPartyClosureTests.collectAsync(t, ThirdPartyClosureTests.PACKAGES, [ThirdPartyClosureTests.createManifest("src/shell/cli", { ghost: "1.0.0" })]),
+        new PackagingException("src/shell/cli/package.json needs ghost, which the root package-lock.json does not lock; pin it in the root package.json and run npm install."));
+    });
+
+    test("a shipped package whose required peer dependency neither a shipped package nor Electron provides is refused", async t => {
+      const packages = { ...ThirdPartyClosureTests.PACKAGES, "node_modules/delta": ThirdPartyClosureTests.lock("delta", "1.0.0", { peerDependencies: { electron: "1.0.0", react: "19.0.0" } }) };
+
+      await assert.rejects(ThirdPartyClosureTests.collectAsync(t, packages, [ThirdPartyClosureTests.DESKTOP]),
+        new PackagingException("delta@1.0.0 at node_modules/delta needs the peer dependency react, which no shipped package brings and Electron does not provide, so it would fail at runtime."));
     });
 
     test("a needed package that is not locked or does not run on the target, or two versions of one name, is refused", async t => {

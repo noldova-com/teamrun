@@ -15,7 +15,7 @@ import TarballFixture from "../fixtures/tarball.fixture.ts";
 
 class TarArchiveTests {
   public static register(): void {
-    test("a gzipped tarball gives the regular files directly inside its top folder, whatever that folder is called", () => {
+    test("a gzipped tarball gives the regular files directly inside its top folder, whatever that folder is called, reading a name prefix only from a POSIX ustar header", () => {
       const archive = TarArchive.fromGzip(TarballFixture.pack([
         { name: "package/", content: "", type: TarballFixture.DIRECTORY },
         { name: "package/package.json", content: "{\"name\":\"fixture\"}" },
@@ -24,13 +24,15 @@ class TarArchiveTests {
         { name: "package/docs", content: "", type: TarballFixture.DIRECTORY },
         { name: "LICENSE", content: "outside" },
         { name: "COPYING", content: "split", prefix: "other" },
+        { name: "package/README", content: "gnu", prefix: "14771233650", isGnu: true },
         { name: "package/NOTICE", content: "plain", type: "\u0000" }
       ]));
 
-      assert.deepEqual([...archive.topLevelFiles.keys()], ["package.json", "LICENSE", "COPYING", "NOTICE"]);
+      assert.deepEqual([...archive.topLevelFiles.keys()], ["package.json", "LICENSE", "COPYING", "README", "NOTICE"]);
       assert.equal(archive.topLevelFiles.get("package.json")?.toString(), "{\"name\":\"fixture\"}");
       assert.equal(archive.topLevelFiles.get("LICENSE")?.toString(), "x".repeat(700));
       assert.equal(archive.topLevelFiles.get("COPYING")?.toString(), "split");
+      assert.equal(archive.topLevelFiles.get("README")?.toString(), "gnu");
       assert.equal(archive.topLevelFiles.get("NOTICE")?.toString(), "plain");
     });
 

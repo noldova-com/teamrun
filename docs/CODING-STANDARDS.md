@@ -326,7 +326,7 @@ Breaking changes require an explicit version/compatibility decision.
 - The root manifest's application version owns the product's version and its packages' versions, except a module's part packages, which take the version in the module's `module.json` ([architecture](ARCHITECTURE.md#modules-and-versions)).
   Package manifests under `src/` use `__VERSION__` for their own version and references to other TeamRun packages; the build stamps each with its package's version.
   External dependency versions are exact pins from the registry, never ranges, tags, aliases, paths, Git or URL sources, and each folder with a lockfile keeps `save-exact=true` in its `.npmrc`; the Dependency pins check enforces both.
-  A shipped package's third-party runtime dependency is pinned at the same version in the root manifest, and its license must be one that [packaging](ARCHITECTURE.md#packaging) allows.
+  A shipped package's third-party runtime dependency is pinned at the same version in the root manifest and locked at it in the root lockfile, which the Dependency pins check also enforces, and its license must be one that [packaging](ARCHITECTURE.md#packaging) allows.
   The root manifest declares the protocol version separately from the application version, and each data format's owner declares that format's version; neither copies the application version.
   A package's `resources.ts` receives the protocol version through `__PROTOCOL_VERSION__`.
   The product version and the build's fingerprint reach the shell through the build's product file, never through a package, so a package is rebuilt only when its own source, its version or a package it depends on changes.

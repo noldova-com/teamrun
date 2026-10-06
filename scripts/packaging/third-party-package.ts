@@ -18,7 +18,7 @@ import TarArchive from "./tar-archive.ts";
 export default class ThirdPartyPackage {
   private static readonly DOWNLOAD_LIMIT: number = 120_000;
   private static readonly MANIFEST_FILE: string = "package.json";
-  private static readonly LICENSE_FILE: RegExp = /^(?:licen[cs]e|copying)(?:[-.][^/]*)?$/i;
+  private static readonly LICENSE_FILE: RegExp = /^(?:(?:licen[cs]e|copying|unlicense)(?:[-_][a-z0-9+-]+(?:\.\d+)*)?|[a-z0-9+-]+(?:\.\d+)*[-_]licen[cs]e)(?:\.(?:md|txt|markdown))?$/i;
   private static readonly LICENSE_SEPARATOR: string = "\n\n";
   private static readonly TARBALL_EXTENSION: string = ".tgz";
   private static readonly REVIEWED_EXTENSION: string = ".txt";
@@ -43,9 +43,10 @@ export default class ThirdPartyPackage {
     await writeFile(file, data);
 
     const archive = TarArchive.fromGzip(data);
-    const manifestText = archive.topLevelFiles.get(ThirdPartyPackage.MANIFEST_FILE)?.toString("utf8");
-    const manifest: unknown = manifestText === undefined ? null : JSON.parse(manifestText);
-    const license = new LicenseExpression(locked.id, typeof manifest === "object" && manifest !== null && "license" in manifest ? manifest.license : undefined);
+    const manifest = ThirdPartyPackage.readManifest(locked, archive);
+    if (manifest["name"] !== locked.name || manifest["version"] !== locked.version)
+      throw new PackagingException(`The tarball of ${locked.id} from ${locked.resolved} holds ${String(manifest["name"])}@${String(manifest["version"])} instead, so it cannot ship.`);
+    const license = new LicenseExpression(locked.id, manifest["license"]);
     const texts = [...archive.topLevelFiles].filter(([name]) => ThirdPartyPackage.LICENSE_FILE.test(name)).sort(([left], [right]) => left.localeCompare(right))
       .map(([, content]) => content.toString("utf8").trim());
     const licenseText = texts.length > 0 ? texts.join(ThirdPartyPackage.LICENSE_SEPARATOR) : await ThirdPartyPackage.readReviewedAsync(locked, reviewedLicenses);
@@ -54,6 +55,22 @@ export default class ThirdPartyPackage {
 
   public formatNotice(): string {
     return `${this.locked.id}\nLicense: ${this.license.describe()}\n\n${this.licenseText}\n`;
+  }
+
+  private static readManifest(locked: LockedPackage, archive: TarArchive): Readonly<Record<string, unknown>> {
+    const text = archive.topLevelFiles.get(ThirdPartyPackage.MANIFEST_FILE)?.toString("utf8");
+    if (text === undefined)
+      throw new PackagingException(`The tarball of ${locked.id} from ${locked.resolved} has no package.json, so it cannot ship.`);
+    let manifest: unknown;
+    try {
+      manifest = JSON.parse(text);
+    }
+    catch (error) {
+      throw new PackagingException(`The package.json in the tarball of ${locked.id} could not be read as JSON, so it cannot ship.`, { cause: error });
+    }
+    if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest))
+      throw new PackagingException(`The package.json in the tarball of ${locked.id} is not a JSON object, so it cannot ship.`);
+    return manifest;
   }
 
   private static async readReviewedAsync(locked: LockedPackage, reviewedLicenses: string): Promise<string> {

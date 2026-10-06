@@ -19,6 +19,7 @@ import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 class DependencyPinCheckTests {
   private static readonly SAVE_EXACT: string = "save-exact=true\n";
   private static readonly NOT_EXACT: string = "which is not an exact version; an external dependency takes an exact version from the registry, such as 1.2.3, never a range, tag, alias, path, Git or URL source.";
+  private static readonly PIN_ROOT: string = "so the root package.json must pin it to the same version in its dependencies; packaging ships it from the root lockfile.";
 
   public static register(): void {
     test("exact external versions, TeamRun's own packages at the build's version and save-exact beside each lockfile pass", async t => {
@@ -93,6 +94,54 @@ class DependencyPinCheckTests {
         "Checked the dependency versions of 1 manifests and the npm configuration of 0 lockfiles.",
         ""
       ].join("\n"));
+    });
+
+    test("a TeamRun package's external dependency must be pinned the same in the root package.json and locked at that version in the root package-lock.json", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({
+        "package.json": DependencyPinCheckTests.manifest({ dependencies: { agreed: "1.0.0", stale: "2.0.0", unlocked: "3.0.0" } }),
+        "package-lock.json": JSON.stringify({ packages: { "node_modules/agreed": { version: "1.0.0" }, "node_modules/stale": { version: "1.9.0" }, "node_modules/unlocked": "3.0.0" } }),
+        ".npmrc": DependencyPinCheckTests.SAVE_EXACT,
+        "src/package.json": DependencyPinCheckTests.manifest({ dependencies: { rxjs: "7.8.2" } }),
+        "src/shell/broken/package.json": "{\n",
+        "src/shell/cli/package.json": DependencyPinCheckTests.manifest({ name: "@noldova/teamrun-shell-cli" }),
+        "src/shell/desktop/package.json": DependencyPinCheckTests.manifest({
+          name: "@noldova/teamrun-shell-desktop",
+          dependencies: { "@noldova/teamrun-foundation-core": "__VERSION__", agreed: "1.0.0", stale: "2.0.0", unlocked: "3.0.0", unpinned: "4.0.0", number: 1 }
+        }),
+        "src/shell/nameless/package.json": "{}\n"
+      });
+      const output = new TextOutputFixture();
+
+      assert.equal(await DependencyPinCheckTests.createCheck(repository).runAsync(output), false);
+      assert.equal(output.text, [
+        "src/shell/broken/package.json: could not be read as JSON.",
+        "src/shell/desktop/package.json: dependencies number has no version string.",
+        "src/shell/desktop/package.json: dependencies stale is \"2.0.0\", but the root package-lock.json locks version 1.9.0 of it; run npm install.",
+        "src/shell/desktop/package.json: dependencies unlocked is \"3.0.0\", but the root package-lock.json locks no version of it; run npm install.",
+        `src/shell/desktop/package.json: dependencies unpinned is "4.0.0", ${DependencyPinCheckTests.PIN_ROOT}`,
+        "Checked the dependency versions of 6 manifests and the npm configuration of 1 lockfiles.",
+        ""
+      ].join("\n"));
+    });
+
+    test("a TeamRun package's external dependency fails without a root package.json to pin it or a root package-lock.json to lock it", async t => {
+      const desktop = DependencyPinCheckTests.manifest({ name: "@noldova/teamrun-shell-desktop", dependencies: { agreed: "1.0.0" } });
+      const cases: readonly (readonly [Readonly<Record<string, string>>, string])[] = [
+        [{ "src/shell/desktop/package.json": desktop }, `src/shell/desktop/package.json: dependencies agreed is "1.0.0", ${DependencyPinCheckTests.PIN_ROOT}`],
+        [{ "package.json": DependencyPinCheckTests.manifest({ dependencies: { agreed: "1.0.0" } }), "src/shell/desktop/package.json": desktop },
+          "src/shell/desktop/package.json: dependencies agreed is \"1.0.0\", but the root package-lock.json locks no version of it; run npm install."]
+      ];
+      for (const [files, finding] of cases) {
+        const repository = await RepositoryFixture.createAsync();
+        t.after(() => repository.disposeAsync());
+        await repository.writeAsync(files);
+        const output = new TextOutputFixture();
+
+        assert.equal(await DependencyPinCheckTests.createCheck(repository).runAsync(output), false);
+        assert.equal(output.text, `${finding}\nChecked the dependency versions of ${Object.keys(files).length} manifests and the npm configuration of 0 lockfiles.\n`);
+      }
     });
 
     test("a manifest that is not a JSON object fails with its file", async t => {
