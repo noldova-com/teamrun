@@ -45,7 +45,7 @@ export class LayoutService {
   private readonly layoutState: WritableSignal<Layout> = signal(Layout.createDefault(this.registryState()));
   private readonly width: WritableSignal<number> = signal(0);
   private readonly height: WritableSignal<number> = signal(0);
-  private readonly metrics: WritableSignal<LayoutMetrics> = signal(LayoutMetrics.none);
+  private readonly metrics: WritableSignal<LayoutMetrics | null> = signal(null);
   private readonly currentGroupId: WritableSignal<number | null> = signal(null);
   private readonly revealedState: WritableSignal<TabReveal | null> = signal(null);
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -59,11 +59,12 @@ export class LayoutService {
   public readonly registry: Signal<ViewRegistry> = this.registryState.asReadonly();
   public readonly iconSides: Signal<ReadonlySet<DockSide>> = computed(() =>
     new Set([...Resources.dockStyleSettings].filter(([, name]) => this.settings.values().get(name) === DockStyle.Icons).map(([side]) => side)));
+  public readonly isMeasured: Signal<boolean> = computed(() => !Object.isNull(this.metrics()));
   public readonly previewTabs: Signal<boolean> = computed(() => this.settings.values().get(Resources.previewTabsSetting) !== false);
   private readonly kept: WritableSignal<DockSide | null> = signal(null);
   public readonly geometry: Signal<LayoutGeometry> = linkedSignal({
     source: () => ({ width: this.width(), height: this.height(), layout: this.layoutState(), registry: this.registryState(), metrics: this.metrics(), iconSides: this.iconSides(), kept: this.kept() }),
-    computation: (source, previous?: { readonly value: LayoutGeometry }) => new LayoutGeometry(source.width, source.height, source.layout, source.registry, source.metrics, source.iconSides,
+    computation: (source, previous?: { readonly value: LayoutGeometry }) => new LayoutGeometry(source.width, source.height, source.layout, source.registry, source.metrics ?? LayoutMetrics.none, source.iconSides,
       new DockYield(source.layout.middleSize ?? Resources.middlePreferredSize, previous?.value.closedSides ?? new Set(), source.kept))
   });
   public readonly currentGroup: Signal<TabGroup> = computed(() => {
@@ -179,7 +180,7 @@ export class LayoutService {
   }
 
   public resizeDock(side: DockSide, size: number): void {
-    const layout = this.layoutState().resizeDock(side, Math.max(this.metrics().dockMinimum, size));
+    const layout = this.layoutState().resizeDock(side, Math.max(this.geometry().metrics.dockMinimum, size));
     if (side === DockSide.Bottom) {
       this.update(layout);
       return;

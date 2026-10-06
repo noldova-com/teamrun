@@ -62,8 +62,8 @@ export class WorkspaceComponent {
     observer.observe(this.element);
     inject(DestroyRef).onDestroy(() => observer.disconnect());
     effect(() => {
-      appearance.theme();
-      this.layout.setMetrics(this.measure(appearance.typography().rootSize));
+      if (appearance.painted() > 0)
+        this.layout.setMetrics(this.measure(untracked(() => appearance.typography().rootSize)));
     });
     effect(() => {
       const rem = appearance.typography().rootSize;

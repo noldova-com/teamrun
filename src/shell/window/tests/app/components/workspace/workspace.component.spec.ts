@@ -9,7 +9,7 @@
 import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
-import { AppearanceService, DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, DefaultTheme, ThemeMode, Typography } from "@noldova/teamrun-shell-ui";
 
 import { WorkspaceComponent } from "../../../../src/app/components/workspace/workspace.component";
 import { DockSide } from "../../../../src/app/enums/dock-side";
@@ -57,7 +57,7 @@ describe("WorkspaceComponent", () => {
 
   async function renderAsync(registry: ViewRegistry, layout: Layout = Layout.createDefault(registry)): Promise<ComponentFixture<WorkspaceHostComponent>> {
     AppearanceFixture.apply();
-    await LayoutServiceFixture.prepareAsync(registry, layout, 0, 0);
+    await LayoutServiceFixture.prepareAsync(registry, layout, 0, 0, null);
     const fixture = TestBed.createComponent(WorkspaceHostComponent);
     await settleAsync(fixture);
     return fixture;
@@ -220,7 +220,23 @@ describe("WorkspaceComponent", () => {
     AppearanceFixture.expectPixels(height ?? 0, 500 - AppearanceFixture.toPixels(0.25));
   });
 
-  it("takes its dock sizes, minimums, strip and gaps from the theme's look and lays out again when the theme changes", async () => {
+  it("lays out nothing until the appearance is painted, and then lays out with the painted looks", async () => {
+    const painted = signal(0);
+    TestBed.overrideProvider(AppearanceService, { useValue: { painted, typography: signal(new Typography()), theme: signal(DefaultTheme.theme) } });
+    const fixture = await renderAsync(LayoutFixture.createRegistry());
+    const layout = TestBed.inject(LayoutService);
+    const before = [layout.isMeasured(), groupsOf(fixture).length];
+
+    painted.set(1);
+    await settleAsync(fixture);
+
+    expect(before).toEqual([false, 0]);
+    expect(layout.isMeasured()).toBe(true);
+    expect(groupsOf(fixture).length).toBeGreaterThan(1);
+    expect(layout.geometry().dock(DockSide.Left).x).toBe(0.25);
+  });
+
+  it("takes its dock sizes, minimums, strip and gaps from the theme's look and lays out again in the same turn as the theme changes", async () => {
     const fixture = await renderAsync(LayoutFixture.createRegistry());
     const appearance = TestBed.inject(AppearanceService);
     const layout = TestBed.inject(LayoutService);
@@ -235,8 +251,9 @@ describe("WorkspaceComponent", () => {
     const standard = shown();
 
     appearance.setTheme(FixtureTheme.theme);
-    await settleAsync(fixture);
+    fixture.detectChanges();
     const themed = shown();
+    await settleAsync(fixture);
     const [x, , width] = boundsOf(groupsOf(fixture).find(t => t.classList.contains("tr-panel-card-shell")) ?? fixture.nativeElement);
     appearance.setTheme(DefaultTheme.theme);
     await settleAsync(fixture);
