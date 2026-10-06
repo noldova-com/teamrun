@@ -354,8 +354,7 @@ export class Resources {
   public static readonly copyFeedbackDuration: number = 2000;
   public static readonly codeThemeName: string = "teamrun";
   public static readonly codePlainColor: string = "#000000";
-  public static readonly codeTokenClass: string = "tr-code-token";
-  public static readonly codeLineBreak: RegExp = /\r?\n/g;
+  public static readonly codeHighlightPrefix: string = "tr-code-";
   public static readonly codePlainScopes: readonly string[] = ["keyword.operator", "punctuation"];
   public static readonly codeTokenScopes: Readonly<Record<CodeTokenKind, readonly string[]>> = {
     [CodeTokenKind.Comment]: ["comment", "punctuation.definition.comment"],

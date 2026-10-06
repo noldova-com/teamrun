@@ -49,27 +49,27 @@ describe("CodeHighlighter", () => {
     make: "all:\n\techo hi # note"
   };
 
-  it("colors a sample of every language it knows, keeping each sample's text and line breaks exactly", async () => {
+  it("colors a sample of every language it knows, each token at its place in the sample", async () => {
     const highlighter = TestBed.inject(CodeHighlighter);
     const results: (readonly [string, boolean, boolean])[] = [];
 
     for (const language of CodeLanguage.all) {
       const sample = samples[language.id] ?? String.empty;
       const tokens = await highlighter.tokensAsync(sample, language);
-      results.push([language.id, tokens.map(t => t.text).join(String.empty) === sample, tokens.some(t => !Object.isNull(t.kind))]);
+      results.push([language.id, tokens.every(t => sample.slice(t.start, t.end) === t.text), tokens.length > 0]);
     }
 
     expect(results).toEqual(CodeLanguage.all.map(t => [t.id, true, true]));
   });
 
-  it("names each token's kind and its classes, and leaves the rest plain", async () => {
-    const tokens = await TestBed.inject(CodeHighlighter).tokensAsync("return 1;", CodeLanguage.named("ts") as CodeLanguage);
+  it("gives each colored token its kind and place, across line breaks, and leaves plain text out", async () => {
+    const tokens = await TestBed.inject(CodeHighlighter).tokensAsync("return 1;\r\nlet a;", CodeLanguage.named("ts") as CodeLanguage);
 
-    expect(tokens.map(t => [t.text, t.kind, t.className])).toEqual([
-      ["return", CodeTokenKind.Control, "tr-code-token tr-code-token-control"],
-      [" ", null, null],
-      ["1", CodeTokenKind.Number, "tr-code-token tr-code-token-number"],
-      [";", null, null]
+    expect(tokens.map(t => [t.start, t.end, t.text, t.kind])).toEqual([
+      [0, 6, "return", CodeTokenKind.Control],
+      [7, 8, "1", CodeTokenKind.Number],
+      [11, 14, "let", CodeTokenKind.Keyword],
+      [15, 16, "a", CodeTokenKind.Variable]
     ]);
   });
 });

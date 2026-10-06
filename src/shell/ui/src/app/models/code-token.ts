@@ -6,19 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import "@noldova/teamrun-foundation-core";
-
 import type { CodeTokenKind } from "../enums/code-token-kind";
-import { Resources } from "../../resources";
 
 export class CodeToken {
+  public readonly start: number;
+  public readonly end: number;
   public readonly text: string;
-  public readonly kind: CodeTokenKind | null;
-  public readonly className: string | null;
+  public readonly kind: CodeTokenKind;
 
-  public constructor(text: string, kind: CodeTokenKind | null) {
+  public constructor(start: number, text: string, kind: CodeTokenKind) {
+    this.start = start;
+    this.end = start + text.length;
     this.text = text;
     this.kind = kind;
-    this.className = Object.isNull(kind) ? null : `${Resources.codeTokenClass} ${Resources.codeTokenClass}-${kind.toLowerCase()}`;
   }
 }

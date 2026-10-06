@@ -37,11 +37,10 @@ export class CodeHighlighter {
   public async tokensAsync(code: string, language: CodeLanguage): Promise<readonly CodeToken[]> {
     const [shiki, primitive] = await this.startAsync();
     await this.loadAsync(primitive, language);
-    const breaks = code.match(Resources.codeLineBreak) ?? [];
-    return shiki.codeToTokensBase(primitive, code, { lang: language.id, theme: Resources.codeThemeName }).flatMap((line, index) => [
-      ...line.map(t => new CodeToken(t.content, CodeHighlighter.kinds.get(t.color) ?? null)),
-      ...breaks.slice(index, index + 1).map(t => new CodeToken(t, null))
-    ]);
+    return shiki.codeToTokensBase(primitive, code, { lang: language.id, theme: Resources.codeThemeName }).flat().flatMap(t => {
+      const kind = CodeHighlighter.kinds.get(t.color);
+      return Object.isUndefined(kind) ? [] : [new CodeToken(t.offset, t.content, kind)];
+    });
   }
 
   private startAsync(): Promise<readonly [typeof import("@shikijs/primitive"), ShikiPrimitive]> {

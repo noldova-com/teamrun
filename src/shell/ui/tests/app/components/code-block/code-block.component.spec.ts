@@ -145,31 +145,35 @@ describe("CodeBlockComponent", () => {
     expect(find(".frame").scrollWidth).toBe(find(".frame").clientWidth);
   });
 
-  it("takes a sideways scrollbar's height from its bottom padding only while its lines scroll, and keeps its end padding once scrolled to the end", async () => {
-    AppearanceFixture.apply();
-    await renderAsync();
-    const bottom = (): number => Number.parseFloat(getComputedStyle(find(".tr-code-block-body > code")).paddingBottom);
-    const lines = (): DOMRect[] => {
-      const range = document.createRange();
-      range.selectNodeContents(find(".tr-code-block-body > code"));
-      return [...range.getClientRects()];
-    };
-    const start = (lines()[0] as DOMRect).left - body().getBoundingClientRect().left;
-    await framesAsync();
+  for (const language of [null, "TypeScript"])
+    it(`takes a sideways scrollbar's height from its bottom padding only while its lines scroll, and keeps its end padding once scrolled to the end, in ${language ?? "plain"} code`, async () => {
+      AppearanceFixture.apply();
+      await renderAsync();
+      await changeAsync(() => host.language.set(language));
+      const colored = tokens().length > 0;
+      const bottom = (): number => Number.parseFloat(getComputedStyle(find(".tr-code-block-body > code")).paddingBottom);
+      const lines = (): DOMRect[] => {
+        const range = document.createRange();
+        range.selectNodeContents(find(".tr-code-block-body > code"));
+        return [...range.getClientRects()];
+      };
+      const start = (lines()[0] as DOMRect).left - body().getBoundingClientRect().left;
+      await framesAsync();
 
-    expect(body().scrollWidth).toBeGreaterThan(body().clientWidth);
-    AppearanceFixture.expectPixels(bottom(), AppearanceFixture.measureLook("space-2") - AppearanceFixture.measureLook("scrollbar-size"));
+      expect(body().scrollWidth).toBeGreaterThan(body().clientWidth);
+      AppearanceFixture.expectPixels(bottom(), AppearanceFixture.measureLook("space-2") - AppearanceFixture.measureLook("scrollbar-size"));
 
-    body().scrollLeft = body().scrollWidth;
+      body().scrollLeft = body().scrollWidth;
 
-    AppearanceFixture.expectPixels(body().getBoundingClientRect().right - Math.max(...lines().map(t => t.right)), start);
+      AppearanceFixture.expectPixels(body().getBoundingClientRect().right - Math.max(...lines().map(t => t.right)), start);
 
-    await changeAsync(() => host.wrapped.set(true));
-    await framesAsync();
+      await changeAsync(() => host.wrapped.set(true));
+      await framesAsync();
 
-    expect(body().scrollWidth).toBe(body().clientWidth);
-    AppearanceFixture.expectPixels(bottom(), AppearanceFixture.measureLook("space-2"));
-  });
+      expect(body().scrollWidth).toBe(body().clientWidth);
+      AppearanceFixture.expectPixels(bottom(), AppearanceFixture.measureLook("space-2"));
+      expect(colored).toBe(!Object.isNull(language));
+    });
 
   it("wraps its lines anywhere while Word wrap is pressed, by pointer, Enter or Space, and scrolls again once it is released", async () => {
     await renderAsync();
@@ -288,15 +292,18 @@ describe("CodeBlockComponent", () => {
     expect(cleared).toHaveBeenCalledWith(feedback);
   });
 
-  const tokens = (): readonly (readonly [string, string | null])[] =>
-    [...body().querySelectorAll("code > span")].map(t => [t.textContent, [...t.classList].find(name => name.startsWith("tr-code-token-"))?.slice("tr-code-token-".length) ?? null] as const);
-  const probe = (kind: CodeTokenKind): HTMLElement => {
-    const span = (body().querySelector("code") as HTMLElement).appendChild(document.createElement("span"));
-    span.className = `tr-code-token tr-code-token-${kind.toLowerCase()}`;
-    return span;
+  const tokens = (): readonly (readonly [string, string])[] => {
+    const code = find(".tr-code-block-body > code");
+    return Object.values(CodeTokenKind)
+      .flatMap(kind => [...CSS.highlights.get(`tr-code-${kind.toLowerCase()}`) ?? []].map(t => t as Range).filter(t => code.contains(t.startContainer))
+        .map(t => [t.startOffset, t.toString(), kind.toLowerCase()] as const))
+      .sort((a, b) => a[0] - b[0])
+      .map(([, text, kind]) => [text, kind] as const);
   };
+  const plain = (): readonly unknown[] => [tokens().length, find(".tr-code-block-body > code").childNodes.length, body().querySelector("code")?.textContent];
+  const colorOf = (kind: CodeTokenKind): string => getComputedStyle(find(".tr-code-block-body > code"), `::highlight(tr-code-${kind.toLowerCase()})`).color;
 
-  it("colors the tokens of a language it knows by their kind, keeping the code's text exactly, and Copy still copies the code as bound", async () => {
+  it("colors the tokens of a language it knows by their kind, keeping the code's text as one text node exactly, and Copy still copies the code as bound", async () => {
     await renderAsync();
     const code = "// greet\r\n@sealed class Box {}\nexport function greet(name: string): string {\n  return `Hello, ${name}` + /a+/g.source + 1;\n}\n";
 
@@ -305,8 +312,9 @@ describe("CodeBlockComponent", () => {
 
     expect(tokens()).toEqual(expect.arrayContaining([
       ["// greet", "comment"], ["@", "meta"], ["class", "keyword"], ["Box", "type"], ["export", "control"], ["function", "keyword"], ["greet", "function"], ["name", "variable"],
-      ["string", "type"], ["return", "control"], ["`Hello, ", "string"], ["a", "regex"], ["1", "number"], ["(", null]
+      ["string", "type"], ["return", "control"], ["`Hello, ", "string"], ["a", "regex"], ["1", "number"]
     ]));
+    expect(find(".tr-code-block-body > code").childNodes.length).toBe(1);
     expect(body().querySelector("code")?.textContent).toBe(code);
     expect(clipboard.texts).toEqual([code]);
   });
@@ -314,11 +322,11 @@ describe("CodeBlockComponent", () => {
   it("leaves code plain, exactly as bound, for a language it doesn't know or none", async () => {
     await renderAsync();
     await changeAsync(() => host.language.set("Klingon"));
-    const unknown = [body().querySelectorAll("span").length, body().querySelector("code")?.textContent];
+    const unknown = plain();
     await changeAsync(() => host.language.set(null));
 
-    expect(unknown).toEqual([0, host.code()]);
-    expect([body().querySelectorAll("span").length, body().querySelector("code")?.textContent]).toEqual([0, host.code()]);
+    expect(unknown).toEqual([0, 1, host.code()]);
+    expect(plain()).toEqual([0, 1, host.code()]);
   });
 
   it("shows changed code at once, plain until its tokens arrive, and never with the tokens of the code before it", async () => {
@@ -327,11 +335,11 @@ describe("CodeBlockComponent", () => {
 
     host.code.set("let changed = 2;");
     fixture.detectChanges();
-    const meanwhile = [body().querySelectorAll("span").length, body().querySelector("code")?.textContent];
+    const meanwhile = plain();
     await fixture.whenStable();
 
     expect(colored).toBeGreaterThan(0);
-    expect(meanwhile).toEqual([0, "let changed = 2;"]);
+    expect(meanwhile).toEqual([0, 1, "let changed = 2;"]);
     expect(tokens()).toEqual(expect.arrayContaining([["let", "keyword"], ["changed", "variable"], ["2", "number"]]));
   });
 
@@ -342,7 +350,7 @@ describe("CodeBlockComponent", () => {
         await renderAsync();
         const kinds = Object.values(CodeTokenKind);
 
-        expect(kinds.map(t => getComputedStyle(probe(t)).color))
+        expect(kinds.map(t => colorOf(t)))
           .toEqual(kinds.map(t => AppearanceFixture.readColor(theme, mode, `teamrun.code${t}Foreground`)));
       });
 
@@ -350,7 +358,7 @@ describe("CodeBlockComponent", () => {
     await renderAsync();
     await ForcedColorsFixture.activateAsync();
     const kinds = Object.values(CodeTokenKind);
-    const shown = kinds.map(t => getComputedStyle(probe(t)).color);
+    const shown = kinds.map(t => colorOf(t));
     const text = ForcedColorsFixture.resolve("CanvasText");
     await ForcedColorsFixture.resetAsync();
 

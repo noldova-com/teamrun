@@ -17,4 +17,4 @@ LICENSE file in the root directory of this source tree.
       [trTooltip]="copyLabel()" (click)="copy()"></button>
   </div>
 </div>
-<pre class="tr-code-block-body"><code>@if (tokens.hasValue()) {<ng-container>@for (token of tokens.value(); track $index) {<span [class]="token.className">{{ token.text }}</span>}</ng-container>}@else {<ng-container>{{ code() }}</ng-container>}</code></pre>
+<pre class="tr-code-block-body"><code #text>{{ code() }}</code></pre>

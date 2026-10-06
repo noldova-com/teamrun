@@ -70,48 +70,57 @@
   }
 }
 
-.tr-code-token-comment {
+.tr-code-block-body > code::highlight(tr-code-comment) {
   color: var(--tr-code-comment);
 }
 
-.tr-code-token-keyword {
+.tr-code-block-body > code::highlight(tr-code-keyword) {
   color: var(--tr-code-keyword);
 }
 
-.tr-code-token-control {
+.tr-code-block-body > code::highlight(tr-code-control) {
   color: var(--tr-code-control);
 }
 
-.tr-code-token-string {
+.tr-code-block-body > code::highlight(tr-code-string) {
   color: var(--tr-code-string);
 }
 
-.tr-code-token-number {
+.tr-code-block-body > code::highlight(tr-code-number) {
   color: var(--tr-code-number);
 }
 
-.tr-code-token-type {
+.tr-code-block-body > code::highlight(tr-code-type) {
   color: var(--tr-code-type);
 }
 
-.tr-code-token-function {
+.tr-code-block-body > code::highlight(tr-code-function) {
   color: var(--tr-code-function);
 }
 
-.tr-code-token-variable {
+.tr-code-block-body > code::highlight(tr-code-variable) {
   color: var(--tr-code-variable);
 }
 
-.tr-code-token-regex {
+.tr-code-block-body > code::highlight(tr-code-regex) {
   color: var(--tr-code-regex);
 }
 
-.tr-code-token-meta {
+.tr-code-block-body > code::highlight(tr-code-meta) {
   color: var(--tr-code-meta);
 }
 
 @include forced-colors {
-  .tr-code-token {
+  .tr-code-block-body > code::highlight(tr-code-comment),
+  .tr-code-block-body > code::highlight(tr-code-keyword),
+  .tr-code-block-body > code::highlight(tr-code-control),
+  .tr-code-block-body > code::highlight(tr-code-string),
+  .tr-code-block-body > code::highlight(tr-code-number),
+  .tr-code-block-body > code::highlight(tr-code-type),
+  .tr-code-block-body > code::highlight(tr-code-function),
+  .tr-code-block-body > code::highlight(tr-code-variable),
+  .tr-code-block-body > code::highlight(tr-code-regex),
+  .tr-code-block-body > code::highlight(tr-code-meta) {
     color: CanvasText;
   }
 }

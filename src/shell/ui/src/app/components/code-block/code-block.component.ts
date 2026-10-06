@@ -7,8 +7,8 @@
  */
 
 import { LiveAnnouncer } from "@angular/cdk/a11y";
-import { ChangeDetectionStrategy, Component, DestroyRef, ErrorHandler, type ResourceRef, type Signal, ViewEncapsulation, type WritableSignal, computed, inject, input, model, resource,
-  signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, type ResourceRef, type Signal, ViewEncapsulation, type WritableSignal, afterRenderEffect,
+  computed, inject, input, model, resource, signal, viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
@@ -17,6 +17,7 @@ import { CodeLanguage } from "../../models/code-language";
 import type { CodeToken } from "../../models/code-token";
 import { ClipboardWriter } from "../../services/clipboard-writer";
 import { CodeHighlighter } from "../../services/code-highlighter";
+import { CodeHighlights } from "../../services/code-highlights";
 import { Resources } from "../../../resources";
 import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { ToolbarItemDirective } from "../toolbar/toolbar-item.directive";
@@ -40,6 +41,8 @@ export class CodeBlockComponent {
   private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
   private readonly highlighter: CodeHighlighter = inject(CodeHighlighter);
+  private readonly highlights: CodeHighlights = inject(CodeHighlights);
+  private readonly text: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("text");
   private readonly copyState: WritableSignal<CopyState> = signal(CopyState.Ready);
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -62,6 +65,10 @@ export class CodeBlockComponent {
 
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.clearCopyTimer());
+    afterRenderEffect(onCleanup => {
+      if (this.tokens.hasValue())
+        onCleanup(this.highlights.add(this.text().nativeElement.firstChild as Text, this.tokens.value()));
+    });
   }
 
   protected toggleWrap(): void {

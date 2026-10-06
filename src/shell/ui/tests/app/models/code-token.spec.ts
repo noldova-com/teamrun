@@ -6,24 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import "@noldova/teamrun-foundation-core";
-
 import { CodeTokenKind } from "../../../src/app/enums/code-token-kind";
 import { CodeToken } from "../../../src/app/models/code-token";
 
 describe("CodeToken", () => {
-  it("keeps its text and kind, and takes the token class with its kind's class", () => {
-    const tokens = [new CodeToken("return", CodeTokenKind.Control), new CodeToken("// note", CodeTokenKind.Comment)];
+  it("keeps its text and kind, and ends where its text ends", () => {
+    const token = new CodeToken(7, "return", CodeTokenKind.Control);
 
-    expect(tokens.map(t => [t.text, t.kind, t.className])).toEqual([
-      ["return", CodeTokenKind.Control, "tr-code-token tr-code-token-control"],
-      ["// note", CodeTokenKind.Comment, "tr-code-token tr-code-token-comment"]
-    ]);
-  });
-
-  it("takes no class for text without a kind", () => {
-    const token = new CodeToken(" ", null);
-
-    expect([token.text, token.kind, token.className]).toEqual([" ", null, null]);
+    expect([token.start, token.end, token.text, token.kind]).toEqual([7, 13, "return", CodeTokenKind.Control]);
   });
 });
