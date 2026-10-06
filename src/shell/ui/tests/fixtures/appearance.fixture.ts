@@ -13,7 +13,7 @@ import type { Theme } from "../../src/app/models/theme";
 import { Typography } from "../../src/app/models/typography";
 import { ThemePainter } from "../../src/app/services/theme-painter";
 import { TypographyPainter } from "../../src/app/services/typography-painter";
-import { DefaultTheme } from "../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../src/app/models/default-theme";
 import { FixtureTheme } from "./fixture-theme";
 import { PointerFixture } from "./pointer.fixture";
 

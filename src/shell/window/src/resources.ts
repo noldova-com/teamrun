@@ -510,6 +510,10 @@ export class Resources {
   public static readonly windowMenuTitle: string = "Window";
   public static readonly helpMenuTitle: string = "Help";
   public static readonly tabMenuTitle: string = "Tab";
+  public static readonly fieldMenu: string = "shell.field";
+  public static readonly fieldMenuTitle: string = "Text field";
+  public static readonly fieldEditingGroup: string = "shell.fieldEditing";
+  public static readonly fieldEditActions: readonly EditAction[] = [EditAction.Cut, EditAction.Copy, EditAction.Paste, EditAction.SelectAll];
   public static readonly closeGroup: string = "shell.close";
   public static readonly tabMoveToMenu: string = "shell.tabMoveTo";
   public static readonly tabSplitMenu: string = "shell.tabSplit";

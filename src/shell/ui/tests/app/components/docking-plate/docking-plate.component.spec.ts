@@ -12,7 +12,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { DockingPlateComponent } from "../../../../src/app/components/docking-plate/docking-plate.component";
 import { DockingDirection } from "../../../../src/app/enums/docking-direction";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

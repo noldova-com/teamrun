@@ -32,6 +32,15 @@ export class EditTarget {
     return EditTarget.isTextField(element) || element.isContentEditable;
   }
 
+  public static fieldOf(element: HTMLElement): HTMLElement | null {
+    if (EditTarget.isTextField(element))
+      return element;
+    let field: HTMLElement | null = element.isContentEditable ? element : null;
+    while (field?.parentElement?.isContentEditable === true)
+      field = field.parentElement;
+    return field;
+  }
+
   public static capture(element: HTMLElement, document: Document): EditTarget {
     if (EditTarget.isTextField(element))
       return new EditTarget(element, element.selectionStart, element.selectionEnd, element.selectionDirection ?? "none", null);

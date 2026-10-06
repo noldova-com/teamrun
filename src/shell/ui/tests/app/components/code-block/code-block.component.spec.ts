@@ -14,7 +14,7 @@ import { userEvent } from "vitest/browser";
 import { CodeBlockComponent } from "../../../../src/app/components/code-block/code-block.component";
 import { ClipboardWriter } from "../../../../src/app/services/clipboard-writer";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import type { ClipboardWriterFixture } from "../../../fixtures/clipboard-writer.fixture";
 import { GalleryFixture } from "../../../fixtures/gallery.fixture";
