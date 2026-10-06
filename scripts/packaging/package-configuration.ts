@@ -22,6 +22,7 @@ export default class PackageConfiguration {
   private static readonly LICENSE_FILE: string = "LICENSE";
   private static readonly FONTS_FOLDER: string = "assets/fonts";
   private static readonly FONT_LICENSE_FILTER: readonly string[] = ["*.txt"];
+  private static readonly DICTIONARIES_FOLDER: string = "assets/dictionaries";
   private static readonly WINDOW_LICENSES_SEGMENTS: readonly string[] = ["_build", "window", "3rdpartylicenses.txt"];
   private static readonly LICENSES_FOLDER: string = "licenses";
   private static readonly WINDOW_LICENSES_FILE: string = "window-third-party.txt";
@@ -205,6 +206,7 @@ export default class PackageConfiguration {
     return [
       { from: path.join(this.root, PackageConfiguration.LICENSE_FILE), to: `${PackageConfiguration.LICENSES_FOLDER}/${PackageConfiguration.LICENSE_FILE}` },
       { from: path.join(this.root, PackageConfiguration.FONTS_FOLDER), to: PackageConfiguration.LICENSES_FOLDER, filter: PackageConfiguration.FONT_LICENSE_FILTER },
+      { from: path.join(this.root, PackageConfiguration.DICTIONARIES_FOLDER), to: PackageConfiguration.LICENSES_FOLDER, filter: PackageConfiguration.FONT_LICENSE_FILTER },
       { from: path.join(this.stage, ...PackageConfiguration.WINDOW_LICENSES_SEGMENTS), to: `${PackageConfiguration.LICENSES_FOLDER}/${PackageConfiguration.WINDOW_LICENSES_FILE}` }
     ];
   }

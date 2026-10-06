@@ -8,6 +8,7 @@
 
 import type { RenderProcessGoneDetails, WindowOpenHandlerResponse } from "electron";
 
+import type { IContextMenuParams } from "./i-context-menu-params.js";
 import type { IPreventableEvent } from "./i-preventable-event.js";
 
 export interface IWindowContents {
@@ -18,6 +19,7 @@ export interface IWindowContents {
   on(event: "will-attach-webview", listener: (event: IPreventableEvent) => void): unknown;
   on(event: "render-process-gone", listener: (event: unknown, details: RenderProcessGoneDetails) => void): unknown;
   on(event: "did-start-loading", listener: () => void): unknown;
+  on(event: "context-menu", listener: (event: unknown, params: IContextMenuParams) => void): unknown;
   setWindowOpenHandler(handler: () => WindowOpenHandlerResponse): void;
   send(channel: string, ...values: unknown[]): void;
   isLoading(): boolean;
@@ -30,5 +32,6 @@ export interface IWindowContents {
   copy(): void;
   paste(): void;
   selectAll(): void;
+  replaceMisspelling(text: string): void;
   getOSProcessId(): number;
 }

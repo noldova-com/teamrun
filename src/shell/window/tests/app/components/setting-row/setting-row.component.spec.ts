@@ -309,11 +309,18 @@ describe("SettingRowComponent", () => {
     expect(changes).toEqual([["en-US"], ["en-GB", "en-US"], ["en-GB"]]);
   });
 
-  it("says so when no spelling language is offered", () => {
+  it("shows the note it is given about the spelling languages, under the languages offered or alone", () => {
     const row = render(SettingsFixture.spellCheckLanguages);
 
+    expect(row.querySelector(".tr-setting-row-note")).toBeNull();
+    fixture.componentRef.setInput("languagesNote", "No spelling languages are offered on this device.");
+    fixture.detectChanges();
     expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("No spelling languages are offered on this device.");
     expect(row.querySelector("tr-checkbox")).toBeNull();
+    fixture.componentRef.setInput("languages", [new SelectOption("en-US", "English (United States)")]);
+    fixture.detectChanges();
+    expect(row.querySelectorAll("tr-checkbox").length).toBe(1);
+    expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("No spelling languages are offered on this device.");
   });
 
   for (const mode of AppearanceFixture.modes)

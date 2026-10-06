@@ -18,6 +18,7 @@ export class FakeApplicationHost implements IApplicationHost {
 
   public readonly calls: string[] = [];
   public readonly isPackaged: boolean;
+  public systemLanguages: string[] = ["en-US"];
   public dock: FakeDockHost | undefined = undefined;
 
   public constructor(hasLock: boolean, isPackaged: boolean) {
@@ -44,6 +45,10 @@ export class FakeApplicationHost implements IApplicationHost {
   public requestSingleInstanceLock(): boolean {
     this.calls.push("requestSingleInstanceLock");
     return this.hasLock;
+  }
+
+  public getPreferredSystemLanguages(): string[] {
+    return this.systemLanguages;
   }
 
   public enableSandbox(): void {

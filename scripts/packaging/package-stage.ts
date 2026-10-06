@@ -27,6 +27,7 @@ export default class PackageStage {
   private static readonly ENTRY_PACKAGES: readonly string[] = ["@noldova/teamrun-shell-desktop", "@noldova/teamrun-shell-cli"];
   private static readonly MANIFEST_FILE: string = "package.json";
   private static readonly LICENSE_FILE: string = "LICENSE";
+  private static readonly DICTIONARIES_FOLDER: string = "assets/dictionaries";
   private static readonly DESKTOP_FILE_EXTENSION: string = ".desktop";
   private static readonly UNREACHABLE_REGISTRY: string = "http://127.0.0.1:9/";
   private static readonly INSTALL_ARGUMENTS: readonly string[] = [
@@ -79,6 +80,7 @@ export default class PackageStage {
     output.write(`Packages in the stage: ${packages.map(t => t.name).join(", ")}.\n`);
 
     await cp(path.join(this.root, product.icons), path.join(this.folder, product.icons), { recursive: true });
+    await cp(path.join(this.root, PackageStage.DICTIONARIES_FOLDER), path.join(this.folder, PackageStage.DICTIONARIES_FOLDER), { recursive: true });
     await copyFile(path.join(this.root, PackageStage.LICENSE_FILE), path.join(this.folder, PackageStage.LICENSE_FILE));
   }
 
