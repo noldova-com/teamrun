@@ -246,6 +246,7 @@ describe("DialogComponent", () => {
     const dialog = document.querySelector("tr-dialog") as HTMLElement;
     const controls = [...dialog.querySelectorAll<HTMLButtonElement>(".tr-dialog-header button")];
     const names = (): readonly (string | null)[] => controls.map(t => t.getAttribute("aria-label"));
+    const glyph = (): string | null | undefined => controls[1]?.querySelector(".tr-icon-button-glyph")?.textContent;
     const bounds = (): readonly number[] => {
       const rectangle = dialog.getBoundingClientRect();
       return [rectangle.left, rectangle.width, rectangle.height];
@@ -255,15 +256,18 @@ describe("DialogComponent", () => {
     const tips = controls.slice(1).map(t => document.getElementById(t.getAttribute("aria-describedby") ?? String.empty)?.textContent);
     const large = bounds();
     const largeNames = names();
+    const largeGlyph = glyph();
 
     await userEvent.click(page.getByRole("button", { name: "Maximize" }));
     await vi.waitFor(() => expect(names()).toEqual(["Pin", "Restore", "Close"]));
     const maximized = bounds();
+    const maximizedGlyph = glyph();
     await userEvent.click(page.getByRole("button", { name: "Restore" }));
     await vi.waitFor(() => expect(names()).toEqual(largeNames));
 
     expect(largeNames).toEqual(["Pin", "Maximize", "Close"]);
     expect(tips).toEqual(["Maximize", "Close"]);
+    expect([largeGlyph, maximizedGlyph, glyph()]).toEqual(["crop_square", "filter_none", "crop_square"]);
     expect(dialog.querySelector(".tr-dialog-body .tr-dialog-probe")).not.toBeNull();
     AppearanceFixture.expectPixels(maximized[0] ?? 0, gap);
     AppearanceFixture.expectPixels(maximized[1] ?? 0, window.innerWidth - gap * 2);

@@ -295,8 +295,8 @@ export class Resources {
   public static readonly dialogCloseLabel: string = "Close";
   public static readonly dialogMaximizeLabel: string = "Maximize";
   public static readonly dialogRestoreLabel: string = "Restore";
-  public static readonly dialogMaximizeGlyph: string = "open_in_full";
-  public static readonly dialogRestoreGlyph: string = "close_fullscreen";
+  public static readonly dialogMaximizeGlyph: string = "crop_square";
+  public static readonly dialogRestoreGlyph: string = "filter_none";
   public static readonly dialogCloseSelector: string = ".tr-dialog-close";
   public static readonly noLimit: string = "none";
   public static readonly inertAttribute: string = "inert";
