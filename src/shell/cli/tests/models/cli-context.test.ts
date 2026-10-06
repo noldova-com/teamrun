@@ -7,6 +7,7 @@
  */
 
 import { EventEmitter } from "node:events";
+import path from "node:path";
 import { PassThrough } from "node:stream";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
@@ -16,16 +17,19 @@ import { ChildProcessStarter, RuntimeBuild } from "@noldova/teamrun-shell-runtim
 @TestClass
 export class CliContextTests {
   @TestMethod
-  public startsTheRuntimeDirectlyAndTheDesktopDetachedByDefault(): void {
+  public startsTheRuntimeDirectlyAndTheDesktopDetachedAndReadsTheRuntimesInstallationsDeclarationsByDefault(): void {
     const streams = new PassThrough();
     const signals = new EventEmitter();
 
-    const context = new CliContext({ A: "1" }, "linux", "/home/person", "/opt/teamrun/teamrun", "/opt/entry.js", RuntimeBuild.identity, streams, streams, streams, signals);
+    const entry = path.join("/opt", "teamrun", "node_modules", "@noldova", "teamrun-shell-runtime", "services", "runtime-entry.js");
+
+    const context = new CliContext({ A: "1" }, "linux", "/home/person", "/opt/teamrun/teamrun", entry, RuntimeBuild.identity, streams, streams, streams, signals);
 
     Assert.isInstanceOf(context.runtimeStarter, ChildProcessStarter);
     Assert.isInstanceOf(context.desktopOpener, DesktopOpener);
     Assert.areEqual("1", context.environment["A"]);
-    Assert.areEqual("linux/home/person/opt/teamrun/teamrun/opt/entry.js", `${context.platform}${context.homeFolder}${context.executablePath}${context.runtimeEntryPath}`);
+    Assert.areEqual(`linux/home/person/opt/teamrun/teamrun${entry}`, `${context.platform}${context.homeFolder}${context.executablePath}${context.runtimeEntryPath}`);
+    Assert.areEqual(path.join("/opt", "teamrun", "_build", "modules", "declarations.json"), context.declarationsFile);
     Assert.areEqual(RuntimeBuild.identity, context.identity);
     Assert.areEqual(signals, context.signals);
     Assert.isTrue(context.output === streams && context.error === streams && context.input === streams);

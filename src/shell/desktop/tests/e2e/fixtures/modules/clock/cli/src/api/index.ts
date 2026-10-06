@@ -6,11 +6,4 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum CliCommand {
-  Status = "Status",
-  Commands = "Commands",
-  Run = "Run",
-  Open = "Open",
-  Help = "Help",
-  Module = "Module"
-}
+export { CliPart } from "../cli-part.js";

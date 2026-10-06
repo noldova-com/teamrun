@@ -9,6 +9,8 @@
 import type { EventEmitter } from "node:events";
 import type { Readable, Writable } from "node:stream";
 
+import { Exception } from "@noldova/teamrun-foundation-exceptions";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
 import type { IProcessStarter } from "@noldova/teamrun-shell-runtime";
 
@@ -51,6 +53,12 @@ export declare enum ExitCode {
    * The command timed out or was cancelled.
    */
   Stopped = 6,
+
+  /**
+   * The command's module is not active: it failed or is blocked in the
+   * runtime, or its command-line part failed to start.
+   */
+  ModuleNotActive = 7,
 
   /**
    * TeamRun is installing an update: the update was still under way after
@@ -187,6 +195,12 @@ export declare class CliContext {
   public readonly updateWaitMilliseconds: number;
 
   /**
+   * The build's module declarations, which give the modules' commands and
+   * their help.
+   */
+  public readonly declarationsFile: string;
+
+  /**
    * Creates the context.
    *
    * @param environment The environment.
@@ -203,6 +217,8 @@ export declare class CliContext {
    * @param desktopOpener Starts the desktop; a detached process by default.
    * @param processId The command line's process id; the running process's by default.
    * @param updateWaitMilliseconds How long to wait for an update under way, in milliseconds; 30 seconds by default.
+   * @param declarationsFile The build's module declarations; by default `_build/modules/declarations.json` of the
+   * installation the runtime's entry script belongs to.
    * @example
    * ```ts
    * import { homedir } from "node:os";
@@ -228,13 +244,14 @@ export declare class CliContext {
     runtimeStarter?: IProcessStarter,
     desktopOpener?: IDesktopOpener,
     processId?: number,
-    updateWaitMilliseconds?: number);
+    updateWaitMilliseconds?: number,
+    declarationsFile?: string);
 }
 
 /**
- * The `teamrun` command line: `status`, `commands`, `run` and `open`, with
- * human output or `--json`. The package's README describes the commands,
- * options and exit codes.
+ * The `teamrun` command line: `status`, `commands`, `run`, `open`, `help` and
+ * the modules' own commands, with human output or `--json`. The package's
+ * README describes the commands, options and exit codes.
  */
 export declare class Cli {
   /**
@@ -319,4 +336,230 @@ export declare class CliEntry {
    * ```
    */
   public static settleAsync(run: Promise<number>, error: Writable, exit: Pick<NodeJS.Process, "exitCode">): Promise<void>;
+}
+
+/**
+ * The exception a module command throws when it refuses its arguments: the
+ * command line exits with {@link ExitCode.Usage} and prints the message with
+ * the command's usage.
+ */
+export declare class UsageException extends Exception {
+  /**
+   * The exception's name, `"UsageException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message What is wrong with the arguments, for people.
+   * @example
+   * ```ts
+   * import { UsageException } from "@noldova/teamrun-shell-cli";
+   *
+   * export function refuse(): never {
+   *   throw new UsageException("The title cannot be blank.");
+   * }
+   * ```
+   */
+  public constructor(message: string);
+}
+
+/**
+ * The exception a module command throws when it fails: the command line exits
+ * with {@link ExitCode.Failed} and reports the module's own code, message and
+ * details.
+ */
+export declare class CliCommandException extends Exception {
+  /**
+   * The exception's name, `"CliCommandException"`, which the class sets itself
+   * so that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * The module's code for the failure, which `--json` reports.
+   */
+  public readonly code: string;
+
+  /**
+   * More about the failure, which `--json` reports, or `null`.
+   */
+  public readonly details: JsonObject | null;
+
+  /**
+   * Creates the exception.
+   *
+   * @param code The module's code for the failure; not blank.
+   * @param message What failed, for people.
+   * @param details More about the failure; `null` by default.
+   * @throws ArgumentException When the code is blank.
+   * @example
+   * ```ts
+   * import { CliCommandException } from "@noldova/teamrun-shell-cli";
+   *
+   * export function fail(title: string): never {
+   *   throw new CliCommandException("NoteExists", `A note named ${title} exists already.`, { title });
+   * }
+   * ```
+   */
+  public constructor(code: string, message: string, details?: JsonObject | null);
+}
+
+/**
+ * What a module command returns: its JSON value, which `--json` prints, and
+ * its text for people, which the command line prints otherwise.
+ */
+export declare class CliCommandResult {
+  /**
+   * The command's JSON value.
+   */
+  public readonly value: JsonValue;
+
+  /**
+   * The command's text for people; nothing is printed when it is empty.
+   */
+  public readonly text: string;
+
+  /**
+   * Creates the result.
+   *
+   * @param value The command's JSON value.
+   * @param text Its text for people.
+   * @example
+   * ```ts
+   * import { CliCommandResult } from "@noldova/teamrun-shell-cli";
+   *
+   * export const result: CliCommandResult = new CliCommandResult({ id: 7 }, "Added note 7.");
+   * ```
+   */
+  public constructor(value: JsonValue, text: string);
+}
+
+/**
+ * Runs one of a module's command-line commands.
+ */
+export interface ICliCommandHandler {
+  /**
+   * Runs the command once the command line has read its arguments and options
+   * against the command's declaration.
+   *
+   * @param values The arguments and options by their names: a variadic
+   * argument and a repeated option as lists, a `Boolean` option as `true`, an
+   * option not given as its default, and nothing for others not given. The
+   * object and its lists are frozen.
+   * @param signal Aborts when the person presses Ctrl+C or the command's
+   * `--timeout` passes; the command line then reports the stop without
+   * waiting for the handler.
+   * @returns A promise of the command's result.
+   * @throws UsageException Rejected when the command refuses its arguments.
+   * @throws CliCommandException Rejected when the command fails.
+   * @example
+   * ```ts
+   * import { CliCommandResult, type ICliCommandHandler } from "@noldova/teamrun-shell-cli";
+   *
+   * export const handler: ICliCommandHandler = {
+   *   handleAsync: async values => new CliCommandResult(values, `Got ${Object.keys(values).length} values.`)
+   * };
+   * ```
+   */
+  handleAsync(values: Readonly<Record<string, JsonValue>>, signal: AbortSignal): Promise<CliCommandResult>;
+}
+
+/**
+ * What a module's command-line part may register and use while it activates.
+ */
+export interface ICliPartContext {
+  /**
+   * The part's module.
+   */
+  readonly moduleId: string;
+
+  /**
+   * Registers one of the command-line commands the module declares.
+   *
+   * @param name The command's declared name, such as `notes.addNote`.
+   * @param handler Runs it.
+   * @throws ArgumentException When the module does not declare the command or
+   * it is registered already.
+   * @example
+   * ```ts
+   * import { CliCommandResult, type ICliPartContext } from "@noldova/teamrun-shell-cli";
+   *
+   * export function register(context: ICliPartContext): void {
+   *   context.registerCommand("notes.addNote", { handleAsync: async () => new CliCommandResult(null, "Added.") });
+   * }
+   * ```
+   */
+  registerCommand(name: string, handler: ICliCommandHandler): void;
+
+  /**
+   * Calls a method of the runtime over the command line's connection, which
+   * is how a command reaches its module's runtime part.
+   *
+   * @param method The method's qualified name, such as `notes.add`.
+   * @param payload Its payload.
+   * @param signal Cancels the call; pass the command's signal.
+   * @returns A promise of the method's result.
+   * @throws MethodFailureException Rejected with the runtime's failure.
+   * @example
+   * ```ts
+   * import type { JsonValue } from "@noldova/teamrun-foundation-json";
+   * import type { ICliPartContext } from "@noldova/teamrun-shell-cli";
+   *
+   * export function addAsync(context: ICliPartContext, title: string, signal: AbortSignal): Promise<JsonValue> {
+   *   return context.requestAsync("notes.add", { title }, signal);
+   * }
+   * ```
+   */
+  requestAsync(method: string, payload: JsonValue, signal: AbortSignal): Promise<JsonValue>;
+}
+
+/**
+ * A module's command-line part. A module's CLI package exports it as the
+ * class `CliPart`, which the command line constructs without arguments. The
+ * command line starts it, after the parts of the module's dependencies, only
+ * to run one of its module's commands or of a module that depends on it.
+ */
+export interface ICliPart {
+  /**
+   * Activates the part: it registers the module's commands.
+   *
+   * @param context What the part may register and use.
+   * @returns A promise that resolves once the part is active; a rejection
+   * ends the command with {@link ExitCode.ModuleNotActive}.
+   * @example
+   * ```ts
+   * import { CliCommandResult, type ICliPart, type ICliPartContext } from "@noldova/teamrun-shell-cli";
+   *
+   * export class CliPart implements ICliPart {
+   *   public async activateAsync(context: ICliPartContext): Promise<void> {
+   *     context.registerCommand("notes.addNote", {
+   *       handleAsync: async (values, signal) => new CliCommandResult(await context.requestAsync("notes.add", values, signal), "Added.")
+   *     });
+   *   }
+   *
+   *   public async deactivateAsync(): Promise<void> {
+   *   }
+   * }
+   * ```
+   */
+  activateAsync(context: ICliPartContext): Promise<void>;
+
+  /**
+   * Deactivates the part once the command has ended: it releases its timers
+   * and files.
+   *
+   * @returns A promise that resolves once the part has released everything.
+   * @example
+   * ```ts
+   * import type { ICliPart } from "@noldova/teamrun-shell-cli";
+   *
+   * export function stopAsync(part: ICliPart): Promise<void> {
+   *   return part.deactivateAsync();
+   * }
+   * ```
+   */
+  deactivateAsync(): Promise<void>;
 }

@@ -38,8 +38,20 @@ export class Resources {
   public static readonly wholeSecondsPattern: RegExp = /^\d+$/;
   public static readonly maximumTimeoutSeconds: number = 3_600;
   public static readonly jsonIndent: number = 2;
+  public static readonly codeParameterName: string = "code";
+  public static readonly nameParameterName: string = "name";
+  public static readonly nameSeparator: string = ".";
+  public static readonly capitalPattern: RegExp = /[A-Z]/g;
+  public static readonly wordSeparator: string = "-";
+  public static readonly numberPattern: RegExp = /^-?\d+(?:\.\d+)?$/;
+  public static readonly lineEnd: string = "\n";
+  public static readonly declarationsFormatVersion: number = 1;
+  public static readonly declarationsSegments: readonly string[] = ["..", "..", "..", "..", "_build", "modules", "declarations.json"];
+  public static readonly cliPartExport: string = "CliPart";
+  public static readonly activateMember: string = "activateAsync";
+  public static readonly deactivateMember: string = "deactivateAsync";
 
-  public static readonly commandWords: Readonly<Record<CliCommand, string>> = {
+  public static readonly commandWords: Readonly<Record<Exclude<CliCommand, CliCommand.Module>, string>> = {
     [CliCommand.Status]: "status",
     [CliCommand.Commands]: "commands",
     [CliCommand.Run]: "run",
@@ -65,6 +77,7 @@ export class Resources {
   public static readonly buildMismatchCode: string = "BuildMismatch";
   public static readonly dataDirectoryUnusableCode: string = "DataDirectoryUnusable";
   public static readonly failedCode: string = "Failed";
+  public static readonly moduleNotActiveCode: string = "ModuleNotActive";
   public static readonly unusableDirectoryErrorCodes: readonly string[] = ["EACCES", "EPERM", "EROFS", "ENOTDIR", "EEXIST"];
 
   public static get usage(): string {
@@ -77,19 +90,39 @@ export class Resources {
       "  run <command> [<json> | --args-file <path> | -]",
       "                                           Runs a runtime command with its arguments, printing its result.",
       `  open                                     Starts ${Resources.productName} or brings its window forward.`,
+      "  help [<module> [<command>]]              Prints this help, a module's commands or one command's help.",
+      "  <module> <command> [<argument>...]       Runs a module's command with its arguments and options.",
       String.empty,
       "Options:",
       "  --data-dir <path>   The data directory to use.",
       "  --device-dir <path> The device folder to use.",
       "  --json              Prints one JSON value on standard output, and errors as JSON on standard error.",
-      "  --no-start          Fails instead of starting a runtime when none is running (commands, run).",
-      "  --take-over         Asks another build's idle runtime to stop and takes its place (commands, run).",
-      "  --timeout <seconds> How long a command may run (run).",
+      "  --no-start          Fails instead of starting a runtime when none is running (commands, run, module commands).",
+      "  --take-over         Asks another build's idle runtime to stop and takes its place (commands, run, module commands).",
+      "  --timeout <seconds> How long a command may run (run, module commands).",
+      "  --help              Prints the help of the command it follows.",
       String.empty,
       "Exit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,",
-      `5 data directory unusable, 6 timed out or cancelled, 8 ${Resources.productName} is installing an update.`
+      `5 data directory unusable, 6 timed out or cancelled, 7 module not active, 8 ${Resources.productName} is installing an update.`
     ].join("\n");
   }
+
+  public static readonly moduleCommandsTitle: string = "Module commands:";
+  public static readonly commandsTitle: string = "Commands:";
+  public static readonly argumentsTitle: string = "Arguments:";
+  public static readonly optionsTitle: string = "Options:";
+  public static readonly examplesTitle: string = "Examples:";
+  public static readonly noModuleCommands: string = "It has no commands.";
+  public static readonly helpIndent: string = "  ";
+  public static readonly helpGap: string = "  ";
+  public static readonly textPlaceholder: string = "<text>";
+  public static readonly numberPlaceholder: string = "<number>";
+  public static readonly repeatedSuffix: string = "...";
+  public static readonly optionalArgument: string = "Optional.";
+  public static readonly requiredOption: string = "Required.";
+  public static readonly repeatedOption: string = "Repeatable.";
+  public static readonly moduleNotInRuntime: string = "The runtime does not have it.";
+  public static readonly cliPartMissing: string = "Its command-line part does not export a CliPart class with activateAsync and deactivateAsync.";
 
   public static readonly commandRequired: string = "A command is required.";
   public static readonly commandNameRequired: string = "The run command needs the name of a command to run.";
@@ -117,7 +150,7 @@ export class Resources {
     return `"${option}" is not an option.`;
   }
 
-  public static formatOptionNotForCommand(option: string, command: CliCommand): string {
+  public static formatOptionNotForCommand(option: string, command: Exclude<CliCommand, CliCommand.Module>): string {
     return `The ${option} option does not apply to ${Resources.commandWords[command]}.`;
   }
 
@@ -163,5 +196,101 @@ export class Resources {
 
   public static formatOpened(root: string): string {
     return `${Resources.productName} is opening with ${root}.`;
+  }
+
+  public static formatWord(name: string): string {
+    return name.replace(Resources.capitalPattern, t => `${Resources.wordSeparator}${t.toLowerCase()}`);
+  }
+
+  public static formatDeclarationsUnreadable(file: string, reason: string): string {
+    return `The module declarations ${file} could not be read: ${reason}`;
+  }
+
+  public static formatDeclarationsVersion(version: number): string {
+    return `Their format version is ${version}, not ${Resources.declarationsFormatVersion}.`;
+  }
+
+  public static formatOptionNotForModuleCommands(option: string): string {
+    return `The ${option} option does not apply to module commands.`;
+  }
+
+  public static formatUnknownModuleCommand(word: string, moduleId: string): string {
+    return `"${word}" is not a command of ${moduleId}.`;
+  }
+
+  public static formatModuleCommandRequired(moduleId: string): string {
+    return `${moduleId} needs one of its commands.`;
+  }
+
+  public static formatOptionTakesNoValue(option: string): string {
+    return `The ${option} option takes no value.`;
+  }
+
+  public static formatOptionNotNumber(option: string, value: string): string {
+    return `The ${option} option takes a number, not "${value}".`;
+  }
+
+  public static formatOptionRepeated(option: string): string {
+    return `The ${option} option was given more than once.`;
+  }
+
+  public static formatArgumentRequired(placeholder: string): string {
+    return `The ${placeholder} argument is required.`;
+  }
+
+  public static formatOptionRequired(option: string): string {
+    return `The ${option} option is required.`;
+  }
+
+  public static formatModuleNotActive(moduleId: string, reason: string): string {
+    return `The module ${moduleId} is not active: ${reason}`;
+  }
+
+  public static formatCliPartFailed(reason: string): string {
+    return `Its command-line part failed to start: ${reason}`;
+  }
+
+  public static formatCommandNotRegistered(name: string): string {
+    return `Its command-line part did not register ${name}.`;
+  }
+
+  public static formatCommandNotDeclared(name: string, moduleId: string): string {
+    return `${name} is not a command-line command that ${moduleId} declares.`;
+  }
+
+  public static formatCommandRegisteredTwice(name: string): string {
+    return `${name} is registered already.`;
+  }
+
+  public static formatModuleHeading(displayName: string, description: string): string {
+    return `${displayName}: ${description}`;
+  }
+
+  public static formatModuleUsage(moduleId: string): string {
+    return `Usage: ${Resources.productSlug} ${moduleId} <command> [options]`;
+  }
+
+  public static formatCommandUsage(moduleId: string, word: string, syntax: readonly string[]): string {
+    return [`Usage: ${Resources.productSlug} ${moduleId} ${word}`, ...syntax].join(" ");
+  }
+
+  public static formatModuleHelpHint(moduleId: string): string {
+    return `Run "${Resources.productSlug} help ${moduleId} <command>" for a command's arguments and options.`;
+  }
+
+  public static formatModuleCommand(moduleId: string, word: string): string {
+    return `${Resources.productSlug} ${moduleId} ${word}`;
+  }
+
+  public static formatExample(moduleId: string, word: string, exampleArguments: string): string {
+    return [Resources.productSlug, moduleId, word, exampleArguments].filter(t => t.length > 0).join(" ");
+  }
+
+  public static formatOptional(syntax: string): string {
+    return `[${syntax}]`;
+  }
+
+  public static formatDefault(value: string): string {
+    return `Default: ${value}.`;
   }
 }

@@ -21,13 +21,16 @@ export class ResourcesTests {
       "\n  commands ",
       "\n  run <command> [<json> | --args-file <path> | -]\n",
       "\n  open                                     Starts TeamRun or brings its window forward.\n",
+      "\n  help [<module> [<command>]]              Prints this help, a module's commands or one command's help.\n",
+      "\n  <module> <command> [<argument>...]       Runs a module's command with its arguments and options.\n",
+      "\n  --help ",
       "\n  --data-dir <path> ",
       "\n  --device-dir <path> ",
       "\n  --json ",
       "\n  --no-start ",
       "\n  --take-over ",
       "\n  --timeout <seconds> ",
-      "\nExit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,\n5 data directory unusable, 6 timed out or cancelled, 8 TeamRun is installing an update.\n"
+      "\nExit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,\n5 data directory unusable, 6 timed out or cancelled, 7 module not active, 8 TeamRun is installing an update.\n"
     ];
 
     const help = await fixture.runAsync(["help"]);

@@ -14,7 +14,21 @@ import { setTimeout as delay } from "node:timers/promises";
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { CommandList, CommandRun, FailureCode, ModuleStatusList, QualifiedName, ShellEvents, ShellMethods, StopPolicy, UpdateSaved, WorkReport } from "@noldova/teamrun-shell-protocol";
+import {
+  CommandList,
+  CommandRun,
+  Failure,
+  FailureCode,
+  ModuleState,
+  type ModuleStatus,
+  ModuleStatusList,
+  QualifiedName,
+  ShellEvents,
+  ShellMethods,
+  StopPolicy,
+  UpdateSaved,
+  WorkReport
+} from "@noldova/teamrun-shell-protocol";
 import {
   AppImageSource,
   AttachOptions,
@@ -37,13 +51,21 @@ import {
 import { ArgumentsSource } from "../enums/arguments-source.js";
 import { CliCommand } from "../enums/cli-command.js";
 import { ExitCode } from "../enums/exit-code.js";
+import { ModuleNotActiveException } from "../exceptions/module-not-active.exception.js";
 import { UsageException } from "../exceptions/usage.exception.js";
+import type { ICliCommandHandler } from "../interfaces/i-cli-command-handler.js";
+import type { CliCommandResult } from "../models/cli-command-result.js";
 import type { CliContext } from "../models/cli-context.js";
 import { CliFailure } from "../models/cli-failure.js";
+import type { CliModule } from "../models/cli-module.js";
 import { CommandLine } from "../models/command-line.js";
+import { ModuleCall } from "../models/module-call.js";
 import { StatusReport } from "../models/status-report.js";
 import { Resources } from "../resources.js";
+import { CliHelp } from "./cli-help.js";
+import { CliModuleReader } from "./cli-module.reader.js";
 import { CliOutput } from "./cli-output.js";
+import { CliPartHost } from "./cli-part-host.js";
 
 export class Cli {
   private static readonly IGNORE: () => void = () => undefined;
@@ -61,15 +83,14 @@ export class Cli {
       commandLine = CommandLine.parse(commandLineArguments);
     }
     catch (error) {
-      return this.fail(new CliOutput(this.context.output, this.context.error, commandLineArguments.includes(Resources.jsonFlag)), error, true);
+      return this.fail(new CliOutput(this.context.output, this.context.error, commandLineArguments.includes(Resources.jsonFlag)), error, Resources.usage);
     }
 
     const output = new CliOutput(this.context.output, this.context.error, commandLine.isJson);
     try {
       switch (commandLine.command) {
         case CliCommand.Help:
-          output.writeUsage();
-          return ExitCode.Success;
+          return await this.helpAsync(commandLine, output);
         case CliCommand.Status:
           output.writeStatus(await this.readStatusAsync(commandLine));
           return ExitCode.Success;
@@ -82,17 +103,103 @@ export class Cli {
         case CliCommand.Open:
           output.writeOpened(await this.openAsync(commandLine));
           return ExitCode.Success;
+        case CliCommand.Module:
+          return await this.runModuleAsync(commandLine, output);
       }
     }
     catch (error) {
-      return this.fail(output, this.isUpdating ? new UpdateInProgressException(UpdateBarrierStatus.Held) : error, false);
+      return this.fail(output, this.isUpdating ? new UpdateInProgressException(UpdateBarrierStatus.Held) : error, null);
     }
   }
 
-  private fail(output: CliOutput, error: unknown, withUsage: boolean): number {
+  private fail(output: CliOutput, error: unknown, usage: string | null): number {
     const failure = error instanceof MethodFailureException ? CliFailure.fromFailure(error.failure) : CliFailure.fromError(error);
-    output.writeFailure(failure, withUsage);
+    output.writeFailure(failure, usage);
     return failure.exitCode;
+  }
+
+  private async helpAsync(commandLine: CommandLine, output: CliOutput): Promise<number> {
+    const modules = await CliModuleReader.readAsync(this.context.declarationsFile);
+    const [moduleId, word, unexpected] = commandLine.moduleArguments;
+    const module = modules.find(t => t.id === moduleId);
+    if (Object.isUndefined(module)) {
+      if (Object.isUndefined(moduleId) || Object.values(Resources.commandWords).includes(moduleId))
+        return Cli.help(output, CliHelp.formatAll(modules));
+      return this.fail(output, new UsageException(Resources.formatUnknownCommand(moduleId)), Resources.usage);
+    }
+    if (!Object.isUndefined(unexpected))
+      return this.fail(output, new UsageException(Resources.formatUnexpectedArgument(unexpected)), CliHelp.formatModule(module));
+    if (Object.isUndefined(word))
+      return Cli.help(output, CliHelp.formatModule(module));
+    const command = module.commands.find(t => t.word === word);
+    if (Object.isUndefined(command))
+      return this.fail(output, new UsageException(Resources.formatUnknownModuleCommand(word, module.id)), CliHelp.formatModule(module));
+    return Cli.help(output, CliHelp.formatCommand(module, command));
+  }
+
+  private async runModuleAsync(commandLine: CommandLine, output: CliOutput): Promise<number> {
+    const modules = await CliModuleReader.readAsync(this.context.declarationsFile);
+    const module = modules.find(t => t.id === commandLine.commandName);
+    if (Object.isUndefined(module))
+      return this.fail(output, new UsageException(Resources.formatUnknownCommand(commandLine.commandName)), Resources.usage);
+    const [word, ...rest] = commandLine.moduleArguments;
+    const command = module.commands.find(t => t.word === word);
+    if (Object.isUndefined(command)) {
+      if (commandLine.isHelp)
+        return Cli.help(output, CliHelp.formatModule(module));
+      const problem = Object.isUndefined(word) ? Resources.formatModuleCommandRequired(module.id) : Resources.formatUnknownModuleCommand(word, module.id);
+      return this.fail(output, new UsageException(problem), CliHelp.formatModule(module));
+    }
+    const usage = CliHelp.formatCommand(module, command);
+    if (commandLine.isHelp)
+      return Cli.help(output, usage);
+    let result: CliCommandResult;
+    try {
+      result = await this.runModuleCommandAsync(commandLine, modules, module, ModuleCall.parse(command, rest));
+    }
+    catch (error) {
+      if (error instanceof UsageException)
+        return this.fail(output, error, usage);
+      throw error;
+    }
+    output.writeCommandResult(result);
+    return ExitCode.Success;
+  }
+
+  private async runModuleCommandAsync(commandLine: CommandLine, modules: readonly CliModule[], module: CliModule, call: ModuleCall): Promise<CliCommandResult> {
+    const client = await this.attachAsync(commandLine, this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
+    const host = new CliPartHost(modules, (method, payload, signal) => Cli.callAsync(client, QualifiedName.parse(method), payload, undefined, signal));
+    try {
+      const status = await Cli.findModuleAsync(client, module.id);
+      if (Object.isUndefined(status))
+        throw new ModuleNotActiveException(module.id, Resources.moduleNotInRuntime);
+      Cli.requireActive(status);
+      const handler = await host.startAsync(module, call.command);
+      return await this.handleAsync(handler, call.values, commandLine.timeoutMilliseconds);
+    }
+    finally {
+      await host.stopAsync();
+      client.close();
+    }
+  }
+
+  private async handleAsync(handler: ICliCommandHandler, values: Readonly<Record<string, JsonValue>>, timeout: number | null): Promise<CliCommandResult> {
+    const controller = new AbortController();
+    const stopped = Promise.withResolvers<never>();
+    const stop = (failure: Failure): void => {
+      controller.abort();
+      stopped.reject(new MethodFailureException(failure));
+    };
+    const interrupt = (): void => stop(new Failure(FailureCode.Cancelled, Resources.cancelled));
+    this.context.signals.on(Resources.interruptSignal, interrupt);
+    const timer = Object.isNull(timeout) ? undefined : setTimeout(() => stop(new Failure(FailureCode.DeadlineExceeded, Resources.timedOut)), timeout);
+    try {
+      return await Promise.race([handler.handleAsync(values, controller.signal), stopped.promise]);
+    }
+    finally {
+      clearTimeout(timer);
+      this.context.signals.off(Resources.interruptSignal, interrupt);
+    }
   }
 
   private async readStatusAsync(commandLine: CommandLine): Promise<StatusReport> {
@@ -126,6 +233,14 @@ export class Cli {
     this.context.signals.on(Resources.interruptSignal, interrupt);
     try {
       return await Cli.callAsync(client, ShellMethods.runCommand, run.toJson(), commandLine.timeoutMilliseconds ?? undefined, controller.signal);
+    }
+    catch (error) {
+      if (error instanceof MethodFailureException && error.failure.code === FailureCode.NotFound) {
+        const status = await Cli.findModuleAsync(client, run.name.owner);
+        if (!Object.isUndefined(status))
+          Cli.requireActive(status);
+      }
+      throw error;
     }
     finally {
       this.context.signals.off(Resources.interruptSignal, interrupt);
@@ -201,6 +316,20 @@ export class Cli {
     this.isUpdating = true;
     const close = (): void => client.close();
     void client.callAsync(ShellMethods.updateSaved, new UpdateSaved(this.context.processId, []).toJson()).then(close, close);
+  }
+
+  private static help(output: CliOutput, help: string): number {
+    output.writeHelp(help);
+    return ExitCode.Success;
+  }
+
+  private static async findModuleAsync(client: RuntimeClient, moduleId: string): Promise<ModuleStatus | undefined> {
+    return ModuleStatusList.fromJson(await Cli.callAsync(client, ShellMethods.modules, null)).modules.find(t => t.id === moduleId);
+  }
+
+  private static requireActive(status: ModuleStatus): void {
+    if (status.state !== ModuleState.Active)
+      throw new ModuleNotActiveException(status.id, String(status.cause), status.blockedBy);
   }
 
   private static isUpdateUnderWay(error: unknown): boolean {

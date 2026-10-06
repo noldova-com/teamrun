@@ -18,12 +18,12 @@ import ModuleSettings from "./module-settings.ts";
 
 export default class ModuleDeclaration {
   public static readonly PARTS: readonly string[] = ["runtime", "window", "cli"];
+  public static readonly RESERVED_IDS: readonly string[] = ["shell", "status", "commands", "run", "open", "help"];
 
   private static readonly FILE_NAME: string = "module.json";
   private static readonly ID_PATTERN: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   private static readonly VERSION_PATTERN: RegExp = /^(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
-  private static readonly RESERVED_IDS: readonly string[] = ["shell", "status", "commands", "run", "open", "help"];
   private static readonly KINDS: readonly string[] = [
     "methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "menus", "themes", ModuleSettings.SETTINGS_KIND, ModuleSettings.SCOPES_KIND,
     ModuleCliCommands.KIND

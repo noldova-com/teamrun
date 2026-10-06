@@ -67,6 +67,7 @@ export class CommandLineTests {
       [["status", "--json=yes"], "\"--json=yes\" is not an option."],
       [["status", "--timeout", "5"], "The --timeout option does not apply to status."],
       [["open", "--args-file", "a.json"], "The --args-file option does not apply to open."],
+      [["notes", "add", "--args-file", "a.json"], "The --args-file option does not apply to module commands."],
       [["status", "--no-start"], "The --no-start option does not apply to status."],
       [["open", "--take-over"], "The --take-over option does not apply to open."],
       [["status", "extra"], "\"extra\" was not expected."],

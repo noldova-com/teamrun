@@ -11,6 +11,7 @@ import { test, type TestContext } from "node:test";
 
 import ModuleCliCommands from "../../modules/module-cli-commands.ts";
 import ModuleException from "../../modules/module.exception.ts";
+import CliUsageFixture from "../fixtures/cli-usage.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class ModuleCliCommandsTests {
@@ -21,6 +22,10 @@ class ModuleCliCommandsTests {
   private static readonly COMMAND_FIELDS: string = "must be an object with the fields name, summary, arguments, options, and optionally description, examples";
 
   public static register(): void {
+    test("the options a module's command may not have are the command line's global options", () => {
+      assert.deepEqual(ModuleCliCommands.GLOBAL_OPTIONS.toSorted(), CliUsageFixture.readGlobalOptions().toSorted());
+    });
+
     test("a module's command-line commands are read with their defaults filled in, and a module without them needs no file", async t => {
       const repository = await ModuleCliCommandsTests.createAsync(t);
       const add = {

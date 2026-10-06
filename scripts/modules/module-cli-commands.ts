@@ -15,6 +15,7 @@ import ModuleException from "./module.exception.ts";
 export default class ModuleCliCommands {
   public static readonly FILE_NAME: string = "cli.json";
   public static readonly KIND: string = "cliCommands";
+  public static readonly GLOBAL_OPTIONS: readonly string[] = ["data-dir", "device-dir", "json", "no-start", "take-over", "timeout", "help"];
   private static readonly COMMAND_FIELDS: readonly string[] = ["name", "summary", "description", "arguments", "options", "examples"];
   private static readonly OPTIONAL_COMMAND_FIELDS: readonly string[] = ["description", "examples"];
   private static readonly ARGUMENT_FIELDS: readonly string[] = ["name", "description", "required", "variadic"];
@@ -22,7 +23,6 @@ export default class ModuleCliCommands {
   private static readonly BOOLEAN_FIELDS: readonly string[] = ["name", "description", "type"];
   private static readonly EXAMPLE_FIELDS: readonly string[] = ["arguments", "description"];
   private static readonly TYPES: readonly string[] = ["Text", "Number", "Boolean"];
-  private static readonly GLOBAL_OPTIONS: readonly string[] = ["data-dir", "device-dir", "json", "no-start", "take-over", "timeout", "help"];
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
 
   public static async readAsync(root: string, folder: string, contributions: ReadonlyMap<string, readonly string[]>): Promise<readonly Readonly<Record<string, unknown>>[]> {

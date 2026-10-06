@@ -7,6 +7,7 @@
  */
 
 import { EventEmitter } from "node:events";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 
@@ -26,6 +27,7 @@ import { SocketFolderFixture } from "./socket-folder.fixture.js";
 export class CliFixture implements AsyncDisposable {
   public static readonly CHECKOUT_VARIABLE: string = "TEAMRUN_CHECKOUT";
   public static readonly DATA_DIRECTORY_VARIABLE: string = "TEAMRUN_DATA_DIR";
+  private static readonly DATA_DIRECTORY_FLAG: string = "--data-dir";
   private static readonly LOCAL_DATA_VARIABLE: string = "LOCALAPPDATA";
   private static readonly STATE_VARIABLE: string = "XDG_STATE_HOME";
   private static readonly STOP_LIMIT: number = 15_000;
@@ -36,6 +38,7 @@ export class CliFixture implements AsyncDisposable {
   public readonly root: string;
   public readonly dataDirectory: string;
   public readonly homeFolder: string;
+  public readonly declarationsFile: string;
   public readonly opener: FakeDesktopOpenerFixture = new FakeDesktopOpenerFixture();
   public readonly signals: EventEmitter = new EventEmitter();
 
@@ -44,10 +47,13 @@ export class CliFixture implements AsyncDisposable {
     this.root = folder.path;
     this.dataDirectory = path.join(folder.path, "data");
     this.homeFolder = path.join(folder.path, "home");
+    this.declarationsFile = path.join(folder.path, "declarations.json");
   }
 
   public static async createAsync(): Promise<CliFixture> {
-    return new CliFixture(await SocketFolderFixture.createAsync("tr-cli-"));
+    const fixture = new CliFixture(await SocketFolderFixture.createAsync("tr-cli-"));
+    await fixture.writeDeclarationsAsync([]);
+    return fixture;
   }
 
   public get environment(): NodeJS.ProcessEnv {
@@ -65,16 +71,25 @@ export class CliFixture implements AsyncDisposable {
     environment: NodeJS.ProcessEnv = this.environment,
     input: string = "",
     starter?: IProcessStarter,
-    updateWaitMilliseconds?: number): Promise<{ code: number; output: string; error: string }> {
+    updateWaitMilliseconds?: number,
+    declarationsFile: string = build?.declarationsFile ?? this.declarationsFile): Promise<{ code: number; output: string; error: string }> {
     const output = new PassThrough({ encoding: "utf8" });
     const error = new PassThrough({ encoding: "utf8" });
     const inputStream = new PassThrough({ encoding: "utf8" });
     inputStream.end(input);
     const identity: BuildIdentity = build?.identity ?? RuntimeBuild.identity;
     const context = new CliContext(environment, process.platform, this.homeFolder, process.execPath, build?.entryPath ?? RuntimeEntry.entryPath, identity,
-      output, error, inputStream, this.signals, starter, this.opener, process.pid, updateWaitMilliseconds);
+      output, error, inputStream, this.signals, starter, this.opener, process.pid, updateWaitMilliseconds, declarationsFile);
     const code = await new Cli(context).runAsync(commandLineArguments);
     return { code, output: String(output.read() ?? ""), error: String(error.read() ?? "") };
+  }
+
+  public runModuleAsync(declarationsFile: string, commandLineArguments: readonly string[]): Promise<{ code: number; output: string; error: string }> {
+    return this.runAsync([CliFixture.DATA_DIRECTORY_FLAG, this.dataDirectory, ...commandLineArguments], null, this.environment, "", undefined, undefined, declarationsFile);
+  }
+
+  public async writeDeclarationsAsync(modules: readonly unknown[], formatVersion: unknown = 1): Promise<void> {
+    await writeFile(this.declarationsFile, JSON.stringify({ formatVersion, modules }));
   }
 
   public get deviceFolder(): string {
