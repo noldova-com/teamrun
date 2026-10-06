@@ -14,12 +14,13 @@ import PackageLayout from "../../packaging/package-layout.ts";
 
 class PackageLayoutTests {
   public static register(): void {
-    test("packaging keeps its stage, caches, Electron copy, configuration, packages, smoke evidence, generated command and third-party tarballs and licenses under _build/package", () => {
+    test("packaging keeps its stage, caches, Electron copy, configuration, packages, smoke evidence, generated command, signing tools, report and third-party tarballs and licenses under _build/package", () => {
       const root = path.join("fixture", "root");
       const folder = path.join(root, "_build", "package");
       const layout = new PackageLayout(root);
 
-      assert.deepEqual([layout.stage, layout.npmCache, layout.electron, layout.toolCache, layout.output, layout.smoke, layout.command, layout.configuration, layout.thirdParty, layout.thirdPartyLicenses], [
+      assert.deepEqual([layout.stage, layout.npmCache, layout.electron, layout.toolCache, layout.output, layout.smoke, layout.command, layout.configuration, layout.signing, layout.report,
+        layout.thirdParty, layout.thirdPartyLicenses], [
         path.join(folder, "app"),
         path.join(folder, "npm-cache"),
         path.join(folder, "electron"),
@@ -28,6 +29,8 @@ class PackageLayoutTests {
         path.join(folder, "smoke"),
         path.join(folder, "command"),
         path.join(folder, "electron-builder.json"),
+        path.join(folder, "signing"),
+        path.join(folder, "package-report.json"),
         path.join(folder, "third-party"),
         path.join(folder, "runtime-third-party.txt")
       ]);

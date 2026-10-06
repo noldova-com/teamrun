@@ -21,6 +21,7 @@ import type IPackageSigning from "./packaging/interfaces/i-package-signing.ts";
 import MacSigning from "./packaging/mac-signing.ts";
 import PackageConfiguration from "./packaging/package-configuration.ts";
 import PackageLayout from "./packaging/package-layout.ts";
+import PackageReport from "./packaging/package-report.ts";
 import PackageStage from "./packaging/package-stage.ts";
 import PackageTarget from "./packaging/package-target.ts";
 import PackagedBuild from "./packaging/packaged-build.ts";
@@ -73,6 +74,8 @@ export default class Package {
 
   public async runAsync(packageArguments: readonly string[]): Promise<number> {
     const credentials = SigningCredentials.take(this.environment);
+    const layout = new PackageLayout(this.root);
+    await rm(layout.report, { force: true });
     if (packageArguments.length > 1 || packageArguments.some(t => t !== Package.SIGNED_OPTION)) {
       this.output.write(Package.USAGE);
       return Package.USAGE_EXIT_CODE;
@@ -80,7 +83,6 @@ export default class Package {
 
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
-      const layout = new PackageLayout(this.root);
       const signing = packageArguments.length === 0 ? null : this.createSigning(target, layout, credentials);
       await this.stage.stageAsync(target, this.output);
       await rm(layout.output, { recursive: true, force: true });
@@ -132,6 +134,7 @@ export default class Package {
     this.output.write(`Packages made:\n${files.map(t => `  ${t}\n`).join("")}`);
     if (signing !== null)
       this.output.write(`Signatures:\n${await signing.verifyAsync(files, manifest.product)}\n`);
+    await new PackageReport(target.id, signing !== null, signing !== null).writeAsync(layout.report);
   }
 
   private createBuilderEnvironment(layout: PackageLayout, target: PackageTarget): NodeJS.ProcessEnv {

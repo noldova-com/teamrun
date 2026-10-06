@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { after, before, test, type TestContext } from "node:test";
 
@@ -155,6 +155,8 @@ class PackageTests {
         assert.equal(await readFile(path.join(repository.directory, "_build", "package", "tool-cache", "package.json"), "utf8"), "{\"type\":\"commonjs\"}\n");
         assert.equal(existsSync(path.join(folder, "TeamRun-linux-x64.AppImage")), false);
         assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n  ${path.join(folder, PackageTests.APP_IMAGE)}\n`);
+        assert.deepEqual(JSON.parse(await readFile(path.join(repository.directory, "_build", "package", "package-report.json"), "utf8")),
+          { target: "linux-x64", signed: false, checked: false });
       });
 
     test("electron-builder compresses a Windows ARM64 package with the x86 filter that the installer's extractor reads, and leaves every other target's filter alone",
@@ -180,27 +182,31 @@ class PackageTests {
         assert.deepEqual(filters, ["BCJ", undefined, undefined, undefined]);
       });
 
-    test("a failed electron-builder run or one that leaves a package unmade fails packaging", { timeout: PackageTests.TIMEOUT }, async t => {
+    test("a failed electron-builder run or one that leaves a package unmade fails packaging, and no package report remains", { timeout: PackageTests.TIMEOUT }, async t => {
       const repository = await PackageTests.createAsync(t);
       const failed = new TextOutputFixture();
       const unmade = new TextOutputFixture();
+      await repository.writeAsync({ "_build/package/package-report.json": "{}" });
 
       assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), new BuilderFixture([], [3]), {}, failed, PackageTests.GALLERY).runAsync([]), 1);
       assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), new BuilderFixture([]), {}, unmade, PackageTests.GALLERY).runAsync([]), 1);
 
       assert.equal(failed.text, `${PackageTests.STAGED}electron-builder failed with exit code 3.\n`);
       assert.equal(unmade.text, `${PackageTests.STAGED}electron-builder finished without making ${path.join(repository.directory, "_build", "package", "out", PackageTests.APP_IMAGE)}.\n`);
+      assert.equal(existsSync(path.join(repository.directory, "_build", "package", "package-report.json")), false);
     });
 
-    test("a host without packages, a failed packaged build or a module list the build refuses stops packaging before electron-builder runs", async t => {
+    test("a host without packages, a failed packaged build or a module list the build refuses stops packaging before electron-builder runs, and no package report remains", async t => {
       const repository = await PackageTests.createAsync(t);
       const unlisted = await PackageTests.createAsync(t, ["absent"]);
       const builder = new BuilderFixture([PackageTests.APP_IMAGE]);
       const host = new TextOutputFixture();
       const staged = new TextOutputFixture();
       const modules = new TextOutputFixture();
+      await repository.writeAsync({ "_build/package/package-report.json": "{}" });
 
       assert.equal(await new Package(repository.directory, "freebsd", "x64", PackageTests.createStage(repository), builder, {}, host, PackageTests.GALLERY).runAsync([]), 1);
+      assert.equal(existsSync(path.join(repository.directory, "_build", "package", "package-report.json")), false);
       assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository, [2]), builder, {}, staged, PackageTests.GALLERY).runAsync([]), 1);
       assert.equal(await new Package(unlisted.directory, "linux", "x64", PackageTests.createStage(unlisted), builder, {}, modules, PackageTests.GALLERY).runAsync([]), 1);
 
@@ -254,6 +260,7 @@ class PackageTests {
         assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], files.join("\n"));
         assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_WINDOWS_PUBLISHER"], "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US");
         assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n  ${files[0]}\nSignatures:\nEvery file is signed.\n`);
+        assert.deepEqual(JSON.parse(await readFile(path.join(folder, "package-report.json"), "utf8")), { target: "windows-x64", signed: true, checked: true });
       });
 
     test("--signed signs and notarizes a macOS package with the certificate and the App Store Connect key that only electron-builder receives, the key in a private file "
@@ -294,6 +301,7 @@ class PackageTests {
         }]);
         assert.deepEqual(builder.keys, [["fixture-key", process.platform === "win32" ? builder.keys[0]?.[1] : 0o600]]);
         assert.equal(existsSync(signing), false);
+        assert.deepEqual(JSON.parse(await readFile(path.join(folder, "package-report.json"), "utf8")), { target: "macos-arm64", signed: true, checked: true });
         assert.equal(configuration.mac["notarize"], true);
         assert.deepEqual(builder.captured, [
           ["hdiutil", check, "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", path.join(check, "0"), files[0] ?? ""],
@@ -337,6 +345,7 @@ class PackageTests {
         assert.ok(unchecked.text.endsWith(`hdiutil attach -readonly -nobrowse -noautoopen -mountpoint ${path.join(repository.directory, "_build", "package", "signing", "check", "0")} `
           + `${path.join(out, made[0] ?? "")} failed with exit code 1:\nhdiutil: attach failed\n`), unchecked.text);
         assert.equal(existsSync(path.join(repository.directory, "_build", "package", "signing")), false);
+        assert.equal(existsSync(path.join(repository.directory, "_build", "package", "package-report.json")), false);
       });
 
     test("--signed is refused for other platforms and without every Azure credential before anything is staged, and an ARM64 package without addons checks its installer and program",
@@ -383,17 +392,18 @@ class PackageTests {
         new RangeError("The fixture broke."));
     });
 
-    test("any argument is refused with the usage, and the command exits with that result", async t => {
+    test("any argument is refused with the usage after any earlier package report is removed, and the command exits with that result", async t => {
       const repository = await PackageTests.createAsync(t);
       const output = new TextOutputFixture();
       const builder = new BuilderFixture([]);
+      await repository.writeAsync({ "_build/package/package-report.json": "{}" });
 
       const exitCode = await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, {}, output, PackageTests.GALLERY).runAsync(["--target", "linux"]);
       const command = spawnSync(process.execPath, [SourceTreeFixture.locateScript("package.ts"), "--help"], { cwd: repository.directory, encoding: "utf8", timeout: 10_000 });
 
       assert.equal(exitCode, 2);
       assert.equal(output.text, PackageTests.USAGE);
-      assert.equal(existsSync(path.join(repository.directory, "_build", "package")), false);
+      assert.deepEqual(await readdir(path.join(repository.directory, "_build", "package")), []);
       assert.deepEqual(builder.runs, []);
       assert.equal(command.status, 2);
       assert.equal(command.stdout, PackageTests.USAGE);
