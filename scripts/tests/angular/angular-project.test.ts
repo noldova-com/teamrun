@@ -178,8 +178,8 @@ class AngularProjectTests {
       const run = await AngularProjectTests.create(repository, reporting).testAsync([], false);
       const silent = await AngularProjectTests.create(repository, new ProcessRunnerFixture([1])).testAsync([], false);
 
-      assert.deepEqual([run.isSuccessful, run.collected, run.result?.passed, run.coverage], [true, ["a.spec.ts", "shell/b.spec.ts"], 1, null]);
-      assert.deepEqual([silent.isSuccessful, silent.exitCode, silent.collected, silent.result, silent.coverage], [false, 1, null, null, null]);
+      assert.deepEqual([run.isSuccessful, run.result?.files, run.result?.passed, run.coverage], [true, ["a.spec.ts", "shell/b.spec.ts"], 1, null]);
+      assert.deepEqual([silent.isSuccessful, silent.exitCode, silent.result, silent.coverage], [false, 1, null, null]);
       assert.deepEqual(reporting.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test", "--reporters=default", "--reporters=json", "--output-file", report]]);
       assert.deepEqual(reporting.logs, [path.join(repository.directory, "_build", "angular-tests.log")]);
       assert.equal(AngularProject.LOG_FILE, "_build/angular-tests.log");
@@ -220,7 +220,7 @@ class AngularProjectTests {
       const single = await AngularProjectTests.create(repository, runner).testAsync([], false);
 
       assert.deepEqual(retrying.retried, [new RetriedTest("shell/a.spec.ts", "A retries", "Error: first")]);
-      assert.deepEqual(single.collected, ["b.spec.ts", "shell/a.spec.ts"]);
+      assert.deepEqual(single.result?.files, ["b.spec.ts", "shell/a.spec.ts"]);
       assert.deepEqual([single.result?.passed, single.result?.failed], [3, 2]);
       assert.deepEqual([runner.environments[0]?.["TEAMRUN_TEST_RETRY"], runner.environments[1]], ["1", undefined]);
       assert.equal(AngularProject.RETRY_VARIABLE, "TEAMRUN_TEST_RETRY");
@@ -234,7 +234,7 @@ class AngularProjectTests {
 
       const run = await AngularProjectTests.create(repository, reporting).testAsync(["a.spec.ts", "shell/b.spec.ts"], false);
 
-      assert.deepEqual(run.collected, ["a.spec.ts"]);
+      assert.deepEqual(run.result?.files, ["a.spec.ts"]);
       assert.deepEqual(reporting.runs, [[
         process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test", "--reporters=default", "--reporters=json", "--output-file", report,
         "--no-coverage", "--include", "a.spec.ts", "--include", "shell/b.spec.ts"

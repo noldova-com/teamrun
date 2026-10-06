@@ -61,10 +61,14 @@ export default class FlakyRecord {
     await rm(this.file, { force: true });
   }
 
+  public async readAsync(): Promise<readonly FlakyTest[]> {
+    return existsSync(this.file) ? FlakyRecord.parse(await readFile(this.file, FlakyRecord.ENCODING)) : [];
+  }
+
   public async addAsync(tests: readonly FlakyTest[], output: Writable): Promise<void> {
     if (tests.length === 0)
       return;
-    const recorded = existsSync(this.file) ? FlakyRecord.parse(await readFile(this.file, FlakyRecord.ENCODING)) : [];
+    const recorded = await this.readAsync();
     const added = tests.map(t => new FlakyTest(t.runner, t.file, t.name, FlakyRecord.cap(t.failure)));
     await mkdir(path.dirname(this.file), { recursive: true });
     await writeFile(this.file, `${JSON.stringify([...recorded, ...added], null, 2)}\n`);

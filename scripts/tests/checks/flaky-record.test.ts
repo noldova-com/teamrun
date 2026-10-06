@@ -59,6 +59,18 @@ class FlakyRecordTests {
       assert.equal(existsSync(path.join(repository.directory, "summary.md")), false);
     });
 
+    test("reading gives the recorded tests in order, and nothing without a record", async t => {
+      const repository = await FlakyRecordTests.createRepositoryAsync(t);
+      const record = new FlakyRecord(repository.directory, {});
+      const first = new FlakyTest("Package tests", "src/a.test.ts", "A.b", "failed");
+      const second = new FlakyTest("Script tests", "scripts/tests/a.test.ts", "a", "failed");
+
+      assert.deepEqual(await record.readAsync(), []);
+      await record.addAsync([first, second], new TextOutputFixture());
+
+      assert.deepEqual(await record.readAsync(), [first, second]);
+    });
+
     test("clearing removes the record, and clearing without one does nothing", async t => {
       const repository = await FlakyRecordTests.createRepositoryAsync(t);
       const record = new FlakyRecord(repository.directory, {});

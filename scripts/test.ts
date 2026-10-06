@@ -19,6 +19,7 @@ import DependencyPinCheck from "./checks/dependency-pin-check.ts";
 import DocumentCheck from "./checks/document-check.ts";
 import FieldOrderCheck from "./checks/field-order-check.ts";
 import FlakyRecord from "./checks/flaky-record.ts";
+import type FlakyTest from "./checks/flaky-test.ts";
 import GitHubConfigurationCheck from "./checks/github-configuration-check.ts";
 import LicenseHeaderCheck from "./checks/license-header-check.ts";
 import type ICheck from "./checks/interfaces/check.ts";
@@ -27,6 +28,7 @@ import ModuleFolderCheck from "./checks/module-folder-check.ts";
 import ModuleImportCheck from "./checks/module-import-check.ts";
 import NameUniquenessCheck from "./checks/name-uniqueness-check.ts";
 import PackageCheck from "./checks/package-check.ts";
+import PackageLayoutCheck from "./checks/package-layout-check.ts";
 import PackageTestCheck from "./checks/package-test-check.ts";
 import PackagedBuildCheck from "./checks/packaged-build-check.ts";
 import ProductIdentityCheck from "./checks/product-identity-check.ts";
@@ -89,7 +91,7 @@ export default class Test {
       return Test.USAGE_EXIT_CODE;
     }
     if (options.isDocuments)
-      return await this.runChecksAsync(this.createDocumentChecks(), Test.DOCUMENTS_NOTICE);
+      return await this.runChecksAsync(this.createDocumentChecks(), Test.DOCUMENTS_NOTICE, null);
 
     const flaky = options.isRerunningFailed ? new FlakyRecord(this.root, this.environment) : null;
     await flaky?.clearAsync();
@@ -98,7 +100,7 @@ export default class Test {
       if (options.repeat > 1)
         this.output.write(`\nRun ${run} of ${options.repeat}\n`);
       const exitCode = options.filters.length === 0
-        ? await this.runChecksAsync(await this.createChecksAsync(options.part, flaky, options.selection), Test.formatNotice(options))
+        ? await this.runChecksAsync(await this.createChecksAsync(options.part, flaky, options.selection), Test.formatNotice(options), flaky)
         : await this.runFilteredAsync(options.filters, flaky);
       if (exitCode !== 0) {
         if (options.repeat > 1)
@@ -111,9 +113,10 @@ export default class Test {
     return 0;
   }
 
-  private async runChecksAsync(checks: readonly ICheck[], notice: string | null): Promise<number> {
+  private async runChecksAsync(checks: readonly ICheck[], notice: string | null, flaky: FlakyRecord | null): Promise<number> {
     if (notice !== null)
       this.output.write(notice);
+    const earlier = (await flaky?.readAsync())?.length ?? 0;
 
     await RunnerTotals.clearAsync(this.root);
     let summary = Test.SUMMARY_HEADER;
@@ -129,8 +132,9 @@ export default class Test {
 
     const totals = await RunnerTotals.readAllAsync(this.root, Test.RUNNERS);
     if (totals.length > 0) {
-      this.output.write(`\nTest totals\n${totals.map(t => t.formatLine()).join("")}`);
-      summary += `\n${RunnerTotals.formatTable(totals)}`;
+      const rerunPassed = Test.countByRunner((await flaky?.readAsync() ?? []).slice(earlier));
+      this.output.write(`\nTest totals\n${totals.map(t => t.formatLine(rerunPassed.get(t.title) ?? 0)).join("")}`);
+      summary += `\n${RunnerTotals.formatTable(totals, rerunPassed)}`;
     }
     this.output.write(`\n${checks.length - failures} of ${checks.length} checks passed.\n`);
     await this.writeSummaryAsync(summary);
@@ -187,6 +191,13 @@ export default class Test {
     return `<code>${filter.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("|", "&#124;")}</code>`;
   }
 
+  private static countByRunner(tests: readonly FlakyTest[]): ReadonlyMap<string, number> {
+    const counts = new Map<string, number>();
+    for (const test of tests)
+      counts.set(test.runner, (counts.get(test.runner) ?? 0) + 1);
+    return counts;
+  }
+
   private createDocumentChecks(): readonly ICheck[] {
     return [new DocumentCheck(this.root, new RepositoryFiles(this.root, new Git(this.root, this.runner)))];
   }
@@ -196,6 +207,7 @@ export default class Test {
     const documents = new DocumentCheck(this.root, files);
     const { default: ApiCatalog } = await import("./api/api-catalog.ts");
     const { default: ApiServer } = await import("./api/api-server.ts");
+    const { default: AngularFileCheck } = await import("./checks/angular-file-check.ts");
     const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
     const { default: ApiDocumentationCheck } = await import("./checks/api-documentation-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
@@ -217,6 +229,7 @@ export default class Test {
       new TestWaitCheck(this.root, files),
       new FieldOrderCheck(this.root, files),
       new BucketNameCheck(files, syntax),
+      new AngularFileCheck(files, syntax),
       new FoundationValueCheck(files, new PackageCatalog(this.root), syntax),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
@@ -229,6 +242,7 @@ export default class Test {
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
       new DependencyPinCheck(this.root, files),
+      new PackageLayoutCheck(this.root, new PackageCatalog(this.root)),
       new PackageCheck(build),
       ...selection === undefined || selection.packages.length > 0 ? [new PackageTestCheck(this.root, build, this.runner, this.environment, flaky, selection?.packages)] : [],
       new TypeCheck(this.root, this.runner),

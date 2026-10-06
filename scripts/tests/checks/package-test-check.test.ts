@@ -149,7 +149,7 @@ class PackageTestCheckTests {
 
       assert.deepEqual(recorded, [true, ""]);
       assert.deepEqual(totals, {
-        version: 1,
+        version: 2,
         runner: "package",
         title: "Package tests",
         discovered: 3,
@@ -161,7 +161,10 @@ class PackageTestCheckTests {
         unreached: 0,
         skips: [{ test: "@noldova/teamrun-foundation-alpha/alpha.test.js › AlphaTests.pending", reason: "Waits for the shell." }],
         files: ["@noldova/teamrun-foundation-alpha/alpha.test.js"],
-        coverage: { unit: "files", covered: 9, total: 10 }
+        coverage: { unit: "files", covered: 9, total: 10 },
+        duplicates: [],
+        empty: [],
+        missing: []
       });
       assert.deepEqual(disagreeing, [false, "Package tests don't add up: 4 discovered, but 3 executed, 0 skipped, 0 unselected and 0 unreached.\n"]);
       assert.deepEqual(unwritten, [false, "The test runner wrote no result to _build/test-result.json.\n"]);
