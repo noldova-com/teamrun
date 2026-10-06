@@ -27,6 +27,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public spelling: Promise<unknown> = Promise.resolve({ languages: [], fallback: null });
   public readonly keptSpellings: (readonly [boolean, readonly string[]])[] = [];
   public readonly replacements: string[] = [];
+  public readonly addedWords: string[] = [];
   public readonly appearances: JsonObject[] = [];
   public readonly changes: JsonObject[] = [];
   public readonly answers: string[] = [];
@@ -167,6 +168,11 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public replaceMisspelling(text: string): Promise<boolean> {
     this.replacements.push(text);
+    return Promise.resolve(true);
+  }
+
+  public addToDictionary(word: string): Promise<boolean> {
+    this.addedWords.push(word);
     return Promise.resolve(true);
   }
 

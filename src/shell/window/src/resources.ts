@@ -543,6 +543,9 @@ export class Resources {
   public static readonly fieldSpellingGroup: string = "shell.fieldSpelling";
   public static readonly replaceMisspellingCommand: string = "shell.replaceMisspelling";
   public static readonly replaceMisspellingTitle: string = "Replace the misspelled word";
+  public static readonly addToDictionaryCommand: string = "shell.addToDictionary";
+  public static readonly addToDictionaryTitle: string = "Add to dictionary";
+  public static readonly addToDictionaryGlyph: string = "library_add";
   public static readonly noSuggestionsLabel: string = "No suggestions";
   public static readonly textArgument: string = "text";
   public static readonly wordArgument: string = "word";

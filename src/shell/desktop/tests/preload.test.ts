@@ -18,7 +18,7 @@ export class PreloadTests {
 
     Assert.areEqual([
       "platform", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "readStartup", "onStartup", "actOnStartup", "readLayout",
-      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "keepAppearance", "readSpelling", "keepSpelling", "onFieldMenu", "replaceMisspelling", "edit", "setMenuBar", "onMenuCommand",
+      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "keepAppearance", "readSpelling", "keepSpelling", "onFieldMenu", "replaceMisspelling", "addToDictionary", "edit", "setMenuBar", "onMenuCommand",
       "onNotificationOpened", "onQuitQuestion", "answerQuit", "logModule", "logError"
     ].join(","), Object.keys(api).join(","));
     Assert.areEqual(process.platform, api["platform"]);
@@ -75,6 +75,7 @@ export class PreloadTests {
       PreloadTests.invoke(api["installCommand"]),
       PreloadTests.invoke(api["readSpelling"]),
       PreloadTests.invoke(api["replaceMisspelling"], "world"),
+      PreloadTests.invoke(api["addToDictionary"], "TeamRun"),
       PreloadTests.invoke(api["edit"], "Copy"),
       PreloadTests.invoke(api["answerQuit"], "wait")
     ]);
@@ -93,6 +94,7 @@ export class PreloadTests {
       ["teamrun:installCommand"],
       ["teamrun:readSpelling"],
       ["teamrun:replaceMisspelling", "world"],
+      ["teamrun:addToDictionary", "TeamRun"],
       ["teamrun:edit", "Copy"],
       ["teamrun:quitAnswer", "wait"]
     ]), JSON.stringify(electron.invoked));

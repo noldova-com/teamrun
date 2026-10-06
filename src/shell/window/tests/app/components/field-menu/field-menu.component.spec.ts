@@ -128,9 +128,9 @@ describe("FieldMenuComponent", () => {
 
     expect([isPrevented, isOpenBeforeAnswer]).toEqual([false, false]);
     expect([box?.left, box?.top]).toEqual([150, 110]);
-    expect(misspelled).toEqual(["Meeting", "Meting", "shell.cut", "shell.copy", "shell.paste", "shell.selectAll"]);
+    expect(misspelled).toEqual(["Meeting", "Meting", "shell.addToDictionary", "shell.cut", "shell.copy", "shell.paste", "shell.selectAll"]);
     expect(focusAfterReplace).toBe(field);
-    expect(unknown).toEqual(["No suggestions (disabled)", "shell.cut (disabled)", "shell.copy (disabled)", "shell.paste", "shell.selectAll"]);
+    expect(unknown).toEqual(["No suggestions (disabled)", "shell.addToDictionary", "shell.cut (disabled)", "shell.copy (disabled)", "shell.paste", "shell.selectAll"]);
     expect(readOnly).toEqual(["shell.cut (disabled)", "shell.copy", "shell.paste (disabled)", "shell.selectAll"]);
   });
 

@@ -1063,6 +1063,23 @@ export interface ISpellCheckHost {
    * ```
    */
   setSpellCheckerDictionaryDownloadURL(url: string): void;
+
+  /**
+   * Adds a word to the session's dictionary, so it is no longer marked. On Linux that dictionary is the profile's own
+   * file; with the Windows or macOS system checker it is the system's user dictionary, which other applications share.
+   *
+   * @param word The word to add.
+   * @returns Whether the session took the word.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function learn(host: ISpellCheckHost): boolean {
+   *   return host.addWordToSpellCheckerDictionary("TeamRun");
+   * }
+   * ```
+   */
+  addWordToSpellCheckerDictionary(word: string): boolean;
 }
 
 /**
@@ -3336,6 +3353,23 @@ export declare class SpellChecker {
    * ```
    */
   public apply(isChecking: boolean, chosen: readonly string[]): void;
+
+  /**
+   * Adds a word to the session's dictionary on every platform. On Linux that dictionary is TeamRun's own file in the
+   * profile; on Windows and macOS it is the system's user dictionary, which other applications share.
+   *
+   * @param word The word to add.
+   * @returns Whether the session took the word.
+   * @example
+   * ```ts
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function learn(checker: SpellChecker): boolean {
+   *   return checker.addWord("TeamRun");
+   * }
+   * ```
+   */
+  public addWord(word: string): boolean;
 
   /**
    * Describes what the window may offer.

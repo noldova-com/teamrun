@@ -149,6 +149,7 @@ export class Resources {
   public static readonly spellingChannel: string = "teamrun:spelling";
   public static readonly fieldMenuChannel: string = "teamrun:fieldMenu";
   public static readonly replaceMisspellingChannel: string = "teamrun:replaceMisspelling";
+  public static readonly addToDictionaryChannel: string = "teamrun:addToDictionary";
   public static readonly dictionaryFolderSegments: readonly string[] = ["assets", "dictionaries"];
   public static readonly dictionariesFile: string = "dictionaries.json";
   public static readonly dictionariesFolder: string = "Dictionaries";
@@ -164,6 +165,7 @@ export class Resources {
   public static readonly spellingTextLimit: number = 100;
   public static readonly languageTagPattern: RegExp = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
   public static readonly dictionaryFilePattern: RegExp = /^[A-Za-z0-9-]+\.bdic$/;
+  public static readonly dictionaryWordPattern: RegExp = /^\S{1,100}$/u;
   public static readonly urlSeparator: string = "/";
   public static readonly listSeparator: string = ", ";
   public static readonly spellingInvalid: string = "The spelling preferences must be whether to check and a list of language tags.";

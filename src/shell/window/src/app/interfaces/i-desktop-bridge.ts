@@ -33,6 +33,7 @@ export interface IDesktopBridge {
   keepSpelling(isChecking: boolean, languages: readonly string[]): void;
   onFieldMenu(listener: (request: unknown) => void): () => void;
   replaceMisspelling(text: string): Promise<boolean>;
+  addToDictionary(word: string): Promise<boolean>;
   edit(action: string): Promise<boolean>;
   setMenuBar(menuBar: JsonObject): void;
   onMenuCommand(listener: (id: string) => void): () => void;

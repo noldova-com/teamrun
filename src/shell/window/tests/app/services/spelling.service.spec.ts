@@ -98,7 +98,7 @@ describe("SpellingService", () => {
     expect(bridge.keptSpellings).toEqual([[true, []], [false, []], [false, ["en-US"]]]);
   });
 
-  it("gives the field menu up to five suggestions for a misspelled word, or a disabled No suggestions row", async () => {
+  it("gives the field menu up to five suggestions for a misspelled word, or a disabled No suggestions row, then Add to dictionary for the word", async () => {
     bridge.spelling = Promise.resolve({ languages: ["en-US"], fallback: null });
     await startAsync();
     const menus = TestBed.inject(MenuService);
@@ -112,9 +112,9 @@ describe("SpellingService", () => {
 
     expect(many).toEqual([
       "shell.replaceMisspelling world true", "shell.replaceMisspelling would true", "shell.replaceMisspelling wold true",
-      "shell.replaceMisspelling word true", "shell.replaceMisspelling wield true"
+      "shell.replaceMisspelling word true", "shell.replaceMisspelling wield true", "shell.addToDictionary Add to dictionary true"
     ]);
-    expect(none).toEqual(["shell.replaceMisspelling No suggestions false"]);
+    expect(none).toEqual(["shell.replaceMisspelling No suggestions false", "shell.addToDictionary Add to dictionary true"]);
     expect([correct, plain]).toEqual([[], []]);
   });
 
