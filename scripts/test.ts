@@ -199,6 +199,8 @@ export default class Test {
     const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
     const { default: ApiDocumentationCheck } = await import("./checks/api-documentation-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
+    const { default: BucketNameCheck } = await import("./checks/bucket-name-check.ts");
+    const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
     const build = new PackageBuild(this.root, this.runner, this.environment);
     const modules = new ModuleCatalog(this.root);
@@ -212,6 +214,7 @@ export default class Test {
       new CommentCheck(this.root, files),
       new TestWaitCheck(this.root, files),
       new FieldOrderCheck(this.root, files),
+      new BucketNameCheck(files, new SyntaxTreeReader(this.root, server, Test.API_TIMEOUT)),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),
