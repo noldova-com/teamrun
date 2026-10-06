@@ -4,8 +4,7 @@
 
 ## 1. Purpose
 
-The command line reports on the data directory's runtime and runs the runtime's commands from a terminal or a script.
-It shares the runtime and the data directory with the desktop.
+The command line reports on the data directory's runtime and runs the runtime's commands from a terminal or a script. It shares the runtime and the data directory with the desktop.
 
 ## 2. Commands
 
@@ -17,8 +16,7 @@ It shares the runtime and the data directory with the desktop.
 | `teamrun open` | Starts TeamRun with the same data directory, or brings its window forward when it already runs. |
 | `teamrun help` | Prints the usage. |
 
-`commands` and `run` start a runtime when none is running.
-The runtime then stays up under its idle policy, so later calls attach to it.
+`commands` and `run` start a runtime when none is running. The runtime then stays up under its idle policy, so later calls attach to it.
 
 ## 3. Options
 
@@ -46,9 +44,7 @@ The exit codes are stable; scripts may rely on them.
 | 5 | The data directory cannot be used: it holds data from before the shell, another program's runtime owns it, or it is not a writable folder. Data from before the shell is reported and never moved. |
 | 6 | The command timed out or was cancelled. |
 
-A failure from the runtime keeps the protocol's code in the JSON error.
-When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1.
-A command the runtime leaves unanswered on an open connection reports `Unavailable`.
+A failure from the runtime keeps the protocol's code in the JSON error. When the connection to the runtime ends during a command, the code is `Disconnected`, as in the desktop, and the exit code is 1. A command the runtime leaves unanswered on an open connection reports `Unavailable`.
 
 ## 5. Installed TeamRun
 
@@ -58,12 +54,10 @@ The installer leaves the user's `Path` unchanged, without a message, when it can
 In that case add `%LOCALAPPDATA%\Programs\teamrun\bin` to the user's `Path` by hand: open Settings, search for "Edit environment variables for your account", select `Path`, choose Edit, then New, and open a new terminal.
 The command passes its arguments through cmd, which can change quotes, `%` and `^` in them; give `run` such JSON with `--args-file` or on standard input with `-` instead.
 
-On macOS, choose TeamRun > Install command in PATH.
-It links `/usr/local/bin/teamrun` to the command inside TeamRun, asking for an administrator's password when that folder cannot be written, so a terminal opened afterwards runs `teamrun` directly.
+On macOS, choose TeamRun > Install command in PATH. It links `/usr/local/bin/teamrun` to the command inside TeamRun, asking for an administrator's password when that folder cannot be written, so a terminal opened afterwards runs `teamrun` directly.
 A file named `/usr/local/bin/teamrun` that is not a link is left alone; move or remove it, then install the command again.
 If TeamRun moves, choose the command again to link its new place.
 
 ## 6. Development
 
-In a checkout, `npm run teamrun -- <command> [options]` runs the command line on the development app, with the checkout's own data directory unless `--data-dir` or `TEAMRUN_DATA_DIR` names another.
-A relative `--data-dir` is resolved from the folder `npm` was started in.
+In a checkout, `npm run teamrun -- <command> [options]` runs the command line on the development app, with the checkout's own data directory unless `--data-dir` or `TEAMRUN_DATA_DIR` names another. A relative `--data-dir` is resolved from the folder `npm` was started in.
