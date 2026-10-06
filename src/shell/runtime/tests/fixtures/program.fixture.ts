@@ -24,10 +24,9 @@ export class ProgramFixture {
   public static readonly ENVIRONMENT: string = "environment";
   public static readonly ARGUMENTS: string = "arguments";
   public static readonly READY: string = "ready";
+  public static readonly file: string = fileURLToPath(import.meta.url);
 
   private static readonly KEPT_PREFIX: string = "TEAMRUN_";
-
-  public static readonly file: string = fileURLToPath(import.meta.url);
 
   public static request(workingFolder: string, launchArguments: readonly string[], signal?: AbortSignal, program: string = process.execPath): ProcessRequest {
     return new ProcessRequest(program, [ProgramFixture.file, ...launchArguments], workingFolder, {}, [], signal);

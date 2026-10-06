@@ -18,12 +18,15 @@ import ProcessResult from "../../processes/process-result.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import NpmCommand from "../../toolchain/npm-command.ts";
 import AngularReportRunnerFixture from "../fixtures/angular-report-runner.fixture.ts";
+import MockPausesFixture from "../fixtures/mock-pauses.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class AngularProjectTests {
   private static readonly NPM: string = "/tools/npm/bin/npm-cli.js";
+  private static readonly INSTALLED: ProcessResult = new ProcessResult(0, "", "");
+  private static readonly FAILED: ProcessResult = new ProcessResult(1, "", "Error: Download failed\n");
 
   public static register(): void {
     test("a tree without the Angular project has nothing to prepare", async t => {
@@ -41,15 +44,18 @@ class AngularProjectTests {
     test("an uninstalled project is installed with npm ci, stale TeamRun copies are removed, and the test browser is installed", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       await repository.writeAsync({ "src/node_modules/@noldova/teamrun-foundation-core/package.json": "{}\n" });
-      const runner = new ProcessRunnerFixture([0], [new ProcessResult(0, "added 1 package", "")]);
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "added 1 package", ""), AngularProjectTests.INSTALLED]);
       const output = new TextOutputFixture();
 
       await AngularProjectTests.create(repository, runner).prepareAsync(output);
 
       const directory = path.join(repository.directory, "src");
       assert.equal(existsSync(path.join(directory, "node_modules", "@noldova")), false);
-      assert.deepEqual(runner.captured, [[process.execPath, directory, AngularProjectTests.NPM, "ci", "--no-audit", "--no-fund"]]);
-      assert.deepEqual(runner.runs, [[process.execPath, directory, path.join(directory, "node_modules", "playwright", "cli.js"), "install", "--only-shell", "chromium"]]);
+      assert.deepEqual(runner.captured, [
+        [process.execPath, directory, AngularProjectTests.NPM, "ci", "--no-audit", "--no-fund"],
+        [process.execPath, directory, path.join(directory, "node_modules", "playwright", "cli.js"), "install", "--only-shell", "chromium"]
+      ]);
+      assert.deepEqual(runner.runs, []);
       assert.equal(output.text, "Installing the Angular project in src/...\nInstalling the browser for the Angular tests...\n");
       assert.equal(await readFile(path.join(directory, "node_modules", ".teamrun-install"), "utf8"), AngularProjectTests.formatRecord("{}\n"));
     });
@@ -57,22 +63,22 @@ class AngularProjectTests {
     test("an installed project is reinstalled only when its lockfile, platform or CPU differ from the recorded install", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n"), "src/node_modules/@angular/cli/bin/ng.js": "" });
-      const current = new ProcessRunnerFixture();
+      const current = new ProcessRunnerFixture([], [AngularProjectTests.INSTALLED]);
       await AngularProjectTests.create(repository, current).prepareAsync(new TextOutputFixture());
 
       await repository.writeAsync({ "src/package-lock.json": "{ \"lockfileVersion\": 3 }\n" });
-      const changed = new ProcessRunnerFixture([], [new ProcessResult(0, "", "")]);
+      const changed = new ProcessRunnerFixture([], [AngularProjectTests.INSTALLED, AngularProjectTests.INSTALLED]);
       await AngularProjectTests.create(repository, changed).prepareAsync(new TextOutputFixture());
       const afterChange = await readFile(path.join(repository.directory, "src", "node_modules", ".teamrun-install"), "utf8");
 
       await repository.writeAsync({ "src/node_modules/.teamrun-install": afterChange.replace(process.arch, "other-cpu") });
-      const otherCpu = new ProcessRunnerFixture([], [new ProcessResult(0, "", "")]);
+      const otherCpu = new ProcessRunnerFixture([], [AngularProjectTests.INSTALLED, AngularProjectTests.INSTALLED]);
       await AngularProjectTests.create(repository, otherCpu).prepareAsync(new TextOutputFixture());
 
-      assert.deepEqual([current.captured.length, current.runs.length], [0, 1]);
-      assert.deepEqual([changed.captured.length, changed.runs.length], [1, 1]);
+      assert.deepEqual([current.captured.length, current.runs.length], [1, 0]);
+      assert.deepEqual([changed.captured.length, changed.runs.length], [2, 0]);
       assert.equal(afterChange, AngularProjectTests.formatRecord("{ \"lockfileVersion\": 3 }\n"));
-      assert.equal(otherCpu.captured.length, 1);
+      assert.equal(otherCpu.captured.length, 2);
     });
 
     test("preparing an installed project removes the test runner's pre-bundled dependencies, so no copy of an earlier build of TeamRun's packages survives", async t => {
@@ -83,11 +89,11 @@ class AngularProjectTests {
         "src/node_modules/@angular/cli/bin/ng.js": "",
         [stale]: "export class EarlierBuild {}\n"
       });
-      const runner = new ProcessRunnerFixture();
+      const runner = new ProcessRunnerFixture([], [AngularProjectTests.INSTALLED]);
 
       await AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture());
 
-      assert.equal(runner.captured.length, 0);
+      assert.equal(runner.captured.length, 1);
       assert.equal(existsSync(path.join(repository.directory, "src", "node_modules", ".vite")), false);
       assert.equal(existsSync(path.join(repository.directory, "src", "node_modules", "@angular", "cli", "bin", "ng.js")), true);
     });
@@ -95,23 +101,48 @@ class AngularProjectTests {
     test("a project without its CLI is reinstalled", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n") });
-      const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "", "")]);
+      const runner = new ProcessRunnerFixture([], [AngularProjectTests.INSTALLED, AngularProjectTests.INSTALLED]);
 
       await AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture());
+
+      assert.equal(runner.captured.length, 2);
+    });
+
+    test("a failed install stops the preparation with the reason, before the browser is installed", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      await repository.writeAsync({ "src/node_modules/.package-lock.json": "{}\n" });
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(1, "", "npm ERR! lockfile out of date\n")]);
+
+      await assert.rejects(
+        AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture()),
+        new ProcessException("\"npm ci\" in src/ failed with exit code 1: npm ERR! lockfile out of date"));
 
       assert.equal(runner.captured.length, 1);
     });
 
-    test("a failed install or browser install stops the preparation with the reason", async t => {
+    test("a failed browser download is tried again after a pause, and the preparation goes on once an attempt succeeds", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
-      await repository.writeAsync({ "src/node_modules/.package-lock.json": "{}\n" });
+      await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n"), "src/node_modules/@angular/cli/bin/ng.js": "" });
+      const runner = new ProcessRunnerFixture([], [AngularProjectTests.FAILED, AngularProjectTests.FAILED, AngularProjectTests.INSTALLED]);
+      const output = new TextOutputFixture();
+
+      await MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(output), () => `${runner.captured.length} attempts started`);
+
+      assert.equal(runner.captured.length, 3);
+      assert.equal(output.text, `Installing the browser for the Angular tests...\n${AngularProjectTests.pausing(1)}${AngularProjectTests.pausing(2)}`);
+    });
+
+    test("a browser download that fails every time stops the preparation after four attempts with the last attempt's output", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n"), "src/node_modules/@angular/cli/bin/ng.js": "" });
+      const attempts = [1, 2, 3, 4].map(number => new ProcessResult(1, "", `Error: Download failed: attempt ${number}\n`));
+      const runner = new ProcessRunnerFixture([], attempts);
 
       await assert.rejects(
-        AngularProjectTests.create(repository, new ProcessRunnerFixture([], [new ProcessResult(1, "", "npm ERR! lockfile out of date\n")])).prepareAsync(new TextOutputFixture()),
-        new ProcessException("\"npm ci\" in src/ failed with exit code 1: npm ERR! lockfile out of date"));
-      await assert.rejects(
-        AngularProjectTests.create(repository, new ProcessRunnerFixture([2], [new ProcessResult(0, "", "")])).prepareAsync(new TextOutputFixture()),
-        new ProcessException("Installing the browser for the Angular tests failed with exit code 2."));
+        MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture()), () => `${runner.captured.length} attempts started`),
+        new ProcessException("The browser for the Angular tests could not be installed in 4 attempts; the last failed with exit code 1: Error: Download failed: attempt 4."));
+
+      assert.equal(runner.captured.length, 4);
     });
 
     test("the tests run the Angular CLI in src/ with a JSON report and a log of their output, and give its result and the spec files it ran", async t => {
@@ -283,6 +314,10 @@ class AngularProjectTests {
         await assert.rejects(project.readPathAliasesAsync(), refused);
       }
     });
+  }
+
+  private static pausing(attempt: number): string {
+    return `The browser for the Angular tests could not be installed (attempt ${attempt} of 4); trying again in ${MockPausesFixture.PAUSE / 1000} seconds.\n`;
   }
 
   private static async createProjectAsync(t: { after: (callback: () => Promise<void>) => void }): Promise<RepositoryFixture> {

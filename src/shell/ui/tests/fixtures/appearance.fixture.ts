@@ -18,16 +18,16 @@ import { FixtureTheme } from "./fixture-theme";
 import { PointerFixture } from "./pointer.fixture";
 
 export class AppearanceFixture {
+  public static readonly modes: readonly ThemeMode[] = [ThemeMode.Light, ThemeMode.Dark];
+  public static readonly themes: readonly Theme[] = [DefaultTheme.theme, FixtureTheme.theme];
+  public static readonly panelSizes: readonly number[] = [12, 13, 14, 15, 16, 17, 18];
+  public static readonly hiddenThumb: string = "rgba(0, 0, 0, 0)";
+
   private static readonly ROOT_SIZE: number = 16;
   private static readonly PANEL_SIZE: number = 13;
   private static readonly SHAPE_ATTRIBUTE: string = "data-tr-tab-shape";
   private static readonly LAYOUT_TOLERANCE: number = 1 / 32;
   private static readonly PIXEL_LENGTH: RegExp = /^-?[\d.]+px$/;
-
-  public static readonly modes: readonly ThemeMode[] = [ThemeMode.Light, ThemeMode.Dark];
-  public static readonly themes: readonly Theme[] = [DefaultTheme.theme, FixtureTheme.theme];
-  public static readonly panelSizes: readonly number[] = [12, 13, 14, 15, 16, 17, 18];
-  public static readonly hiddenThumb: string = "rgba(0, 0, 0, 0)";
 
   public static apply(theme: Theme = DefaultTheme.theme, mode: ThemeMode = ThemeMode.Light, panelSize: number = AppearanceFixture.PANEL_SIZE): void {
     const root = document.documentElement;

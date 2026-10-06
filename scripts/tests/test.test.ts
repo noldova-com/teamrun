@@ -42,12 +42,12 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
-        "Documents", "License headers", "Test waits", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
+        "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
         "Script types", "API declarations", "API documentation", "API examples",
         "Script tests and coverage", "Angular tests and coverage", "Packaged build leaves out the Gallery"
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
-      assert.ok(output.text.endsWith("\n21 of 21 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n22 of 22 checks passed.\n"));
       for (const part of ["src/shell/ui", "src/shell/window"]) {
         assert.ok(output.text.includes(`\n${part}: matches its declarations\n`), output.text);
         assert.ok(output.text.includes(`\n${part}: documents every public member\n`), output.text);
@@ -91,7 +91,7 @@ class TestTests {
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
-      assert.ok(output.text.endsWith("\n20 of 21 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n21 of 22 checks passed.\n"));
       assert.equal(runner.runs.length, 5);
     });
 
