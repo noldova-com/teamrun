@@ -721,8 +721,10 @@ Durable state goes to its section 7 owner after a pause in changes and at close.
 Once the runtime has been ready, the window keeps its workspace while the runtime starts again: the workspace stays, inert under the startup card, no command but the Edit commands runs from anywhere in the window, view dialogs close and none opens, and when the runtime is ready again the focus returns to where it was in the workspace unless the person moved it, or to the active tab of its group when that place is gone.
 The views and documents of parts that continue stay as they are, as do the shell's own documents, and those of rebuilt parts load again ([Lifecycle](#lifecycle)).
 While the runtime is not ready, the window holds its layout changes and writes the newest layout once the runtime is ready again; the desktop holds the window's newest bounds the same way on Windows, where the window reports only the person's own moves and resizes; on macOS and Linux a move or resize made before the runtime is ready is not held, because the system also moves and resizes a window as it shows, and the saved bounds apply once the runtime is ready.
+Held bounds whose write ends with the connection stay held for the next time the runtime is ready, without a log entry.
 Closing while the runtime cannot be reached loses those bounds, and the desktop log records it.
 The window shows once its appearance is painted and, when the runtime is ready, its saved bounds are applied.
+A read of the saved bounds that ends with the connection is tried again the next time the runtime is ready, without a log entry.
 A new window is 1280 by 800 pixels, but no more than nine tenths of the primary display's work area on each side, and centered on it.
 Saved bounds keep their size when it fits the work area of the display that shows most of the window; a larger size shrinks to no more than nine tenths of that work area on each side, centered on that display, and a saved size below the window's minimum, 640 by 480 pixels, grows to it.
 Bounds that no display shows open centered on the primary display, sized by the same rule, and a window saved maximized opens maximized.
