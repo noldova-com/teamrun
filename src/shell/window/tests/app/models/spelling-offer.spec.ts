@@ -21,7 +21,7 @@ describe("SpellingOffer", () => {
 
   it("refuses an offer without them", () => {
     expect(() => SpellingOffer.fromJson({ languages: ["en-US"] })).toThrowError(JsonException);
-    expect(() => SpellingOffer.fromJson({ languages: ["en-US"], fallback: null })).toThrowError(JsonException);
+    expect(() => SpellingOffer.fromJson({ fallback: null })).toThrowError(JsonException);
     expect(() => SpellingOffer.fromJson(null)).toThrowError(JsonException);
   });
 });
