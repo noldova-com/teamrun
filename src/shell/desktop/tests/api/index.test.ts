@@ -16,6 +16,7 @@ export class DesktopApiTests {
     Assert.areEqual(
       JSON.stringify([
         "AppearanceStore",
+        "ChildProgramHost",
         "CloseCoordinator",
         "DesktopApplication",
         "DesktopLog",
@@ -32,6 +33,7 @@ export class DesktopApiTests {
         "PathCommand",
         "PathCommandException",
         "PathCommandOutcome",
+        "ProgramException",
         "QuitChoice",
         "QuitCoordinator",
         "QuitOutcome",
@@ -41,10 +43,12 @@ export class DesktopApiTests {
         "ScreenArea",
         "SenderInfo",
         "SenderPolicy",
+        "StartedProgram",
         "StartupState",
         "StartupStateKind",
         "SystemNotifier",
         "TaskbarIdentity",
+        "TrayHostWatcher",
         "UtilityProcessStarter",
         "WindowAppearance",
         "WindowBoundsKeeper",
