@@ -517,7 +517,12 @@ export class DesktopApplication {
       this.restored.add(open);
       const device = await this.device;
       if (!Object.isNull(device))
-        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => this.log.write(Resources.formatBoundsNotRestored(String(error))));
+        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => {
+          if (error instanceof WindowStateUnavailableException)
+            this.restored.delete(open);
+          else
+            this.log.write(Resources.formatBoundsNotRestored(String(error)));
+        });
     }
     open.settle();
   }
