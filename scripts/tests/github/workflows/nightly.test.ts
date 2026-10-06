@@ -106,7 +106,7 @@ class NightlyWorkflowTests {
         "exit \"$failed\"",
         ""
       ].join("\n"));
-      assert.ok(workflow.readStepScript("Repeat the UI workflows").includes("xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- --repeat-each 5 --retries 0\n"));
+      assert.ok(workflow.readStepScript("Repeat the UI workflows").includes("dbus-run-session -- xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- --repeat-each 5 --retries 0\n"));
       assert.ok(workflow.readStepScript("Repeat the UI workflows").includes("else\n  npm run test:ui -- --repeat-each 5 --retries 0\n"));
       assert.deepEqual(simulation.run({ part: "tests" }, {}).ran, ["Build", "Repeat the tests", "Record the result", "Keep the result"]);
       assert.deepEqual(simulation.run({ part: "workflows" }, {}).ran, ["Repeat the UI workflows", "Record the result", "Keep the result"]);

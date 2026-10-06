@@ -54,7 +54,7 @@ DesktopApplication.start(
     isDefaultApp: process.defaultApp === true,
     errorOutput: process.stderr,
     processId: process.pid,
-    programs: new ChildProgramHost(Resources.programTimeout),
+    programs: new ChildProgramHost(process.platform, Resources.programTimeout),
     startDetached: (path, args) => spawn(path, [...args], { detached: true, stdio: "ignore" }).unref(),
     endProcess: t => process.kill(t, "SIGKILL"),
     onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),

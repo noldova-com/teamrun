@@ -9,7 +9,7 @@
 import { ChildProgramHost, type IProgramHost, type StartedProgram } from "@noldova/teamrun-shell-desktop";
 
 export class CountingProgramHost implements IProgramHost {
-  private readonly host: ChildProgramHost = new ChildProgramHost(5000);
+  private readonly host: ChildProgramHost = new ChildProgramHost(process.platform, 5000);
 
   public answered: number = 0;
 

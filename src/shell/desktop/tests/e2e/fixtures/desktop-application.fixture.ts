@@ -291,13 +291,18 @@ export default class DesktopApplicationFixture {
     const found = await this.answerAsync(action, this.application.evaluate((_, { port, frame }) => {
       const handles = (Reflect.get(process, "_getActiveHandles") as () => object[]).call(process);
       const standard: readonly object[] = [process.stdin, process.stdout, process.stderr];
+      const children: readonly unknown[] = handles.filter(t => t.constructor.name === "ChildProcess").flatMap(t => Reflect.get(t, "stdio") as unknown[]);
       const sockets = handles.filter(t => t.constructor.name === "Socket").map(t => {
         const socket = t as IActiveSocket;
+        const isChild = children.includes(t);
         const isRuntime = port === null
-          ? socket.remoteAddress === undefined && socket.readable && socket.writable && !standard.includes(t)
+          ? socket.remoteAddress === undefined && socket.readable && socket.writable && !standard.includes(t) && !isChild
           : socket.remoteAddress === "127.0.0.1" && socket.remotePort === port;
         const address = socket.remoteAddress === undefined ? "no remote address" : `${socket.remoteAddress}:${String(socket.remotePort)}`;
-        return { socket, isRuntime, description: `${address}, readable ${String(socket.readable)}, writable ${String(socket.writable)}, standard ${String(standard.includes(t))}` };
+        return {
+          socket, isRuntime,
+          description: `${address}, readable ${String(socket.readable)}, writable ${String(socket.writable)}, standard ${String(standard.includes(t))}, child stdio ${String(isChild)}`
+        };
       });
       const matches = sockets.filter(t => t.isRuntime);
       if (matches.length === 1)
