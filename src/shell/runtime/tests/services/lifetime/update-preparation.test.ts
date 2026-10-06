@@ -5,16 +5,15 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import childProcess, { spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { syncBuiltinESMExports } from "node:module";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { FailureCode, Request, type Response, ShellEvents, ShellMethods, UpdateReady, UpdateRequest, UpdateSaved } from "@noldova/teamrun-shell-protocol";
+import { FailureCode, Request, ShellEvents, ShellMethods, type UpdateProcess, UpdateReady, UpdateRequest, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import { RuntimeBuild, ServerSettings, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
@@ -71,29 +70,26 @@ export class UpdatePreparationTests {
     return RuntimeHostFixture.runAsync(async fixture => {
       await using folder = await TemporaryFolderFixture.createAsync();
       const installation = UpdateBarrierFixture.open(folder.path);
-      await fixture.startAsync(30_000, undefined, undefined, process.env, new ServerSettings(undefined, undefined, undefined, undefined, 5_000, 20), installation.folder);
+      let isUnknown = false;
+      const presence = {
+        stampAsync: (t: readonly (readonly [number, string])[]): Promise<readonly UpdateProcess[]> => UpdateBarrierFixture.PRESENCE.stampAsync(t),
+        isRunningAsync: (t: UpdateProcess): Promise<boolean> => isUnknown
+          ? Promise.reject(new Error("The process table could not be read."))
+          : UpdateBarrierFixture.PRESENCE.isRunningAsync(t)
+      };
+      await fixture.startAsync(30_000, undefined, undefined, process.env, new ServerSettings(undefined, undefined, undefined, undefined, 5_000, 20), installation.folder, presence);
       const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
       const holder = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000);"], { stdio: "ignore" });
       await once(holder, "spawn");
       await UpdateBarrierFixture.holdAsync(installation, Number(holder.pid), UpdateBarrierState.Preparing);
       desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
       await RuntimeHostFixture.readMessagesAsync(desktop, 2);
-      const execFile = childProcess.execFile;
-      childProcess.execFile = ((_file: string, _arguments: unknown, _options: unknown, callback: (error: Error, output: string) => void): void => {
-        setImmediate(() => callback(new Error("The process table could not be read."), ""));
-      }) as unknown as typeof childProcess.execFile;
-      syncBuiltinESMExports();
-      let whileUnknown: Response;
-      try {
-        holder.kill();
-        await once(holder, "exit");
-        await delay(200);
-        [, whileUnknown] = await fixture.handshakeAsync("unknown", RuntimeBuild.identity);
-      }
-      finally {
-        childProcess.execFile = execFile;
-        syncBuiltinESMExports();
-      }
+      isUnknown = true;
+      holder.kill();
+      await once(holder, "exit");
+      await delay(200);
+      const [, whileUnknown] = await fixture.handshakeAsync("unknown", RuntimeBuild.identity);
+      isUnknown = false;
       await UpdateBarrierFixture.readEventAsync(desktop, ShellEvents.updateEnded);
       const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
 

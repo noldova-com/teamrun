@@ -5259,6 +5259,8 @@ export declare class RuntimeHost implements IIdleParticipant {
    * @param options How the runtime runs.
    * @param platform The platform, as in `process.platform`; Windows listens on loopback TCP, others on a socket in the discovery folder.
    * @param environment The environment the discovery folder's protection uses.
+   * @param presence Looks up the processes of an update: the launch barrier's holder and the clients and programs it
+   * stamps while preparing; by default {@link ProcessPresence.create} for the platform.
    * @returns A promise of the running host.
    * @throws {DeclarationsFormatException} Rejected, before taking ownership, when the build's module declarations cannot be read.
    * @throws {DataDirectoryOwnedException} Rejected when another runtime owns the directory and has published its discovery file, or still owns it once the options' takeover time has passed.
@@ -5272,7 +5274,7 @@ export declare class RuntimeHost implements IIdleParticipant {
    * }
    * ```
    */
-  public static startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv): Promise<RuntimeHost>;
+  public static startAsync(options: RuntimeOptions, platform: string, environment: NodeJS.ProcessEnv, presence?: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">): Promise<RuntimeHost>;
 
   /**
    * Stops the runtime because it stayed idle.
