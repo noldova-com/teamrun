@@ -374,7 +374,7 @@ It then uninstalls silently and requires the install folder emptied and the user
 On macOS, once the runtime answers, it links the bundle's `Contents/Resources/bin/teamrun` from its own folder and requires that link's `teamrun status` to report the runtime as well.
 A run by hand packages every target, macOS included, and keeps the packages and the package report as artifacts for two weeks.
 A run by hand from `main` with `signed` set signs the packages of the platforms in `teamrun.signedPlatforms`: those jobs run in the `release` environment, and their packaging step alone receives its platform's credentials, as in a release.
-`signed` is refused on any other branch, and the nightly run never signs.
+`signed` is refused from any other ref, a tag included, and the nightly run never signs.
 The nightly run calls it for Windows x64 and Linux x64 only, keeps those packages three days and reports a failure to make or start the package like its other jobs, in the issue "Nightly: packaging <target>".
 A package that was made and started but could not be kept fails the job without an issue, since the product did not fail.
 The Linux jobs run on Ubuntu 24.04 with libfuse2 removed, as a stock Ubuntu leaves it out, and with unprivileged user namespaces restricted as the runner ships them, so the AppImage starts as it does on a person's machine.

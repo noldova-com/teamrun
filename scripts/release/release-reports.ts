@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync, type Dirent } from "node:fs";
+import type { Dirent } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -16,6 +16,8 @@ import ReleaseException from "./release.exception.ts";
 
 export default class ReleaseReports {
   public static readonly REPORT_FILE: string = "package-report.json";
+
+  private static readonly NOT_FOUND: string = "ENOENT";
 
   private readonly signedPlatforms: readonly string[];
 
@@ -34,9 +36,9 @@ export default class ReleaseReports {
     const problems: string[] = [];
     const reports: PackageReport[] = [];
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      const report = entry.isDirectory() ? await ReleaseReports.readAsync(path.join(folder, entry.name, ReleaseReports.REPORT_FILE)) : null;
-      if (report === null)
-        problems.push(`${entry.name} holds no package report.`);
+      const report = await ReleaseReports.readAsync(folder, entry);
+      if (typeof report === "string")
+        problems.push(report);
       else
         reports.push(report);
     }
@@ -59,16 +61,25 @@ export default class ReleaseReports {
     return `Every target has one package report, and the signed ones were signed and checked: ${this.signedPlatforms.length === 0 ? "none" : this.signedPlatforms.join(", ")}.`;
   }
 
-  private static async readAsync(file: string): Promise<PackageReport | null> {
-    if (!existsSync(file))
-      return null;
-    const text = await readFile(file, "utf8");
+  private static async readAsync(folder: string, entry: Dirent): Promise<PackageReport | string> {
+    const missing = `${entry.name} holds no package report.`;
+    if (!entry.isDirectory())
+      return missing;
+    let text: string;
     try {
-      return PackageReport.parse(JSON.parse(text));
+      text = await readFile(path.join(folder, entry.name, ReleaseReports.REPORT_FILE), "utf8");
+    }
+    catch (error) {
+      return error instanceof Error && "code" in error && error.code === ReleaseReports.NOT_FOUND ? missing : `${entry.name}'s package report cannot be read.`;
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
     }
     catch {
-      return null;
+      return missing;
     }
+    return PackageReport.parse(value) ?? missing;
   }
 
   private static describe(report: PackageReport): string {

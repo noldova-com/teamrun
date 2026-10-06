@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { after, before, test, type TestContext } from "node:test";
 
@@ -196,15 +196,17 @@ class PackageTests {
       assert.equal(existsSync(path.join(repository.directory, "_build", "package", "package-report.json")), false);
     });
 
-    test("a host without packages, a failed packaged build or a module list the build refuses stops packaging before electron-builder runs", async t => {
+    test("a host without packages, a failed packaged build or a module list the build refuses stops packaging before electron-builder runs, and no package report remains", async t => {
       const repository = await PackageTests.createAsync(t);
       const unlisted = await PackageTests.createAsync(t, ["absent"]);
       const builder = new BuilderFixture([PackageTests.APP_IMAGE]);
       const host = new TextOutputFixture();
       const staged = new TextOutputFixture();
       const modules = new TextOutputFixture();
+      await repository.writeAsync({ "_build/package/package-report.json": "{}" });
 
       assert.equal(await new Package(repository.directory, "freebsd", "x64", PackageTests.createStage(repository), builder, {}, host, PackageTests.GALLERY).runAsync([]), 1);
+      assert.equal(existsSync(path.join(repository.directory, "_build", "package", "package-report.json")), false);
       assert.equal(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository, [2]), builder, {}, staged, PackageTests.GALLERY).runAsync([]), 1);
       assert.equal(await new Package(unlisted.directory, "linux", "x64", PackageTests.createStage(unlisted), builder, {}, modules, PackageTests.GALLERY).runAsync([]), 1);
 
@@ -390,17 +392,18 @@ class PackageTests {
         new RangeError("The fixture broke."));
     });
 
-    test("any argument is refused with the usage, and the command exits with that result", async t => {
+    test("any argument is refused with the usage after any earlier package report is removed, and the command exits with that result", async t => {
       const repository = await PackageTests.createAsync(t);
       const output = new TextOutputFixture();
       const builder = new BuilderFixture([]);
+      await repository.writeAsync({ "_build/package/package-report.json": "{}" });
 
       const exitCode = await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, {}, output, PackageTests.GALLERY).runAsync(["--target", "linux"]);
       const command = spawnSync(process.execPath, [SourceTreeFixture.locateScript("package.ts"), "--help"], { cwd: repository.directory, encoding: "utf8", timeout: 10_000 });
 
       assert.equal(exitCode, 2);
       assert.equal(output.text, PackageTests.USAGE);
-      assert.equal(existsSync(path.join(repository.directory, "_build", "package")), false);
+      assert.deepEqual(await readdir(path.join(repository.directory, "_build", "package")), []);
       assert.deepEqual(builder.runs, []);
       assert.equal(command.status, 2);
       assert.equal(command.stdout, PackageTests.USAGE);

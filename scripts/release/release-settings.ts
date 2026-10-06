@@ -14,7 +14,7 @@ import ReleaseException from "./release.exception.ts";
 export default class ReleaseSettings {
   public static readonly FILE_NAME: string = "package.json";
 
-  public static async readAsync(root: string, name: string, invalid: string): Promise<unknown> {
+  public static async readAsync(root: string, invalid: string): Promise<object> {
     let manifest: unknown;
     try {
       manifest = JSON.parse(await readFile(path.join(root, ReleaseSettings.FILE_NAME), "utf8"));
@@ -27,6 +27,6 @@ export default class ReleaseSettings {
     const settings = manifest.teamrun;
     if (typeof settings !== "object" || settings === null)
       throw new ReleaseException(invalid);
-    return name in settings ? Reflect.get(settings, name) : [];
+    return settings;
   }
 }

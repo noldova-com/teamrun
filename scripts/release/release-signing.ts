@@ -14,8 +14,6 @@ import ReleaseSettings from "./release-settings.ts";
 export default class ReleaseSigning {
   public static readonly SIGNABLE_PLATFORMS: readonly string[] = [PackageTarget.WINDOWS, PackageTarget.MACOS];
 
-  private static readonly SETTING: string = "signedPlatforms";
-
   private readonly platforms: readonly string[];
 
   private constructor(platforms: readonly string[]) {
@@ -23,10 +21,14 @@ export default class ReleaseSigning {
   }
 
   public static async readAsync(root: string): Promise<ReleaseSigning> {
-    const value = await ReleaseSettings.readAsync(root, ReleaseSigning.SETTING, ReleaseSigning.formatInvalid());
-    if (!Array.isArray(value) || new Set(value).size !== value.length || !value.every(t => ReleaseSigning.SIGNABLE_PLATFORMS.includes(t)))
+    const settings = await ReleaseSettings.readAsync(root, ReleaseSigning.formatInvalid());
+    const value: unknown = "signedPlatforms" in settings ? settings.signedPlatforms : [];
+    if (!Array.isArray(value))
       throw new ReleaseException(ReleaseSigning.formatInvalid());
-    return new ReleaseSigning(ReleaseSigning.SIGNABLE_PLATFORMS.filter(t => value.includes(t)));
+    const platforms: readonly unknown[] = value;
+    if (new Set(platforms).size !== platforms.length || !platforms.every(t => typeof t === "string" && ReleaseSigning.SIGNABLE_PLATFORMS.includes(t)))
+      throw new ReleaseException(ReleaseSigning.formatInvalid());
+    return new ReleaseSigning(ReleaseSigning.SIGNABLE_PLATFORMS.filter(t => platforms.includes(t)));
   }
 
   public listSignedPlatforms(product: ProductIdentity, repository: string): readonly string[] {
@@ -35,11 +37,11 @@ export default class ReleaseSigning {
     const unsigned = ReleaseSigning.SIGNABLE_PLATFORMS.filter(t => !this.platforms.includes(t));
     if (unsigned.length > 0)
       throw new ReleaseException(`${repository} is ${product.name}'s update feed, which gets only signed ${ReleaseSigning.SIGNABLE_PLATFORMS.join(" and ")} packages, `
-        + `but teamrun.${ReleaseSigning.SETTING} leaves out ${unsigned.join(" and ")}.`);
+        + `but teamrun.signedPlatforms leaves out ${unsigned.join(" and ")}.`);
     return this.platforms;
   }
 
   private static formatInvalid(): string {
-    return `The root ${ReleaseSettings.FILE_NAME}'s teamrun.${ReleaseSigning.SETTING} must list distinct platforms among ${ReleaseSigning.SIGNABLE_PLATFORMS.join(", ")}.`;
+    return `The root ${ReleaseSettings.FILE_NAME}'s teamrun.signedPlatforms must list distinct platforms among ${ReleaseSigning.SIGNABLE_PLATFORMS.join(", ")}.`;
   }
 }

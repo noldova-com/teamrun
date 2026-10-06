@@ -22,11 +22,10 @@ export default class PackageReport {
   }
 
   public static parse(value: unknown): PackageReport | null {
-    if (typeof value !== "object" || value === null || Array.isArray(value) || Object.keys(value).length !== PackageReport.FIELD_COUNT)
+    if (typeof value !== "object" || value === null || Array.isArray(value) || Object.keys(value).length !== PackageReport.FIELD_COUNT
+      || !("target" in value) || !("signed" in value) || !("checked" in value))
       return null;
-    const target: unknown = Reflect.get(value, "target");
-    const signed: unknown = Reflect.get(value, "signed");
-    const checked: unknown = Reflect.get(value, "checked");
+    const { target, signed, checked } = value;
     if (typeof target !== "string" || typeof signed !== "boolean" || typeof checked !== "boolean")
       return null;
     return new PackageReport(target, signed, checked);

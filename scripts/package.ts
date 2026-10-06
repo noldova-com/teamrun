@@ -74,6 +74,8 @@ export default class Package {
 
   public async runAsync(packageArguments: readonly string[]): Promise<number> {
     const credentials = SigningCredentials.take(this.environment);
+    const layout = new PackageLayout(this.root);
+    await rm(layout.report, { force: true });
     if (packageArguments.length > 1 || packageArguments.some(t => t !== Package.SIGNED_OPTION)) {
       this.output.write(Package.USAGE);
       return Package.USAGE_EXIT_CODE;
@@ -81,8 +83,6 @@ export default class Package {
 
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
-      const layout = new PackageLayout(this.root);
-      await rm(layout.report, { force: true });
       const signing = packageArguments.length === 0 ? null : this.createSigning(target, layout, credentials);
       await this.stage.stageAsync(this.output);
       await rm(layout.output, { recursive: true, force: true });

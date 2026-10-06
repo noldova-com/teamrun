@@ -57,16 +57,19 @@ class ReleaseReportsTests {
         + "The linux-x64 package was unsigned but marked checked, but the release does not sign linux packages."));
     });
 
-    test("a file in place of a report folder, a report that is not JSON or not a report, and a folder that cannot be read are refused", async t => {
+    test("a file in place of a report folder, a report that is not JSON, not a report or cannot be read, and a folder that cannot be read are refused", async t => {
       const folder = await ReleaseReportsTests.createAsync(t, []);
       await ReleaseReportsTests.writeAsync(folder, {
         "reports/notes.txt": "notes",
         "reports/report-linux-x64/package-report.json": "{",
-        "reports/report-linux-arm64/package-report.json": "[]"
+        "reports/report-linux-arm64/package-report.json": "[]",
+        "reports/report-macos-x64/package-report.json": null
       });
+      await mkdir(path.join(folder, "report-macos-x64", "package-report.json"));
 
       await assert.rejects(new ReleaseReports([]).verifyAsync(folder), new ReleaseException(`${ReleaseReportsTests.FAILED}notes.txt holds no package report.\n`
-        + "report-linux-arm64 holds no package report.\nreport-linux-x64 holds no package report.\nNo package report covers linux-x64.\nNo package report covers linux-arm64."));
+        + "report-linux-arm64 holds no package report.\nreport-linux-x64 holds no package report.\nreport-macos-x64's package report cannot be read.\n"
+        + "No package report covers linux-x64.\nNo package report covers linux-arm64.\nNo package report covers macos-x64."));
       await assert.rejects(new ReleaseReports([]).verifyAsync(path.join(folder, "missing")), new ReleaseException(`The package reports in ${path.join(folder, "missing")} cannot be read.`));
     });
   }
