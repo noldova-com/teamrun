@@ -293,6 +293,10 @@ export class Resources {
   public static readonly dialogTitleIdPrefix: string = "tr-dialog-title-";
   public static readonly dialogTitleIdToken: string = "tr-dialog-title-id";
   public static readonly dialogCloseLabel: string = "Close";
+  public static readonly dialogMaximizeLabel: string = "Maximize";
+  public static readonly dialogRestoreLabel: string = "Restore";
+  public static readonly dialogMaximizeGlyph: string = "crop_square";
+  public static readonly dialogRestoreGlyph: string = "filter_none";
   public static readonly dialogCloseSelector: string = ".tr-dialog-close";
   public static readonly noLimit: string = "none";
   public static readonly inertAttribute: string = "inert";

@@ -207,6 +207,8 @@ export class Resources {
   public static readonly showInDialogCommand: string = "shell.showInDialog";
   public static readonly showInDialogTitle: string = "Show in a dialog";
   public static readonly showInDialogGlyph: string = "open_in_full";
+  public static readonly openInMainWindowLabel: string = "Open in main window";
+  public static readonly openInMainWindowGlyph: string = "tab_move";
   public static readonly dialogAlreadyOpen: string = "A dialog is already open.";
   public static readonly dialogWhileReconnecting: string = "A dialog can't open while the window reconnects to the runtime.";
   public static readonly settingsDocument: string = "shell.settings";

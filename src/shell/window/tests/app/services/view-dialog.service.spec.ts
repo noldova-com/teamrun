@@ -253,6 +253,37 @@ describe("ViewDialogService", () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it("opens its view in the main window with focus: in the tab it came from, made active, or else as a new tab in the current group, or with the documents when that group can't hold it", async () => {
+    const layout = TestBed.inject(LayoutService);
+    const draft = new DocumentTab(plan.name, "draft");
+    layout.openDocument(LayoutFixture.todo);
+    const tabElements = [plan, search, draft].map(t => {
+      const element = document.createElement("button");
+      element.dataset["tabKey"] = t.key;
+      document.body.append(element);
+      return element;
+    });
+    const openAsync = async (tab: DocumentTab | ViewTab, element: HTMLElement): Promise<readonly unknown[]> => {
+      const shown = dialogs.showAsync(tab);
+      await vi.waitFor(() => expect(container()).not.toBeNull());
+      await userEvent.click(page.getByRole("button", { name: "Open in main window" }));
+      await shown;
+      await vi.waitFor(() => expect(document.activeElement).toBe(element));
+      const group = layout.layout().groupOf(tab);
+      return [group?.id, group?.tabs.map(t => t.key), group?.active?.key, dialogs.shown()];
+    };
+
+    const fromTab = await openAsync(plan, tabElements[0] as HTMLElement);
+    layout.focusGroup(1);
+    const intoGroup = await openAsync(search, tabElements[1] as HTMLElement);
+    const intoDocuments = await openAsync(draft, tabElements[2] as HTMLElement);
+    tabElements.forEach(t => t.remove());
+
+    expect(fromTab).toEqual([layout.layout().documents.id, [plan.key, LayoutFixture.todo.key], plan.key, null]);
+    expect(intoGroup).toEqual([1, [LayoutFixture.files.key, search.key], search.key, null]);
+    expect(intoDocuments).toEqual([layout.layout().documents.id, [plan.key, LayoutFixture.todo.key, draft.key], draft.key, null]);
+  });
+
   it("closes on Escape or the close button but leaves Escape to the view when the view handled it, and the window behind doesn't respond", async () => {
     const shown = dialogs.showAsync(search);
     await vi.waitFor(() => expect(document.activeElement?.classList.contains("tr-test-query")).toBe(true));

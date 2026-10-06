@@ -47,19 +47,12 @@ class TrustedSigningModuleTests {
       ]);
     });
 
-    test("the Azure credentials are taken out of the environment, and signing needs every one of them and passes only those and the module's folder on", () => {
+    test("signing needs every Azure credential, and passes only those and the module's folder on", () => {
       const folder = path.resolve("signing");
-      const environment: NodeJS.ProcessEnv = { ...TrustedSigningModuleTests.CREDENTIALS, GH_TOKEN: "fixture-token" };
-      const partial: NodeJS.ProcessEnv = { AZURE_CLIENT_ID: "fixture-client", AZURE_CLIENT_SECRET: "" };
-      const signing = new TrustedSigningModule(new ProcessRunnerFixture(), folder, environment);
+      const signing = new TrustedSigningModule(new ProcessRunnerFixture(), folder, { GH_TOKEN: "fixture-token" });
 
-      const credentials = TrustedSigningModule.takeCredentials(environment);
-
-      assert.deepEqual(credentials, TrustedSigningModuleTests.CREDENTIALS);
-      assert.deepEqual(environment, { GH_TOKEN: "fixture-token" });
-      assert.deepEqual(TrustedSigningModule.takeCredentials(partial), { AZURE_CLIENT_ID: "fixture-client", AZURE_CLIENT_SECRET: "" });
-      assert.deepEqual(partial, {});
-      assert.deepEqual(signing.describeEnvironment(credentials), { ...TrustedSigningModuleTests.CREDENTIALS, TEAMRUN_SIGNING_FOLDER: folder });
+      assert.deepEqual(signing.describeEnvironment({ ...TrustedSigningModuleTests.CREDENTIALS, MAC_CERTIFICATE: "fixture-certificate" }),
+        { ...TrustedSigningModuleTests.CREDENTIALS, TEAMRUN_SIGNING_FOLDER: folder });
       assert.throws(() => signing.describeEnvironment({ AZURE_CLIENT_ID: "fixture-client", AZURE_CLIENT_SECRET: "" }),
         new PackagingException("Signing Windows packages needs AZURE_TENANT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with noldova-signing."));
     });

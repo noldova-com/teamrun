@@ -276,23 +276,34 @@ describe("WorkspaceComponent", () => {
     expect(getComputedStyle(docked[0] ?? fixture.nativeElement).backgroundColor).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "sideBar.background"));
   });
 
-  it("moves an open tab's view into a dialog that shows it, leaving its place empty, and back once the dialog closes", async () => {
+  it("moves an open tab's view into a dialog that shows it, takes the tab out of its strip for the group's next tab without changing the saved layout, and puts both back once the dialog closes", async () => {
     const registry = LayoutFixture.createRegistry();
-    const fixture = await renderAsync(registry, Layout.createDefault(registry).openDocument(LayoutFixture.plan));
+    const { plan, todo } = LayoutFixture;
+    const fixture = await renderAsync(registry, Layout.createDefault(registry).openDocument(todo).openDocument(plan));
     const host: HTMLElement = fixture.nativeElement;
+    const layout = TestBed.inject(LayoutService);
     const dialogs = TestBed.inject(ViewDialogService);
+    const saved = layout.layout();
+    const documents = (): HTMLElement => host.querySelector(`tr-tab-group[data-group="${saved.documents.id}"]`) as HTMLElement;
+    const strip = (): readonly (string | null)[] => [...documents().querySelectorAll(".tr-tab")].map(t => t.getAttribute("data-tab-key"));
+    const selected = (): string | null => documents().querySelector(".tr-tab-selected")?.getAttribute("data-tab-key") ?? null;
+    const shownView = (): Element | null => documents().querySelector("tr-tab-content");
     const before = [...host.querySelectorAll("tr-tab-content")];
+    const planView = shownView();
 
-    const shown = dialogs.showAsync(LayoutFixture.plan);
+    const shown = dialogs.showAsync(plan);
     await settleAsync(fixture);
-    const whileShown = host.querySelectorAll("tr-tab-content").length;
+    const whileShown = [strip(), selected(), layout.layout() === saved];
     const inDialog = [...document.querySelectorAll("tr-view-dialog tr-tab-content")];
+    const nextView = shownView();
     dialogs.close();
     await shown;
     await settleAsync(fixture);
 
-    expect([whileShown, inDialog.length]).toEqual([before.length - 1, 1]);
-    expect(before).toContain(inDialog[0]);
+    expect([strip(), selected()]).toEqual([[todo.key, plan.key], plan.key]);
+    expect(whileShown).toEqual([[todo.key], todo.key, true]);
+    expect([inDialog.length, inDialog[0] === planView, before.includes(nextView as Element)]).toEqual([1, true, false]);
+    expect([shownView() === planView, layout.layout() === saved]).toEqual([true, true]);
     expect(new Set(host.querySelectorAll("tr-tab-content"))).toEqual(new Set(before));
   });
 

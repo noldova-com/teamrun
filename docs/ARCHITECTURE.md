@@ -246,9 +246,10 @@ A window part asks with `showInDialogAsync(name, { instance, title })` for its o
 The person has no way of their own to open one.
 Asking while any dialog is open is refused.
 
-A view or document already open in a tab moves into the dialog: its tab stays where it is with an empty panel, and its content returns there when the dialog closes, so the saved layout never changes.
+A view or document already open in a tab moves into the dialog, and its tab leaves the tab strip while the dialog shows: its group shows what it would if the tab had closed, but the saved layout keeps the tab in its place, and the view returns there when the dialog closes.
 One that was not open closes with the dialog.
 It moves there as the same live view, as when a tab moves between groups ([Window](#8-window)).
+The dialog's title bar offers Open in main window, which closes the dialog and shows the view in a tab with focus: the tab it came from, made active, or else a new tab at the end of the current group, or of the documents when that group can't hold it.
 The dialog closes when its view's module goes away or the tab it came from closes.
 When a document other than its own opens or is activated while it shows, as when a command run from the view opens one, the dialog closes, the view returns to its place, and the document's tab shows active with focus.
 When it closes and the control that opened it is gone, as when the view showed itself, focus goes to the view's tab.
@@ -396,7 +397,7 @@ A part reads the settings of its module, its dependencies and the shell, for the
 A window reads them all with `shell.settings`, reads one key's entry, its value in effect and whether the key itself holds it, with `shell.readSetting`, and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows.
 A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
-The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals, showing the page its `page` argument names when it has one.
+The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals.
 Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear, and About last.
 Keyboard shortcuts lists every command with its owner and key.
 The person records a new key, removes a key, resets a command to its default or resets every shortcut, and each change writes `shell.keyBindings` whole, in one write, built on the window's previous change until the setting reports that change; when two windows change it at the same moment, the later write is kept.
@@ -412,9 +413,7 @@ A chosen language that no longer ships is dropped at the next change.
 `[]` checks in the operating system's languages that ship; when none of them ships, the first shipped language is used and the row says which.
 On macOS the system chooses the languages.
 
-About shows TeamRun's name, version, platform and processor and the update's state with its action (section 10), then its Updates group, which holds Check for updates automatically, `shell.updateChecks`, a device setting, on by default.
-It only checks; downloading always waits for the person.
-A build that cannot update leaves the group out of About and of a search, since the setting does nothing there.
+About shows TeamRun's name, version, platform and processor and the update's state with its action (section 10), then its Updates group, which holds Check for updates, `shell.updateChecks`, a device setting whose choices are Automatically, the default, Only at start and Only when I ask.
 
 ### Setting scopes
 
@@ -439,7 +438,7 @@ Showing TeamRun's icon in the tray, `shell.trayIcon`, is a device setting whose 
 
 A module declares its notification kinds in `contributes.notifications`.
 A part posts a notification of one of them through its context and gets a handle that updates or dismisses it.
-The shell posts kinds of its own: `shell.saveFailed` and `shell.saveUnfinished` (section 9), which offer no command, and `shell.updateAvailable` and `shell.updateReady` (section 10), which run the shell's commands to download the update and to restart to install it.
+The shell posts kinds of its own: `shell.saveFailed` and `shell.saveUnfinished` (section 9), which offer no command, and `shell.updateReady` (section 10), which runs the shell's command to restart to install the update.
 They belong to no module, and turning modules' notifications off never mutes them.
 
 - Its commands, the one opening it runs and those of its actions, are the module's own or a dependency's.
@@ -993,8 +992,8 @@ Each target is packaged on its own platform and processor.
 - **Tools.** electron-builder downloads its packaging tools into `_build/package/tool-cache` and checks each against the SHA-256 it pins.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
 - **Signing (Windows).**
-  `npm run package` makes unsigned packages; `npm run package -- --signed` signs a Windows package and refuses any other target.
-  It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing account `noldova-signing` and its certificate profile `TeamRun`, and checks them before anything is built.
+  `npm run package` makes unsigned packages; `npm run package -- --signed` signs a Windows or macOS package and refuses a Linux one.
+  It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing endpoint, account and certificate profile in `scripts/packaging/trusted-signing-module.ts`, and checks them before anything is built.
   Packaging takes them out of its own environment as it starts, so staging, the module's preparation and the signature check run without them; only electron-builder receives them, and only with `--signed`.
   - It downloads Microsoft's TrustedSigning PowerShell module 0.5.8 from the PowerShell Gallery, and from nuget.org the three packages that module would otherwise install unchecked as it first signs: `Microsoft.Windows.SDK.BuildTools` 10.0.26100.4188, `Microsoft.Trusted.Signing.Client` 1.0.95 and `sign` 0.9.1-beta.24469.1.
     It checks each package against the SHA-512 its gallery published before expanding any, and expands them into `_build/package/signing`, where signing finds the tools in place and downloads nothing.
@@ -1003,6 +1002,14 @@ Each target is packaged on its own platform and processor.
     Besides the program and the installer, it signs the native addons in `app.asar.unpacked`.
   - Afterwards PowerShell 7 reads the Authenticode signatures of the installer, the unpacked program and every addon.
     Packaging fails unless each is valid, timestamped and signed by a subject that has every field of `teamrun.product.windowsPublisher`.
+- **Signing (macOS).**
+  `npm run package -- --signed` signs a macOS package with a Developer ID Application certificate and notarizes it with an App Store Connect API key.
+  It needs `MAC_CERTIFICATE` (the certificate and its private key as a base64 PKCS #12), `MAC_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8` (the key's text), `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`, and checks them before anything is built.
+  Packaging takes them out of its environment as it starts, together with the Windows credentials; only electron-builder receives them.
+  - The key is written to a file in `_build/package/signing` that only its owner can read, and that folder is removed once packaging ends, whether it succeeded or not.
+  - electron-builder signs the app and its helpers with the hardened runtime and `assets/macos/entitlements.plist`, which allows only the JIT that V8 needs, then notarizes the app and staples the ticket.
+    A signed package keeps its signature after the fuses are flipped, so it is not signed ad hoc again.
+  - Afterwards packaging opens the disk image and expands the archive, and checks each app: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl` must accept it as notarized; and `stapler` must find its ticket.
 
 ### Publication
 
@@ -1060,22 +1067,27 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The build decides, never a setting, a variable or an argument.
   `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
-  A test build, and a package made for a native update check, name instead a local feed and a test publisher given to the build when it is made; `release:assets` refuses a package whose product file names any feed but the production one.
+  A test build, and a package made for a native update check, name instead a local feed given to the build when it is made; `release:assets` refuses a package whose product file names any feed but the production one.
+  The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
 - **Versions.**
   Only a version higher than the installed one is offered.
   The same version, a lower one or a version with a prerelease suffix leaves TeamRun up to date.
 - **Checks.**
-  The desktop checks 30 seconds after it starts, then every 4 hours while it runs, and whenever the person runs Check for updates.
-  The automatic checks follow the device setting `shell.updateChecks`, on by default, and are skipped while a download runs or an update is ready.
+  The device setting `shell.updateChecks` chooses when the desktop checks by itself: Automatically, the default, 30 seconds after it starts and then every hour while it runs; Only at start, once, 30 seconds after it starts; or Only when I ask, never.
+  The person can always run Check for updates.
+  The desktop's own checks are skipped while a download runs or an update is ready.
   A failed automatic check shows only in About and the log, and the next one runs at its time; a failed check the person asked for shows as a failure.
 - **Validation.**
   Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
   After downloading, it checks the file's size and SHA-512 against it.
-  On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, or the test build's test publisher.
+  On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, and no other.
   A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher.
   Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
+- **Downloading.**
+  A newer version a check finds downloads in the background at once, and only About shows its progress.
+  A failed download shows its reason and can be tried again.
 - **The person decides.**
-  Downloading and restarting to install are explicit actions; downloading can be cancelled.
+  Restarting to install is the person's choice, Restart to update.
   Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed or a newer one replaces it.
 - **Restart to update.**
   Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.
@@ -1085,10 +1097,10 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
   Outside one, the desktop still checks but downloads and installs nothing: About says to move TeamRun to Applications, and so does the update item while a newer version is available.
 - **What the person sees.**
-  - **States:** up to date, checking, available, downloading with its progress, ready and failed.
-  - **Status bar:** the update item shows only while there is something to act on.
-  - **Notifications:** the shell's notification kinds `shell.updateAvailable` and `shell.updateReady`, each posted once per version, download the update and restart to install it.
-  - **Commands:** `shell.checkForUpdates`, `shell.downloadUpdate` and `shell.restartToUpdate`, each applying only in its state, are in command search.
+  - **States:** up to date, checking, downloading with its progress, ready and failed, and on macOS outside an Applications folder, available.
+  - **Status bar:** the update item shows only while an update is ready or failed, or on macOS outside an Applications folder while a newer version is available.
+  - **Notifications:** the shell's notification kind `shell.updateReady`, posted once per version when its update is ready, restarts to install it.
+  - **Commands:** `shell.checkForUpdates` and `shell.restartToUpdate`, each applying only in its state, are in command search.
     Check for updates is also in Help, or on macOS in the application menu after About.
   - **About:** Settings' About page shows the version and the update's state with its action, and says why a build that cannot update doesn't.
 

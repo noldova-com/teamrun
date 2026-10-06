@@ -540,6 +540,7 @@ export default class DesktopApplicationFixture {
     this.page = window;
     await expect.poll(() => this.isVisibleAsync()).toBe(true);
     await this.waitForRuntimeAsync();
+    await DesktopApplicationFixture.loadFontsAsync(window);
     await this.recordProcessesAsync();
     if (this.viewport !== null)
       await this.applyViewportAsync(this.viewport);
@@ -572,6 +573,18 @@ export default class DesktopApplicationFixture {
     }, DesktopApplicationFixture.LAUNCH_LIMIT, DesktopApplicationFixture.LAUNCH_INTERVAL);
     if (!isStarted)
       throw await this.describeLaunchFailureAsync(`no runtime published discovery within ${(Date.now() - started) / 1000} s, though one holds the data directory`, held, load);
+  }
+
+  private static async loadFontsAsync(window: Page): Promise<void> {
+    const [count, failed] = await window.evaluate(async () => {
+      const faces = [...document.fonts];
+      await Promise.allSettled(faces.map(t => t.load()));
+      return [faces.length, faces.filter(t => t.status !== "loaded").map(t => `${t.family} ${t.weight} ${t.style}`)] as const;
+    });
+    if (count === 0)
+      throw new Error("The window declares no font face, so its text would be measured in fallback fonts.");
+    if (failed.length > 0)
+      throw new Error(`The window's font faces did not load: ${failed.join(", ")}.`);
   }
 
   private async describeLaunchFailureAsync(reason: string, held: readonly [number, number] | null, load: ProcessorLoadFixture): Promise<Error> {
