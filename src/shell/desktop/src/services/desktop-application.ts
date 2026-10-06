@@ -65,10 +65,10 @@ import { AppIcons } from "./app-icons.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { DeviceSettingFollower } from "./device-setting-follower.js";
+import { DeviceState } from "./device-state.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
-import { OneTimeHints } from "./one-time-hints.js";
 import { OpenWindow } from "./open-window.js";
 import type { PathCommand } from "./path-command.js";
 import { QuitCoordinator } from "./quit-coordinator.js";
@@ -114,7 +114,7 @@ export class DesktopApplication {
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
   private readonly quitFlow: QuitFlow;
-  private readonly hints: OneTimeHints;
+  private readonly deviceState: DeviceState;
   private readonly tray: TrayController;
   private readonly trayHosts: TrayHostWatcher;
   private readonly trayIcon: DeviceSettingFollower;
@@ -185,13 +185,13 @@ export class DesktopApplication {
       quit: () => electron.app.quit(),
       exit: () => this.exit()
     }, this.quit);
-    this.hints = new OneTimeHints(createDeviceFile(this.deviceFolder, Resources.deviceStateFile), t => this.log.write(t));
+    this.deviceState = new DeviceState(createDeviceFile(this.deviceFolder, Resources.deviceStateFile), t => this.log.write(t));
     this.tray = new TrayController(electron.tray, electron.menu, icons, process.platform,
       { open: () => this.reopen(), openNotification: t => this.openNotification(t), setDoNotDisturb: t => void this.setDoNotDisturbAsync(t), quit: () => electron.app.quit() }, t => this.log.write(t),
       t => this.followTrayIcon(t));
     this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.changeTrayHost(t));
     this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
-      t => this.tray.setEnabled(t === true), t => this.log.write(t));
+      t => this.followTrayIconSetting(t), t => this.log.write(t));
     this.spelling = spelling;
   }
 
@@ -322,12 +322,15 @@ export class DesktopApplication {
       if (this.hasPassedBarrier && this.windows.size === 0)
         this.open();
     });
-    void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync(), this.recordSelfAsync()]).then(([isClear]) => {
+    void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync(), this.recordSelfAsync(), this.deviceState.readAsync()]).then(([isClear, , , state]) => {
       if (!isClear) {
         this.electron.app.exit(Resources.quitExitCode);
         return;
       }
       this.hasPassedBarrier = true;
+      const trayIcon = state[Resources.trayIconStateKey];
+      if (Object.isBoolean(trayIcon))
+        this.trayIcon.startFrom(trayIcon);
       this.tray.setHostAvailable(this.trayHosts.isAvailable);
       this.tray.setEnabled(this.trayIcon.value === true);
       this.trayHosts.start();
@@ -500,7 +503,7 @@ export class DesktopApplication {
 
   private closeToBackground(): void {
     if (this.settings.platform !== Resources.macPlatform)
-      void this.hints.showOnceAsync(Resources.trayCloseHintKey, () => this.showTrayCloseHint());
+      void this.deviceState.showOnceAsync(Resources.trayCloseHintKey, () => this.showTrayCloseHint());
   }
 
   private showTrayCloseHint(): boolean {
@@ -511,6 +514,11 @@ export class DesktopApplication {
     hint.on(Resources.clickEvent, () => this.reopen());
     hint.show();
     return true;
+  }
+
+  private followTrayIconSetting(value: JsonValue): void {
+    this.tray.setEnabled(value === true);
+    void this.deviceState.rememberAsync(Resources.trayIconStateKey, value);
   }
 
   private followTrayIcon(isShown: boolean): void {

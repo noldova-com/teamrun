@@ -30,7 +30,7 @@ export class TrayControllerTests {
     Assert.areEqual(1, fixture.electron.tray.trays.length);
     Assert.areEqual(DesktopStartFixture.icon("tray/tray-idle.ico"), fixture.tray.images.at(-1));
     Assert.areEqual("TeamRun", fixture.tray.toolTips.at(-1));
-    Assert.areEqual(JSON.stringify(["Open TeamRun", "-", "No work running (disabled)", "-", "Do not disturb [ ]", "-", "Quit TeamRun"]), JSON.stringify(fixture.rows));
+    Assert.areEqual(JSON.stringify(["No work running (disabled)", "-", "Open TeamRun", "Do not disturb [ ]", "-", "Quit TeamRun"]), JSON.stringify(fixture.rows));
     const reads = fixture.connection.calls.map((t, index) => `${t} ${JSON.stringify(fixture.connection.payloads[index])}`)
       .filter(t => t.startsWith("shell.readSetting") || t.startsWith("shell.notifications"));
     Assert.areEqual(
@@ -60,8 +60,8 @@ export class TrayControllerTests {
     Assert.areEqual("TeamRun: 7 running, 3 unread", fixture.tray.toolTips.at(-1));
     Assert.areEqual(
       JSON.stringify([
-        "Open TeamRun", "-", "Reply to Ada (disabled)", "Run the tests (disabled)", "Build (disabled)", "Lint (disabled)", "Format (disabled)", "and 2 more (disabled)", "-",
-        "Fourth", "Third", "First", "-", "Do not disturb [ ]", "-", "Quit TeamRun"
+        "Reply to Ada (disabled)", "Run the tests (disabled)", "Build (disabled)", "Lint (disabled)", "Format (disabled)", "and 2 more (disabled)",
+        "Fourth", "Third", "First", "-", "Open TeamRun", "Do not disturb [ ]", "-", "Quit TeamRun"
       ]),
       JSON.stringify(fixture.rows));
   }
@@ -203,6 +203,40 @@ export class TrayControllerTests {
 
     Assert.areEqual(0, whileOff);
     Assert.areEqual(DesktopStartFixture.icon("tray/tray-idle.png"), fixture.tray.images.at(-1));
+  }
+
+  @TestMethod
+  public async startsFromTheSettingLastHeardOnThisDeviceAndRemembersEachChange(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.files.state.kept = { trayCloseHintShown: true, trayIcon: false };
+    const answer = Promise.withResolvers<Response>();
+    fixture.connection.deferred.set("shell.readSetting", () => answer.promise);
+    await fixture.startAsync();
+
+    const beforeAnswer = fixture.electron.tray.trays.length;
+    answer.resolve(Response.success("r", { name: "shell.trayIcon", value: true, isSet: false }));
+    await Condition.waitAsync(() => fixture.files.state.writes.length > 0);
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: false, isSet: true });
+    await Condition.waitAsync(() => fixture.files.state.writes.length > 1);
+
+    Assert.areEqual(0, beforeAnswer);
+    Assert.areEqual(1, fixture.electron.tray.trays.length);
+    Assert.isUndefined(fixture.electron.tray.shown);
+    Assert.areEqual(JSON.stringify([{ trayCloseHintShown: true, trayIcon: true }, { trayCloseHintShown: true, trayIcon: false }]), JSON.stringify(fixture.files.state.writes));
+  }
+
+  @TestMethod
+  public async ignoresARememberedSettingThatIsNotOnOrOff(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    fixture.files.state.kept = { trayIcon: "on" };
+    const answer = Promise.withResolvers<Response>();
+    fixture.connection.deferred.set("shell.readSetting", () => answer.promise);
+    await fixture.startAsync();
+
+    Assert.isDefined(fixture.electron.tray.shown);
+    answer.resolve(Response.success("r", { name: "shell.trayIcon", value: true, isSet: false }));
+    await setImmediate();
+    Assert.areEqual(0, fixture.files.state.writes.length);
   }
 
   @TestMethod

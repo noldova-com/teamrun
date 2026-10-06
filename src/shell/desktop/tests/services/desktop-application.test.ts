@@ -413,7 +413,7 @@ export class DesktopApplicationTests {
       JSON.stringify([hint?.title, hint?.options.body, hint?.isShown]));
     Assert.areEqual(1, fixture.electron.notifications.created.length);
     Assert.areEqual(JSON.stringify([{ trayCloseHintShown: true }]), JSON.stringify(fixture.files.state.writes));
-    Assert.areEqual(1, DesktopStartFixture.readErrors(fixture.process, "The device's one-time hints could not be read, so they count as not shown: SyntaxError: Unexpected end of JSON input").length);
+    Assert.areEqual(1, DesktopStartFixture.readErrors(fixture.process, "The device's state could not be read, so its hints count as not shown and the tray icon follows its default until the runtime answers: SyntaxError: Unexpected end of JSON input").length);
     Assert.isFalse(fixture.electron.app.calls.some(t => t.startsWith("quit")));
     Assert.isFalse(fixture.connection.calls.includes("shell.stop"));
   }
@@ -516,7 +516,8 @@ export class DesktopApplicationTests {
     await Condition.waitAsync(() => electron.app.calls.includes("quit"));
 
     Assert.areEqual(0, callsInBackground);
-    Assert.areEqual(0, electron.notifications.created.length + files.state.writes.length);
+    Assert.areEqual(0, electron.notifications.created.length);
+    Assert.areEqual(JSON.stringify([{ trayIcon: true }]), JSON.stringify(files.state.writes));
   }
 
   @TestMethod

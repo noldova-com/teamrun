@@ -193,6 +193,7 @@ export class Resources {
   public static readonly appearanceFile: string = "appearance.json";
   public static readonly deviceStateFile: string = "device-state.json";
   public static readonly trayCloseHintKey: string = "trayCloseHintShown";
+  public static readonly trayIconStateKey: string = "trayIcon";
   public static readonly trayCloseHintBody: string = "Open it again or quit it from its icon in the system tray.";
   public static readonly fileNameParameter: string = "fileName";
   public static readonly temporarySuffix: string = ".tmp";
@@ -532,12 +533,12 @@ export class Resources {
     return `${Resources.applicationName} is still running`;
   }
 
-  public static formatHintsNotRead(reason: string): string {
-    return `The device's one-time hints could not be read, so they count as not shown: ${reason}`;
+  public static formatDeviceStateNotRead(reason: string): string {
+    return `The device's state could not be read, so its hints count as not shown and the tray icon follows its default until the runtime answers: ${reason}`;
   }
 
-  public static formatHintUnsaved(key: string, reason: string): string {
-    return `The device could not record that the hint ${key} has shown: ${reason}`;
+  public static formatDeviceStateUnsaved(key: string, reason: string): string {
+    return `The device could not record ${key} in its state: ${reason}`;
   }
 
   public static formatModuleLogLine(moduleId: string, line: string): string {

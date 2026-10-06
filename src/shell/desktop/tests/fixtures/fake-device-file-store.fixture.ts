@@ -12,10 +12,12 @@ import type { IDeviceFileStore } from "@noldova/teamrun-shell-desktop";
 export class FakeDeviceFileStore implements IDeviceFileStore {
   public readonly writes: JsonObject[] = [];
   public kept: JsonObject | null = null;
+  public reads: number = 0;
   public readFailure?: Error;
   public writeFailure?: Error;
 
   public readAsync(): Promise<JsonObject | null> {
+    this.reads++;
     return Object.isUndefined(this.readFailure) ? Promise.resolve(this.kept) : Promise.reject(this.readFailure);
   }
 

@@ -4107,41 +4107,75 @@ export declare class SpellChecker {
 }
 
 /**
- * Shows each one-time hint once on a device, such as where TeamRun went when its last window closed into the tray, and
- * records the hints it has shown in one keyed device file.
+ * Keeps the device's own state in one keyed device file: the one-time hints it has shown, such as where TeamRun went
+ * when its last window closed into the tray, and the tray icon setting last heard from the runtime. It reads the file
+ * once and writes one change at a time, so changes never overwrite each other.
  */
-export declare class OneTimeHints {
+export declare class DeviceState {
   /**
-   * Creates the hints.
+   * Creates the state.
    *
-   * @param store The device file that records which hints have shown, keyed by name.
-   * @param log Records a record that cannot be read or written.
+   * @param store The device file that holds the state, keyed by name.
+   * @param log Records a file that cannot be read or written.
    * @example
    * ```ts
-   * import { DeviceFileStore, OneTimeHints } from "@noldova/teamrun-shell-desktop";
+   * import { DeviceFileStore, DeviceState } from "@noldova/teamrun-shell-desktop";
    *
-   * export const hints: OneTimeHints = new OneTimeHints(new DeviceFileStore("/home/person/.local/state/noldova/teamrun", "device-state.json"), console.error);
+   * export const state: DeviceState = new DeviceState(new DeviceFileStore("/home/person/.local/state/noldova/teamrun", "device-state.json"), console.error);
    * ```
    */
   public constructor(store: IDeviceFileStore, log: (text: string) => void);
 
   /**
-   * Shows a hint unless this device has shown it before, then records that it has; a hint is tried at most once a
-   * run, and one that could not show is not recorded. A record that cannot be read counts as no hint shown.
+   * Reads the state, from the file the first time and from memory after that. A file that is missing or cannot be read
+   * counts as empty.
    *
-   * @param key The hint's name in the record, such as `trayCloseHintShown`.
+   * @returns A promise of the state, which never rejects.
+   * @example
+   * ```ts
+   * import type { DeviceState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function readTrayIconAsync(state: DeviceState): Promise<unknown> {
+   *   return (await state.readAsync())["trayIcon"];
+   * }
+   * ```
+   */
+  public readAsync(): Promise<JsonObject>;
+
+  /**
+   * Shows a hint unless this device has shown it before, then records that it has; a hint is tried at most once a
+   * run, and one that could not show is not recorded.
+   *
+   * @param key The hint's name in the state, such as `trayCloseHintShown`.
    * @param show Shows the hint and returns whether it could.
    * @returns A promise that settles once the hint is recorded or left alone.
    * @example
    * ```ts
-   * import type { OneTimeHints } from "@noldova/teamrun-shell-desktop";
+   * import type { DeviceState } from "@noldova/teamrun-shell-desktop";
    *
-   * export function hintAsync(hints: OneTimeHints): Promise<void> {
-   *   return hints.showOnceAsync("trayCloseHintShown", () => true);
+   * export function hintAsync(state: DeviceState): Promise<void> {
+   *   return state.showOnceAsync("trayCloseHintShown", () => true);
    * }
    * ```
    */
   public showOnceAsync(key: string, show: () => boolean): Promise<void>;
+
+  /**
+   * Records a value under a key, after any change already being written; a failed write is logged.
+   *
+   * @param key The value's name in the state, such as `trayIcon`.
+   * @param value The value.
+   * @returns A promise that settles once the value is written or its failure logged.
+   * @example
+   * ```ts
+   * import type { DeviceState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function rememberAsync(state: DeviceState, isShown: boolean): Promise<void> {
+   *   return state.rememberAsync("trayIcon", isShown);
+   * }
+   * ```
+   */
+  public rememberAsync(key: string, value: JsonValue): Promise<void>;
 }
 
 /**

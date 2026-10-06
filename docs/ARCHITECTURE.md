@@ -701,7 +701,7 @@ The ownership database of section 6 is separate.
 | The commands each device last ran from command search | The shell, in its database, the 20 newest per device |
 | The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
 | The data directories an installation's runtimes have owned, the desktops running from it, and its launch barrier | The installation's folder beside the device's identity, outside every data directory ([Stopping for an update](#stopping-for-an-update)) |
-| The one-time hints the device has shown | The desktop, in `device-state.json` beside the device's identity, outside the data directory; one key for each hint, such as `trayCloseHintShown`, set once the hint has shown |
+| The one-time hints the device has shown and its last tray setting | The desktop, in `device-state.json` beside the device's identity, outside the data directory; one key for each hint, such as `trayCloseHintShown`, set once the hint has shown, and `trayIcon`, the last value of `shell.trayIcon` the desktop heard for the device |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory; the window keeps the transient state of the shell's own tabs, such as Settings' page, under the tab's key while the tab is open, through moves, and drops it when the tab closes |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |
@@ -776,7 +776,7 @@ It keeps the middle width the person left by dragging a side dock when that is u
 The desktop shows TeamRun's icon in the Windows notification area, the macOS menu bar or the Linux tray while the device setting `shell.trayIcon` is on.
 The runtime declares the setting with its own platform's title and default: "Show TeamRun in the notification area", on by default, on Windows; "in the menu bar", off by default, on macOS; and "in the tray", on by default, elsewhere.
 Both follow the runtime's platform, not the desktop's, so a desktop attached to a runtime on another system would show that system's title and default.
-The desktop reads the setting for its device once the runtime is ready, follows its changes for that device, and until it has read it uses its platform's default.
+The desktop reads the setting for its device once the runtime is ready, follows its changes for that device, and until it has read it uses the value it last heard on this device or, without one, its platform's default.
 On Linux the icon shows only while a StatusNotifierItem host is registered: the desktop asks the session bus through `/usr/bin/gdbus` whether `org.kde.StatusNotifierWatcher` reports `IsStatusNotifierHostRegistered`, and keeps `gdbus monitor` on that name to ask again when its owner changes or a host registers or leaves.
 A missing `gdbus`, no watcher or a failed answer means no host; when the monitor ends, the desktop asks once and starts it again after a wait that begins at a second and doubles up to a minute.
 Windows and macOS always have a place for the icon.
@@ -786,7 +786,7 @@ The icon has four images: idle, work running, unread notifications, and both.
 Running work is the runtime's newest `shell.work` report; unread notifications are counted as the bell counts them, leaving out those read and those of modules turned off.
 The desktop reads both once the runtime is ready, follows their events, and shows the idle image while the runtime is not ready.
 Its tooltip names the counts that are not zero.
-Its menu lists Open TeamRun; the titles of up to five pieces of running work and "and N more", or No work running; the three newest unread notifications, each opening TeamRun and running the notification's command as an operating system notification does; Do not disturb for this device, as a checkbox; and Quit TeamRun.
+Its menu lists the titles of up to five pieces of running work and "and N more", or No work running; the three newest unread notifications, each opening TeamRun and running the notification's command as an operating system notification does; Open TeamRun; Do not disturb for this device, as a checkbox; and Quit TeamRun.
 On Windows and Linux a click on the icon brings a window forward, opening one when none is open, and the host shows the menu; on macOS a click opens the menu.
 
 While the icon shows on Windows or Linux, closing the last window leaves TeamRun running behind the icon, as section 9 describes.
