@@ -27,7 +27,6 @@ import { SettingsPageService } from "../../services/settings-page.service";
 import { SettingsService } from "../../services/settings.service";
 import { SpellingService } from "../../services/spelling.service";
 import { UpdateService } from "../../services/update.service";
-import { ViewStateService } from "../../services/view-state.service";
 import { AboutComponent } from "../about/about.component";
 import { SettingRowComponent } from "../setting-row/setting-row.component";
 import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
