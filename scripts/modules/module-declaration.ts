@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import type IModuleDeclarationJson from "./interfaces/i-module-declaration-json.ts";
+import ModuleCliCommands from "./module-cli-commands.ts";
 import ModuleMenus from "./module-menus.ts";
 import ModuleException from "./module.exception.ts";
 import ModuleSettings from "./module-settings.ts";
@@ -22,13 +23,15 @@ export default class ModuleDeclaration {
   private static readonly ID_PATTERN: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   private static readonly VERSION_PATTERN: RegExp = /^(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})\.(?:0|[1-9]\d{0,8})$/;
   private static readonly MEMBER_PATTERN: RegExp = /^[a-z][a-zA-Z0-9]*$/;
-  private static readonly RESERVED_ID: string = "shell";
+  private static readonly RESERVED_IDS: readonly string[] = ["shell", "status", "commands", "run", "open", "help"];
   private static readonly KINDS: readonly string[] = [
-    "methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "menus", "themes", ModuleSettings.SETTINGS_KIND, ModuleSettings.SCOPES_KIND
+    "methods", "events", "commands", "notifications", "views", "documents", "statusBarItems", "topBarActions", "menus", "themes", ModuleSettings.SETTINGS_KIND, ModuleSettings.SCOPES_KIND,
+    ModuleCliCommands.KIND
   ];
   private static readonly FIELDS: readonly string[] = ["id", "version", "displayName", "description", "parts", "dependencies", "contributes"];
   private static readonly RUNTIME_PART: string = "runtime";
   private static readonly WINDOW_PART: string = "window";
+  private static readonly CLI_PART: string = "cli";
   private static readonly WINDOW_ENTRY: string = "window/src/api/index";
   private static readonly MENUS_KIND: string = "menus";
 
@@ -42,6 +45,7 @@ export default class ModuleDeclaration {
   public readonly contributions: ReadonlyMap<string, readonly string[]>;
   public readonly menus: ModuleMenus;
   public readonly settings: readonly Readonly<Record<string, unknown>>[];
+  public readonly cliCommands: readonly Readonly<Record<string, unknown>>[];
   public readonly isFixture: boolean;
 
   private constructor(
@@ -55,6 +59,7 @@ export default class ModuleDeclaration {
     contributions: ReadonlyMap<string, readonly string[]>,
     menus: ModuleMenus,
     settings: readonly Readonly<Record<string, unknown>>[],
+    cliCommands: readonly Readonly<Record<string, unknown>>[],
     isFixture: boolean) {
     this.folder = folder;
     this.id = id;
@@ -66,6 +71,7 @@ export default class ModuleDeclaration {
     this.contributions = contributions;
     this.menus = menus;
     this.settings = settings;
+    this.cliCommands = cliCommands;
     this.isFixture = isFixture;
   }
 
@@ -91,8 +97,8 @@ export default class ModuleDeclaration {
       throw fail(`has unknown fields: ${unknown.join(", ")}`);
 
     const id = record.get("id");
-    if (typeof id !== "string" || id !== path.posix.basename(folder) || !ModuleDeclaration.ID_PATTERN.test(id) || id === ModuleDeclaration.RESERVED_ID)
-      throw fail(`must have the id "${path.posix.basename(folder)}", its folder's name: lowercase kebab-case and not "${ModuleDeclaration.RESERVED_ID}"`);
+    if (typeof id !== "string" || id !== path.posix.basename(folder) || !ModuleDeclaration.ID_PATTERN.test(id) || ModuleDeclaration.RESERVED_IDS.includes(id))
+      throw fail(`must have the id "${path.posix.basename(folder)}", its folder's name: lowercase kebab-case and none of ${ModuleDeclaration.RESERVED_IDS.join(", ")}`);
     const version = record.get("version");
     if (typeof version !== "string" || !ModuleDeclaration.VERSION_PATTERN.test(version))
       throw fail("must have a version of the form <major>.<minor>.<patch>: three whole numbers of up to nine digits without leading zeros, such as 0.0.1");
@@ -119,7 +125,10 @@ export default class ModuleDeclaration {
     }
     const menus = await ModuleMenus.readAsync(root, folder, id, contributions.get(ModuleDeclaration.MENUS_KIND) ?? []);
     const settings = await ModuleSettings.readAsync(root, folder, dependencies, contributions);
-    return new ModuleDeclaration(folder, id, version, displayName, description, parts, dependencies, contributions, menus, settings, isFixture);
+    if ((contributions.get(ModuleCliCommands.KIND) ?? []).length > 0 && !parts.includes(ModuleDeclaration.CLI_PART))
+      throw fail("declares command-line commands without a cli part");
+    const cliCommands = await ModuleCliCommands.readAsync(root, folder, contributions);
+    return new ModuleDeclaration(folder, id, version, displayName, description, parts, dependencies, contributions, menus, settings, cliCommands, isFixture);
   }
 
   public get file(): string {
@@ -127,9 +136,11 @@ export default class ModuleDeclaration {
   }
 
   public get runtimePackage(): string | null {
-    return this.parts.includes(ModuleDeclaration.RUNTIME_PART)
-      ? `@noldova/teamrun-${this.isFixture ? "fixture" : "modules"}-${this.id}-${ModuleDeclaration.RUNTIME_PART}`
-      : null;
+    return this.locatePackage(ModuleDeclaration.RUNTIME_PART);
+  }
+
+  public get cliPackage(): string | null {
+    return this.locatePackage(ModuleDeclaration.CLI_PART);
   }
 
   public get windowEntry(): string | null {
@@ -144,8 +155,10 @@ export default class ModuleDeclaration {
       description: this.description,
       dependencies: [...this.dependencies],
       runtimePackage: this.runtimePackage,
+      cliPackage: this.cliPackage,
       contributes: Object.fromEntries([...this.contributions].map(([kind, names]) => [kind, [...names]])),
-      settings: [...this.settings]
+      settings: [...this.settings],
+      cliCommands: [...this.cliCommands]
     };
   }
 
@@ -161,5 +174,9 @@ export default class ModuleDeclaration {
     if (!Array.isArray(value) || !value.every(t => typeof t === "string" && isOwned(t)))
       throw fail(`must list its ${kind} as "${id}.<name>", with a camelCase name`);
     return value.map(t => String(t));
+  }
+
+  private locatePackage(part: string): string | null {
+    return this.parts.includes(part) ? `@noldova/teamrun-${this.isFixture ? "fixture" : "modules"}-${this.id}-${part}` : null;
   }
 }
