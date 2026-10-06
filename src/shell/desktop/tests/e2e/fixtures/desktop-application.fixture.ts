@@ -215,11 +215,12 @@ export default class DesktopApplicationFixture {
   }
 
   public async checkpointAsync(name: string): Promise<Buffer> {
-    const image = await this.window.screenshot({ scale: "css" });
+    const zoom = await this.readZoomAsync();
+    const image = zoom === 1 ? await this.window.screenshot({ scale: "css" }) : await this.captureZoomedAsync();
     if (this.viewport !== null)
       expect([image.readUInt32BE(16), image.readUInt32BE(20)]).toEqual([this.viewport.width, this.viewport.height]);
     await this.testInfo.attach(name, { body: image, contentType: "image/png" });
-    this.testInfo.annotations.push({ type: DesktopApplicationFixture.CHECKPOINT_ANNOTATION, description: JSON.stringify({ name, ...await this.readAppearanceAsync() }) });
+    this.testInfo.annotations.push({ type: DesktopApplicationFixture.CHECKPOINT_ANNOTATION, description: JSON.stringify({ name, ...await this.readAppearanceAsync(zoom) }) });
     return image;
   }
 
@@ -227,13 +228,6 @@ export default class DesktopApplicationFixture {
     const image = await this.checkpointAsync(DesktopApplicationFixture.MAIN_WINDOW);
     const file = `${DesktopApplicationFixture.MAIN_WINDOW}-${process.platform}-${process.arch}.png`;
     await writeFile(path.join(this.testInfo.project.outputDir, "..", file), image);
-  }
-
-  public async readAppearanceAsync(): Promise<object> {
-    const settings = await this.readSettingsAsync();
-    const zoom = await this.answerAsync("report its zoom", this.application.browserWindow(this.window).then(t => t.evaluate(u => u.webContents.getZoomFactor())));
-    const page = await this.window.evaluate(() => ({ colorScheme: getComputedStyle(document.documentElement).colorScheme, viewport: { width: innerWidth, height: innerHeight }, pixelRatio: devicePixelRatio }));
-    return { ...settings, colorScheme: page.colorScheme, zoom, viewport: page.viewport, pixelRatio: page.pixelRatio };
   }
 
   public async closeAsync(keepRuntime: boolean = false): Promise<number | null> {
@@ -433,6 +427,26 @@ export default class DesktopApplicationFixture {
       `The window's request to it, teamrun.readBuild(), ${described}.`,
       this.placement
     ].join("\n");
+  }
+
+  private async readZoomAsync(): Promise<number> {
+    return await this.answerAsync("report its zoom", this.application.browserWindow(this.window).then(t => t.evaluate(u => u.webContents.getZoomFactor())));
+  }
+
+  private async captureZoomedAsync(): Promise<Buffer> {
+    const session = await this.window.context().newCDPSession(this.window);
+    try {
+      return Buffer.from((await session.send("Page.captureScreenshot", { format: "png" })).data, "base64");
+    }
+    finally {
+      await session.detach();
+    }
+  }
+
+  private async readAppearanceAsync(zoom: number): Promise<object> {
+    const settings = await this.readSettingsAsync();
+    const page = await this.window.evaluate(() => ({ colorScheme: getComputedStyle(document.documentElement).colorScheme, viewport: { width: innerWidth, height: innerHeight }, pixelRatio: devicePixelRatio }));
+    return { ...settings, colorScheme: page.colorScheme, zoom, viewport: page.viewport, pixelRatio: page.pixelRatio };
   }
 
   private async readSettingsAsync(): Promise<object> {

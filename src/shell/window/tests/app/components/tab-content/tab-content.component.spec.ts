@@ -105,6 +105,7 @@ describe("TabContentComponent", () => {
     updateNotificationAsync: () => Promise.resolve(true),
     dismissNotification: () => undefined,
     readSetting: () => undefined,
+    readSettingAsync: () => Promise.reject(new Error("unused")),
     writeSettingAsync: () => Promise.resolve(),
     resetSettingAsync: () => Promise.resolve(),
     onSettingChanged: () => () => undefined,
