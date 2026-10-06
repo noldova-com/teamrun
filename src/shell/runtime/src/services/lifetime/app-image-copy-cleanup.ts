@@ -11,6 +11,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/teamrun-foundation-core";
+
 import { ProductInfo } from "../../models/product-info.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
@@ -28,12 +30,12 @@ export class AppImageCopyCleanup {
     const lines = (await readFile(record, Resources.utf8Encoding)).split("\n");
     const mounts = lines.map(t => Resources.copyMountRecord.exec(t)).filter(t => !Object.isNull(t));
     const extractions = lines.map(t => Resources.copyExtractionRecord.exec(t)).filter(t => !Object.isNull(t));
-    const holders = [...mounts.map(([, holder = ""]) => holder), ...extractions.map(([, holder = ""]) => holder)];
+    const holders = [...mounts.map(([, holder = String.empty]) => holder), ...extractions.map(([, holder = String.empty]) => holder)];
     if ((await Promise.all(holders.map(t => AppImageCopyCleanup.isHolderRunningAsync(t)))).includes(true))
       return;
-    for (const [, , mounter = "", image = ""] of mounts)
+    for (const [, , mounter = String.empty, image = String.empty] of mounts)
       await AppImageCopyCleanup.endMountAsync(mounter, image);
-    for (const [, , folder = ""] of extractions)
+    for (const [, , folder = String.empty] of extractions)
       await AppImageCopyCleanup.removeExtractionAsync(folder);
     await rm(record, { force: true });
   }
@@ -62,7 +64,7 @@ export class AppImageCopyCleanup {
     }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code === Resources.missingFileCode)
-        return "";
+        return String.empty;
       throw error;
     }
   }

@@ -8,6 +8,7 @@
 
 import { accessSync, constants, readdirSync } from "node:fs";
 
+import "@noldova/teamrun-foundation-core";
 import { ArgumentException, ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 import { LaunchException } from "../exceptions/launch.exception.js";

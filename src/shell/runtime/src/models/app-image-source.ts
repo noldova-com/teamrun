@@ -9,6 +9,8 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import "@noldova/teamrun-foundation-core";
+
 import { Resources } from "../resources.js";
 
 export class AppImageSource {
@@ -22,14 +24,14 @@ export class AppImageSource {
 
   public get isMounted(): boolean {
     const mountPoints = readFileSync(Resources.mountTableFile, Resources.utf8Encoding).split("\n")
-      .map(t => t.split(" ")[Resources.mountPointField] ?? "")
+      .map(t => t.split(" ")[Resources.mountPointField] ?? String.empty)
       .map(t => t.replace(Resources.mountTableEscape, (_, code: string) => String.fromCharCode(Number.parseInt(code, Resources.octalRadix))));
     return mountPoints.includes(this.folder);
   }
 
   public static find(environment: NodeJS.ProcessEnv, executablePath: string): AppImageSource | null {
-    const file = environment[Resources.appImageVariable] ?? "";
-    const folder = path.posix.normalize(environment[Resources.appImageFolderVariable] ?? "").replace(Resources.trailingSlashes, "");
+    const file = environment[Resources.appImageVariable] ?? String.empty;
+    const folder = path.posix.normalize(environment[Resources.appImageFolderVariable] ?? String.empty).replace(Resources.trailingSlashes, String.empty);
     if (!path.posix.isAbsolute(file) || !path.posix.isAbsolute(folder))
       return null;
     const relative = path.posix.relative(folder, executablePath);
