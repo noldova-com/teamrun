@@ -25,6 +25,7 @@ import RepositoryFixture from "../fixtures/repository.fixture.ts";
 class PackageInstallerTests {
   private static readonly LIMIT: number = 120_000;
   private static readonly PACKAGES: readonly string[] = ["Fixture Studio-windows-x64.exe", "Fixture Studio-macos-arm64.dmg", "Fixture Studio-linux-x64.AppImage"];
+  private static readonly WINDOWS: NodeJS.ProcessEnv = { SystemRoot: "C:\\Windows" };
 
   public static register(): void {
     test("on Windows the installer runs silently for the user, and the program installed under LOCALAPPDATA is used", async t => {
@@ -32,7 +33,7 @@ class PackageInstallerTests {
       const runner = PackageInstallerTests.createRunner(t);
       runner.localAppData = path.join(repository.directory, "local");
 
-      const installed = await PackageInstallerTests.installAsync(repository, runner, "win32", "x64", { LOCALAPPDATA: runner.localAppData });
+      const installed = await PackageInstallerTests.installAsync(repository, runner, "win32", "x64", { LOCALAPPDATA: runner.localAppData, ...PackageInstallerTests.WINDOWS });
 
       const program = path.join(repository.directory, "local", "Programs", "fixture-studio", "Fixture Studio.exe");
       assert.deepEqual(runner.calls, [["Fixture Studio-windows-x64.exe", "/S"]]);
@@ -40,29 +41,35 @@ class PackageInstallerTests {
       assert.deepEqual([installed.desktop, installed.program, installed.resources], [program, program, path.join(path.dirname(program), "resources")]);
     });
 
-    test("on Windows the installer runs without PSModulePath, however it is spelled, and with every other variable", async t => {
+    test("on Windows the installer's PSModulePath, however it is spelled, starts with Windows PowerShell's own modules, and every other variable is kept", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
       const runner = PackageInstallerTests.createRunner(t);
       runner.localAppData = path.join(repository.directory, "local");
+      const environment = { LOCALAPPDATA: runner.localAppData, ...PackageInstallerTests.WINDOWS, Path: "C:\\Tools" };
 
       for (const name of ["PSModulePath", "PSMODULEPATH"])
-        await PackageInstallerTests.installAsync(repository, runner, "win32", "x64", { LOCALAPPDATA: runner.localAppData, [name]: "C:\\Modules", Path: "C:\\Tools" });
+        await PackageInstallerTests.installAsync(repository, runner, "win32", "x64", { ...environment, [name]: "C:\\Modules\\az" });
+      await PackageInstallerTests.installAsync(repository, runner, "win32", "x64", environment);
 
-      assert.deepEqual(runner.installerEnvironments, [1, 2].map(() => ({ LOCALAPPDATA: runner.localAppData, Path: "C:\\Tools" })));
+      const modules = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\Modules";
+      assert.deepEqual(runner.installerEnvironments, [`${modules};C:\\Modules\\az`, `${modules};C:\\Modules\\az`, modules].map(t => ({ ...environment, PSModulePath: t })));
     });
 
-    test("on Windows a missing LOCALAPPDATA stops before the installer runs, and an installer that leaves no program fails", async t => {
+    test("on Windows a missing LOCALAPPDATA or SystemRoot stops before the installer runs, and an installer that leaves no program fails", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
       const unnamed = PackageInstallerTests.createRunner(t);
+      const rootless = PackageInstallerTests.createRunner(t);
       const elsewhere = PackageInstallerTests.createRunner(t);
       elsewhere.localAppData = path.join(repository.directory, "elsewhere");
       const local = path.join(repository.directory, "local");
 
-      await assert.rejects(PackageInstallerTests.installAsync(repository, unnamed, "win32", "x64"),
+      await assert.rejects(PackageInstallerTests.installAsync(repository, unnamed, "win32", "x64", PackageInstallerTests.WINDOWS),
         new PackagingException("LOCALAPPDATA must name the folder the installer installs into for the user."));
-      await assert.rejects(PackageInstallerTests.installAsync(repository, elsewhere, "win32", "x64", { LOCALAPPDATA: local }),
+      await assert.rejects(PackageInstallerTests.installAsync(repository, rootless, "win32", "x64", { LOCALAPPDATA: local }),
+        new PackagingException("SystemRoot must name the Windows folder, whose PowerShell modules the installer's checks search first."));
+      await assert.rejects(PackageInstallerTests.installAsync(repository, elsewhere, "win32", "x64", { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS }),
         new PackagingException(`The installed package has no ${path.join(local, "Programs", "fixture-studio", "Fixture Studio.exe")}.`));
-      assert.deepEqual(unnamed.calls, []);
+      assert.deepEqual([unnamed.calls, rootless.calls], [[], []]);
     });
 
     test("on Windows an installer that times out fails with the files it had installed, and any other installer failure is passed on unchanged", async t => {
@@ -79,7 +86,7 @@ class PackageInstallerTests {
       const installer = path.join(repository.directory, "_build", "package", "out", "Fixture Studio-windows-x64.exe");
       const timeout = `"${installer}" did not finish within ${PackageInstallerTests.LIMIT} ms.`;
 
-      await assert.rejects(PackageInstallerTests.installAsync(repository, partial, "win32", "x64", { LOCALAPPDATA: local }), (error: unknown) =>
+      await assert.rejects(PackageInstallerTests.installAsync(repository, partial, "win32", "x64", { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS }), (error: unknown) =>
         error instanceof PackagingException && error.cause instanceof ProcessTimeoutException && error.message === [
           timeout,
           `${installFolder} held 2 files when the installer was stopped:`,
@@ -87,9 +94,9 @@ class PackageInstallerTests {
           `${path.join("resources", "app.asar")}: 8 bytes`
         ].join("\n"));
       await rm(installFolder, { recursive: true, force: true });
-      await assert.rejects(PackageInstallerTests.installAsync(repository, empty, "win32", "x64", { LOCALAPPDATA: local }), (error: unknown) =>
+      await assert.rejects(PackageInstallerTests.installAsync(repository, empty, "win32", "x64", { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS }), (error: unknown) =>
         error instanceof PackagingException && error.message === `${timeout}\nThe installer had not created ${installFolder}.`);
-      await assert.rejects(PackageInstallerTests.installAsync(repository, failing, "win32", "x64", { LOCALAPPDATA: local }),
+      await assert.rejects(PackageInstallerTests.installAsync(repository, failing, "win32", "x64", { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS }),
         new ProcessException("Fixture Studio-windows-x64.exe /S failed with exit code 9:\nFixture Studio-windows-x64.exe broke"));
     });
 

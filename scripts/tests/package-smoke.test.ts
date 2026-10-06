@@ -417,7 +417,7 @@ class PackageSmokeTests {
   private static async runAsync(t: TestContext, repository: RepositoryFixture, platform: string, runner: SmokeRunnerFixture, output: TextOutputFixture,
     architecture: string = "x64", variables: NodeJS.ProcessEnv = {}, temporaryFolder: TemporaryFolderFixture = new TemporaryFolderFixture(repository.directory)): Promise<number> {
     t.after(() => runner.disposeAsync());
-    const environment = { PATH: "fixture-path", LOCALAPPDATA: path.join(repository.directory, "local"), ...variables };
+    const environment = { PATH: "fixture-path", LOCALAPPDATA: path.join(repository.directory, "local"), SystemRoot: "C:\\Windows", ...variables };
     const smoke = new PackageSmoke(repository.directory, platform, architecture, runner, temporaryFolder, environment, output);
     t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
     try {
