@@ -12,6 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { DataDirectory, OwnershipLock, ProcessStartException, ProcessSupervisor, ShellDatabase, ShellMigrations, SystemCommand } from "@noldova/teamrun-shell-runtime";
 
+import { PlatformFixture } from "../../fixtures/platform.fixture.js";
 import { ProcessSupervisorFixture } from "../../fixtures/process-supervisor.fixture.js";
 import { ProgramFixture } from "../../fixtures/program.fixture.js";
 import { SettingsFixture } from "../../fixtures/settings.fixture.js";
@@ -39,6 +40,46 @@ export class ProcessSupervisorTests {
     Assert.areEqual("ERR_INVALID_ARG_VALUE", (invalidArgument.cause as { code: string }).code);
     Assert.areEqual(0, processes.programs.length);
     Assert.areEqual(0, settings.database.readAll(ProcessSupervisorFixture.RECORDS).length);
+  }
+
+  @TestMethod
+  public async reportsEachStartAndStopOnceWithAGrowingSequenceUntilItsListenerIsDisposed(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const processes = ProcessSupervisorFixture.create(settings);
+    const changes: string[] = [];
+    const watching = processes.onChanged(() => changes.push(`${processes.status.sequence}:${processes.status.programs.map(t => `${t.moduleId} ${t.hasExited}`).join(",")}`));
+
+    const owned = await processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT]));
+    await ProgramFixture.readLineAsync(owned);
+    const listed = processes.status;
+    await owned.stopAsync();
+    watching[Symbol.dispose]();
+    const later = await processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.WAIT]));
+    await processes.stopOwnedByAsync(ProcessSupervisorFixture.MODULE);
+    await later.exited;
+
+    Assert.areEqual("1:notes false|2:", changes.join("|"));
+    Assert.areEqual(`1 ${owned.processId} ${process.execPath}`, [listed.sequence, ...listed.programs.map(t => `${t.processId} ${t.program}`)].join(" "));
+    Assert.areEqual(4, processes.status.sequence);
+  }
+
+  @TestMethod
+  @PlatformFixture.posixOnly()
+  public async reportsACleanExitThatLeavesItsGroupAndTheGroupsEndAsSeparateChanges(): Promise<void> {
+    await using settings = await SettingsFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const processes = ProcessSupervisorFixture.create(settings);
+    const changes: string[] = [];
+    processes.onChanged(() => changes.push(`${processes.status.sequence}:${processes.status.programs.map(t => `${t.processId} ${t.hasExited}`).join(",")}`));
+
+    const owned = await processes.startAsync(ProcessSupervisorFixture.MODULE, ProgramFixture.request(folder.path, [ProgramFixture.PARENT, "0"]));
+    await ProgramFixture.readLineAsync(owned);
+    await owned.exited;
+    await ProcessSupervisorFixture.waitForAsync(() => changes.length === 2);
+    await processes.stopOwnedByAsync(ProcessSupervisorFixture.MODULE);
+
+    Assert.areEqual(`1:${owned.processId} false|2:${owned.processId} true|3:`, changes.join("|"));
   }
 
   @TestMethod
