@@ -8,8 +8,10 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import PackageTarget from "../packaging/package-target.ts";
 import type ProcessResult from "../processes/process-result.ts";
 import ReleasePublish from "../release-publish.ts";
 import ProductIdentityFixture from "./fixtures/product-identity.fixture.ts";
@@ -28,7 +30,8 @@ class BrokenGitHubFixture extends ReleaseGitHubFixture {
 class ReleasePublishTests {
   private static readonly REVISION: string = "0123456789abcdef0123456789abcdef01234567";
   private static readonly USAGE: string = "Usage: RELEASE_REPOSITORY=<owner/name> RELEASE_VERSION=<N.N.N> RELEASE_REVISION=<commit> RELEASE_FOLDER=<folder> "
-    + "RELEASE_RUN_URL=<url> npm run release:publish\n";
+    + "RELEASE_REPORTS=<folder> RELEASE_RUN_URL=<url> npm run release:publish\n";
+  private static readonly REPORTS_FOLDER: string = "reports";
 
   public static register(): void {
     test("the release's files are checked and published to the requested repository with the notes", async t => {
@@ -36,15 +39,40 @@ class ReleasePublishTests {
       const github = new ReleaseGitHubFixture();
       const output = new TextOutputFixture();
 
-      const exitCode = await new ReleasePublish(repository.directory, github, ReleasePublishTests.describe(release), output).runAsync([]);
+      const exitCode = await new ReleasePublish(repository.directory, github, ReleasePublishTests.describe(release, repository), output).runAsync([]);
 
       assert.equal(exitCode, 0, output.text);
+      assert.ok(output.text.startsWith("Every target has one package report, and the signed ones were signed and checked: none.\n"), output.text);
       assert.ok(output.text.endsWith(`Published v0.0.7 from ${ReleasePublishTests.REVISION} with 22 files.\n`), output.text);
       assert.ok(github.fields.includes("body=Unsigned test release of Fixture Studio, published in noldova-com/teamrun; an installed Fixture Studio never updates from it.\n\n"
         + "Fixture Studio 0.0.7 for Windows, Linux and macOS, each on x64 and ARM64. Its packages are unsigned.\n\n"
         + "No target has passed its native acceptance yet, so every target was accepted by a CI run only.\n\n"
         + "Each target's package passed its install check on that target's own runner in the run that built it: https://github.com/noldova-com/teamrun/actions/runs/7"), github.fields.join("\n"));
       assert.deepEqual(github.releases.map(t => [t.tag, t.isDraft, t.assets.length]), [["v0.0.7", false, 22]]);
+    });
+
+    test("a release to the update feed publishes with the declared platforms signed, and a report whose signing differs stops it before anything is published", async t => {
+      const [repository, release] = await ReleasePublishTests.createAsync(t, { signedPlatforms: ["windows", "macos"] });
+      const github = new ReleaseGitHubFixture();
+      const refused = new ReleaseGitHubFixture();
+      const output = new TextOutputFixture();
+      const mismatch = new TextOutputFixture();
+      await ReleasePublishTests.writeReportsAsync(repository, ["windows", "macos"]);
+
+      const exitCode = await new ReleasePublish(repository.directory, github, ReleasePublishTests.describe(release, repository), output).runAsync([]);
+      await ReleasePublishTests.writeReportsAsync(repository, ["windows"]);
+      const refusedCode = await new ReleasePublish(repository.directory, refused, ReleasePublishTests.describe(release, repository), mismatch).runAsync([]);
+
+      assert.equal(exitCode, 0, output.text);
+      assert.ok(output.text.startsWith("Every target has one package report, and the signed ones were signed and checked: windows, macos.\n"), output.text);
+      assert.ok(github.fields.includes("body=Fixture Studio 0.0.7 for Windows, Linux and macOS, each on x64 and ARM64. "
+        + "The Windows and macOS packages are signed; the Linux packages are unsigned.\n\n"
+        + "No target has passed its native acceptance yet, so every target was accepted by a CI run only.\n\n"
+        + "Each target's package passed its install check on that target's own runner in the run that built it: https://github.com/noldova-com/teamrun/actions/runs/7"), github.fields.join("\n"));
+      assert.equal(refusedCode, 1);
+      assert.equal(mismatch.text, "The package reports do not match the release's signing, so nothing was published:\n"
+        + "The macos-x64 package was unsigned, but the release signs macos packages.\nThe macos-arm64 package was unsigned, but the release signs macos packages.\n");
+      assert.deepEqual([refused.releases, refused.fields], [[], []]);
     });
 
     test("a relative, missing or #-marked folder, a run address that is missing or not https, files that differ from the release or a GitHub failure fails with the reason, and an unexpected error reaches the caller", async t => {
@@ -57,9 +85,14 @@ class ReleasePublishTests {
         [{ RELEASE_FOLDER: release.locate("out#1") }, new ReleaseGitHubFixture(),
           `RELEASE_FOLDER must not contain #, which gh release upload reads as the start of a file's label: "${release.locate("out#1")}".\n`],
         [{ RELEASE_FOLDER: release.locate("missing") }, new ReleaseGitHubFixture(), `The release's folder ${release.locate("missing")} does not exist.\n`],
+        [{ RELEASE_REPORTS: "reports" }, new ReleaseGitHubFixture(),
+          "RELEASE_REPORTS must be the absolute path of the folder that holds the targets' package reports, not \"reports\".\n"],
+        [{ RELEASE_REPORTS: undefined }, new ReleaseGitHubFixture(),
+          "RELEASE_REPORTS must be the absolute path of the folder that holds the targets' package reports, not \"\".\n"],
         [{ RELEASE_RUN_URL: undefined }, new ReleaseGitHubFixture(), "RELEASE_RUN_URL must be the https address of the run that built the release, not \"\".\n"],
         [{ RELEASE_RUN_URL: "http://github.com/runs/7" }, new ReleaseGitHubFixture(),
           "RELEASE_RUN_URL must be the https address of the run that built the release, not \"http://github.com/runs/7\".\n"],
+        [{ RELEASE_REPORTS: release.locate("missing") }, new ReleaseGitHubFixture(), `The package reports in ${release.locate("missing")} cannot be read.\n`],
         [{ RELEASE_VERSION: "0.0.8" }, new ReleaseGitHubFixture(), "latest-windows-x64.yml does not describe version 0.0.8 with Fixture Studio-windows-x64.exe as they are.\n"],
         [{}, refusing, `Creating the draft release v0.0.7 for ${ReleasePublishTests.REVISION}.\n"gh release upload v0.0.7 ${release.locate("Fixture Studio-windows-x64.exe")} `
           + `--repo ${ReleaseGitHubFixture.REPOSITORY}" failed with exit code 1: HTTP 422: Validation Failed (https://uploads.github.com/)\n`]
@@ -67,10 +100,10 @@ class ReleasePublishTests {
 
       for (const [variables, github, reason] of cases) {
         const output = new TextOutputFixture();
-        assert.equal(await new ReleasePublish(repository.directory, github, { ...ReleasePublishTests.describe(release), ...variables }, output).runAsync([]), 1, reason);
-        assert.equal(output.text, reason);
+        assert.equal(await new ReleasePublish(repository.directory, github, { ...ReleasePublishTests.describe(release, repository), ...variables }, output).runAsync([]), 1, reason);
+        assert.ok(output.text.endsWith(reason), reason);
       }
-      await assert.rejects(new ReleasePublish(repository.directory, new BrokenGitHubFixture(), ReleasePublishTests.describe(release), new TextOutputFixture()).runAsync([]),
+      await assert.rejects(new ReleasePublish(repository.directory, new BrokenGitHubFixture(), ReleasePublishTests.describe(release, repository), new TextOutputFixture()).runAsync([]),
         new RangeError("The fixture broke."));
     });
 
@@ -86,19 +119,26 @@ class ReleasePublishTests {
     });
   }
 
-  private static describe(release: ReleaseFolderFixture): NodeJS.ProcessEnv {
+  private static describe(release: ReleaseFolderFixture, repository: RepositoryFixture): NodeJS.ProcessEnv {
     return {
       RELEASE_REPOSITORY: ReleaseGitHubFixture.REPOSITORY, RELEASE_VERSION: "0.0.7", RELEASE_REVISION: ReleasePublishTests.REVISION, RELEASE_FOLDER: release.folder,
-      RELEASE_RUN_URL: "https://github.com/noldova-com/teamrun/actions/runs/7"
+      RELEASE_REPORTS: path.join(repository.directory, ReleasePublishTests.REPORTS_FOLDER), RELEASE_RUN_URL: "https://github.com/noldova-com/teamrun/actions/runs/7"
     };
   }
 
-  private static async createAsync(t: TestContext): Promise<readonly [RepositoryFixture, ReleaseFolderFixture]> {
+  private static async createAsync(t: TestContext, settings: Readonly<Record<string, unknown>> | null = null): Promise<readonly [RepositoryFixture, ReleaseFolderFixture]> {
     const repository = await RepositoryFixture.createAsync();
     const release = await ReleaseFolderFixture.createAsync(String(ProductIdentityFixture.json["name"]), "0.0.7");
     t.after(() => Promise.all([repository.disposeAsync(), release.disposeAsync()]));
-    await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest()) });
+    const manifest = settings === null ? ProductIdentityFixture.manifest() : ProductIdentityFixture.manifest({ releaseRepository: ReleaseGitHubFixture.REPOSITORY }, [], settings);
+    await repository.writeAsync({ "package.json": JSON.stringify(manifest) });
+    await ReleasePublishTests.writeReportsAsync(repository, []);
     return [repository, release];
+  }
+
+  private static async writeReportsAsync(repository: RepositoryFixture, signed: readonly string[]): Promise<void> {
+    await repository.writeAsync(Object.fromEntries(PackageTarget.listAll().map(t => [`${ReleasePublishTests.REPORTS_FOLDER}/report-${t.id}/package-report.json`,
+      JSON.stringify({ target: t.id, signed: signed.includes(t.platform), checked: signed.includes(t.platform) })])));
   }
 }
 

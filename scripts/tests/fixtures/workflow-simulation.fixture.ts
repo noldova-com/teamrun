@@ -97,6 +97,8 @@ export default class WorkflowSimulation {
     const settings: string[] = [];
     let isWith = false;
     for (const line of lines.slice(1)) {
+      if (line.trim().length > 0 && !line.startsWith(keyIndentation))
+        break;
       const key = line.startsWith(keyIndentation) && line[keyIndentation.length] !== " " ? WorkflowSimulation.KEY_PATTERN.exec(line.slice(keyIndentation.length)) : null;
       if (key !== null) {
         isWith = key[1] === "with";

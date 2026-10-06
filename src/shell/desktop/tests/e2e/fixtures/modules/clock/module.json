@@ -2,8 +2,8 @@
   "id": "clock",
   "version": "0.0.1",
   "displayName": "Clock",
-  "description": "Tells the time, ticks, and starts and stops a program that starts one of its own, for the UI workflows.",
-  "parts": ["runtime", "window"],
+  "description": "Tells the time, also on the command line, ticks, and starts and stops a program that starts one of its own, for the UI workflows.",
+  "parts": ["runtime", "window", "cli"],
   "dependencies": [],
   "contributes": {
     "methods": ["clock.time", "clock.record"],
@@ -13,6 +13,7 @@
     "views": ["clock.face"],
     "statusBarItems": ["clock.ticks"],
     "settings": ["clock.tickStep"],
-    "menus": ["clock.controls"]
+    "menus": ["clock.controls"],
+    "cliCommands": ["clock.showTime"]
   }
 }

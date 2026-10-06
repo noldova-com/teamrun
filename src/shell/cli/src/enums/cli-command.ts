@@ -11,5 +11,6 @@ export enum CliCommand {
   Commands = "Commands",
   Run = "Run",
   Open = "Open",
-  Help = "Help"
+  Help = "Help",
+  Module = "Module"
 }

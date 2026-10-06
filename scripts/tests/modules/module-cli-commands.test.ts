@@ -145,7 +145,7 @@ class ModuleCliCommandsTests {
         "must have only its last argument variadic");
       await ModuleCliCommandsTests.assertRefusedAsync(repository, { ...add, options: [option("dataDir"), option("verbose"), option("help"), option("noStart")] },
         "must not have options the command line has itself: --data-dir, --help, --no-start");
-      for (const name of ["deviceDir", "json", "takeOver", "timeout"])
+      for (const name of ["deviceDir", "json", "takeOver", "timeout", "argsFile"])
         await ModuleCliCommandsTests.assertRefusedAsync(repository, { ...add, options: [option(name)] }, `must not have options the command line has itself: --${name.replace(/[A-Z]/g, t => `-${t.toLowerCase()}`)}`);
     });
   }

@@ -362,7 +362,10 @@ It also requires `bin\teamrun.cmd`, with its folder once in the user's `Path`, a
 Once the runtime has stopped, it installs again over the install and requires the entry still once.
 It then uninstalls silently and requires the install folder emptied and the user's `Path` as it was before the install.
 On macOS, once the runtime answers, it links the bundle's `Contents/Resources/bin/teamrun` from its own folder and requires that link's `teamrun status` to report the runtime as well.
-A run by hand packages every target, macOS included, and keeps the packages as artifacts for two weeks.
+A run by hand packages every target, macOS included, and keeps the packages and the package report as artifacts for two weeks.
+A run by hand from `main` with `signed` set signs the packages of the platforms a release to the update feed signs, as `node scripts/signed-platforms.ts` reads them from `teamrun.signedPlatforms`.
+Those targets package in their own job in the `release` environment, whose packaging step alone receives its platform's credentials, as in a release; the other targets package without an environment.
+`signed` is refused from any other ref, a tag included, and the nightly run never signs.
 The nightly run calls it for Windows x64 and Linux x64 only, keeps those packages three days and reports a failure to make or start the package like its other jobs, in the issue "Nightly: packaging <target>".
 A package that was made and started but could not be kept fails the job without an issue, since the product did not fail.
 The Linux jobs run on Ubuntu 24.04 with libfuse2 removed, as a stock Ubuntu leaves it out, and with unprivileged user namespaces restricted as the runner ships them, so the AppImage starts as it does on a person's machine.
@@ -451,6 +454,9 @@ Test animations explicitly when relevant.
 Record platform, viewport, scale, theme, mode and font settings.
 
 The shared desktop UI suite uses a 1920 × 1080 renderer viewport at one device pixel per CSS pixel at normal zoom.
+The harness sets that viewport through Playwright, whose screenshots keep it on a display scaled above 100%; there a screenshot drops a viewport set through a DevTools session of its own, and a capture through one ignores it.
+On such a display the window reports the emulated ratio off by a rounding error, such as 1.0000000149 at 125%, so the harness reads the device pixel ratio to six decimals, in its viewport step and in each checkpoint; a harness test checks that such a ratio reads as the one it is, while a really different one, such as 1.25, stays different.
+A harness workflow started with Chromium's scale factor forced to 1.25, which needs no display setting and so runs on every CI runner, checks that the viewport keeps one device pixel per CSS pixel through checkpoints, a clipped screenshot and zoom.
 Captures remain 1920 × 1080 pixels during zoom tests; the recorded CSS viewport and pixel ratio reflect the zoom.
 A harness test checks that a checkpoint at 200% zoom shows the whole window in 1920 × 1080 pixels, and that the layout checks the zoom workflows use report a control cut off, outside the window, covered or under 24 × 24 CSS pixels without the spacing that UI-STANDARDS allows instead, a region that scrolls sideways or shows no control, readable text cut off without an ellipsis or at the bottom, and focus out of view.
 Verify the actual viewport and PNG dimensions so host display defaults cannot silently reduce the evidence resolution.

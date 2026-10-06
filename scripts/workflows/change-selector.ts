@@ -17,6 +17,7 @@ export default class ChangeSelector {
     "@noldova/teamrun-foundation-json",
     "@noldova/teamrun-shell-protocol"
   ];
+  public static readonly SCRIPT_SOURCES: readonly string[] = ["src/shell/cli/src/models/command-line-names.ts"];
 
   private static readonly TESTING_PACKAGE: string = "@noldova/teamrun-foundation-testing";
   private static readonly SHARED_CONFIGURATION: RegExp = /(?:^|\/)(?:package\.json|package-lock\.json|tsconfig[^/]*\.json|angular\.json|vitest\.config\.[^/]+|playwright\.config\.[^/]+)$/;
@@ -43,7 +44,9 @@ export default class ChangeSelector {
     const uiWorkflows: string[] = [];
     let runsEveryUiWorkflow = false;
     let runsAngularTests = false;
+    let runsScriptTests = toolingPaths.length > 0;
     for (const changedPath of appPaths) {
+      runsScriptTests ||= ChangeSelector.SCRIPT_SOURCES.includes(changedPath);
       if (ChangeSelector.SHARED_CONFIGURATION.test(changedPath))
         return ChangeSelection.everything(`${changedPath} is shared configuration: a manifest, a lockfile, or TypeScript, Angular, Vitest or Playwright configuration.`);
       if (ChangeSelector.TOOLING_FOLDERS.some(t => changedPath.startsWith(t)))
@@ -77,7 +80,7 @@ export default class ChangeSelector {
     const sourceDependents = this.findDependents(changedSources);
     runsAngularTests ||= ChangeSelector.WINDOW_DEPENDENCIES.some(t => sourceDependents.has(t));
     const selected = this.findDependents(changed);
-    const tests = new SelectedTests(this.packages.filter(t => selected.has(t.name)).map(t => t.name), runsAngularTests, toolingPaths.length > 0);
+    const tests = new SelectedTests(this.packages.filter(t => selected.has(t.name)).map(t => t.name), runsAngularTests, runsScriptTests);
     return ChangeSelection.narrowed(tests, runsEveryUiWorkflow ? undefined : uiWorkflows);
   }
 
