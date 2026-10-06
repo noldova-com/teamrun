@@ -12,12 +12,14 @@ export default class ScannedSource {
   public readonly imports: readonly SourceLiteral[];
   public readonly selectors: readonly SourceLiteral[];
   public readonly texts: readonly SourceLiteral[];
+  public readonly comments: readonly number[];
   public readonly hasFunctionBody: boolean;
 
-  public constructor(imports: readonly SourceLiteral[], selectors: readonly SourceLiteral[], texts: readonly SourceLiteral[], hasFunctionBody: boolean) {
+  public constructor(imports: readonly SourceLiteral[], selectors: readonly SourceLiteral[], texts: readonly SourceLiteral[], comments: readonly number[], hasFunctionBody: boolean) {
     this.imports = imports;
     this.selectors = selectors;
     this.texts = texts;
+    this.comments = comments;
     this.hasFunctionBody = hasFunctionBody;
   }
 }

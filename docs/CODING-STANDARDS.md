@@ -160,7 +160,7 @@ Every public callable signature documents:
 
 Document relevant generic roles, property meaning, mutation, lifecycle, performance and deprecation. Use `@remarks` and symbol links where useful; keep conceptual guides separate and linked. Avoid repetitive prose without omitting argument documentation.
 
-Source, tests, scripts and styles carry only the license header, with no JSDoc, rationale or summary comments. Rename or restructure code that needs explanation; put rationale in the issue, PR or owning document.
+Source, tests, scripts and styles carry only the license header, with no JSDoc, rationale or summary comments. Rename or restructure code that needs explanation; put rationale in the issue, PR or owning document. The Comments check refuses any other comment in scripts, styles and templates; the handwritten `src/api/index.d.ts` declarations are its only exception.
 
 External references may establish behavior; their prose is not copied. Every JSDoc uses the multiline form with separate opening and closing lines; parameter tags use `@param name description`, without a hyphen after the name:
 
