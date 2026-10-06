@@ -40,6 +40,17 @@ class PackageInstallerTests {
       assert.deepEqual([installed.desktop, installed.program, installed.resources], [program, program, path.join(path.dirname(program), "resources")]);
     });
 
+    test("on Windows the installer runs without PSModulePath, however it is spelled, and with every other variable", async t => {
+      const repository = await PackageInstallerTests.createAsync(t);
+      const runner = PackageInstallerTests.createRunner(t);
+      runner.localAppData = path.join(repository.directory, "local");
+
+      for (const name of ["PSModulePath", "PSMODULEPATH"])
+        await PackageInstallerTests.installAsync(repository, runner, "win32", "x64", { LOCALAPPDATA: runner.localAppData, [name]: "C:\\Modules", Path: "C:\\Tools" });
+
+      assert.deepEqual(runner.installerEnvironments, [1, 2].map(() => ({ LOCALAPPDATA: runner.localAppData, Path: "C:\\Tools" })));
+    });
+
     test("on Windows a missing LOCALAPPDATA stops before the installer runs, and an installer that leaves no program fails", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
       const unnamed = PackageInstallerTests.createRunner(t);

@@ -25,6 +25,7 @@ export default class PackageInstaller {
   private static readonly WINDOWS_PROGRAM_EXTENSION: string = ".exe";
   private static readonly RESOURCES_FOLDER: string = "resources";
   private static readonly SILENT_INSTALL: readonly string[] = ["/S"];
+  private static readonly MODULE_PATH: string = "PSMODULEPATH";
   private static readonly DISK_IMAGES: string = "hdiutil";
   private static readonly ATTACH: string = "attach";
   private static readonly ATTACH_OPTIONS: readonly string[] = ["-nobrowse", "-readonly", "-mountpoint"];
@@ -79,13 +80,17 @@ export default class PackageInstaller {
       throw new PackagingException(`The installed package has no ${file}.`);
   }
 
+  private createInstallerEnvironment(): NodeJS.ProcessEnv {
+    return Object.fromEntries(Object.entries(this.environment).filter(([name]) => name.toUpperCase() !== PackageInstaller.MODULE_PATH));
+  }
+
   private async installWindowsAsync(installer: string, product: ProductIdentity, folder: string): Promise<InstalledPackage> {
     const localAppData = this.environment[PackageInstaller.LOCAL_APP_DATA] ?? "";
     if (localAppData.length === 0)
       throw new PackagingException(`${PackageInstaller.LOCAL_APP_DATA} must name the folder the installer installs into for the user.`);
     const installFolder = path.join(localAppData, PackageInstaller.PROGRAMS_FOLDER, product.slug);
     try {
-      await this.requireAsync(installer, PackageInstaller.SILENT_INSTALL, folder);
+      await this.runner.requireAsync(installer, PackageInstaller.SILENT_INSTALL, folder, PackageInstaller.LIMIT, this.createInstallerEnvironment());
     }
     catch (error) {
       if (!(error instanceof ProcessTimeoutException))

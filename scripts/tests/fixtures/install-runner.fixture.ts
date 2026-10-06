@@ -21,6 +21,7 @@ export default class InstallRunnerFixture extends ProcessRunner {
   public installedBeforeTimeout: readonly string[] | null = null;
   public readonly calls: (readonly string[])[] = [];
   public readonly limits: number[] = [];
+  public readonly installerEnvironments: (NodeJS.ProcessEnv | undefined)[] = [];
 
   public constructor(failing: readonly string[] = []) {
     super();
@@ -37,11 +38,12 @@ export default class InstallRunnerFixture extends ProcessRunner {
       await rm(directory, { recursive: true, force: true });
   }
 
-  public override async captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number): Promise<ProcessResult> {
+  public override async captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
     const name = path.basename(command);
     this.directories.add(directory);
     this.calls.push([name, ...commandArguments.map(t => t.startsWith(directory) ? path.relative(directory, t) : t)]);
     this.limits.push(timeout);
+    this.installerEnvironments.push(environment);
     if (this.failing.includes(name) || this.failing.includes(String(commandArguments[0])))
       return new ProcessResult(9, "", `${name} broke`);
     if (commandArguments[0] === "--appimage-extract")
