@@ -6,18 +6,17 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
 import type ApiCatalog from "../api/api-catalog.ts";
+import ApiDeclarationSession from "../api/api-declaration-session.ts";
 import type ApiExample from "../api/api-example.ts";
 import ApiExampleReader from "../api/api-example.reader.ts";
 import type ApiExamples from "../api/api-examples.ts";
 import type ApiPackage from "../api/api-package.ts";
 import ApiProject from "../api/api-project.ts";
-import ApiServer from "../api/api-server.ts";
 import ApiException from "../api/api.exception.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import LicenseHeader from "../structure/license-header.ts";
@@ -27,6 +26,7 @@ import type ICheck from "./interfaces/check.ts";
 export default class ApiExampleCheck implements ICheck {
   private static readonly PURPOSE: string = "api-examples";
   private static readonly NO_PACKAGES: string = "No packages under src/; there are no API examples to compile.\n";
+  private static readonly VERDICT: string = "every example compiles";
   private static readonly COMPILER_ARGUMENTS: readonly string[] = ["--pretty", "false", "--project"];
   private static readonly HEADER: string = `${LicenseHeader.BLOCK}\n`;
   private static readonly HEADER_LINES: number = ApiExampleCheck.HEADER.split("\n").length - 1;
@@ -37,7 +37,7 @@ export default class ApiExampleCheck implements ICheck {
   private readonly root: string;
   private readonly catalog: ApiCatalog;
   private readonly runner: ProcessRunner;
-  private readonly server: readonly string[];
+  private readonly session: ApiDeclarationSession;
   private readonly timeout: number;
 
   public readonly title: string = "API examples";
@@ -46,26 +46,12 @@ export default class ApiExampleCheck implements ICheck {
     this.root = root;
     this.catalog = catalog;
     this.runner = runner;
-    this.server = [...server];
+    this.session = new ApiDeclarationSession(root, server, timeout);
     this.timeout = timeout;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    const apiPackages = await this.catalog.listOrReportAsync(output);
-    if (apiPackages === undefined)
-      return false;
-    if (apiPackages.length === 0) {
-      output.write(ApiExampleCheck.NO_PACKAGES);
-      return true;
-    }
-
-    let passed = true;
-    for (const apiPackage of apiPackages) {
-      const problems = await this.inspectAsync(apiPackage);
-      output.write(problems.length === 0 ? `${apiPackage.directory}: every example compiles\n` : `${apiPackage.directory}:\n${problems.map(t => `  ${t}\n`).join("")}`);
-      passed &&= problems.length === 0;
-    }
-    return passed;
+    return await this.catalog.inspectEachAsync(output, ApiExampleCheck.NO_PACKAGES, ApiExampleCheck.VERDICT, t => this.inspectAsync(t));
   }
 
   private static describe(examples: readonly ApiExample[], line: string): string {
@@ -77,13 +63,9 @@ export default class ApiExampleCheck implements ICheck {
   }
 
   private async inspectAsync(apiPackage: ApiPackage): Promise<readonly string[]> {
-    if (!existsSync(apiPackage.declarations))
-      return [apiPackage.missingDeclarationsMessage];
     try {
-      const reading = new ApiProject(this.root, `${ApiExampleCheck.PURPOSE}-reading`, apiPackage.id);
-      await reading.writeAsync(apiPackage.project, this.root, [apiPackage.declarations]);
-      const found = await ApiServer.useAsync(this.server, this.root, reading.file, this.timeout,
-        t => new ApiExampleReader(t).readAsync(apiPackage.declarations));
+      const found = await this.session.useAsync(apiPackage, `${ApiExampleCheck.PURPOSE}-reading`, [apiPackage.declarations],
+        t => new ApiExampleReader(t, apiPackage.visibility).readAsync(apiPackage.declarations));
       return [...found.undocumented.map(t => `${t} has no @example`), ...await this.compileAsync(apiPackage, found)];
     }
     catch (error) {

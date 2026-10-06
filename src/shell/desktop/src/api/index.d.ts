@@ -885,8 +885,32 @@ export interface IApplicationHost {
    * ```
    */
   on(event: "second-instance", listener: () => void): unknown;
+
+  /**
+   * Listens for the last window closing.
+   *
+   * @param event The event's name.
+   * @param listener Called each time the last window closes.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "window-all-closed", listener: () => void): unknown;
+
+  /**
+   * Listens for the application being activated, as macOS does when its Dock icon is clicked.
+   *
+   * @param event The event's name.
+   * @param listener Called on each activation.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "activate", listener: () => void): unknown;
+
+  /**
+   * Listens for the application being about to quit, after its windows have closed.
+   *
+   * @param event The event's name.
+   * @param listener Called once the application is about to quit.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "will-quit", listener: () => void): unknown;
 }
 
@@ -1060,7 +1084,23 @@ export interface IWindowContents {
    * ```
    */
   on(event: "will-navigate", listener: (event: IPreventableEvent, url: string) => void): unknown;
+
+  /**
+   * Listens for a redirect during a navigation, which the listener may cancel.
+   *
+   * @param event The event's name.
+   * @param listener Receives the cancellable event and the URL the redirect leads to.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "will-redirect", listener: (event: IPreventableEvent, url: string) => void): unknown;
+
+  /**
+   * Listens for a webview being attached to the page, which the listener may cancel.
+   *
+   * @param event The event's name.
+   * @param listener Receives the cancellable event.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "will-attach-webview", listener: (event: IPreventableEvent) => void): unknown;
 
   /**
@@ -1721,13 +1761,77 @@ export interface IDesktopWindow {
    * ```
    */
   on(event: "close", listener: (event: IPreventableEvent) => void): unknown;
+
+  /**
+   * Listens for the window having been resized.
+   *
+   * @param event The event's name.
+   * @param listener Called after each resize.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "resize", listener: () => void): unknown;
+
+  /**
+   * Listens for the window having been moved.
+   *
+   * @param event The event's name.
+   * @param listener Called after each move.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "move", listener: () => void): unknown;
+
+  /**
+   * Listens for the window being about to move.
+   *
+   * @param event The event's name.
+   * @param listener Called before each move.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "will-move", listener: () => void): unknown;
+
+  /**
+   * Listens for the window being about to be resized.
+   *
+   * @param event The event's name.
+   * @param listener Called before each resize.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "will-resize", listener: () => void): unknown;
+
+  /**
+   * Listens for the window being maximized.
+   *
+   * @param event The event's name.
+   * @param listener Called each time the window is maximized.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "maximize", listener: () => void): unknown;
+
+  /**
+   * Listens for the window being restored from maximized.
+   *
+   * @param event The event's name.
+   * @param listener Called each time the window leaves the maximized state.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "unmaximize", listener: () => void): unknown;
+
+  /**
+   * Listens for the window's page no longer responding.
+   *
+   * @param event The event's name.
+   * @param listener Called each time the page stops responding.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "unresponsive", listener: () => void): unknown;
+
+  /**
+   * Listens for the window's page responding again after it stopped.
+   *
+   * @param event The event's name.
+   * @param listener Called each time the page responds again.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
   on(event: "responsive", listener: () => void): unknown;
 
   /**
@@ -3337,8 +3441,8 @@ export declare class WindowErrorLimit {
   /**
    * Counts one more error and says what becomes of it.
    *
-   * @returns {@link WindowErrorAdmission.Write} for the period's first `burst` errors, {@link WindowErrorAdmission.Notice} for the next one, and
-   * {@link WindowErrorAdmission.Drop} for the rest of the period.
+   * @returns The admission: {@link WindowErrorAdmission.Write} for the period's first `burst` errors, {@link WindowErrorAdmission.Notice} for the
+   * next one, and {@link WindowErrorAdmission.Drop} for the rest of the period.
    * @example
    * ```ts
    * import { WindowErrorAdmission, type WindowErrorLimit } from "@noldova/teamrun-shell-desktop";

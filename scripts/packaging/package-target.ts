@@ -9,14 +9,23 @@
 import PackagingException from "./packaging.exception.ts";
 
 export default class PackageTarget {
-  private static readonly PLATFORMS: ReadonlyMap<string, string> = new Map([["win32", "windows"], ["darwin", "macos"], ["linux", "linux"]]);
+  public static readonly WINDOWS: string = "windows";
+  public static readonly MACOS: string = "macos";
+  public static readonly LINUX: string = "linux";
+  public static readonly INSTALLER: string = "exe";
+  public static readonly DISK_IMAGE: string = "dmg";
+  public static readonly APP_IMAGE: string = "AppImage";
+  private static readonly ARCHIVE: string = "zip";
+  private static readonly PLATFORMS: ReadonlyMap<string, string> = new Map([["win32", PackageTarget.WINDOWS], ["darwin", PackageTarget.MACOS], ["linux", PackageTarget.LINUX]]);
   private static readonly ARCHITECTURES: readonly string[] = ["x64", "arm64"];
   private static readonly FORMATS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([
-    ["windows", new Map([["nsis", "exe"]])],
-    ["macos", new Map([["dmg", "dmg"], ["zip", "zip"]])],
-    ["linux", new Map([["AppImage", "AppImage"]])]
+    [PackageTarget.WINDOWS, new Map([["nsis", PackageTarget.INSTALLER]])],
+    [PackageTarget.MACOS, new Map([["dmg", PackageTarget.DISK_IMAGE], ["zip", PackageTarget.ARCHIVE]])],
+    [PackageTarget.LINUX, new Map([["AppImage", PackageTarget.APP_IMAGE]])]
   ]);
-  private static readonly UPDATE_EXTENSIONS: ReadonlyMap<string, string> = new Map([["windows", "exe"], ["macos", "zip"], ["linux", "AppImage"]]);
+  private static readonly UPDATE_EXTENSIONS: ReadonlyMap<string, string> = new Map([
+    [PackageTarget.WINDOWS, PackageTarget.INSTALLER], [PackageTarget.MACOS, PackageTarget.ARCHIVE], [PackageTarget.LINUX, PackageTarget.APP_IMAGE]
+  ]);
 
   public readonly platform: string;
   public readonly architecture: string;

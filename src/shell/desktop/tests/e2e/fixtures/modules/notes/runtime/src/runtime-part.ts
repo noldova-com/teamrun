@@ -21,6 +21,7 @@ export class RuntimePart implements IRuntimePart {
   public async activateAsync(context: IRuntimePartContext): Promise<void> {
     const isMany = existsSync(path.join(context.moduleFolder, Resources.manyTabsMarker));
     const isLongCount = existsSync(path.join(context.moduleFolder, Resources.longCountMarker));
+    this.isHolding = existsSync(path.join(context.moduleFolder, Resources.holdFirstOptionsMarker));
     const runtime = randomUUID();
     context.registerMethod(Resources.optionsMethod, {
       handleAsync: async () => {

@@ -57,6 +57,40 @@ test.describe("command search", () => {
     await desktop.checkpointAsync("command-search-open");
   });
 
+  test("selects the query with Shift and Home or End, leaving the list where it is, while Home and End alone move through the list", async ({ desktop }) => {
+    const window = desktop.window;
+    const selection = (): Promise<number[]> => field(window).evaluate((input: HTMLInputElement) => [input.selectionStart ?? -1, input.selectionEnd ?? -1]);
+    const idOf = async (option: Locator): Promise<string> => {
+      const id = await option.getAttribute("id");
+      if (id === null)
+        throw new Error("The option has no id.");
+      return id;
+    };
+    await window.locator("tr-window-row").getByRole("button", { name: "Search commands" }).click();
+    await expect(field(window)).toBeFocused();
+    await window.keyboard.type("new note");
+    await expect(options(window)).toHaveCount(2);
+    const first = await idOf(options(window).first());
+    const last = await idOf(options(window).last());
+
+    await window.keyboard.press("End");
+    await expect(field(window)).toHaveAttribute("aria-activedescendant", last);
+    await expect.poll(selection).toEqual([8, 8]);
+    await window.keyboard.press("Shift+Home");
+    await expect.poll(selection).toEqual([0, 8]);
+    await expect(field(window)).toHaveAttribute("aria-activedescendant", last);
+    await window.keyboard.press("ArrowLeft");
+    await expect.poll(selection).toEqual([0, 0]);
+    await window.keyboard.press("Shift+End");
+    await expect.poll(selection).toEqual([0, 8]);
+    await expect(field(window)).toHaveAttribute("aria-activedescendant", last);
+    await window.keyboard.press("Home");
+    await expect(field(window)).toHaveAttribute("aria-activedescendant", first);
+    await window.keyboard.press("Escape");
+
+    await expect(pane(window)).toHaveCount(0);
+  });
+
   test("opens from the top bar, runs a runtime part's command chosen with the pointer, leaves out a disabled command, and returns focus when dismissed", async ({ desktop }) => {
     const window = desktop.window;
     const ticks = window.locator("[data-fixture-content=clock-ticks]");

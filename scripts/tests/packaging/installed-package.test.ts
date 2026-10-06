@@ -1,0 +1,24 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import InstalledPackage from "../../packaging/installed-package.ts";
+
+class InstalledPackageTests {
+  public static register(): void {
+    test("an installed package keeps the program that starts the desktop, the program that runs the command line and its resources", () => {
+      const installed = new InstalledPackage("desktop", "program", "resources");
+
+      assert.deepEqual([installed.desktop, installed.program, installed.resources], ["desktop", "program", "resources"]);
+    });
+  }
+}
+
+InstalledPackageTests.register();
