@@ -16,6 +16,9 @@ import type { IViewDialogOptions } from "../interfaces/i-view-dialog-options";
 import type { IWindowPartHost } from "../interfaces/i-window-part-host";
 import type { CommandContribution } from "./command-contribution";
 import type { DocumentContribution } from "./document-contribution";
+import { DocumentTab } from "./layout/document-tab";
+import type { Tab } from "./layout/tab";
+import { ViewTab } from "./layout/view-tab";
 import { MenuItem } from "./menu-item";
 import type { MenuRowContribution } from "./menu-row-contribution";
 import { NotificationHandle } from "./notification-handle";
@@ -41,6 +44,7 @@ export class WindowPartContext implements IWindowPartContext {
   private readonly saveList: (() => Promise<void>)[] = [];
   private readonly subscriptions: (() => void)[] = [];
   private readonly badgedViews: Set<string> = new Set();
+  private readonly workingTabs: Map<string, number> = new Map();
 
   public readonly moduleId: string;
 
@@ -146,6 +150,27 @@ export class WindowPartContext implements IWindowPartContext {
     this.host.setViewBadge(view, badge);
   }
 
+  public markWorking(name: string, instance?: string): () => void {
+    const key = this.findOwnTab(name, instance).key;
+    const count = this.workingTabs.get(key) ?? 0;
+    this.workingTabs.set(key, count + 1);
+    if (count === 0)
+      this.host.setTabWorking(key, true);
+    let isMarked = true;
+    return () => {
+      const left = this.workingTabs.get(key);
+      if (!isMarked || Object.isUndefined(left))
+        return;
+      isMarked = false;
+      if (left > 1) {
+        this.workingTabs.set(key, left - 1);
+        return;
+      }
+      this.workingTabs.delete(key);
+      this.host.setTabWorking(key, false);
+    };
+  }
+
   public runCommandAsync(name: string, commandArguments: JsonValue = null): Promise<JsonValue> {
     this.requireAllowed(name);
     return this.host.runCommandAsync(name, commandArguments);
@@ -235,6 +260,9 @@ export class WindowPartContext implements IWindowPartContext {
     for (const view of [...this.badgedViews])
       this.host.setViewBadge(view, null);
     this.badgedViews.clear();
+    for (const key of this.workingTabs.keys())
+      this.host.setTabWorking(key, false);
+    this.workingTabs.clear();
     this.statusBarItemList.length = 0;
     this.topBarActionList.length = 0;
     this.host.refresh();
@@ -265,6 +293,15 @@ export class WindowPartContext implements IWindowPartContext {
       throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, Resources.notificationKind, post.kind.text));
     for (const command of [...post.open === null ? [] : [post.open], ...post.actions.map(t => t.command)])
       this.requireAllowed(command.name.text);
+  }
+
+  private findOwnTab(name: string, instance: string | undefined): Tab {
+    this.requireOwn(name);
+    if (this.source.viewNames.includes(name))
+      return new ViewTab(name, instance);
+    if (this.source.documentNames.includes(name))
+      return new DocumentTab(name, instance);
+    throw new WindowPartAccessException(Resources.formatUndeclaredContribution(this.moduleId, Resources.viewOrDocumentKind, name));
   }
 
   private requireOwn(name: string): void {

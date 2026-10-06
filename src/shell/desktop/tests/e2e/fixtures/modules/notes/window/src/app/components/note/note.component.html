@@ -17,6 +17,7 @@ LICENSE file in the root directory of this source tree.
 @for (choice of savings; track choice[0]) {
   <button type="button" [attr.data-fixture-content]="'notes-save-' + choice[0]" [attr.aria-pressed]="saving() === choice[0]" (click)="saveBy(choice[0])">{{ choice[1] }}</button>
 }
+<button type="button" [attr.data-fixture-content]="'notes-work-' + instance()" [attr.aria-pressed]="working()" (click)="toggleWorking()">Work on this note</button>
 <p class="tr-notes-note-runtime" data-fixture-content="notes-runtime" [attr.data-continued]="continued()">Runtime {{ runtime() }}</p>
 @for (section of sections; track section) {
   <h2>{{ section }}</h2>

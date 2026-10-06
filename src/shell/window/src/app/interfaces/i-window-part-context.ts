@@ -31,6 +31,7 @@ export interface IWindowPartContext {
   registerSave(save: () => Promise<void>): () => void;
   provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void;
   setViewBadge(view: string, badge: ViewBadge | null): void;
+  markWorking(name: string, instance?: string): () => void;
   isAllowed(name: string): boolean;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;

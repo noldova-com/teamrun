@@ -114,6 +114,10 @@ export class WindowPartContextHostFixture implements IWindowPartHost {
     this.calls.push(`badge ${view} ${badge?.count ?? "dot"} ${badge?.description ?? "none"}`);
   }
 
+  public setTabWorking(tabKey: string, isWorking: boolean): void {
+    this.calls.push(`working ${tabKey} ${isWorking}`);
+  }
+
   public refresh(): void {
     this.calls.push("refresh");
   }
