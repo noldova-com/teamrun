@@ -835,8 +835,12 @@ export declare class ConfigurationTableActionDirective {
  * {@link ConfigurationTableActionDirective} at the end of the heading's row,
  * then an optional explanation, then the owner's own native table, marked
  * {@link ConfigurationTableDirective}, with its column headers and its row
- * actions. The heading's row, the explanation and the table stand 0.75rem
- * apart, and a part that is missing leaves no gap. Cells line up on their
+ * actions. A table with actions but no heading puts its explanation at the
+ * start of the actions' row instead: the explanation takes the rest of the
+ * row and wraps, its first line level with the actions' labels, and the
+ * actions wrap under it once it would be narrower than a text field. The
+ * heading's row, the explanation and the table stand 0.75rem apart, and a
+ * part that is missing leaves no gap. Cells line up on their
  * first line's baseline and have 0.5rem padding, except on the outer side of
  * each row's first and last cells, and a line runs under the header and
  * every row. Every column keeps to one line except the one marked with
@@ -885,8 +889,9 @@ export declare class ConfigurationTableComponent {
   public readonly level: InputSignal<number>;
 
   /**
-   * The text between the heading's row and the table, its `explanation`
-   * input; none when empty, the default.
+   * The text between the heading's row and the table, or at the start of
+   * the actions' row when there is no heading, its `explanation` input;
+   * none when empty, the default.
    */
   public readonly explanation: InputSignal<string>;
 }
