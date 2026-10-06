@@ -7,7 +7,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtemp, stat } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
@@ -16,6 +16,7 @@ import type InstalledPackage from "../../packaging/installed-package.ts";
 import PackageInstaller from "../../packaging/package-installer.ts";
 import PackageTarget from "../../packaging/package-target.ts";
 import PackagingException from "../../packaging/packaging.exception.ts";
+import ProcessTimeoutException from "../../processes/process-timeout.exception.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import InstallRunnerFixture from "../fixtures/install-runner.fixture.ts";
 import ProductIdentityFixture from "../fixtures/product-identity.fixture.ts";
@@ -51,6 +52,34 @@ class PackageInstallerTests {
       await assert.rejects(PackageInstallerTests.installAsync(repository, elsewhere, "win32", "x64", { LOCALAPPDATA: local }),
         new PackagingException(`The installed package has no ${path.join(local, "Programs", "fixture-studio", "Fixture Studio.exe")}.`));
       assert.deepEqual(unnamed.calls, []);
+    });
+
+    test("on Windows an installer that times out fails with the files it had installed, and any other installer failure is passed on unchanged", async t => {
+      const repository = await PackageInstallerTests.createAsync(t);
+      const partial = PackageInstallerTests.createRunner(t);
+      const empty = PackageInstallerTests.createRunner(t);
+      const failing = PackageInstallerTests.createRunner(t, ["/S"]);
+      const local = path.join(repository.directory, "local");
+      const installFolder = path.join(local, "Programs", "fixture-studio");
+      for (const runner of [partial, empty])
+        runner.localAppData = local;
+      partial.installedBeforeTimeout = ["resources/app.asar", "Fixture Studio.exe"];
+      empty.installedBeforeTimeout = [];
+      const installer = path.join(repository.directory, "_build", "package", "out", "Fixture Studio-windows-x64.exe");
+      const timeout = `"${installer}" did not finish within ${PackageInstallerTests.LIMIT} ms.`;
+
+      await assert.rejects(PackageInstallerTests.installAsync(repository, partial, "win32", "x64", { LOCALAPPDATA: local }), (error: unknown) =>
+        error instanceof PackagingException && error.cause instanceof ProcessTimeoutException && error.message === [
+          timeout,
+          `${installFolder} held 2 files when the installer was stopped:`,
+          "Fixture Studio.exe: 8 bytes",
+          `${path.join("resources", "app.asar")}: 8 bytes`
+        ].join("\n"));
+      await rm(installFolder, { recursive: true, force: true });
+      await assert.rejects(PackageInstallerTests.installAsync(repository, empty, "win32", "x64", { LOCALAPPDATA: local }), (error: unknown) =>
+        error instanceof PackagingException && error.message === `${timeout}\nThe installer had not created ${installFolder}.`);
+      await assert.rejects(PackageInstallerTests.installAsync(repository, failing, "win32", "x64", { LOCALAPPDATA: local }),
+        new ProcessException("Fixture Studio-windows-x64.exe /S failed with exit code 9:\nFixture Studio-windows-x64.exe broke"));
     });
 
     test("on macOS the app is copied out of the disk image, which is then detached by force", async t => {
