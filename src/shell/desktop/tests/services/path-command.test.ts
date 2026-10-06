@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdir, mkdtemp, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readlink, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -23,7 +23,8 @@ export class PathCommandTests {
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
       const link = path.join(folder, "usr", "local", "bin", "teamrun");
       const ran: (readonly string[])[] = [];
-      const command = new PathCommand(target, link, new PathCommandFilesFixture(), (program, args) => {
+      const files = new PathCommandFilesFixture();
+      const command = new PathCommand(target, link, files, (program, args) => {
         ran.push([program, ...args]);
         return Promise.resolve();
       });
@@ -31,7 +32,7 @@ export class PathCommandTests {
       const outcomes = [await command.installAsync(), await command.installAsync()];
 
       Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.AlreadyInstalled].join(), outcomes.join());
-      Assert.areEqual(target, await readlink(link));
+      Assert.areEqual(target, files.links.get(link));
       Assert.areEqual(link, command.linkPath);
       Assert.areEqual(0, ran.length);
     });
@@ -42,16 +43,17 @@ export class PathCommandTests {
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
       const stale = path.join(folder, "stale");
       const file = path.join(folder, "file");
-      await symlink(path.join(folder, "old", "teamrun"), stale);
+      const files = new PathCommandFilesFixture();
+      await files.symlink(path.join(folder, "old", "teamrun"), stale);
       await writeFile(file, "someone else's teamrun\n");
 
       const outcomes = [
-        await new PathCommand(target, stale, new PathCommandFilesFixture(), () => Promise.resolve()).installAsync(),
-        await new PathCommand(target, file, new PathCommandFilesFixture(), () => Promise.resolve()).installAsync()
+        await new PathCommand(target, stale, files, () => Promise.resolve()).installAsync(),
+        await new PathCommand(target, file, files, () => Promise.resolve()).installAsync()
       ];
 
       Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.Occupied].join(), outcomes.join());
-      Assert.areEqual(target, await readlink(stale));
+      Assert.areEqual(target, files.links.get(stale));
     });
   }
 

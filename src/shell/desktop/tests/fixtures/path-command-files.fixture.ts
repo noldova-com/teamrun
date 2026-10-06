@@ -7,23 +7,29 @@
  */
 
 import type { Stats } from "node:fs";
-import { lstat, mkdir, readlink, rm, symlink } from "node:fs/promises";
+import { lstat, mkdir, readlink, rm, writeFile } from "node:fs/promises";
 
 import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
 
 export class PathCommandFilesFixture implements IPathCommandFiles {
   public readingRefusal: string | null = null;
   public writingRefusal: string | null = null;
+  public readonly links: Map<string, string> = new Map();
 
   public lstat(file: string): Promise<Stats> {
-    return PathCommandFilesFixture.refuseOr(this.readingRefusal, () => lstat(file));
+    return PathCommandFilesFixture.refuseOr(this.readingRefusal, async () => {
+      const stats = await lstat(file);
+      return this.links.has(file) ? Object.assign(stats, { isSymbolicLink: () => true }) : stats;
+    });
   }
 
   public readlink(link: string): Promise<string> {
-    return readlink(link);
+    const target = this.links.get(link);
+    return target === undefined ? readlink(link) : Promise.resolve(target);
   }
 
   public rm(file: string): Promise<void> {
+    this.links.delete(file);
     return rm(file);
   }
 
@@ -31,8 +37,9 @@ export class PathCommandFilesFixture implements IPathCommandFiles {
     return PathCommandFilesFixture.refuseOr(this.writingRefusal, () => mkdir(folder, options));
   }
 
-  public symlink(target: string, link: string): Promise<void> {
-    return symlink(target, link);
+  public async symlink(target: string, link: string): Promise<void> {
+    await writeFile(link, "", { flag: "wx" });
+    this.links.set(link, target);
   }
 
   private static refuseOr<T>(code: string | null, action: () => Promise<T>): Promise<T> {
