@@ -17,7 +17,15 @@ class TestOptionsTests {
     test("no arguments select the complete gate once", () => {
       const options = TestOptions.parse([]);
 
-      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.selection], [false, [], 1, undefined]);
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.part, options.selection], [false, [], 1, null, undefined]);
+    });
+
+    test("a part selects its checks, once or repeated", () => {
+      const once = TestOptions.parse(["--part", "packages"]);
+      const repeated = TestOptions.parse(["--repeat", "3", "--part", "angular-and-checks"]);
+
+      assert.deepEqual([once.isDocuments, once.filters, once.repeat, once.part], [false, [], 1, "packages"]);
+      assert.deepEqual([repeated.isDocuments, repeated.filters, repeated.repeat, repeated.part], [false, [], 3, "angular-and-checks"]);
     });
 
     test("packages, the Angular tests and the script tests select a run of every check with only those tests, which a repeat count applies to", () => {
@@ -30,6 +38,16 @@ class TestOptionsTests {
       assert.deepEqual([options.selection?.runsAngularTests, options.selection?.runsScriptTests], [true, true]);
       assert.deepEqual([scripts?.packages, scripts?.runsAngularTests, scripts?.runsScriptTests], [[], false, true]);
       assert.deepEqual([checksOnly.repeat, checksOnly.selection?.packages, checksOnly.selection?.runsAngularTests, checksOnly.selection?.runsScriptTests], [1, [], false, false]);
+    });
+
+    test("a part with a selection takes that part's selected tests", () => {
+      const packages = TestOptions.parse(["--part", "packages", "--package", "@noldova/teamrun-foundation-core"]);
+      const scripts = TestOptions.parse(["--script-tests", "--part", "scripts"]);
+      const checks = TestOptions.parse(["--part", "angular-and-checks", "--checks-only"]);
+
+      assert.deepEqual([packages.part, packages.selection?.packages], ["packages", ["@noldova/teamrun-foundation-core"]]);
+      assert.deepEqual([scripts.part, scripts.selection?.runsScriptTests], ["scripts", true]);
+      assert.deepEqual([checks.part, checks.selection?.packages, checks.selection?.runsAngularTests, checks.selection?.runsScriptTests], ["angular-and-checks", [], false, false]);
     });
 
     test("documents alone selects the document checks", () => {
@@ -64,6 +82,13 @@ class TestOptionsTests {
         [["--repeat", "2.5"], "--repeat takes a whole number from 1."],
         [["--repeat", "two"], "--repeat takes a whole number from 1."],
         [["--repeat", "2", "--repeat", "3"], "--repeat may be given only once."],
+        [["--part"], "--part takes one of packages, scripts, angular-and-checks."],
+        [["--part", "ui"], "--part takes one of packages, scripts, angular-and-checks."],
+        [["--part", "scripts", "--part", "packages"], "--part may be given only once."],
+        [["--part", "scripts", "--filter", "alpha"], "--part runs a whole part, so it takes no --filter."],
+        [["--filter", "alpha", "--part", "scripts"], "--part runs a whole part, so it takes no --filter."],
+        [["--part", "packages", "--script-tests"], "--part packages runs none of the selected tests."],
+        [["--checks-only", "--part", "scripts"], "--part scripts runs none of the selected tests."],
         [["coverage"], "\"coverage\" is not an option of npm test."],
         [["--filter", "alpha", "extra"], "\"extra\" is not an option of npm test."],
         [["--repeat", "2", "documents"], "\"documents\" is not an option of npm test."],

@@ -20,7 +20,7 @@ export default class ChangeSelector {
 
   private static readonly TESTING_PACKAGE: string = "@noldova/teamrun-foundation-testing";
   private static readonly SHARED_CONFIGURATION: RegExp = /(?:^|\/)(?:package\.json|package-lock\.json|tsconfig[^/]*\.json|angular\.json|vitest\.config\.[^/]+|playwright\.config\.[^/]+)$/;
-  private static readonly TEST_RUNNER_PATHS: readonly string[] = ["scripts/test.ts", "scripts/test-options.ts", "scripts/test-options.exception.ts", "scripts/checks/"];
+  private static readonly TEST_RUNNER_PATHS: readonly string[] = ["scripts/test.ts", "scripts/test-options.ts", "scripts/test-options.exception.ts", "scripts/test-part.ts", "scripts/checks/"];
   private static readonly TOOLING_FOLDERS: readonly string[] = [".github/", "scripts/"];
   private static readonly UI_WORKFLOW_FOLDER: string = "src/shell/desktop/tests/e2e/";
   private static readonly UI_WORKFLOW_PATTERN: RegExp = /^src\/shell\/desktop\/tests\/e2e\/[^/]+\.spec\.ts$/;

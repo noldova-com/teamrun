@@ -1,0 +1,227 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Build and test a target
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: The runner label of the target.
+        type: string
+        required: true
+      architecture:
+        description: The CPU architecture of the target.
+        type: string
+        required: true
+      jobs:
+        description: The target's test jobs, as the classification plans them.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build
+    if: ${{ fromJSON(inputs.jobs)[0].prebuilt }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Stop Spotlight indexing before building
+        if: runner.os == 'macOS'
+        run: sudo mdutil -i off /System/Volumes/Data
+
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare the job
+        uses: ./.github/actions/prepare
+        with:
+          architecture: ${{ inputs.architecture }}
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack the build
+        run: tar -cf build.tar _build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/window node_modules/.package-lock.json node_modules/@noldova src/generated
+
+      - name: Keep the build for the test parts
+        id: keep
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-${{ inputs.runner }}-${{ inputs.architecture }}
+          path: build.tar
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the build again
+        if: steps.keep.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the build for the test parts again
+        id: keep-again
+        if: steps.keep.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-${{ inputs.runner }}-${{ inputs.architecture }}
+          path: build.tar
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the build a last time
+        if: steps.keep-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the build for the test parts a last time
+        if: steps.keep-again.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: build-${{ inputs.runner }}-${{ inputs.architecture }}
+          path: build.tar
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true
+
+  tests:
+    name: ${{ matrix.name }}
+    needs: build
+    if: ${{ !cancelled() && contains(fromJSON('["success", "skipped"]'), needs.build.result) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.jobs) }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Stop Spotlight indexing before testing
+        if: runner.os == 'macOS'
+        run: sudo mdutil -i off /System/Volumes/Data
+
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare the job
+        uses: ./.github/actions/prepare
+        with:
+          architecture: ${{ inputs.architecture }}
+
+      - name: Fetch the build
+        id: fetch
+        if: matrix.prebuilt
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-${{ inputs.runner }}-${{ inputs.architecture }}
+
+      - name: Wait before fetching the build again
+        if: steps.fetch.outcome == 'failure'
+        run: sleep 15
+
+      - name: Fetch the build again
+        id: fetch-again
+        if: steps.fetch.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-${{ inputs.runner }}-${{ inputs.architecture }}
+
+      - name: Wait before fetching the build a last time
+        if: steps.fetch-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Fetch the build a last time
+        if: steps.fetch-again.outcome == 'failure'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: build-${{ inputs.runner }}-${{ inputs.architecture }}
+
+      - name: Unpack the build
+        if: matrix.prebuilt
+        run: tar -xf build.tar && rm build.tar
+
+      - name: Build for the tests
+        if: matrix.build
+        run: npm run build
+
+      - name: Test
+        id: test
+        env:
+          PART: ${{ matrix.part }}
+        run: |
+          if [ -n "$PART" ]; then
+            npm test -- --part "$PART"
+          else
+            npm test
+          fi
+
+      - name: Keep the Angular test output
+        id: angular
+        if: always() && matrix.angular && steps.test.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: angular-tests-${{ inputs.runner }}-${{ inputs.architecture }}-${{ github.run_attempt }}
+          path: |
+            _build/angular-tests.log
+            _build/angular-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the Angular test output again
+        if: always() && matrix.angular && steps.test.outcome == 'failure' && steps.angular.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the Angular test output again
+        id: angular-again
+        if: always() && matrix.angular && steps.test.outcome == 'failure' && steps.angular.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: angular-tests-${{ inputs.runner }}-${{ inputs.architecture }}-${{ github.run_attempt }}
+          path: |
+            _build/angular-tests.log
+            _build/angular-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the Angular test output a last time
+        if: always() && matrix.angular && steps.test.outcome == 'failure' && steps.angular-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the Angular test output a last time
+        id: angular-last
+        if: always() && matrix.angular && steps.test.outcome == 'failure' && steps.angular-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: angular-tests-${{ inputs.runner }}-${{ inputs.architecture }}-${{ github.run_attempt }}
+          path: |
+            _build/angular-tests.log
+            _build/angular-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Warn that the Angular test output was not kept
+        if: always() && matrix.angular && steps.test.outcome == 'failure' && steps.angular-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached."

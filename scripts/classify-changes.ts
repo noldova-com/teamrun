@@ -15,6 +15,7 @@ import Git from "./repository/git.ts";
 import BuildMatrix from "./workflows/build-matrix.ts";
 import type BuildTarget from "./workflows/build-target.ts";
 import ChangeClassifier from "./workflows/change-classifier.ts";
+import TestJobPlan from "./workflows/test-job-plan.ts";
 
 export default class ClassifyChanges {
   private static readonly OUTPUT_VARIABLE: string = "GITHUB_OUTPUT";
@@ -48,7 +49,7 @@ export default class ClassifyChanges {
     const eventName = environment[ClassifyChanges.EVENT_VARIABLE];
     const scope = await this.classifier.classifyAsync(eventName, environment[ClassifyChanges.BASE_VARIABLE], environment[ClassifyChanges.HEAD_VARIABLE]);
     const matrix = new BuildMatrix(eventName);
-    const targets = JSON.stringify(matrix.targets.map(t => ClassifyChanges.describe(t)));
+    const targets = JSON.stringify(matrix.targets.map(t => ({ ...ClassifyChanges.describe(t), jobs: TestJobPlan.plan(t) })));
     const table = matrix.targets.map(t => [t.name, t.runner, t.operatingSystem, t.architecture].join(ClassifyChanges.CELL_SEPARATOR)).join(ClassifyChanges.ROW_SEPARATOR);
     const uiTargets = matrix.uiTargets.map(t => t.key).join(ClassifyChanges.KEY_SEPARATOR);
     const uiPlan = JSON.stringify(Object.fromEntries(matrix.uiTargets.map(t => {

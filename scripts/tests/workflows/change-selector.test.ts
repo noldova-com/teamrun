@@ -93,6 +93,7 @@ class ChangeSelectorTests {
         [[narrow], ["scripts/release/release-publisher.ts", "scripts/test.ts"], "scripts/test.ts is part of npm test, which runs every check and test."],
         [[], ["scripts/test-options.ts"], "scripts/test-options.ts is part of npm test, which runs every check and test."],
         [[], ["scripts/test-options.exception.ts"], "scripts/test-options.exception.ts is part of npm test, which runs every check and test."],
+        [[], ["scripts/test-part.ts"], "scripts/test-part.ts is part of npm test, which runs every check and test."],
         [[], ["scripts/checks/type-check.ts"], "scripts/checks/type-check.ts is part of npm test, which runs every check and test."],
         [[".github/workflows/build-and-test.yml"], [], ".github/workflows/build-and-test.yml is tooling the app is built or its UI workflows are run with."],
         [[".github/actions/prepare/action.yml"], [], ".github/actions/prepare/action.yml is tooling the app is built or its UI workflows are run with."],

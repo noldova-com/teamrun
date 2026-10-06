@@ -8,11 +8,13 @@
 
 import SelectedTests from "./checks/selected-tests.ts";
 import TestOptionsException from "./test-options.exception.ts";
+import TestPart from "./test-part.ts";
 
 export default class TestOptions {
   private static readonly DOCUMENTS: string = "documents";
   private static readonly FILTER: string = "--filter";
   private static readonly REPEAT: string = "--repeat";
+  private static readonly PART: string = "--part";
   private static readonly OPTION_PREFIX: string = "--";
   private static readonly COUNT: RegExp = /^[1-9]\d*$/;
   private static readonly DOCUMENTS_ALONE: string = "documents takes no other option.";
@@ -20,18 +22,23 @@ export default class TestOptions {
   private static readonly PACKAGE_VALUE: string = "--package takes a package's name that is not blank and does not start with --.";
   private static readonly REPEAT_VALUE: string = "--repeat takes a whole number from 1.";
   private static readonly REPEAT_ONCE: string = "--repeat may be given only once.";
+  private static readonly PART_VALUE: string = `--part takes one of ${TestPart.ALL.join(", ")}.`;
+  private static readonly PART_ONCE: string = "--part may be given only once.";
+  private static readonly PART_OR_FILTER: string = "--part runs a whole part, so it takes no --filter.";
   private static readonly FILTER_OR_SELECTION: string = "--filter selects tests by name and takes no --package, --angular-tests, --script-tests or --checks-only.";
   private static readonly CHECKS_ONLY_ALONE: string = "--checks-only runs no tests, so it takes no --package, --angular-tests or --script-tests.";
 
   public readonly isDocuments: boolean;
   public readonly filters: readonly string[];
   public readonly repeat: number;
+  public readonly part: string | null;
   public readonly selection?: SelectedTests;
 
-  private constructor(isDocuments: boolean, filters: readonly string[], repeat: number, selection?: SelectedTests) {
+  private constructor(isDocuments: boolean, filters: readonly string[], repeat: number, part: string | null, selection?: SelectedTests) {
     this.isDocuments = isDocuments;
     this.filters = filters;
     this.repeat = repeat;
+    this.part = part;
     if (selection !== undefined)
       this.selection = selection;
   }
@@ -40,12 +47,13 @@ export default class TestOptions {
     if (args[0] === TestOptions.DOCUMENTS) {
       if (args.length !== 1)
         throw new TestOptionsException(TestOptions.DOCUMENTS_ALONE);
-      return new TestOptions(true, [], 1);
+      return new TestOptions(true, [], 1, null);
     }
 
     const filters: string[] = [];
     const packages: string[] = [];
     let repeat: number | null = null;
+    let part: string | null = null;
     let runsAngularTests = false;
     let runsScriptTests = false;
     let isChecksOnly = false;
@@ -69,23 +77,42 @@ export default class TestOptions {
           throw new TestOptionsException(TestOptions.REPEAT_VALUE);
         repeat = Number(value);
       }
+      else if (option === TestOptions.PART) {
+        const value = args[++index] ?? "";
+        if (part !== null)
+          throw new TestOptionsException(TestOptions.PART_ONCE);
+        if (!TestPart.ALL.includes(value))
+          throw new TestOptionsException(TestOptions.PART_VALUE);
+        part = value;
+      }
       else
         throw new TestOptionsException(`${JSON.stringify(option)} is not an option of npm test.`);
     }
 
     const isSelected = packages.length > 0 || runsAngularTests || runsScriptTests;
+    if (part !== null && filters.length > 0)
+      throw new TestOptionsException(TestOptions.PART_OR_FILTER);
     if (filters.length > 0 && (isSelected || isChecksOnly))
       throw new TestOptionsException(TestOptions.FILTER_OR_SELECTION);
     if (isChecksOnly && isSelected)
       throw new TestOptionsException(TestOptions.CHECKS_ONLY_ALONE);
-    return isSelected || isChecksOnly
-      ? new TestOptions(false, [], repeat ?? 1, new SelectedTests(packages, runsAngularTests, runsScriptTests))
-      : new TestOptions(false, filters, repeat ?? 1);
+    if (!isSelected && !isChecksOnly)
+      return new TestOptions(false, filters, repeat ?? 1, part);
+    const selection = new SelectedTests(packages, runsAngularTests, runsScriptTests);
+    if (part !== null && !TestOptions.selectsPart(part, selection))
+      throw new TestOptionsException(`--part ${part} runs none of the selected tests.`);
+    return new TestOptions(false, [], repeat ?? 1, part, selection);
   }
 
   private static readText(value: string | undefined, reason: string): string {
     if (value === undefined || value.trim() === "" || value.startsWith(TestOptions.OPTION_PREFIX))
       throw new TestOptionsException(reason);
     return value;
+  }
+
+  private static selectsPart(part: string, selection: SelectedTests): boolean {
+    if (part === TestPart.PACKAGES)
+      return selection.packages.length > 0;
+    return part !== TestPart.SCRIPTS || selection.runsScriptTests;
   }
 }
