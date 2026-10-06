@@ -25,6 +25,7 @@ export default class ProductIdentity {
   private static readonly SLUG: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   private static readonly VARIABLE: RegExp = /^[A-Z][A-Z0-9_]*$/;
   private static readonly REPOSITORY: RegExp = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/;
+  private static readonly DISTINGUISHED_NAME: RegExp = /^CN=[^,=+"\\<>;\n\r]+(?:, [A-Z]+=[^,=+"\\<>;\n\r]+)*$/;
   private static readonly UNSAFE_NAME: RegExp = /["\\\n\r]/;
   private static readonly UNSAFE_SEGMENT: RegExp = /[\\:*?"<>|]/;
   private static readonly SEPARATOR: string = "/";
@@ -43,6 +44,7 @@ export default class ProductIdentity {
   public readonly dataDirectoryVariable: string;
   public readonly icons: string;
   public readonly releaseRepository: string;
+  public readonly windowsPublisher: string;
 
   public constructor(
     name: string,
@@ -54,7 +56,8 @@ export default class ProductIdentity {
     deviceFolders: readonly [windows: string, macos: string, linux: string],
     dataDirectoryVariable: string,
     icons: string,
-    releaseRepository: string) {
+    releaseRepository: string,
+    windowsPublisher: string) {
     const [windows, macos, linux] = deviceFolders;
     ProductIdentity.require(name.trim().length > 0 && !ProductIdentity.UNSAFE_NAME.test(name), "name", "a name without quotes, backslashes or line breaks");
     ProductIdentity.require(publisher.trim().length > 0 && !ProductIdentity.UNSAFE_NAME.test(publisher), "publisher", "a name without quotes, backslashes or line breaks");
@@ -66,6 +69,8 @@ export default class ProductIdentity {
       ProductIdentity.require(ProductIdentity.isRelativeFolder(folder), field, "a relative folder whose segments are separated by /");
     ProductIdentity.require(ProductIdentity.VARIABLE.test(dataDirectoryVariable), "dataDirectoryVariable", "an uppercase environment variable name");
     ProductIdentity.require(ProductIdentity.REPOSITORY.test(releaseRepository), "releaseRepository", "a GitHub repository written as owner/name");
+    ProductIdentity.require(ProductIdentity.DISTINGUISHED_NAME.test(windowsPublisher), "windowsPublisher",
+      "the distinguished name of the Windows signing certificate's subject, starting with CN= and with its fields separated by \", \"");
 
     this.name = name;
     this.publisher = publisher;
@@ -79,6 +84,7 @@ export default class ProductIdentity {
     this.dataDirectoryVariable = dataDirectoryVariable;
     this.icons = icons;
     this.releaseRepository = releaseRepository;
+    this.windowsPublisher = windowsPublisher;
   }
 
   public static async readAsync(root: string): Promise<ProductIdentity> {
@@ -107,7 +113,8 @@ export default class ProductIdentity {
       [ProductIdentity.readText(folders, "windows"), ProductIdentity.readText(folders, "macos"), ProductIdentity.readText(folders, "linux")],
       ProductIdentity.readText(product, "dataDirectoryVariable"),
       ProductIdentity.readText(product, "icons"),
-      ProductIdentity.readText(product, "releaseRepository"));
+      ProductIdentity.readText(product, "releaseRepository"),
+      ProductIdentity.readText(product, "windowsPublisher"));
   }
 
   public get literals(): readonly string[] {
