@@ -19,6 +19,6 @@ export class CodeToken {
   public constructor(text: string, kind: CodeTokenKind | null) {
     this.text = text;
     this.kind = kind;
-    this.className = Object.isNull(kind) ? null : `${Resources.codeTokenClass} ${Resources.codeTokenClass}-${kind}`;
+    this.className = Object.isNull(kind) ? null : `${Resources.codeTokenClass} ${Resources.codeTokenClass}-${kind.toLowerCase()}`;
   }
 }

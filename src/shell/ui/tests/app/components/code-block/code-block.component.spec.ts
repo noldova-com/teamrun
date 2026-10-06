@@ -292,7 +292,7 @@ describe("CodeBlockComponent", () => {
     [...body().querySelectorAll("code > span")].map(t => [t.textContent, [...t.classList].find(name => name.startsWith("tr-code-token-"))?.slice("tr-code-token-".length) ?? null] as const);
   const probe = (kind: CodeTokenKind): HTMLElement => {
     const span = (body().querySelector("code") as HTMLElement).appendChild(document.createElement("span"));
-    span.className = `tr-code-token tr-code-token-${kind}`;
+    span.className = `tr-code-token tr-code-token-${kind.toLowerCase()}`;
     return span;
   };
 
@@ -304,8 +304,8 @@ describe("CodeBlockComponent", () => {
     await copyAsync();
 
     expect(tokens()).toEqual(expect.arrayContaining([
-      ["//", "comment"], ["@", "meta"], ["class", "keyword"], ["Box", "type"], ["export", "control"], ["function", "keyword"], ["greet", "function"], ["name", "variable"],
-      ["string", "type"], ["return", "control"], ["Hello, ", "string"], ["a", "regex"], ["1", "number"], ["{", null]
+      ["// greet", "comment"], ["@", "meta"], ["class", "keyword"], ["Box", "type"], ["export", "control"], ["function", "keyword"], ["greet", "function"], ["name", "variable"],
+      ["string", "type"], ["return", "control"], ["`Hello, ", "string"], ["a", "regex"], ["1", "number"], ["(", null]
     ]));
     expect(body().querySelector("code")?.textContent).toBe(code);
     expect(clipboard.texts).toEqual([code]);
@@ -343,7 +343,7 @@ describe("CodeBlockComponent", () => {
         const kinds = Object.values(CodeTokenKind);
 
         expect(kinds.map(t => getComputedStyle(probe(t)).color))
-          .toEqual(kinds.map(t => AppearanceFixture.readColor(theme, mode, `teamrun.code${t[0]?.toUpperCase()}${t.slice(1)}Foreground`)));
+          .toEqual(kinds.map(t => AppearanceFixture.readColor(theme, mode, `teamrun.code${t}Foreground`)));
       });
 
   it("paints every kind of token in the system's text color in forced colors", async () => {

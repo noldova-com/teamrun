@@ -19,14 +19,14 @@ import { Resources } from "../../resources";
 
 @Injectable({ providedIn: "root" })
 export class CodeHighlighter {
-  private static readonly kinds: ReadonlyMap<string | undefined, CodeTokenKind> = new Map(Object.values(CodeTokenKind).map(t => [t, t] as const));
+  private static readonly kinds: ReadonlyMap<string | undefined, CodeTokenKind> = new Map(Object.values(CodeTokenKind).map(t => [t.toLowerCase(), t] as const));
   private static readonly theme: ThemeRegistrationRaw = {
     name: Resources.codeThemeName,
     fg: Resources.codePlainColor,
     bg: Resources.codePlainColor,
     settings: [
       { settings: { foreground: Resources.codePlainColor } },
-      ...Object.values(CodeTokenKind).map(t => ({ scope: [...Resources.codeTokenScopes[t]], settings: { foreground: t } })),
+      ...Object.values(CodeTokenKind).map(t => ({ scope: [...Resources.codeTokenScopes[t]], settings: { foreground: t.toLowerCase() } })),
       { scope: [...Resources.codePlainScopes], settings: { foreground: Resources.codePlainColor } }
     ]
   };

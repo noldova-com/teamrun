@@ -7,14 +7,14 @@
  */
 
 export enum CodeTokenKind {
-  Comment = "comment",
-  Keyword = "keyword",
-  Control = "control",
-  String = "string",
-  Number = "number",
-  Type = "type",
-  Function = "function",
-  Variable = "variable",
-  Regex = "regex",
-  Meta = "meta"
+  Comment = "Comment",
+  Keyword = "Keyword",
+  Control = "Control",
+  String = "String",
+  Number = "Number",
+  Type = "Type",
+  Function = "Function",
+  Variable = "Variable",
+  Regex = "Regex",
+  Meta = "Meta"
 }
