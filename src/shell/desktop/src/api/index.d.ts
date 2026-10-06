@@ -3776,6 +3776,225 @@ export declare class PathCommandException extends Exception {
 }
 
 /**
+ * Runs other programs for the desktop, without a shell or a window.
+ */
+export interface IProgramHost {
+  /**
+   * Runs a program to its end.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @returns A promise of the program's standard output.
+   * @throws ProgramException, through the promise, when the program cannot start, ends with an error or runs too long.
+   * @example
+   * ```ts
+   * import type { IProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readVersionAsync(programs: IProgramHost): Promise<string> {
+   *   return programs.runAsync("/usr/bin/gdbus", ["--version"], process.env);
+   * }
+   * ```
+   */
+  runAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): Promise<string>;
+
+  /**
+   * Starts a program that keeps running and passes its standard output on as it comes.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param onOutput Receives each piece of the program's standard output.
+   * @param onExit Called once, when the program ends or cannot start.
+   * @returns The running program.
+   * @example
+   * ```ts
+   * import type { IProgramHost, StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function monitor(programs: IProgramHost): StartedProgram {
+   *   return programs.start("/usr/bin/gdbus", ["monitor", "--session"], process.env, t => console.log(t), () => console.log("ended"));
+   * }
+   * ```
+   */
+  start(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onOutput: (text: string) => void, onExit: () => void): StartedProgram;
+}
+
+/**
+ * A program that an {@link IProgramHost} started.
+ */
+export declare class StartedProgram {
+  /**
+   * Creates the running program.
+   *
+   * @param end Ends the program.
+   * @example
+   * ```ts
+   * import { StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const program: StartedProgram = new StartedProgram(() => undefined);
+   * ```
+   */
+  public constructor(end: () => void);
+
+  /**
+   * Ends the program; its host's exit callback follows once it has ended.
+   *
+   * @example
+   * ```ts
+   * import type { StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(program: StartedProgram): void {
+   *   program.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+}
+
+/**
+ * Runs other programs as child processes of the desktop.
+ */
+export declare class ChildProgramHost implements IProgramHost {
+  /**
+   * Creates the host.
+   *
+   * @param timeout How long, in milliseconds, a program run to its end may take before it is ended and fails.
+   * @example
+   * ```ts
+   * import { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const programs: ChildProgramHost = new ChildProgramHost(5000);
+   * ```
+   */
+  public constructor(timeout: number);
+
+  /**
+   * Runs a program to its end.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @returns A promise of the program's standard output.
+   * @throws ProgramException, through the promise, when the program cannot start, ends with an error, runs longer than
+   * the timeout or writes more than 64 KiB.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readVersionAsync(programs: ChildProgramHost): Promise<string> {
+   *   return programs.runAsync("/usr/bin/gdbus", ["--version"], process.env);
+   * }
+   * ```
+   */
+  public runAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): Promise<string>;
+
+  /**
+   * Starts a program that keeps running and passes its standard output on as it comes.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param onOutput Receives each piece of the program's standard output.
+   * @param onExit Called once, when the program ends or cannot start.
+   * @returns The running program.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost, StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function monitor(programs: ChildProgramHost): StartedProgram {
+   *   return programs.start("/usr/bin/gdbus", ["monitor", "--session"], process.env, t => console.log(t), () => console.log("ended"));
+   * }
+   * ```
+   */
+  public start(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onOutput: (text: string) => void, onExit: () => void): StartedProgram;
+}
+
+/**
+ * The exception a program host gives when a program cannot start, ends with an error or runs too long.
+ */
+export declare class ProgramException extends Exception {
+  /**
+   * The exception's name, `"ProgramException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong, naming the program.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { ProgramException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: ProgramException = new ProgramException("/usr/bin/gdbus failed: spawn /usr/bin/gdbus ENOENT");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * Tells whether the desktop has somewhere to show a tray icon. Windows and macOS always have one. On Linux it asks the
+ * session bus, through `/usr/bin/gdbus`, whether a StatusNotifierWatcher has a host registered, and asks again whenever
+ * the watcher's name changes owner or the watcher signals a host coming or going. A missing `gdbus`, a missing watcher
+ * or a failed answer means no host. When the monitor ends, it asks once and starts the monitor again after a wait that
+ * begins at a second and doubles up to a minute, back to a second once the monitor is heard again.
+ */
+export declare class TrayHostWatcher {
+  /**
+   * Creates the watcher.
+   *
+   * @param platform The platform, as `process.platform` names it.
+   * @param programs Runs `gdbus`.
+   * @param environment The environment `gdbus` runs in, which names the session bus.
+   * @param delayAsync Waits the given milliseconds before the monitor starts again.
+   * @param onChange Called with the new answer whenever it changes.
+   * @example
+   * ```ts
+   * import { ChildProgramHost, TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const watcher: TrayHostWatcher = new TrayHostWatcher(process.platform, new ChildProgramHost(5000), process.env,
+   *   t => new Promise<void>(resolve => setTimeout(resolve, t)), t => console.log(t));
+   * ```
+   */
+  public constructor(platform: string, programs: IProgramHost, environment: NodeJS.ProcessEnv, delayAsync: (milliseconds: number) => Promise<void>, onChange: (isAvailable: boolean) => void);
+
+  /**
+   * Whether a tray host is there: always on Windows and macOS; on Linux, not until the session bus says so.
+   */
+  public get isAvailable(): boolean;
+
+  /**
+   * Starts watching the session bus on Linux; elsewhere, and when it already watches, it does nothing.
+   *
+   * @example
+   * ```ts
+   * import type { TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(watcher: TrayHostWatcher): void {
+   *   watcher.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Stops watching, ends the monitor and ignores answers that arrive afterward; the last answer stays.
+   *
+   * @example
+   * ```ts
+   * import type { TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function close(watcher: TrayHostWatcher): void {
+   *   watcher.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+}
+
+/**
  * The exception thrown when a window's state cannot be read or kept through the runtime.
  */
 export declare class WindowStateException extends Exception {
