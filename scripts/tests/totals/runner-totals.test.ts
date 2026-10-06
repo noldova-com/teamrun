@@ -112,12 +112,21 @@ class RunnerTotalsTests {
         "\n<details><summary>Script tests skipped (1)</summary>\n\n- scripts/tests/a.test.ts › waits: Waits for &lt;b&gt; &#124; c.\n\n</details>\n");
     });
 
-    test("a line sums up the runner for the console, with each skipped test and its reason after it", () => {
+    test("the table says beside a runner's failed count how many of its tests passed when run again", () => {
+      const script = RunnerTotalsTests.create(RunnerTotalsTests.COUNTS);
+      const unmeasured = new RunnerTotals("package", "Package tests", { discovered: 1, passed: 1, failed: 0, skipped: 0, unselected: 0, unreached: 0 }, [], [], null, RunnerTotalsTests.NO_FINDINGS);
+
+      assert.ok(RunnerTotals.formatTable([unmeasured, script], new Map([["Script tests", 1]])).includes(
+        "| Package tests | 1 | 1 | 1 | 0 | 0 | 0 | 0 | Not measured |\n| Script tests | 10 | 6 | 5 | 1 (1 passed when run again; see the flaky record) | 1 | 2 | 1 | 75.0% of 4 blocks |\n"));
+    });
+
+    test("a line sums up the runner for the console, with each skipped test and its reason after it, and any failed tests that passed when run again", () => {
       const script = RunnerTotalsTests.create(RunnerTotalsTests.COUNTS);
 
       assert.equal(script.formatLine(),
         "Script tests: 10 discovered, 6 executed, 5 passed, 1 failed, 1 skipped, 2 unselected, 1 unreached; coverage 75.0% of 4 blocks.\n" +
         "  Skipped scripts/tests/a.test.ts › waits: Waits for <b> | c.\n");
+      assert.ok(script.formatLine(1).startsWith("Script tests: 10 discovered, 6 executed, 5 passed, 1 failed (1 passed when run again; see the flaky record), 1 skipped,"));
     });
 
     test("recording writes the totals and reports each of their problems, which fails the record, and reporting only prints them", async t => {

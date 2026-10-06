@@ -12,6 +12,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
+import FlakyRecord from "../checks/flaky-record.ts";
+import FlakyTest from "../checks/flaky-test.ts";
 import UiSummary from "../ui-summary.ts";
 import RepositoryFixture from "./fixtures/repository.fixture.ts";
 import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
@@ -35,6 +37,22 @@ class UiSummaryTests {
       assert.ok(summary.startsWith("### UI workflows: Windows x64\n"));
       assert.ok(summary.endsWith("[Main window screenshot](https://example.com/a)\n"));
       assert.equal(log.text, summary);
+    });
+
+    test("the tests that passed only on retry go to the flaky test record, the log and the step summary", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const report = { stats: { expected: 1, unexpected: 0, flaky: 1, skipped: 0, duration: 4000 }, suites: [{ title: "a.spec.ts", specs: [{ title: "docks", file: "a.spec.ts", tests: [{ status: "flaky", results: [{ errors: [{ message: "Error: first" }] }] }] }] }] };
+      await repository.writeAsync({ "_build/ui/report.json": JSON.stringify(report) });
+      const summaryPath = path.join(repository.directory, "summary.md");
+      const log = new TextOutputFixture();
+
+      assert.equal(await new UiSummary(repository.directory, log).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Linux x64" }), 0);
+
+      assert.deepEqual(FlakyRecord.parse(await readFile(path.join(repository.directory, "_build", "flaky-tests.json"), "utf8")),
+        [new FlakyTest("UI workflows", "src/shell/desktop/tests/e2e/a.spec.ts", "a.spec.ts › docks", "Error: first")]);
+      assert.ok(log.text.endsWith("Flaky, passed when run again: a.spec.ts › docks (src/shell/desktop/tests/e2e/a.spec.ts)\n"));
+      assert.ok((await readFile(summaryPath, "utf8")).includes("| UI workflows | a.spec.ts › docks | src/shell/desktop/tests/e2e/a.spec.ts | Error: first |\n"));
     });
 
     test("the summary says so when the screenshot link is missing because its upload failed", async t => {

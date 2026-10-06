@@ -52,6 +52,7 @@ export class GalleryFormsComponent {
   protected readonly longPillOptions: readonly SelectOption[] = GalleryResources.text.choicePillOptionsLong.map(t => new SelectOption(t.value, t.title));
   protected readonly wideTable: typeof GalleryResources.text.configurationWideTable = GalleryResources.text.configurationWideTable;
   protected readonly narrowTable: typeof GalleryResources.text.configurationNarrowTable = GalleryResources.text.configurationNarrowTable;
+  protected readonly unheadedTable: typeof GalleryResources.text.configurationUnheadedTable = GalleryResources.text.configurationUnheadedTable;
   protected readonly chipKinds: typeof ChipKind = ChipKind;
   protected readonly pill: WritableSignal<string> = signal(GalleryResources.text.choicePillInitial);
   protected readonly choice: WritableSignal<string> = signal(GalleryResources.text.selectInitial);

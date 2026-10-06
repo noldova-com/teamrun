@@ -40,13 +40,18 @@ export default class AngularTestReport {
   private readFile(result: JsonFields): string {
     const file = this.name(result.text("name"));
     const assertions = result.objects("assertionResults");
-    const statuses = assertions.map(t => t.text("status"));
+    const statuses = assertions.map(t => AngularTestReport.firstStatus(t));
     const failed = result.text("status") === AngularTestReport.FAILED;
     this.failed += Number(failed && !statuses.includes(AngularTestReport.FAILED));
     if (!failed && assertions.length === 0)
       this.empty.push(file);
-    assertions.forEach(t => this.count(file, [...t.texts("ancestorTitles"), t.text("title")], t.text("status")));
+    assertions.forEach(t => this.count(file, [...t.texts("ancestorTitles"), t.text("title")], AngularTestReport.firstStatus(t)));
     return file;
+  }
+
+  private static firstStatus(test: JsonFields): string {
+    const status = test.text("status");
+    return status === AngularTestReport.PASSED && test.has("failureMessages") && test.list("failureMessages").length > 0 ? AngularTestReport.FAILED : status;
   }
 
   private count(file: string, names: readonly string[], status: string): void {

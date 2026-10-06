@@ -140,8 +140,13 @@ describe("ShortcutsComponent", () => {
     const look = (element: Element): readonly string[] => [getComputedStyle(element).color, getComputedStyle(element).fontSize, getComputedStyle(element).lineHeight];
     const name = row("clock.tick").querySelector(".tr-shortcut-name") as HTMLElement;
     const title = (row("clock.tick").querySelector(".tr-shortcut-title") as HTMLElement).getBoundingClientRect();
-    const owner = row("clock.tick").querySelector(".tr-shortcut-owner") as HTMLElement;
-    const ownerLine = owner.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(owner).paddingTop);
+    const textTop = (element: Element): number => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return range.getBoundingClientRect().top;
+    };
+    const ownerLine = textTop(row("clock.tick").querySelector(".tr-shortcut-owner tr-highlighted-text") as Element);
+    const titleLine = textTop(row("clock.tick").querySelector(".tr-shortcut-title tr-highlighted-text") as Element);
     const key = keyOf("clock.tick").getBoundingClientRect();
 
     const rows = [...element().querySelectorAll("tbody tr")];
@@ -149,16 +154,18 @@ describe("ShortcutsComponent", () => {
     expect(rows.map(t => t.querySelector(".tr-shortcut-name")?.textContent)).toEqual(rows.map(t => t.getAttribute("data-command")));
     expect(look(name)).toEqual(look(probe));
     expect(name.getBoundingClientRect().top).toBeCloseTo(title.bottom, 0);
-    expect(Math.abs(ownerLine - title.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(ownerLine - titleLine)).toBeLessThanOrEqual(1);
     expect(Math.abs(key.top - title.top)).toBeLessThanOrEqual(1);
     expect(key.height).toBeCloseTo(title.height, 0);
     probe.remove();
   });
 
-  for (const query of ["", "Group"])
-    it(`wraps a long id within its Command cell, at its word boundaries, when the table is narrow${query === "" ? "" : ` and a search marks "${query}" in it`}`, async () => {
+  for (const query of ["", "Each"])
+    it(`keeps every id within its Command cell, which stays a text field wide, wraps an id longer than the cell at its word boundaries, and scrolls the table sideways when the page is narrow${query === "" ? "" : ` and a search marks "${query}" in it`}`, async () => {
+      const long = "notes.sortByTheLastChangeThenByTheTitleOfEachNote";
       AppearanceFixture.apply();
       await renderAsync();
+      TestBed.inject(CommandService).setCommands([new CommandContribution(long, "Sort the notes", null, null, () => Promise.resolve(null))]);
       element().style.width = "20rem";
       const field = element().querySelector<HTMLInputElement>(".tr-settings-search-field") as HTMLInputElement;
       field.value = query;
@@ -169,9 +176,8 @@ describe("ShortcutsComponent", () => {
         const end = cell.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(cell).paddingRight);
         return [t.getAttribute("data-command"), Math.max(0, Math.round((t.querySelector(".tr-shortcut-name") as HTMLElement).getBoundingClientRect().right - end))];
       });
-      const long = row("shell.moveTabToPreviousGroup").querySelector(".tr-shortcut-name") as HTMLElement;
-      const next = row("shell.moveTabToNextGroup").querySelector(".tr-shortcut-name") as HTMLElement;
-      const walker = document.createTreeWalker(next, NodeFilter.SHOW_TEXT);
+      const name = row(long).querySelector(".tr-shortcut-name") as HTMLElement;
+      const walker = document.createTreeWalker(name, NodeFilter.SHOW_TEXT);
       const texts: Node[] = [];
       for (let node = walker.nextNode(); !Object.isNull(node); node = walker.nextNode())
         if (!String.isNullOrWhitespace(node.textContent))
@@ -179,16 +185,19 @@ describe("ShortcutsComponent", () => {
       const pieces = texts.map(t => {
         const range = document.createRange();
         range.selectNodeContents(t);
-        return [t.textContent, range.getClientRects().length, Math.round(range.getBoundingClientRect().left - next.getBoundingClientRect().left)];
+        return [t.textContent, range.getClientRects().length, Math.round(range.getBoundingClientRect().left - name.getBoundingClientRect().left)];
       });
+      const scroll = element().querySelector(".tr-configuration-table-scroll") as HTMLElement;
 
+      expect(overflows.length).toBeGreaterThan(query === "" ? 20 : 0);
       expect(overflows.filter(t => t[1] !== 0)).toEqual([]);
-      expect(long.getBoundingClientRect().height).toBeGreaterThan(Number.parseFloat(getComputedStyle(long).lineHeight));
-      expect(pieces.map(t => t[0])).toEqual(["shell.", "move", "Tab", "To", "Next", "Group"]);
+      expect((row(long).querySelector("td") as HTMLElement).getBoundingClientRect().width).toBeGreaterThanOrEqual(AppearanceFixture.measureLook("text-field-width") - 0.5);
+      expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth);
+      expect(pieces.map(t => t[0])).toEqual(["notes.", "sort", "By", "The", "Last", "Change", "Then", "By", "The", "Title", "Of", "Each", "Note"]);
       expect(pieces.filter(t => t[1] !== 1)).toEqual([]);
-      expect(pieces.at(-1)?.[2]).toBe(0);
-      expect(next.getBoundingClientRect().height).toBeGreaterThan(Number.parseFloat(getComputedStyle(next).lineHeight));
-      expect([...next.querySelectorAll("mark")].map(t => t.textContent)).toEqual(query === "" ? [] : [query]);
+      expect(pieces.slice(1).some(t => t[2] === 0)).toBe(true);
+      expect(name.getBoundingClientRect().height).toBeGreaterThan(Number.parseFloat(getComputedStyle(name).lineHeight));
+      expect([...name.querySelectorAll("mark")].map(t => t.textContent)).toEqual(query === "" ? [] : [query]);
     });
 
   it("records a new key from the first key pressed after the modifiers, without running the command it would run, and keeps the focus", async () => {

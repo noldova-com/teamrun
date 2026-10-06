@@ -26,6 +26,7 @@ export default class RunnerTotals {
   private static readonly ENCODING: BufferEncoding = "utf8";
   private static readonly TABLE_HEADER: string = "| Tests | Discovered | Executed | Passed | Failed | Skipped | Unselected | Unreached | Coverage |\n|---|---|---|---|---|---|---|---|---|\n";
   private static readonly NOT_MEASURED: string = "Not measured";
+  private static readonly RERUN_NOTE: string = "passed when run again; see the flaky record";
 
   public readonly runner: string;
   public readonly title: string;
@@ -101,14 +102,14 @@ export default class RunnerTotals {
     return totals;
   }
 
-  public static formatTable(totals: readonly RunnerTotals[]): string {
+  public static formatTable(totals: readonly RunnerTotals[], rerunPassed: ReadonlyMap<string, number> = new Map()): string {
     const skips = totals.filter(t => t.skips.length > 0).map(t =>
       `\n<details><summary>${RunnerTotals.escape(t.title)} skipped (${t.skips.length})</summary>\n\n${t.skips.map(u => `- ${RunnerTotals.escape(u.test)}: ${RunnerTotals.escape(u.reason)}\n`).join("")}\n</details>\n`);
-    return `${RunnerTotals.TABLE_HEADER}${totals.map(t => `| ${RunnerTotals.escape(t.title)} | ${t.discovered} | ${t.executed} | ${t.passed} | ${t.failed} | ${t.skipped} | ${t.unselected} | ${t.unreached} | ${t.formatCoverage()} |\n`).join("")}${skips.join("")}`;
+    return `${RunnerTotals.TABLE_HEADER}${totals.map(t => `| ${RunnerTotals.escape(t.title)} | ${t.discovered} | ${t.executed} | ${t.passed} | ${t.failed}${RunnerTotals.formatRerun(rerunPassed.get(t.title) ?? 0)} | ${t.skipped} | ${t.unselected} | ${t.unreached} | ${t.formatCoverage()} |\n`).join("")}${skips.join("")}`;
   }
 
-  public formatLine(): string {
-    return `${this.title}: ${this.discovered} discovered, ${this.executed} executed, ${this.passed} passed, ${this.failed} failed, ${this.skipped} skipped, ${this.unselected} unselected, ${this.unreached} unreached; coverage ${this.formatCoverage()}.\n` +
+  public formatLine(rerunPassed: number = 0): string {
+    return `${this.title}: ${this.discovered} discovered, ${this.executed} executed, ${this.passed} passed, ${this.failed} failed${RunnerTotals.formatRerun(rerunPassed)}, ${this.skipped} skipped, ${this.unselected} unselected, ${this.unreached} unreached; coverage ${this.formatCoverage()}.\n` +
       this.skips.map(t => `  Skipped ${t.test}: ${t.reason}\n`).join("");
   }
 
@@ -169,6 +170,10 @@ export default class RunnerTotals {
 
   private static locate(root: string, runner: string): string {
     return path.join(root, ...RunnerTotals.FOLDER_SEGMENTS, `${runner}${RunnerTotals.EXTENSION}`);
+  }
+
+  private static formatRerun(rerunPassed: number): string {
+    return rerunPassed === 0 ? "" : ` (${rerunPassed} ${RunnerTotals.RERUN_NOTE})`;
   }
 
   private static formatList(heading: string, items: readonly string[]): string | null {

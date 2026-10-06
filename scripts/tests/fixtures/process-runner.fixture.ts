@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Writable } from "node:stream";
+
 import type ProcessResult from "../../processes/process-result.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 
@@ -39,8 +41,8 @@ export default class ProcessRunnerFixture extends ProcessRunner {
     return this.exitCodes.length === 0 ? 0 : this.exitCodes.shift() ?? null;
   }
 
-  public override runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string): Promise<number | null> {
+  public override runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string, _output: Writable, _errorOutput: Writable, environment?: NodeJS.ProcessEnv): Promise<number | null> {
     this.logs.push(log);
-    return this.runAsync(command, commandArguments, directory);
+    return this.runAsync(command, commandArguments, directory, environment);
   }
 }

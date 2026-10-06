@@ -61,6 +61,19 @@ class AngularTestReportTests {
       assert.deepEqual(result.empty, ["a.spec.ts", "z.spec.ts"]);
     });
 
+    test("a test that passed only when Vitest ran it again counts as failed, as it did in its first run", () => {
+      const result = new AngularTestReport("report.json", t => t).read([{
+        name: "a.spec.ts",
+        status: "passed",
+        assertionResults: [
+          { ancestorTitles: ["A"], title: "steady", status: "passed", failureMessages: [] },
+          { ancestorTitles: ["A"], title: "retried", status: "passed", failureMessages: ["Error: timed out"] }
+        ]
+      }]);
+
+      assert.deepEqual([result.passed, result.failed], [1, 1]);
+    });
+
     test("a test with an unknown status, or a file without its tests, is refused with its place in the report", () => {
       const read = (results: readonly unknown[]): unknown => new AngularTestReport("report.json", t => t).read(results);
 
