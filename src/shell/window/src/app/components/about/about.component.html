@@ -10,7 +10,7 @@ LICENSE file in the root directory of this source tree.
 <p class="tr-about-platform">{{ platform }}</p>
 <div class="tr-about-state">
 <div class="tr-about-update">
-  <p #status class="tr-about-status" role="status" tabindex="-1">
+  <p #statusLine class="tr-about-status" role="status" tabindex="-1">
     <span>{{ status() }}@if (percent(); as percent) {<span aria-hidden="true">{{ percent }}</span>}</span>
     @for (detail of details(); track $index) {
       <span class="tr-about-detail">{{ detail }}</span>

@@ -34,7 +34,7 @@ export class AboutComponent {
   private readonly updates: UpdateService = inject(UpdateService);
   private readonly time: Intl.DateTimeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
   private readonly dayAndTime: Intl.DateTimeFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  private readonly statusElement: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("status");
+  private readonly statusElement: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("statusLine");
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly kinds: typeof UpdateStateKind = UpdateStateKind;
