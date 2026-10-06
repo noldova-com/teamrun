@@ -283,9 +283,10 @@ test.describe("settings", () => {
     }
   });
 
-  test("in the narrowest window every command's id wraps within its Command cell, the longest included", async ({ desktop }) => {
+  test("in the narrowest window every command's id stays within its Command cell, which keeps a text field's width, and the table scrolls sideways to its row actions", async ({ desktop }) => {
     const window = desktop.window;
     const longest = window.locator("[data-command=\"shell.moveTabToPreviousGroup\"]");
+    const scroll = window.locator("tr-shortcuts .tr-configuration-table-scroll");
     await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
 
     await desktop.useViewportAsync(640, 480);
@@ -295,30 +296,36 @@ test.describe("settings", () => {
       const end = cell.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(cell).paddingRight);
       return [t.getAttribute("data-command"), Math.max(0, Math.round((t.querySelector(".tr-shortcut-name") as HTMLElement).getBoundingClientRect().right - end))] as const;
     }));
+    const fieldWidth = await window.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.style.width = "var(--tr-text-field-width)";
+      document.body.append(probe);
+      const width = probe.getBoundingClientRect().width;
+      probe.remove();
+      return width;
+    });
 
     expect(overflows.length).toBeGreaterThan(20);
     expect(overflows.filter(t => t[1] !== 0)).toEqual([]);
+    expect(await longest.locator("td").first().evaluate(t => t.getBoundingClientRect().width)).toBeGreaterThanOrEqual(fieldWidth - 0.5);
+    expect(await scroll.evaluate(t => t.scrollWidth - t.clientWidth)).toBeGreaterThan(0);
     await longest.scrollIntoViewIfNeeded();
-    expect(await longest.locator(".tr-shortcut-name").evaluate(t => t.getBoundingClientRect().height > Number.parseFloat(getComputedStyle(t).lineHeight))).toBe(true);
-    expect(await window.locator("[data-command=\"shell.moveTabToNextGroup\"] .tr-shortcut-name").evaluate(t => {
-      const range = document.createRange();
-      const group = [...t.querySelectorAll("tr-highlighted-text")].flatMap(u => [...u.childNodes]).find(u => u.textContent === "Group") as Node;
-      range.selectNodeContents(group);
-      return [Math.round(range.getBoundingClientRect().left - t.getBoundingClientRect().left), range.getBoundingClientRect().top > t.getBoundingClientRect().top, t.textContent];
-    })).toEqual([0, true, "shell.moveTabToNextGroup"]);
+    await scroll.evaluate(t => {
+      t.scrollLeft = 0;
+    });
     for (const scheme of ["light", "dark"] as const) {
       await window.emulateMedia({ colorScheme: scheme });
       await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
       await desktop.checkpointAsync(`settings-shortcut-ids-narrow-${scheme}`);
     }
 
+    const close = window.locator("[data-command=\"shell.closeTab\"]").getByRole("button", { name: /^Remove/ });
+    await close.scrollIntoViewIfNeeded();
+    await expect(close).toBeInViewport();
+    expect(await scroll.evaluate(t => t.scrollLeft)).toBeGreaterThan(0);
     await window.getByRole("searchbox", { name: "Search settings" }).fill("Group");
     const next = window.locator("[data-command=\"shell.moveTabToNextGroup\"] .tr-shortcut-name");
     await expect(next.locator("mark")).toHaveText(["Group"]);
-    expect(await next.evaluate(t => {
-      const mark = (t.querySelector("mark") as HTMLElement).getBoundingClientRect();
-      return [Math.round(mark.left - t.getBoundingClientRect().left), mark.top > t.getBoundingClientRect().top, t.textContent];
-    })).toEqual([0, true, "shell.moveTabToNextGroup"]);
     await next.scrollIntoViewIfNeeded();
     await desktop.checkpointAsync("settings-shortcut-id-search-narrow");
   });

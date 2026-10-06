@@ -10,20 +10,28 @@ import type { Writable } from "node:stream";
 
 import AngularProject from "../angular/angular-project.ts";
 import ProcessException from "../processes/process.exception.ts";
+import TotalsException from "../totals/totals.exception.ts";
 import CheckSelection from "./check-selection.ts";
+import type FlakyRecord from "./flaky-record.ts";
+import FlakyTest from "./flaky-test.ts";
 import type ISelectableCheck from "./interfaces/selectable-check.ts";
 
 export default class AngularTestCheck implements ISelectableCheck {
+  public static readonly RUNNER: string = "angular";
+
   private static readonly UNIT: string = "spec files";
+  private static readonly TOTALS_TITLE: string = "Angular tests";
   private static readonly NO_REPORT: string = "The Angular tests passed but wrote no report of the spec files they ran.\n";
   private static readonly LOG_HINT: string = `The Angular tests' full output is in ${AngularProject.LOG_FILE}.\n`;
 
   private readonly project: AngularProject;
+  private readonly flaky: FlakyRecord | null;
 
   public readonly title: string = "Angular tests and coverage";
 
-  public constructor(project: AngularProject) {
+  public constructor(project: AngularProject, flaky: FlakyRecord | null) {
     this.project = project;
+    this.flaky = flaky;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
@@ -54,7 +62,9 @@ export default class AngularTestCheck implements ISelectableCheck {
 
   private async checkAsync(output: Writable, include: readonly string[] = []): Promise<boolean> {
     try {
-      const run = await this.project.testAsync(include);
+      const run = await this.project.testAsync(include, this.flaky !== null);
+      await this.flaky?.addAsync(run.retried.map(t => new FlakyTest(AngularTestCheck.TOTALS_TITLE, t.file, t.name, t.failure)), output);
+      const recorded = include.length > 0 || run.result === null || await run.result.toTotals(AngularTestCheck.RUNNER, AngularTestCheck.TOTALS_TITLE, run.coverage).recordAsync(this.project.root, output);
       if (!run.isSuccessful)
         return false;
       if (run.collected === null) {
@@ -64,12 +74,12 @@ export default class AngularTestCheck implements ISelectableCheck {
       const collected = new Set(run.collected);
       const missing = (include.length === 0 ? await this.project.specFilesAsync() : include).filter(t => !collected.has(t));
       if (missing.length === 0)
-        return true;
+        return recorded;
       output.write(`The Angular tests did not run ${missing.length} of the spec files under src/:\n${missing.map(t => `  ${t}\n`).join("")}`);
       return false;
     }
     catch (error) {
-      if (!(error instanceof ProcessException))
+      if (!(error instanceof ProcessException || error instanceof TotalsException))
         throw error;
       output.write(`${error.message}\n`);
       return false;

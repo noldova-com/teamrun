@@ -54,19 +54,19 @@ class BuildAndTestTargetTests {
         assert.match(use[1] ?? "", /^(actions\/[a-z-]+@[0-9a-f]{40}|\.\/\.github\/actions\/prepare|\.\/\.github\/workflows\/ui-workflows\.yml)$/);
     });
 
-    test("a target builds once when its jobs reuse a build, and each job runs its part of the tests, or all of them", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {
+    test("a target builds once when its jobs reuse a build, and each job runs its part of the tests, or all of them, rerunning the failed ones once", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW);
       const text = workflow.text;
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("npm", "test -- --part scripts", "");
-      doubles.respond("npm", "test", "");
+      doubles.respond("npm", "test -- --part scripts --rerun-failed", "");
+      doubles.respond("npm", "test -- --rerun-failed", "");
 
       const part = await doubles.runAsync(workflow.readStepScript(BuildAndTestTargetTests.TEST_STEP), { PART: "scripts" });
       const whole = await doubles.runAsync(workflow.readStepScript(BuildAndTestTargetTests.TEST_STEP), { PART: "" });
 
       assert.deepEqual([part.status, whole.status], [0, 0], part.stderr + whole.stderr);
-      assert.deepEqual(await doubles.readCallsAsync(), ["npm test -- --part scripts", "npm test"]);
+      assert.deepEqual(await doubles.readCallsAsync(), ["npm test -- --part scripts --rerun-failed", "npm test -- --rerun-failed"]);
       assert.ok(text.includes("  build:\n    name: Build\n    if: ${{ fromJSON(inputs.jobs)[0].prebuilt }}\n    runs-on: ${{ inputs.runner }}\n    timeout-minutes: 20\n"));
       assert.ok(text.includes("  tests:\n    name: ${{ matrix.name }}\n    needs: build\n" +
         "    if: ${{ !cancelled() && contains(fromJSON('[\"success\", \"skipped\"]'), needs.build.result) }}\n" +

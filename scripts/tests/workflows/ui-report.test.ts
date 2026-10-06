@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import FlakyTest from "../../checks/flaky-test.ts";
 import UiReport from "../../workflows/ui-report.ts";
 import UiReportException from "../../workflows/ui-report.exception.ts";
 
@@ -42,8 +43,28 @@ class UiReportTests {
       ]);
     });
 
+    test("each test that passed only on retry is flaky, named with its suites, its spec file and its first full error", () => {
+      const report = UiReport.parse(JSON.stringify({
+        stats: UiReportTests.STATS,
+        suites: [{
+          title: "docking.spec.ts",
+          specs: [
+            { title: "docks", file: "docking.spec.ts", tests: [{ status: "flaky", results: [{ errors: [] }, { errors: [{ message: "\u001b[31mError: first\u001b[39m\n    at docking.spec.ts:3" }] }, { errors: [] }] }] },
+            { title: "undocks", file: "docking.spec.ts", tests: [{ status: "flaky", results: [] }] },
+            { title: "stays", file: "docking.spec.ts", tests: [{ status: "expected", results: [] }] }
+          ]
+        }]
+      }));
+
+      assert.deepEqual(report.flakyTests, [
+        new FlakyTest("UI workflows", "src/shell/desktop/tests/e2e/docking.spec.ts", "docking.spec.ts › docks", "Error: first\n    at docking.spec.ts:3"),
+        new FlakyTest("UI workflows", "src/shell/desktop/tests/e2e/docking.spec.ts", "docking.spec.ts › undocks", "")
+      ]);
+      assert.deepEqual(report.failures, []);
+    });
+
     test("the summary shows the counts, the duration and the screenshot link, or says there is no screenshot", () => {
-      const report = new UiReport(5, 0, 0, 0, 2500, [], 3);
+      const report = new UiReport(5, 0, 0, 0, 2500, [], 3, []);
 
       assert.equal(report.formatSummary("Linux x64", "https://github.com/noldova-com/teamrun/actions/runs/1/artifacts/2"),
         "### UI workflows: Linux x64\n\n| Passed | Failed | Flaky | Skipped | Duration | Platform log lines |\n|---|---|---|---|---|---|\n| 5 | 0 | 0 | 0 | 2.5 s | 3 |\n\n" +
@@ -56,7 +77,7 @@ class UiReportTests {
 
     test("the summary lists at most twenty failures, escaped, and counts the rest", () => {
       const failures = Array.from({ length: 22 }, (_, index) => ({ title: `case ${index}`, message: "a <b> & c | `d`" }));
-      const report = new UiReport(0, 22, 0, 0, 0, failures, 0);
+      const report = new UiReport(0, 22, 0, 0, 0, failures, 0, []);
 
       const summary = report.formatSummary("macOS <ARM64>", undefined);
 

@@ -42,19 +42,23 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
-        "Documents", "License headers", "Test waits", "Field order", "Bucket names", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Coverage exclusions", "Unique names", "Declared dependencies", "Dependency pins", "Packages", "Package tests and coverage",
+        "Documents", "License headers", "Comments", "Test waits", "Field order", "Bucket names", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Coverage exclusions", "Unique names", "Declared dependencies", "Dependency pins", "Packages", "Package tests and coverage",
         "Script types", "API declarations", "API documentation", "API examples",
         "Script tests and coverage", "Angular tests and coverage", "Packaged build leaves out the Gallery"
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
-      assert.ok(output.text.endsWith("\n25 of 25 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n26 of 26 checks passed.\n"));
       for (const part of ["src/shell/ui", "src/shell/window"]) {
         assert.ok(output.text.includes(`\n${part}: matches its declarations\n`), output.text);
         assert.ok(output.text.includes(`\n${part}: documents every public member\n`), output.text);
         assert.ok(output.text.includes(`\n${part}: every example compiles\n`), output.text);
       }
       assert.equal(runner.runs.length, 5);
-      assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
+      const counts = "0 discovered, 0 executed, 0 passed, 0 failed, 0 skipped, 0 unselected, 0 unreached; coverage Not measured.";
+      assert.ok(output.text.endsWith(`\nTest totals\nScript tests: ${counts}\nAngular tests: ${counts}\n\n26 of 26 checks passed.\n`), output.text);
+      assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}\n` +
+        "| Tests | Discovered | Executed | Passed | Failed | Skipped | Unselected | Unreached | Coverage |\n|---|---|---|---|---|---|---|---|---|\n" +
+        `${["Script tests", "Angular tests"].map(t => `| ${t} | 0 | 0 | 0 | 0 | 0 | 0 | 0 | Not measured |\n`).join("")}`);
     });
 
     test("a selected run runs every check other than the tests and only the selected tests, and says it is not the complete gate", async t => {
@@ -64,7 +68,7 @@ class TestTests {
       const checksOnly = new TextOutputFixture();
       const selected = new TextOutputFixture();
       const results = (text: string): readonly string[] => [...text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`);
-      const before = ["Documents", "License headers", "Test waits", "Field order", "Bucket names", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Coverage exclusions", "Unique names", "Declared dependencies", "Dependency pins", "Packages"]
+      const before = ["Documents", "License headers", "Comments", "Test waits", "Field order", "Bucket names", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Coverage exclusions", "Unique names", "Declared dependencies", "Dependency pins", "Packages"]
         .map(t => `${t}: passed`);
       const after = ["Script types", "API declarations", "API documentation", "API examples"].map(t => `${t}: passed`);
 
@@ -74,12 +78,12 @@ class TestTests {
       assert.equal(checksOnlyExitCode, 0, checksOnly.text);
       assert.ok(checksOnly.text.startsWith("Selected run: every check other than the tests, and no tests. A selected run is not the complete gate.\n"), checksOnly.text);
       assert.deepEqual(results(checksOnly.text), [...before, ...after, "Packaged build leaves out the Gallery: passed"]);
-      assert.ok(checksOnly.text.endsWith("\n22 of 22 checks passed.\n"));
+      assert.ok(checksOnly.text.endsWith("\n23 of 23 checks passed.\n"));
       assert.equal(selectedExitCode, 1);
       assert.ok(selected.text.startsWith("Selected run: every check other than the tests, and the package tests of @noldova/teamrun-foundation-missing and the script tests. A selected run is not the complete gate.\n"), selected.text);
       assert.ok(selected.text.includes("\nNo package is named @noldova/teamrun-foundation-missing. The packages are none.\n"), selected.text);
       assert.deepEqual(results(selected.text), [...before, "Package tests and coverage: failed", ...after, "Script tests and coverage: passed", "Packaged build leaves out the Gallery: passed"]);
-      assert.ok(selected.text.endsWith("\n23 of 24 checks passed.\n"));
+      assert.ok(selected.text.endsWith("\n24 of 25 checks passed.\n"));
     });
 
     test("each part runs only its own checks, in the complete gate's order, and says that only all parts together are the complete gate", async t => {
@@ -114,7 +118,7 @@ class TestTests {
       assert.equal(exitCode, 0, output.text);
       assert.ok(output.text.startsWith("Part run: angular-and-checks. Only all 3 parts together are the complete gate.\nSelected run: every check other than the tests, and no tests. A selected run is not the complete gate.\n"), output.text);
       assert.ok(!output.text.includes("Angular tests and coverage: "), output.text);
-      assert.ok(output.text.endsWith("\n22 of 22 checks passed.\n"), output.text);
+      assert.ok(output.text.endsWith("\n23 of 23 checks passed.\n"), output.text);
     });
 
     test("a failing check fails the gate after the remaining checks have run", async t => {
@@ -127,7 +131,7 @@ class TestTests {
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
-      assert.ok(output.text.endsWith("\n24 of 25 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n25 of 26 checks passed.\n"));
       assert.equal(runner.runs.length, 5);
     });
 
@@ -225,6 +229,17 @@ class TestTests {
       assert.ok(!single.text.includes("runs passed"));
     });
 
+    test("a run that reruns failed tests starts with an empty flaky test record and lets the test checks retry", async t => {
+      const repository = await TestTests.createFilteredRepositoryAsync(t);
+      await repository.writeAsync({ "_build/flaky-tests.json": "[]\n" });
+      const runner = new AngularReportRunnerFixture(TestTests.specReport(repository), [0, 0]);
+
+      assert.equal(await new Test(repository.directory, runner, new TextOutputFixture(), {}).runAsync(["--filter", "alpha", "--filter", "a.spec", "--rerun-failed"]), 0);
+
+      assert.equal(existsSync(path.join(repository.directory, "_build", "flaky-tests.json")), false);
+      assert.equal(runner.environments.at(-1)?.["TEAMRUN_TEST_RETRY"], "1");
+    });
+
     test("a repeat without filters repeats the complete gate", async t => {
       const repository = await TestTests.createRepositoryAsync(t);
       await repository.writeAsync({ ".gitignore": "_build/\n" });
@@ -272,7 +287,7 @@ class TestTests {
         const output = new TextOutputFixture();
 
         assert.equal(await new Test("unused", new ProcessRunnerFixture(), output, {}).runAsync(selection), 2);
-        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] | [--part <part>] --checks-only [--repeat <count>]]\n`);
+        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] [--rerun-failed] | [--part <part>] [--package <name>]... [--angular-tests] [--script-tests] [--repeat <count>] [--rerun-failed] | [--part <part>] --checks-only [--repeat <count>]]\n`);
       }
     });
 
@@ -364,7 +379,7 @@ class TestTests {
   }
 
   private static specReport(repository: RepositoryFixture): string {
-    return JSON.stringify({ testResults: [{ name: path.join(repository.directory, "src", "shell", "ui", "tests", "a.spec.ts") }] });
+    return JSON.stringify({ testResults: [{ name: path.join(repository.directory, "src", "shell", "ui", "tests", "a.spec.ts"), status: "passed", assertionResults: [] }] });
   }
 
   private static async createRepositoryAsync(t: TestContext): Promise<RepositoryFixture> {

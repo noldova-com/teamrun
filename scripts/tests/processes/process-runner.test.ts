@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { realpathSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -90,13 +90,17 @@ class ProcessRunnerTests {
       assert.ok(["passedfailed", "failedpassed"].includes(await readFile(log, "utf8")));
     });
 
-    test("running passes the given environment instead of the process's own", async () => {
+    test("running passes the given environment instead of the process's own", async t => {
       const script = "process.exitCode = process.env.TEAMRUN_FIXTURE_VALUE === \"given\" ? 0 : 3";
 
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", script], tmpdir(), { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" }), 0);
       assert.equal(await new ProcessRunner().runAsync(process.execPath, ["-e", script], tmpdir()), 3);
       assert.equal((await new ProcessRunner().captureAsync(process.execPath, ["-e", script], tmpdir(), ProcessRunnerTests.TIMEOUT, { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" })).exitCode, 0);
       assert.equal((await new ProcessRunner().captureAsync(process.execPath, ["-e", script], tmpdir(), ProcessRunnerTests.TIMEOUT)).exitCode, 3);
+      const log = path.join(tmpdir(), `teamrun-environment-${process.pid}.log`);
+      t.after(() => rm(log, { force: true }));
+      assert.equal(await new ProcessRunner().runLoggedAsync(process.execPath, ["-e", script], tmpdir(), log, new TextOutputFixture(), new TextOutputFixture(), { ...process.env, TEAMRUN_FIXTURE_VALUE: "given" }), 0);
+      assert.equal(await new ProcessRunner().runLoggedAsync(process.execPath, ["-e", script], tmpdir(), log, new TextOutputFixture(), new TextOutputFixture()), 3);
     });
 
     test("starting returns the running process at once, with both output streams going to the log", async t => {
