@@ -10,9 +10,6 @@ export class KitStylesheetFixture {
   public static readonly HREF: string = "styles.css";
   public static readonly SELECTOR: string = `link[href="${KitStylesheetFixture.HREF}"]`;
   public static readonly LOAD_LIMIT: number = 30_000;
-  public static readonly TEXT_FONTS: readonly string[] = [
-    "400 1em \"Noldova Sans\"", "italic 400 1em \"Noldova Sans\"", "600 1em \"Noldova Sans\"", "italic 600 1em \"Noldova Sans\"", "400 1em \"Noldova Mono\"", "600 1em \"Noldova Mono\""
-  ];
   private static readonly APPLIED_PROPERTY: string = "--tr-text-panel";
 
   public static get isApplied(): boolean {
@@ -22,7 +19,7 @@ export class KitStylesheetFixture {
   public static async ensureAsync(link: HTMLLinkElement | null = document.querySelector(KitStylesheetFixture.SELECTOR)): Promise<void> {
     if (!KitStylesheetFixture.isApplied)
       await KitStylesheetFixture.loadAsync(link ?? KitStylesheetFixture.add());
-    await Promise.all(KitStylesheetFixture.TEXT_FONTS.map(t => document.fonts.load(t)));
+    await Promise.all([...document.fonts].map(t => t.load()));
   }
 
   private static add(): HTMLLinkElement {

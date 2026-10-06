@@ -56,12 +56,14 @@ describe("KitStylesheetFixture", () => {
     expect([KitStylesheetFixture.isApplied, count()]).toEqual([true, before + 1]);
   });
 
-  it("loads the kit's text fonts once the stylesheet is applied, so text measures in them from a spec's first frame", async () => {
+  it("loads every face the page declares once the stylesheet is applied, so text measures in its fonts from a spec's first frame", async () => {
     page.forEach(t => t.media = "");
 
     await KitStylesheetFixture.ensureAsync();
+    const faces = [...document.fonts];
 
-    expect(KitStylesheetFixture.TEXT_FONTS.map(t => document.fonts.check(t))).toEqual(KitStylesheetFixture.TEXT_FONTS.map(() => true));
+    expect(faces.length).toBeGreaterThan(0);
+    expect(faces.filter(t => t.status !== "loaded").map(t => `${t.family} ${t.weight} ${t.style}`)).toEqual([]);
   });
 
   it("waits for nothing while the stylesheet is applied", async () => {
