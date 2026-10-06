@@ -1050,30 +1050,38 @@ Each target is packaged on its own platform and processor.
 The desktop owns the update: it checks, downloads, validates and installs, and gives its windows the update's state, which they show.
 It uses electron-updater, pinned exactly, with a provider that reads TeamRun's file names.
 
-- **Feed.** The desktop reads `latest-<platform>-<arch>.yml` for its own platform and processor from the latest release of `teamrun.product.releaseRepository` on GitHub, then downloads the package that file names from the same release, over anonymous HTTPS.
+- **Feed.**
+  The desktop reads `latest-<platform>-<arch>.yml` for its own platform and processor from the latest release of `teamrun.product.releaseRepository` on GitHub, then downloads the package that file names from the same release, over anonymous HTTPS.
   No repository or provider credential is placed in the application or its updater, and a private repository is not made reachable that way.
   Only the latest release is offered.
   A release to any other repository is an unsigned test release ([Publication](#publication)), so it never reaches the feed.
-- **Which builds read it.** The build decides, never a setting, a variable or an argument.
+- **Which builds read it.**
+  The build decides, never a setting, a variable or an argument.
   `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
   A test build, and a package made for a native update check, name instead a local feed and a test publisher given to the build when it is made; `release:assets` refuses a package whose product file names any feed but the production one.
-- **Versions.** Only a version higher than the installed one is offered.
+- **Versions.**
+  Only a version higher than the installed one is offered.
   The same version, a lower one or a version with a prerelease suffix leaves TeamRun up to date.
-- **Checks.** The desktop checks 30 seconds after it starts, then every 4 hours while it runs, and whenever the person runs Check for updates.
+- **Checks.**
+  The desktop checks 30 seconds after it starts, then every 4 hours while it runs, and whenever the person runs Check for updates.
   The automatic checks follow the device setting `shell.updateChecks`, on by default, and are skipped while a download runs or an update is ready.
   A failed automatic check shows only in About and the log, and the next one runs at its time; a failed check the person asked for shows as a failure.
-- **Validation.** Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
+- **Validation.**
+  Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
   After downloading, it checks the file's size and SHA-512 against it.
   On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, or the test build's test publisher.
   A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher.
   Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
-- **The person decides.** Downloading and restarting to install are explicit actions; downloading can be cancelled.
+- **The person decides.**
+  Downloading and restarting to install are explicit actions; downloading can be cancelled.
   Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed or a newer one replaces it.
-- **Restart to update.** Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.
+- **Restart to update.**
+  Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.
   Section 9 owns the choice the person makes while work is in progress.
   The handoff installs the way the platform does: Windows runs the installer quietly in the existing installation's scope, macOS installs through Squirrel.Mac from the ZIP, and Linux replaces the AppImage file in place, keeping its location and launchers.
-- **macOS location.** A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
+- **macOS location.**
+  A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
   Outside one, the desktop still checks but downloads and installs nothing: About says to move TeamRun to Applications, and so does the update item while a newer version is available.
 - **What the person sees.**
   - **States:** up to date, checking, available, downloading with its progress, ready and failed.
