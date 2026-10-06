@@ -14,7 +14,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 
-import type { IFolderProtector } from "../../interfaces/folder-protector.js";
+import type { IFolderProtector } from "../../interfaces/i-folder-protector.js";
 import type { RuntimeDiscovery } from "../../models/runtime-discovery.js";
 import { Resources } from "../../resources.js";
 import type { OwnershipLock } from "../ownership/ownership-lock.js";

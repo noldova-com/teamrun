@@ -53,6 +53,7 @@ export class DockComponent {
   protected readonly isCollapsed: Signal<boolean> = computed(() => this.layout.geometry().isCollapsed(this.side()));
   protected readonly orientation: Signal<SashOrientation> = computed(() => this.side() === DockSide.Bottom ? SashOrientation.Horizontal : SashOrientation.Vertical);
   protected readonly size: Signal<number> = computed(() => this.bounds().length(this.dock().axis));
+  protected readonly minimumSize: Signal<number> = computed(() => this.dock().minimumSize(this.layout.geometry().metrics));
   protected readonly isVertical: Signal<boolean> = computed(() => this.side() !== DockSide.Bottom);
   protected readonly tooltipSide: Signal<OverlaySide> = computed(() => Resources.dockStripTooltipSides[this.side()]);
   protected readonly isRail: Signal<boolean> = computed(() => !Object.isNull(this.layout.geometry().rail(this.side())));
@@ -62,7 +63,7 @@ export class DockComponent {
   protected readonly separatorOrientation: Signal<string> = computed(() => this.isVertical() ? Resources.horizontalOrientation : Resources.verticalOrientation);
   protected readonly sash: Signal<Bounds> = computed(() => {
     const bounds = this.bounds();
-    const gap = Resources.panelGap;
+    const gap = this.layout.geometry().metrics.gap;
     switch (this.side()) {
       case DockSide.Left:
         return new Bounds(bounds.right, bounds.y, gap, bounds.height);
@@ -109,7 +110,7 @@ export class DockComponent {
   protected resize(delta: number): void {
     const rem = delta / this.appearance.typography().rootSize;
     const grow = this.side() === DockSide.Left ? rem : -rem;
-    const size = Math.max(this.dock().minimumSize, Math.min(this.layout.geometry().maximumSize(this.side()), this.size() + grow));
+    const size = Math.max(this.minimumSize(), Math.min(this.layout.geometry().maximumSize(this.side()), this.size() + grow));
     this.layout.resizeDock(this.side(), size);
   }
 }

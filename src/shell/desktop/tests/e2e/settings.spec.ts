@@ -122,6 +122,37 @@ test.describe("settings", () => {
     await expect(window.locator("tr-tab[data-tab-key^=\"document/notes.note/\"]")).toHaveCount(4);
   });
 
+  test("a module's window part reads its setting for one of its objects through the object's folder and the application, and sets and resets it there", async ({ desktop }) => {
+    const window = desktop.window;
+    const note = (id: number): Locator => window.locator(`tr-tab[data-tab-key="document/notes.note/${id}"]`);
+    const wrapping = (id: number): Locator => window.locator(`[data-fixture-content=notes-wrapping-${id}]`);
+    const press = async (action: string, id: number): Promise<void> => await window.locator(`[data-fixture-content=notes-${action}-${id}]`).click();
+    await note(1).click();
+    await expect(wrapping(1)).toHaveText("Wraps lines: no, not set for this note");
+
+    await press("wrap-note", 1);
+    await expect(wrapping(1)).toHaveText("Wraps lines: yes, set for this note");
+    await press("wrap-inbox", 1);
+    await press("reset-note", 1);
+    await expect(wrapping(1)).toHaveText("Wraps lines: yes, not set for this note");
+    await note(2).click();
+    await expect(wrapping(2)).toHaveText("Wraps lines: yes, not set for this note");
+    await press("reset-inbox", 2);
+    await expect(wrapping(2)).toHaveText("Wraps lines: no, not set for this note");
+    await SettingsFixture.openPageAsync(window, "Notes");
+    const setting = row(window, "notes.wrapsLines");
+    await expect(setting.getByRole("checkbox")).not.toBeChecked();
+    await expect(setting.locator(".tr-setting-row-marker")).toHaveCount(0);
+    await setting.getByRole("checkbox").click();
+    await note(1).click();
+
+    await expect(wrapping(1)).toHaveText("Wraps lines: yes, not set for this note");
+    await desktop.checkpointAsync("settings-scoped-read");
+    await desktop.restartAsync();
+    await desktop.window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]").click();
+    await expect(desktop.window.locator("[data-fixture-content=notes-wrapping-1]")).toHaveText("Wraps lines: yes, not set for this note");
+  });
+
   test("the page list reveals its scrollbar's thumb colour while hovered, a long page shows its thumb while hovered, and dragging that thumb scrolls the page", async ({ desktop }) => {
     const window = desktop.window;
     const content = window.locator(".tr-settings-content");

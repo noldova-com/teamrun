@@ -11,11 +11,11 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
-import type ICoverageCount from "./interfaces/coverage-count.ts";
-import type IRunnerCounts from "./interfaces/runner-counts.ts";
-import type IRunnerFindings from "./interfaces/runner-findings.ts";
-import type IRunnerScope from "./interfaces/runner-scope.ts";
-import type ITestSkip from "./interfaces/test-skip.ts";
+import type ICoverageCount from "./interfaces/i-coverage-count.ts";
+import type IRunnerCounts from "./interfaces/i-runner-counts.ts";
+import type IRunnerFindings from "./interfaces/i-runner-findings.ts";
+import type IRunnerScope from "./interfaces/i-runner-scope.ts";
+import type ITestSkip from "./interfaces/i-test-skip.ts";
 import JsonFields from "./json-fields.ts";
 import TotalsException from "./totals.exception.ts";
 

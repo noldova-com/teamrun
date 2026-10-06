@@ -13,7 +13,7 @@ import type { Writable } from "node:stream";
 
 import type ModuleCatalog from "../modules/module-catalog.ts";
 import ModuleDeclaration from "../modules/module-declaration.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class ModuleFolderCheck implements ICheck {
   private static readonly MODULES_FOLDER: string = "src/modules";

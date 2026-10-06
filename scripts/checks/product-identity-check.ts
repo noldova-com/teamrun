@@ -13,7 +13,7 @@ import type ProductIdentity from "../packages/product-identity.ts";
 import type SourceFile from "../structure/source-file.ts";
 import SourceScanner from "../structure/source-scanner.ts";
 import type SourceTree from "../structure/source-tree.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class ProductIdentityCheck implements ICheck {
   private static readonly SHELL_PREFIX: string = "src/shell/";

@@ -14,10 +14,10 @@ import type { OwnedProcess } from "../models/owned-process.js";
 import type { ProcessRequest } from "../models/process-request.js";
 import type { RuntimeCommand } from "../models/runtime-command.js";
 import type { WorkItem } from "../models/work-item.js";
-import type { IMethodHandler } from "./method-handler.js";
-import type { IModuleDatabase } from "./module-database.js";
-import type { IModuleLog } from "./module-log.js";
-import type { IModuleSettings } from "./module-settings.js";
+import type { IMethodHandler } from "./i-method-handler.js";
+import type { IModuleDatabase } from "./i-module-database.js";
+import type { IModuleLog } from "./i-module-log.js";
+import type { IModuleSettings } from "./i-module-settings.js";
 
 export interface IRuntimePartContext {
   readonly moduleId: string;

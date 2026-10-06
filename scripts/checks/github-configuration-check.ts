@@ -11,7 +11,7 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import type RepositoryFiles from "../repository/repository-files.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class GitHubConfigurationCheck implements ICheck {
   private static readonly CONFIGURATION_FILE: RegExp = /^\.github\/.+\.ya?ml$/;

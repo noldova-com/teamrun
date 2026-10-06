@@ -13,7 +13,7 @@ import path from "node:path";
 import "@noldova/teamrun-foundation-core";
 
 import { SystemCommandException } from "../../exceptions/system-command.exception.js";
-import type { IFolderProtector } from "../../interfaces/folder-protector.js";
+import type { IFolderProtector } from "../../interfaces/i-folder-protector.js";
 import { Resources } from "../../resources.js";
 import type { SystemCommand } from "../commands/system-command.js";
 

@@ -13,7 +13,7 @@ import type { Writable } from "node:stream";
 import type RepositoryFiles from "../repository/repository-files.ts";
 import LicenseHeader from "../structure/license-header.ts";
 import SourceFile from "../structure/source-file.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class LicenseHeaderCheck implements ICheck {
   private static readonly HEADERS: ReadonlyMap<string, string> = new Map([

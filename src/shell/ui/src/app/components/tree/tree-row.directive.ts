@@ -9,7 +9,7 @@
 import { CdkTreeNode } from "@angular/cdk/tree";
 import { Directive, ElementRef, inject } from "@angular/core";
 
-import type { TreeNode } from "../../models/tree-node";
+import type { TreeNode } from "../../models/tree.node";
 
 @Directive({ selector: "[trTreeRow]" })
 export class TreeRowDirective {

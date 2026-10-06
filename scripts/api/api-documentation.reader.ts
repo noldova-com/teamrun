@@ -30,7 +30,7 @@ import {
   isVariableDeclaration
 } from "typescript/unstable/ast/is";
 
-import ApiSymbolWalker from "./api-symbol.walker.ts";
+import ApiSymbolWalker from "./api-symbol-walker.ts";
 import type ApiVisibility from "./api-visibility.ts";
 
 export default class ApiDocumentationReader {

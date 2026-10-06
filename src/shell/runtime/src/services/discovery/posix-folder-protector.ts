@@ -8,7 +8,7 @@
 
 import { chmod } from "node:fs/promises";
 
-import type { IFolderProtector } from "../../interfaces/folder-protector.js";
+import type { IFolderProtector } from "../../interfaces/i-folder-protector.js";
 import { Resources } from "../../resources.js";
 
 export class PosixFolderProtector implements IFolderProtector {

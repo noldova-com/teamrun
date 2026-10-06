@@ -661,11 +661,11 @@ export class Resources {
   }
 
   public static formatSettingNeedsDevice(name: string): string {
-    return `The setting ${name} is kept per device and needs a device, without a scope.`;
+    return `The setting ${name} is kept per device and needs a device.`;
   }
 
   public static formatSettingScopeNotAllowed(name: string, scope: string): string {
-    return `The setting ${name} cannot be set for the scope ${scope}.`;
+    return `The setting ${name} does not list the scope ${scope}.`;
   }
 
   public static formatSettingNotReadable(moduleId: string, name: string): string {

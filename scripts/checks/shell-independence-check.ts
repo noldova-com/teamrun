@@ -12,7 +12,7 @@ import ModuleNameMatcher from "../structure/module-name-matcher.ts";
 import type SourceFile from "../structure/source-file.ts";
 import SourceScanner from "../structure/source-scanner.ts";
 import SourceTree from "../structure/source-tree.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class ShellIndependenceCheck implements ICheck {
   private static readonly LINE_SEPARATOR: string = "\n";

@@ -11,7 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { ModuleState, type ModuleStatus, NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
+import { ModuleState, type ModuleStatus, NotificationPost, NotificationSeverity, QualifiedName, SettingScope } from "@noldova/teamrun-shell-protocol";
 
 import { ModulesComponent } from "../../../src/app/components/modules/modules.component";
 import { SettingsComponent } from "../../../src/app/components/settings/settings.component";
@@ -152,6 +152,8 @@ describe("WindowPartHostService", () => {
     await vi.waitFor(() => expect(loads).toEqual([""]));
     const stop = host.onSettingChanged(t => heard.push(t.key.name.text));
 
+    bridge.responses.set("shell.readSetting", { payload: { name: "shell.mode", value: "Dark", isSet: false } });
+    const entry = await host.readSettingAsync("shell.mode", new SettingScope(QualifiedName.parse("notes.note"), "n1"));
     await host.writeSettingAsync("shell.mode", "Dark", null);
     await host.resetSettingAsync("shell.mode", null);
     bridge.publishEvent("shell.settingsChanged", { name: "shell.mode", value: "Dark", isSet: true });
@@ -160,7 +162,12 @@ describe("WindowPartHostService", () => {
 
     expect([host.readSetting("shell.mode"), settings.read("shell.mode")]).toEqual(["Light", "Light"]);
     expect(heard).toEqual(["shell.mode"]);
-    expect(bridge.requests.slice(-2)).toEqual([["shell.setSetting", { name: "shell.mode", value: "Dark" }], ["shell.resetSetting", { name: "shell.mode" }]]);
+    expect([entry.name.text, entry.value, entry.isSet]).toEqual(["shell.mode", "Dark", false]);
+    expect(bridge.requests.slice(-3)).toEqual([
+      ["shell.readSetting", { name: "shell.mode", scope: { name: "notes.note", id: "n1" } }],
+      ["shell.setSetting", { name: "shell.mode", value: "Dark" }],
+      ["shell.resetSetting", { name: "shell.mode" }]
+    ]);
   });
 
   it("activates the active modules' window parts before loading the layout and finds their contributions", async () => {

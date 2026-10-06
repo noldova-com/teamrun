@@ -6,8 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type ITestName from "./test-name.ts";
+import type IVitestLogger from "./i-vitest-logger.ts";
 
-export default interface IRunnerSkip extends ITestName {
-  readonly reason: string;
+export default interface IVitestRun {
+  readonly logger: IVitestLogger;
+
+  onClose(listener: () => void): void;
 }

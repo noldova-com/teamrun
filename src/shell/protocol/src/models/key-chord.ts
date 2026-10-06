@@ -9,7 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
-import type { IKeyStroke } from "../interfaces/key-stroke.js";
+import type { IKeyStroke } from "../interfaces/i-key-stroke.js";
 import { Resources } from "../resources.js";
 import { KeyName } from "./key-name.js";
 import type { QualifiedName } from "./qualified-name.js";
