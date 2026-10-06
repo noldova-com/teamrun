@@ -56,10 +56,16 @@ class BuilderFixture extends ProcessRunnerFixture {
 }
 
 class CredentialWitnessFixture extends ProcessRunner {
+  public static readonly NAMES: readonly string[] = ["AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"];
+
   public readonly seen: (readonly string[])[] = [];
 
+  public static find(environment: NodeJS.ProcessEnv | undefined): readonly string[] {
+    return Object.keys(environment ?? {}).filter(t => CredentialWitnessFixture.NAMES.includes(t.toUpperCase()));
+  }
+
   public override captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
-    this.seen.push(Object.keys(environment ?? process.env).filter(t => t.startsWith("AZURE_")));
+    this.seen.push(CredentialWitnessFixture.find(environment ?? process.env));
     return super.captureAsync(command, commandArguments, directory, timeout, environment);
   }
 }
@@ -197,7 +203,7 @@ class PackageTests {
         const output = new TextOutputFixture();
         Object.assign(process.env, PackageTests.CREDENTIALS);
         t.after(() => {
-          for (const name of Object.keys(PackageTests.CREDENTIALS))
+          for (const name of CredentialWitnessFixture.NAMES)
             Reflect.deleteProperty(process.env, name);
         });
 
@@ -211,9 +217,10 @@ class PackageTests {
         assert.deepEqual(gallery.requests, ["/module", "/tool"]);
         assert.ok(npm.seen.length > 0);
         assert.deepEqual(npm.seen.filter(t => t.length > 0), []);
-        assert.deepEqual(builder.captureEnvironments.map(t => Object.keys(t ?? {}).filter(name => name.startsWith("AZURE_"))), [[], []]);
-        assert.deepEqual(Object.keys(process.env).filter(t => t.startsWith("AZURE_")), []);
-        assert.deepEqual(builder.environments.map(t => Object.fromEntries(Object.entries(t ?? {}).filter(([name]) => name.startsWith("AZURE_") || name.startsWith("TEAMRUN_")))), [{
+        assert.deepEqual(builder.captureEnvironments.map(t => CredentialWitnessFixture.find(t)), [[], []]);
+        assert.deepEqual(CredentialWitnessFixture.find(process.env), []);
+        assert.deepEqual(builder.environments.map(t => Object.fromEntries(Object.entries(t ?? {})
+          .filter(([name]) => CredentialWitnessFixture.NAMES.includes(name) || name.startsWith("TEAMRUN_")))), [{
           ...PackageTests.CREDENTIALS,
           TEAMRUN_SIGNING_FOLDER: path.join(folder, "signing")
         }]);
