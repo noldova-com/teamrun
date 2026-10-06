@@ -98,7 +98,7 @@ class UiSummaryTests {
       await repository.writeAsync({ "_build/ui/report.json": UiSummaryTests.report(repository, [{ title: "a.spec.ts", specs: [UiSummaryTests.spec("a.spec.ts", "docks", checkpointed)] }]) });
       const summaryPath = path.join(repository.directory, "summary.md");
 
-      assert.equal(await new UiSummary(repository.directory, new TextOutputFixture(), UiSummaryTests.listing(repository)).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Linux x64" }), 0);
+      assert.equal(await new UiSummary(repository.directory, new TextOutputFixture(), UiSummaryTests.listing(repository)).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Linux x64", UI_SHARD: "1/2" }), 0);
 
       assert.ok((await readFile(summaryPath, "utf8")).endsWith("<details><summary>Screenshot checkpoints (1)</summary>\n\n" +
         "| Workflow | Checkpoint | Theme | Mode | Fonts (interface / code) | Sizes (panel / message / code) | Zoom | Viewport | Pixel ratio |\n|---|---|---|---|---|---|---|---|---|\n" +
