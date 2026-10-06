@@ -68,14 +68,15 @@ class FlakyIssueFilerTests {
       ].join("\n"));
     });
 
-    test("a flaky test comments on the open bug whose body holds its key, or else on one whose title names it exactly, and never on a partial match", async () => {
+    test("a flaky test comments on the open bug whose body holds its key, or else on one whose title is exactly its flaky title, and never on a partial match", async () => {
       const keyed = new FlakyTest("Package tests", "@noldova/a/a.test.js", "ATests.fails", "first");
       const named = new FlakyTest("Angular tests", "shell/b.spec.ts", "B shows", "second");
       const partial = new FlakyTest("UI workflows", "src/shell/desktop/tests/e2e/c.spec.ts", "c.spec.ts › docks", "third");
       const fixture = FlakyIssueFilerTests.createFixture([
         { number: 40, title: "Flaky: B shows", body: "", pull_request: {} },
         { number: 41, title: "Something else", body: `Older text\n<!-- flaky-test: ${FlakyIssueFiler.keyOf(keyed)} -->` },
-        { number: 42, title: "B shows sometimes fails", body: null },
+        { number: 42, title: "Flaky: B shows", body: null },
+        { number: 43, title: "B shows sometimes fails", body: "B shows" },
         { number: 44, title: "Flaky: c.spec.ts › docks_twice", body: "c.spec.ts › docksAgain and xc.spec.ts › docks" }
       ]);
       fixture.answer("/issues", { number: 45 });
@@ -96,10 +97,11 @@ class FlakyIssueFilerTests {
       ].join("\n"));
     });
 
-    test("a short name in an unrelated bug's body finds nothing, and the key wins over a title that names the test", async () => {
+    test("a bug whose title or body mentions a short name, without its exact flaky title, finds nothing, and the key wins over that title", async () => {
       const short = new FlakyTest("Script tests", "scripts/tests/a.test.ts", "opens", "first");
       const keyed = new FlakyTest("Script tests", "scripts/tests/b.test.ts", "closes", "second");
       const fixture = FlakyIssueFilerTests.createFixture([
+        { number: 49, title: "Settings opens slowly", body: "" },
         { number: 50, title: "Settings is slow", body: "The tab opens slowly." },
         { number: 51, title: "Flaky: closes", body: "" },
         { number: 52, title: "Something else", body: `<!-- flaky-test: ${FlakyIssueFiler.keyOf(keyed)} -->` }
@@ -110,14 +112,6 @@ class FlakyIssueFilerTests {
 
       assert.deepEqual(lines, ["- opens: opened #53", "- closes: commented on #52"]);
       assert.deepEqual(fixture.writes, ["POST /issues", "POST /issues/52/comments"]);
-    });
-
-    test("a name is found only where it stands on its own, at either end of the text or between other characters", () => {
-      assert.deepEqual(
-        ["a > b", "x a > b.", "(a > b)", "a > bc", "za > b", "a > b_", "a > ba > b"].map(t => FlakyIssueFiler.names(t, "a > b")),
-        [true, true, true, false, false, false, false]);
-      assert.equal(FlakyIssueFiler.names("é a > b ü", "a > b"), true);
-      assert.equal(FlakyIssueFiler.names("éa > b", "a > b"), false);
     });
 
     test("a title longer than GitHub allows is cut with an ellipsis, and the key in the body still finds its bug", () => {

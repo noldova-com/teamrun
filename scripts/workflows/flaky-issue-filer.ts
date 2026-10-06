@@ -32,7 +32,6 @@ export default class FlakyIssueFiler {
   private static readonly MAXIMUM_TITLE_LENGTH: number = 256;
   private static readonly ELLIPSIS: string = "…";
   private static readonly FIX_MILLISECONDS: number = 24 * 3_600_000;
-  private static readonly WORD_CHARACTER: RegExp = /[\p{L}\p{N}_]/u;
   private static readonly BACKTICK: string = "`";
   private static readonly NEUTRAL_BACKTICK: string = String.fromCodePoint(0x2cb);
   private static readonly MENTION: string = "@";
@@ -61,13 +60,6 @@ export default class FlakyIssueFiler {
   public static titleOf(name: string): string {
     const title = `${FlakyIssueFiler.TITLE_PREFIX}${name}`;
     return title.length <= FlakyIssueFiler.MAXIMUM_TITLE_LENGTH ? title : `${title.slice(0, FlakyIssueFiler.MAXIMUM_TITLE_LENGTH - 1)}${FlakyIssueFiler.ELLIPSIS}`;
-  }
-
-  public static names(text: string, name: string): boolean {
-    for (let index = text.indexOf(name); index >= 0; index = text.indexOf(name, index + 1))
-      if (!FlakyIssueFiler.WORD_CHARACTER.test(text.charAt(index - 1)) && !FlakyIssueFiler.WORD_CHARACTER.test(text.charAt(index + name.length)))
-        return true;
-    return false;
   }
 
   public static formatOccurrence(name: string, jobs: readonly string[]): string {
@@ -113,7 +105,7 @@ export default class FlakyIssueFiler {
 
   private async fileOneAsync(open: readonly { number: number; title: string; body: string }[], milestone: number | null, occurrence: FlakyOccurrence): Promise<string> {
     const key = `${FlakyIssueFiler.KEY_MARKER}${FlakyIssueFiler.keyOf(occurrence.test)}${FlakyIssueFiler.MARKER_END}`;
-    const existing = open.find(t => t.body.includes(key)) ?? open.find(t => FlakyIssueFiler.names(t.title, occurrence.test.name));
+    const existing = open.find(t => t.body.includes(key)) ?? open.find(t => t.title === FlakyIssueFiler.titleOf(occurrence.test.name));
     return existing === undefined
       ? await this.openAsync(FlakyIssueFiler.titleOf(occurrence.test.name), this.describe(key, occurrence), milestone)
       : await this.commentAsync(existing.number, this.describeAgain(occurrence));
