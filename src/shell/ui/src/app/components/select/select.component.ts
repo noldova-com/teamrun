@@ -91,8 +91,8 @@ export class SelectComponent {
   }
 
   protected chooseAgain(event: KeyboardEvent, button: HTMLButtonElement): void {
-    if (event.key === Resources.enterKey || event.key === Resources.spaceKey)
-      this.closeOnCurrent((event.target as HTMLElement).getAttribute(Resources.valueAttribute), button);
+    if ((event.key === Resources.enterKey || event.key === Resources.spaceKey) && event.target instanceof HTMLElement)
+      this.closeOnCurrent(event.target.getAttribute(Resources.valueAttribute), button);
   }
 
   protected closeOnCurrent(value: string | null, button: HTMLButtonElement): void {

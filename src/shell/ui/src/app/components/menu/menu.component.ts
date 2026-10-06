@@ -31,7 +31,8 @@ export class MenuComponent {
     const held: Element[] = [];
     const holdEnter = (event: MouseEvent): void => {
       event.stopPropagation();
-      held.push(event.target as Element);
+      if (event.target instanceof Element)
+        held.push(event.target);
     };
     const stop = (): void => {
       host.removeEventListener(Resources.mouseenterEvent, holdEnter, true);
