@@ -11,10 +11,23 @@ import path from "node:path";
 import { test } from "node:test";
 
 import CoverageRun from "../../checks/coverage-run.ts";
+import TotalsException from "../../totals/totals.exception.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
+import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class CoverageRunTests {
   public static register(): void {
+    test("the environment names the file the coverage run writes its count of fully covered files to, which is read back when it was written", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({ "_build/counted.json": JSON.stringify({ covered: 3, total: 4 }), "_build/broken.json": JSON.stringify({ covered: 3 }) });
+
+      assert.deepEqual(CoverageRun.countingIn({ KEPT: "yes" }, "count.json"), { KEPT: "yes", TEAMRUN_COVERAGE_RESULT_FILE: "count.json" });
+      assert.deepEqual(await CoverageRun.readCountAsync(repository.directory, path.join(repository.directory, "_build", "counted.json")), { unit: "files", covered: 3, total: 4 });
+      assert.equal(await CoverageRun.readCountAsync(repository.directory, path.join(repository.directory, "_build", "missing.json")), null);
+      await assert.rejects(CoverageRun.readCountAsync(repository.directory, path.join(repository.directory, "_build", "broken.json")), new TotalsException("_build/broken.json has no count total."));
+    });
+
     test("a project's arguments name it, its folders, its exclusions and its test folders, and the environment names the folder that records the coverage", () => {
       assert.deepEqual(CoverageRun.formatProjectArguments("alpha", "installed", "source", CoverageRun.NO_EXCLUSIONS, CoverageRun.NO_TEST_FOLDERS), ["alpha", "installed", "source", "[]", "[]"]);
       assert.deepEqual(CoverageRun.recordingIn({ KEPT: "yes" }, "reports"), { KEPT: "yes", NODE_V8_COVERAGE: "reports" });

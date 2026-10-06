@@ -21,19 +21,23 @@ import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
-class SelectionRunnerFixture extends ProcessRunnerFixture {
-  private readonly selection: string | null;
+class ResultRunnerFixture extends ProcessRunnerFixture {
+  private readonly result: string | null;
+  private readonly coverage: string | null;
 
-  public constructor(exitCodes: readonly (number | null)[], selection: string | null) {
+  public constructor(exitCodes: readonly (number | null)[], result: string | null, coverage: string | null = null) {
     super(exitCodes);
 
-    this.selection = selection;
+    this.result = result;
+    this.coverage = coverage;
   }
 
   public override async runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
-    const file = environment?.["TEAMRUN_TEST_SELECTION_FILE"];
-    if (file !== undefined && this.selection !== null)
-      await writeFile(file, this.selection);
+    for (const [variable, content] of [["TEAMRUN_TEST_RESULT_FILE", this.result], ["TEAMRUN_COVERAGE_RESULT_FILE", this.coverage]]) {
+      const file = environment?.[String(variable)];
+      if (file !== undefined && content !== null)
+        await writeFile(file, String(content));
+    }
     return super.runAsync(command, commandArguments, directory, environment);
   }
 }
@@ -57,7 +61,7 @@ class PackageTestCheckTests {
       const manifest = path.join(repository.directory, "src", "foundation", "alpha", "package.json");
       const exclusions = [{ file: "main.ts", reason: "Runs only inside Electron." }];
       await writeFile(manifest, JSON.stringify({ ...JSON.parse(await readFile(manifest, "utf8")) as object, teamrun: { coverageExclusions: exclusions } }));
-      const runner = new ProcessRunnerFixture([0, 0]);
+      const runner = new ResultRunnerFixture([0, 0], PackageTestCheckTests.result(2, 2));
       const check = new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, { KEPT: "yes" });
 
       assert.equal(await check.runAsync(new TextOutputFixture()), true);
@@ -73,7 +77,7 @@ class PackageTestCheckTests {
         "@noldova/teamrun-foundation-alpha",
         path.join(repository.directory, "_build", "tests", "foundation-alpha")
       ]);
-      assert.deepEqual(runner.environments[0], { KEPT: "yes", TEAMRUN_TEST_FILTERS: "[]", NODE_V8_COVERAGE: coverage });
+      assert.deepEqual(runner.environments[0], { KEPT: "yes", TEAMRUN_TEST_FILTERS: "[]", TEAMRUN_TEST_RESULT_FILE: path.join(repository.directory, "_build", "test-result.json"), NODE_V8_COVERAGE: coverage });
       assert.deepEqual(runner.runs[1], [
         process.execPath,
         repository.directory,
@@ -91,12 +95,55 @@ class PackageTestCheckTests {
         "[{\"file\":\"main.ts\",\"reason\":\"Runs only inside Electron.\"}]",
         "[]"
       ]);
-      assert.deepEqual(runner.environments[1], { KEPT: "yes" });
+      assert.deepEqual(runner.environments[1], { KEPT: "yes", TEAMRUN_COVERAGE_RESULT_FILE: path.join(repository.directory, "_build", "package-coverage.json") });
+    });
+
+    test("the runner's result and the measured coverage become the package tests' totals, and a run fails without a readable result or with counts that disagree", async t => {
+      const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
+      const build = new PackageBuildFixture(repository.directory);
+      const run = async (result: string | null, coverage: string | null): Promise<readonly unknown[]> => {
+        const output = new TextOutputFixture();
+        return [await new PackageTestCheck(repository.directory, build, new ResultRunnerFixture([0, 0], result, coverage), {}).runAsync(output), output.text];
+      };
+      const skipped = JSON.stringify({
+        discovered: 3,
+        selected: 3,
+        passed: 2,
+        failed: 0,
+        skipped: 1,
+        unreached: 0,
+        skips: [{ file: "@noldova/teamrun-foundation-alpha/alpha.test.js", names: ["AlphaTests.pending"], reason: "Waits for the shell." }],
+        files: ["@noldova/teamrun-foundation-alpha/alpha.test.js"]
+      });
+
+      const recorded = await run(skipped, JSON.stringify({ covered: 9, total: 10 }));
+      const totals = JSON.parse(await readFile(path.join(repository.directory, "_build", "totals", "package.json"), "utf8"));
+      const disagreeing = await run(JSON.stringify({ discovered: 4, selected: 4, passed: 3, failed: 0, skipped: 0, unreached: 0, skips: [], files: [] }), null);
+      const unwritten = await run(null, null);
+
+      assert.deepEqual(recorded, [true, ""]);
+      assert.deepEqual(totals, {
+        version: 1,
+        runner: "package",
+        title: "Package tests",
+        discovered: 3,
+        executed: 2,
+        passed: 2,
+        failed: 0,
+        skipped: 1,
+        unselected: 0,
+        unreached: 0,
+        skips: [{ test: "@noldova/teamrun-foundation-alpha/alpha.test.js › AlphaTests.pending", reason: "Waits for the shell." }],
+        files: ["@noldova/teamrun-foundation-alpha/alpha.test.js"],
+        coverage: { unit: "files", covered: 9, total: 10 }
+      });
+      assert.deepEqual(disagreeing, [false, "Package tests don't add up: 4 discovered, but 3 executed, 0 skipped, 0 unselected and 0 unreached.\n"]);
+      assert.deepEqual(unwritten, [false, "The test runner wrote no result to _build/test-result.json.\n"]);
     });
 
     test("a filtered run passes its filters to the test framework, measures no coverage and reports what it selected", async t => {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
-      const runner = new SelectionRunnerFixture([0], JSON.stringify({ discovered: 10, selected: 3 }));
+      const runner = new ResultRunnerFixture([0], PackageTestCheckTests.result(10, 3));
       const check = new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, { KEPT: "yes" });
 
       const selection = await check.runSelectedAsync(["Alpha", "category:fast"], new TextOutputFixture());
@@ -106,7 +153,7 @@ class PackageTestCheckTests {
       assert.deepEqual(runner.environments[0], {
         KEPT: "yes",
         TEAMRUN_TEST_FILTERS: JSON.stringify(["Alpha", "category:fast"]),
-        TEAMRUN_TEST_SELECTION_FILE: path.join(repository.directory, "_build", "test-selection.json")
+        TEAMRUN_TEST_RESULT_FILE: path.join(repository.directory, "_build", "test-result.json")
       });
     });
 
@@ -114,11 +161,11 @@ class PackageTestCheckTests {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
       const build = new PackageBuildFixture(repository.directory);
       const run = (exitCode: number, selection: string | null): Promise<CheckSelection> =>
-        new PackageTestCheck(repository.directory, build, new SelectionRunnerFixture([exitCode], selection), {}).runSelectedAsync(["Alpha"], new TextOutputFixture());
+        new PackageTestCheck(repository.directory, build, new ResultRunnerFixture([exitCode], selection), {}).runSelectedAsync(["Alpha"], new TextOutputFixture());
 
-      const failing = await run(1, JSON.stringify({ discovered: 10, selected: 3 }));
-      const none = await run(0, JSON.stringify({ discovered: 10, selected: 0 }));
-      const brokenNone = await run(1, JSON.stringify({ discovered: 10, selected: 0 }));
+      const failing = await run(1, PackageTestCheckTests.result(10, 3));
+      const none = await run(0, PackageTestCheckTests.result(10, 0));
+      const brokenNone = await run(1, PackageTestCheckTests.result(10, 0));
       const unreadable: CheckSelection[] = [];
       for (const selection of [null, "{", "null", JSON.stringify({ discovered: 10 }), JSON.stringify({ discovered: "10", selected: 1 })])
         unreadable.push(await run(0, selection));
@@ -131,7 +178,7 @@ class PackageTestCheckTests {
 
     test("a filtered run fails with the reason when the framework discovered no package test at all", async t => {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
-      const runner = new SelectionRunnerFixture([0], JSON.stringify({ discovered: 0, selected: 0 }));
+      const runner = new ResultRunnerFixture([0], PackageTestCheckTests.result(0, 0));
       const output = new TextOutputFixture();
 
       const selection = await new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {}).runSelectedAsync(["Alpha"], output);
@@ -142,7 +189,7 @@ class PackageTestCheckTests {
 
     test("failing tests or incomplete coverage fail the check, and both still run", async t => {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
-      const runner = new ProcessRunnerFixture([1, 0, 0, 1]);
+      const runner = new ResultRunnerFixture([1, 0, 0, 1], PackageTestCheckTests.result(2, 2));
       const check = new PackageTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {});
 
       assert.equal(await check.runAsync(new TextOutputFixture()), false);
@@ -174,6 +221,10 @@ class PackageTestCheckTests {
       assert.equal(stale.text, "The built artifacts are stale.\n");
       assert.equal(unstarted.text, `"${process.execPath}" could not start.\n`);
     });
+  }
+
+  private static result(discovered: number, selected: number): string {
+    return JSON.stringify({ discovered, selected, passed: selected, failed: 0, skipped: 0, unreached: 0, skips: [], files: [] });
   }
 
   private static async createRepositoryAsync(t: TestContext, withTests: boolean): Promise<RepositoryFixture> {

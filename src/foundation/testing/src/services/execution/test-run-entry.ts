@@ -14,8 +14,10 @@ import { join } from "node:path";
 
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
+import { TestOutcome } from "../../enums/test-outcome.js";
 import { TestingException } from "../../exceptions/testing.exception.js";
 import { TestProject } from "../../models/discovery/test-project.js";
+import type { TestRunResult } from "../../models/results/test-run-result.js";
 import { Resources } from "../../resources.js";
 import { TestDiscovery } from "../discovery/test-discovery.js";
 import { GitHubSummaryWriter } from "../reporting/git-hub-summary-writer.js";
@@ -51,14 +53,14 @@ export class TestRunEntry {
 
       reporter.writeSummary(result);
       summary.writeTests(result);
-      const selectionFile = process.env[Resources.selectionFileVariable];
-      const ownsEmptySelection = Object.isUndefined(selectionFile);
+      const resultFile = process.env[Resources.resultFileVariable];
+      const ownsEmptySelection = Object.isUndefined(resultFile);
       if (ownsEmptySelection && result.selection.isFiltered && result.selection.selected === 0) {
         console.error(Resources.noTestMatchedFilters.trimEnd());
         summary.writeFailure(Resources.noTestMatchedFilters);
       }
       if (!ownsEmptySelection)
-        writeFileSync(selectionFile, JSON.stringify({ discovered: result.selection.discovered, selected: result.selection.selected }));
+        writeFileSync(resultFile, JSON.stringify(this.describe(result)));
       interrupted = result.isInterrupted;
       process.exitCode = Math.min(result.failed + result.unreached + Number(ownsEmptySelection && result.total === 0), 1);
     }
@@ -88,6 +90,21 @@ export class TestRunEntry {
       summary.writeFailure(failure);
       process.exit(Resources.failedExitCode);
     }, Resources.testShutdownGraceMilliseconds).unref();
+  }
+
+  private describe(result: TestRunResult): object {
+    return {
+      discovered: result.selection.discovered,
+      selected: result.selection.selected,
+      passed: result.passed,
+      failed: result.failed,
+      skipped: result.skipped,
+      unreached: result.unreached,
+      skips: result.classResults.flatMap(t => t.methodResults
+        .filter(u => u.outcome === TestOutcome.Skipped)
+        .map(u => ({ file: `${t.packageName}/${t.filePath}`, names: [u.displayName], reason: String(u.skipReason) }))),
+      files: [...new Set(result.classResults.map(t => `${t.packageName}/${t.filePath}`))]
+    };
   }
 
   private keepCoverageFromChildren(): void {

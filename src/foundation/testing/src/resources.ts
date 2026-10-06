@@ -14,7 +14,8 @@ export class Resources {
   public static readonly waitIntervalMilliseconds: number = 25;
   public static readonly gitHubSummaryVariable: string = "GITHUB_STEP_SUMMARY";
   public static readonly filtersVariable: string = "TEAMRUN_TEST_FILTERS";
-  public static readonly selectionFileVariable: string = "TEAMRUN_TEST_SELECTION_FILE";
+  public static readonly resultFileVariable: string = "TEAMRUN_TEST_RESULT_FILE";
+  public static readonly coverageResultFileVariable: string = "TEAMRUN_COVERAGE_RESULT_FILE";
   public static readonly skipTestDetailsVariable: string = "TEAMRUN_SKIP_TEST_DETAILS";
   public static readonly timeoutVariable: string = "TEAMRUN_TEST_TIMEOUT_MILLISECONDS";
   public static readonly temporaryRootVariable: string = "TEAMRUN_TEMPORARY_ROOT";

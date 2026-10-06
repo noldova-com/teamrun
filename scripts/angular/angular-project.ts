@@ -16,6 +16,10 @@ import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
 import RetriedDownload from "../processes/retried-download.ts";
 import type NpmCommand from "../toolchain/npm-command.ts";
+import type ICoverageCount from "../totals/interfaces/coverage-count.ts";
+import JsonFields from "../totals/json-fields.ts";
+import type RunnerResult from "../totals/runner-result.ts";
+import AngularTestReport from "./angular-test-report.ts";
 import AngularTestRun from "./angular-test-run.ts";
 
 export default class AngularProject {
@@ -38,6 +42,9 @@ export default class AngularProject {
   private static readonly INCLUDE_OPTION: string = "--include";
   private static readonly NO_COVERAGE_OPTION: string = "--no-coverage";
   private static readonly REPORT_SEGMENTS: readonly string[] = ["_build", "angular-tests.json"];
+  private static readonly COVERAGE_SEGMENTS: readonly string[] = ["_build", "angular-coverage"];
+  private static readonly COVERAGE_SUMMARY: string = "coverage-summary.json";
+  private static readonly COVERAGE_UNIT: string = "statements";
   private static readonly TEST_TARGET: string = "test";
   private static readonly OPTIONS_PATH: readonly string[] = ["architect", AngularProject.TEST_TARGET, "options"];
   private static readonly BUILD_ARGUMENTS: readonly string[] = ["build"];
@@ -49,11 +56,11 @@ export default class AngularProject {
   private static readonly BROWSER_SUBJECT: string = "The browser for the Angular tests";
   private static readonly BUILDING: string = "Building the window...\n";
 
-  private readonly root: string;
   private readonly directory: string;
   private readonly runner: ProcessRunner;
   private readonly npm: NpmCommand;
 
+  public readonly root: string;
   public readonly projectFile: string;
   public readonly projectName: string;
 
@@ -125,7 +132,9 @@ export default class AngularProject {
 
   public async testAsync(include: readonly string[] = []): Promise<AngularTestRun> {
     const report = path.join(this.root, ...AngularProject.REPORT_SEGMENTS);
+    const coverage = path.join(this.root, ...AngularProject.COVERAGE_SEGMENTS, AngularProject.COVERAGE_SUMMARY);
     await rm(report, { force: true });
+    await rm(path.dirname(coverage), { recursive: true, force: true });
     await rm(path.join(this.directory, AngularProject.DEPENDENCY_CACHE), { recursive: true, force: true });
     await mkdir(path.dirname(report), { recursive: true });
     const exitCode = await this.runner.runLoggedAsync(
@@ -135,7 +144,7 @@ export default class AngularProject {
       path.join(this.root, AngularProject.LOG_FILE),
       process.stdout,
       process.stderr);
-    return new AngularTestRun(exitCode, existsSync(report) ? await this.readCollectedAsync(report) : null);
+    return new AngularTestRun(exitCode, existsSync(report) ? await this.readResultAsync(report) : null, existsSync(coverage) ? await this.readCoverageAsync(coverage) : null);
   }
 
   public async specFilesAsync(): Promise<readonly string[]> {
@@ -171,11 +180,16 @@ export default class AngularProject {
     return aliases;
   }
 
-  private async readCollectedAsync(report: string): Promise<readonly string[]> {
+  private async readResultAsync(report: string): Promise<RunnerResult> {
     const results = AngularProject.field(await this.readJsonAsync(report), "testResults");
     if (!Array.isArray(results) || results.some(t => typeof AngularProject.field(t, "name") !== "string"))
       throw new ProcessException(`The Angular test report ${this.describe(report)} lists no test files.`);
-    return results.map(t => this.specName(path.resolve(String(AngularProject.field(t, "name"))))).sort();
+    return new AngularTestReport(this.describe(report), t => this.specName(path.resolve(t))).read(results);
+  }
+
+  private async readCoverageAsync(summary: string): Promise<ICoverageCount> {
+    const statements = new JsonFields(await this.readJsonAsync(summary), this.describe(summary)).object("total").object(AngularProject.COVERAGE_UNIT);
+    return { unit: AngularProject.COVERAGE_UNIT, covered: statements.count("covered"), total: statements.count("total") };
   }
 
   private async readJsonAsync(file: string): Promise<unknown> {

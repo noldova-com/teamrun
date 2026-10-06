@@ -54,7 +54,11 @@ class TestTests {
         assert.ok(output.text.includes(`\n${part}: every example compiles\n`), output.text);
       }
       assert.equal(runner.runs.length, 5);
-      assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
+      const counts = "0 discovered, 0 executed, 0 passed, 0 failed, 0 skipped, 0 unselected, 0 unreached; coverage Not measured.";
+      assert.ok(output.text.endsWith(`\nTest totals\nScript tests: ${counts}\nAngular tests: ${counts}\n\n22 of 22 checks passed.\n`), output.text);
+      assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}\n` +
+        "| Tests | Discovered | Executed | Passed | Failed | Skipped | Unselected | Unreached | Coverage |\n|---|---|---|---|---|---|---|---|---|\n" +
+        `${["Script tests", "Angular tests"].map(t => `| ${t} | 0 | 0 | 0 | 0 | 0 | 0 | 0 | Not measured |\n`).join("")}`);
     });
 
     test("each part runs only its own checks, in the complete gate's order, and says that only all parts together are the complete gate", async t => {
@@ -327,7 +331,7 @@ class TestTests {
   }
 
   private static specReport(repository: RepositoryFixture): string {
-    return JSON.stringify({ testResults: [{ name: path.join(repository.directory, "src", "shell", "ui", "tests", "a.spec.ts") }] });
+    return JSON.stringify({ testResults: [{ name: path.join(repository.directory, "src", "shell", "ui", "tests", "a.spec.ts"), status: "passed", assertionResults: [] }] });
   }
 
   private static async createRepositoryAsync(t: TestContext): Promise<RepositoryFixture> {

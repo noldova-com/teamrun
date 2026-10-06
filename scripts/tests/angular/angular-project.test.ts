@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -17,11 +17,29 @@ import AngularProject from "../../angular/angular-project.ts";
 import ProcessResult from "../../processes/process-result.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import NpmCommand from "../../toolchain/npm-command.ts";
+import TotalsException from "../../totals/totals.exception.ts";
 import AngularReportRunnerFixture from "../fixtures/angular-report-runner.fixture.ts";
 import MockPausesFixture from "../fixtures/mock-pauses.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
+
+class CoverageReportRunnerFixture extends AngularReportRunnerFixture {
+  private readonly summary: string;
+
+  public constructor(summary: string) {
+    super(JSON.stringify({ testResults: [] }), [0]);
+
+    this.summary = summary;
+  }
+
+  public override async runAsync(command: string, commandArguments: readonly string[], directory: string, environment?: NodeJS.ProcessEnv): Promise<number | null> {
+    const folder = path.join(directory, "..", "_build", "angular-coverage");
+    await mkdir(folder, { recursive: true });
+    await writeFile(path.join(folder, "coverage-summary.json"), this.summary);
+    return super.runAsync(command, commandArguments, directory, environment);
+  }
+}
 
 class AngularProjectTests {
   private static readonly NPM: string = "/tools/npm/bin/npm-cli.js";
@@ -149,24 +167,38 @@ class AngularProjectTests {
       const repository = await AngularProjectTests.createProjectAsync(t);
       const directory = path.join(repository.directory, "src");
       const report = path.join(repository.directory, "_build", "angular-tests.json");
-      const reporting = new AngularReportRunnerFixture(JSON.stringify({ testResults: [{ name: path.join(directory, "shell", "b.spec.ts") }, { name: path.join(directory, "a.spec.ts") }] }), [0]);
-      await repository.writeAsync({ "_build/angular-tests.json": "stale" });
+      const reporting = new AngularReportRunnerFixture(JSON.stringify({ testResults: [
+        { name: path.join(directory, "shell", "b.spec.ts"), status: "passed", assertionResults: [{ ancestorTitles: ["B"], title: "works", status: "passed" }] },
+        { name: path.join(directory, "a.spec.ts"), status: "passed", assertionResults: [] }
+      ] }), [0]);
+      await repository.writeAsync({ "_build/angular-tests.json": "stale", "_build/angular-coverage/coverage-summary.json": "stale" });
 
       const run = await AngularProjectTests.create(repository, reporting).testAsync();
       const silent = await AngularProjectTests.create(repository, new ProcessRunnerFixture([1])).testAsync();
 
-      assert.deepEqual([run.isSuccessful, run.collected], [true, ["a.spec.ts", "shell/b.spec.ts"]]);
-      assert.deepEqual([silent.isSuccessful, silent.exitCode, silent.collected], [false, 1, null]);
+      assert.deepEqual([run.isSuccessful, run.collected, run.result?.passed, run.coverage], [true, ["a.spec.ts", "shell/b.spec.ts"], 1, null]);
+      assert.deepEqual([silent.isSuccessful, silent.exitCode, silent.collected, silent.result, silent.coverage], [false, 1, null, null, null]);
       assert.deepEqual(reporting.runs, [[process.execPath, directory, path.join(directory, "node_modules", "@angular", "cli", "bin", "ng.js"), "test", "--reporters=default", "--reporters=json", "--output-file", report]]);
       assert.deepEqual(reporting.logs, [path.join(repository.directory, "_build", "angular-tests.log")]);
       assert.equal(AngularProject.LOG_FILE, "_build/angular-tests.log");
+    });
+
+    test("a run takes the statements its coverage covered from the coverage summary, and a summary without them is refused", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const summary = { total: { lines: { total: 9, covered: 9 }, statements: { total: 10, covered: 8, skipped: 0, pct: 80 } } };
+
+      const run = await AngularProjectTests.create(repository, new CoverageReportRunnerFixture(JSON.stringify(summary))).testAsync();
+
+      assert.deepEqual(run.coverage, { unit: "statements", covered: 8, total: 10 });
+      await assert.rejects(AngularProjectTests.create(repository, new CoverageReportRunnerFixture(JSON.stringify({ total: { lines: {} } }))).testAsync(),
+        new TotalsException("_build/angular-coverage/coverage-summary.json, total, statements, is not a JSON object."));
     });
 
     test("tests selected by path run through the CLI's include option, without the coverage gate", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       const directory = path.join(repository.directory, "src");
       const report = path.join(repository.directory, "_build", "angular-tests.json");
-      const reporting = new AngularReportRunnerFixture(JSON.stringify({ testResults: [{ name: path.join(directory, "a.spec.ts") }] }), [0]);
+      const reporting = new AngularReportRunnerFixture(JSON.stringify({ testResults: [{ name: path.join(directory, "a.spec.ts"), status: "passed", assertionResults: [] }] }), [0]);
 
       const run = await AngularProjectTests.create(repository, reporting).testAsync(["a.spec.ts", "shell/b.spec.ts"]);
 
