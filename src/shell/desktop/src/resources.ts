@@ -182,6 +182,17 @@ export class Resources {
   public static readonly windowsIcon: string = "icon-dark.ico";
   public static readonly windowIcon: string = "icon-dark-512.png";
   public static readonly dockIcon: string = "icon-dock-512.png";
+  public static readonly trayFolder: string = "tray";
+  public static readonly trayIconPrefix: string = "tray-";
+  public static readonly trayWindowsExtension: string = ".ico";
+  public static readonly trayMacSuffix: string = "Template.png";
+  public static readonly trayLinuxExtension: string = ".png";
+  public static readonly trayWorkRows: number = 5;
+  public static readonly trayNotificationRows: number = 3;
+  public static readonly trayLabelLimit: number = 60;
+  public static readonly trayEllipsis: string = "…";
+  public static readonly noWorkLabel: string = "No work running";
+  public static readonly doNotDisturbLabel: string = "Do not disturb";
   public static readonly preloadFileName: string = "preload.cjs";
   public static readonly repositoryRootSegments: readonly string[] = ["..", "..", ".."];
   public static readonly windowIndexSegments: readonly string[] = ["_build", "window", "browser", "index.html"];
@@ -413,6 +424,39 @@ export class Resources {
 
   public static formatEventNotForwarded(name: string, reason: string): string {
     return `The runtime's event ${name} could not be passed to the window: ${reason}`;
+  }
+
+  public static get openApplicationLabel(): string {
+    return `Open ${Resources.applicationName}`;
+  }
+
+  public static get quitApplicationLabel(): string {
+    return `Quit ${Resources.applicationName}`;
+  }
+
+  public static formatMoreWork(count: number): string {
+    return `and ${count} more`;
+  }
+
+  public static formatTrayToolTip(running: number, unread: number): string {
+    const parts = [...running > 0 ? [`${running} running`] : [], ...unread > 0 ? [`${unread} unread`] : []];
+    return parts.length === 0 ? Resources.applicationName : `${Resources.applicationName}: ${parts.join(", ")}`;
+  }
+
+  public static formatSettingNotRead(name: string, reason: string): string {
+    return `The setting ${name} could not be read for this device, so the desktop keeps its last value: ${reason}`;
+  }
+
+  public static formatTrayNotShown(reason: string): string {
+    return `The tray icon could not be shown: ${reason}`;
+  }
+
+  public static formatTrayStateNotRead(reason: string): string {
+    return `The tray icon could not read the runtime's work and notifications: ${reason}`;
+  }
+
+  public static formatDoNotDisturbNotSet(reason: string): string {
+    return `Do not disturb could not be changed from the tray: ${reason}`;
   }
 
   public static formatWorkNotRead(reason: string): string {

@@ -17,8 +17,10 @@
         "linux": "noldova/teamrun"
       },
       "dataDirectoryVariable": "TEAMRUN_DATA_DIR",
-      "icons": "assets/icons"
-    }
+      "icons": "assets/icons",
+      "releaseRepository": "noldova-com/teamrun"
+    },
+    "supportedTargets": []
   },
   "private": true,
   "type": "module",

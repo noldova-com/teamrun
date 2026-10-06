@@ -142,12 +142,47 @@ class PackageInstallerTests {
         new ProcessException(`Uninstall Fixture Studio.exe /S _?=${installFolder} failed with exit code 9:\nUninstall Fixture Studio.exe broke`));
       await PackageInstallerTests.installAsync(repository, leaving, "win32", "x64", environment);
       await assert.rejects(PackageInstallerTests.uninstallAsync(repository, leaving, environment),
-        new PackagingException(`The uninstaller left ${["Fixture Studio.exe", "resources", path.join("resources", "app.asar")].join(", ")} in ${installFolder}.`));
+        new PackagingException(`The uninstaller left ${["Fixture Studio.exe", "resources", path.join("resources", "app.asar")].join(", ")} in ${installFolder}.\n`
+          + "What holds them now:\nFixture Studio.exe: process 4 MsMpEng.exe, service WinDefend."));
       await rm(installFolder, { recursive: true, force: true });
       await PackageInstallerTests.installAsync(repository, staying, "win32", "x64", environment);
       const uninstaller = path.join(installFolder, "Uninstall Fixture Studio.exe");
       await assert.rejects(PackageInstallerTests.uninstallAsync(repository, staying, environment), (error: unknown) =>
         error instanceof PackagingException && error.message.startsWith(`The uninstaller ${uninstaller} could not be removed after it ran: `) && error.cause instanceof Error);
+    });
+
+    test("on Windows the files an uninstaller left are given to Windows PowerShell, which reports what holds them and Defender's recent events, and a report that fails says so", async t => {
+      const repository = await PackageInstallerTests.createAsync(t);
+      const reporting = PackageInstallerTests.createRunner(t);
+      const unreadable = PackageInstallerTests.createRunner(t, ["powershell.exe"]);
+      const local = path.join(repository.directory, "local");
+      const installFolder = path.join(local, "Programs", "fixture-studio");
+      const environment = { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS };
+      for (const runner of [reporting, unreadable]) {
+        runner.localAppData = local;
+        runner.uninstallLeaves = ["resources/app.asar", "Fixture Studio.exe"];
+      }
+      const left = `The uninstaller left ${["Fixture Studio.exe", "resources", path.join("resources", "app.asar")].join(", ")} in ${installFolder}.\n`;
+
+      await PackageInstallerTests.installAsync(repository, reporting, "win32", "x64", environment);
+      await assert.rejects(PackageInstallerTests.uninstallAsync(repository, reporting, environment));
+      const [name, ...options] = reporting.calls.at(-1) ?? [];
+      const script = Buffer.from(String(options.at(-1)), "base64").toString("utf16le");
+      await rm(installFolder, { recursive: true, force: true });
+      await PackageInstallerTests.installAsync(repository, unreadable, "win32", "x64", environment);
+
+      assert.equal(name, "powershell.exe");
+      assert.deepEqual(options.slice(0, -1), ["-NoProfile", "-NonInteractive", "-EncodedCommand"]);
+      assert.deepEqual(reporting.installerEnvironments.at(-1), {
+        ...environment,
+        PSModulePath: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\Modules",
+        TEAMRUN_LEFT_FILES: [path.join(installFolder, "Fixture Studio.exe"), path.join(installFolder, "resources", "app.asar")].join("\n")
+      });
+      assert.ok(script.includes("foreach ($file in $env:TEAMRUN_LEFT_FILES.Split([char]10)) {\n"));
+      assert.ok(script.includes("RmGetList(session, out needed, ref count, infos, out reasons);"));
+      assert.ok(script.includes("LogName = 'Microsoft-Windows-Windows Defender/Operational'; StartTime = $since"));
+      await assert.rejects(PackageInstallerTests.uninstallAsync(repository, unreadable, environment),
+        new PackagingException(`${left}What holds them could not be read: powershell.exe exited with 9:\npowershell.exe broke`));
     });
 
     test("on macOS the app is copied out of the disk image, which is then detached by force", async t => {

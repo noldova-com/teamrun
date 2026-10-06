@@ -22,31 +22,33 @@
   --tr-scroll-thumb: var(--tr-scrollbar);
 }
 
-::-webkit-scrollbar {
-  width: var(--tr-scrollbar-size);
-  height: var(--tr-scrollbar-size);
-}
+@media (forced-colors: none) {
+  ::-webkit-scrollbar {
+    width: var(--tr-scrollbar-size);
+    height: var(--tr-scrollbar-size);
+  }
 
-::-webkit-scrollbar-track,
-::-webkit-scrollbar-corner {
-  background-color: transparent;
-}
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background-color: transparent;
+  }
 
-::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
+  ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 
-::-webkit-scrollbar-thumb {
-  --tr-scroll-thumb: inherit;
-  border-radius: var(--tr-scrollbar-size);
-  background-color: transparent;
-  box-shadow: inset 0 0 0 var(--tr-scrollbar-size) var(--tr-scroll-thumb);
-}
+  ::-webkit-scrollbar-thumb {
+    --tr-scroll-thumb: inherit;
+    border-radius: var(--tr-scrollbar-size);
+    background-color: transparent;
+    box-shadow: inset 0 0 0 var(--tr-scrollbar-size) var(--tr-scroll-thumb);
+  }
 
-::-webkit-scrollbar-thumb:active {
-  box-shadow: inset 0 0 0 var(--tr-scrollbar-size) var(--tr-scrollbar-active);
+  ::-webkit-scrollbar-thumb:active {
+    box-shadow: inset 0 0 0 var(--tr-scrollbar-size) var(--tr-scrollbar-active);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

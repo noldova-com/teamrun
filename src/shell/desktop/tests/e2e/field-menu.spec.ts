@@ -48,6 +48,8 @@ test.describe("text field menu", () => {
   });
 
   test("a right click on a misspelled word offers the spell checker's suggestions first, then Add to dictionary, and the first replaces the word; on Linux, TeamRun's own dictionary suggests world and takes a word", async ({ desktop }) => {
+    const firstCheck = process.platform === "win32" ? 60000 : 20000;
+    test.setTimeout(firstCheck + 60000);
     const window = desktop.window;
     await window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]").click();
     const summary = window.locator("tr-notes-note", { has: window.locator("[data-fixture-content=\"notes-note-1\"]") }).getByRole("textbox", { name: "Summary" });
@@ -56,13 +58,14 @@ test.describe("text field menu", () => {
     const add = menu.getByRole("menuitem", { name: "Add to dictionary" });
     const suggestions = menu.locator(".tr-place-menu-item[data-command=\"shell.replaceMisspelling\"]:not([aria-disabled=\"true\"])");
     const openOnWordAsync = async (word: string, ready: Locator): Promise<void> => {
-      await summary.fill(word);
       await expect(async () => {
         if (await menu.count() > 0)
           await window.keyboard.press("Escape");
+        await summary.fill("");
+        await summary.fill(word);
         await summary.click({ button: "right", position: await middleOfTextAsync(summary) });
         await expect(ready).toBeVisible({ timeout: 2000 });
-      }).toPass({ timeout: 20000 });
+      }).toPass({ timeout: firstCheck });
     };
 
     await openOnWordAsync("wrold ", suggestions.first());

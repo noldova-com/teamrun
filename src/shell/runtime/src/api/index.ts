@@ -88,6 +88,7 @@ export { ModuleDatabase } from "../services/database/module-database.js";
 export { ShellDatabase } from "../services/database/shell-database.js";
 export { ShellMigrations } from "../services/database/shell-migrations.js";
 export { SettingsService } from "../services/settings/settings.service.js";
+export { ShellSettings } from "../services/settings/shell-settings.js";
 export { DiagnosticRedactor } from "../services/diagnostics/diagnostic-redactor.js";
 export { LogFile } from "../services/diagnostics/log-file.js";
 export { LogText } from "../services/diagnostics/log-text.js";

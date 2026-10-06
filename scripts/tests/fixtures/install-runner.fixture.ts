@@ -28,6 +28,7 @@ export default class InstallRunnerFixture extends ProcessRunner {
   public uninstallLeaves: readonly string[] = [];
   public uninstallKeepsPath: boolean = false;
   public uninstallerStays: boolean = false;
+  public holders: ProcessResult = new ProcessResult(0, "Fixture Studio.exe: process 4 MsMpEng.exe, service WinDefend.", "");
   public readonly calls: (readonly string[])[] = [];
   public readonly limits: number[] = [];
   public readonly installerEnvironments: (NodeJS.ProcessEnv | undefined)[] = [];
@@ -65,6 +66,8 @@ export default class InstallRunnerFixture extends ProcessRunner {
       return new ProcessResult(9, "", `${name} broke`);
     if (name === "reg.exe")
       return this.answerRegistry();
+    if (name === "powershell.exe")
+      return this.holders;
     if (name === InstallRunnerFixture.UNINSTALLER)
       return this.uninstallAsync();
     if (commandArguments[0] === "--appimage-extract")
