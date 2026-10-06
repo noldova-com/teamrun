@@ -266,6 +266,7 @@ export class Resources {
   }
 
   public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
+  public static readonly settingDescriptionIdPrefix: string = "tr-setting-description-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";

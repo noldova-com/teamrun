@@ -11,14 +11,14 @@ import { ChangeDetectionStrategy, Component, type Signal, type WritableSignal, c
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { type SettingDefinition, SettingKind } from "@noldova/teamrun-shell-protocol";
-import { ButtonComponent, ButtonVariant, CheckboxComponent, ChoicePillsComponent, SelectComponent, SelectOption, TextFieldComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
+import { ButtonComponent, ButtonVariant, CheckboxComponent, ChoicePillsComponent, FieldMessageComponent, SelectComponent, SelectOption, TextFieldComponent, TooltipDirective } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../../resources";
 import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.component";
 
 @Component({
   selector: "tr-setting-row",
-  imports: [ButtonComponent, CheckboxComponent, ChoicePillsComponent, HighlightedTextComponent, SelectComponent, TextFieldComponent, TooltipDirective],
+  imports: [ButtonComponent, CheckboxComponent, ChoicePillsComponent, FieldMessageComponent, HighlightedTextComponent, SelectComponent, TextFieldComponent, TooltipDirective],
   templateUrl: "./setting-row.component.html",
   styleUrl: "./setting-row.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -30,8 +30,11 @@ import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.c
 export class SettingRowComponent {
   private static count: number = 0;
 
+  private readonly index: number = SettingRowComponent.count++;
+
   protected readonly resources: typeof Resources = Resources;
-  protected readonly errorId: string = `${Resources.settingErrorIdPrefix}${SettingRowComponent.count++}`;
+  protected readonly errorId: string = `${Resources.settingErrorIdPrefix}${this.index}`;
+  protected readonly descriptionId: string = `${Resources.settingDescriptionIdPrefix}${this.index}`;
   protected readonly kinds: typeof SettingKind = SettingKind;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
 
@@ -50,6 +53,7 @@ export class SettingRowComponent {
 
   protected readonly current: Signal<JsonValue> = computed(() => this.value() ?? this.definition().defaultValue);
   protected readonly error: WritableSignal<string | null> = linkedSignal<JsonValue, string | null>({ source: this.current, computation: () => null });
+  protected readonly describedBy: Signal<string> = computed(() => Object.isNull(this.error()) ? this.descriptionId : `${this.descriptionId} ${this.errorId}`);
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.definition().type.options.map(t => new SelectOption(t.value, t.title)));
   protected readonly isFew: Signal<boolean> = computed(() => this.options().length >= Resources.choicePillMinimum && this.options().length <= Resources.choicePillLimit);
   protected readonly chosen: Signal<ReadonlySet<string>> = computed(() => {

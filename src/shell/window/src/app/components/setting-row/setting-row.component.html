@@ -19,7 +19,7 @@ LICENSE file in the root directory of this source tree.
 </div>
 <div class="tr-setting-row-name"><tr-highlighted-text [text]="definition().name.text" [query]="query()" [breaksWords]="true" /></div>
 @if (definition().type.kind !== kinds.Boolean) {
-  <div class="tr-setting-row-description"><tr-highlighted-text [text]="definition().description" [query]="query()" /></div>
+  <div class="tr-setting-row-description" [id]="descriptionId"><tr-highlighted-text [text]="definition().description" [query]="query()" /></div>
 }
 <div class="tr-setting-row-control">
   @switch (definition().type.kind) {
@@ -30,26 +30,26 @@ LICENSE file in the root directory of this source tree.
     }
     @case (kinds.Choice) {
       @if (isFew()) {
-        <tr-choice-pills [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+        <tr-choice-pills [label]="definition().title" [describedBy]="describedBy()" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
       } @else {
-        <tr-select [label]="definition().title" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
+        <tr-select [label]="definition().title" [describedBy]="describedBy()" [options]="options()" [value]="asString(current())" (valueChange)="choose($event)" />
       }
     }
     @case (kinds.Number) {
       <input tr-text-field type="number" class="tr-setting-row-number" [attr.aria-label]="definition().title" [min]="definition().type.minimum" [max]="definition().type.maximum"
-        [step]="definition().type.step" [value]="current()" [attr.aria-invalid]="error() ? true : null" [attr.aria-describedby]="error() ? errorId : null"
+        [step]="definition().type.step" [value]="current()" [attr.aria-invalid]="error() ? true : null" [attr.aria-describedby]="describedBy()"
         (change)="commitNumber($event)" (keydown.escape)="revertNumber($event)" />
     }
     @case (kinds.Text) {
-      <input tr-text-field type="text" [attr.aria-label]="definition().title" [attr.maxlength]="definition().type.maxLength" [value]="asString(current())" (change)="commitText($event)" />
+      <input tr-text-field type="text" [attr.aria-label]="definition().title" [attr.aria-describedby]="describedBy()" [attr.maxlength]="definition().type.maxLength" [value]="asString(current())" (change)="commitText($event)" />
     }
     @case (kinds.Action) {
-      <button type="button" tr-button [variant]="secondary" [disabled]="!canRun()" (click)="run.emit()">
+      <button type="button" tr-button [variant]="secondary" [attr.aria-describedby]="describedBy()" [disabled]="!canRun()" (click)="run.emit()">
         <tr-highlighted-text [text]="asString(definition().type.label)" [query]="query()" />
       </button>
     }
     @case (kinds.Modules) {
-      <div class="tr-setting-row-list" role="group" [attr.aria-label]="definition().title">
+      <div class="tr-setting-row-list" role="group" [attr.aria-label]="definition().title" [attr.aria-describedby]="describedBy()">
         @for (module of modules(); track module.value) {
           <tr-checkbox [checked]="chosen().has(module.value) !== isInverse()" (checkedChange)="toggleModule(module.value, $event)">{{ module.title }}</tr-checkbox>
         }
@@ -57,7 +57,7 @@ LICENSE file in the root directory of this source tree.
     }
     @case (kinds.Languages) {
       @if (languages().length > 0) {
-        <div class="tr-setting-row-list" role="group" [attr.aria-label]="definition().title">
+        <div class="tr-setting-row-list" role="group" [attr.aria-label]="definition().title" [attr.aria-describedby]="describedBy()">
           @for (language of languages(); track language.value) {
             <tr-checkbox [checked]="chosen().has(language.value)" (checkedChange)="toggleLanguage(language.value, $event)">{{ language.title }}</tr-checkbox>
           }
@@ -70,5 +70,5 @@ LICENSE file in the root directory of this source tree.
   }
 </div>
 @if (error(); as message) {
-  <div class="tr-setting-row-error" role="alert" [id]="errorId">{{ message }}</div>
+  <tr-field-message [id]="errorId">{{ message }}</tr-field-message>
 }
