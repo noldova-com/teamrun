@@ -9,6 +9,7 @@
 export { BuildRelation } from "../enums/build-relation.js";
 export { DataDirectoryState } from "../enums/data-directory-state.js";
 export { EndpointKind } from "../enums/endpoint-kind.js";
+export { AddonLoadException } from "../exceptions/addon-load.exception.js";
 export { BackupVerificationException } from "../exceptions/backup-verification.exception.js";
 export { BuildMismatchException } from "../exceptions/build-mismatch.exception.js";
 export { ConnectionException } from "../exceptions/connection.exception.js";
@@ -38,6 +39,7 @@ export type { IFolderProtector } from "../interfaces/i-folder-protector.js";
 export type { IIdleParticipant } from "../interfaces/i-idle-participant.js";
 export type { IMethodHandler } from "../interfaces/i-method-handler.js";
 export type { IProcessStarter } from "../interfaces/i-process-starter.js";
+export type { IWindowsProcessApi } from "../interfaces/i-windows-process-api.js";
 export type { IRuntimeClientListener } from "../interfaces/i-runtime-client-listener.js";
 export type { IRuntimeDiscoveryJson } from "../interfaces/i-runtime-discovery-json.js";
 export type { IModuleDatabase } from "../interfaces/i-module-database.js";

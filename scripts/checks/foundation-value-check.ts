@@ -22,7 +22,7 @@ import type ICheck from "./interfaces/i-check.ts";
 export default class FoundationValueCheck implements ICheck {
   private static readonly CORE: string = "@noldova/teamrun-foundation-core";
   private static readonly EXTENSIONS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-    ["Object", new Set(["isUndefined", "isNull", "isNullOrUndefined", "isString", "isNumber", "isBoolean", "isObject", "isFunction"])],
+    ["Object", new Set(["isUndefined", "isNull", "isNullOrUndefined", "isString", "isNumber", "isBigInt", "isBoolean", "isObject", "isFunction"])],
     ["String", new Set(["empty", "isNullOrEmpty", "isNullOrWhitespace"])]
   ]);
   private static readonly SOURCE_FOLDER: string = "src";

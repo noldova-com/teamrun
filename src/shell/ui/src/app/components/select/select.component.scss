@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "states";
 
 :host {
@@ -40,6 +41,8 @@
 .tr-select-button[aria-expanded="true"] {
   border-color: var(--tr-accent);
   outline: none;
+
+  @include forced-focus;
 }
 
 .tr-select-button:disabled {
@@ -88,10 +91,14 @@
 
 .tr-select-option#{states.$hover} {
   background-color: var(--tr-hover);
+
+  @include forced-hover;
 }
 
 .tr-select-option[aria-selected="true"],
 .tr-select-option.cdk-option-active {
   background-color: var(--tr-list-active);
   color: var(--tr-list-active-text);
+
+  @include forced-selected;
 }

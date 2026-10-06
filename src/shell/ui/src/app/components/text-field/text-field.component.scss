@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "states";
 
 :host {
@@ -34,6 +35,8 @@
 :host(#{states.$focus}) {
   border-color: var(--tr-accent);
   outline: none;
+
+  @include forced-focus;
 }
 
 :host([aria-invalid="true"]) {

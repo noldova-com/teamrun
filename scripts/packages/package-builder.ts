@@ -19,6 +19,7 @@ import type PackageManifest from "./package-manifest.ts";
 import type PackageVersions from "./package-versions.ts";
 import PackageException from "./package.exception.ts";
 import type RootManifest from "./root-manifest.ts";
+import type WindowsAddonBuilder from "./windows-addon-builder.ts";
 
 export default class PackageBuilder {
   private static readonly COMPILE_TIMEOUT: number = 300_000;
@@ -44,13 +45,15 @@ export default class PackageBuilder {
   private readonly versions: PackageVersions;
   private readonly runner: ProcessRunner;
   private readonly npm: NpmCommand;
+  private readonly addons: WindowsAddonBuilder;
 
-  public constructor(layout: BuildLayout, rootManifest: RootManifest, versions: PackageVersions, runner: ProcessRunner, npm: NpmCommand) {
+  public constructor(layout: BuildLayout, rootManifest: RootManifest, versions: PackageVersions, runner: ProcessRunner, npm: NpmCommand, addons: WindowsAddonBuilder) {
     this.layout = layout;
     this.rootManifest = rootManifest;
     this.versions = versions;
     this.runner = runner;
     this.npm = npm;
+    this.addons = addons;
   }
 
   public async buildSourceAsync(manifest: PackageManifest, archives: readonly string[]): Promise<void> {
@@ -68,6 +71,7 @@ export default class PackageBuilder {
     await copyFile(path.join(this.layout.root, PackageBuilder.LICENSE_FILE), path.join(output, PackageBuilder.LICENSE_FILE));
     await mkdir(path.join(output, ...PackageBuilder.DECLARATIONS.slice(0, -1)), { recursive: true });
     await copyFile(declarations, path.join(output, ...PackageBuilder.DECLARATIONS));
+    await this.addons.buildAsync(manifest, output);
 
     await mkdir(this.layout.archivesFolder, { recursive: true });
     PackageBuilder.require(await this.npm.runAsync([...PackageBuilder.PACK_ARGUMENTS, this.layout.archivesFolder], output), `Packing ${manifest.name}`);

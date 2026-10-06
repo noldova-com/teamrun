@@ -12,7 +12,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { ProcessSupervisorFixture } from "../fixtures/process-supervisor.fixture.js";
 import { SettingsFixture } from "../fixtures/settings.fixture.js";
 import { SimulatedProcessesFixture } from "../fixtures/simulated-processes.fixture.js";
-import { SystemCommandFixture } from "../fixtures/system-command.fixture.js";
+import { WindowsProcessApiFixture } from "../fixtures/windows-process-api.fixture.js";
 
 @TestClass
 export class ProcessKillingTests {
@@ -22,22 +22,22 @@ export class ProcessKillingTests {
     using simulated = new SimulatedProcessesFixture();
     const clock = ProcessSupervisorFixture.WINDOWS;
     const now = clock.now();
-    settings.database.run(ProcessSupervisorFixture.INSERT, "notes", 900_821, "tool", "C:\\Tools\\tool.exe", clock.boot, now, now, now, clock.offset());
+    settings.database.run(ProcessSupervisorFixture.INSERT, "notes", 900_821, "tool", "C:\\Tools\\tool.exe", clock.boot, now - 10_000, now - 10_000, now - 1_000, clock.offset());
     for (const processId of [900_821, 900_822, 900_823, 900_824, 900_825])
       simulated.add(processId, 0);
-    simulated.replace(900_822);
     simulated.fail(900_823, "SIGKILL", Object.assign(new Error("kill EPERM"), { code: "EPERM" }));
-    const command = new SystemCommandFixture([[
-      `900821\t1\t${now}\tC:\\Tools\\tool.exe`,
-      `900822\t900821\t${now + 1}\tC:\\Tools\\child.exe`,
-      `900823\t900821\t${now + 2}\tC:\\Tools\\child.exe`,
-      `900824\t900821\t${now + 3}\tC:\\Tools\\child.exe`
-    ].join("\n"), t => simulated.answerKillsAsync(t, [
-      `900822\t4\t${now + 3}\tC:\\Other\\holder.exe`,
-      `900825\t900822\t${now + 4}\tC:\\Other\\child.exe`,
-      `900823\t900821\t${now + 2}\tC:\\Tools\\child.exe`
-    ].join("\n"))]);
-    const processes = ProcessSupervisorFixture.createWindows(settings, { SystemRoot: ProcessSupervisorFixture.SYSTEM_ROOT }, command);
+    const windows = new WindowsProcessApiFixture([[
+      `900821\t1\t${now - 10_000}\tC:\\Tools\\tool.exe`,
+      `900822\t900821\t${now - 9_999}\tC:\\Tools\\child.exe`,
+      `900823\t900821\t${now - 9_998}\tC:\\Tools\\child.exe`,
+      `900824\t900821\t${now - 9_997}\tC:\\Tools\\child.exe`
+    ].join("\n"), [
+      `900822\t4\t${now - 9_997}\tC:\\Other\\holder.exe`,
+      `900825\t900822\t${now - 9_996}\tC:\\Other\\child.exe`,
+      `900823\t900821\t${now - 9_998}\tC:\\Tools\\child.exe`
+    ].join("\n")]);
+    windows.replaced.set(900_822, WindowsProcessApiFixture.END);
+    const processes = ProcessSupervisorFixture.createWindows(settings, windows);
 
     await processes.cleanUpAsync();
 
@@ -47,6 +47,7 @@ export class ProcessKillingTests {
       "The module notes's program tool (process 900821): An earlier runtime left processes 900821, 900824 running, so they were ended.\n" +
       "The module notes's program tool (process 900821): Processes 900823 were still running after they were ended forcefully.\n",
       settings.diagnostics.text);
+    Assert.areEqual(0, windows.openHandles);
     Assert.areEqual(0, settings.database.readAll(ProcessSupervisorFixture.RECORDS).length);
   }
 }
