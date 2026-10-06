@@ -1115,7 +1115,8 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   - **States:** up to date, checking, downloading with its progress as a whole percentage, ready and failed, and on macOS outside an Applications folder, available.
     An available, downloading or ready update names its version, and only an available or failed one says TeamRun must move to Applications, an available one always; the window refuses any other state.
   - **Status bar:** the update item shows only while an update is ready or failed, or on macOS outside an Applications folder while a newer version is available.
-  - **Notifications:** the shell's notification kind `shell.updateReady`, posted once per version when its update is ready, restarts to install it.
+  - **Notifications:** the shell's notification kind `shell.updateReady` restarts to install the update.
+    The desktop posts it once per version, when that version first becomes ready, and records that it did with the ready version, so neither a restart nor another window posts it again.
   - **Commands:** `shell.checkForUpdates` and `shell.restartToUpdate`, each applying only in its state, are in command search.
     Check for updates is also in Help, or on macOS in the application menu after About.
   - **About:** Settings' About page shows the version and the update's state with its action, and says why a build that cannot update doesn't.
