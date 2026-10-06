@@ -2157,6 +2157,12 @@ export interface IElectron {
  */
 export declare class DeviceIdentityException extends Exception {
   /**
+   * The exception's name, `"DeviceIdentityException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong with the file.
@@ -3500,6 +3506,12 @@ export declare class PathCommand {
  */
 export declare class PathCommandException extends Exception {
   /**
+   * The exception's name, `"PathCommandException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What went wrong.
@@ -3518,6 +3530,12 @@ export declare class PathCommandException extends Exception {
  * The exception thrown when a window's state cannot be read or kept through the runtime.
  */
 export declare class WindowStateException extends Exception {
+  /**
+   * The exception's name, `"WindowStateException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -3538,6 +3556,12 @@ export declare class WindowStateException extends Exception {
  * has no connection, or the connection failed. A refusal from the runtime is a {@link WindowStateException} instead.
  */
 export declare class WindowStateUnavailableException extends WindowStateException {
+  /**
+   * The exception's name, `"WindowStateUnavailableException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
