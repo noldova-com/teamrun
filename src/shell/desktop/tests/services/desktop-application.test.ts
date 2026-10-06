@@ -665,6 +665,32 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async restoresTheSavedBoundsTheNextTimeTheRuntimeIsReadyWhenTheConnectionEndsDuringTheRead(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    first.deferred.set("shell.readWindowBounds", () => {
+      first.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const second = new FakeRuntimeConnection();
+    second.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const reconnection = Promise.withResolvers<FakeRuntimeConnection>();
+    const launcher = new FakeRuntimeLauncher(first, reconnection.promise);
+    const process = new FakeDesktopProcess("linux");
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+    launcher.listener?.onDisconnected(null);
+    reconnection.resolve(second);
+    await Condition.waitAsync(() => window.calls.some(t => t.startsWith("setBounds")));
+
+    Assert.areEqual(JSON.stringify(["show", "setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}"]), JSON.stringify(window.calls));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's saved bounds").length);
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
+  }
+
+  @TestMethod
   public async readsTheDeviceIdentityFromTheFolderItIsGivenOrTheOperatingSystemsOne(): Promise<void> {
     const given = new FakeDeviceIdentity();
     const located = new FakeDeviceIdentity();
@@ -1156,6 +1182,41 @@ export class DesktopApplicationTests {
     Assert.areEqual(
       JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }),
       JSON.stringify(connection.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+  }
+
+  @TestMethod
+  public async writesWhereThePersonPlacedAWindowToTheNextConnectionWhenTheFirstClosesDuringTheRestore(): Promise<void> {
+    const first = new FakeRuntimeConnection();
+    first.deferred.set("shell.writeWindowBounds", () => {
+      first.isClosed = true;
+      return Promise.reject(new ConnectionException("The connection to the runtime is closed."));
+    });
+    const second = new FakeRuntimeConnection();
+    second.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: false });
+    const connections = [Promise.withResolvers<FakeRuntimeConnection>(), Promise.withResolvers<FakeRuntimeConnection>()];
+    const launcher = new FakeRuntimeLauncher(...connections.map(t => t.promise));
+    const process = new FakeDesktopProcess("win32");
+    const electron = await DesktopStartFixture.startReadyAsync("win32", launcher, new FakeElectron(), new FakeDeviceIdentity(), process);
+    const window = DesktopStartFixture.firstWindow(electron);
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("win32"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+
+    window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+    window.change("will-move");
+    connections[0]?.resolve(first);
+    await Condition.waitAsync(() => first.calls.includes("shell.writeWindowBounds"));
+    await setImmediate();
+    launcher.listener?.onDisconnected(null);
+    connections[1]?.resolve(second);
+    await Condition.waitAsync(() => second.calls.includes("shell.writeWindowBounds"));
+
+    Assert.areEqual(JSON.stringify(["show"]), JSON.stringify(window.calls));
+    Assert.isFalse(second.calls.includes("shell.readWindowBounds"));
+    Assert.areEqual(
+      JSON.stringify({ x: 40, y: 60, width: 900, height: 640, maximized: false }),
+      JSON.stringify(second.states.get(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`)));
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's saved bounds").length);
+    Assert.areEqual(0, DesktopStartFixture.readErrors(process, "The window's bounds").length);
   }
 
   @TestMethod

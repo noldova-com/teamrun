@@ -674,10 +674,10 @@ export declare class RuntimeHandover {
 }
 
 /**
- * The payload of `shell.stop`, which asks a runtime to stop. Its form with
- * only `policy` never changes after protocol version 1, so any build can
- * stop any earlier one; `keepsWhileShared` is sent only to a runtime of the
- * client's own build.
+ * The payload of `shell.stop`, which asks a runtime to stop. Its wire form
+ * never changes after protocol version 1: every build reads and writes the
+ * form with only `policy`, so any build can stop any earlier one, and a
+ * client sends `keepsWhileShared` only to a runtime of its own build.
  */
 export declare class StopRequest {
   /**

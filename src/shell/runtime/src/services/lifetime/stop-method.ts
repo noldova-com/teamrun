@@ -28,9 +28,11 @@ export class StopMethod implements IMethodHandler {
 
   public handleAsync(context: RequestContext): Promise<JsonValue> {
     const request = StopRequest.fromJson(context.payload);
-    const others = this.countOthers(context);
-    if (request.keepsWhileShared && others > 0)
-      return Promise.resolve(new KeptRuntime(others).toJson());
+    if (request.keepsWhileShared) {
+      const others = this.countOthers(context);
+      if (others > 0)
+        return Promise.resolve(new KeptRuntime(others).toJson());
+    }
     if (request.policy === StopPolicy.IfIdle && !this.work.isEmpty)
       return Promise.reject(new MethodFailureException(new Failure(FailureCode.Conflict, Resources.workInProgress, new RunningWork(this.work.descriptions).toJson())));
 
