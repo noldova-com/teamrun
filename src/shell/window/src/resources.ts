@@ -610,6 +610,7 @@ export class Resources {
   public static readonly windowPartActivationFailed: string = "Its window part failed to activate.";
   public static readonly windowPartReconnectionFailed: string = "Its window part failed to continue after the runtime started again.";
   public static readonly windowPartSaveFailed: string = `Its window part failed to save while ${productName} was closing.`;
+  public static readonly windowPartSaveFailedLate: string = `Its window part failed to save after ${productName} stopped waiting for it.`;
   public static readonly windowPartSaveUnfinished: string = `Its window part did not finish saving within 4 seconds while ${productName} was closing; ${productName} closed without it.`;
   public static readonly partSaveTimeout: number = 4000;
   public static readonly partSaveUnfinishedText: string = `${productName} closed after waiting 4 seconds for it.`;

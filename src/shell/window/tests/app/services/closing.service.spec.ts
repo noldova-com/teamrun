@@ -130,15 +130,33 @@ describe("ClosingService", () => {
     const isSettled = await Promise.race([saving.then(() => true), Promise.resolve(false)]);
     await vi.advanceTimersByTimeAsync(1);
     const canClose = await saving;
-    failDrafts(new Error("Too late."));
-    await Promise.resolve();
+    const errorsBefore = [...errors];
+    const late = new Error("Too late.");
+    failDrafts(late);
+    await vi.advanceTimersByTimeAsync(0);
 
-    expect([isSettled, canClose, errors]).toEqual([false, true, []]);
+    expect([isSettled, canClose, errorsBefore]).toEqual([false, true, []]);
+    expect(errors.map(t => t instanceof WindowPartFailureException ? [t.moduleId, t.message, t.cause] : t))
+      .toEqual([["drafts", "Its window part failed to save after TeamRun stopped waiting for it.", late]]);
     const unfinished = (moduleId: string, title: string): unknown => new NotificationPost(
       ShellNotifications.saveUnfinished, moduleId, title, "TeamRun closed after waiting 4 seconds for it.", NotificationSeverity.Warning, null, [], null).toJson();
     expect(posts()).toEqual([unfinished("notes", "Notes didn't finish saving"), unfinished("drafts", "Drafts didn't finish saving")]);
     const logged = "Its window part did not finish saving within 4 seconds while TeamRun was closing; TeamRun closed without it.";
     expect(bridge.errorsLogged).toEqual([["notes", logged], ["drafts", logged]]);
+  });
+
+  it("answers from the saves alone, without waiting for the notifications it posts", async () => {
+    vi.useFakeTimers();
+    bridge.responses.set("shell.postNotification", new Promise(() => undefined));
+    saves.set("notes", [() => Promise.reject(new Error("The disk is full."))]);
+    saves.set("tasks", [() => new Promise<void>(() => undefined)]);
+
+    const saving = TestBed.inject(ClosingService).saveAsync();
+    await vi.advanceTimersByTimeAsync(4000);
+    const answer = await Promise.race([saving, Promise.resolve("waiting")]);
+
+    expect(answer).toBe(false);
+    expect(posts().length).toBe(2);
   });
 
   it("logs a failed layout save and a notification the runtime refuses, and still lets TeamRun close", async () => {
@@ -153,6 +171,7 @@ describe("ClosingService", () => {
     await vi.advanceTimersByTimeAsync(4000);
 
     expect(await saving).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
     expect(errors.length).toBe(2);
     expect(errors[0]).toBe(layoutFailure);
     expect((errors[1] as Error).message).toBe("TeamRun is not connected to its runtime.");

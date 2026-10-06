@@ -47,16 +47,18 @@ export class ClosingService {
       timer = setTimeout(() => resolve(false), Resources.partSaveTimeout);
     });
     const name = this.statuses.nameOf(moduleId);
+    const saving = Promise.all(saves.map(t => ClosingService.runAsync(t)));
     try {
-      if (await Promise.race([Promise.all(saves.map(t => ClosingService.runAsync(t))).then(() => true), unfinished]))
+      if (await Promise.race([saving.then(() => true), unfinished]))
         return true;
+      saving.catch((error: unknown) => this.errors.handleError(new WindowPartFailureException(moduleId, Resources.windowPartSaveFailedLate, error)));
       this.bridge.logError(moduleId, Resources.windowPartSaveUnfinished);
-      await this.postAsync(ShellNotifications.saveUnfinished, moduleId, Resources.formatPartSaveUnfinished(name), Resources.partSaveUnfinishedText, NotificationSeverity.Warning);
+      this.post(ShellNotifications.saveUnfinished, moduleId, Resources.formatPartSaveUnfinished(name), Resources.partSaveUnfinishedText, NotificationSeverity.Warning);
       return true;
     }
     catch (error) {
       this.errors.handleError(new WindowPartFailureException(moduleId, Resources.windowPartSaveFailed, error));
-      await this.postAsync(ShellNotifications.saveFailed, moduleId, Resources.formatPartSaveFailed(name), error instanceof Error ? error.message : String(error), NotificationSeverity.Error);
+      this.post(ShellNotifications.saveFailed, moduleId, Resources.formatPartSaveFailed(name), error instanceof Error ? error.message : String(error), NotificationSeverity.Error);
       return false;
     }
     finally {
@@ -64,13 +66,9 @@ export class ClosingService {
     }
   }
 
-  private async postAsync(kind: QualifiedName, moduleId: string, title: string, text: string, severity: NotificationSeverity): Promise<void> {
-    try {
-      await this.bridge.requestAsync(ShellMethods.postNotification.text, new NotificationPost(kind, moduleId, title, text, severity, null, [], null).toJson());
-    }
-    catch (error) {
-      this.errors.handleError(error);
-    }
+  private post(kind: QualifiedName, moduleId: string, title: string, text: string, severity: NotificationSeverity): void {
+    this.bridge.requestAsync(ShellMethods.postNotification.text, new NotificationPost(kind, moduleId, title, text, severity, null, [], null).toJson())
+      .catch((error: unknown) => this.errors.handleError(error));
   }
 
   private static async runAsync(save: () => Promise<void>): Promise<void> {
