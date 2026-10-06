@@ -413,8 +413,7 @@ A chosen language that no longer ships is dropped at the next change.
 `[]` checks in the operating system's languages that ship; when none of them ships, the first shipped language is used and the row says which.
 On macOS the system chooses the languages.
 
-About shows TeamRun's name, version, platform and processor and the update's state with its action (section 10), then its Updates group, which holds Check for updates automatically, `shell.updateChecks`, a device setting, on by default.
-It only checks; downloading always waits for the person.
+About shows TeamRun's name, version, platform and processor and the update's state with its action (section 10), then its Updates group, which holds Check for updates, `shell.updateChecks`, a device setting whose choices are Automatically, the default, Only at start and Only when I ask.
 
 ### Setting scopes
 
@@ -439,7 +438,7 @@ Showing TeamRun's icon in the tray, `shell.trayIcon`, is a device setting whose 
 
 A module declares its notification kinds in `contributes.notifications`.
 A part posts a notification of one of them through its context and gets a handle that updates or dismisses it.
-The shell posts kinds of its own: `shell.saveFailed` and `shell.saveUnfinished` (section 9), which offer no command, and `shell.updateAvailable` and `shell.updateReady` (section 10), which run the shell's commands to download the update and to restart to install it.
+The shell posts kinds of its own: `shell.saveFailed` and `shell.saveUnfinished` (section 9), which offer no command, and `shell.updateReady` (section 10), which runs the shell's command to restart to install the update.
 They belong to no module, and turning modules' notifications off never mutes them.
 
 - Its commands, the one opening it runs and those of its actions, are the module's own or a dependency's.
@@ -1066,8 +1065,9 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   Only a version higher than the installed one is offered.
   The same version, a lower one or a version with a prerelease suffix leaves TeamRun up to date.
 - **Checks.**
-  The desktop checks 30 seconds after it starts, then every 4 hours while it runs, and whenever the person runs Check for updates.
-  The automatic checks follow the device setting `shell.updateChecks`, on by default, and are skipped while a download runs or an update is ready.
+  The device setting `shell.updateChecks` chooses when the desktop checks by itself: Automatically, the default, 30 seconds after it starts and then every hour while it runs; Only at start, once, 30 seconds after it starts; or Only when I ask, never.
+  The person can always run Check for updates.
+  The desktop's own checks are skipped while a download runs or an update is ready.
   A failed automatic check shows only in About and the log, and the next one runs at its time; a failed check the person asked for shows as a failure.
 - **Validation.**
   Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
@@ -1075,8 +1075,11 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, and no other.
   A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher.
   Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
+- **Downloading.**
+  A newer version a check finds downloads in the background at once, and only About shows its progress.
+  A failed download shows its reason and can be tried again.
 - **The person decides.**
-  Downloading and restarting to install are explicit actions; downloading can be cancelled.
+  Restarting to install is the person's choice, Restart to update.
   Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed or a newer one replaces it.
 - **Restart to update.**
   Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.
@@ -1086,10 +1089,10 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
   Outside one, the desktop still checks but downloads and installs nothing: About says to move TeamRun to Applications, and so does the update item while a newer version is available.
 - **What the person sees.**
-  - **States:** up to date, checking, available, downloading with its progress, ready and failed.
-  - **Status bar:** the update item shows only while there is something to act on.
-  - **Notifications:** the shell's notification kinds `shell.updateAvailable` and `shell.updateReady`, each posted once per version, download the update and restart to install it.
-  - **Commands:** `shell.checkForUpdates`, `shell.downloadUpdate` and `shell.restartToUpdate`, each applying only in its state, are in command search.
+  - **States:** up to date, checking, downloading with its progress, ready and failed, and on macOS outside an Applications folder, available.
+  - **Status bar:** the update item shows only while an update is ready or failed, or on macOS outside an Applications folder while a newer version is available.
+  - **Notifications:** the shell's notification kind `shell.updateReady`, posted once per version when its update is ready, restarts to install it.
+  - **Commands:** `shell.checkForUpdates` and `shell.restartToUpdate`, each applying only in its state, are in command search.
     Check for updates is also in Help, or on macOS in the application menu after About.
   - **About:** Settings' About page shows the version and the update's state with its action, and says why a build that cannot update doesn't.
 
