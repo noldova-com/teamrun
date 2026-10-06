@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import { JsonException, JsonReader } from "@noldova/teamrun-foundation-json";
 import { KeyChord } from "@noldova/teamrun-shell-protocol";
 

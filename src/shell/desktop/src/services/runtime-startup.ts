@@ -185,7 +185,7 @@ export class RuntimeStartup {
     this.connectionValue = null;
     this.unstableEnds = this.now() - this.readyAt < Resources.stableConnectionPeriod ? this.unstableEnds + 1 : 1;
     const delay = Resources.reconnectionDelays[this.unstableEnds - 1];
-    if (delay === undefined)
+    if (Object.isUndefined(delay))
       return this.stopReconnecting(failure);
     if (!Object.isNull(failure))
       this.log(Resources.formatConnectionEnded(failure.code, failure.message));

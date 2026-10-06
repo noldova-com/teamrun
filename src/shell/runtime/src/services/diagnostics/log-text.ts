@@ -6,10 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
+
 import { Resources } from "../../resources.js";
 
 export class LogText {
   public static lines(text: string): readonly string[] {
-    return text.trimEnd().split(Resources.logLineBreakPattern).map(t => t.replace(Resources.logControlPattern, ""));
+    return text.trimEnd().split(Resources.logLineBreakPattern).map(t => t.replace(Resources.logControlPattern, String.empty));
   }
 }
