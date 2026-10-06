@@ -29,7 +29,7 @@ export default class BuildMatrix {
   public readonly uiDeferred: readonly BuildTarget[];
 
   public constructor(eventName: string | undefined) {
-    this.isPullRequest = eventName === GitHubEvent.PULL_REQUEST;
+    this.isPullRequest = eventName !== undefined && GitHubEvent.PULL_REQUEST_LEVEL.includes(eventName);
     this.targets = BuildMatrix.TARGETS.filter(t => !this.isPullRequest || t.runsOnPullRequests);
     this.deferred = BuildMatrix.TARGETS.filter(t => !this.targets.includes(t));
     this.uiTargets = this.targets.filter(t => eventName !== GitHubEvent.PUSH || t.runsUiOnPushes);

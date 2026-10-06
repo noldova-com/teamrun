@@ -31,7 +31,7 @@ export default class ChangeClassifier {
     "scripts/ui-summary.ts",
     "scripts/watch-pull-requests.ts"
   ];
-  private static readonly MANUAL_RUN: string = "Events other than pull requests verify everything.";
+  private static readonly MANUAL_RUN: string = "Events other than pull requests and merge groups verify everything.";
   private static readonly PUSH: string = "A push to main verifies everything.";
   private static readonly HISTORY_UNAVAILABLE: string = "The revisions to compare are unavailable.";
   private static readonly EMPTY_COMPARISON: string = "The comparison found no changed files.";
@@ -62,7 +62,7 @@ export default class ChangeClassifier {
   public async classifyAsync(eventName?: string, baseRevision?: string, headRevision?: string): Promise<VerificationScope> {
     if (eventName === GitHubEvent.PUSH)
       return new VerificationScope(true, true, ChangeClassifier.PUSH);
-    if (eventName !== GitHubEvent.PULL_REQUEST)
+    if (eventName === undefined || !GitHubEvent.PULL_REQUEST_LEVEL.includes(eventName))
       return new VerificationScope(true, true, ChangeClassifier.MANUAL_RUN);
     if (baseRevision === undefined || headRevision === undefined || !await this.existsAsync(baseRevision) || !await this.existsAsync(headRevision))
       return new VerificationScope(true, true, ChangeClassifier.HISTORY_UNAVAILABLE);
