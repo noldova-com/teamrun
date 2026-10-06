@@ -12,7 +12,7 @@ import type { Writable } from "node:stream";
 
 import ProcessRunner from "../processes/process-runner.ts";
 import DevelopmentBinary from "./development-binary.ts";
-import SandboxHelper from "./sandbox-helper.ts";
+import SandboxValidator from "./sandbox.validator.ts";
 import TeamRunCommand from "./teamrun.ts";
 
 export default class Start {
@@ -22,9 +22,9 @@ export default class Start {
   private readonly root: string;
   private readonly runner: ProcessRunner;
   private readonly binary: DevelopmentBinary;
-  private readonly sandbox: SandboxHelper;
+  private readonly sandbox: SandboxValidator;
 
-  public constructor(root: string, runner: ProcessRunner, binary: DevelopmentBinary, sandbox: SandboxHelper) {
+  public constructor(root: string, runner: ProcessRunner, binary: DevelopmentBinary, sandbox: SandboxValidator) {
     this.root = root;
     this.runner = runner;
     this.binary = binary;
@@ -47,6 +47,6 @@ export default class Start {
 if (import.meta.main) {
   const root = realpathSync(process.cwd());
   const runner = new ProcessRunner();
-  const sandbox = new SandboxHelper(process.platform, SandboxHelper.readOptionalTextAsync, SandboxHelper.statOptionalAsync);
+  const sandbox = new SandboxValidator(process.platform, SandboxValidator.readOptionalTextAsync, SandboxValidator.statOptionalAsync);
   process.exitCode = await new Start(root, runner, new DevelopmentBinary(root, runner), sandbox).runAsync(process.argv.slice(2), process.env, process.stdout);
 }

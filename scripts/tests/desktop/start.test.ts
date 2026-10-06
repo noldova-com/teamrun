@@ -13,7 +13,7 @@ import { copyFile, mkdir, readFile, symlink } from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-import SandboxHelper from "../../desktop/sandbox-helper.ts";
+import SandboxValidator from "../../desktop/sandbox.validator.ts";
 import Start from "../../desktop/start.ts";
 import PreparedBinaryFixture from "../fixtures/prepared-binary.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
@@ -99,8 +99,8 @@ class StartTests {
     });
   }
 
-  private static createSandbox(platform: string, mode: number): SandboxHelper {
-    return new SandboxHelper(platform, async t => t === StartTests.RESTRICTION ? "1\n" : null, async () => ({ uid: 1000, mode }));
+  private static createSandbox(platform: string, mode: number): SandboxValidator {
+    return new SandboxValidator(platform, async t => t === StartTests.RESTRICTION ? "1\n" : null, async () => ({ uid: 1000, mode }));
   }
 }
 

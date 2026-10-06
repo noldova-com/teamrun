@@ -11,7 +11,7 @@ import { ChangeDetectionStrategy, Component, effect, inject, input } from "@angu
 
 @Component({
   selector: "button[tr-menu-bar-item]",
-  template: "{{ label() }}",
+  templateUrl: "./menu-bar-item.component.html",
   styleUrl: "./menu-bar-item.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   hostDirectives: [{ directive: CdkMenuItem, inputs: ["cdkMenuItemDisabled: disabled"], outputs: ["cdkMenuItemTriggered: triggered"] }],
