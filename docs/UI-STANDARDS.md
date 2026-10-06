@@ -78,7 +78,7 @@ The table specifies normal-state colors. Check actual composited foreground/back
 | `--tr-scrollbar` | `scrollbarSlider.background` | #64646466 | #79797966 | Scrollbar thumb; adjust when needed for visibility |
 | `--tr-scrollbar-active` | `scrollbarSlider.hoverBackground`, fallback `scrollbarSlider.background` | #646464B3 | #646464B3 | Scrollbar thumb while dragged |
 | `--tr-title-bar`, `--tr-title-bar-text` | `titleBar.activeBackground`, `titleBar.activeForeground` | #F8F8F8, #1E1E1E | #181818, #CCCCCC | Native title-bar integration |
-| `--tr-input`, `--tr-input-border`, `--tr-input-text`, `--tr-placeholder` | `input.*`, with contrast-checked border fallback | #FFFFFF, #858585, #3B3B3B, #767676 | #313131, #858585, #CCCCCC, #989898 | Fields and selects; placeholders are not substitutes for labels |
+| `--tr-input`, `--tr-input-border`, `--tr-input-text`, `--tr-placeholder` | `input.*`, with contrast-checked border fallback | #FFFFFF, #858585, #3B3B3B, #767676 | #313131, #858585, #CCCCCC, #9A9A9A | Fields and selects; placeholders are not substitutes for labels |
 | `--tr-button`, `--tr-button-text`, `--tr-button-hover` | `button.*` | #005FB8, #FFFFFF, #0258A8 | #0078D4, #FFFFFF, #026EC1 | Primary button and the chosen docking guide |
 | `--tr-button-secondary`, `--tr-button-secondary-text`, `--tr-button-secondary-hover` | `button.secondary*` | #E5E5E5, #3B3B3B, #CCCCCC | transparent, #CCCCCC, #2B2B2B | Secondary button |
 | `--tr-dropdown`, `--tr-dropdown-border`, `--tr-dropdown-list` | `dropdown.*`, fallback `input.*` | #FFFFFF, #858585, #FFFFFF | #313131, #858585, #1F1F1F | Select and options list |
