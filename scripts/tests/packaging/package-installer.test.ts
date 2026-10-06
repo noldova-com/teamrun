@@ -7,6 +7,7 @@
  */
 
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
@@ -29,7 +30,7 @@ class PackageInstallerTests {
   private static readonly DISTRIBUTION: readonly string[] = ["electron.exe", "ffmpeg.dll", "libEGL.DLL", "LICENSE"];
 
   public static register(): void {
-    test("on Windows the installer runs silently for the user, and the program installed under LOCALAPPDATA is used", async t => {
+    test("on Windows the installer runs silently for the user, and the program installed under LOCALAPPDATA and the command in its bin folder are used", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
       const runner = PackageInstallerTests.createRunner(t);
       runner.localAppData = path.join(repository.directory, "local");
@@ -39,7 +40,8 @@ class PackageInstallerTests {
       const program = path.join(repository.directory, "local", "Programs", "fixture-studio", "Fixture Studio.exe");
       assert.deepEqual(runner.calls, [["Fixture Studio-windows-x64.exe", "/S"]]);
       assert.deepEqual(runner.limits, [PackageInstallerTests.LIMIT]);
-      assert.deepEqual([installed.desktop, installed.program, installed.resources], [program, program, path.join(path.dirname(program), "resources")]);
+      assert.deepEqual([installed.desktop, installed.program, installed.resources, installed.command],
+        [program, program, path.join(path.dirname(program), "resources"), path.join(path.dirname(program), "bin", "fixture-studio.cmd")]);
     });
 
     test("on Windows the installer's PSModulePath, however it is spelled, starts with Windows PowerShell's own modules, and every other variable is kept", async t => {
@@ -56,7 +58,7 @@ class PackageInstallerTests {
       assert.deepEqual(runner.installerEnvironments, [`${modules};C:\\Modules\\az`, `${modules};C:\\Modules\\az`, modules].map(t => ({ ...environment, PSModulePath: t })));
     });
 
-    test("on Windows a missing LOCALAPPDATA or SystemRoot stops before the installer runs, and an installer that leaves out the program or any of Electron's DLLs fails", async t => {
+    test("on Windows a missing LOCALAPPDATA or SystemRoot stops before the installer runs, and an installer that leaves out the program, its command or any of Electron's DLLs fails", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
       const unnamed = PackageInstallerTests.createRunner(t);
       const rootless = PackageInstallerTests.createRunner(t);
@@ -73,7 +75,7 @@ class PackageInstallerTests {
       await assert.rejects(PackageInstallerTests.installAsync(repository, rootless, "win32", "x64", { LOCALAPPDATA: local }),
         new PackagingException("SystemRoot must name the Windows folder, whose PowerShell modules the installer's checks search first."));
       await assert.rejects(PackageInstallerTests.installAsync(repository, elsewhere, "win32", "x64", { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS }),
-        new PackagingException(`The installed package has no ${["Fixture Studio.exe", "ffmpeg.dll", "libEGL.DLL"].map(t => path.join(installFolder, t)).join(", ")}.`));
+        new PackagingException(`The installed package has no ${["Fixture Studio.exe", path.join("bin", "fixture-studio.cmd"), "ffmpeg.dll", "libEGL.DLL"].map(t => path.join(installFolder, t)).join(", ")}.`));
       await assert.rejects(PackageInstallerTests.installAsync(repository, partial, "win32", "x64", { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS }),
         new PackagingException(`The installed package has no ${path.join(installFolder, "libEGL.DLL")}.`));
       assert.deepEqual([unnamed.calls, rootless.calls], [[], []]);
@@ -107,6 +109,40 @@ class PackageInstallerTests {
         new ProcessException("Fixture Studio-windows-x64.exe /S failed with exit code 9:\nFixture Studio-windows-x64.exe broke"));
     });
 
+    test("on Windows the uninstaller runs silently in place with the installer's environment, and then it and the emptied install folder are removed", async t => {
+      const repository = await PackageInstallerTests.createAsync(t);
+      const runner = PackageInstallerTests.createRunner(t);
+      runner.localAppData = path.join(repository.directory, "local");
+      const environment = { LOCALAPPDATA: runner.localAppData, ...PackageInstallerTests.WINDOWS };
+      const installFolder = path.join(runner.localAppData, "Programs", "fixture-studio");
+      await PackageInstallerTests.installAsync(repository, runner, "win32", "x64", environment);
+
+      await PackageInstallerTests.uninstallAsync(repository, runner, environment);
+
+      assert.deepEqual(runner.calls.at(-1), ["Uninstall Fixture Studio.exe", "/S", `_?=${installFolder}`]);
+      assert.deepEqual(runner.installerEnvironments.at(-1), { ...environment, PSModulePath: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\Modules" });
+      assert.equal(existsSync(installFolder), false);
+    });
+
+    test("on Windows an uninstaller that fails or leaves files behind fails the uninstall, naming what it left", async t => {
+      const repository = await PackageInstallerTests.createAsync(t);
+      const failing = PackageInstallerTests.createRunner(t, ["Uninstall Fixture Studio.exe"]);
+      const leaving = PackageInstallerTests.createRunner(t);
+      const local = path.join(repository.directory, "local");
+      const installFolder = path.join(local, "Programs", "fixture-studio");
+      const environment = { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS };
+      for (const runner of [failing, leaving])
+        runner.localAppData = local;
+      leaving.uninstallLeaves = ["resources/app.asar", "Fixture Studio.exe"];
+
+      await PackageInstallerTests.installAsync(repository, failing, "win32", "x64", environment);
+      await assert.rejects(PackageInstallerTests.uninstallAsync(repository, failing, environment),
+        new ProcessException(`Uninstall Fixture Studio.exe /S _?=${installFolder} failed with exit code 9:\nUninstall Fixture Studio.exe broke`));
+      await PackageInstallerTests.installAsync(repository, leaving, "win32", "x64", environment);
+      await assert.rejects(PackageInstallerTests.uninstallAsync(repository, leaving, environment),
+        new PackagingException(`The uninstaller left ${["Fixture Studio.exe", "resources", path.join("resources", "app.asar")].join(", ")} in ${installFolder}.`));
+    });
+
     test("on macOS the app is copied out of the disk image, which is then detached by force", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
       const runner = PackageInstallerTests.createRunner(t);
@@ -121,7 +157,7 @@ class PackageInstallerTests {
         ["hdiutil", "detach", "-force", "mount"]
       ]);
       assert.deepEqual(runner.limits, [1, 2, 3].map(() => PackageInstallerTests.LIMIT));
-      assert.deepEqual([installed.desktop, installed.resources], [path.join(application, "Contents", "MacOS", "Fixture Studio"), path.join(application, "Contents", "Resources")]);
+      assert.deepEqual([installed.desktop, installed.resources, installed.command], [path.join(application, "Contents", "MacOS", "Fixture Studio"), path.join(application, "Contents", "Resources"), null]);
     });
 
     test("on macOS a failed copy still detaches the disk image, a detach that fails after it is reported with the copy's reason, and a failed detach after the copy fails", async t => {
@@ -153,7 +189,7 @@ class PackageInstallerTests {
       const appImage = path.join(repository.directory, "_build", "package", "out", "Fixture Studio-linux-x64.AppImage");
       const extracted = path.join(runner.folder, "squashfs-root");
       assert.deepEqual(runner.calls, [["Fixture Studio-linux-x64.AppImage", "--appimage-extract"]]);
-      assert.deepEqual([installed.desktop, installed.program, installed.resources], [appImage, path.join(extracted, "fixture-studio"), path.join(extracted, "resources")]);
+      assert.deepEqual([installed.desktop, installed.program, installed.resources, installed.command], [appImage, path.join(extracted, "fixture-studio"), path.join(extracted, "resources"), null]);
       if (process.platform !== "win32")
         assert.equal((await stat(appImage)).mode & 0o777, 0o755);
       await assert.rejects(PackageInstallerTests.installAsync(repository, failing, "linux", "x64"),
@@ -172,6 +208,12 @@ class PackageInstallerTests {
     const manifest = await RootManifest.readAsync(repository.directory);
     const folder = await mkdtemp(path.join(repository.directory, "install-"));
     return new PackageInstaller(repository.directory, runner, environment).installAsync(PackageTarget.fromProcess(platform, architecture), manifest.product, folder);
+  }
+
+  private static async uninstallAsync(repository: RepositoryFixture, runner: InstallRunnerFixture, environment: NodeJS.ProcessEnv): Promise<void> {
+    const manifest = await RootManifest.readAsync(repository.directory);
+    const folder = await mkdtemp(path.join(repository.directory, "uninstall-"));
+    await new PackageInstaller(repository.directory, runner, environment).uninstallWindowsAsync(manifest.product, folder);
   }
 
   private static async createAsync(t: TestContext): Promise<RepositoryFixture> {
