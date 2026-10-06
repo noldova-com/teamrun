@@ -33,10 +33,17 @@ export declare class ExceptionOptions implements ErrorOptions {
 }
 
 /**
- * The abstract base of every foundation exception. It extends `Error`, sets
- * `name` to the concrete class name and keeps the preceding failure as `cause`.
+ * The abstract base of every foundation exception. It extends `Error` and keeps
+ * the preceding failure as `cause`; each concrete class sets `name` to its own
+ * class name, written out, because a minifier renames classes.
  */
 export declare abstract class Exception extends Error {
+  /**
+   * The exception's class name, which each concrete class sets as a string so
+   * that the name stays the same in a minified build.
+   */
+  public abstract override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -47,6 +54,8 @@ export declare abstract class Exception extends Error {
    * import { Exception, ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
    *
    * export class ConfigurationException extends Exception {
+   *   public override readonly name: string = "ConfigurationException";
+   *
    *   public constructor(message: string, cause?: unknown) {
    *     super(message, new ExceptionOptions(cause));
    *   }
@@ -68,6 +77,12 @@ export declare abstract class Exception extends Error {
  * contract.
  */
 export declare class ArgumentException extends Exception {
+  /**
+   * The exception's name, `"ArgumentException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The name of the offending parameter, when one was given. The message also
    * carries it as `(Parameter 'name')`.
@@ -139,6 +154,12 @@ export declare class ArgumentException extends Exception {
  * method accepts.
  */
 export declare class ArgumentOutOfRangeException extends ArgumentException {
+  /**
+   * The exception's name, `"ArgumentOutOfRangeException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The rejected value, or `undefined` when it was not given.
    */

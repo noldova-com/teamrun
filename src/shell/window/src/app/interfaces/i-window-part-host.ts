@@ -25,6 +25,8 @@ export interface IWindowPartHost {
 
   log(moduleId: string, message: string): void;
 
+  openLinkAsync(url: string): Promise<void>;
+
   isCommandRegistered(name: string): boolean;
 
   declaresDynamicMenuGroup(moduleId: string, group: string): boolean;
@@ -50,6 +52,8 @@ export interface IWindowPartHost {
   onSettingChanged(listener: (change: SettingChange) => void): () => void;
 
   setViewBadge(view: string, badge: ViewBadge | null): void;
+
+  setTabWorking(tabKey: string, isWorking: boolean): void;
 
   refresh(): void;
 }

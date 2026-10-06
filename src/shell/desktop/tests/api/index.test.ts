@@ -25,6 +25,7 @@ export class DesktopApiTests {
         "DetachedStartRequest",
         "DeviceIdentity",
         "DeviceIdentityException",
+        "LinkPolicy",
         "MainProcessFailureKind",
         "MainProcessRecovery",
         "OpenWindow",

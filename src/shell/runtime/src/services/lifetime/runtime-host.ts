@@ -57,6 +57,7 @@ import { UpdateNotificationMethod } from "../notifications/update-notification-m
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { ProcessSupervisor } from "../process/process-supervisor.js";
+import { ProgramsMethod } from "../process/programs-method.js";
 import { RecentCommandsMethod } from "../recent-commands/recent-commands-method.js";
 import { RecentCommandsStore } from "../recent-commands/recent-commands-store.js";
 import { RecordCommandMethod } from "../recent-commands/record-command-method.js";
@@ -97,6 +98,7 @@ export class RuntimeHost implements IIdleParticipant {
   private isStopping: boolean = false;
   private notificationSettings: NotificationSettings = new NotificationSettings(null);
   private readonly workEvent: EventChannel;
+  private readonly programsEvent: EventChannel;
 
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
@@ -135,6 +137,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
     this.workEvent = this.events.declare(ShellEvents.work);
     const commandsChanged = this.events.declare(ShellEvents.commandsChanged);
+    this.programsEvent = this.events.declare(ShellEvents.programsChanged);
     this.commands = new CommandRegistry(t => commandsChanged.publish(t.toJson()));
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
@@ -259,6 +262,8 @@ export class RuntimeHost implements IIdleParticipant {
   private async activateModulesAsync(database: ShellDatabase, settings: SettingsService): Promise<void> {
     const processes = new ProcessSupervisor(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
     this.processes = processes;
+    processes.onChanged(() => this.programsEvent.publish(processes.status.toJson()));
+    this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));
     await processes.cleanUpAsync();
     await this.modules.activateAsync(settings, processes);
   }

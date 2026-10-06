@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 
-export interface SimulatedStep {
+export interface ISimulatedStep {
   readonly name: string;
   readonly id: string | null;
   readonly condition: string | null;
@@ -27,7 +27,7 @@ export default class WorkflowSimulation {
   private static readonly FAILURE: string = "failure()";
   private static readonly SKIPPED: string = "skipped";
 
-  public readonly steps: readonly SimulatedStep[];
+  public readonly steps: readonly ISimulatedStep[];
 
   public constructor(workflow: string, firstStep: string, lastStep: string) {
     const lines = workflow.split("\n");
@@ -39,7 +39,7 @@ export default class WorkflowSimulation {
     this.steps = all.slice(first, last + 1);
   }
 
-  public find(name: string): SimulatedStep {
+  public find(name: string): ISimulatedStep {
     const step = this.steps.find(t => t.name === name);
     assert.ok(step !== undefined, `No step named "${name}".`);
     return step;
@@ -89,7 +89,7 @@ export default class WorkflowSimulation {
     return value;
   }
 
-  private static parse(lines: readonly string[]): SimulatedStep {
+  private static parse(lines: readonly string[]): ISimulatedStep {
     const step = WorkflowSimulation.STEP_PATTERN.exec(lines[0] ?? "");
     const keyIndentation = " ".repeat((step?.[1]?.length ?? 0) + 2);
     const settingIndentation = `${keyIndentation}  `;

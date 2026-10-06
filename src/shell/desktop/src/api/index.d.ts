@@ -1067,7 +1067,7 @@ export interface IClipboardHost {
 }
 
 /**
- * Opens files and folders in the system's own application, as Electron's `shell` provides it.
+ * Opens files, folders and links in the system's own application, as Electron's `shell` provides it.
  */
 export interface IShellHost {
   /**
@@ -1085,6 +1085,23 @@ export interface IShellHost {
    * ```
    */
   openPath(path: string): Promise<string>;
+
+  /**
+   * Opens a link in the system's own application, such as a web page in the browser.
+   *
+   * @param url The link to open, one that `LinkPolicy.findAllowed` allowed.
+   * @returns A promise that settles once the system has taken the link.
+   * @throws Error asynchronously when the system cannot open it.
+   * @example
+   * ```ts
+   * import type { IShellHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function openDocsAsync(host: IShellHost): Promise<void> {
+   *   await host.openExternal("https://example.com/docs");
+   * }
+   * ```
+   */
+  openExternal(url: string): Promise<void>;
 }
 
 /**
@@ -2099,7 +2116,7 @@ export interface IElectron {
   readonly clipboard: IClipboardHost;
 
   /**
-   * The system's file manager, for opening the log folder.
+   * The system's file manager and browser, for opening the log folder and links.
    */
   readonly shell: IShellHost;
 
@@ -2139,6 +2156,12 @@ export interface IElectron {
  * The exception thrown when this device's identity file cannot be read or holds no valid identity.
  */
 export declare class DeviceIdentityException extends Exception {
+  /**
+   * The exception's name, `"DeviceIdentityException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -3238,6 +3261,26 @@ export declare class RuntimeStartup {
 }
 
 /**
+ * Decides which links TeamRun opens in the system's own application: well-formed http, https and mailto links without
+ * credentials, at most 32768 characters long.
+ */
+export declare class LinkPolicy {
+  /**
+   * Finds the link to open for a URL the window asked to open.
+   *
+   * @param url The URL as the window sent it; any value.
+   * @returns The link in its normalized form, or `null` for any other value, scheme or a URL that does not parse.
+   * @example
+   * ```ts
+   * import { LinkPolicy } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const link: string | null = LinkPolicy.findAllowed("https://example.com/docs");
+   * ```
+   */
+  public static findAllowed(url: unknown): string | null;
+}
+
+/**
  * Decides which frames may use the bridge: only the main frame of the window's own page.
  */
 export declare class SenderPolicy {
@@ -3463,6 +3506,12 @@ export declare class PathCommand {
  */
 export declare class PathCommandException extends Exception {
   /**
+   * The exception's name, `"PathCommandException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What went wrong.
@@ -3481,6 +3530,12 @@ export declare class PathCommandException extends Exception {
  * The exception thrown when a window's state cannot be read or kept through the runtime.
  */
 export declare class WindowStateException extends Exception {
+  /**
+   * The exception's name, `"WindowStateException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -3501,6 +3556,12 @@ export declare class WindowStateException extends Exception {
  * has no connection, or the connection failed. A refusal from the runtime is a {@link WindowStateException} instead.
  */
 export declare class WindowStateUnavailableException extends WindowStateException {
+  /**
+   * The exception's name, `"WindowStateUnavailableException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *

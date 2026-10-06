@@ -11,6 +11,7 @@ import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-ex
 import { Resources } from "../resources.js";
 
 export class JsonException extends Exception {
+  public override readonly name: string = "JsonException";
   public readonly path: string;
 
   public constructor(text: string, path: string, options?: ExceptionOptions) {

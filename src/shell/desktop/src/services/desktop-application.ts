@@ -47,6 +47,7 @@ import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { DeviceIdentity } from "./device-identity.js";
+import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
 import { OpenWindow } from "./open-window.js";
 import type { PathCommand } from "./path-command.js";
@@ -208,6 +209,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.readBuildChannel, event => Object.isNull(this.findTrusted(event)) ? null : RuntimeBuild.identity.toJson());
     this.electron.ipcMain.handle(Resources.copyTextChannel, (event, text) => Object.isNull(this.findTrusted(event)) ? false : this.copyText(text));
     this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
+    this.electron.ipcMain.handle(Resources.openLinkChannel, (event, url) => Object.isNull(this.findTrusted(event)) ? false : this.openLinkAsync(url));
     this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
     this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
@@ -521,6 +523,22 @@ export class DesktopApplication {
     if (failure.length > 0)
       this.log.write(Resources.formatLogFolderNotOpened(failure));
     return failure.length === 0;
+  }
+
+  private async openLinkAsync(url: unknown): Promise<boolean> {
+    const link = LinkPolicy.findAllowed(url);
+    if (Object.isNull(link)) {
+      this.log.write(Resources.linkRefused);
+      return false;
+    }
+    try {
+      await this.electron.shell.openExternal(link);
+      return true;
+    }
+    catch (error) {
+      this.log.write(Resources.formatLinkNotOpened(String(error)));
+      return false;
+    }
   }
 
   private async installCommandAsync(event: IIpcEvent): Promise<boolean> {

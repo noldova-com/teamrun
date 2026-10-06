@@ -13,6 +13,7 @@ import { ProductInfo } from "../models/product-info.js";
 import { Resources } from "../resources.js";
 
 export class PreShellDataFoundException extends Exception {
+  public override readonly name: string = "PreShellDataFoundException";
   public readonly data: PreShellData;
 
   public constructor(data: PreShellData) {

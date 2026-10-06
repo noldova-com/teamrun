@@ -12,6 +12,7 @@ import { ProductInfo } from "../models/product-info.js";
 import { Resources } from "../resources.js";
 
 export class DataDirectoryOwnedException extends Exception {
+  public override readonly name: string = "DataDirectoryOwnedException";
   public readonly root: string;
 
   public constructor(root: string, options?: ExceptionOptions) {

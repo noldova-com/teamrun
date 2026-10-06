@@ -13,6 +13,7 @@ import { Resources } from "../resources.js";
 import { Exception } from "./exception.js";
 
 export class ArgumentException extends Exception {
+  public override readonly name: string = "ArgumentException";
   public readonly parameterName?: string;
 
   public constructor(message?: string, parameterName?: string, options?: ExceptionOptions) {

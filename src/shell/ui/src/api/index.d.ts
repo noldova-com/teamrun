@@ -2610,9 +2610,11 @@ export declare class QueryMatcher {
  */
 export declare class QuickInputComponent {
   /**
-   * The results in the order shown. Every change makes the first one active
-   * again. A result with a section starts that section, after a separator
-   * unless it is the first.
+   * The results in the order shown. A result the person made active with the
+   * keys stays active through a change while it is still listed, until the
+   * query changes; otherwise a change makes the first one active. A result
+   * with a section starts that section, after a separator unless it is the
+   * first.
    */
   public readonly items: InputSignal<readonly QuickInputItem[]>;
 
@@ -3298,6 +3300,12 @@ export declare class Theme {
  */
 export declare class ThemeException extends Exception {
   /**
+   * The exception's name, `"ThemeException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message A sentence naming the theme and the missing value.
@@ -3935,6 +3943,12 @@ export declare class TreeMove {
  * parent is missing, is the row itself or lies inside it.
  */
 export declare class TreeMoveException extends Exception {
+  /**
+   * The exception's name, `"TreeMoveException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
