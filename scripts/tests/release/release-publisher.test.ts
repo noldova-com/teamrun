@@ -273,12 +273,15 @@ class ReleasePublisherTests {
       await assert.rejects(ReleasePublisherTests.publishAsync(t, unreadable, release, new TextOutputFixture()), (error: unknown) => error instanceof GitHubException && error.status === 500);
       await assert.rejects(ReleasePublisherTests.publishAsync(t, kept, release, new TextOutputFixture()), new ReleaseException("GitHub kept v0.0.2 as a draft when it was published."));
       await assert.rejects(ReleasePublisherTests.publishAsync(t, untagged, release, new TextOutputFixture()),
-        new ReleaseException(`v0.0.2 is public now, but it no longer matches what was published: The tag v0.0.2 points at nothing, not at ${ReleasePublisherTests.REVISION}. `
+        new ReleaseException(`v0.0.2 is public now, but checking it after publishing failed: ReleaseException: The tag v0.0.2 points at nothing, not at ${ReleasePublisherTests.REVISION}. `
           + "Check it by hand; a published release is never replaced."));
       await assert.rejects(ReleasePublisherTests.publishAsync(t, added, release, new TextOutputFixture()),
-        new ReleaseException("v0.0.2 is public now, but it no longer matches what was published: v0.0.2 on GitHub differs from the built files. Missing: none. "
+        new ReleaseException("v0.0.2 is public now, but checking it after publishing failed: ReleaseException: v0.0.2 on GitHub differs from the built files. Missing: none. "
           + "Not part of the release: notes.txt. Check it by hand; a published release is never replaced."));
-      await assert.rejects(ReleasePublisherTests.publishAsync(t, unreadableAfter, release, new TextOutputFixture()), (error: unknown) => error instanceof GitHubException && error.status === 500);
+      await assert.rejects(ReleasePublisherTests.publishAsync(t, unreadableAfter, release, new TextOutputFixture()), (error: unknown) => error instanceof ReleaseException
+        && error.message.startsWith("v0.0.2 is public now, but checking it after publishing failed: GitHubException: ")
+        && error.message.endsWith("(HTTP 500) Check it by hand; a published release is never replaced.")
+        && error.cause instanceof GitHubException && error.cause.status === 500);
       assert.deepEqual(unreadableAfter.releases.map(t => t.isDraft), [false]);
       assert.deepEqual([annotated, unreadable].map(t => t.writes), [[], []]);
     });
