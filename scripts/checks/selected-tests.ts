@@ -7,16 +7,16 @@
  */
 
 export default class SelectedTests {
+  public static readonly PACKAGE_OPTION: string = "--package";
+  public static readonly ANGULAR_OPTION: string = "--angular-tests";
+  public static readonly SCRIPT_OPTION: string = "--script-tests";
+  public static readonly CHECKS_ONLY_OPTION: string = "--checks-only";
+
   private static readonly NO_TESTS: string = "no tests";
   private static readonly ANGULAR_TESTS: string = "the Angular tests";
   private static readonly SCRIPT_TESTS: string = "the script tests";
   private static readonly LIST_SEPARATOR: string = ", ";
   private static readonly LAST_SEPARATOR: string = " and ";
-
-  public static readonly PACKAGE_OPTION: string = "--package";
-  public static readonly ANGULAR_OPTION: string = "--angular-tests";
-  public static readonly SCRIPT_OPTION: string = "--script-tests";
-  public static readonly CHECKS_ONLY_OPTION: string = "--checks-only";
 
   public readonly packages: readonly string[];
   public readonly runsAngularTests: boolean;

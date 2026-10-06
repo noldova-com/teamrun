@@ -11,6 +11,13 @@ import type PackageManifest from "../packages/package-manifest.ts";
 import ChangeSelection from "./change-selection.ts";
 
 export default class ChangeSelector {
+  public static readonly WINDOW_DEPENDENCIES: readonly string[] = [
+    "@noldova/teamrun-foundation-core",
+    "@noldova/teamrun-foundation-exceptions",
+    "@noldova/teamrun-foundation-json",
+    "@noldova/teamrun-shell-protocol"
+  ];
+
   private static readonly TESTING_PACKAGE: string = "@noldova/teamrun-foundation-testing";
   private static readonly SHARED_CONFIGURATION: RegExp = /(?:^|\/)(?:package\.json|package-lock\.json|tsconfig[^/]*\.json|angular\.json|vitest\.config\.[^/]+|playwright\.config\.[^/]+)$/;
   private static readonly TEST_RUNNER_PATHS: readonly string[] = ["scripts/test.ts", "scripts/test-options.ts", "scripts/test-options.exception.ts", "scripts/checks/"];
@@ -19,13 +26,6 @@ export default class ChangeSelector {
   private static readonly UI_WORKFLOW_PATTERN: RegExp = /^src\/shell\/desktop\/tests\/e2e\/[^/]+\.spec\.ts$/;
   private static readonly WINDOW_FOLDERS: readonly string[] = ["src/shell/ui/", "src/shell/window/"];
   private static readonly TESTS_FOLDER: string = "tests/";
-
-  public static readonly WINDOW_DEPENDENCIES: readonly string[] = [
-    "@noldova/teamrun-foundation-core",
-    "@noldova/teamrun-foundation-exceptions",
-    "@noldova/teamrun-foundation-json",
-    "@noldova/teamrun-shell-protocol"
-  ];
 
   private readonly packages: readonly PackageManifest[];
 
