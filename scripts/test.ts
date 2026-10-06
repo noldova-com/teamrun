@@ -197,6 +197,7 @@ export default class Test {
     const documents = new DocumentCheck(this.root, files);
     const { default: ApiCatalog } = await import("./api/api-catalog.ts");
     const { default: ApiServer } = await import("./api/api-server.ts");
+    const { default: AngularFileCheck } = await import("./checks/angular-file-check.ts");
     const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
     const { default: ApiDocumentationCheck } = await import("./checks/api-documentation-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
@@ -208,6 +209,7 @@ export default class Test {
     const angular = new AngularProject(this.root, this.runner, new NpmCommand(this.runner, this.environment));
     const apis = new ApiCatalog(this.root, new PackageCatalog(this.root), new BuildLayout(this.root), angular, Test.API_PARTS);
     const server = [ApiServer.locateCompiler()];
+    const syntax = new SyntaxTreeReader(this.root, server, Test.API_TIMEOUT);
     const partOf = (check: ICheck): string => check instanceof PackageTestCheck ? TestPart.PACKAGES : check instanceof ScriptTestCheck ? TestPart.SCRIPTS : TestPart.ANGULAR_AND_CHECKS;
     const checks = [
       documents,
@@ -215,7 +217,8 @@ export default class Test {
       new CommentCheck(this.root, files),
       new TestWaitCheck(this.root, files),
       new FieldOrderCheck(this.root, files),
-      new BucketNameCheck(files, new SyntaxTreeReader(this.root, server, Test.API_TIMEOUT)),
+      new BucketNameCheck(files, syntax),
+      new AngularFileCheck(files, syntax),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
       new ShellIndependenceCheck(tree),
