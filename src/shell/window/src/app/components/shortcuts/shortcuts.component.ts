@@ -34,6 +34,9 @@ import { HighlightedTextComponent } from "../highlighted-text/highlighted-text.c
   }
 })
 export class ShortcutsComponent {
+  private static count: number = 0;
+
+  private readonly index: number = ShortcutsComponent.count++;
   private readonly settings: SettingsService = inject(SettingsService);
   private readonly commands: CommandService = inject(CommandService);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
@@ -112,6 +115,19 @@ export class ShortcutsComponent {
 
   protected formatKeyLabel(row: ShortcutRow, isRecording: boolean): string {
     return isRecording ? Resources.formatRecordingLabel(row.title, this.hint()) : Resources.formatChangeKeyLabel(row.title, row.key);
+  }
+
+  protected collisionId(row: ShortcutRow): string {
+    return `${Resources.shortcutCollisionIdPrefix}${this.index}${Resources.shortcutIdSeparator}${row.name}`;
+  }
+
+  protected noticeId(row: ShortcutRow): string {
+    return `${Resources.shortcutNoticeIdPrefix}${this.index}${Resources.shortcutIdSeparator}${row.name}`;
+  }
+
+  protected describeKey(row: ShortcutRow, hasNotice: boolean): string | null {
+    const ids = [Object.isNull(row.collision) ? null : this.collisionId(row), hasNotice ? this.noticeId(row) : null].filter(t => !Object.isNull(t));
+    return ids.length === 0 ? null : ids.join(" ");
   }
 
   private get bindings(): KeyBindings {

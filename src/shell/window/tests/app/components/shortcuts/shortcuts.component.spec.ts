@@ -274,6 +274,24 @@ describe("ShortcutsComponent", () => {
     expect(document.activeElement).toBe(keyOf("clock.tick"));
   });
 
+  it("describes each key button by its row's collision and notice while they show", async () => {
+    const description = (command: string): readonly (string | undefined)[] | null =>
+      keyOf(command).getAttribute("aria-describedby")?.split(" ").map(t => document.getElementById(t)?.textContent?.trim()) ?? null;
+    await renderAsync("linux", { "clock.tick": "Mod+PageDown" });
+
+    const plain = description("clock.tick");
+    const collided = description("shell.nextTab");
+    await recordAsync("shell.nextTab");
+    await pressAsync("shell.nextTab", { key: "n", code: "KeyN", ctrlKey: true, altKey: true });
+    const both = description("shell.nextTab");
+    await recordAsync("notes.newNote");
+    await pressAsync("notes.newNote", { key: "PageDown", code: "PageDown", ctrlKey: true });
+
+    expect([plain, collided, description("notes.newNote")]).toEqual([null, ["Ctrl+PageDown is taken by Tick the clock"], ["Ctrl+PageDown is used by Tick the clock"]]);
+    expect(both).toEqual(["Ctrl+PageDown is taken by Tick the clock", "Ctrl+Alt+N is used by New note"]);
+    expect(description("shell.nextTab")).toEqual(["Ctrl+PageDown is taken by Tick the clock"]);
+  });
+
   it("refuses a key that takes typing, one editing or the system owns, the Super key and a key no shortcut names, with the reason", async () => {
     await renderAsync();
     const reasons: (string | null)[] = [];
