@@ -17,7 +17,7 @@ import type {
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchException, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -680,16 +680,17 @@ export interface IDesktopProcess {
    * @param executablePath The program.
    * @param args Its arguments: the start's data directory, user data and
    * device directory arguments, so the newer build opens the same data.
+   * @param onFailure Called with the reason when the program cannot be started.
    * @example
    * ```ts
    * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
    *
-   * export function handOver(process: IDesktopProcess): void {
-   *   process.startDetached("/opt/teamrun/teamrun", ["--data-dir=/home/person/work-data"]);
+   * export function handOver(process: IDesktopProcess, log: (text: string) => void): void {
+   *   process.startDetached("/opt/teamrun/teamrun", ["--data-dir=/home/person/work-data"], t => log(String(t)));
    * }
    * ```
    */
-  startDetached(executablePath: string, args: readonly string[]): void;
+  startDetached(executablePath: string, args: readonly string[], onFailure: (error: Error) => void): void;
 
   /**
    * Ends another process at once, for a window's page that did not stop when asked.
@@ -4813,21 +4814,24 @@ export declare class StartedProgram {
 }
 
 /**
- * Runs other programs as child processes of the desktop.
+ * Runs other programs as child processes of the desktop. On Linux each program starts through the
+ * runtime's `ProcessLaunchCommand`, so it keeps none of the desktop's descriptors above standard error,
+ * such as Chromium's channels to its own processes.
  */
 export declare class ChildProgramHost implements IProgramHost {
   /**
    * Creates the host.
    *
+   * @param platform The platform, as in `process.platform`.
    * @param timeout How long, in milliseconds, a program run to its end may take before it is ended and fails.
    * @example
    * ```ts
    * import { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
    *
-   * export const programs: ChildProgramHost = new ChildProgramHost(5000);
+   * export const programs: ChildProgramHost = new ChildProgramHost(process.platform, 5000);
    * ```
    */
-  public constructor(timeout: number);
+  public constructor(platform: string, timeout: number);
 
   /**
    * Runs a program to its end.
@@ -4837,7 +4841,8 @@ export declare class ChildProgramHost implements IProgramHost {
    * @param environment The program's environment.
    * @returns A promise of the program's standard output.
    * @throws ProgramException, through the promise, when the program cannot start, ends with an error, runs longer than
-   * the timeout or writes more than 64 KiB.
+   * the timeout or writes more than 64 KiB, or on Linux when `/bin/bash` or `/proc/self/fd` is unavailable.
+   * @throws ArgumentException, through the promise, when the program's path is empty or whitespace.
    * @example
    * ```ts
    * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
@@ -4856,7 +4861,9 @@ export declare class ChildProgramHost implements IProgramHost {
    * @param programArguments The program's arguments.
    * @param environment The program's environment.
    * @param onOutput Receives each piece of the program's standard output.
-   * @param onExit Called once, when the program ends or cannot start.
+   * @param onExit Called once, when the program ends or cannot start, including on Linux when `/bin/bash` or
+   * `/proc/self/fd` is unavailable.
+   * @throws {ArgumentException} When the program's path is empty or whitespace.
    * @returns The running program.
    * @example
    * ```ts
@@ -4868,6 +4875,27 @@ export declare class ChildProgramHost implements IProgramHost {
    * ```
    */
   public start(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onOutput: (text: string) => void, onExit: () => void): StartedProgram;
+
+  /**
+   * Starts a program in its own session that outlives the desktop, with its standard streams ignored.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param onFailure Called with the reason when the program cannot be started: a `LaunchException` on Linux when
+   * `/bin/bash` is not executable or `/proc/self/fd` cannot be read, or the error the system gives elsewhere. On Linux
+   * the program starts through Bash, which reports nothing back when the program itself is missing.
+   * @throws {ArgumentException} When the program's path is empty or whitespace.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function handOver(programs: ChildProgramHost, executablePath: string, log: (text: string) => void): void {
+   *   programs.startDetached(executablePath, ["--data-dir=/home/person/work-data"], process.env, t => log(String(t)));
+   * }
+   * ```
+   */
+  public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onFailure: (error: Error) => void): void;
 }
 
 /**
@@ -4915,7 +4943,7 @@ export declare class TrayHostWatcher {
    * ```ts
    * import { ChildProgramHost, TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
    *
-   * export const watcher: TrayHostWatcher = new TrayHostWatcher(process.platform, new ChildProgramHost(5000), process.env,
+   * export const watcher: TrayHostWatcher = new TrayHostWatcher(process.platform, new ChildProgramHost(process.platform, 5000), process.env,
    *   t => new Promise<void>(resolve => setTimeout(resolve, t)), t => console.log(t));
    * ```
    */

@@ -452,7 +452,7 @@ class BuildAndTestTests {
       const script = workflow.readStepScript(BuildAndTestTests.UI_STEP);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3 --retries 1", "");
+      doubles.respond("dbus-run-session", "-- xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3 --retries 1", "");
       doubles.respond("npm", "run test:ui -- --require-current --shard 2/3 --retries 1", "");
 
       doubles.respond("npm", "run test:ui -- --shard 1/1 --retries 1 --grep @smoke", "");
@@ -465,7 +465,7 @@ class BuildAndTestTests {
 
       assert.deepEqual([linux.status, windows.status, macos.status, smoke.status], [0, 0, 0, 0], linux.stderr + windows.stderr + macos.stderr + smoke.stderr);
       assert.deepEqual(await doubles.readCallsAsync(), [
-        "xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3 --retries 1", "npm run test:ui -- --require-current --shard 2/3 --retries 1",
+        "dbus-run-session -- xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 2/3 --retries 1", "npm run test:ui -- --require-current --shard 2/3 --retries 1",
         "npm run test:ui -- --require-current --shard 2/3 --retries 1", "npm run test:ui -- --shard 1/1 --retries 1 --grep @smoke"
       ]);
       assert.ok(text.includes("      - name: Test the UI workflows\n        id: ui\n        env:\n          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}\n" +
@@ -686,7 +686,7 @@ class BuildAndTestTests {
       const script = (await WorkflowFileFixture.readAsync(BuildAndTestTests.UI_WORKFLOW)).readStepScript(BuildAndTestTests.UI_STEP);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      doubles.respond("xvfb-run", "--auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 1/3 --retries 1", "", 1);
+      doubles.respond("dbus-run-session", "-- xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm run test:ui -- --require-current --shard 1/3 --retries 1", "", 1);
       doubles.respond("npm", "run test:ui -- --require-current --shard 1/3 --retries 1", "", 1);
 
       assert.equal((await doubles.runAsync(script, { RUNNER_OS: "Linux", SHARD: "1/3", REQUIRE_CURRENT: "--require-current", GREP: "" })).status, 1);

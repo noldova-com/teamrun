@@ -291,7 +291,8 @@ export default class DesktopApplicationFixture {
     const found = await this.answerAsync(action, this.application.evaluate((_, { port, frame }) => {
       const handles = (Reflect.get(process, "_getActiveHandles") as () => object[]).call(process);
       const standard: readonly object[] = [process.stdin, process.stdout, process.stderr];
-      const children: readonly unknown[] = handles.filter(t => t.constructor.name === "ChildProcess").flatMap(t => Reflect.get(t, "stdio") as unknown[]);
+      const { ChildProcess } = process.getBuiltinModule("node:child_process");
+      const children: readonly unknown[] = handles.flatMap(t => t instanceof ChildProcess ? t.stdio : []);
       const sockets = handles.filter(t => t.constructor.name === "Socket").map(t => {
         const socket = t as IActiveSocket;
         const isChild = children.includes(t);
