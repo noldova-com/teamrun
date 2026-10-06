@@ -129,6 +129,7 @@ class ChangeClassifierTests {
         ["scripts/release-publish.ts", false],
         ["scripts/repeat-plan.ts", false],
         ["scripts/classify-changes.ts", false],
+        ["scripts/format-documents.ts", false],
         ["scripts/test.ts", false],
         ["scripts/test-part.ts", false],
         ["scripts/ui-summary.ts", false],

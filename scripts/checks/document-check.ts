@@ -12,6 +12,7 @@ import type { Writable } from "node:stream";
 
 import DocumentLinkValidator from "../documents/document-link.validator.ts";
 import MarkdownDocument from "../documents/markdown-document.ts";
+import SentenceBreaker from "../documents/sentence-breaker.ts";
 import TextFormatValidator from "../documents/text-format.validator.ts";
 import type RepositoryFiles from "../repository/repository-files.ts";
 import type ICheck from "./interfaces/check.ts";
@@ -32,13 +33,17 @@ export default class DocumentCheck implements ICheck {
   public async runAsync(output: Writable): Promise<boolean> {
     const files = await this.files.listAsync();
     const formatValidator = new TextFormatValidator();
+    const breaker = new SentenceBreaker();
     const findings: string[] = [];
     const documents: MarkdownDocument[] = [];
     for (const file of files) {
       const content = await readFile(path.join(this.root, file));
       findings.push(...formatValidator.validate(file, content));
-      if (file.endsWith(DocumentCheck.MARKDOWN_EXTENSION))
-        documents.push(new MarkdownDocument(file, content.toString("utf8")));
+      if (file.endsWith(DocumentCheck.MARKDOWN_EXTENSION)) {
+        const text = content.toString("utf8");
+        documents.push(new MarkdownDocument(file, text));
+        findings.push(...breaker.findCrowdedLines(text).map(t => `${file}:${t}: holds more than one sentence; put each sentence on its own line, as npm run format:documents does.`));
+      }
     }
 
     const linkValidator = new DocumentLinkValidator(files, documents);

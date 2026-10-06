@@ -32,19 +32,20 @@ class DocumentCheckTests {
         "Documents");
     });
 
-    test("format problems in any text file and broken links in Markdown fail the check", async t => {
+    test("format problems in any text file, Markdown lines with more than one sentence and broken links fail the check", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      await repository.writeAsync({ "README.md": "# TeamRun\n\nSee [the guide](docs/missing.md).\n", "scripts/tool.ts": "const value = 1; \n" });
+      await repository.writeAsync({ "README.md": "# TeamRun\n\nSee [the guide](docs/missing.md). It is gone.\n", "notes.txt": "One. Two.\n", "scripts/tool.ts": "const value = 1; \n" });
       const output = new TextOutputFixture();
 
       const passed = await DocumentCheckTests.createCheck(repository).runAsync(output);
 
       assert.equal(passed, false);
       assert.equal(output.text, [
+        "README.md:3: holds more than one sentence; put each sentence on its own line, as npm run format:documents does.",
         "scripts/tool.ts:1: ends with whitespace.",
         "README.md:3: the link \"docs/missing.md\" points to a missing file.",
-        "Checked 2 files and the links of 1 Markdown documents.",
+        "Checked 3 files and the links of 1 Markdown documents.",
         ""
       ].join("\n"));
     });
