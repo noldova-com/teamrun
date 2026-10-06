@@ -398,7 +398,7 @@ A window reads them all with `shell.settings`, reads one key's entry, its value 
 A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
 The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals.
-Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear.
+Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear, and About last.
 Keyboard shortcuts lists every command with its owner and key.
 The person records a new key, removes a key, resets a command to its default or resets every shortcut, and each change writes `shell.keyBindings` whole, in one write, built on the window's previous change until the setting reports that change; when two windows change it at the same moment, the later write is kept.
 A key the rules refuse is refused with the reason, and a key another command holds is shown with that command: Use it here gives the key to this command; the other command keeps its other default keys if it has any, and is left without a key otherwise.
@@ -412,6 +412,8 @@ Spelling languages, `shell.spellCheckLanguages`, is a device setting of the kind
 A chosen language that no longer ships is dropped at the next change.
 `[]` checks in the operating system's languages that ship; when none of them ships, the first shipped language is used and the row says which.
 On macOS the system chooses the languages.
+
+About shows TeamRun's name, version, platform and processor and the update's state with its action (section 10), then its Updates group, which holds Check for updates, `shell.updateChecks`, a device setting whose choices are Automatically, the default, Only at start and Only when I ask.
 
 ### Setting scopes
 
@@ -436,7 +438,8 @@ Showing TeamRun's icon in the tray, `shell.trayIcon`, is a device setting whose 
 
 A module declares its notification kinds in `contributes.notifications`.
 A part posts a notification of one of them through its context and gets a handle that updates or dismisses it.
-The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` (section 9): they belong to no module, offer no command, and turning modules' notifications off never mutes them.
+The shell posts kinds of its own: `shell.saveFailed` and `shell.saveUnfinished` (section 9), which offer no command, and `shell.updateReady` (section 10), which runs the shell's command to restart to install the update.
+They belong to no module, and turning modules' notifications off never mutes them.
 
 - Its commands, the one opening it runs and those of its actions, are the module's own or a dependency's.
   A post with an undeclared kind or another module's command is refused.
@@ -1064,15 +1067,56 @@ Each target is packaged on its own platform and processor.
 
 ### Updates
 
-- The installed updater checks the releases of `teamrun.product.releaseRepository` for its platform and CPU, and no other repository's.
-  Every packaged target updates itself: Windows through its installer, macOS through Squirrel.Mac and a Linux AppImage by replacing the file.
-- A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced; an installation that cannot update itself explains why.
-- The GitHub release route is anonymous HTTPS; a private repository is not made reachable by injecting repository or provider credentials.
-- Validate metadata and downloaded bytes before offering installation.
-  Production signing, notarization and trust requirements are distinct from an explicitly authorized unsigned test release.
-  Source builds and incompatible targets do not accidentally use a production update feed.
-- Download and restart/install are explicit user actions; ordinary application close does not install an update.
+The desktop owns the update: it checks, downloads, validates and installs, and gives its windows the update's state, which they show.
+It uses electron-updater, pinned exactly, with a provider that reads TeamRun's file names.
+
+- **Feed.**
+  The desktop reads `latest-<platform>-<arch>.yml` for its own platform and processor from the latest release of `teamrun.product.releaseRepository` on GitHub, then downloads the package that file names from the same release, over anonymous HTTPS.
+  No repository or provider credential is placed in the application or its updater, and a private repository is not made reachable that way.
+  Only the latest release is offered.
+  A release to any other repository is an unsigned test release ([Publication](#publication)), so it never reaches the feed.
+- **Which builds read it.**
+  The build decides, never a setting, a variable or an argument.
+  `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
+  Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
+  A test build, and a package made for a native update check, name instead a local feed given to the build when it is made; `release:assets` refuses a package whose product file names any feed but the production one.
+  The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
+- **Versions.**
+  Only a version higher than the installed one is offered.
+  The same version, a lower one or a version with a prerelease suffix leaves TeamRun up to date.
+- **Checks.**
+  The device setting `shell.updateChecks` chooses when the desktop checks by itself: Automatically, the default, 30 seconds after it starts and then every hour while it runs; Only at start, once, 30 seconds after it starts; or Only when I ask, never.
+  The person can always run Check for updates.
+  The desktop's own checks are skipped while a download runs or an update is ready.
+  A failed automatic check shows only in About and the log, and the next one runs at its time; a failed check the person asked for shows as a failure.
+- **Validation.**
+  Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
+  After downloading, it checks the file's size and SHA-512 against it.
+  On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, and no other.
+  A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher.
+  Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
+- **Downloading.**
+  A newer version a check finds downloads in the background at once, and only About shows its progress.
+  A failed download shows its reason and can be tried again.
+- **The person decides.**
+  Restarting to install is the person's choice, Restart to update.
+  Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed or a newer one replaces it.
+- **Restart to update.**
+  Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.
   Section 9 owns the choice the person makes while work is in progress.
+  The handoff installs the way the platform does: Windows runs the installer quietly in the existing installation's scope, macOS installs through Squirrel.Mac from the ZIP, and Linux replaces the AppImage file in place, keeping its location and launchers.
+- **macOS location.**
+  A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
+  Outside one, the desktop still checks but downloads and installs nothing: About says to move TeamRun to Applications, and so does the update item while a newer version is available.
+- **What the person sees.**
+  - **States:** up to date, checking, downloading with its progress, ready and failed, and on macOS outside an Applications folder, available.
+  - **Status bar:** the update item shows only while an update is ready or failed, or on macOS outside an Applications folder while a newer version is available.
+  - **Notifications:** the shell's notification kind `shell.updateReady`, posted once per version when its update is ready, restarts to install it.
+  - **Commands:** `shell.checkForUpdates` and `shell.restartToUpdate`, each applying only in its state, are in command search.
+    Check for updates is also in Help, or on macOS in the application menu after About.
+  - **About:** Settings' About page shows the version and the update's state with its action, and says why a build that cannot update doesn't.
+
+  [UI-STANDARDS](UI-STANDARDS.md#8-component-metrics-and-behavior) owns the item, the page and their wording.
 
 The updater and the desktop's update stop divide an update at the person's Restart to update:
 
