@@ -90,7 +90,7 @@ export class SystemNotifier {
   }
 
   private show(notification: Notification): void {
-    const shown = this.host.create({ title: notification.post.title, body: notification.post.text ?? "", icon: this.readIcon() });
+    const shown = this.host.create({ title: notification.post.title, body: notification.post.text ?? String.empty, icon: this.readIcon() });
     const entry = { sequence: notification.sequence, notification: shown };
     shown.on(Resources.clickEvent, () => {
       this.forget(notification.id, entry);

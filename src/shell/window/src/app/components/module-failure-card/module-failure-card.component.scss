@@ -14,13 +14,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--tr-space-1);
-  padding: var(--tr-space-3);
-  border: var(--tr-border-width) solid var(--tr-card-border);
-  border-radius: var(--tr-radius-medium);
-  background-color: var(--tr-raised);
-  color: var(--tr-text);
-  font-size: var(--tr-text-message);
-  line-height: var(--tr-line-message);
 }
 
 .tr-module-failure-card-title {

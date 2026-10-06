@@ -8,6 +8,8 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { WindowStateKind } from "./enums/window-state-kind.js";
+
 export class Resources {
   public static readonly folderSeparator: string = "/";
   public static readonly rootParameterName: string = "root";
@@ -67,7 +69,7 @@ export class Resources {
   public static readonly commitStatement: string = "COMMIT";
   public static readonly writeAheadLogStatement: string = "PRAGMA journal_mode = WAL";
   public static readonly rollbackJournalStatement: string = "PRAGMA journal_mode = DELETE";
-  public static readonly databaseFileSuffixes: readonly string[] = ["", "-wal", "-shm", "-journal"];
+  public static readonly databaseFileSuffixes: readonly string[] = [String.empty, "-wal", "-shm", "-journal"];
   public static readonly historyTableName: string = "migration_history";
   public static readonly createHistoryStatement: string = "CREATE TABLE migration_history (position INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE) STRICT";
   public static readonly readHistoryStatement: string = "SELECT position, id FROM migration_history ORDER BY position";
@@ -107,10 +109,14 @@ export class Resources {
   public static readonly deviceColumn: string = "device";
   public static readonly parentNameColumn: string = "parent_name";
   public static readonly parentIdColumn: string = "parent_id";
-  public static readonly applicationScope: string = "";
-  public static readonly sharedDevice: string = "";
+  public static readonly applicationScope: string = String.empty;
+  public static readonly sharedDevice: string = String.empty;
   public static readonly createWindowStatesStatement: string =
     "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
+  public static readonly windowStateColumns: Readonly<Record<WindowStateKind, string>> = {
+    [WindowStateKind.Bounds]: "bounds",
+    [WindowStateKind.Layout]: "layout"
+  };
   public static readonly errorCodeField: "errcode" = "errcode";
   public static readonly busyErrorCode: number = 5;
   public static readonly fileErrorCodeField: "code" = "code";
@@ -947,7 +953,7 @@ export class Resources {
       "if ($started -ne $targets[$i + 1]) { \"$id`tother\"; continue }; " +
       "try { $p.Kill(); \"$id`tkilled\" } catch { \"$id`tfailed\" }; " +
       "$held.Add($p) }; " +
-      (lists ? `${Resources.windowsProcessTableScript}; ` : "") +
+      (lists ? `${Resources.windowsProcessTableScript}; ` : String.empty) +
       "foreach ($p in $held) { $left = [int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds); " +
       "if ($p.WaitForExit($left)) { \"$($p.Id)`tended\" } else { \"$($p.Id)`trunning\" } }";
   }
@@ -960,11 +966,13 @@ export class Resources {
     return `The module ${moduleId}'s program ${program} (process ${processId}): ${text}\n`;
   }
 
-  public static formatReadWindowState(column: string): string {
+  public static formatReadWindowState(kind: WindowStateKind): string {
+    const column = Resources.windowStateColumns[kind];
     return `SELECT ${column} AS value FROM window_states WHERE device = ? AND window = ?`;
   }
 
-  public static formatWriteWindowState(column: string): string {
+  public static formatWriteWindowState(kind: WindowStateKind): string {
+    const column = Resources.windowStateColumns[kind];
     return `INSERT INTO window_states (device, window, ${column}) VALUES (?, ?, ?) ON CONFLICT (device, window) DO UPDATE SET ${column} = excluded.${column}`;
   }
 }

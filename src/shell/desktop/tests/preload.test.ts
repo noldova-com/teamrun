@@ -69,7 +69,7 @@ export class PreloadTests {
       PreloadTests.invoke(api["readBuild"]),
       PreloadTests.invoke(api["copyText"], "text"),
       PreloadTests.invoke(api["openLogFolder"]),
-      PreloadTests.invoke(api["edit"], "copy"),
+      PreloadTests.invoke(api["edit"], "Copy"),
       PreloadTests.invoke(api["answerQuit"], "wait")
     ]);
 
@@ -83,7 +83,7 @@ export class PreloadTests {
       ["teamrun:readBuild"],
       ["teamrun:copyText", "text"],
       ["teamrun:openLogFolder"],
-      ["teamrun:edit", "copy"],
+      ["teamrun:edit", "Copy"],
       ["teamrun:quitAnswer", "wait"]
     ]), JSON.stringify(electron.invoked));
     Assert.areEqual(JSON.stringify(electron.invoked.map(t => t.length)), JSON.stringify(replies));

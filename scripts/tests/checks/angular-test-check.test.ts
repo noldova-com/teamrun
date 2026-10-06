@@ -198,22 +198,24 @@ class AngularTestCheckTests {
       assert.equal(await new AngularTestCheck(new AngularProjectFixture(new TotalsException("The report has no count passed."), [], root), null).runAsync(unreadable), false);
 
       assert.deepEqual(recorded, {
-        version: 2,
+        version: 3,
         runner: "angular",
         title: "Angular tests",
+        shard: null,
         discovered: 3,
         executed: 2,
         passed: 1,
         failed: 1,
+        rerunPassed: 0,
         skipped: 1,
         unselected: 0,
         unreached: 0,
         skips: [{ test: "a.spec.ts › A › waits", reason: "No reason given." }],
         files: ["a.spec.ts"],
+        expected: ["a.spec.ts"],
         coverage: { unit: "statements", covered: 7, total: 8 },
         duplicates: [],
-        empty: [],
-        missing: []
+        empty: []
       });
       assert.equal(failed.text, AngularTestCheckTests.LOG_HINT);
       assert.equal(disagreed.text, `Angular tests name 0 skipped tests but count 1.\n${AngularTestCheckTests.LOG_HINT}`);

@@ -83,7 +83,7 @@ export default class ScriptTestCheck implements ISelectableCheck {
     const covered = await new CoverageRun(this.root, this.runner).measureAsync(coverage, CoverageRun.formatProjectArguments(ScriptTestCheck.PROJECT, scripts, scripts, CoverageRun.NO_EXCLUSIONS, [ScriptTestCheck.TESTS_FOLDER]), environment);
     try {
       const result = await RunnerResult.readAsync(this.root, resultFile);
-      return await result.toTotals(ScriptTestCheck.RUNNER, ScriptTestCheck.TOTALS_TITLE, await CoverageRun.readCountAsync(this.root, coverageResult), await this.listAsync()).recordAsync(this.root, output) && testsPassed && covered;
+      return await result.toTotals(ScriptTestCheck.RUNNER, ScriptTestCheck.TOTALS_TITLE, await CoverageRun.readCountAsync(this.root, coverageResult), await this.listAsync(), null).recordAsync(this.root, output) && testsPassed && covered;
     }
     catch (error) {
       if (!(error instanceof TotalsException))

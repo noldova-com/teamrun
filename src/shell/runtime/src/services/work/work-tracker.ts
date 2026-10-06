@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import { WorkReport } from "@noldova/teamrun-shell-protocol";
 
 import { WorkItem } from "../../models/work-item.js";
@@ -31,7 +32,7 @@ export class WorkTracker {
     return new WorkReport(this.descriptions, this.sequence);
   }
 
-  public begin(description: string, owner: string = ""): WorkItem {
+  public begin(description: string, owner: string = String.empty): WorkItem {
     const item = new WorkItem(description, t => this.end(t));
     this.items.set(item, owner);
     this.notify();

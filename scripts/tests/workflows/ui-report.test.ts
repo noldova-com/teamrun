@@ -10,14 +10,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import FlakyTest from "../../checks/flaky-test.ts";
+import RunnerTotals from "../../totals/runner-totals.ts";
 import UiReport from "../../workflows/ui-report.ts";
 import UiReportException from "../../workflows/ui-report.exception.ts";
 
 class UiReportTests {
-  private static readonly STATS: object = { expected: 4, unexpected: 1, flaky: 1, skipped: 2, duration: 12345.6 };
+  private static readonly STATS: object = { duration: 12345.6 };
+  private static readonly TOTALS: RunnerTotals = new RunnerTotals("ui", "UI workflows", { discovered: 6, passed: 5, failed: 0, rerunPassed: 0, skipped: 1, unselected: 0, unreached: 0 }, [{ test: "e2e/a.spec.ts › waits", reason: "Later." }], ["e2e/a.spec.ts"], null, { duplicates: [], empty: [] }, { expected: ["e2e/a.spec.ts"], shard: null });
 
   public static register(): void {
-    test("the report counts the outcomes and names each failure with its first error line", () => {
+    test("the report keeps the run's duration and platform log lines and names each failure with its first error line", () => {
       const report = UiReport.parse(JSON.stringify({
         stats: UiReportTests.STATS,
         suites: [{
@@ -35,7 +37,7 @@ class UiReportTests {
         }, { title: "", specs: [{ title: "top-level", tests: [{ status: "unexpected" }] }] }]
       }));
 
-      assert.deepEqual([report.passed, report.failed, report.flaky, report.skipped, report.durationMs, report.platformLogLines], [4, 1, 1, 2, 12345.6, 2]);
+      assert.deepEqual([report.durationMs, report.platformLogLines], [12345.6, 2]);
       assert.deepEqual(report.failures.map(t => [t.title, t.message]), [
         ["empty-window.spec.ts › the empty window › closes", "Error: expected 0"],
         ["empty-window.spec.ts › the empty window › is quiet", "No error message was reported."],
@@ -63,23 +65,31 @@ class UiReportTests {
       assert.deepEqual(report.failures, []);
     });
 
-    test("the summary shows the counts, the duration and the screenshot link, or says there is no screenshot", () => {
-      const report = new UiReport(5, 0, 0, 0, 2500, [], 3, []);
+    test("the summary shows the totals with their skipped tests, the duration and the screenshot link, or says there is no screenshot", () => {
+      const report = new UiReport(2500, [], 3, []);
 
-      assert.equal(report.formatSummary("Linux x64", "https://github.com/noldova-com/teamrun/actions/runs/1/artifacts/2"),
-        "### UI workflows: Linux x64\n\n| Passed | Failed | Flaky | Skipped | Duration | Platform log lines |\n|---|---|---|---|---|---|\n| 5 | 0 | 0 | 0 | 2.5 s | 3 |\n\n" +
-        "[Main window screenshot](https://github.com/noldova-com/teamrun/actions/runs/1/artifacts/2)\n");
-      assert.ok(report.formatSummary("Linux x64", undefined).endsWith("\n\nNo main-window screenshot was kept.\n"));
-      assert.ok(report.formatSummary("Linux x64", "").endsWith("\n\nNo main-window screenshot was kept.\n"));
-      assert.ok(report.formatSummary("Linux x64", "", true).endsWith("\n\nNo main-window screenshot link: its upload failed.\n"));
-      assert.ok(report.formatSummary("Linux x64", "https://example.com/a", true).endsWith("[Main window screenshot](https://example.com/a)\n"));
+      assert.equal(report.formatSummary("Linux x64", UiReportTests.TOTALS, "https://github.com/noldova-com/teamrun/actions/runs/1/artifacts/2", false),
+        "### UI workflows: Linux x64\n\n| Tests | Discovered | Executed | Passed | Failed | Skipped | Unselected | Unreached | Coverage |\n|---|---|---|---|---|---|---|---|---|\n" +
+        "| UI workflows | 6 | 5 | 5 | 0 | 1 | 0 | 0 | Not measured |\n\n<details><summary>UI workflows skipped (1)</summary>\n\n- e2e/a.spec.ts › waits: Later.\n\n</details>\n\n" +
+        "Duration 2.5 s, 3 platform log lines.\n\n[Main window screenshot](https://github.com/noldova-com/teamrun/actions/runs/1/artifacts/2)\n");
+      assert.ok(report.formatSummary("Linux x64", UiReportTests.TOTALS, undefined, false).endsWith("\n\nNo main-window screenshot was kept.\n"));
+      assert.ok(report.formatSummary("Linux x64", UiReportTests.TOTALS, "", false).endsWith("\n\nNo main-window screenshot was kept.\n"));
+      assert.ok(report.formatSummary("Linux x64", UiReportTests.TOTALS, "", true).endsWith("\n\nNo main-window screenshot link: its upload failed.\n"));
+      assert.ok(report.formatSummary("Linux x64", UiReportTests.TOTALS, "https://example.com/a", true).endsWith("[Main window screenshot](https://example.com/a)\n"));
+    });
+
+    test("the summary says beside the failed count how many tests the totals record as passing only when run again", () => {
+      const totals = new RunnerTotals("ui", "UI workflows", { discovered: 2, passed: 1, failed: 1, rerunPassed: 1, skipped: 0, unselected: 0, unreached: 0 }, [], ["e2e/a.spec.ts"], null, { duplicates: [], empty: [] }, { expected: ["e2e/a.spec.ts"], shard: "1/2" });
+      const report = new UiReport(0, [], 0, [new FlakyTest("UI workflows", "src/shell/desktop/tests/e2e/a.spec.ts", "a.spec.ts › docks", "Error: first")]);
+
+      assert.ok(report.formatSummary("Linux x64", totals, undefined, false).includes("| UI workflows | 2 | 2 | 1 | 1 (1 passed when run again; see the flaky record) | 0 | 0 | 0 | Not measured |\n"));
     });
 
     test("the summary lists at most twenty failures, escaped, and counts the rest", () => {
       const failures = Array.from({ length: 22 }, (_, index) => ({ title: `case ${index}`, message: "a <b> & c | `d`" }));
-      const report = new UiReport(0, 22, 0, 0, 0, failures, 0, []);
+      const report = new UiReport(0, failures, 0, []);
 
-      const summary = report.formatSummary("macOS <ARM64>", undefined);
+      const summary = report.formatSummary("macOS <ARM64>", UiReportTests.TOTALS, undefined, false);
 
       assert.ok(summary.startsWith("### UI workflows: macOS &lt;ARM64&gt;\n"));
       assert.ok(summary.includes("\n<details><summary>Failures (22)</summary>\n\n- case 0: a &lt;b&gt; &amp; c &#124; &#96;d&#96;\n"));
@@ -102,7 +112,7 @@ class UiReportTests {
         "{",
         "null",
         "{}",
-        JSON.stringify({ stats: { ...UiReportTests.STATS, expected: -1 } }),
+        JSON.stringify({ stats: { ...UiReportTests.STATS, duration: -1 } }),
         JSON.stringify({ stats: { ...UiReportTests.STATS, duration: "1" } }),
         JSON.stringify({ stats: UiReportTests.STATS, suites: {} }),
         JSON.stringify({ stats: UiReportTests.STATS, suites: [1] }),
