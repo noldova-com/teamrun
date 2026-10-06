@@ -12,6 +12,7 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import ProcessResult from "./process-result.ts";
+import ProcessTimeoutException from "./process-timeout.exception.ts";
 import ProcessException from "./process.exception.ts";
 import StartedProcess from "./started-process.ts";
 
@@ -38,7 +39,7 @@ export default class ProcessRunner {
         else
           chunks.push(chunk);
       };
-      const timer = setTimeout(() => stop(new ProcessException(`"${command}" did not finish within ${timeout} ms.`)), timeout);
+      const timer = setTimeout(() => stop(new ProcessTimeoutException(`"${command}" did not finish within ${timeout} ms.`)), timeout);
       child.stdout.on("data", (t: Buffer) => receive(output, t));
       child.stderr.on("data", (t: Buffer) => receive(errorOutput, t));
       child.on("error", t => stop(new ProcessException(`"${command}" could not start.`, { cause: t })));
