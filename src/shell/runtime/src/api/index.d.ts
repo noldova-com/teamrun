@@ -14,7 +14,7 @@ import type { Readable, Writable } from "node:stream";
 import { type ArgumentException, type ArgumentOutOfRangeException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type {
-  BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response,
+  BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, ProgramStatus, ProgramStatusList, QualifiedName, Response,
   RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingEntry, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 
@@ -47,6 +47,12 @@ export declare enum DataDirectoryState {
  */
 export declare class BackupVerificationException extends Exception {
   /**
+   * The exception's name, `"BackupVerificationException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param options The failure that prevented the check, if any.
@@ -66,6 +72,12 @@ export declare class BackupVerificationException extends Exception {
  * The exception thrown when another process already owns a data directory.
  */
 export declare class DataDirectoryOwnedException extends Exception {
+  /**
+   * The exception's name, `"DataDirectoryOwnedException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The absolute path of the data directory another process owns.
    */
@@ -95,6 +107,12 @@ export declare class DataDirectoryOwnedException extends Exception {
  */
 export declare class DiscoveryFormatException extends Exception {
   /**
+   * The exception's name, `"DiscoveryFormatException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong with the metadata.
@@ -116,6 +134,12 @@ export declare class DiscoveryFormatException extends Exception {
  * fails. Its changes and its history row were rolled back together.
  */
 export declare class MigrationException extends Exception {
+  /**
+   * The exception's name, `"MigrationException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The id of the migration that failed.
    */
@@ -145,6 +169,12 @@ export declare class MigrationException extends Exception {
  */
 export declare class ModuleDatabaseException extends Exception {
   /**
+   * The exception's name, `"ModuleDatabaseException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What went wrong.
@@ -164,6 +194,12 @@ export declare class ModuleDatabaseException extends Exception {
  */
 export declare class OwnershipReleasedException extends Exception {
   /**
+   * The exception's name, `"OwnershipReleasedException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    * @example
    * ```ts
@@ -182,6 +218,12 @@ export declare class OwnershipReleasedException extends Exception {
  * that predates the shell. Such data is neither migrated nor reset.
  */
 export declare class PreShellDataException extends Exception {
+  /**
+   * The exception's name, `"PreShellDataException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The absolute path of the data directory.
    */
@@ -217,6 +259,12 @@ export declare class PreShellDataException extends Exception {
  */
 export declare class SystemCommandException extends Exception {
   /**
+   * The exception's name, `"SystemCommandException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What failed.
@@ -240,6 +288,12 @@ export declare class SystemCommandException extends Exception {
  * history. The database is left unchanged.
  */
 export declare class UnknownSchemaException extends Exception {
+  /**
+   * The exception's name, `"UnknownSchemaException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -1481,6 +1535,12 @@ export declare enum EndpointKind {
  */
 export declare class ConnectionException extends Exception {
   /**
+   * The exception's name, `"ConnectionException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * The failure the runtime answered with, a `Disconnected` failure when an established connection has ended,
    * or `null` when the runtime could not be reached, did not finish the handshake or did not answer in time.
    */
@@ -1511,6 +1571,12 @@ export declare class ConnectionException extends Exception {
  */
 export declare class LaunchException extends Exception {
   /**
+   * The exception's name, `"LaunchException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What went wrong.
@@ -1531,6 +1597,12 @@ export declare class LaunchException extends Exception {
  * The exception thrown when a module's program is not found or cannot be started.
  */
 export declare class ProcessStartException extends Exception {
+  /**
+   * The exception's name, `"ProcessStartException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -1555,6 +1627,12 @@ export declare class ProcessStartException extends Exception {
  */
 export declare class ProductFileException extends Exception {
   /**
+   * The exception's name, `"ProductFileException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong.
@@ -1575,6 +1653,12 @@ export declare class ProductFileException extends Exception {
  * The exception a method handler throws to answer its request with a specific failure.
  */
 export declare class MethodFailureException extends Exception {
+  /**
+   * The exception's name, `"MethodFailureException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The failure the request is answered with.
    */
@@ -1601,6 +1685,12 @@ export declare class MethodFailureException extends Exception {
  * The exception thrown when the data directory holds data from a release that predates the shell. The runtime is refusing until the data is moved aside.
  */
 export declare class PreShellDataFoundException extends Exception {
+  /**
+   * The exception's name, `"PreShellDataFoundException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Where the old data is.
    */
@@ -1630,6 +1720,12 @@ export declare class PreShellDataFoundException extends Exception {
  */
 export declare class DeclarationsFormatException extends Exception {
   /**
+   * The exception's name, `"DeclarationsFormatException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong.
@@ -1652,6 +1748,12 @@ export declare class DeclarationsFormatException extends Exception {
  */
 export declare class ModuleLoadException extends Exception {
   /**
+   * The exception's name, `"ModuleLoadException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong.
@@ -1673,6 +1775,12 @@ export declare class ModuleLoadException extends Exception {
  */
 export declare class ServiceAccessException extends Exception {
   /**
+   * The exception's name, `"ServiceAccessException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What went wrong.
@@ -1692,6 +1800,12 @@ export declare class ServiceAccessException extends Exception {
  * The exception thrown when a method, event or service name is registered twice, an event is published after it was withdrawn, or a module registers a name its declaration does not contribute or publishes a service under another owner's id.
  */
 export declare class RegistrationException extends Exception {
+  /**
+   * The exception's name, `"RegistrationException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -1714,6 +1828,12 @@ export declare class RegistrationException extends Exception {
  * lets it escape answers with its failure.
  */
 export declare class SettingException extends MethodFailureException {
+  /**
+   * The exception's name, `"SettingException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -1738,6 +1858,12 @@ export declare class SettingException extends MethodFailureException {
  * was told not to take it over.
  */
 export declare class BuildMismatchException extends Exception {
+  /**
+   * The exception's name, `"BuildMismatchException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The running runtime's build identity and the program it runs from.
    */
@@ -1766,6 +1892,12 @@ export declare class BuildMismatchException extends Exception {
  */
 export declare class NoRuntimeException extends Exception {
   /**
+   * The exception's name, `"NoRuntimeException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * The data directory's root.
    */
   public readonly root: string;
@@ -1790,6 +1922,12 @@ export declare class NoRuntimeException extends Exception {
  * The exception thrown when a newer build's runtime owns the data directory, so this older build hands the person over to it.
  */
 export declare class RuntimeHandoverException extends Exception {
+  /**
+   * The exception's name, `"RuntimeHandoverException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The newer runtime's build identity and the program it runs from.
    */
@@ -1816,6 +1954,12 @@ export declare class RuntimeHandoverException extends Exception {
  * The exception thrown when an older build's runtime refuses to stop because work is in progress, so the person must choose to wait or stop it.
  */
 export declare class WorkInProgressException extends Exception {
+  /**
+   * The exception's name, `"WorkInProgressException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The work in progress.
    */
@@ -3678,6 +3822,21 @@ export declare class RunningProgram {
    * ```
    */
   public constructor(moduleId: string, program: string, processId: number, started: Date, hasExited?: boolean);
+
+  /**
+   * Returns what `shell.programs` reports of the program: never its
+   * arguments or environment, which it does not hold.
+   *
+   * @returns The program's status.
+   * @example
+   * ```ts
+   * import type { ProgramStatus } from "@noldova/teamrun-shell-protocol";
+   * import { RunningProgram } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const status: ProgramStatus = new RunningProgram("git", "/usr/bin/git", 4_210, new Date()).toStatus();
+   * ```
+   */
+  public toStatus(): ProgramStatus;
 }
 
 /**
@@ -5572,8 +5731,8 @@ export declare class NotificationPolicy {
   public constructor(declarations: readonly ModuleDeclaration[], isActive: (moduleId: string) => boolean);
 
   /**
-   * Checks a window part's post: its kind's module is active and declares the kind, and its commands are that module's own
-   * or a dependency's.
+   * Checks a window's post: its kind's module is active and declares the kind, and its commands are that module's own
+   * or a dependency's. A kind of the shell's own, from `ShellNotifications`, is allowed without commands.
    *
    * @param post The post.
    * @returns Why the post is refused, safe to show, or `null` when it is allowed.
@@ -6014,6 +6173,32 @@ export declare class ProcessSupervisor {
    * exited.
    */
   public get programs(): readonly RunningProgram[];
+
+  /**
+   * The programs as `shell.programs` reports them, with the count of changes
+   * to them so far as the sequence.
+   */
+  public get status(): ProgramStatusList;
+
+  /**
+   * Follows the programs: the listener is called once after each change, so
+   * after a program starts, after a program exits and it is known whether its
+   * process group still runs, and after programs begin to be stopped. A
+   * clean exit that leaves the group running and the group's end are
+   * separate changes.
+   *
+   * @param listener Called after each change.
+   * @returns The registration; disposing it stops the listener.
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor, Registration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function watch(processes: ProcessSupervisor, report: (count: number) => void): Registration {
+   *   return processes.onChanged(() => report(processes.programs.length));
+   * }
+   * ```
+   */
+  public onChanged(listener: () => void): Registration;
 
   /**
    * Starts a program for a module; see

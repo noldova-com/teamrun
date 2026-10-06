@@ -22,13 +22,13 @@ import { DockComponent } from "../dock/dock.component";
 import { DockingGuidesComponent } from "../docking-guides/docking-guides.component";
 import { EmptyWindowComponent } from "../empty-window/empty-window.component";
 import { SplitSashComponent } from "../split-sash/split-sash.component";
-import { TabContentComponent } from "../tab-content/tab-content.component";
 import { TabGroupComponent } from "../tab-group/tab-group.component";
+import { TabSlotComponent } from "../tab-slot/tab-slot.component";
 import { Resources } from "../../../resources";
 
 @Component({
   selector: "tr-workspace",
-  imports: [DockComponent, DockingGuidesComponent, EmptyWindowComponent, SplitSashComponent, TabContentComponent, TabGroupComponent],
+  imports: [DockComponent, DockingGuidesComponent, EmptyWindowComponent, SplitSashComponent, TabGroupComponent, TabSlotComponent],
   templateUrl: "./workspace.component.html",
   styleUrl: "./workspace.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,

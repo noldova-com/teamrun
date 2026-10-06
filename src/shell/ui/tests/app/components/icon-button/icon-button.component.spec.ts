@@ -12,7 +12,7 @@ import { userEvent } from "vitest/browser";
 
 import { IconButtonComponent } from "../../../../src/app/components/icon-button/icon-button.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

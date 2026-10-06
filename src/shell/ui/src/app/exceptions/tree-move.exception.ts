@@ -9,6 +9,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class TreeMoveException extends Exception {
+  public override readonly name: string = "TreeMoveException";
+
   public constructor(message: string) {
     super(message);
   }

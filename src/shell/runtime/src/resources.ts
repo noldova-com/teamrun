@@ -223,6 +223,8 @@ export class Resources {
   public static readonly mutedModulesSetting: string = "mutedModules";
   public static readonly keyBindingsSetting: string = "keyBindings";
   public static readonly recentCommandCountSetting: string = "recentCommandCount";
+  public static readonly spellCheckSetting: string = "spellCheck";
+  public static readonly spellCheckLanguagesSetting: string = "spellCheckLanguages";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
@@ -230,6 +232,7 @@ export class Resources {
   public static readonly textGroup: string = "Text";
   public static readonly layoutGroup: string = "Layout";
   public static readonly commandSearchGroup: string = "Command search";
+  public static readonly spellingGroup: string = "Spelling";
   public static readonly notificationsGroup: string = "Notifications";
   public static readonly shortcutsGroup: string = "Keys";
   public static readonly defaultThemeId: string = "shell.default";
@@ -279,6 +282,10 @@ export class Resources {
   public static readonly mutedModulesDescription: string = "A module turned off still adds its notifications to the list, without toasts or operating system notifications.";
   public static readonly keyBindingsTitle: string = "Keyboard shortcuts";
   public static readonly keyBindingsDescription: string = "The keys you chose for commands, in place of their default keys, on every device.";
+  public static readonly spellCheckTitle: string = "Check spelling";
+  public static readonly spellCheckDescription: string = "Underline misspelled words in the text you type and offer corrections in the text field's menu. Code is never checked.";
+  public static readonly spellCheckLanguagesTitle: string = "Spelling languages";
+  public static readonly spellCheckLanguagesDescription: string = "The languages words are checked in on this device. With none chosen, the operating system's languages that have a dictionary are used, or else the first language offered. On macOS the system chooses the languages.";
   public static readonly recentCommandCountTitle: string = "Recent commands";
   public static readonly recentCommandCountDescription: string = "How many commands you recently ran from command search are listed first. 0 lists none.";
   public static readonly maximumRecentCommands: number = 20;
@@ -702,6 +709,14 @@ export class Resources {
 
   public static formatNotificationCommandNotAllowed(moduleId: string, command: string): string {
     return `The module ${moduleId} may not offer the command ${command} in a notification; it must be its own or a dependency's.`;
+  }
+
+  public static formatShellNotificationUnknown(kind: string): string {
+    return `The shell posts no notification of the kind ${kind}.`;
+  }
+
+  public static formatShellNotificationCommand(kind: string): string {
+    return `The shell's notification kind ${kind} offers no command.`;
   }
 
   public static formatNotificationNotFound(id: string): string {

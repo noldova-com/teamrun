@@ -11,6 +11,7 @@ import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-ex
 import type { FailureCode } from "../enums/failure-code.js";
 
 export class ProtocolException extends Exception {
+  public override readonly name: string = "ProtocolException";
   public readonly code: FailureCode;
 
   public constructor(code: FailureCode, message: string, options?: ExceptionOptions) {

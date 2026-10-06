@@ -12,7 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import { PanelCardComponent } from "../../../../src/app/components/panel-card/panel-card.component";
 import { PanelSurface } from "../../../../src/app/enums/panel-surface";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

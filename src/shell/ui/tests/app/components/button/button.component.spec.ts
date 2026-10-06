@@ -13,7 +13,7 @@ import { userEvent } from "vitest/browser";
 import { ButtonComponent } from "../../../../src/app/components/button/button.component";
 import { ButtonVariant } from "../../../../src/app/enums/button-variant";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

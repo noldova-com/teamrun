@@ -11,6 +11,8 @@ import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-ex
 import { Resources } from "../resources.js";
 
 export class BackupVerificationException extends Exception {
+  public override readonly name: string = "BackupVerificationException";
+
   public constructor(options?: ExceptionOptions) {
     super(Resources.backupUnverified, options);
   }

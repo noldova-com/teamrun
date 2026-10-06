@@ -13,6 +13,7 @@ import { Resources } from "../resources.js";
 import { TestingException } from "./testing.exception.js";
 
 export class TestTimeoutException extends TestingException {
+  public override readonly name: string = "TestTimeoutException";
   public readonly timeoutMilliseconds: number;
 
   public constructor(timeoutMilliseconds: number, options?: ExceptionOptions) {

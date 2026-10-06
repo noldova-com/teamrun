@@ -11,7 +11,7 @@ import { TestBed } from "@angular/core/testing";
 
 import { CardComponent } from "../../../../src/app/components/card/card.component";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
-import { DefaultTheme } from "../../../../src/app/themes/default-theme";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
 @Component({

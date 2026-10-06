@@ -431,6 +431,29 @@ export interface IWindowPartContext {
   registerTopBarAction(action: TopBarActionContribution): TopBarAction;
 
   /**
+   * Registers a step that saves the part's unsaved state when TeamRun
+   * closes, quits for a newer build or restarts. The window runs every
+   * part's steps and its own layout save together and closes only once they
+   * settle. A step that rejects keeps TeamRun open: the window logs the
+   * error and shows it as a notification naming the module, and the person
+   * closes again once it is fixed. A part whose steps have not settled after
+   * 4 seconds does not hold closing back: TeamRun closes, and the window
+   * logs it and posts a warning naming the module.
+   *
+   * @param save The step; it resolves once the state is saved.
+   * @returns A function that removes the step; deactivation removes it too.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function saveDraftsOnClose(context: IWindowPartContext, saveDraftsAsync: () => Promise<void>): () => void {
+   *   return context.registerSave(saveDraftsAsync);
+   * }
+   * ```
+   */
+  registerSave(save: () => Promise<void>): () => void;
+
+  /**
    * Supplies the rows of one of the module's dynamic menu groups. The window
    * asks again whenever it builds the menu or toolbar, and leaves out a row
    * whose command belongs to neither the module nor a dependency, and a group
@@ -473,6 +496,36 @@ export interface IWindowPartContext {
    * ```
    */
   setViewBadge(view: string, badge: ViewBadge | null): void;
+
+  /**
+   * Marks the tab of one of the module's views or documents as working. The
+   * tab shows a spinner in place of its close glyph, reveals Close when hovered
+   * or focused, and is marked busy for assistive technology, until every mark
+   * on it is cleared or the part is withdrawn. Real work that should hold up
+   * quitting is reported by the module's runtime part, not by this mark.
+   *
+   * @param name The view's or document's name, which the module declares in
+   * `contributes.views` or `contributes.documents`.
+   * @param instance The tab's instance, if it has one.
+   * @returns A function that clears this mark; calling it again does nothing.
+   * @throws Error synchronously when the name belongs to another module, the
+   * module declares no such view or document, or the instance is not valid.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export async function syncNoteAsync(context: IWindowPartContext, note: string, sync: () => Promise<void>): Promise<void> {
+   *   const clear = context.markWorking("notes.note", note);
+   *   try {
+   *     await sync();
+   *   }
+   *   finally {
+   *     clear();
+   *   }
+   * }
+   * ```
+   */
+  markWorking(name: string, instance?: string): () => void;
 
   /**
    * Tells whether a name belongs to the module or one of its dependencies,
@@ -611,6 +664,27 @@ export interface IWindowPartContext {
    * ```
    */
   log(message: string): void;
+
+  /**
+   * Opens a link in the system's own application, such as a web page in the
+   * person's browser or a new message in their mail app. TeamRun opens only
+   * well-formed http, https and mailto links without credentials, and never
+   * asks first. A click on such a link in the window's content opens it the
+   * same way, unless the part handled the click itself.
+   *
+   * @param url The link to open.
+   * @returns A promise that settles once the system has taken the link; it
+   * rejects when TeamRun refuses the link or the system cannot open it.
+   * @example
+   * ```ts
+   * import type { IWindowPartContext } from "@noldova/teamrun-shell-window";
+   *
+   * export function openHelp(context: IWindowPartContext): Promise<void> {
+   *   return context.openLinkAsync("https://example.com/help");
+   * }
+   * ```
+   */
+  openLinkAsync(url: string): Promise<void>;
 
   /**
    * Calls a method of the module's runtime part or a dependency's.
@@ -1492,6 +1566,15 @@ export declare class WindowPartTokens {
    * The {@link ContentPaddingRef} of the page the component is shown on.
    */
   public static readonly contentPadding: InjectionToken<ContentPaddingRef>;
+
+  /**
+   * Whether the page the component is shown on is in view.
+   * @remarks The window keeps a tab's page while the tab is open. A hidden
+   * page is taken out of the document and gets no change detection until it
+   * shows again, so a component reads this signal to pause work of its own,
+   * such as timers, while it is hidden.
+   */
+  public static readonly shown: InjectionToken<Signal<boolean>>;
 }
 
 /**

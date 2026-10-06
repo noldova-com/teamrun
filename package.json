@@ -30,6 +30,7 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
+    "format:documents": "node scripts/format-documents.ts",
     "package": "node scripts/package.ts",
     "package:smoke": "node scripts/package-smoke.ts",
     "release:assets": "node scripts/release-assets.ts",

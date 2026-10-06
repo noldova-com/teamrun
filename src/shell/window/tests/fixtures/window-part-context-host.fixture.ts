@@ -44,6 +44,11 @@ export class WindowPartContextHostFixture implements IWindowPartHost {
     this.calls.push(`log ${moduleId} ${message}`);
   }
 
+  public openLinkAsync(url: string): Promise<void> {
+    this.calls.push(`openLink ${url}`);
+    return Promise.resolve();
+  }
+
   public showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void> {
     this.calls.push(`show ${name} ${instance ?? "-"} ${title ?? "-"}`);
     return Promise.resolve();
@@ -112,6 +117,10 @@ export class WindowPartContextHostFixture implements IWindowPartHost {
 
   public setViewBadge(view: string, badge: ViewBadge | null): void {
     this.calls.push(`badge ${view} ${badge?.count ?? "dot"} ${badge?.description ?? "none"}`);
+  }
+
+  public setTabWorking(tabKey: string, isWorking: boolean): void {
+    this.calls.push(`working ${tabKey} ${isWorking}`);
   }
 
   public refresh(): void {
