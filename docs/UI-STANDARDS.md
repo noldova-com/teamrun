@@ -327,7 +327,7 @@ The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
   Non-modal search and popovers do not accidentally trap focus.
   See the [modal-dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
 - Dialogs are the shell's own, drawn in the window.
-  The exceptions are a window whose page has stopped or no longer responds, because the page cannot draw then, and a desktop whose main process has failed, because the window's dialogs run through it: the desktop asks with the operating system's message box, in the product's voice, with the safe choice as default.
+  The exceptions are a window whose page has stopped or no longer responds, because the page cannot draw then, a desktop whose main process has failed, because the window's dialogs run through it, and a desktop that starts while an update holds its installation, because it must exit without opening a window: the desktop asks with the operating system's message box, in the product's voice, with the safe choice as default.
 - Pointer targets are at least 24 by 24 CSS pixels or meet a documented spacing/equivalent-control exception.
   A target sized in rem keeps this minimum when the root is small.
   Visual glyphs, hover pads and hit regions can differ, but hit regions must not overlap adjacent controls.

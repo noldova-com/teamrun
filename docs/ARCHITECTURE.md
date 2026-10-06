@@ -992,7 +992,7 @@ It is written whole to a temporary file and linked into place, which fails when 
 While it holds:
 
 - No launcher starts a runtime, and a runtime that finds it after taking ownership releases ownership and exits.
-- A desktop that starts tells the person that TeamRun is installing an update and exits.
+- A desktop that starts, before it opens a window, tells the person that TeamRun is installing an update and exits.
 - The command line waits for it as section 6 describes.
 
 A barrier whose holder no longer runs, matched by process id and start time, is settled by the next desktop or command line of the installation:
