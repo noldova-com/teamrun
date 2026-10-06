@@ -19,6 +19,7 @@ test.describe("working tabs", () => {
     await expect(tab).toHaveAttribute("aria-busy", "true");
     await expect(tab.locator(".tr-tab-spinner")).toBeVisible();
     await expect(tab.locator(".tr-tab-close")).toBeHidden();
+    await desktop.checkpointAsync("working-tab");
     await tab.hover();
     await expect(tab.locator(".tr-tab-close")).toBeVisible();
     await expect(tab.locator(".tr-tab-spinner")).toBeHidden();

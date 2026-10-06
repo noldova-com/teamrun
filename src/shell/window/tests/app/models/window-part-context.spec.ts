@@ -321,6 +321,18 @@ describe("WindowPartContext", () => {
     ]);
   });
 
+  it("keeps a tab marked after a withdraw working when a mark from before the withdraw is cleared", () => {
+    const old = context.markWorking("notes.note", "1");
+    context.withdraw();
+    const current = context.markWorking("notes.note", "1");
+    old();
+    const before = [...host.calls];
+    current();
+
+    expect(before).toEqual(["working document/notes.note/1 true", "working document/notes.note/1 false", "refresh", "working document/notes.note/1 true"]);
+    expect(host.calls.slice(before.length)).toEqual(["working document/notes.note/1 false"]);
+  });
+
   it("withdraws its contributions and listeners and has the host refresh", () => {
     const heard: JsonValue[] = [];
     context.registerView(view("notes.list"));

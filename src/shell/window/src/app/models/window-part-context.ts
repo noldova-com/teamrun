@@ -44,7 +44,7 @@ export class WindowPartContext implements IWindowPartContext {
   private readonly saveList: (() => Promise<void>)[] = [];
   private readonly subscriptions: (() => void)[] = [];
   private readonly badgedViews: Set<string> = new Set();
-  private readonly workingTabs: Map<string, number> = new Map();
+  private readonly workingTabs: Map<string, Set<object>> = new Map();
 
   public readonly moduleId: string;
 
@@ -152,20 +152,16 @@ export class WindowPartContext implements IWindowPartContext {
 
   public markWorking(name: string, instance?: string): () => void {
     const key = this.findOwnTab(name, instance).key;
-    const count = this.workingTabs.get(key) ?? 0;
-    this.workingTabs.set(key, count + 1);
-    if (count === 0)
+    const mark = {};
+    const marks = this.workingTabs.get(key) ?? new Set<object>();
+    marks.add(mark);
+    if (marks.size === 1) {
+      this.workingTabs.set(key, marks);
       this.host.setTabWorking(key, true);
-    let isMarked = true;
+    }
     return () => {
-      const left = this.workingTabs.get(key);
-      if (!isMarked || Object.isUndefined(left))
+      if (!marks.delete(mark) || marks.size > 0)
         return;
-      isMarked = false;
-      if (left > 1) {
-        this.workingTabs.set(key, left - 1);
-        return;
-      }
       this.workingTabs.delete(key);
       this.host.setTabWorking(key, false);
     };
@@ -260,8 +256,10 @@ export class WindowPartContext implements IWindowPartContext {
     for (const view of [...this.badgedViews])
       this.host.setViewBadge(view, null);
     this.badgedViews.clear();
-    for (const key of this.workingTabs.keys())
+    for (const [key, marks] of this.workingTabs) {
+      marks.clear();
       this.host.setTabWorking(key, false);
+    }
     this.workingTabs.clear();
     this.statusBarItemList.length = 0;
     this.topBarActionList.length = 0;
