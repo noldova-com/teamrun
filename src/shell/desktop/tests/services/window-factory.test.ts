@@ -107,7 +107,7 @@ export class WindowFactoryTests {
         nodeIntegration: false,
         nodeIntegrationInWorker: false,
         webSecurity: true,
-        spellcheck: false,
+        spellcheck: true,
         additionalArguments: []
       }
     }), JSON.stringify({ ...window.options, titleBarOverlay: undefined, trafficLightPosition: undefined, icon: undefined }));

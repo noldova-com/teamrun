@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { rm, writeFile } from "node:fs/promises";
+import { access, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
@@ -94,15 +94,24 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-shortcuts");
   });
 
-  test("Appearance's Spelling group checks spelling by default and says when no spelling language is offered", async ({ desktop }) => {
+  test("Appearance's Spelling group checks spelling by default and offers the shipped dictionaries, or says that macOS chooses the languages", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openAsync(window);
     const group = window.locator(".tr-settings-group").filter({ has: window.locator(".tr-settings-group-title", { hasText: "Spelling" }) });
+    const languages = row(window, "shell.spellCheckLanguages");
 
     await group.scrollIntoViewIfNeeded();
 
     await expect(group.getByRole("checkbox", { name: /Underline misspelled words/ })).toBeChecked();
-    await expect(group.locator(".tr-setting-row-note")).toHaveText("No spelling languages are offered on this device.");
+    if (process.platform === "darwin") {
+      await expect(languages.locator(".tr-setting-row-note")).toHaveText("On macOS the system chooses the spelling languages.");
+      await expect(languages.getByRole("checkbox")).toHaveCount(0);
+    } else {
+      await expect(languages.getByRole("checkbox", { name: "English (United States)" })).not.toBeChecked();
+      const notes = await languages.locator(".tr-setting-row-note").allTextContents();
+      expect(notes.filter(t => t !== "None of this device's languages has a dictionary here, so words are checked in English (United States).")).toEqual([]);
+      await access(path.join(desktop.dataDirectory, "desktop", "Dictionaries", "en-US-10-1.bdic"));
+    }
     await desktop.checkpointAsync("settings-spelling");
   });
 
