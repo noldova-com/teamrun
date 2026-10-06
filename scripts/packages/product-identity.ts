@@ -124,6 +124,10 @@ export default class ProductIdentity {
     ])];
   }
 
+  public isReleaseRepository(repository: string): boolean {
+    return repository.toLowerCase() === this.releaseRepository.toLowerCase();
+  }
+
   public formatDevelopmentApplicationId(checkout: string): string {
     const hash = createHash(ProductIdentity.CHECKOUT_HASH_ALGORITHM).update(realpathSync(checkout)).digest("hex").slice(0, ProductIdentity.CHECKOUT_HASH_LENGTH);
     return `${this.developmentApplicationId}.${hash}`;

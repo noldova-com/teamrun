@@ -44,6 +44,12 @@ class ReleaseNotesTests {
       assert.equal(none.split("\n\n")[1], "No target has passed its native acceptance yet, so every target was accepted by a CI run only.");
     });
 
+    test("a release to the product's own repository written in another case is no test release", () => {
+      const notes = ReleaseNotes.compose(ReleaseNotesTests.PRODUCT, [], "FixtureWorks/Studio", ReleaseNotesTests.VERSION, ReleaseNotesTests.RUN);
+
+      assert.equal(notes.split("\n\n")[0], ReleaseNotesTests.OPENING);
+    });
+
     test("a release to any other repository opens by marking itself an unsigned test release that installations never update from", () => {
       const notes = ReleaseNotes.compose(ReleaseNotesTests.PRODUCT, [], "fixtureworks/studio-trial", ReleaseNotesTests.VERSION, ReleaseNotesTests.RUN);
 

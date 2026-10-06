@@ -104,17 +104,21 @@ class ReleaseCheckTests {
       }
     });
 
-    test("an unsigned release to the product's own repository, its update feed, is refused before GitHub is asked anything", async t => {
+    test("an unsigned release to the product's own repository, its update feed, is refused before GitHub is asked anything, whatever the case it is written in", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest({ releaseRepository: GitHubApiFixture.REPOSITORY })) });
-      const github = new GitHubApiFixture();
-      const output = new TextOutputFixture();
 
-      assert.equal(await ReleaseCheckTests.checkAsync(repository, github, output), 1);
-      assert.equal(output.text, "Fixture Studio publishes no unsigned release to noldova-com/teamrun, its update feed, so its releases there start once its packages are signed. "
-        + "Run a trial in a test repository.\n");
-      assert.deepEqual(github.requests, []);
+      for (const requested of [GitHubApiFixture.REPOSITORY, "NOLDOVA-COM/teamrun"]) {
+        const github = new GitHubApiFixture();
+        const output = new TextOutputFixture();
+        const environment = { RELEASE_REPOSITORY: requested, RELEASE_VERSION: "0.0.7", RELEASE_REVISION: ReleaseCheckTests.REVISION };
+
+        assert.equal(await new ReleaseCheck(repository.directory, github, environment, output).runAsync([]), 1, requested);
+        assert.equal(output.text, `Fixture Studio publishes no unsigned release to ${requested}, its update feed, so its releases there start once its packages are signed. `
+          + "Run a trial in a test repository.\n", requested);
+        assert.deepEqual(github.requests, [], requested);
+      }
     });
 
     test("a GitHub failure other than a missing resource is reported, and an unexpected error reaches the caller", async t => {

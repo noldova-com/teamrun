@@ -54,6 +54,13 @@ class ProductIdentityTests {
       assert.notEqual(product.formatDevelopmentApplicationId(second.directory), id);
     });
 
+    test("the release repository is the update feed whatever the case it is written in, and no other repository is", () => {
+      const product = ProductIdentity.fromManifest(ProductIdentityFixture.manifest());
+
+      assert.deepEqual(["fixtureworks/studio", "FixtureWorks/Studio", "FIXTUREWORKS/STUDIO", "fixtureworks/studio-trial", "other/studio"].map(t => product.isReleaseRepository(t)),
+        [true, true, true, false, false]);
+    });
+
     test("the same device folder on several systems is one literal", () => {
       const product = ProductIdentity.fromManifest(ProductIdentityFixture.manifest({ deviceFolders: { windows: "Works/Studio", macos: "Works/Studio", linux: "works/studio" } }));
 

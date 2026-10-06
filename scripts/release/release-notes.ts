@@ -33,7 +33,7 @@ export default class ReleaseNotes {
         + (ciOnly.length === 0 ? "" : ` Accepted by a CI run only: ${ReleaseNotes.formatTargets(ciOnly)}.`),
       `Each target's package passed its install check on that target's own runner in the run that built it: ${runUrl}`
     ];
-    if (repository !== product.releaseRepository)
+    if (!product.isReleaseRepository(repository))
       paragraphs.unshift(`Unsigned test release of ${name}, published in ${repository}; an installed ${name} never updates from it.`);
     return paragraphs.join(ReleaseNotes.PARAGRAPH);
   }

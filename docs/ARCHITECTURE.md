@@ -945,6 +945,7 @@ Each target is packaged on its own platform and processor.
 - `release:publish` writes the release notes.
   They name the supported targets and the targets a CI run alone accepted, say whether the packages are signed, and link the run whose install checks the packages passed.
 - `teamrun.product.releaseRepository` names the repository whose releases are the update feed.
+  Like GitHub, the release scripts compare repository names without regard to case.
   A release published to any other repository is an unsigned test release: its notes open by saying so and that an installed TeamRun never updates from it.
   It follows every other rule here, including the versions and becoming that repository's latest release.
 - The **Release** workflow, `.github/workflows/release.yml`, releases its own repository.
