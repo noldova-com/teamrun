@@ -125,14 +125,14 @@ Each module declares itself in `module.json` at its folder's root, with exactly 
 | `description` | A sentence that tells people what the module does |
 | `parts` | Its parts, each once: `runtime`, `window` or `cli`, each with a folder of that name |
 | `dependencies` | The ids of the modules it depends on |
-| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus`, `themes`, `settings` and `settingScopes`, each of the form `<id>.<name>` with a camelCase name |
+| `contributes` | The names it registers, listed by kind: `methods`, `events`, `commands`, `notifications`, `views`, `documents`, `statusBarItems`, `topBarActions`, `menus`, `themes`, `settings`, `settingScopes` and `cliCommands`, each of the form `<id>.<name>` with a camelCase name |
 
-A module that contributes settings defines them in `settings.json`, and one that contributes menus in `menus.json`, each beside `module.json`, as section 5 describes.
+A module that contributes settings defines them in `settings.json`, one that contributes menus in `menus.json`, and one that contributes command-line commands in `cli.json`, each beside `module.json`, as section 5 describes.
 A module without parts may leave `module.json` out until it gains one, but a module the build lists must have it.
-An id is lowercase kebab-case and never `shell`.
+An id is lowercase kebab-case, never `shell` and never one of the words the [command line's document](../src/shell/cli/README.md#7-module-commands) reserves for its own commands.
 Dependencies form no cycle, and a build refuses a module whose dependency it does not include.
-The build validates the declarations, orders them after their dependencies and writes the runtime's view of them: each module's id, version, display name, description, dependencies, runtime package, contributions and settings, without its parts.
-The runtime reads that from `_build/modules/declarations.json` in the repository it is installed in, as the desktop finds the window's build there; a package keeps that layout, as [Packaging](#packaging) describes.
+The build validates the declarations, orders them after their dependencies and writes the runtime's and the command line's view of them: each module's id, version, display name, description, dependencies, runtime package, CLI package, contributions, settings and command-line commands, without its parts.
+The runtime and the command line read that from `_build/modules/declarations.json` in the repository they are installed in, as the desktop finds the window's build there; a package keeps that layout, as [Packaging](#packaging) describes.
 The window's parts and menus reach the window through source the build generates.
 A host reads the declarations before it runs any module code, so it applies a theme without activating the module's parts.
 
@@ -148,6 +148,7 @@ The runtime decides which modules are active, and the window and the CLI follow 
    Otherwise the runtime records its failure; the shell and unaffected modules continue.
 4. After handshake and reconnection, window/CLI hosts receive active modules and failures before sending module requests: `shell.modules` reports every module of the build in module order, with its version, display name, description, dependencies and declared contributions by kind, and its state: active, failed with its cause, or blocked with its cause and the dependency that blocks it.
    They activate only active modules' parts, in dependency order.
+   The command line activates only the part of the module whose command it runs and the parts of that module's dependencies, and none for its own commands.
    The window restores its saved layout once, after its parts first activate.
    With no saved layout to restore, documents a part opens while activating open as any document does.
    With a saved layout, the layout alone decides which tabs open: a document a part opens while it first activates shows only when the layout holds it, in its saved place, without changing which tab or document group is active.
@@ -233,7 +234,7 @@ The shell has no feature-specific entry lists and registers its own entries, inc
 | Themes | Themes in its declaration: for each, colors for the light and dark modes and a look, as data. The declaration lists only theme names so far; the format of that data is decided when a second theme is built | Offers them in Settings and applies the person's theme and mode before the window paints; uses the default theme when the chosen one is absent |
 | Protocol | Methods and events | Authenticates, routes and delivers them |
 | Storage | Its database's tables and migrations, and its files | Creates, migrates, backs up and closes its database |
-| CLI | Commands | Reads the command line and runs the command |
+| CLI | Commands under its id, from its CLI part, as [command-line commands](#command-line-commands): each with its arguments, options and help | Reads the command line against the declaration, prints the help, runs the command and prints its result |
 
 When two default shortcuts collide, the one registered first keeps the key, Settings shows the collision, and the person's binding decides.
 A saved layout keeps the place of a view or document whose module is absent and shows it again when the module returns.
@@ -464,6 +465,31 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
   The event carries the devices with Do not disturb on; the desktop adds its own device to its window's `shell.notifications` request and forwards the event as the state for that device, so the device's identity never reaches the window.
   The window changes both settings through `shell.setSetting`, like any other setting.
 
+### Command-line commands
+
+A module's CLI part registers the commands that `contributes.cliCommands` declares, each with its handler, and each runs under its module's id: `notes.addNote` is `teamrun notes add-note`, the kebab-case form of its name.
+A module defines them in `cli.json`, an object whose only field, `commands`, lists them, and the build refuses a file whose commands differ from those `module.json` declares.
+A command has exactly these fields:
+
+| Field | Holds |
+|---|---|
+| `name` | The command's name, `<id>.<name>` |
+| `summary` | One line for the list of commands in the help |
+| `description` | Optional text for the command's own help |
+| `arguments` | Its positional arguments in order, each with a camelCase `name`, a `description`, `required`, true by default, and `variadic`, false by default, for a last argument that takes the rest of the line |
+| `options` | Its options, each with a camelCase `name`, a `description` and a `type`: `Text`, `Number` or `Boolean`. A `Text` or `Number` option also takes `required` and `repeated`, both false by default, and a `default` its type accepts, which a required or repeated option has none of. A `Boolean` option takes no value and is true when given |
+| `examples` | Optional examples, each with `arguments`, the text after `teamrun <id> <command>`, and a `description` |
+
+The command line shows an argument as `<kebab-case>` and an option as `--kebab-case`.
+The build also refuses a command whose arguments and options repeat a name, a required argument after an optional one, a variadic argument that is not last, and an option whose command-line form is one of the command line's global options.
+
+The command line reads the call against the declaration before it starts or reaches a runtime, so a call that does not match starts none.
+It gives the handler the arguments and options as one frozen object keyed by their names, holding the default or nothing for those not given, and a signal that aborts when the command is cancelled or times out.
+A command reaches its module's runtime part only through requests on the command line's connection, never through the module's database or files.
+The handler returns the command's result, a JSON value and the text for people; the command line owns the output, and a part never writes to it.
+Help comes from the declarations alone, without a runtime or module code.
+The [command line's document](../src/shell/cli/README.md#7-module-commands) owns the syntax, the help, the output and the exit codes.
+
 ## 6. Runtime ownership and local protocol
 
 ### Ownership
@@ -659,7 +685,9 @@ The desktop cuts such text to its first 65,536 characters.
 - The command line runs on TeamRun's own program in Node mode and connects as the client `cli`, so it is always the same build as a runtime it starts.
   [Its document](../src/shell/cli/README.md) owns its commands, options, output and exit codes.
 - It starts a runtime for a command that needs one, unless asked not to.
-  Reporting the runtime's state never starts one.
+  Reporting the runtime's state and printing the help never start one.
+- It hosts modules' [command-line commands](#command-line-commands).
+  A module command or a runtime command that cannot run because its module is not active names that module and why.
 - It refuses another build's runtime and names it, unless asked to take over; it then takes over only an older build's idle runtime, never stopping work.
   The rule that the person is never asked to find and quit another TeamRun is the desktop's.
 - It reports data from before the shell and never moves it.
@@ -891,7 +919,7 @@ Each target is packaged on its own platform and processor.
 - **Stage.**
   The packaged app mirrors the checkout's layout, so the desktop, the runtime and the command line find their files by the same relative paths as in a checkout:
   - `package.json` names the product, its version, its Linux desktop name and the desktop's entry as `main`.
-  - `node_modules` holds the desktop, the command line and each module's runtime part with their dependencies.
+  - `node_modules` holds the desktop, the command line and each module's runtime and CLI parts with their dependencies.
     They are installed offline from the build's own archives, never from the registry, and without peer dependencies, since the program itself is the desktop's Electron.
   - `_build` holds the window, the module declarations and the product file of `npm run build -- --packaged`.
     The packaging checks the window again for the Gallery.

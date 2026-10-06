@@ -19,7 +19,7 @@ class RepeatSelectionTests {
         "scripts/tests/desktop/electron-binary.test.ts",
         "src/modules/notes/window/tests/app/list.spec.ts",
         "src/foundation/testing/tests/exceptions/assert-failed.exception.test.ts"
-      ], []);
+      ], [], 0);
 
       assert.deepEqual(selection.testArguments, [
         "--filter", "scripts/tests/desktop/electron-binary.test.ts",
@@ -31,8 +31,8 @@ class RepeatSelectionTests {
     });
 
     test("the summary lists the test files and the UI workflow files, each in path order", () => {
-      const selection = new RepeatSelection(["scripts/tests/b.test.ts", "scripts/tests/a.test.ts"], ["src/shell/desktop/tests/e2e/quit.spec.ts", "src/shell/desktop/tests/e2e/menus.spec.ts"]);
-      const workflowsOnly = new RepeatSelection([], ["src/shell/desktop/tests/e2e/quit.spec.ts"]);
+      const selection = new RepeatSelection(["scripts/tests/b.test.ts", "scripts/tests/a.test.ts"], ["src/shell/desktop/tests/e2e/quit.spec.ts", "src/shell/desktop/tests/e2e/menus.spec.ts"], 4);
+      const workflowsOnly = new RepeatSelection([], ["src/shell/desktop/tests/e2e/quit.spec.ts"], 1);
 
       assert.equal(selection.summary, [
         "Repeated test files:",
@@ -42,13 +42,13 @@ class RepeatSelectionTests {
         "- src/shell/desktop/tests/e2e/menus.spec.ts",
         "- src/shell/desktop/tests/e2e/quit.spec.ts"
       ].join("\n"));
-      assert.deepEqual(selection.workflows, ["src/shell/desktop/tests/e2e/menus.spec.ts", "src/shell/desktop/tests/e2e/quit.spec.ts"]);
+      assert.deepEqual([selection.workflows, selection.workflowTests], [["src/shell/desktop/tests/e2e/menus.spec.ts", "src/shell/desktop/tests/e2e/quit.spec.ts"], 4]);
       assert.equal(workflowsOnly.summary, "Repeated UI workflow files:\n- src/shell/desktop/tests/e2e/quit.spec.ts");
       assert.deepEqual([workflowsOnly.isEmpty, workflowsOnly.testArguments], [false, []]);
     });
 
     test("an empty selection says nothing is repeated", () => {
-      const selection = new RepeatSelection([], []);
+      const selection = new RepeatSelection([], [], 0);
 
       assert.deepEqual([selection.isEmpty, selection.testArguments, selection.summary], [true, [], "No test or UI workflow file is affected by the change, so nothing is repeated."]);
     });
