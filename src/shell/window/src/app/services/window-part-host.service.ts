@@ -48,6 +48,7 @@ import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
 import { LayoutService } from "./layout.service";
+import { LinkService } from "./link.service";
 import { LiveViewService } from "./live-view.service";
 import { MenuService } from "./menu.service";
 import { ModuleStatusService } from "./module-status.service";
@@ -58,6 +59,7 @@ import { ViewDialogService } from "./view-dialog.service";
 @Injectable({ providedIn: "root" })
 export class WindowPartHostService implements IWindowPartHost {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
+  private readonly links: LinkService = inject(LinkService);
   private readonly layout: LayoutService = inject(LayoutService);
   private readonly liveViews: LiveViewService = inject(LiveViewService);
   private readonly opener: DocumentOpenerService = inject(DocumentOpenerService);
@@ -165,6 +167,10 @@ export class WindowPartHostService implements IWindowPartHost {
     this.bridge.logModule(moduleId, message);
   }
 
+  public openLinkAsync(url: string): Promise<void> {
+    return this.links.openAsync(url);
+  }
+
   public keepDocument(moduleId: string, name: string, instance: string): void {
     this.startOpens = this.startOpens.map(t => t.kept(moduleId, name, instance));
     this.pendingOpens = this.pendingOpens.map(t => t.kept(moduleId, name, instance));
@@ -222,6 +228,10 @@ export class WindowPartHostService implements IWindowPartHost {
 
   public setViewBadge(view: string, badge: ViewBadge | null): void {
     this.labels.setBadge(view, badge);
+  }
+
+  public setTabWorking(tabKey: string, isWorking: boolean): void {
+    this.labels.setWorking(tabKey, isWorking);
   }
 
   public refresh(): void {

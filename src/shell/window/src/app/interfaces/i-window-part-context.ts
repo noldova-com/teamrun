@@ -31,6 +31,7 @@ export interface IWindowPartContext {
   registerSave(save: () => Promise<void>): () => void;
   provideMenuGroup(group: string, provider: (context: JsonObject) => readonly MenuRowContribution[]): () => void;
   setViewBadge(view: string, badge: ViewBadge | null): void;
+  markWorking(name: string, instance?: string): () => void;
   isAllowed(name: string): boolean;
   runCommandAsync(name: string, commandArguments?: JsonValue): Promise<JsonValue>;
   postNotificationAsync(post: NotificationPost): Promise<NotificationHandle>;
@@ -38,6 +39,7 @@ export interface IWindowPartContext {
   keepDocument(name: string, instance: string): void;
   showInDialogAsync(name: string, options?: IViewDialogOptions): Promise<void>;
   log(message: string): void;
+  openLinkAsync(url: string): Promise<void>;
   requestAsync(method: string, parameters: JsonValue): Promise<JsonValue>;
   onEvent(event: string, listener: (payload: JsonValue) => void): () => void;
   readSetting(name: string): JsonValue | undefined;

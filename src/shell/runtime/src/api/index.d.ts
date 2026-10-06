@@ -14,7 +14,7 @@ import type { Readable, Writable } from "node:stream";
 import { type ArgumentException, type ArgumentOutOfRangeException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type {
-  BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response,
+  BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, ProgramStatus, ProgramStatusList, QualifiedName, Response,
   RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingEntry, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 
@@ -3678,6 +3678,21 @@ export declare class RunningProgram {
    * ```
    */
   public constructor(moduleId: string, program: string, processId: number, started: Date, hasExited?: boolean);
+
+  /**
+   * Returns what `shell.programs` reports of the program: never its
+   * arguments or environment, which it does not hold.
+   *
+   * @returns The program's status.
+   * @example
+   * ```ts
+   * import type { ProgramStatus } from "@noldova/teamrun-shell-protocol";
+   * import { RunningProgram } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const status: ProgramStatus = new RunningProgram("git", "/usr/bin/git", 4_210, new Date()).toStatus();
+   * ```
+   */
+  public toStatus(): ProgramStatus;
 }
 
 /**
@@ -6014,6 +6029,32 @@ export declare class ProcessSupervisor {
    * exited.
    */
   public get programs(): readonly RunningProgram[];
+
+  /**
+   * The programs as `shell.programs` reports them, with the count of changes
+   * to them so far as the sequence.
+   */
+  public get status(): ProgramStatusList;
+
+  /**
+   * Follows the programs: the listener is called once after each change, so
+   * after a program starts, after a program exits and it is known whether its
+   * process group still runs, and after programs begin to be stopped. A
+   * clean exit that leaves the group running and the group's end are
+   * separate changes.
+   *
+   * @param listener Called after each change.
+   * @returns The registration; disposing it stops the listener.
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor, Registration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function watch(processes: ProcessSupervisor, report: (count: number) => void): Registration {
+   *   return processes.onChanged(() => report(processes.programs.length));
+   * }
+   * ```
+   */
+  public onChanged(listener: () => void): Registration;
 
   /**
    * Starts a program for a module; see

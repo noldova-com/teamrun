@@ -9,6 +9,7 @@
 import { Component, type Type } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingChange, SettingKey, SettingScope } from "@noldova/teamrun-shell-protocol";
 
@@ -247,6 +248,12 @@ describe("WindowPartContext", () => {
     expect(host.calls).toEqual(["log notes Opened the list"]);
   });
 
+  it("opens a link through the host", async () => {
+    await context.openLinkAsync("https://example.com/help");
+
+    expect(host.calls).toEqual(["openLink https://example.com/help"]);
+  });
+
   it("calls its own module's and its dependencies' methods and refuses others", async () => {
     expect(await context.requestAsync("notes.read", { id: 1 })).toEqual({ method: "notes.read", payload: { id: 1 } });
     expect(await context.requestAsync("tasks.list", null)).toEqual({ method: "tasks.list", payload: null });
@@ -295,6 +302,41 @@ describe("WindowPartContext", () => {
     context.withdraw();
     context.withdraw();
     expect(host.calls).toEqual(["badge notes.list 3 3 unread", "badge notes.list dot none", "badge notes.list dot Changed", "badge notes.list dot none", "refresh", "refresh"]);
+  });
+
+  it("marks its own declared views' and documents' tabs as working until every mark on a tab is cleared, and clears the rest when withdrawn", () => {
+    const list = context.markWorking("notes.list");
+    const first = context.markWorking("notes.note", "1");
+    const second = context.markWorking("notes.note", "1");
+    context.markWorking("notes.note", "2");
+    first();
+    first();
+    list();
+    const before = [...host.calls];
+    second();
+    const late = context.markWorking("notes.list");
+    context.withdraw();
+    late();
+
+    expect(() => context.markWorking("tasks.list")).toThrowError(WindowPartAccessException);
+    expect(() => context.markWorking("notes.outline")).toThrowError(new WindowPartAccessException("The module notes does not declare the view or document notes.outline."));
+    expect(() => context.markWorking("notes.note", "")).toThrowError(ArgumentException);
+    expect(before).toEqual(["working view/notes.list true", "working document/notes.note/1 true", "working document/notes.note/2 true", "working view/notes.list false"]);
+    expect(host.calls.slice(before.length)).toEqual([
+      "working document/notes.note/1 false", "working view/notes.list true", "working document/notes.note/2 false", "working view/notes.list false", "refresh"
+    ]);
+  });
+
+  it("keeps a tab marked after a withdraw working when a mark from before the withdraw is cleared", () => {
+    const old = context.markWorking("notes.note", "1");
+    context.withdraw();
+    const current = context.markWorking("notes.note", "1");
+    old();
+    const before = [...host.calls];
+    current();
+
+    expect(before).toEqual(["working document/notes.note/1 true", "working document/notes.note/1 false", "refresh", "working document/notes.note/1 true"]);
+    expect(host.calls.slice(before.length)).toEqual(["working document/notes.note/1 false"]);
   });
 
   it("withdraws its contributions and listeners and has the host refresh", () => {
