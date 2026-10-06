@@ -8,6 +8,8 @@
 
 import "@noldova/teamrun-foundation-core";
 
+import { WindowStateKind } from "./enums/window-state-kind.js";
+
 export class Resources {
   public static readonly folderSeparator: string = "/";
   public static readonly rootParameterName: string = "root";
@@ -110,6 +112,10 @@ export class Resources {
   public static readonly sharedDevice: string = String.empty;
   public static readonly createWindowStatesStatement: string =
     "CREATE TABLE window_states (device TEXT NOT NULL, window TEXT NOT NULL, bounds TEXT, layout TEXT, PRIMARY KEY (device, window)) STRICT";
+  public static readonly windowStateColumns: Readonly<Record<WindowStateKind, string>> = {
+    [WindowStateKind.Bounds]: "bounds",
+    [WindowStateKind.Layout]: "layout"
+  };
   public static readonly errorCodeField: "errcode" = "errcode";
   public static readonly busyErrorCode: number = 5;
   public static readonly fileErrorCodeField: "code" = "code";
@@ -872,11 +878,13 @@ export class Resources {
     return `The module ${moduleId}'s program ${program} (process ${processId}): ${text}\n`;
   }
 
-  public static formatReadWindowState(column: string): string {
+  public static formatReadWindowState(kind: WindowStateKind): string {
+    const column = Resources.windowStateColumns[kind];
     return `SELECT ${column} AS value FROM window_states WHERE device = ? AND window = ?`;
   }
 
-  public static formatWriteWindowState(column: string): string {
+  public static formatWriteWindowState(kind: WindowStateKind): string {
+    const column = Resources.windowStateColumns[kind];
     return `INSERT INTO window_states (device, window, ${column}) VALUES (?, ?, ?) ON CONFLICT (device, window) DO UPDATE SET ${column} = excluded.${column}`;
   }
 }

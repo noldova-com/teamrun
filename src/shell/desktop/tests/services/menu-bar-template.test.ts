@@ -17,18 +17,18 @@ export class MenuBarTemplateTests {
     const electron = await DesktopStartFixture.startReadyAsync("darwin");
     const window = DesktopStartFixture.firstWindow(electron);
     const command = (id: string, label: string, key: string | null, enabled: boolean, check: string, checked: boolean): unknown =>
-      ({ type: "command", id, label, key, enabled, check, checked });
+      ({ type: "Command", id, label, key, enabled, check, checked });
 
     electron.ipcMain.send("teamrun:menuBar", DesktopStartFixture.trustedEvent("darwin"), {
       menus: [
         { place: "shell.app", title: "TeamRun", rows: [command("shell.app/shell.settings/0", "Settings…", "Mod+Comma", true, "None", false)] },
         { place: "shell.file", title: "File", rows: [command("shell.file/notes.create/0", "New note", "Mod+Alt+N", true, "None", false)] },
         { place: "shell.edit", title: "Edit", rows: [] },
-        { place: "shell.view", title: "View", rows: [command("shell.view/shell.docks/0", "Left dock", "Ctrl+Shift+F5", true, "Checkbox", true), { type: "separator" }] },
+        { place: "shell.view", title: "View", rows: [command("shell.view/shell.docks/0", "Left dock", "Ctrl+Shift+F5", true, "Checkbox", true), { type: "Separator" }] },
         {
           place: "notes.tools", title: "Notes", rows: [
             command("notes.tools/notes.sorting/0", "Sort by title", null, false, "Radio", false),
-            { type: "submenu", label: "New from template", rows: [command("notes.tools/notes.more/0/notes.templates/notes.fromTemplate/0", "Plan", null, true, "None", false)] }
+            { type: "Submenu", label: "New from template", rows: [command("notes.tools/notes.more/0/notes.templates/notes.fromTemplate/0", "Plan", null, true, "None", false)] }
           ]
         },
         { place: "shell.empty", title: "Empty", rows: [] },

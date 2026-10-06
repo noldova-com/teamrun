@@ -618,6 +618,28 @@ export declare class ButtonComponent {
 }
 
 /**
+ * A card, `tr-card`: content on the raised surface inside a 1px card border
+ * with the medium radius and padding, in the message text, as tall as its
+ * content. Long words wrap inside it rather than widen it.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { CardComponent } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-sync-paused-card",
+ *   imports: [CardComponent],
+ *   template: "<tr-card><strong>Sync is paused</strong><p>Changes stay on this computer until you resume.</p></tr-card>"
+ * })
+ * export class SyncPausedCardComponent {
+ * }
+ * ```
+ */
+export declare class CardComponent {
+}
+
+/**
  * The kit's checkbox, `tr-checkbox`, a native checkbox with a drawn tick
  * whose content is its label, which is part of its hit target. It does not
  * keep its own state: it reports each change through
@@ -741,6 +763,101 @@ export declare class ChoicePillsComponent {
    * keyboard, only when it differs from {@link ChoicePillsComponent.value}.
    */
   public readonly valueChange: OutputEmitterRef<string>;
+}
+
+/**
+ * Writes text to the system clipboard for the kit's controls that copy, such
+ * as a {@link CodeBlockComponent}. The window provides it through the
+ * desktop's clipboard; a test provides a double.
+ */
+export declare abstract class ClipboardWriter {
+  /**
+   * Replaces the clipboard's content with text.
+   *
+   * @param text The text to write, exactly as given.
+   * @returns Whether the clipboard took the text.
+   *
+   * @example
+   * ```ts
+   * import { ClipboardWriter } from "@noldova/teamrun-shell-ui";
+   *
+   * export class RecordingClipboard extends ClipboardWriter {
+   *   public readonly texts: string[] = [];
+   *
+   *   public writeTextAsync(text: string): Promise<boolean> {
+   *     this.texts.push(text);
+   *     return Promise.resolve(true);
+   *   }
+   * }
+   * ```
+   */
+  public abstract writeTextAsync(text: string): Promise<boolean>;
+}
+
+/**
+ * A block of code, `tr-code-block`: a header with the code's language and a
+ * toolbar named Code block actions, then the code in the code text role,
+ * without highlighting.
+ *
+ * Long lines scroll sideways inside the block and never widen its container,
+ * until the toolbar's Word wrap button, a toggle that starts off, wraps them
+ * or the owner binds {@link CodeBlockComponent.wrapped}.
+ * Copy writes the code, exactly as bound, through the {@link ClipboardWriter}
+ * the window provides. For two seconds it then shows a check glyph and is
+ * named Copied, or, when the clipboard refused the text, is named Couldn't
+ * copy; either is announced politely. The block is as tall as its code.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { CodeBlockComponent } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-install-step",
+ *   imports: [CodeBlockComponent],
+ *   template: "<tr-code-block language=\"bash\" code=\"npm install --save-exact @noldova/teamrun-shell-ui\" />"
+ * })
+ * export class InstallStepComponent {
+ * }
+ * ```
+ */
+export declare class CodeBlockComponent {
+  /**
+   * Creates the block, which Angular does for each `tr-code-block` element.
+   *
+   * @example
+   * ```ts
+   * import { Component } from "@angular/core";
+   * import { CodeBlockComponent } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-config-example",
+   *   imports: [CodeBlockComponent],
+   *   template: "<tr-code-block language=\"JSON\" [code]=\"example\" [wrapped]=\"true\" />"
+   * })
+   * export class ConfigExampleComponent {
+   *   protected readonly example: string = "{ \"shell.theme\": \"shell.default\" }";
+   * }
+   * ```
+   */
+  public constructor();
+
+  /**
+   * The code the block shows and copies, with its own line breaks.
+   */
+  public readonly code: InputSignal<string>;
+
+  /**
+   * The language named at the start of the header, such as `TypeScript`, or
+   * null for none, which is the default.
+   */
+  public readonly language: InputSignal<string | null>;
+
+  /**
+   * Whether long lines wrap, which the Word wrap button toggles; false, so
+   * code keeps its own shape, until it is pressed or bound.
+   */
+  public readonly wrapped: ModelSignal<boolean>;
 }
 
 /**
@@ -1392,6 +1509,29 @@ export declare class IconButtonComponent {
    * toggle, which is the default.
    */
   public readonly pressed: InputSignal<boolean | undefined>;
+}
+
+/**
+ * Code inside running text, `code[tr-inline-code]`: the code font on the
+ * inline-code background with the small radius, at the size and line height
+ * of the text around it, so it never makes a line taller. Its text stays
+ * fully opaque, and a long name wraps anywhere rather than widen its line.
+ *
+ * @example
+ * ```ts
+ * import { Component } from "@angular/core";
+ * import { InlineCodeComponent } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-editor-hint",
+ *   imports: [InlineCodeComponent],
+ *   template: "<p>Set <code tr-inline-code>EDITOR</code> to choose the editor.</p>"
+ * })
+ * export class EditorHintComponent {
+ * }
+ * ```
+ */
+export declare class InlineCodeComponent {
 }
 
 /**

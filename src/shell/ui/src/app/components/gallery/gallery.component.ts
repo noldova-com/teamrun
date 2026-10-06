@@ -14,6 +14,7 @@ import { ThemeMode } from "../../enums/theme-mode";
 import type { IGalleryScope } from "../../interfaces/i-gallery-scope";
 import type { Theme } from "../../models/theme";
 import { DefaultTheme } from "../../themes/default-theme";
+import { GalleryContentComponent } from "./gallery-content.component";
 import { GalleryFormsComponent } from "./gallery-forms.component";
 import { GalleryNavigationComponent } from "./gallery-navigation.component";
 import { GalleryOverlayContainer } from "./gallery-overlay-container";
@@ -23,7 +24,7 @@ import { GalleryScopeDirective } from "./gallery-scope.directive";
 
 @Component({
   selector: "tr-gallery",
-  imports: [GalleryFormsComponent, GalleryNavigationComponent, GalleryOverlaysComponent, GalleryScopeDirective, NgTemplateOutlet],
+  imports: [GalleryContentComponent, GalleryFormsComponent, GalleryNavigationComponent, GalleryOverlaysComponent, GalleryScopeDirective, NgTemplateOutlet],
   templateUrl: "./gallery.component.html",
   styleUrl: "./gallery.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush

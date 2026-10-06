@@ -130,11 +130,13 @@ export default class Test {
         failures++;
     }
 
-    const totals = await RunnerTotals.readAllAsync(this.root, Test.RUNNERS);
+    const rerunPassed = Test.countByRunner((await flaky?.readAsync() ?? []).slice(earlier));
+    const totals = (await RunnerTotals.readAllAsync(this.root, Test.RUNNERS)).map(t => t.withRerunPassed(rerunPassed.get(t.title) ?? 0));
     if (totals.length > 0) {
-      const rerunPassed = Test.countByRunner((await flaky?.readAsync() ?? []).slice(earlier));
-      this.output.write(`\nTest totals\n${totals.map(t => t.formatLine(rerunPassed.get(t.title) ?? 0)).join("")}`);
-      summary += `\n${RunnerTotals.formatTable(totals, rerunPassed)}`;
+      for (const runner of totals)
+        await runner.writeAsync(this.root);
+      this.output.write(`\nTest totals\n${totals.map(t => t.formatLine()).join("")}`);
+      summary += `\n${RunnerTotals.formatTable(totals)}`;
     }
     this.output.write(`\n${checks.length - failures} of ${checks.length} checks passed.\n`);
     await this.writeSummaryAsync(summary);
@@ -213,6 +215,7 @@ export default class Test {
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
     const { default: BucketNameCheck } = await import("./checks/bucket-name-check.ts");
     const { default: ConceptFileCheck } = await import("./checks/concept-file-check.ts");
+    const { default: EnumValueCheck } = await import("./checks/enum-value-check.ts");
     const { default: FoundationValueCheck } = await import("./checks/foundation-value-check.ts");
     const { default: SyntaxTreeReader } = await import("./structure/syntax-tree.reader.ts");
     const tree = new SourceTree(this.root, files);
@@ -232,6 +235,7 @@ export default class Test {
       new BucketNameCheck(files, syntax),
       new AngularFileCheck(files, syntax),
       new FoundationValueCheck(files, new PackageCatalog(this.root), syntax),
+      new EnumValueCheck(files, syntax),
       new ConceptFileCheck(this.root, files, syntax),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),

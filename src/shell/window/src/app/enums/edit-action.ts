@@ -7,10 +7,10 @@
  */
 
 export enum EditAction {
-  Undo = "undo",
-  Redo = "redo",
-  Cut = "cut",
-  Copy = "copy",
-  Paste = "paste",
-  SelectAll = "selectAll"
+  Undo = "Undo",
+  Redo = "Redo",
+  Cut = "Cut",
+  Copy = "Copy",
+  Paste = "Paste",
+  SelectAll = "SelectAll"
 }

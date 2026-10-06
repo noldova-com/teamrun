@@ -14,12 +14,13 @@ import type { Writable } from "node:stream";
 import type ICoverageCount from "./interfaces/i-coverage-count.ts";
 import type IRunnerCounts from "./interfaces/i-runner-counts.ts";
 import type IRunnerFindings from "./interfaces/i-runner-findings.ts";
+import type IRunnerScope from "./interfaces/i-runner-scope.ts";
 import type ITestSkip from "./interfaces/i-test-skip.ts";
 import JsonFields from "./json-fields.ts";
 import TotalsException from "./totals.exception.ts";
 
 export default class RunnerTotals {
-  public static readonly VERSION: number = 2;
+  public static readonly VERSION: number = 3;
 
   private static readonly FOLDER_SEGMENTS: readonly string[] = ["_build", "totals"];
   private static readonly EXTENSION: string = ".json";
@@ -33,6 +34,7 @@ export default class RunnerTotals {
   public readonly discovered: number;
   public readonly passed: number;
   public readonly failed: number;
+  public readonly rerunPassed: number;
   public readonly skipped: number;
   public readonly unselected: number;
   public readonly unreached: number;
@@ -41,14 +43,16 @@ export default class RunnerTotals {
   public readonly coverage: ICoverageCount | null;
   public readonly duplicates: readonly string[];
   public readonly empty: readonly string[];
-  public readonly missing: readonly string[];
+  public readonly expected: readonly string[];
+  public readonly shard: string | null;
 
-  public constructor(runner: string, title: string, counts: IRunnerCounts, skips: readonly ITestSkip[], files: readonly string[], coverage: ICoverageCount | null, findings: IRunnerFindings) {
+  public constructor(runner: string, title: string, counts: IRunnerCounts, skips: readonly ITestSkip[], files: readonly string[], coverage: ICoverageCount | null, findings: IRunnerFindings, scope: IRunnerScope) {
     this.runner = runner;
     this.title = title;
     this.discovered = counts.discovered;
     this.passed = counts.passed;
     this.failed = counts.failed;
+    this.rerunPassed = counts.rerunPassed;
     this.skipped = counts.skipped;
     this.unselected = counts.unselected;
     this.unreached = counts.unreached;
@@ -57,11 +61,21 @@ export default class RunnerTotals {
     this.coverage = coverage;
     this.duplicates = [...findings.duplicates];
     this.empty = [...findings.empty];
-    this.missing = [...findings.missing];
+    this.expected = [...scope.expected];
+    this.shard = scope.shard;
   }
 
   public get executed(): number {
     return this.passed + this.failed;
+  }
+
+  public get counts(): IRunnerCounts {
+    return { discovered: this.discovered, passed: this.passed, failed: this.failed, rerunPassed: this.rerunPassed, skipped: this.skipped, unselected: this.unselected, unreached: this.unreached };
+  }
+
+  public get missing(): readonly string[] {
+    const files = new Set(this.files);
+    return this.shard === null ? this.expected.filter(t => !files.has(t)) : [];
   }
 
   public get problems(): readonly string[] {
@@ -81,11 +95,12 @@ export default class RunnerTotals {
     return new RunnerTotals(
       fields.text("runner"),
       fields.text("title"),
-      { discovered: fields.count("discovered"), passed: fields.count("passed"), failed: fields.count("failed"), skipped: fields.count("skipped"), unselected: fields.count("unselected"), unreached: fields.count("unreached") },
+      { discovered: fields.count("discovered"), passed: fields.count("passed"), failed: fields.count("failed"), rerunPassed: fields.count("rerunPassed"), skipped: fields.count("skipped"), unselected: fields.count("unselected"), unreached: fields.count("unreached") },
       fields.objects("skips").map(t => ({ test: t.text("test"), reason: t.text("reason") })),
       fields.texts("files"),
       coverage === null ? null : { unit: coverage.text("unit"), covered: coverage.count("covered"), total: coverage.count("total") },
-      { duplicates: fields.texts("duplicates"), empty: fields.texts("empty"), missing: fields.texts("missing") });
+      { duplicates: fields.texts("duplicates"), empty: fields.texts("empty") },
+      { expected: fields.texts("expected"), shard: fields.has("shard") ? fields.text("shard") : null });
   }
 
   public static async clearAsync(root: string): Promise<void> {
@@ -102,15 +117,19 @@ export default class RunnerTotals {
     return totals;
   }
 
-  public static formatTable(totals: readonly RunnerTotals[], rerunPassed: ReadonlyMap<string, number>): string {
+  public static formatTable(totals: readonly RunnerTotals[]): string {
     const skips = totals.filter(t => t.skips.length > 0).map(t =>
       `\n<details><summary>${RunnerTotals.escape(t.title)} skipped (${t.skips.length})</summary>\n\n${t.skips.map(u => `- ${RunnerTotals.escape(u.test)}: ${RunnerTotals.escape(u.reason)}\n`).join("")}\n</details>\n`);
-    return `${RunnerTotals.TABLE_HEADER}${totals.map(t => `| ${RunnerTotals.escape(t.title)} | ${t.discovered} | ${t.executed} | ${t.passed} | ${t.failed}${RunnerTotals.formatRerun(rerunPassed.get(t.title) ?? 0)} | ${t.skipped} | ${t.unselected} | ${t.unreached} | ${t.formatCoverage()} |\n`).join("")}${skips.join("")}`;
+    return `${RunnerTotals.TABLE_HEADER}${totals.map(t => `| ${RunnerTotals.escape(t.title)} | ${t.discovered} | ${t.executed} | ${t.passed} | ${t.failed}${t.formatRerun()} | ${t.skipped} | ${t.unselected} | ${t.unreached} | ${t.formatCoverage()} |\n`).join("")}${skips.join("")}`;
   }
 
-  public formatLine(rerunPassed: number): string {
-    return `${this.title}: ${this.discovered} discovered, ${this.executed} executed, ${this.passed} passed, ${this.failed} failed${RunnerTotals.formatRerun(rerunPassed)}, ${this.skipped} skipped, ${this.unselected} unselected, ${this.unreached} unreached; coverage ${this.formatCoverage()}.\n` +
+  public formatLine(): string {
+    return `${this.title}: ${this.discovered} discovered, ${this.executed} executed, ${this.passed} passed, ${this.failed} failed${this.formatRerun()}, ${this.skipped} skipped, ${this.unselected} unselected, ${this.unreached} unreached; coverage ${this.formatCoverage()}.\n` +
       this.skips.map(t => `  Skipped ${t.test}: ${t.reason}\n`).join("");
+  }
+
+  public withRerunPassed(rerunPassed: number): RunnerTotals {
+    return new RunnerTotals(this.runner, this.title, { ...this.counts, rerunPassed }, this.skips, this.files, this.coverage, this, this);
   }
 
   public toJson(): string {
@@ -118,19 +137,21 @@ export default class RunnerTotals {
       version: RunnerTotals.VERSION,
       runner: this.runner,
       title: this.title,
+      shard: this.shard,
       discovered: this.discovered,
       executed: this.executed,
       passed: this.passed,
       failed: this.failed,
+      rerunPassed: this.rerunPassed,
       skipped: this.skipped,
       unselected: this.unselected,
       unreached: this.unreached,
       skips: this.skips,
       files: this.files,
+      expected: this.expected,
       coverage: this.coverage,
       duplicates: this.duplicates,
-      empty: this.empty,
-      missing: this.missing
+      empty: this.empty
     });
   }
 
@@ -172,8 +193,8 @@ export default class RunnerTotals {
     return path.join(root, ...RunnerTotals.FOLDER_SEGMENTS, `${runner}${RunnerTotals.EXTENSION}`);
   }
 
-  private static formatRerun(rerunPassed: number): string {
-    return rerunPassed === 0 ? "" : ` (${rerunPassed} ${RunnerTotals.RERUN_NOTE})`;
+  private formatRerun(): string {
+    return this.rerunPassed === 0 ? "" : ` (${this.rerunPassed} ${RunnerTotals.RERUN_NOTE})`;
   }
 
   private static formatList(heading: string, items: readonly string[]): string | null {

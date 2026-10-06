@@ -7,6 +7,6 @@
  */
 
 export enum WindowStateKind {
-  Bounds = "bounds",
-  Layout = "layout"
+  Bounds = "Bounds",
+  Layout = "Layout"
 }
