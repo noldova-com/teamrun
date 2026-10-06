@@ -12,7 +12,7 @@ import type { Writable } from "node:stream";
 
 import type RepositoryFiles from "../repository/repository-files.ts";
 import SourceFile from "../structure/source-file.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class FieldOrderCheck implements ICheck {
   private static readonly FOLDERS: readonly string[] = ["src/", "scripts/"];

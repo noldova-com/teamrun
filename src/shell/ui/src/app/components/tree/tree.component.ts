@@ -18,7 +18,7 @@ import { TreeDropPlace } from "../../enums/tree-drop-place";
 import { TreeStep } from "../../enums/tree-step";
 import { TreeDragHooks } from "../../models/tree-drag-hooks";
 import type { TreeMove } from "../../models/tree-move";
-import { TreeNode } from "../../models/tree-node";
+import { TreeNode } from "../../models/tree.node";
 import { TreePlace } from "../../models/tree-place";
 import { TreePlan } from "../../models/tree-plan";
 import { TreeDragSession } from "../../services/tree-drag-session";

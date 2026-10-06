@@ -9,9 +9,9 @@
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { SettingValue } from "@noldova/teamrun-shell-protocol";
 
-import type { IMethodHandler } from "../../interfaces/method-handler.js";
+import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
-import type { SettingsService } from "./settings-service.js";
+import type { SettingsService } from "./settings.service.js";
 
 export class SettingWriteMethod implements IMethodHandler {
   private readonly settings: SettingsService;

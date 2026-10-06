@@ -13,7 +13,7 @@ import { open } from "node:fs/promises";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 import { LaunchException } from "../../exceptions/launch.exception.js";
-import type { IProcessStarter } from "../../interfaces/process-starter.js";
+import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import { Resources } from "../../resources.js";
 
 export class ChildProcessStarter implements IProcessStarter {

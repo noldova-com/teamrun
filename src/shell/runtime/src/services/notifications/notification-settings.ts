@@ -9,7 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 import { SettingKey } from "@noldova/teamrun-shell-protocol";
 
-import type { SettingsService } from "../settings/settings-service.js";
+import type { SettingsService } from "../settings/settings.service.js";
 import { ShellSettings } from "../settings/shell-settings.js";
 
 export class NotificationSettings {

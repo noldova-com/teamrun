@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IRuntimePart } from "./runtime-part.js";
+import type IVitestRun from "./i-vitest-run.ts";
 
-export interface IRuntimePartLoader {
-  loadAsync(packageName: string): Promise<IRuntimePart>;
+export default interface IVitestPluginContext {
+  readonly vitest: IVitestRun;
 }

@@ -26,7 +26,7 @@ import CheckSelection from "./check-selection.ts";
 import CoverageRun from "./coverage-run.ts";
 import type FlakyRecord from "./flaky-record.ts";
 import FlakyTest from "./flaky-test.ts";
-import type ISelectableCheck from "./interfaces/selectable-check.ts";
+import type ISelectableCheck from "./interfaces/i-selectable-check.ts";
 
 export default class PackageTestCheck implements ISelectableCheck {
   public static readonly RUNNER: string = "package";

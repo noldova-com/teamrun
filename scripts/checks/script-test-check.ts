@@ -20,7 +20,7 @@ import CheckSelection from "./check-selection.ts";
 import CoverageRun from "./coverage-run.ts";
 import type FlakyRecord from "./flaky-record.ts";
 import FlakyTest from "./flaky-test.ts";
-import type ISelectableCheck from "./interfaces/selectable-check.ts";
+import type ISelectableCheck from "./interfaces/i-selectable-check.ts";
 import ScriptTestState from "./script-test-state.ts";
 
 export default class ScriptTestCheck implements ISelectableCheck {

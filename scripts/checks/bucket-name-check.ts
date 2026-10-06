@@ -16,7 +16,7 @@ import ApiException from "../api/api.exception.ts";
 import type RepositoryFiles from "../repository/repository-files.ts";
 import ScriptFile from "../structure/source-file.ts";
 import type SyntaxTreeReader from "../structure/syntax-tree.reader.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class BucketNameCheck implements ICheck {
   private static readonly BUCKETS: ReadonlySet<string> = new Set(["helper", "helpers", "util", "utils", "utility", "common", "shared", "misc"]);

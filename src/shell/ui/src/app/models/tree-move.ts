@@ -10,7 +10,7 @@ import "@noldova/teamrun-foundation-core";
 
 import { Resources } from "../../resources";
 import { TreeMoveException } from "../exceptions/tree-move.exception";
-import { TreeNode } from "./tree-node";
+import { TreeNode } from "./tree.node";
 import { TreePlace } from "./tree-place";
 
 export class TreeMove {

@@ -8,7 +8,7 @@
 
 import * as nodeModule from "node:module";
 
-import type ITypeStripApi from "./interfaces/type-strip-api.ts";
+import type ITypeStripApi from "./interfaces/i-type-strip-api.ts";
 import TypeStripException from "./type-strip.exception.ts";
 
 export default class TypeStripper {

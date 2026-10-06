@@ -11,7 +11,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import type ProcessRunner from "../processes/process-runner.ts";
-import type ICoverageCount from "../totals/interfaces/coverage-count.ts";
+import type ICoverageCount from "../totals/interfaces/i-coverage-count.ts";
 import JsonFields from "../totals/json-fields.ts";
 
 export default class CoverageRun {

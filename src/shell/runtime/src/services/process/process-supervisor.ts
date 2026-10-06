@@ -15,7 +15,7 @@ import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 import { ProcessStartException } from "../../exceptions/process-start.exception.js";
-import type { IProcessEnder } from "../../interfaces/process-ender.js";
+import type { IProcessEnder } from "../../interfaces/i-process-ender.js";
 import { KeptProgram } from "../../models/kept-program.js";
 import { OwnedProcess } from "../../models/owned-process.js";
 import type { ProcessEnding } from "../../models/process-ending.js";

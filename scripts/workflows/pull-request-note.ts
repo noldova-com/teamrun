@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type IPullRequestComment from "./interfaces/pull-request-comment.ts";
+import type IPullRequestComment from "./interfaces/i-pull-request-comment.ts";
 
 export default class PullRequestNote {
   private static readonly PREFIX: string = "pull-request-watch";

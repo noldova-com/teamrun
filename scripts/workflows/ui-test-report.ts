@@ -9,11 +9,11 @@
 import { glob } from "node:fs/promises";
 import path from "node:path";
 
-import type IRunnerSkip from "../totals/interfaces/runner-skip.ts";
+import type IRunnerSkip from "../totals/interfaces/i-runner-skip.ts";
 import JsonFields from "../totals/json-fields.ts";
 import RunnerResult from "../totals/runner-result.ts";
 import TestNames from "../totals/test-names.ts";
-import type IUiTest from "./interfaces/ui-test.ts";
+import type IUiTest from "./interfaces/i-ui-test.ts";
 
 export default class UiTestReport {
   private static readonly SKIPPED: string = "skipped";

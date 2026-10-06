@@ -13,7 +13,7 @@ import ApiDeclarationSession from "../api/api-declaration-session.ts";
 import ApiDocumentationReader from "../api/api-documentation.reader.ts";
 import type ApiPackage from "../api/api-package.ts";
 import ApiException from "../api/api.exception.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class ApiDocumentationCheck implements ICheck {
   private static readonly PURPOSE: string = "api-documentation";

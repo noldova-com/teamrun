@@ -11,7 +11,7 @@ import "@noldova/teamrun-foundation-core";
 import { TreeDropPlace } from "../enums/tree-drop-place";
 import { TreeStep } from "../enums/tree-step";
 import { TreeMove } from "./tree-move";
-import type { TreeNode } from "./tree-node";
+import type { TreeNode } from "./tree.node";
 import { TreePlace } from "./tree-place";
 import { TreeSpot } from "./tree-spot";
 

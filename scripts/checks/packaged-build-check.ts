@@ -13,7 +13,7 @@ import type AngularProject from "../angular/angular-project.ts";
 import type PackagedBuild from "../packaging/packaged-build.ts";
 import PackagingException from "../packaging/packaging.exception.ts";
 import ProcessException from "../processes/process.exception.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class PackagedBuildCheck implements ICheck {
   private static readonly OUTPUT_SEGMENTS: readonly string[] = ["_build", "variants", "packaged"];

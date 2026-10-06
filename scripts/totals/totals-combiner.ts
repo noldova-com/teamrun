@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type ICoverageCount from "./interfaces/coverage-count.ts";
-import type IRunnerCounts from "./interfaces/runner-counts.ts";
+import type ICoverageCount from "./interfaces/i-coverage-count.ts";
+import type IRunnerCounts from "./interfaces/i-runner-counts.ts";
 import RunnerTotals from "./runner-totals.ts";
 
 export default class TotalsCombiner {
