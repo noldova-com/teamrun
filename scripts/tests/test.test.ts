@@ -64,7 +64,7 @@ class TestTests {
       const checksOnly = new TextOutputFixture();
       const selected = new TextOutputFixture();
       const results = (text: string): readonly string[] => [...text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`);
-      const before = ["Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages"]
+      const before = ["Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Coverage exclusions", "Unique names", "Declared dependencies", "Dependency pins", "Packages"]
         .map(t => `${t}: passed`);
       const after = ["Script types", "API declarations", "API documentation", "API examples"].map(t => `${t}: passed`);
 
@@ -74,12 +74,12 @@ class TestTests {
       assert.equal(checksOnlyExitCode, 0, checksOnly.text);
       assert.ok(checksOnly.text.startsWith("Selected run: every check other than the tests, and no tests. A selected run is not the complete gate.\n"), checksOnly.text);
       assert.deepEqual(results(checksOnly.text), [...before, ...after, "Packaged build leaves out the Gallery: passed"]);
-      assert.ok(checksOnly.text.endsWith("\n19 of 19 checks passed.\n"));
+      assert.ok(checksOnly.text.endsWith("\n21 of 21 checks passed.\n"));
       assert.equal(selectedExitCode, 1);
       assert.ok(selected.text.startsWith("Selected run: every check other than the tests, and the package tests of @noldova/teamrun-foundation-missing and the script tests. A selected run is not the complete gate.\n"), selected.text);
       assert.ok(selected.text.includes("\nNo package is named @noldova/teamrun-foundation-missing. The packages are none.\n"), selected.text);
       assert.deepEqual(results(selected.text), [...before, "Package tests and coverage: failed", ...after, "Script tests and coverage: passed", "Packaged build leaves out the Gallery: passed"]);
-      assert.ok(selected.text.endsWith("\n20 of 21 checks passed.\n"));
+      assert.ok(selected.text.endsWith("\n22 of 23 checks passed.\n"));
     });
 
     test("each part runs only its own checks, in the complete gate's order, and says that only all parts together are the complete gate", async t => {
@@ -114,7 +114,7 @@ class TestTests {
       assert.equal(exitCode, 0, output.text);
       assert.ok(output.text.startsWith("Part run: angular-and-checks. Only all 3 parts together are the complete gate.\nSelected run: every check other than the tests, and no tests. A selected run is not the complete gate.\n"), output.text);
       assert.ok(!output.text.includes("Angular tests and coverage: "), output.text);
-      assert.ok(output.text.endsWith("\n19 of 19 checks passed.\n"), output.text);
+      assert.ok(output.text.endsWith("\n21 of 21 checks passed.\n"), output.text);
     });
 
     test("a failing check fails the gate after the remaining checks have run", async t => {
