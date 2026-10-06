@@ -835,8 +835,8 @@ export class Resources {
     return `${displayName} didn't start`;
   }
 
-  public static formatUpdateReady(version: string): string {
-    return `${Resources.productName} ${version} is ready to install.`;
+  public static formatUpdateReady(version: string | null): string {
+    return Object.isNull(version) ? `${Resources.productName} is ready to install.` : `${Resources.productName} ${version} is ready to install.`;
   }
 
   public static formatDownloadingVersion(version: string | null): string {

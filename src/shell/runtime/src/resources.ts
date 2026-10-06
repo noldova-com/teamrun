@@ -60,6 +60,7 @@ export class Resources {
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly migrationIdPattern: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   public static readonly reservedModuleId: string = "shell";
+  public static readonly shellSettingsPages: readonly string[] = ["Keyboard shortcuts", "About"];
   public static readonly moduleVersionPattern: RegExp = /^(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})$/;
   public static readonly movedFolderInfix: string = "-before-shell-";
   public static readonly timestampSeparatorPattern: RegExp = /[-:]|\.\d+/g;

@@ -40,6 +40,7 @@ describe("AboutComponent", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     DesktopBridgeFixture.remove();
     AppearanceFixture.reset();
   });
@@ -90,8 +91,9 @@ describe("AboutComponent", () => {
 
   it("shows each state's line with its action, then the last check, the reason or the move to Applications, the details muted", async () => {
     AppearanceFixture.apply();
-    const today = new Date();
-    today.setHours(10, 42, 0, 0);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 9, 6, 23, 59));
+    const today = new Date(2026, 9, 6, 10, 42);
     const earlier = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 3, 10, 42).getTime();
     const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(today);
     const dayAndTime = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(earlier);
@@ -109,6 +111,7 @@ describe("AboutComponent", () => {
       of(UpdateStateKind.Checking),
       of(UpdateStateKind.Downloading, { version: "1.3.0", progress: 42 }),
       of(UpdateStateKind.Ready, { version: "1.3.0", reason: "Notes couldn't save." }),
+      of(UpdateStateKind.Ready),
       of(UpdateStateKind.Failed, { reason: "The download doesn't match the release." }),
       of(UpdateStateKind.Failed, { reason: "The release's information is invalid.", mustMove: true })
     ]) {
@@ -128,11 +131,12 @@ describe("AboutComponent", () => {
       "Checking for updates… | ",
       "Downloading TeamRun 1.3.0… 42% | ",
       "TeamRun 1.3.0 is ready to install. / Notes couldn't save. | Restart to update",
+      "TeamRun is ready to install. | Restart to update",
       "The update failed. / The download doesn't match the release. | Try again",
       "The update failed. / The release's information is invalid. / Move TeamRun to Applications to get updates. | Try again"
     ]);
-    expect(muted).toEqual([[false], [false, true], [false, true], [false], [false], [false, true], [false, true], [false, true, false]]);
-    expect(calls).toEqual(["Check", "Check", "Check", "Restart", "Check", "Check"]);
+    expect(muted).toEqual([[false], [false, true], [false, true], [false], [false], [false, true], [false], [false, true], [false, true, false]]);
+    expect(calls).toEqual(["Check", "Check", "Check", "Restart", "Restart", "Check", "Check"]);
   });
 
   it("keeps the download's percentage out of its polite status, since the progress bar carries it", async () => {
@@ -157,6 +161,30 @@ describe("AboutComponent", () => {
 
       expect([button.textContent?.trim(), buttons(fixture).length, document.activeElement?.className, calls]).toEqual([label, 0, "tr-about-status", ["Check"]]);
     });
+
+  it("keeps focus on the update's status when a check it didn't ask for removes the focused button, and never takes focus from anywhere else", async () => {
+    state.set(of(UpdateStateKind.UpToDate));
+    const fixture = await renderAsync();
+    const outside = document.body.appendChild(document.createElement("button"));
+    (buttons(fixture)[0] as HTMLButtonElement).focus();
+
+    state.set(of(UpdateStateKind.Checking));
+    await fixture.whenStable();
+    const onButton = document.activeElement?.className;
+    state.set(of(UpdateStateKind.Ready, { version: "1.3.0" }));
+    await fixture.whenStable();
+    (buttons(fixture)[0] as HTMLButtonElement).focus();
+    state.set(of(UpdateStateKind.Ready, { version: "1.3.0", reason: "Notes couldn't save." }));
+    await fixture.whenStable();
+    const kept = document.activeElement?.textContent?.trim();
+    outside.focus();
+    state.set(of(UpdateStateKind.Failed));
+    await fixture.whenStable();
+    const elsewhere = document.activeElement;
+    outside.remove();
+
+    expect([onButton, kept, elsewhere === outside]).toEqual(["tr-about-status", "Restart to update", true]);
+  });
 
   it("shows the download's progress below its line and as wide as it, named for the download, and an unknown amount while it has none", async () => {
     AppearanceFixture.apply();

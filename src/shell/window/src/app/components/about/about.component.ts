@@ -6,7 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, ElementRef, ErrorHandler, PendingTasks, type Signal, type WritableSignal, computed, inject, signal, viewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DOCUMENT, ElementRef, ErrorHandler, PendingTasks, type Signal, type WritableSignal, computed, effect, inject, signal, untracked,
+  viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import { ButtonComponent, ButtonVariant, ProgressComponent } from "@noldova/teamrun-shell-ui";
@@ -35,6 +36,8 @@ export class AboutComponent {
   private readonly time: Intl.DateTimeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
   private readonly dayAndTime: Intl.DateTimeFormat = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   private readonly statusElement: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("statusLine");
+  private readonly document: Document = inject(DOCUMENT);
+  private shownKind: UpdateStateKind | null = null;
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly kinds: typeof UpdateStateKind = UpdateStateKind;
@@ -61,6 +64,12 @@ export class AboutComponent {
     this.platform = Resources.formatPlatform(bridge.platform, bridge.processor);
     void inject(PendingTasks).run(() =>
       bridge.readBuildAsync().then(t => this.version.set(Resources.formatProductVersion(t.productVersion)), (error: unknown) => errors.handleError(error)));
+    effect(() => {
+      const kind = this.state().kind;
+      if (kind !== this.shownKind)
+        untracked(() => this.keepFocus());
+      this.shownKind = kind;
+    });
   }
 
   private statusOf(state: UpdateState): string {
@@ -76,7 +85,7 @@ export class AboutComponent {
       case UpdateStateKind.Downloading:
         return Resources.formatDownloadingLine(state.version);
       case UpdateStateKind.Ready:
-        return Resources.formatUpdateReady(String(state.version));
+        return Resources.formatUpdateReady(state.version);
       case UpdateStateKind.Failed:
         return Resources.updateFailed;
     }
@@ -92,8 +101,14 @@ export class AboutComponent {
     return new Date(checkedAt).toDateString() === new Date().toDateString() ? this.time.format(checkedAt) : this.dayAndTime.format(checkedAt);
   }
 
+  private keepFocus(): void {
+    const status = this.statusElement().nativeElement;
+    const focused = this.document.activeElement;
+    if (focused instanceof HTMLButtonElement && focused.parentElement === status.parentElement)
+      status.focus();
+  }
+
   protected check(): void {
-    this.statusElement().nativeElement.focus();
     this.updates.act(UpdateAction.Check);
   }
 
