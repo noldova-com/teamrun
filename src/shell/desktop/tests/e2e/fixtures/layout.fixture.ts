@@ -16,6 +16,7 @@ export default class LayoutFixture {
   private static readonly TAB_STOPS: string = "button, a[href], input, select, textarea, [tabindex]";
   private static readonly TOLERANCE: number = 0.5;
   private static readonly TARGET_SIZE: number = 24;
+  private static readonly CUT_TOLERANCE: number = 1;
 
   public static async findProblemsAsync(regions: Locator, inset: number = 0): Promise<string[]> {
     return await regions.evaluateAll((roots, [controls, scrollingContent, tolerance, target, margin]) => {
@@ -70,6 +71,24 @@ export default class LayoutFixture {
       }
       return problems;
     }, [LayoutFixture.CONTROLS, LayoutFixture.SCROLLING_CONTENT, LayoutFixture.TOLERANCE, LayoutFixture.TARGET_SIZE, inset] as const);
+  }
+
+  public static async findCutTextAsync(regions: Locator): Promise<string[]> {
+    return await regions.evaluateAll((roots, tolerance) => {
+      const problems: string[] = [];
+      for (const root of roots)
+        for (const element of [root, ...root.querySelectorAll("*")]) {
+          if (![...element.childNodes].some(t => t.nodeType === Node.TEXT_NODE && (t.textContent ?? "").trim() !== "") || element.getClientRects().length === 0 || element.closest("[aria-hidden=\"true\"]") !== null)
+            continue;
+          const style = getComputedStyle(element);
+          const name = `${element.tagName.toLowerCase()} "${(element.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40)}"`;
+          if (element.scrollWidth > element.clientWidth + tolerance && /hidden|clip/.test(style.overflowX) && style.textOverflow !== "ellipsis")
+            problems.push(`${name} cuts its text off at the side without an ellipsis.`);
+          if (element.scrollHeight > element.clientHeight + tolerance && /hidden|clip/.test(style.overflowY) && style.webkitLineClamp === "none")
+            problems.push(`${name} cuts its text off at the bottom.`);
+        }
+      return problems;
+    }, LayoutFixture.CUT_TOLERANCE);
   }
 
   public static async countTabStopsAsync(region: Locator): Promise<number> {
