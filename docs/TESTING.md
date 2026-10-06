@@ -279,6 +279,7 @@ When a target splits its tests and its shards reuse a build, its one build job a
 Any other target with shards makes their builds in a build job of the UI workflows and passes them, as an artifact of the same run, to the target's shard jobs.
 Each shard runs its part with Playwright's `--shard` and `--require-current`, which fails the shard instead of rebuilding when the builds it received are not current.
 A target whose pull request level is the smoke set has no build job: when it splits its tests, its one smoke job builds and runs `--grep @smoke` itself, and otherwise its Build and test job runs the set as its last step, after `npm test`, so macOS ARM64 takes one macOS job on a pull request.
+That job has 30 minutes instead of a test job's 20, so a slow `npm test` leaves the set its time, and the set starts a flaky test record of its own, so the job's tests are not recorded twice.
 The classification plans each target's build and shards, and `scripts/workflows/build-matrix.ts` says which targets run the smoke set on a pull request and which run on a push to `main`.
 Each target's shard count is set in `scripts/workflows/build-matrix.ts`, chosen from measured times so that no shard takes much more than about three minutes, setup included; the PR that changes one records those times.
 A PR's own runs, and a merge group's, build and test Linux x64, Linux ARM64, Windows x64 and macOS ARM64, each running every test once and the UI workflows its [level](#ci-levels) selects.

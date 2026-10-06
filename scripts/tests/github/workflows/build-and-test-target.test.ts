@@ -82,7 +82,8 @@ class BuildAndTestTargetTests {
       assert.ok(text.includes("  build:\n    name: Build\n    if: ${{ fromJSON(inputs.jobs)[0].prebuilt }}\n    runs-on: ${{ inputs.runner }}\n    timeout-minutes: 20\n"));
       assert.ok(text.includes("  tests:\n    name: ${{ matrix.name }}\n    needs: build\n" +
         "    if: ${{ !cancelled() && contains(fromJSON('[\"success\", \"skipped\"]'), needs.build.result) }}\n" +
-        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(inputs.jobs) }}\n    runs-on: ${{ inputs.runner }}\n    timeout-minutes: 20\n"));
+        "    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(inputs.jobs) }}\n    runs-on: ${{ inputs.runner }}\n" +
+        "    timeout-minutes: ${{ inputs.ui != 'null' && fromJSON(inputs.ui).folded && 30 || 20 }}\n"));
       assert.ok(text.includes("          PART: ${{ matrix.part }}\n"));
       assert.equal(workflow.readStepScript("Build"), "npm run build\n");
       assert.equal(workflow.readStepScript(BuildAndTestTargetTests.BUILD_STEP), "npm run build\n");

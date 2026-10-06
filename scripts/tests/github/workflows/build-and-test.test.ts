@@ -487,6 +487,14 @@ class BuildAndTestTests {
       assert.ok(text.includes("        SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}\n"));
     });
 
+    test("the UI workflows start a flaky test record of their own before they run, so a job that ran its tests first does not record them again", async () => {
+      const text = (await WorkflowFileFixture.readActionAsync(BuildAndTestTests.UI_ACTION)).text;
+      const reset = "    - name: Start the flaky test record afresh\n      shell: bash\n      run: rm -f _build/flaky-tests.json\n";
+
+      assert.ok(text.includes(reset));
+      assert.ok(text.indexOf(reset) < text.indexOf(`    - name: ${BuildAndTestTests.UI_STEP}\n`));
+    });
+
     test("each upload of the UI results is tried three times with a pause, with the same settings", async () => {
       const workflow = await WorkflowFileFixture.readActionAsync(BuildAndTestTests.UI_ACTION);
       const simulation = new WorkflowSimulation(workflow.text, BuildAndTestTests.UI_STEP, BuildAndTestTests.SUMMARY_STEP);

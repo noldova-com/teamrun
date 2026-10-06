@@ -122,7 +122,7 @@ jobs:
       matrix:
         include: ${{ fromJSON(inputs.jobs) }}
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 20
+    timeout-minutes: ${{ inputs.ui != 'null' && fromJSON(inputs.ui).folded && 30 || 20 }}
     steps:
       - name: Stop Spotlight indexing before testing
         if: runner.os == 'macOS'
