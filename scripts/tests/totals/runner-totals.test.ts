@@ -12,9 +12,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
-import type IRunnerCounts from "../../totals/interfaces/runner-counts.ts";
-import type IRunnerFindings from "../../totals/interfaces/runner-findings.ts";
-import type IRunnerScope from "../../totals/interfaces/runner-scope.ts";
+import type IRunnerCounts from "../../totals/interfaces/i-runner-counts.ts";
+import type IRunnerFindings from "../../totals/interfaces/i-runner-findings.ts";
+import type IRunnerScope from "../../totals/interfaces/i-runner-scope.ts";
 import RunnerTotals from "../../totals/runner-totals.ts";
 import TotalsException from "../../totals/totals.exception.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";

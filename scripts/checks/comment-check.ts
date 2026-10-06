@@ -11,12 +11,12 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 
 import type RepositoryFiles from "../repository/repository-files.ts";
-import type ICommentReader from "../structure/interfaces/comment-reader.ts";
+import type ICommentReader from "../structure/interfaces/i-comment.reader.ts";
 import MarkupCommentReader from "../structure/markup-comment.reader.ts";
 import ScriptCommentReader from "../structure/script-comment.reader.ts";
 import SourceFile from "../structure/source-file.ts";
 import StyleCommentReader from "../structure/style-comment.reader.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class CommentCheck implements ICheck {
   private static readonly READERS: ReadonlyMap<string, ICommentReader> = new Map([

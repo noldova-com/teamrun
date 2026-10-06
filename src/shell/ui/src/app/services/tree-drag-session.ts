@@ -17,7 +17,7 @@ import type { TreeDragHooks } from "../models/tree-drag-hooks";
 import { TreeDrop } from "../models/tree-drop";
 import { TreeGhost } from "../models/tree-ghost";
 import { TreeLine } from "../models/tree-line";
-import type { TreeNode } from "../models/tree-node";
+import type { TreeNode } from "../models/tree.node";
 import { TreePlan } from "../models/tree-plan";
 
 export class TreeDragSession {

@@ -7,7 +7,7 @@
  */
 
 import type { TreeMove } from "./tree-move";
-import type { TreeNode } from "./tree-node";
+import type { TreeNode } from "./tree.node";
 
 export class TreeDragHooks {
   public readonly nodeAt: (row: Element) => TreeNode | undefined;

@@ -9,7 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 import { ArgumentOutOfRangeException } from "@noldova/teamrun-foundation-exceptions";
 
-import type { IIdleParticipant } from "../../interfaces/idle-participant.js";
+import type { IIdleParticipant } from "../../interfaces/i-idle-participant.js";
 import { Resources } from "../../resources.js";
 
 export class IdleMonitor implements Disposable {

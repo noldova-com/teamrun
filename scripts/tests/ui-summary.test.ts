@@ -91,6 +91,20 @@ class UiSummaryTests {
       assert.ok(summary.includes(`| UI workflows | a.spec.ts › docks | ${UiSummaryTests.WORKFLOWS}/a.spec.ts | Error: first |\n`));
     });
 
+    test("the summary lists the shard's screenshot checkpoints after the totals", async t => {
+      const repository = await UiSummaryTests.createRepositoryAsync(t, UiSummaryTests.SPEC_FILES);
+      const record = { name: "docked", settings: null, settingsProblem: "shell.settings failed: closed.", colorScheme: "light", zoom: 1, viewport: { width: 1920, height: 1080 }, pixelRatio: 1 };
+      const checkpointed = { ...UiSummaryTests.PASSED, results: [{ status: "passed", retry: 0, annotations: [{ type: "checkpoint", description: JSON.stringify(record) }] }] };
+      await repository.writeAsync({ "_build/ui/report.json": UiSummaryTests.report(repository, [{ title: "a.spec.ts", specs: [UiSummaryTests.spec("a.spec.ts", "docks", checkpointed)] }]) });
+      const summaryPath = path.join(repository.directory, "summary.md");
+
+      assert.equal(await new UiSummary(repository.directory, new TextOutputFixture(), UiSummaryTests.listing(repository)).runAsync({ GITHUB_STEP_SUMMARY: summaryPath, UI_TARGET: "Linux x64", UI_SHARD: "1/2" }), 0);
+
+      assert.ok((await readFile(summaryPath, "utf8")).endsWith("<details><summary>Screenshot checkpoints (1)</summary>\n\n" +
+        "| Workflow | Checkpoint | Theme | Mode | Fonts (interface / code) | Sizes (panel / message / code) | Zoom | Viewport | Pixel ratio |\n|---|---|---|---|---|---|---|---|---|\n" +
+        "| a.spec.ts › docks | docked | Not read: shell.settings failed: closed. | light | Not read | Not read | 1 | 1920 × 1080 | 1 |\n\n</details>\n"));
+    });
+
     test("the summary says so when the screenshot link is missing because its upload failed", async t => {
       const repository = await UiSummaryTests.createRepositoryAsync(t, UiSummaryTests.SPEC_FILES);
       const summaryPath = path.join(repository.directory, "summary.md");

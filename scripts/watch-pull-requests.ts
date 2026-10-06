@@ -13,7 +13,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import ProcessRunner from "./processes/process-runner.ts";
 import Git from "./repository/git.ts";
 import GitHubApi from "./repository/github-api.ts";
-import type IWait from "./workflows/interfaces/wait.ts";
+import type IWait from "./workflows/interfaces/i-wait.ts";
 import MergeConflictReader from "./workflows/merge-conflict.reader.ts";
 import PullRequestEvaluator from "./workflows/pull-request-evaluator.ts";
 import PullRequestWatcher from "./workflows/pull-request-watcher.ts";

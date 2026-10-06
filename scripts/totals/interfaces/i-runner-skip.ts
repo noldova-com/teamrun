@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type IVitestRun from "./vitest-run.ts";
+import type ITestName from "./i-test-name.ts";
 
-export default interface IVitestPluginContext {
-  readonly vitest: IVitestRun;
+export default interface IRunnerSkip extends ITestName {
+  readonly reason: string;
 }

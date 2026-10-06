@@ -13,7 +13,7 @@ import type { Writable } from "node:stream";
 import type RepositoryFiles from "../repository/repository-files.ts";
 import SourceFile from "../structure/source-file.ts";
 import SourceTree from "../structure/source-tree.ts";
-import type ICheck from "./interfaces/check.ts";
+import type ICheck from "./interfaces/i-check.ts";
 
 export default class TestWaitCheck implements ICheck {
   private static readonly CONTRACT_FILE: string = "docs/TESTING.md";

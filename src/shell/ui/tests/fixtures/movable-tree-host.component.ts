@@ -10,7 +10,7 @@ import { Component, signal } from "@angular/core";
 
 import { TreeComponent } from "../../src/app/components/tree/tree.component";
 import type { TreeMove } from "../../src/app/models/tree-move";
-import { TreeNode } from "../../src/app/models/tree-node";
+import { TreeNode } from "../../src/app/models/tree.node";
 
 @Component({
   imports: [TreeComponent],

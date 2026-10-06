@@ -10,9 +10,9 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import type ICoverageCount from "./interfaces/coverage-count.ts";
-import type IRunnerSkip from "./interfaces/runner-skip.ts";
-import type ITestName from "./interfaces/test-name.ts";
+import type ICoverageCount from "./interfaces/i-coverage-count.ts";
+import type IRunnerSkip from "./interfaces/i-runner-skip.ts";
+import type ITestName from "./interfaces/i-test-name.ts";
 import JsonFields from "./json-fields.ts";
 import RunnerTotals from "./runner-totals.ts";
 import TestIdentity from "./test-identity.ts";

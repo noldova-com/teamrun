@@ -10,7 +10,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { Failure, FailureCode, RunningWork, StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
 
 import { MethodFailureException } from "../../exceptions/method-failure.exception.js";
-import type { IMethodHandler } from "../../interfaces/method-handler.js";
+import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
 import { Resources } from "../../resources.js";
 import type { WorkTracker } from "../work/work-tracker.js";
