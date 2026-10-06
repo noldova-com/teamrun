@@ -10,19 +10,22 @@ import { ErrorHandler, type WritableSignal, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { ModuleState, ModuleStatus, type SettingDefinition } from "@noldova/teamrun-shell-protocol";
+import { ModuleState, ModuleStatus, ProgramStatus, type SettingDefinition } from "@noldova/teamrun-shell-protocol";
 import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { ModulesComponent } from "../../../../src/app/components/modules/modules.component";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
+import { WindowPartTokens } from "../../../../src/app/models/window-part-tokens";
 import { CommandService } from "../../../../src/app/services/command.service";
 import { ModuleSelectionService } from "../../../../src/app/services/module-selection.service";
 import { ModuleStatusService } from "../../../../src/app/services/module-status.service";
+import { ProgramStatusService } from "../../../../src/app/services/program-status.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
 import { Resources } from "../../../../src/resources";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { SettingsFixture } from "../../../fixtures/settings.fixture";
+import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
 
 describe("ModulesComponent", () => {
   const clock = new ModuleStatus("clock", "1.4.2", "Clock", "Tells the time.", [], new Map([
@@ -33,6 +36,8 @@ describe("ModulesComponent", () => {
   const alarm = new ModuleStatus("alarm", "0.0.1", "Alarm", "Rings at a time.", ["clock", "notes"], new Map(), ModuleState.Blocked, "It depends on notes, which is not active.", "notes");
   let fixture: ComponentFixture<ModulesComponent>;
   let modules: WritableSignal<readonly ModuleStatus[]>;
+  let programs: WritableSignal<readonly ProgramStatus[]>;
+  let isShown: WritableSignal<boolean>;
   let bridge: DesktopBridgeFixture;
   let errors: unknown[];
 
@@ -69,10 +74,14 @@ describe("ModulesComponent", () => {
   beforeEach(() => {
     bridge = DesktopBridgeFixture.install("linux");
     modules = signal([clock, notes, alarm]);
+    programs = signal([]);
+    isShown = signal(true);
     errors = [];
     TestBed.configureTestingModule({
       providers: [
         { provide: ModuleStatusService, useValue: { modules } },
+        { provide: WindowPartTokens.shown, useValue: isShown },
+        { provide: ProgramStatusService, useValue: { ofModule: (id: string) => programs().filter(t => t.moduleId === id) } },
         { provide: SettingsService, useValue: { definitions: signal<readonly SettingDefinition[]>(SettingsFixture.all), values: signal<ReadonlyMap<string, JsonValue>>(new Map()) } },
         { provide: ErrorHandler, useValue: { handleError: (error: unknown) => errors.push(error) } }
       ]
@@ -81,6 +90,8 @@ describe("ModulesComponent", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     DesktopBridgeFixture.remove();
     AppearanceFixture.reset();
   });
@@ -118,7 +129,78 @@ describe("ModulesComponent", () => {
     expect(texts(".tr-modules-facts:first-of-type dt")).toEqual(["Version", "State", "Blocked by", "Depends on", "Needed by"]);
     expect([parts(".tr-modules-fact-state"), texts(".tr-modules-fact-blocker"), texts(".tr-modules-fact-dependencies"), texts(".tr-modules-fact-dependents")])
       .toEqual([[["error", "Blocked", "It depends on notes, which is not active."]], ["Notes"], ["Clock, Notes"], ["None"]]);
-    expect([texts(".tr-modules-contributions"), texts(".tr-modules-none")]).toEqual([[], ["None", "No commands, settings, menus, views or notification kinds."]]);
+    expect([texts(".tr-modules-contributions"), texts(".tr-modules-none")]).toEqual([[], ["None", "No programs are running.", "No commands, settings, menus, views or notification kinds."]]);
+  });
+
+  it("lists the selected module's running programs, counts them in the list rows and says how long each has run, each minute", async () => {
+    const started = new Date("2026-10-06T08:00:00.000Z");
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(started.getTime() + 3 * 60_000 + 30_000);
+    programs.set([
+      new ProgramStatus("clock", "/usr/bin/node", 4210, started, false),
+      new ProgramStatus("notes", "C:\\Tools\\sync.exe", 4300, started, false),
+      new ProgramStatus("clock", "/opt/clock/helper", 4211, started, true)
+    ]);
+    await renderAsync();
+
+    const rows = texts(".tr-modules-row-programs");
+    const shown = parts(".tr-modules-program");
+    vi.advanceTimersByTime(60_000);
+    fixture.detectChanges();
+    const minuteLater = texts(".tr-modules-program-state");
+    click(row("notes"));
+    const notesShown = parts(".tr-modules-program");
+    programs.set([]);
+    fixture.detectChanges();
+
+    expect(rows).toEqual(["2 programs", "1 program"]);
+    expect(shown).toEqual([["node", "Running for 3 min", "/usr/bin/node", "Process 4210"], ["helper", "Exited, its processes still run", "/opt/clock/helper", "Process 4211"]]);
+    expect(minuteLater).toEqual(["Running for 4 min", "Exited, its processes still run"]);
+    expect(notesShown).toEqual([["sync.exe", "Running for 4 min", "C:\\Tools\\sync.exe", "Process 4300"]]);
+    expect([texts(".tr-modules-programs"), texts(".tr-modules-row-programs"), texts(".tr-modules-section-title")])
+      .toEqual([[], [], ["Running programs", "Contributes"]]);
+    expect(texts(".tr-modules-none")).toContain("No programs are running.");
+  });
+
+  it("keeps no minute clock while its page is hidden, and shows the running time again as soon as it is shown", async () => {
+    const started = new Date("2026-10-06T08:00:00.000Z");
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(started.getTime() + 3 * 60_000);
+    programs.set([new ProgramStatus("clock", "/usr/bin/node", 4210, started, false)]);
+    await renderAsync();
+    const shownTimers = vi.getTimerCount();
+
+    isShown.set(false);
+    fixture.detectChanges();
+    const hiddenTimers = vi.getTimerCount();
+    vi.advanceTimersByTime(5 * 60_000);
+    fixture.detectChanges();
+    const hidden = texts(".tr-modules-program-state");
+    isShown.set(true);
+    fixture.detectChanges();
+
+    expect([shownTimers, hiddenTimers, vi.getTimerCount()]).toEqual([1, 0, 1]);
+    expect(hidden).toEqual(["Running for 3 min"]);
+    expect(texts(".tr-modules-program-state")).toEqual(["Running for 8 min"]);
+  });
+
+  it("gives a program's start in a tooltip, keeps its name and path on one line with their full text in a tooltip while cut short, and stops its minute clock when it closes", async () => {
+    const started = new Date("2026-10-06T08:00:00.000Z");
+    programs.set([new ProgramStatus("clock", `/opt/${"far/".repeat(40)}node`, 4210, started, false)]);
+    const clear = vi.spyOn(globalThis, "clearInterval");
+    await renderAsync();
+    const program = element().querySelector(".tr-modules-program") as HTMLElement;
+
+    const truncating = [".tr-modules-program-name", ".tr-modules-program-path"].map(t => program.querySelector(t)?.hasAttribute("data-truncates"));
+    const meta = getComputedStyle(program.querySelector(".tr-modules-program-meta") as Element);
+    const layout = [meta.display, meta.minWidth, getComputedStyle(program.querySelector(".tr-modules-program-process") as Element).flexShrink];
+    await TooltipFixture.expectTooltipAsync(program.querySelector(".tr-modules-program-state") as HTMLElement,
+      `Started ${new Intl.DateTimeFormat(undefined, Resources.programStartFormat).format(started)}`);
+    fixture.destroy();
+
+    expect(truncating).toEqual([true, true]);
+    expect(layout).toEqual(["flex", "0px", "0"]);
+    expect(clear).toHaveBeenCalled();
   });
 
   it("names a dependency or blocker the list lacks by its id, without a link", async () => {

@@ -26,6 +26,15 @@ describe("Resources", () => {
     expect(Resources.formatModuleDetails("clock", "0.4.0", "Active", null)).toBe("clock 0.4.0: Active");
   });
 
+  it("formats how long a program has run in minutes, hours and days, its start, its process and a module's count of programs", () => {
+    expect([0, 3, 59, 60, 90, 1439, 1440, 1500].map(t => Resources.formatRunningFor(t))).toEqual([
+      "Running for less than a minute", "Running for 3 min", "Running for 59 min", "Running for 1 h", "Running for 1 h 30 min",
+      "Running for 23 h 59 min", "Running for 1 d", "Running for 1 d 1 h"
+    ]);
+    expect([Resources.formatProgramStarted("Oct 6, 2026, 8:00 AM"), Resources.formatProcessId(4210)]).toEqual(["Started Oct 6, 2026, 8:00 AM", "Process 4210"]);
+    expect([Resources.formatProgramCount(1), Resources.formatProgramCount(2)]).toEqual(["1 program", "2 programs"]);
+  });
+
   it("accepts contribution names of the form <module id>.<name> only", () => {
     const valid = ["files.tree", "shell.settings", "git-history.log", "a1.b.c_d-e"];
     const invalid = ["files", ".tree", "Files.tree", "files.", "files..tree", "git--log.x", "files.tree view"];
