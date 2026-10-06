@@ -26,6 +26,7 @@ export default class ChangeClassifier {
     "scripts/classify-changes.ts",
     "scripts/flaky-report.ts",
     "scripts/flaky-week-summary.ts",
+    "scripts/format-documents.ts",
     "scripts/package-smoke.ts",
     "scripts/package.ts",
     "scripts/release-assets.ts",

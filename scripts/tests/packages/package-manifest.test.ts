@@ -51,6 +51,19 @@ class PackageManifestTests {
       assert.equal((await PackageManifest.readAsync(repository.directory, "src/shell/ui")).coverageExclusions, "[]");
     });
 
+    test("a manifest lists its Windows addons by name, and none when it declares none", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.writeAsync({
+        "src/shell/runtime/package.json": JSON.stringify({ name: "@noldova/teamrun-shell-runtime", version: "__VERSION__", teamrun: { windowsAddons: ["windows-process", "job2"] } }),
+        "src/shell/ui/package.json": JSON.stringify({ name: "@noldova/teamrun-shell-ui", version: "__VERSION__" })
+      });
+
+      assert.deepEqual((await PackageManifest.readAsync(repository.directory, "src/shell/runtime")).windowsAddons, ["windows-process", "job2"]);
+      assert.deepEqual((await PackageManifest.readAsync(repository.directory, "src/shell/ui")).windowsAddons, []);
+      assert.deepEqual(new PackageManifest("src/shell/ui", "@noldova/teamrun-shell-ui", []).windowsAddons, []);
+    });
+
     test("a name that does not follow the package's path is refused", () => {
       assert.throws(
         () => new PackageManifest("src/shell/ui", "@noldova/teamrun-ui", []),
@@ -90,7 +103,10 @@ class PackageManifestTests {
           "src/shell/ui/package.json must depend on @noldova/teamrun-foundation-core at version \"__VERSION__\"."
         ],
         [`{ ${name}, "version": "__VERSION__", "teamrun": null }`, "src/shell/ui/package.json must keep its TeamRun settings in an object."],
-        [`{ ${name}, "version": "__VERSION__", "teamrun": { "coverageExclusions": "main.ts" } }`, "src/shell/ui/package.json must list its coverage exclusions in an array."]
+        [`{ ${name}, "version": "__VERSION__", "teamrun": { "coverageExclusions": "main.ts" } }`, "src/shell/ui/package.json must list its coverage exclusions in an array."],
+        [`{ ${name}, "version": "__VERSION__", "teamrun": { "windowsAddons": "windows-process" } }`, "src/shell/ui/package.json must list its Windows addons in an array of kebab-case names."],
+        [`{ ${name}, "version": "__VERSION__", "teamrun": { "windowsAddons": [1] } }`, "src/shell/ui/package.json must list its Windows addons in an array of kebab-case names."],
+        [`{ ${name}, "version": "__VERSION__", "teamrun": { "windowsAddons": ["../escape"] } }`, "src/shell/ui/package.json must list its Windows addons in an array of kebab-case names."]
       ];
       for (const [text, message] of cases) {
         if (text !== null)

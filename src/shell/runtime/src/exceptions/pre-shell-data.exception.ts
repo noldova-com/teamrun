@@ -11,6 +11,7 @@ import { Exception } from "@noldova/teamrun-foundation-exceptions";
 import { Resources } from "../resources.js";
 
 export class PreShellDataException extends Exception {
+  public override readonly name: string = "PreShellDataException";
   public readonly root: string;
   public readonly entries: readonly string[];
 

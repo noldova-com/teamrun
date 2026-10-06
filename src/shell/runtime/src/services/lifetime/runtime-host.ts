@@ -57,6 +57,7 @@ import { UpdateNotificationMethod } from "../notifications/update-notification-m
 import { PackageRuntimePartLoader } from "../modules/package-runtime-part-loader.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { ProcessSupervisor } from "../process/process-supervisor.js";
+import { ProgramsMethod } from "../process/programs-method.js";
 import { RecentCommandsMethod } from "../recent-commands/recent-commands-method.js";
 import { RecentCommandsStore } from "../recent-commands/recent-commands-store.js";
 import { RecordCommandMethod } from "../recent-commands/record-command-method.js";
@@ -97,6 +98,7 @@ export class RuntimeHost implements IIdleParticipant {
   private isStopping: boolean = false;
   private notificationSettings: NotificationSettings = new NotificationSettings(null);
   private readonly workEvent: EventChannel;
+  private readonly programsEvent: EventChannel;
 
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
@@ -135,6 +137,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.idle = new IdleMonitor(options.idleGraceMilliseconds, this);
     this.workEvent = this.events.declare(ShellEvents.work);
     const commandsChanged = this.events.declare(ShellEvents.commandsChanged);
+    this.programsEvent = this.events.declare(ShellEvents.programsChanged);
     this.commands = new CommandRegistry(t => commandsChanged.publish(t.toJson()));
     const notificationsChanged = this.events.declare(ShellEvents.notifications);
     this.notifications = new NotificationCenter(
@@ -142,7 +145,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.modules = new ModuleHost(
       declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics,
       this.work, new DiagnosticRedactor(homedir()));
-    this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
+    this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.server.countOtherClients(t), t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     this.methods.register(ShellMethods.work, new WorkMethod(this.work));
     this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
@@ -257,15 +260,17 @@ export class RuntimeHost implements IIdleParticipant {
   }
 
   private async activateModulesAsync(database: ShellDatabase, settings: SettingsService): Promise<void> {
-    const processes = new ProcessSupervisor(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
+    const processes = ProcessSupervisor.create(database, this.platform, this.environment, new SystemCommand(), this.log.diagnostics);
     this.processes = processes;
+    processes.onChanged(() => this.programsEvent.publish(processes.status.toJson()));
+    this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));
     await processes.cleanUpAsync();
     await this.modules.activateAsync(settings, processes);
   }
 
   private registerShellFacilities(database: ShellDatabase): SettingsService {
     const store = new WindowStateStore(database);
-    const settings = new SettingsService(database, [...ShellSettings.all, ...this.modules.settingDefinitions], this.log.diagnostics);
+    const settings = new SettingsService(database, [...ShellSettings.definitionsFor(this.platform), ...this.modules.settingDefinitions], this.log.diagnostics);
     const changed = this.events.declare(ShellEvents.settingsChanged);
     this.notificationSettings = new NotificationSettings(settings);
     settings.onChanged(t => {

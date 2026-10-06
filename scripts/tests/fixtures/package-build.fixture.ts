@@ -13,7 +13,7 @@ export default class PackageBuildFixture extends PackageBuild {
   private readonly failure: Error | null;
 
   public constructor(root: string, failure: Error | null = null) {
-    super(root, new ProcessRunner(), process.env);
+    super(root, new ProcessRunner(), process.env, process.platform, process.arch);
 
     this.failure = failure;
   }

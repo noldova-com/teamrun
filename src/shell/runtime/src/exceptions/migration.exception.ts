@@ -11,6 +11,7 @@ import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-ex
 import { Resources } from "../resources.js";
 
 export class MigrationException extends Exception {
+  public override readonly name: string = "MigrationException";
   public readonly migrationId: string;
 
   public constructor(database: string, migrationId: string, options?: ExceptionOptions) {

@@ -26,7 +26,7 @@ import OffCursorPlacement from "./off-cursor-placement.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
 import ProcessorLoadFixture from "./processor-load.fixture.ts";
 
-interface MainProcessSilence {
+interface IMainProcessSilence {
   readonly action: string;
   readonly since: number;
   readonly processorMilliseconds: number | null;
@@ -94,7 +94,7 @@ export default class DesktopApplicationFixture {
   private readonly recorded: Set<number> = new Set();
   private placement: string = "The window had not been moved off the cursor.";
   private isPageUnreachable: boolean = false;
-  private silence: MainProcessSilence | null = null;
+  private silence: IMainProcessSilence | null = null;
   private lastAnswer: IMainProcessAnswerRecord | null = null;
   private mainProcessId: number | null = null;
 
@@ -309,7 +309,7 @@ export default class DesktopApplicationFixture {
       throw new Error(`The main process should hold one connection to the runtime at ${discovery.endpoint} but holds ${found.matched}. It found these sockets through process._getActiveHandles(), which Node does not document: ${found.descriptions.join("; ") || "none"}.`);
   }
 
-  private async killSilentAsync(silence: MainProcessSilence): Promise<string> {
+  private async killSilentAsync(silence: IMainProcessSilence): Promise<string> {
     const processId = this.mainProcessId;
     const question = silence.action === DesktopApplicationFixture.QUIT_ACTION ? await this.describeQuestionAsync() : null;
     if (question !== null)
@@ -411,7 +411,7 @@ export default class DesktopApplicationFixture {
     ].join("\n");
   }
 
-  private async describeSilenceAsync(silence: MainProcessSilence): Promise<string> {
+  private async describeSilenceAsync(silence: IMainProcessSilence): Promise<string> {
     const processorMilliseconds = await this.readProcessorMillisecondsAsync();
     const started = Date.now();
     const request = this.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readBuild(): Promise<unknown> }).readBuild());

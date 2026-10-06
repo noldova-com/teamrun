@@ -8,24 +8,24 @@
 
 import { expect, test } from "@playwright/test";
 
-import OffCursorPlacement, { type Point, type Rectangle } from "./fixtures/off-cursor-placement.ts";
+import OffCursorPlacement, { type IPoint, type IRectangle } from "./fixtures/off-cursor-placement.ts";
 
 test.describe("the harness's move of the window off the real cursor", () => {
-  const main: Rectangle = { x: 0, y: 0, width: 1920, height: 1080 };
-  const left: Rectangle = { x: -1440, y: 0, width: 1440, height: 900 };
-  const window: Rectangle = { x: 320, y: 84, width: 1280, height: 800 };
+  const main: IRectangle = { x: 0, y: 0, width: 1920, height: 1080 };
+  const left: IRectangle = { x: -1440, y: 0, width: 1440, height: 900 };
+  const window: IRectangle = { x: 320, y: 84, width: 1280, height: 800 };
   const menuBar = 25;
 
-  function belowMenuBar(target: Rectangle): Rectangle {
+  function belowMenuBar(target: IRectangle): IRectangle {
     return { ...target, y: Math.max(target.y, menuBar) };
   }
 
-  function recorder(clamp: (target: Rectangle) => Rectangle): { readonly targets: Rectangle[]; readonly moveAsync: (target: Rectangle) => Promise<Rectangle> } {
-    const targets: Rectangle[] = [];
+  function recorder(clamp: (target: IRectangle) => IRectangle): { readonly targets: IRectangle[]; readonly moveAsync: (target: IRectangle) => Promise<IRectangle> } {
+    const targets: IRectangle[] = [];
     return { targets, moveAsync: async target => { targets.push(target); return clamp(target); } };
   }
 
-  async function placeAsync(bounds: Rectangle, cursor: Point, clamp: (target: Rectangle) => Rectangle = t => t): Promise<{ readonly placed: Rectangle; readonly targets: readonly Rectangle[] }> {
+  async function placeAsync(bounds: IRectangle, cursor: IPoint, clamp: (target: IRectangle) => IRectangle = t => t): Promise<{ readonly placed: IRectangle; readonly targets: readonly IRectangle[] }> {
     const moves = recorder(clamp);
     const placed = await OffCursorPlacement.placeAsync(bounds, cursor, [main, left], moves.moveAsync);
     return { placed, targets: moves.targets };
@@ -70,13 +70,13 @@ test.describe("the harness's move of the window off the real cursor", () => {
     });
 
   test("shifts of the same length keep the order right, left, down, up", () => {
-    const square: Rectangle = { x: 0, y: 100, width: 100, height: 100 };
+    const square: IRectangle = { x: 0, y: 100, width: 100, height: 100 };
 
     expect(OffCursorPlacement.candidates(square, { x: 50, y: 150 }).map(t => [t.x, t.y])).toEqual([[-50, 100], [0, 50], [51, 100], [0, 151]]);
   });
 
   test("a cursor on a display left of the main one, at negative coordinates, with the window across both, is cleared by the nearest shift", async () => {
-    const across: Rectangle = { x: -1000, y: 100, width: 1280, height: 800 };
+    const across: IRectangle = { x: -1000, y: 100, width: 1280, height: 800 };
     const cursor = { x: -700, y: 400 };
 
     const result = await placeAsync(across, cursor, belowMenuBar);

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 :host {
   display: inline-block;
   position: relative;
@@ -28,6 +30,11 @@
   border-top-color: var(--tr-progress);
   border-radius: 50%;
   animation: tr-spinner-turn 0.8s linear infinite;
+
+  @include forced-colors {
+    border-color: Canvas;
+    border-top-color: Highlight;
+  }
 }
 
 .tr-spinner-label {
@@ -43,6 +50,10 @@
   .tr-spinner-ring {
     animation: none;
     border-inline-end-color: var(--tr-progress);
+
+    @include forced-colors {
+      border-inline-end-color: Highlight;
+    }
   }
 }
 

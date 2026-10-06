@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 :host {
   position: relative;
   display: flex;
@@ -50,6 +52,8 @@
 .tr-toolbar-grip:focus-visible {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * -1);
+
+  @include forced-focus;
 }
 
 .tr-toolbar-dot {
@@ -58,6 +62,8 @@
   height: var(--tr-sash-grip);
   border-radius: 50%;
   background-color: var(--tr-icon-color);
+
+  @include forced-line;
 }
 
 .tr-toolbar-content,
@@ -88,6 +94,8 @@
   height: var(--tr-icon);
   margin-inline: calc(var(--tr-toolbar-gap) / 2);
   background-color: var(--tr-menu-separator);
+
+  @include forced-line;
 }
 
 .tr-toolbar-ghost {

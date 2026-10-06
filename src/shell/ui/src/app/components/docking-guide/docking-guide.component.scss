@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 :host {
   display: grid;
   place-items: center;
@@ -22,6 +24,13 @@
   border-color: var(--tr-button);
   background-color: var(--tr-button);
   color: var(--tr-button-text);
+
+  @include forced-colors {
+    border-color: Highlight;
+    background-color: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
 }
 
 .tr-docking-guide-glyph {

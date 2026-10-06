@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
 @use "states";
 
 :host {
@@ -40,6 +41,8 @@
 
 :host(:not(:disabled)#{states.$hover}) {
   background-color: var(--tr-button-hover);
+
+  @include forced-hover;
 }
 
 :host(.tr-button-secondary) {
@@ -54,6 +57,8 @@
 :host(#{states.$focus-visible}) {
   outline: var(--tr-border-width) solid var(--tr-accent);
   outline-offset: calc(var(--tr-border-width) * 2);
+
+  @include forced-focus;
 }
 
 :host(:disabled) {

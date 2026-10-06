@@ -10,13 +10,14 @@ import { execFile, spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { promisify } from "node:util";
 
-import { BrowserWindow, Menu, Notification, app, clipboard, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
+import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
 
 import "@noldova/teamrun-foundation-core";
 import { ChildProcessStarter, RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
 import { AppearanceStore } from "./services/appearance-store.js";
+import { ChildProgramHost } from "./services/child-program-host.js";
 import { DesktopApplication } from "./services/desktop-application.js";
 import { DeviceIdentity } from "./services/device-identity.js";
 import { PathCommand } from "./services/path-command.js";
@@ -40,6 +41,7 @@ DesktopApplication.start(
       }
     },
     notifications: { isSupported: () => Notification.isSupported(), create: t => new Notification(t) },
+    tray: { create: t => new Tray(t) },
     createWindow: t => new BrowserWindow(t)
   },
   {
@@ -52,6 +54,7 @@ DesktopApplication.start(
     isDefaultApp: process.defaultApp === true,
     errorOutput: process.stderr,
     processId: process.pid,
+    programs: new ChildProgramHost(Resources.programTimeout),
     startDetached: (path, args) => spawn(path, [...args], { detached: true, stdio: "ignore" }).unref(),
     endProcess: t => process.kill(t, "SIGKILL"),
     onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),

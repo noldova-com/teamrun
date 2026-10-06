@@ -9,6 +9,8 @@
 import { Exception } from "@noldova/teamrun-foundation-exceptions";
 
 export class ServiceAccessException extends Exception {
+  public override readonly name: string = "ServiceAccessException";
+
   public constructor(message: string) {
     super(message);
   }

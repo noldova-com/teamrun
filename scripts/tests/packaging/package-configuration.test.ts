@@ -41,6 +41,7 @@ class PackageConfigurationTests {
         electronDist: PackageConfigurationTests.DISTRIBUTION,
         electronVersion: "44.5.1",
         asar: { smartUnpack: false },
+        asarUnpack: ["**/*.node"],
         npmRebuild: false,
         nodeGypRebuild: false,
         buildDependenciesFromSource: false,
@@ -57,6 +58,7 @@ class PackageConfigurationTests {
         extraResources: [
           { from: path.join(PackageConfigurationTests.ROOT, "LICENSE"), to: "licenses/LICENSE" },
           { from: path.join(PackageConfigurationTests.ROOT, "assets", "fonts"), to: "licenses", filter: ["*.txt"] },
+          { from: path.join(PackageConfigurationTests.ROOT, "assets", "dictionaries"), to: "licenses", filter: ["*.txt"] },
           { from: path.join(PackageConfigurationTests.STAGE, "_build", "window", "3rdpartylicenses.txt"), to: "licenses/window-third-party.txt" }
         ],
         publish: null,
@@ -73,7 +75,7 @@ class PackageConfigurationTests {
           shortcutName: "Fixture Studio",
           uninstallDisplayName: "Fixture Studio",
           artifactName: "Fixture Studio-windows-x64.${ext}",
-          include: path.join(PackageConfigurationTests.ROOT, "assets", "installer", "command-path.nsh")
+          include: path.join(PackageConfigurationTests.ROOT, "assets", "installer", "installer.nsh")
         }
       });
     });

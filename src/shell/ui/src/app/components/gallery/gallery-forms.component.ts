@@ -22,6 +22,7 @@ import { ConfigurationTableActionDirective } from "../configuration-table/config
 import { ConfigurationTableFillDirective } from "../configuration-table/configuration-table-fill.directive";
 import { ConfigurationTableComponent } from "../configuration-table/configuration-table.component";
 import { ConfigurationTableDirective } from "../configuration-table/configuration-table.directive";
+import { FieldMessageComponent } from "../field-message/field-message.component";
 import { ProgressComponent } from "../progress/progress.component";
 import { SelectComponent } from "../select/select.component";
 import { SpinnerComponent } from "../spinner/spinner.component";
@@ -34,12 +35,15 @@ import { GalleryStateDirective } from "./gallery-state.directive";
 
 @Component({
   selector: "tr-gallery-forms",
-  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective, GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, IconButtonComponent, NgTemplateOutlet, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
+  imports: [ButtonComponent, CheckboxComponent, ChipComponent, ChoicePillsComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective, FieldMessageComponent, GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, IconButtonComponent, NgTemplateOutlet, ProgressComponent, SelectComponent, SpinnerComponent, TextFieldComponent, TooltipDirective],
   templateUrl: "./gallery-forms.component.html",
   styleUrl: "./gallery-forms.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GalleryFormsComponent {
+  private static count: number = 0;
+
+  protected readonly messageId: string = `${GalleryResources.fieldMessageIdPrefix}${GalleryFormsComponent.count++}`;
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
   protected readonly sizes: typeof GallerySize = GallerySize;
   protected readonly hoveredPill: string = GalleryResources.hoveredPill;

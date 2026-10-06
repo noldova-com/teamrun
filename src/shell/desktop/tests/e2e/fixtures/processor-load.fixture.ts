@@ -8,7 +8,7 @@
 
 import os from "node:os";
 
-interface ProcessorTimes {
+interface IProcessorTimes {
   readonly busy: number;
   readonly total: number;
 }
@@ -17,7 +17,7 @@ export default class ProcessorLoadFixture {
   private static readonly INTERVAL: number = 1_000;
 
   private readonly percentages: number[] = [];
-  private last: ProcessorTimes = ProcessorLoadFixture.read();
+  private last: IProcessorTimes = ProcessorLoadFixture.read();
   private lastTime: number = Date.now();
 
   public sample(): void {
@@ -35,7 +35,7 @@ export default class ProcessorLoadFixture {
     return `${os.cpus().length} processors, busy each second: ${use}`;
   }
 
-  private static read(): ProcessorTimes {
+  private static read(): IProcessorTimes {
     let busy = 0;
     let total = 0;
     for (const { times } of os.cpus()) {

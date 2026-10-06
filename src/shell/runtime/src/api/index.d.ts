@@ -14,7 +14,7 @@ import type { Readable, Writable } from "node:stream";
 import { type ArgumentException, type ArgumentOutOfRangeException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type {
-  BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response,
+  BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, ProgramStatus, ProgramStatusList, QualifiedName, Response,
   RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingEntry, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 
@@ -47,6 +47,12 @@ export declare enum DataDirectoryState {
  */
 export declare class BackupVerificationException extends Exception {
   /**
+   * The exception's name, `"BackupVerificationException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param options The failure that prevented the check, if any.
@@ -66,6 +72,12 @@ export declare class BackupVerificationException extends Exception {
  * The exception thrown when another process already owns a data directory.
  */
 export declare class DataDirectoryOwnedException extends Exception {
+  /**
+   * The exception's name, `"DataDirectoryOwnedException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The absolute path of the data directory another process owns.
    */
@@ -95,6 +107,12 @@ export declare class DataDirectoryOwnedException extends Exception {
  */
 export declare class DiscoveryFormatException extends Exception {
   /**
+   * The exception's name, `"DiscoveryFormatException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong with the metadata.
@@ -116,6 +134,12 @@ export declare class DiscoveryFormatException extends Exception {
  * fails. Its changes and its history row were rolled back together.
  */
 export declare class MigrationException extends Exception {
+  /**
+   * The exception's name, `"MigrationException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The id of the migration that failed.
    */
@@ -145,6 +169,12 @@ export declare class MigrationException extends Exception {
  */
 export declare class ModuleDatabaseException extends Exception {
   /**
+   * The exception's name, `"ModuleDatabaseException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What went wrong.
@@ -164,6 +194,12 @@ export declare class ModuleDatabaseException extends Exception {
  */
 export declare class OwnershipReleasedException extends Exception {
   /**
+   * The exception's name, `"OwnershipReleasedException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    * @example
    * ```ts
@@ -182,6 +218,12 @@ export declare class OwnershipReleasedException extends Exception {
  * that predates the shell. Such data is neither migrated nor reset.
  */
 export declare class PreShellDataException extends Exception {
+  /**
+   * The exception's name, `"PreShellDataException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The absolute path of the data directory.
    */
@@ -217,6 +259,12 @@ export declare class PreShellDataException extends Exception {
  */
 export declare class SystemCommandException extends Exception {
   /**
+   * The exception's name, `"SystemCommandException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What failed.
@@ -240,6 +288,12 @@ export declare class SystemCommandException extends Exception {
  * history. The database is left unchanged.
  */
 export declare class UnknownSchemaException extends Exception {
+  /**
+   * The exception's name, `"UnknownSchemaException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -1481,6 +1535,12 @@ export declare enum EndpointKind {
  */
 export declare class ConnectionException extends Exception {
   /**
+   * The exception's name, `"ConnectionException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * The failure the runtime answered with, a `Disconnected` failure when an established connection has ended,
    * or `null` when the runtime could not be reached, did not finish the handshake or did not answer in time.
    */
@@ -1511,6 +1571,12 @@ export declare class ConnectionException extends Exception {
  */
 export declare class LaunchException extends Exception {
   /**
+   * The exception's name, `"LaunchException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What went wrong.
@@ -1528,9 +1594,43 @@ export declare class LaunchException extends Exception {
 }
 
 /**
+ * The exception thrown when the runtime cannot load one of its addons, or loads
+ * one that lacks the functions the runtime calls.
+ */
+export declare class AddonLoadException extends Exception {
+  /**
+   * The exception's name, `"AddonLoadException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message Which addon failed to load, and from where.
+   * @param options The error that loading it raised, if any.
+   * @example
+   * ```ts
+   * import { AddonLoadException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function fail(file: string): never {
+   *   throw new AddonLoadException(`The runtime could not load its Windows addon from ${file}.`);
+   * }
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
  * The exception thrown when a module's program is not found or cannot be started.
  */
 export declare class ProcessStartException extends Exception {
+  /**
+   * The exception's name, `"ProcessStartException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -1555,6 +1655,12 @@ export declare class ProcessStartException extends Exception {
  */
 export declare class ProductFileException extends Exception {
   /**
+   * The exception's name, `"ProductFileException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong.
@@ -1575,6 +1681,12 @@ export declare class ProductFileException extends Exception {
  * The exception a method handler throws to answer its request with a specific failure.
  */
 export declare class MethodFailureException extends Exception {
+  /**
+   * The exception's name, `"MethodFailureException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The failure the request is answered with.
    */
@@ -1601,6 +1713,12 @@ export declare class MethodFailureException extends Exception {
  * The exception thrown when the data directory holds data from a release that predates the shell. The runtime is refusing until the data is moved aside.
  */
 export declare class PreShellDataFoundException extends Exception {
+  /**
+   * The exception's name, `"PreShellDataFoundException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Where the old data is.
    */
@@ -1630,6 +1748,12 @@ export declare class PreShellDataFoundException extends Exception {
  */
 export declare class DeclarationsFormatException extends Exception {
   /**
+   * The exception's name, `"DeclarationsFormatException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong.
@@ -1652,6 +1776,12 @@ export declare class DeclarationsFormatException extends Exception {
  */
 export declare class ModuleLoadException extends Exception {
   /**
+   * The exception's name, `"ModuleLoadException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What is wrong.
@@ -1673,6 +1803,12 @@ export declare class ModuleLoadException extends Exception {
  */
 export declare class ServiceAccessException extends Exception {
   /**
+   * The exception's name, `"ServiceAccessException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Creates the exception.
    *
    * @param message What went wrong.
@@ -1692,6 +1828,12 @@ export declare class ServiceAccessException extends Exception {
  * The exception thrown when a method, event or service name is registered twice, an event is published after it was withdrawn, or a module registers a name its declaration does not contribute or publishes a service under another owner's id.
  */
 export declare class RegistrationException extends Exception {
+  /**
+   * The exception's name, `"RegistrationException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -1714,6 +1856,12 @@ export declare class RegistrationException extends Exception {
  * lets it escape answers with its failure.
  */
 export declare class SettingException extends MethodFailureException {
+  /**
+   * The exception's name, `"SettingException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * Creates the exception.
    *
@@ -1738,6 +1886,12 @@ export declare class SettingException extends MethodFailureException {
  * was told not to take it over.
  */
 export declare class BuildMismatchException extends Exception {
+  /**
+   * The exception's name, `"BuildMismatchException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The running runtime's build identity and the program it runs from.
    */
@@ -1766,6 +1920,12 @@ export declare class BuildMismatchException extends Exception {
  */
 export declare class NoRuntimeException extends Exception {
   /**
+   * The exception's name, `"NoRuntimeException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * The data directory's root.
    */
   public readonly root: string;
@@ -1790,6 +1950,12 @@ export declare class NoRuntimeException extends Exception {
  * The exception thrown when a newer build's runtime owns the data directory, so this older build hands the person over to it.
  */
 export declare class RuntimeHandoverException extends Exception {
+  /**
+   * The exception's name, `"RuntimeHandoverException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The newer runtime's build identity and the program it runs from.
    */
@@ -1816,6 +1982,12 @@ export declare class RuntimeHandoverException extends Exception {
  * The exception thrown when an older build's runtime refuses to stop because work is in progress, so the person must choose to wait or stop it.
  */
 export declare class WorkInProgressException extends Exception {
+  /**
+   * The exception's name, `"WorkInProgressException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
   /**
    * The work in progress.
    */
@@ -1893,6 +2065,132 @@ export interface IProcessStarter {
    * ```
    */
   startAsync(executable: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, errorFile: string): Promise<number>;
+}
+
+/**
+ * The system calls a {@link ProcessSupervisor} makes on Windows to read the
+ * process table and end processes. {@link ProcessSupervisor.create} passes
+ * the system's own functions, called through the runtime's Windows addon.
+ * Each call returns at once, and creating an implementation loads nothing, so
+ * a supervisor can be created on any platform.
+ */
+export interface IWindowsProcessApi {
+  /**
+   * Lists the processes running now, as `CreateToolhelp32Snapshot` sees them.
+   *
+   * @returns Each process's id and its parent's id.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function listChildren(api: IWindowsProcessApi, parentId: number): number[] {
+   *   return api.listProcesses().filter(([, parent]) => parent === parentId).map(([processId]) => processId);
+   * }
+   * ```
+   */
+  listProcesses(): readonly (readonly [number, number])[];
+
+  /**
+   * Opens a process, as `OpenProcess` does.
+   *
+   * @param processId The process to open.
+   * @param access The access rights asked for.
+   * @returns The process's handle, or the Windows error code when it could not be opened: 87 when no process has the id.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isOpenable(api: IWindowsProcessApi, processId: number): boolean {
+   *   const handle = api.openProcess(processId, 0x1000);
+   *   if (typeof handle === "number")
+   *     return false;
+   *   api.closeHandle(handle);
+   *   return true;
+   * }
+   * ```
+   */
+  openProcess(processId: number, access: number): bigint | number;
+
+  /**
+   * Reads when a process was created, as `GetProcessTimes` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}.
+   * @returns The creation time in 100-nanosecond units since 1601, or `null` when it could not be read.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readCreated(api: IWindowsProcessApi, handle: bigint): number | null {
+   *   const created = api.readCreationTime(handle);
+   *   return created === null ? null : Number(created / 10_000n) - 11_644_473_600_000;
+   * }
+   * ```
+   */
+  readCreationTime(handle: bigint): bigint | null;
+
+  /**
+   * Reads the full path of the executable a process runs, as `QueryFullProcessImageNameW` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}.
+   * @returns The path, or `null` when it could not be read.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function runs(api: IWindowsProcessApi, handle: bigint, executable: string): boolean {
+   *   return api.readImagePath(handle)?.toLowerCase() === executable.toLowerCase();
+   * }
+   * ```
+   */
+  readImagePath(handle: bigint): string | null;
+
+  /**
+   * Ends a process, as `TerminateProcess` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess} with the right to terminate.
+   * @returns Whether the process was told to end.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function end(api: IWindowsProcessApi, handle: bigint): string {
+   *   return api.terminateProcess(handle) ? "ending" : "refused";
+   * }
+   * ```
+   */
+  terminateProcess(handle: bigint): boolean;
+
+  /**
+   * Checks whether a process has exited, as `WaitForSingleObject` does with no wait.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess} with the right to synchronize.
+   * @returns Whether the process has exited.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function countRunning(api: IWindowsProcessApi, handles: readonly bigint[]): number {
+   *   return handles.filter(t => !api.hasExited(t)).length;
+   * }
+   * ```
+   */
+  hasExited(handle: bigint): boolean;
+
+  /**
+   * Closes a handle, as `CloseHandle` does.
+   *
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess}, which is not used again.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function closeAll(api: IWindowsProcessApi, handles: readonly bigint[]): void {
+   *   for (const handle of handles)
+   *     api.closeHandle(handle);
+   * }
+   * ```
+   */
+  closeHandle(handle: bigint): void;
 }
 
 /**
@@ -3678,6 +3976,21 @@ export declare class RunningProgram {
    * ```
    */
   public constructor(moduleId: string, program: string, processId: number, started: Date, hasExited?: boolean);
+
+  /**
+   * Returns what `shell.programs` reports of the program: never its
+   * arguments or environment, which it does not hold.
+   *
+   * @returns The program's status.
+   * @example
+   * ```ts
+   * import type { ProgramStatus } from "@noldova/teamrun-shell-protocol";
+   * import { RunningProgram } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const status: ProgramStatus = new RunningProgram("git", "/usr/bin/git", 4_210, new Date()).toStatus();
+   * ```
+   */
+  public toStatus(): ProgramStatus;
 }
 
 /**
@@ -4126,6 +4439,22 @@ export declare class RuntimeServer implements IEventSink {
    * The number of open connections, authenticated or not.
    */
   public get sessionCount(): number;
+
+  /**
+   * Counts the authenticated connections other than the one that made a request, whatever names their clients gave.
+   *
+   * @param context The request's context, as the server passed it to the method handler.
+   * @returns The number of such connections; every authenticated connection when the server did not make the context.
+   * @example
+   * ```ts
+   * import type { RequestContext, RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isShared(server: RuntimeServer, context: RequestContext): boolean {
+   *   return server.countOtherClients(context) > 0;
+   * }
+   * ```
+   */
+  public countOtherClients(context: RequestContext): number;
 
   /**
    * Listens on a loopback port the system assigns.
@@ -4725,6 +5054,118 @@ export declare class ModuleDeclarationReader {
    * ```
    */
   public static readAsync(file: string): Promise<readonly ModuleDeclaration[]>;
+}
+
+/**
+ * The shell's own settings: their names, and their definitions as the runtime declares them on a platform.
+ */
+export declare class ShellSettings {
+  /**
+   * The theme, `shell.theme`.
+   */
+  public static readonly theme: QualifiedName;
+
+  /**
+   * Light, dark or the system's mode, `shell.mode`.
+   */
+  public static readonly mode: QualifiedName;
+
+  /**
+   * The interface font, `shell.interfaceFont`.
+   */
+  public static readonly interfaceFont: QualifiedName;
+
+  /**
+   * The code font, `shell.codeFont`.
+   */
+  public static readonly codeFont: QualifiedName;
+
+  /**
+   * The panels' text size, `shell.panelSize`.
+   */
+  public static readonly panelSize: QualifiedName;
+
+  /**
+   * The messages' text size, `shell.messageSize`.
+   */
+  public static readonly messageSize: QualifiedName;
+
+  /**
+   * The code's text size, `shell.codeSize`.
+   */
+  public static readonly codeSize: QualifiedName;
+
+  /**
+   * The left dock's style, `shell.leftDockStyle`.
+   */
+  public static readonly leftDockStyle: QualifiedName;
+
+  /**
+   * The right dock's style, `shell.rightDockStyle`.
+   */
+  public static readonly rightDockStyle: QualifiedName;
+
+  /**
+   * Where the menu bar shows, `shell.menuBar`.
+   */
+  public static readonly menuBar: QualifiedName;
+
+  /**
+   * Whether opening a document previews it in a tab, `shell.previewTabs`.
+   */
+  public static readonly previewTabs: QualifiedName;
+
+  /**
+   * Do not disturb, a device setting, `shell.doNotDisturb`.
+   */
+  public static readonly doNotDisturb: QualifiedName;
+
+  /**
+   * The modules whose notifications are turned off, `shell.mutedModules`.
+   */
+  public static readonly mutedModules: QualifiedName;
+
+  /**
+   * Whether the desktop shows its tray icon, a device setting, `shell.trayIcon`.
+   */
+  public static readonly trayIcon: QualifiedName;
+
+  /**
+   * The keys chosen for commands, `shell.keyBindings`.
+   */
+  public static readonly keyBindings: QualifiedName;
+
+  /**
+   * How many recent commands command search lists first, `shell.recentCommandCount`.
+   */
+  public static readonly recentCommandCount: QualifiedName;
+
+  /**
+   * Whether spelling is checked, `shell.spellCheck`.
+   */
+  public static readonly spellCheck: QualifiedName;
+
+  /**
+   * The languages spelling is checked in, a device setting, `shell.spellCheckLanguages`.
+   */
+  public static readonly spellCheckLanguages: QualifiedName;
+
+  /**
+   * The shell's setting definitions, in the order Settings shows them. The tray icon's title names the place the
+   * platform shows it, the notification area on Windows, the menu bar on macOS and the tray elsewhere, and it is on
+   * by default except on macOS.
+   *
+   * @param platform The runtime's platform, as `process.platform` names it.
+   * @returns The definitions.
+   * @example
+   * ```ts
+   * import type { SettingDefinition } from "@noldova/teamrun-shell-protocol";
+   * import { ShellSettings } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const definitions: readonly SettingDefinition[] = ShellSettings.definitionsFor(process.platform);
+   * ```
+   */
+  public static definitionsFor(platform: string): readonly SettingDefinition[];
 }
 
 /**
@@ -5983,19 +6424,23 @@ export declare class ProcessSupervisor {
    * @param database The shell's database, which holds the records.
    * @param platform The platform, as in `process.platform`.
    * @param environment The runtime's environment, which programs inherit from.
-   * @param command Reads the process table.
+   * @param command Reads the process table on macOS and Linux.
    * @param diagnostics The runtime's log, which receives the programs that
    * had to be killed or could not be ended.
+   * @param windows The system calls the supervisor makes on Windows to read
+   * the process table and end processes. {@link ProcessSupervisor.create}
+   * passes the system's own functions, called through the runtime's Windows
+   * addon.
    * @param settings How long programs may take to end.
    * @param clock The clock that times programs' starts and names the boot;
    * {@link ProcessClock.create} for the platform this process runs on by
    * default.
    * @example
    * ```ts
-   * import { ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { type IWindowsProcessApi, ProcessSettings, ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
    *
-   * export function createSupervisor(database: ShellDatabase): ProcessSupervisor {
-   *   return new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), process.stderr, new ProcessSettings());
+   * export function createSupervisor(database: ShellDatabase, windows: IWindowsProcessApi): ProcessSupervisor {
+   *   return new ProcessSupervisor(database, process.platform, process.env, new SystemCommand(), process.stderr, windows, new ProcessSettings());
    * }
    * ```
    */
@@ -6005,8 +6450,45 @@ export declare class ProcessSupervisor {
     environment: NodeJS.ProcessEnv,
     command: SystemCommand,
     diagnostics: Writable,
+    windows: IWindowsProcessApi,
     settings?: ProcessSettings,
     clock?: ProcessClock);
+
+  /**
+   * Creates the supervisor the runtime runs with, which on Windows reads the
+   * process table and ends processes through the system's own functions,
+   * called through the runtime's Windows addon. The addon loads at its first
+   * use, and a call throws an {@link AddonLoadException} when it cannot load
+   * or returns a value this runtime does not expect.
+   *
+   * @param database The shell's database, which holds the records.
+   * @param platform The platform, as in `process.platform`.
+   * @param environment The runtime's environment, which programs inherit from.
+   * @param command Reads the process table on macOS and Linux.
+   * @param diagnostics The runtime's log, which receives the programs that
+   * had to be killed or could not be ended.
+   * @param settings How long programs may take to end.
+   * @param clock The clock that times programs' starts and names the boot;
+   * {@link ProcessClock.create} for the platform this process runs on by
+   * default.
+   * @returns The supervisor.
+   * @example
+   * ```ts
+   * import { ProcessSupervisor, type ShellDatabase, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function createSupervisor(database: ShellDatabase): ProcessSupervisor {
+   *   return ProcessSupervisor.create(database, process.platform, process.env, new SystemCommand(), process.stderr);
+   * }
+   * ```
+   */
+  public static create(
+    database: ShellDatabase,
+    platform: string,
+    environment: NodeJS.ProcessEnv,
+    command: SystemCommand,
+    diagnostics: Writable,
+    settings?: ProcessSettings,
+    clock?: ProcessClock): ProcessSupervisor;
 
   /**
    * The programs running, in the order they started, then the programs that
@@ -6014,6 +6496,32 @@ export declare class ProcessSupervisor {
    * exited.
    */
   public get programs(): readonly RunningProgram[];
+
+  /**
+   * The programs as `shell.programs` reports them, with the count of changes
+   * to them so far as the sequence.
+   */
+  public get status(): ProgramStatusList;
+
+  /**
+   * Follows the programs: the listener is called once after each change, so
+   * after a program starts, after a program exits and it is known whether its
+   * process group still runs, and after programs begin to be stopped. A
+   * clean exit that leaves the group running and the group's end are
+   * separate changes.
+   *
+   * @param listener Called after each change.
+   * @returns The registration; disposing it stops the listener.
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor, Registration } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function watch(processes: ProcessSupervisor, report: (count: number) => void): Registration {
+   *   return processes.onChanged(() => report(processes.programs.length));
+   * }
+   * ```
+   */
+  public onChanged(listener: () => void): Registration;
 
   /**
    * Starts a program for a module; see

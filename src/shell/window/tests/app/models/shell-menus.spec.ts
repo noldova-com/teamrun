@@ -22,8 +22,9 @@ describe("ShellMenus", () => {
     expect(other.groups.slice(1)).toEqual(mac.groups);
     expect([other.groups[0]?.name, other.groups[0]?.place, other.groups[0]?.items.map(t => t.command)])
       .toEqual(["shell.editing", "shell.edit", ["shell.undo", "shell.redo", "shell.cut", "shell.copy", "shell.paste", "shell.selectAll"]]);
-    expect([mac.groups[0]?.name, mac.groups[0]?.place, mac.groups[0]?.items.map(t => t.command)])
+    expect([mac.groups[0]?.name, mac.groups[0]?.place, mac.groups[0]?.isDynamic]).toEqual(["shell.fieldSpelling", "shell.field", true]);
+    expect([mac.groups[1]?.name, mac.groups[1]?.place, mac.groups[1]?.items.map(t => t.command)])
       .toEqual(["shell.fieldEditing", "shell.field", ["shell.cut", "shell.copy", "shell.paste", "shell.selectAll"]]);
-    expect(mac.groups.filter(t => t.isDynamic).length).toBe(2);
+    expect(mac.groups.filter(t => t.isDynamic).length).toBe(3);
   });
 });

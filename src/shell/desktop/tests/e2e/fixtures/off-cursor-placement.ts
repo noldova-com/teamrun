@@ -6,23 +6,23 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export interface Point {
+export interface IPoint {
   readonly x: number;
   readonly y: number;
 }
 
-export interface Rectangle extends Point {
+export interface IRectangle extends IPoint {
   readonly width: number;
   readonly height: number;
 }
 
 export default class OffCursorPlacement {
-  public static contains(bounds: Rectangle, cursor: Point): boolean {
+  public static contains(bounds: IRectangle, cursor: IPoint): boolean {
     return cursor.x >= bounds.x && cursor.y >= bounds.y && cursor.x < bounds.x + bounds.width && cursor.y < bounds.y + bounds.height;
   }
 
-  public static candidates(bounds: Rectangle, cursor: Point): readonly Rectangle[] {
-    const shifts: readonly Point[] = [
+  public static candidates(bounds: IRectangle, cursor: IPoint): readonly IRectangle[] {
+    const shifts: readonly IPoint[] = [
       { x: cursor.x + 1 - bounds.x, y: 0 },
       { x: cursor.x - bounds.x - bounds.width, y: 0 },
       { x: 0, y: cursor.y + 1 - bounds.y },
@@ -33,7 +33,7 @@ export default class OffCursorPlacement {
       .map(t => ({ ...bounds, x: bounds.x + t.x, y: bounds.y + t.y }));
   }
 
-  public static async placeAsync(bounds: Rectangle, cursor: Point, displays: readonly Rectangle[], moveAsync: (target: Rectangle) => Promise<Rectangle>): Promise<Rectangle> {
+  public static async placeAsync(bounds: IRectangle, cursor: IPoint, displays: readonly IRectangle[], moveAsync: (target: IRectangle) => Promise<IRectangle>): Promise<IRectangle> {
     if (!OffCursorPlacement.contains(bounds, cursor))
       return bounds;
     const attempts: string[] = [];
@@ -49,7 +49,7 @@ export default class OffCursorPlacement {
       `Each move left the cursor inside: ${attempts.join("; ")}. Displays: ${displays.map(t => OffCursorPlacement.describe(t)).join("; ")}.`);
   }
 
-  public static describe(bounds: Rectangle): string {
+  public static describe(bounds: IRectangle): string {
     return `${bounds.x},${bounds.y} ${bounds.width}x${bounds.height}`;
   }
 }

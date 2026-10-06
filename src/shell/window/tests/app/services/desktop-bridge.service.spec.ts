@@ -14,6 +14,7 @@ import { QuitChoice } from "../../../src/app/enums/quit-choice";
 import { DesktopBridgeException } from "../../../src/app/exceptions/desktop-bridge.exception";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../../../src/app/exceptions/runtime-request.exception";
+import type { FieldMenuRequest } from "../../../src/app/models/field-menu-request";
 import type { QuitQuestion } from "../../../src/app/models/quit-question";
 import { WindowAppearance } from "../../../src/app/models/window-appearance";
 import { DesktopBridgeService } from "../../../src/app/services/desktop-bridge.service";
@@ -38,8 +39,13 @@ describe("DesktopBridgeService", () => {
     readBuild: (): Promise<unknown> => Promise.resolve(null),
     copyText: (): Promise<boolean> => Promise.resolve(true),
     openLogFolder: (): Promise<boolean> => Promise.resolve(true),
+    openLink: (): Promise<boolean> => Promise.resolve(true),
     installCommand: (): Promise<boolean> => Promise.resolve(true),
     keepAppearance: (): void => undefined,
+    readSpelling: (): Promise<unknown> => Promise.resolve(null),
+    keepSpelling: (): void => undefined,
+    onFieldMenu: (): (() => void) => () => undefined,
+    replaceMisspelling: (): Promise<boolean> => Promise.resolve(true),
     onNotificationOpened: (): (() => void) => () => undefined,
     onQuitQuestion: (): (() => void) => () => undefined,
     answerQuit: (): Promise<boolean> => Promise.resolve(true),
@@ -64,8 +70,13 @@ describe("DesktopBridgeService", () => {
     ["no readBuild", { ...complete, readBuild: null }],
     ["no copyText", { ...complete, copyText: null }],
     ["no openLogFolder", { ...complete, openLogFolder: null }],
+    ["no openLink", { ...complete, openLink: null }],
     ["no installCommand", { ...complete, installCommand: null }],
     ["no keepAppearance", { ...complete, keepAppearance: null }],
+    ["no readSpelling", { ...complete, readSpelling: null }],
+    ["no keepSpelling", { ...complete, keepSpelling: null }],
+    ["no onFieldMenu", { ...complete, onFieldMenu: null }],
+    ["no replaceMisspelling", { ...complete, replaceMisspelling: null }],
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
     ["no onQuitQuestion", { ...complete, onQuitQuestion: null }],
     ["no answerQuit", { ...complete, answerQuit: null }],
@@ -211,17 +222,20 @@ describe("DesktopBridgeService", () => {
     expect(events).toEqual([["notes.changed", { path: "/notes/a.md" }]]);
   });
 
-  it("reads the build, copies text and opens the log folder through the desktop", async () => {
+  it("reads the build, copies text, opens the log folder and links, and installs the command through the desktop", async () => {
     const bridge = DesktopBridgeFixture.install();
     const service = TestBed.inject(DesktopBridgeService);
 
     const build = await service.readBuildAsync();
     const isCopied = await service.writeTextAsync("clock: Failed");
     const isOpened = await service.openLogFolderAsync();
+    const isLinkOpened = await service.openLinkAsync("https://example.com/");
+    bridge.isLinkOpened = false;
+    const isRefusedLinkOpened = await service.openLinkAsync("file:///etc/passwd");
     const isInstalled = await service.installCommandAsync();
 
-    expect([build.productVersion, build.fingerprint, isCopied, isOpened, isInstalled]).toEqual(["1.2.3", "abc123", true, true, true]);
-    expect([bridge.copied, bridge.logFolderOpens, bridge.commandInstalls]).toEqual([["clock: Failed"], 1, 1]);
+    expect([build.productVersion, build.fingerprint, isCopied, isOpened, isLinkOpened, isRefusedLinkOpened, isInstalled]).toEqual(["1.2.3", "abc123", true, true, true, false, true]);
+    expect([bridge.copied, bridge.logFolderOpens, bridge.links, bridge.commandInstalls]).toEqual([["clock: Failed"], 1, ["https://example.com/", "file:///etc/passwd"], 1]);
   });
 
   it("passes on the id of a notification opened from the operating system and ignores a blank one", () => {
@@ -246,6 +260,34 @@ describe("DesktopBridgeService", () => {
 
     expect(service.initialAppearance).toEqual({ "shell.mode": "Dark" });
     expect(bridge.keptAppearances).toEqual([{ "shell.mode": "Light" }]);
+  });
+
+  it("reads the spelling languages the desktop offers and keeps the window's spelling preferences", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.spelling = Promise.resolve({ languages: ["en-US"], fallback: "en-US" });
+    const service = TestBed.inject(DesktopBridgeService);
+
+    const offer = await service.readSpellingAsync();
+    service.keepSpelling(true, ["en-US"]);
+
+    expect([offer.languages, offer.fallback]).toEqual([["en-US"], "en-US"]);
+    expect(bridge.keptSpellings).toEqual([[true, ["en-US"]]]);
+  });
+
+  it("passes on the desktop's field menus as requests, and replaces a word through the desktop", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+    const requests: FieldMenuRequest[] = [];
+
+    const stop = service.onFieldMenu(t => requests.push(t));
+    bridge.publishFieldMenu({ x: 10, y: 20, isKeyboard: false, word: "wrold", suggestions: ["world"] });
+    stop();
+    bridge.publishFieldMenu({ x: 1, y: 2, isKeyboard: true, word: "", suggestions: [] });
+    const answer = await service.replaceMisspellingAsync("world");
+
+    expect(requests.map(t => [t.x, t.y, t.isKeyboard, t.toContext()])).toEqual([[10, 20, false, { word: "wrold", suggestions: ["world"] }]]);
+    expect(answer).toBe(true);
+    expect(bridge.replacements).toEqual(["world"]);
   });
 
   it("passes on the question about work in progress or its end, answers it and writes a module's log lines through the desktop", async () => {

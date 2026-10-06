@@ -31,6 +31,12 @@ export declare type JsonObject = { readonly [key: string]: JsonValue };
  */
 export declare class JsonException extends Exception {
   /**
+   * The exception's name, `"JsonException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
    * Path of the offending field, such as `$.params.name`, or the root path `$` when the whole
    * value is at fault.
    */

@@ -11,6 +11,7 @@ import { TestBed } from "@angular/core/testing";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 
 import { PanelEdge } from "../../../src/app/enums/panel-edge";
+import { DocumentHeading } from "../../../src/app/models/document-heading";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { SplitDropTarget } from "../../../src/app/models/layout/split-drop-target";
 import { DocumentOpenerService } from "../../../src/app/services/document-opener.service";
@@ -40,9 +41,9 @@ describe("DocumentOpenerService", () => {
   });
 
   it("opens a module's own document with its title and activates it when opened again with a new title", () => {
-    opener.open("notes", "notes.note", "1", "Note 1", false);
-    opener.open("notes", "notes.note", "2", "Note 2", false);
-    opener.open("notes", "notes.note", "1", "First note", false);
+    opener.open("notes", "notes.note", "1", new DocumentHeading("Note 1"), false);
+    opener.open("notes", "notes.note", "2", new DocumentHeading("Note 2"), false);
+    opener.open("notes", "notes.note", "1", new DocumentHeading("First note"), false);
     const first = new DocumentTab("notes.note", "1");
 
     expect(layout.layout().documents.tabs).toEqual([first, new DocumentTab("notes.note", "2")]);
@@ -51,8 +52,8 @@ describe("DocumentOpenerService", () => {
   });
 
   it("opens a document as a preview that the next preview replaces, and keeps it on request", () => {
-    opener.open("notes", "notes.note", "1", "Note 1", true);
-    opener.open("notes", "notes.note", "2", "Note 2", true);
+    opener.open("notes", "notes.note", "1", new DocumentHeading("Note 1"), true);
+    opener.open("notes", "notes.note", "2", new DocumentHeading("Note 2"), true);
     opener.keep("notes", "notes.note", "2");
     const second = new DocumentTab("notes.note", "2");
 
@@ -66,26 +67,26 @@ describe("DocumentOpenerService", () => {
     const first = new DocumentTab("notes.note", "1");
     const second = new DocumentTab("notes.note", "2");
     const third = new DocumentTab("notes.note", "3");
-    opener.open("notes", "notes.note", "1", "Note 1", false);
-    opener.open("notes", "notes.note", "2", "Note 2", true);
-    opener.open("notes", "notes.note", "1", "Note 1", false);
+    opener.open("notes", "notes.note", "1", new DocumentHeading("Note 1"), false);
+    opener.open("notes", "notes.note", "2", new DocumentHeading("Note 2"), true);
+    opener.open("notes", "notes.note", "1", new DocumentHeading("Note 1"), false);
 
-    opener.restore("notes", "notes.note", "2", "Second note", true);
+    opener.restore("notes", "notes.note", "2", new DocumentHeading("Second note"), true);
     expect([layout.layout().documents.active, layout.layout().documents.preview]).toEqual([first, second]);
-    opener.restore("notes", "notes.note", "2", "Second note", false);
+    opener.restore("notes", "notes.note", "2", new DocumentHeading("Second note"), false);
     expect([layout.layout().documents.active, layout.layout().documents.preview]).toEqual([first, null]);
     expect(labels.of(second).title).toBe("Second note");
-    opener.restore("notes", "notes.note", "3", "Note 3", true);
+    opener.restore("notes", "notes.note", "3", new DocumentHeading("Note 3"), true);
     expect(layout.layout().documents.tabs).toEqual([first, second, third]);
     expect([layout.layout().documents.active, layout.layout().documents.preview]).toEqual([first, third]);
-    expect(() => opener.restore("clock", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
+    expect(() => opener.restore("clock", "notes.note", "1", new DocumentHeading("Note 1"), false)).toThrow(ArgumentException);
   });
 
   it("restores a document into an empty group as its active tab, and a preview as a kept tab when the group has a preview", () => {
     const first = new DocumentTab("notes.note", "1");
     const second = new DocumentTab("notes.note", "2");
-    opener.restore("notes", "notes.note", "1", "Note 1", true);
-    opener.restore("notes", "notes.note", "2", "Note 2", true);
+    opener.restore("notes", "notes.note", "1", new DocumentHeading("Note 1"), true);
+    opener.restore("notes", "notes.note", "2", new DocumentHeading("Note 2"), true);
 
     expect(layout.layout().documents.tabs).toEqual([first, second]);
     expect([layout.layout().documents.active, layout.layout().documents.preview]).toEqual([first, first]);
@@ -93,13 +94,13 @@ describe("DocumentOpenerService", () => {
 
   it("restores a document in another document group without making that group the active one", () => {
     const first = new DocumentTab("notes.note", "1");
-    opener.open("notes", "notes.note", "1", "Note 1", false);
-    opener.open("notes", "notes.note", "2", "Note 2", false);
+    opener.open("notes", "notes.note", "1", new DocumentHeading("Note 1"), false);
+    opener.open("notes", "notes.note", "2", new DocumentHeading("Note 2"), false);
     layout.place(new DocumentTab("notes.note", "2"), new SplitDropTarget(layout.layout().documents.id, PanelEdge.Right));
     layout.activate(first);
     const active = layout.layout().documents.id;
 
-    opener.restore("notes", "notes.note", "2", "Note 2", false);
+    opener.restore("notes", "notes.note", "2", new DocumentHeading("Note 2"), false);
 
     expect(layout.layout().documentGroups).toHaveLength(2);
     expect(layout.layout().documents.id).toBe(active);
@@ -108,22 +109,35 @@ describe("DocumentOpenerService", () => {
 
   it("restores a saved document that is open as restore does, and leaves out one that is not", () => {
     const first = new DocumentTab("notes.note", "1");
-    opener.open("notes", "notes.note", "1", "Note 1", true);
-    opener.open("notes", "notes.note", "2", "Note 2", false);
+    opener.open("notes", "notes.note", "1", new DocumentHeading("Note 1"), true);
+    opener.open("notes", "notes.note", "2", new DocumentHeading("Note 2"), false);
 
-    opener.restoreSaved("notes", "notes.note", "1", "First note", false);
-    opener.restoreSaved("notes", "notes.note", "3", "Note 3", false);
+    opener.restoreSaved("notes", "notes.note", "1", new DocumentHeading("First note"), false);
+    opener.restoreSaved("notes", "notes.note", "3", new DocumentHeading("Note 3"), false);
 
     expect(layout.layout().documents.tabs).toEqual([first, new DocumentTab("notes.note", "2")]);
     expect([layout.layout().documents.active, layout.layout().documents.preview, labels.of(first).title]).toEqual([new DocumentTab("notes.note", "2"), null, "First note"]);
-    expect(() => opener.restoreSaved("clock", "notes.note", "3", "Note 3", false)).toThrow(ArgumentException);
+    expect(() => opener.restoreSaved("clock", "notes.note", "3", new DocumentHeading("Note 3"), false)).toThrow(ArgumentException);
   });
 
-  it("refuses another module's document, an unregistered one and an empty title", () => {
-    expect(() => opener.open("clock", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
-    expect(() => opener.open("note", "notes.note", "1", "Note 1", false)).toThrow(ArgumentException);
-    expect(() => opener.open("notes", "notes.page", "1", "Page", false)).toThrow(ArgumentException);
-    expect(() => opener.open("notes", "notes.note", "1", " ", false)).toThrow(ArgumentException);
+  it("changes an open document's title and breadcrumb, keeping what is left out, and nothing for one that is not open", () => {
+    const first = new DocumentTab("notes.note", "1");
+    opener.open("notes", "notes.note", "1", new DocumentHeading("Note 1", ["Notes"]), false);
+
+    opener.update("notes", "notes.note", "1", "Plan", null);
+    const renamed = labels.headingOf(first).text;
+    opener.update("notes", "notes.note", "1", null, ["Notes", "Drafts"]);
+    opener.update("notes", "notes.note", "2", "Note 2", ["Notes"]);
+
+    expect([renamed, labels.headingOf(first).text, labels.of(first).title]).toEqual(["Notes › Plan", "Notes › Drafts › Plan", "Plan"]);
+    expect(labels.headingOf(new DocumentTab("notes.note", "2")).text).toBe("2");
+    expect(() => opener.update("clock", "notes.note", "1", "Plan", null)).toThrow(ArgumentException);
+  });
+
+  it("refuses another module's document and an unregistered one", () => {
+    expect(() => opener.open("clock", "notes.note", "1", new DocumentHeading("Note 1"), false)).toThrow(ArgumentException);
+    expect(() => opener.open("note", "notes.note", "1", new DocumentHeading("Note 1"), false)).toThrow(ArgumentException);
+    expect(() => opener.open("notes", "notes.page", "1", new DocumentHeading("Page"), false)).toThrow(ArgumentException);
     expect(layout.layout().documents.tabs).toEqual([]);
   });
 });

@@ -9,6 +9,7 @@
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { NotificationPost, SettingChange, SettingEntry, SettingScope } from "@noldova/teamrun-shell-protocol";
 
+import type { DocumentHeading } from "../models/document-heading";
 import type { MenuItem } from "../models/menu-item";
 import type { ViewBadge } from "../models/view-badge";
 
@@ -17,13 +18,17 @@ export interface IWindowPartHost {
 
   onEvent(listener: (name: string, payload: JsonValue) => void): () => void;
 
-  openDocument(moduleId: string, name: string, instance: string, title: string, isPreview: boolean): void;
+  openDocument(moduleId: string, name: string, instance: string, heading: DocumentHeading, isPreview: boolean): void;
 
   keepDocument(moduleId: string, name: string, instance: string): void;
+
+  updateDocument(moduleId: string, name: string, instance: string, title: string | null, breadcrumb: readonly string[] | null): void;
 
   showInDialogAsync(name: string, instance: string | null, title: string | null): Promise<void>;
 
   log(moduleId: string, message: string): void;
+
+  openLinkAsync(url: string): Promise<void>;
 
   isCommandRegistered(name: string): boolean;
 
@@ -50,6 +55,8 @@ export interface IWindowPartHost {
   onSettingChanged(listener: (change: SettingChange) => void): () => void;
 
   setViewBadge(view: string, badge: ViewBadge | null): void;
+
+  setTabWorking(tabKey: string, isWorking: boolean): void;
 
   refresh(): void;
 }

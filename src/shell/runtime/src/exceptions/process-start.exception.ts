@@ -9,6 +9,8 @@
 import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 export class ProcessStartException extends Exception {
+  public override readonly name: string = "ProcessStartException";
+
   public constructor(message: string, options?: ExceptionOptions) {
     super(message, options);
   }
