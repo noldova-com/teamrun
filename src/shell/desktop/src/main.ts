@@ -58,7 +58,7 @@ DesktopApplication.start(
     onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)
   },
   import.meta.url,
-  (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, starter, installation),
+  (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, installation, starter),
   t => DeviceIdentity.readOrCreateAsync(t),
   t => new AppearanceStore(t),
   t => PathCommand.forBundle(t, async (program, args) => {

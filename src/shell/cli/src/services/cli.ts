@@ -181,7 +181,7 @@ export class Cli {
       : path.resolve(commandLine.deviceDirectory);
     const presence = ProcessPresence.create(context.platform, new SystemCommand(), context.environment);
     const installation = new Installation(Installation.locate(deviceFolder, AppImageSource.locateProgram(context.environment, context.executablePath), context.platform), t => presence.isRunningAsync(t));
-    return new RuntimeLauncher(settings, context.identity, context.runtimeStarter, installation);
+    return new RuntimeLauncher(settings, context.identity, installation, context.runtimeStarter);
   }
 
   private async connectAsync(launcher: RuntimeLauncher, options: AttachOptions): Promise<RuntimeClient> {

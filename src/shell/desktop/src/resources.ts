@@ -49,6 +49,18 @@ export class Resources {
   public static readonly okButton: string = "OK";
   public static readonly updateStoppedBeforeHandoff: string = "An update stopped before its handoff, so its launch barrier was removed.";
   public static readonly updateBarrierCleared: string = "The person chose to open the application after an unfinished update, so its launch barrier was removed.";
+  public static get updateBarrierNotCleared(): string {
+    return `${Resources.applicationName} could not clear the unfinished update, so it will quit.`;
+  }
+
+  public static get updateBarrierNotClearedDetail(): string {
+    return `Open ${Resources.applicationName} again in a moment. If this keeps happening, its log has the reason.`;
+  }
+
+  public static formatBarrierNotCleared(message: string): string {
+    return `The launch barrier of an unfinished update could not be removed: ${message}`;
+  }
+
   public static formatBarrierUnreadable(message: string): string {
     return `The launch barrier could not be read: ${message}`;
   }
@@ -238,6 +250,7 @@ export class Resources {
   public static readonly cleanExitReason: string = "clean-exit";
   public static readonly warningBoxType: "warning" = "warning";
   public static readonly infoBoxType: "info" = "info";
+  public static readonly errorBoxType: "error" = "error";
   public static get commandName(): string {
     return ProductInfo.current.slug;
   }

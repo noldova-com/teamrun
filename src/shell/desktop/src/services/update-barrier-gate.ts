@@ -13,12 +13,12 @@ import type { IDialogHost } from "../interfaces/i-dialog-host.js";
 import { Resources } from "../resources.js";
 
 export class UpdateBarrierGate {
-  private readonly installation: Pick<Installation, "readAsync" | "checkAsync" | "releaseAsync">;
+  private readonly installation: Pick<Installation, "readAsync" | "readTextAsync" | "checkAsync" | "removeAsync">;
   private readonly productVersion: string;
   private readonly dialog: IDialogHost;
   private readonly log: (text: string) => void;
 
-  public constructor(installation: Pick<Installation, "readAsync" | "checkAsync" | "releaseAsync">, productVersion: string, dialog: IDialogHost, log: (text: string) => void) {
+  public constructor(installation: Pick<Installation, "readAsync" | "readTextAsync" | "checkAsync" | "removeAsync">, productVersion: string, dialog: IDialogHost, log: (text: string) => void) {
     this.installation = installation;
     this.productVersion = productVersion;
     this.dialog = dialog;
@@ -55,7 +55,30 @@ export class UpdateBarrierGate {
     });
     if (buttons[response] !== Resources.openApplicationButton)
       return false;
-    await this.installation.releaseAsync();
+    return await this.clearAsync();
+  }
+
+  private async clearAsync(): Promise<boolean> {
+    let status: UpdateBarrierStatus;
+    let isRemoved: boolean;
+    try {
+      const text = await this.installation.readTextAsync();
+      if (Object.isNull(text))
+        return true;
+      status = await this.installation.checkAsync(this.productVersion);
+      isRemoved = status === UpdateBarrierStatus.Unfinished && await this.installation.removeAsync(text);
+    }
+    catch (error) {
+      this.log(Resources.formatBarrierNotCleared(String(error)));
+      await this.dialog.showMessageBox(null, {
+        type: Resources.errorBoxType, message: Resources.updateBarrierNotCleared, detail: Resources.updateBarrierNotClearedDetail, buttons: [Resources.quitButton], defaultId: 0, cancelId: 0, noLink: true
+      });
+      return false;
+    }
+    if (status !== UpdateBarrierStatus.Unfinished)
+      return await this.askAsync(status);
+    if (!isRemoved)
+      return await this.clearAsync();
     this.log(Resources.updateBarrierCleared);
     return true;
   }

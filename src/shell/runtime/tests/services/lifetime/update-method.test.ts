@@ -5,6 +5,8 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
+import path from "node:path";
+
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { FailureCode, Request, ShellEvents, ShellMethods, UpdateReady, UpdateRequest, UpdateSaved } from "@noldova/teamrun-shell-protocol";
@@ -58,10 +60,28 @@ export class UpdateMethodTests {
       const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
 
       const refused = await RuntimeHostFixture.callAsync(desktop, "desktop:1", ShellMethods.update, new UpdateRequest("installations/0123456789abcdef").toJson());
-      const modules = await RuntimeHostFixture.callAsync(desktop, "desktop:2", ShellMethods.modules, null);
+      const withoutOwn = await RuntimeHostFixture.callAsync(desktop, "desktop:2", ShellMethods.update, new UpdateRequest(path.resolve("installations", "0123456789abcdef")).toJson());
+      const modules = await RuntimeHostFixture.callAsync(desktop, "desktop:3", ShellMethods.modules, null);
 
       Assert.areEqual(`${FailureCode.InvalidParams}|The installation's folder must be an absolute path.`, `${refused.failure?.code}|${refused.failure?.message}`);
+      Assert.areEqual(`${FailureCode.InvalidParams}|The update names another installation than the one this runtime belongs to.`, `${withoutOwn.failure?.code}|${withoutOwn.failure?.message}`);
       Assert.isFalse(modules.hasFailed);
+    });
+  }
+
+  @TestMethod
+  public refusesAnUpdateOfAnotherInstallationAndKeepsWorking(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      await using folder = await TemporaryFolderFixture.createAsync();
+      const installation = UpdateBarrierFixture.open(folder.path);
+      await fixture.startAsync(30_000, undefined, undefined, process.env, undefined, installation.folder);
+      const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+
+      const refused = await RuntimeHostFixture.callAsync(desktop, "desktop:1", ShellMethods.update, new UpdateRequest(path.join(folder.path, "other")).toJson());
+      const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
+
+      Assert.areEqual(`${FailureCode.InvalidParams}|The update names another installation than the one this runtime belongs to.`, `${refused.failure?.code}|${refused.failure?.message}`);
+      Assert.isFalse(late.hasFailed);
     });
   }
 }

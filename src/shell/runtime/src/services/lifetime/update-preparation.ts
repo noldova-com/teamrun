@@ -27,6 +27,7 @@ export class UpdatePreparation implements Disposable {
   private readonly ended: EventChannel;
   private readonly saveWait: number;
   private readonly barrierInterval: number;
+  private readonly installationFolder: string | null;
   private answers: Map<number, UpdateSaved> | null = null;
   private answered: (() => void) | null = null;
   private expected: readonly ConnectedClient[] = [];
@@ -40,7 +41,8 @@ export class UpdatePreparation implements Disposable {
     updating: EventChannel,
     ended: EventChannel,
     saveWait: number,
-    barrierInterval: number) {
+    barrierInterval: number,
+    installationFolder: string | null) {
     this.server = server;
     this.presence = presence;
     this.processes = processes;
@@ -48,10 +50,14 @@ export class UpdatePreparation implements Disposable {
     this.ended = ended;
     this.saveWait = saveWait;
     this.barrierInterval = barrierInterval;
+    this.installationFolder = installationFolder;
   }
 
   public async prepareAsync(connection: number, request: UpdateRequest): Promise<UpdateReady> {
     const failure = new Failure(FailureCode.Updating, Resources.formatUpdating(ProductInfo.current.name));
+    const installationFolder = this.installationFolder;
+    if (Object.isNull(installationFolder) || request.installation !== installationFolder)
+      throw new MethodFailureException(new Failure(FailureCode.InvalidParams, Resources.installationNotThisRuntimes));
     if (!Object.isNull(this.answers))
       throw new MethodFailureException(failure);
     const answers = new Map<number, UpdateSaved>();
@@ -63,7 +69,7 @@ export class UpdatePreparation implements Disposable {
     this.server.beginUpdate(failure);
     this.processes.pause();
     this.updating.publish(null);
-    this.watchBarrier(new Installation(request.installation, t => this.presence.isRunningAsync(t)));
+    this.watchBarrier(new Installation(installationFolder, t => this.presence.isRunningAsync(t)));
     this.settleIfAnswered(answers);
     const timer = setTimeout(settled.resolve, this.saveWait);
     await settled.promise;
@@ -91,9 +97,9 @@ export class UpdatePreparation implements Disposable {
 
   private async readReadyAsync(expected: readonly ConnectedClient[], answers: ReadonlyMap<number, UpdateSaved>): Promise<UpdateReady> {
     const problems = expected.flatMap(t => answers.get(t.connection)?.problems ?? [Resources.formatClientNotAnswered(t.client)]);
-    const clients = expected.flatMap(t => {
+    const clients = expected.flatMap((t): (readonly [number, string])[] => {
       const saved = answers.get(t.connection);
-      return Object.isUndefined(saved) ? [] : [[saved.processId, t.client] as const];
+      return Object.isUndefined(saved) ? [] : [[saved.processId, t.client]];
     });
     const processes: UpdateProcess[] = [...await this.presence.stampAsync(clients), ...this.processes.updateProcesses];
     return new UpdateReady(problems, processes);

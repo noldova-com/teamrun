@@ -84,8 +84,8 @@ export class CliFixture implements AsyncDisposable {
     return [...commandLineArguments, "--data-dir", this.dataDirectory];
   }
 
-  public async startHostAsync(declarationsFile: string): Promise<RuntimeHost> {
-    const options = new RuntimeOptions(new DataDirectory(this.dataDirectory), 30_000, new ServerSettings(), declarationsFile);
+  public async startHostAsync(declarationsFile: string, installationFolder: string | null = null): Promise<RuntimeHost> {
+    const options = new RuntimeOptions(new DataDirectory(this.dataDirectory), 30_000, new ServerSettings(), declarationsFile, null, undefined, installationFolder);
     const host = await RuntimeHost.startAsync(options, process.platform, process.env);
     this.hosts.push(host);
     return host;

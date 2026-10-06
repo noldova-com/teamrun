@@ -535,8 +535,8 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
 - A runtime of the same build can be asked to prepare for an update with `shell.update`.
   It then refuses every new handshake with an `Updating` failure and announces `shell.updating` to its clients.
   A client keeps its requests until it answers `shell.updateSaved`, so it can save; from then on, its requests other than `shell.updateSaved`, `shell.work` and `shell.stop` are refused with `Updating`.
-  A second `shell.update` is refused with `Updating`, and one that names a folder other than an absolute path with `InvalidParams`.
-  Only while updating, it reads its installation's launch barrier every second.
+  A second `shell.update` is refused with `Updating`, and one that names a folder other than an absolute path, or an installation other than the one the runtime was started for, with `InvalidParams`.
+  Only while updating, it reads its own installation's launch barrier every second.
   It goes back to normal and announces `shell.updateEnded` once the barrier is confirmed missing, or once its holder is confirmed to have exited while the barrier is `Preparing` or `Closing`.
   A `HandedOff` barrier keeps it updating until the barrier is gone, whatever its holder, and so does any doubt: a barrier it cannot read or parse, or a holder it cannot look up.
   [Stopping for an update](#stopping-for-an-update) owns the rest of the exchange.
@@ -988,7 +988,8 @@ Its `data-directories` folder lists the canonical data directories the installat
 An entry proves nothing by itself: a directory whose discovery names another program, or that no runtime owns, is skipped, and one that no longer exists is dropped.
 
 **Launch barrier.**
-The installation's `barrier.json` holds the coordinating desktop's process id and start time, the version being installed and the state `Preparing`, `Closing` or `HandedOff`.
+The installation's `barrier.json` holds the coordinating desktop's process id and start time, the version being installed, the state `Preparing`, `Closing` or `HandedOff` and, once handed off, the process id and start time of the process that took the handoff when the platform gives one.
+It holds while its holder runs, and a `HandedOff` barrier for another version also while the process that took the handoff runs.
 It is written whole to a temporary file and linked into place, which fails when a barrier exists, and each change of state replaces it through a temporary file and a rename, so no reader sees it half-written.
 While it holds:
 
@@ -1001,11 +1002,13 @@ A barrier whose holder no longer runs, matched by process id and start time, is 
 - `Preparing` or `Closing`: the update stopped before the handoff.
   The barrier is removed and the desktop's log says so.
 - `HandedOff`, found by the version being installed: the update finished, and the barrier is removed.
-- `HandedOff`, found by any other version: the update may still be installing or may have failed.
+- `HandedOff`, found by any other version, once the process that took the handoff has gone too or when none was recorded: the update may have failed or may still be installing.
   The desktop says so and removes the barrier only when the person confirms; the command line exits with the code for an update in progress.
   An installer's failure never clears the barrier by itself.
+- A barrier that cannot be parsed is treated the same way, whatever its holder, since nothing in it can be checked.
 
-A settled barrier is removed by first moving it aside under a unique name and deleting it only when it is still the barrier that was judged; one that replaced it meanwhile is put back and judged again.
+A settled barrier is removed by first moving it aside under a unique name and deleting it only when it is still the barrier that was judged; one that replaced it meanwhile is put back and judged again, and when yet another took its place, the one moved aside is deleted.
+When the person confirms, the desktop reads and judges the barrier again, since the question may have stayed open for minutes, and removes it the same way; one that holds by then is reported as holding, and when the barrier cannot be removed, the desktop tells the person and quits.
 
 **Order.**
 The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use:
@@ -1031,7 +1034,7 @@ The update stop of the desktop where the person chose Restart to update coordina
    It waits up to 10 seconds for every runtime and every process step 3 listed except the desktops to exit, checking each by process id and start time as [Programs modules run](#programs-modules-run) identifies a process.
    It then sets the barrier to `Closing`, and waits up to 10 more seconds for every other desktop to see it, quit and be verified the same way.
 6. **Handoff.**
-   It sets the barrier to `HandedOff` and calls the handoff.
+   It sets the barrier to `HandedOff` and calls the handoff, then records in the barrier the process the handoff names as taking over.
    After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage.
 
 A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and a missing barrier unfreezes it and reconnects.

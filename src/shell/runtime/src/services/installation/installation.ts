@@ -60,13 +60,13 @@ export class Installation {
     await rename(temporary, file);
   }
 
-  public async releaseAsync(): Promise<void> {
-    await rm(this.barrierFile, { force: true });
-  }
-
   public async readAsync(): Promise<UpdateBarrier | null> {
     const text = await this.readBarrierAsync();
     return Object.isNull(text) ? null : UpdateBarrier.fromJson(JSON.parse(text));
+  }
+
+  public readTextAsync(): Promise<string | null> {
+    return this.readBarrierAsync();
   }
 
   public async checkAsync(version: string): Promise<UpdateBarrierStatus> {
@@ -79,7 +79,7 @@ export class Installation {
     if (await this.isRunningAsync(barrier.holder))
       return UpdateBarrierStatus.Held;
     if (barrier.state === UpdateBarrierState.HandedOff && barrier.version !== version)
-      return UpdateBarrierStatus.Unfinished;
+      return !Object.isNull(barrier.handoff) && await this.isRunningAsync(barrier.handoff) ? UpdateBarrierStatus.Held : UpdateBarrierStatus.Unfinished;
     return await this.removeStaleAsync(text, version);
   }
 
@@ -91,17 +91,29 @@ export class Installation {
     return barrier.state !== UpdateBarrierState.HandedOff && !await this.isRunningAsync(barrier.holder);
   }
 
-  private async removeStaleAsync(text: string, version: string): Promise<UpdateBarrierStatus> {
+  public async removeAsync(text: string): Promise<boolean> {
     const claimed = path.join(this.folder, Resources.formatTemporaryName(Resources.barrierFileName, randomUUID()));
     if (Object.isNull(await Installation.unlessMissingAsync(rename(this.barrierFile, claimed).then(() => claimed))))
-      return await this.checkAsync(version);
-    if (await readFile(claimed, Resources.utf8Encoding) !== text) {
-      await link(claimed, this.barrierFile);
-      await rm(claimed);
-      return await this.checkAsync(version);
-    }
+      return true;
+    const isJudged = await readFile(claimed, Resources.utf8Encoding) === text;
+    if (!isJudged)
+      await Installation.putBackAsync(claimed, this.barrierFile);
     await rm(claimed, { force: true });
-    return UpdateBarrierStatus.None;
+    return isJudged;
+  }
+
+  private async removeStaleAsync(text: string, version: string): Promise<UpdateBarrierStatus> {
+    return await this.removeAsync(text) ? UpdateBarrierStatus.None : await this.checkAsync(version);
+  }
+
+  private static async putBackAsync(claimed: string, file: string): Promise<void> {
+    try {
+      await link(claimed, file);
+    }
+    catch (error) {
+      if (!Installation.hasCode(error, Resources.existingFileErrorCode))
+        throw error;
+    }
   }
 
   private static parse(text: string): UpdateBarrier | null {
@@ -122,9 +134,13 @@ export class Installation {
       return await operation;
     }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code === Resources.missingFileErrorCode)
+      if (Installation.hasCode(error, Resources.missingFileErrorCode))
         return null;
       throw error;
     }
+  }
+
+  private static hasCode(error: unknown, code: string): boolean {
+    return error instanceof Error && "code" in error && error.code === code;
   }
 }

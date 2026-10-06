@@ -1917,14 +1917,15 @@ export declare enum UpdateBarrierStatus {
   None = "None",
 
   /**
-   * An update is under way: the barrier's holder still runs.
+   * An update is under way: the barrier's holder, or the process that took
+   * its handoff, still runs.
    */
   Held = "Held",
 
   /**
-   * An update handed to the installer may still be installing or did not
-   * finish, or the barrier cannot be read; it is removed only once the
-   * person confirms.
+   * An update handed off to another version whose handoff process is gone or
+   * unknown may have failed or may still be installing, or the barrier cannot
+   * be read; it is removed only once the person confirms.
    */
   Unfinished = "Unfinished"
 }
@@ -2012,21 +2013,28 @@ export declare class UpdateBarrier {
   public readonly state: UpdateBarrierState;
 
   /**
+   * The process that took the handoff, by process id and start, once the platform gave it; `null` before the handoff
+   * or when the platform gives none. While it runs, a barrier handed off to another version still holds.
+   */
+  public readonly handoff: UpdateProcess | null;
+
+  /**
    * Creates the barrier.
    *
    * @param holder The coordinating desktop.
    * @param version The version being installed; not whitespace only.
    * @param state Where the update stands.
+   * @param handoff The process that took the handoff, or `null`.
    * @throws {ArgumentException} When the version is empty or whitespace only.
    * @example
    * ```ts
    * import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
    * import { UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
    *
-   * export const barrier: UpdateBarrier = new UpdateBarrier(new UpdateProcess(4120, 1500, 1501, "desktop"), "0.2.0", UpdateBarrierState.Preparing);
+   * export const barrier: UpdateBarrier = new UpdateBarrier(new UpdateProcess(4120, 1500, 1501, "desktop"), "0.2.0", UpdateBarrierState.Preparing, null);
    * ```
    */
-  public constructor(holder: UpdateProcess, version: string, state: UpdateBarrierState);
+  public constructor(holder: UpdateProcess, version: string, state: UpdateBarrierState, handoff: UpdateProcess | null);
 
   /**
    * Reads a barrier from its file's JSON.
@@ -2049,7 +2057,7 @@ export declare class UpdateBarrier {
   /**
    * Returns the file's JSON.
    *
-   * @returns The `holder`, `version` and `state` fields.
+   * @returns The `holder`, `version`, `state` and `handoff` fields.
    * @example
    * ```ts
    * import type { UpdateBarrier } from "@noldova/teamrun-shell-runtime";
@@ -2166,11 +2174,12 @@ export declare class Installation {
   /**
    * Reads the launch barrier for a client that wants to start a runtime.
    * A barrier whose holder no longer runs is removed when the update stopped
-   * before the handoff, or when it was handed off for this version; one
-   * handed off for another version, or one that cannot be read, is
-   * `Unfinished` and stays. A stale barrier is first moved aside under a
-   * unique name and removed only when it is still the one judged stale; a
-   * barrier that replaced it meanwhile is put back and checked again.
+   * before the handoff, or when it was handed off for this version. One
+   * handed off for another version is `Held` while the process that took the
+   * handoff runs and `Unfinished` once it has gone or when none was recorded,
+   * and stays, as does one that cannot be parsed. A stale barrier is removed
+   * as {@link Installation.removeAsync} removes one, and a barrier that
+   * replaced it meanwhile is checked in turn.
    *
    * @param version The client's product version.
    * @returns A promise of the barrier's status.
@@ -2205,21 +2214,6 @@ export declare class Installation {
   public hasEndedAsync(): Promise<boolean>;
 
   /**
-   * Removes the launch barrier, if there is one.
-   *
-   * @returns A promise that settles once the barrier is gone.
-   * @example
-   * ```ts
-   * import type { Installation } from "@noldova/teamrun-shell-runtime";
-   *
-   * export function resumeAsync(installation: Installation): Promise<void> {
-   *   return installation.releaseAsync();
-   * }
-   * ```
-   */
-  public releaseAsync(): Promise<void>;
-
-  /**
    * Reads the launch barrier.
    *
    * @returns A promise of the barrier, or null when there is none.
@@ -2235,6 +2229,45 @@ export declare class Installation {
    * ```
    */
   public readAsync(): Promise<UpdateBarrier | null>;
+
+  /**
+   * Reads the launch barrier's file as it is, parsable or not, so that
+   * {@link Installation.removeAsync} can later remove that barrier and no other.
+   *
+   * @returns A promise of the file's text, or null when there is no barrier.
+   * @throws Error When the barrier cannot be read for any reason but its absence.
+   * @example
+   * ```ts
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function hasBarrierAsync(installation: Installation): Promise<boolean> {
+   *   return (await installation.readTextAsync()) !== null;
+   * }
+   * ```
+   */
+  public readTextAsync(): Promise<string | null>;
+
+  /**
+   * Removes the launch barrier only while it is still the one that was read: it
+   * moves the barrier aside under a unique name and deletes it when its text is
+   * unchanged. A barrier that replaced it is put back, unless yet another one
+   * has taken its place meanwhile, in which case the moved one is deleted.
+   *
+   * @param text The barrier's text, as {@link Installation.readTextAsync} read it.
+   * @returns A promise of whether that barrier is gone; `false` when another
+   * one replaced it.
+   * @throws Error When the barrier cannot be moved, read or put back.
+   * @example
+   * ```ts
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function clearAsync(installation: Installation): Promise<boolean> {
+   *   const text = await installation.readTextAsync();
+   *   return text === null || await installation.removeAsync(text);
+   * }
+   * ```
+   */
+  public removeAsync(text: string): Promise<boolean>;
 }
 
 /**
@@ -4616,18 +4649,18 @@ export declare class RuntimeLauncher {
    *
    * @param settings How to start and attach.
    * @param identity The client's build identity.
+   * @param installation The installation the client belongs to. Before starting a runtime the launcher checks its launch barrier, and it gives the runtime the installation's folder; when a runtime it started exits before it is found, it checks the barrier again and reports an update in progress rather than the exit.
    * @param starter Starts the runtime's process. Defaults to {@link ChildProcessStarter}; the desktop passes one that keeps its own handles out of the runtime on Windows.
-   * @param installation The installation the client belongs to, or `null`. Before starting a runtime the launcher checks its launch barrier, and it gives the runtime the installation's folder. Defaults to `null`.
    * @example
    * ```ts
-   * import { type IRuntimeClientListener, type LaunchSettings, RuntimeBuild, type RuntimeClient, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
+   * import { type Installation, type IRuntimeClientListener, type LaunchSettings, RuntimeBuild, type RuntimeClient, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
    *
-   * export function attachAsync(settings: LaunchSettings, listener: IRuntimeClientListener): Promise<RuntimeClient> {
-   *   return new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", listener);
+   * export function attachAsync(settings: LaunchSettings, installation: Installation, listener: IRuntimeClientListener): Promise<RuntimeClient> {
+   *   return new RuntimeLauncher(settings, RuntimeBuild.identity, installation).attachAsync("desktop", listener);
    * }
    * ```
    */
-  public constructor(settings: LaunchSettings, identity: BuildIdentity, starter?: IProcessStarter, installation?: Installation | null);
+  public constructor(settings: LaunchSettings, identity: BuildIdentity, installation: Installation, starter?: IProcessStarter);
 
   /**
    * Returns a connection to the data directory's runtime of this build, starting one when none runs. An older build's runtime is asked to stop and replaced.
@@ -4642,14 +4675,15 @@ export declare class RuntimeLauncher {
    * @throws {RuntimeHandoverException} Rejected when a newer build's runtime owns the directory.
    * @throws {PreShellDataFoundException} Rejected when the runtime refuses until data from before the shell is moved aside.
    * @throws {WorkInProgressException} Rejected when an older runtime has work in progress and the policy is to stop only if idle.
+   * @throws {UpdateInProgressException} Rejected when an update holds the installation's launch barrier before a runtime starts, or once a runtime it started exits.
    * @throws {LaunchException} Rejected when the runtime cannot start, exits before it is reachable, does not start in time, holds the directory without becoming reachable within the launch limit, or an older runtime refuses to stop or does not stop in time.
    * @throws {ConnectionException} Rejected when the runtime refuses the connection.
    * @example
    * ```ts
-   * import { type IRuntimeClientListener, type LaunchSettings, RuntimeBuild, type RuntimeClient, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
+   * import { type Installation, type IRuntimeClientListener, type LaunchSettings, RuntimeBuild, type RuntimeClient, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
    *
-   * export function attachAsync(settings: LaunchSettings, listener: IRuntimeClientListener): Promise<RuntimeClient> {
-   *   return new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", listener);
+   * export function attachAsync(settings: LaunchSettings, installation: Installation, listener: IRuntimeClientListener): Promise<RuntimeClient> {
+   *   return new RuntimeLauncher(settings, RuntimeBuild.identity, installation).attachAsync("desktop", listener);
    * }
    * ```
    */

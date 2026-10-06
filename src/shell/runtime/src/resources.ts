@@ -130,6 +130,7 @@ export class Resources {
   public static readonly logSizeLimit: number = 1048576;
   public static readonly logRecordShare: number = 4;
   public static readonly missingFileErrorCode: string = "ENOENT";
+  public static readonly existingFileErrorCode: string = "EEXIST";
   public static readonly utf8ContinuationMask: number = 0xC0;
   public static readonly utf8ContinuationBits: number = 0x80;
   public static readonly privateFolderMode: number = 0o700;
@@ -155,6 +156,7 @@ export class Resources {
   public static readonly versionField: string = "version";
   public static readonly holderField: string = "holder";
   public static readonly stateField: string = "state";
+  public static readonly handoffField: string = "handoff";
   public static readonly dataDirectoryField: string = "dataDirectory";
   public static readonly buildField: string = "build";
   public static readonly installRootSegments: readonly string[] = ["..", "..", "..", ".."];
@@ -491,6 +493,7 @@ export class Resources {
   public static readonly workInProgress: string = "Work is in progress; stopping now would interrupt it.";
   public static readonly updateNotPreparing: string = "The runtime is not preparing for an update.";
   public static readonly installationNotAbsolute: string = "The installation's folder must be an absolute path.";
+  public static readonly installationNotThisRuntimes: string = "The update names another installation than the one this runtime belongs to.";
   public static readonly updateSaveWait: number = 6000;
   public static readonly updateBarrierInterval: number = 1000;
   public static readonly clientClosed: string = "The connection to the runtime is closed.";

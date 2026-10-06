@@ -46,9 +46,9 @@ export class RuntimeLauncher {
   private readonly settings: LaunchSettings;
   private readonly identity: BuildIdentity;
   private readonly starter: IProcessStarter;
-  private readonly installation: Installation | null;
+  private readonly installation: Installation;
 
-  public constructor(settings: LaunchSettings, identity: BuildIdentity, starter: IProcessStarter = new ChildProcessStarter(), installation: Installation | null = null) {
+  public constructor(settings: LaunchSettings, identity: BuildIdentity, installation: Installation, starter: IProcessStarter = new ChildProcessStarter()) {
     this.settings = settings;
     this.identity = identity;
     this.starter = starter;
@@ -137,7 +137,10 @@ export class RuntimeLauncher {
   private async describeExitAsync(started: StartedRuntime): Promise<LaunchException> {
     const text = await readFile(started.startLog, Resources.utf8Encoding);
     await rm(started.startLog, { force: true });
-    await this.requireNoUpdateAsync();
+    await this.requireNoUpdateAsync().catch((error: unknown) => {
+      if (error instanceof UpdateInProgressException)
+        throw error;
+    });
     const reason = new DiagnosticRedactor(homedir()).redact(text.slice(-Resources.startLogTailLength).trim());
     return new LaunchException(String.isNullOrWhitespace(reason) ? Resources.runtimeExitedWithoutReason : Resources.formatRuntimeExited(reason));
   }
@@ -183,10 +186,7 @@ export class RuntimeLauncher {
   }
 
   private async requireNoUpdateAsync(): Promise<void> {
-    const installation = this.installation;
-    if (Object.isNull(installation))
-      return;
-    const status = await installation.checkAsync(this.identity.productVersion);
+    const status = await this.installation.checkAsync(this.identity.productVersion);
     if (status !== UpdateBarrierStatus.None)
       throw new UpdateInProgressException(status);
   }
@@ -195,7 +195,6 @@ export class RuntimeLauncher {
     const directory = this.settings.dataDirectory;
     const unique = randomUUID();
     const startLogName = Resources.formatStartLogName(unique);
-    const installation = this.installation;
     const command = new ProcessLaunchCommand(this.settings.platform, this.settings.executablePath, [
       this.settings.entryPath,
       Resources.dataDirectoryArgument,
@@ -204,7 +203,8 @@ export class RuntimeLauncher {
       String(this.settings.idleGraceMilliseconds),
       Resources.startLogArgument,
       startLogName,
-      ...Object.isNull(installation) ? [] : [Resources.installationArgument, installation.folder]
+      Resources.installationArgument,
+      this.installation.folder
     ], this.settings.environment, path.join(directory.logsFolder, Resources.formatCopyRecordName(unique)));
     await mkdir(directory.logsFolder, { recursive: true });
     const startLog = path.join(directory.logsFolder, startLogName);

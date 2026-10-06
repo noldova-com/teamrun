@@ -217,11 +217,11 @@ export class CliFailureTests {
   public async answersARuntimePreparingForAnUpdateAndReportsTheUpdate(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0");
-    await fixture.startHostAsync(build.declarationsFile);
     const installation = Installation.locate(fixture.deviceFolder, process.execPath, process.platform);
+    await fixture.startHostAsync(build.declarationsFile, installation);
     await CliFailureTests.holdBarrierAsync(installation);
     const settings = new LaunchSettings(new DataDirectory(fixture.dataDirectory), process.execPath, RuntimeEntry.entryPath, fixture.environment, process.platform);
-    const desktop = await new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", { onEvent: () => undefined, onDisconnected: () => undefined });
+    const desktop = await new RuntimeLauncher(settings, RuntimeBuild.identity, new Installation(installation, () => Promise.resolve(false))).attachAsync("desktop", { onEvent: () => undefined, onDisconnected: () => undefined });
 
     const running = fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--json"]));
     await ProbeBuildFixture.waitUntilWaitingAsync(ProbeBuildFixture.markerPath(fixture.dataDirectory));
@@ -241,6 +241,6 @@ export class CliFailureTests {
     const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), process.env).stampAsync([[process.pid, "desktop"]]);
     Assert.isDefined(holder);
     await mkdir(folder, { recursive: true });
-    await writeFile(path.join(folder, "barrier.json"), JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing).toJson()));
+    await writeFile(path.join(folder, "barrier.json"), JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
   }
 }

@@ -464,7 +464,7 @@ export class DesktopApplicationTests {
       const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), environment).stampAsync([[process.pid, "desktop"]]);
       Assert.isDefined(holder);
       await mkdir(installation.folder, { recursive: true });
-      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing).toJson()));
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
 
       const status = await installation.checkAsync(RuntimeBuild.identity.productVersion);
 
@@ -491,10 +491,12 @@ export class DesktopApplicationTests {
       const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), environment).stampAsync([[process.pid, "desktop"]]);
       Assert.isDefined(holder);
       await mkdir(installation.folder, { recursive: true });
-      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing).toJson()));
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
 
       await electron.app.becomeReadyAsync();
+      electron.app.emit("activate");
       await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+      electron.app.emit("activate");
 
       Assert.areEqual(0, electron.windows.length);
       Assert.areEqual(0, launcher.calls.length);
@@ -518,7 +520,7 @@ export class DesktopApplicationTests {
       const [installation] = installations;
       Assert.isDefined(installation);
       await mkdir(installation.folder, { recursive: true });
-      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(new UpdateProcess(process.pid, 1, 2, "desktop"), "0.3.0", UpdateBarrierState.Closing).toJson()));
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(new UpdateProcess(process.pid, 1, 2, "desktop"), "0.3.0", UpdateBarrierState.Closing, null).toJson()));
 
       await DesktopStartFixture.openAsync(electron);
 
@@ -595,6 +597,21 @@ export class DesktopApplicationTests {
       JSON.stringify(DesktopStartFixture.readErrors(process, "The device's last appearance")));
     Assert.areEqual(JSON.stringify(["The device's appearance could not be kept for the next start: Error: The disk is full."]),
       JSON.stringify(DesktopStartFixture.readErrors(process, "The device's appearance could not be kept")));
+  }
+
+  @TestMethod
+  public async opensOneWindowWhenActivatedBeforeItsLaunchBarrierIsChecked(): Promise<void> {
+    const electron = new FakeElectron();
+    DesktopStartFixture.start(electron, new FakeDesktopProcess("darwin"));
+    await electron.app.becomeReadyAsync();
+
+    electron.app.emit("activate");
+    const whileChecking = electron.windows.length;
+    await Condition.waitAsync(() => electron.windows.length > 0);
+    electron.app.emit("activate");
+
+    Assert.areEqual(0, whileChecking);
+    Assert.areEqual(1, electron.windows.length);
   }
 
   @TestMethod

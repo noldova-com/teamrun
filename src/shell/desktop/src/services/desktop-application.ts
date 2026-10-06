@@ -112,6 +112,7 @@ export class DesktopApplication {
   private device: Promise<string | null> = Promise.resolve(null);
   private knownDevice: string | null = null;
   private isReady: boolean = false;
+  private hasPassedBarrier: boolean = false;
 
   private constructor(
     electron: IElectron,
@@ -260,7 +261,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
     this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
-      if (this.windows.size === 0)
+      if (this.hasPassedBarrier && this.windows.size === 0)
         this.open();
     });
     void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync()]).then(([isClear]) => {
@@ -268,6 +269,7 @@ export class DesktopApplication {
         this.electron.app.exit(Resources.quitExitCode);
         return;
       }
+      this.hasPassedBarrier = true;
       this.open();
       void this.startup.startAsync();
     });

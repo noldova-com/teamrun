@@ -3044,7 +3044,7 @@ export declare class UpdateBarrierGate {
    * }
    * ```
    */
-  public constructor(installation: Pick<Installation, "readAsync" | "checkAsync" | "releaseAsync">, productVersion: string, dialog: IDialogHost, log: (text: string) => void);
+  public constructor(installation: Pick<Installation, "readAsync" | "readTextAsync" | "checkAsync" | "removeAsync">, productVersion: string, dialog: IDialogHost, log: (text: string) => void);
 
   /**
    * Checks the barrier and, when it holds, asks as {@link askAsync} does. A barrier that cannot be read lets the
@@ -3066,11 +3066,14 @@ export declare class UpdateBarrierGate {
 
   /**
    * Tells the person what a barrier means: `Held` shows that TeamRun is installing an update, with OK; `Unfinished`
-   * asks with Quit, the default, and Open TeamRun, which removes the barrier; `None` asks nothing.
+   * asks with Quit, the default, and Open TeamRun; `None` asks nothing. Open TeamRun reads and judges the barrier
+   * again, since the person may have taken minutes, and removes it only while it is unchanged: a barrier that holds
+   * by then is reported as `Held` is, and one that replaced it is judged in turn. When it cannot be removed, the
+   * desktop's log says why and an error box tells the person that TeamRun will quit.
    *
    * @param status What the barrier means for this installation.
    * @returns A promise of `true` when the desktop may start, `false` when it exits.
-   * @throws Error Rejected when the message box fails or the barrier cannot be removed.
+   * @throws Error Rejected when a message box fails.
    * @example
    * ```ts
    * import type { UpdateBarrierGate } from "@noldova/teamrun-shell-desktop";
@@ -3227,7 +3230,7 @@ export declare class DesktopApplication {
    *     electron,
    *     process,
    *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
-   *     (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, undefined, installation),
+   *     (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, installation),
    *     t => DeviceIdentity.readOrCreateAsync(t),
    *     t => new AppearanceStore(t),
    *     t => PathCommand.forBundle(t, () => Promise.resolve()));

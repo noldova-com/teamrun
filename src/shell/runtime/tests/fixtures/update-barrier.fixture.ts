@@ -9,8 +9,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { Assert } from "@noldova/teamrun-foundation-testing";
-import type { Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
-import { Installation, ProcessPresence, SystemCommand, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+import type { BuildIdentity, Event, QualifiedName } from "@noldova/teamrun-shell-protocol";
+import {
+  type IProcessStarter, Installation, type LaunchSettings, ProcessPresence, RuntimeLauncher, SystemCommand, UpdateBarrier, UpdateBarrierState
+} from "@noldova/teamrun-shell-runtime";
 
 import type { RawConnectionFixture } from "./raw-connection.fixture.js";
 
@@ -21,11 +23,15 @@ export class UpdateBarrierFixture {
     return new Installation(path.join(folder, "installation"), t => UpdateBarrierFixture.PRESENCE.isRunningAsync(t));
   }
 
+  public static createLauncher(settings: LaunchSettings, identity: BuildIdentity, starter?: IProcessStarter): RuntimeLauncher {
+    return new RuntimeLauncher(settings, identity, UpdateBarrierFixture.open(path.dirname(settings.dataDirectory.root)), starter);
+  }
+
   public static async holdAsync(installation: Installation, processId: number = process.pid, state: UpdateBarrierState = UpdateBarrierState.Preparing): Promise<void> {
     const [holder] = await UpdateBarrierFixture.PRESENCE.stampAsync([[processId, "desktop"]]);
     Assert.isDefined(holder);
     await mkdir(installation.folder, { recursive: true });
-    await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", state).toJson()));
+    await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", state, null).toJson()));
   }
 
   public static async readEventAsync(connection: RawConnectionFixture, name: QualifiedName): Promise<Event> {
