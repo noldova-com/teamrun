@@ -26,7 +26,8 @@ export default class PackageArchivesFixture {
     { directory: "src/foundation/testing", name: "@noldova/teamrun-foundation-testing", version: "0.0.7", dependencies: [], peers: {} },
     { directory: "src/shell/cli", name: "@noldova/teamrun-shell-cli", version: "0.0.7", dependencies: ["@noldova/teamrun-foundation-alpha"], peers: {} },
     { directory: "src/shell/desktop", name: "@noldova/teamrun-shell-desktop", version: "0.0.7", dependencies: ["@noldova/teamrun-foundation-alpha"], peers: { electron: "44.5.1" } },
-    { directory: "src/modules/tasks/runtime", name: "@noldova/teamrun-modules-tasks-runtime", version: "0.3.0", dependencies: ["@noldova/teamrun-foundation-beta"], peers: {} }
+    { directory: "src/modules/tasks/runtime", name: "@noldova/teamrun-modules-tasks-runtime", version: "0.3.0", dependencies: ["@noldova/teamrun-foundation-beta"], peers: {} },
+    { directory: "src/modules/tasks/cli", name: "@noldova/teamrun-modules-tasks-cli", version: "0.3.0", dependencies: ["@noldova/teamrun-foundation-alpha"], peers: {} }
   ];
   private static readonly SHIPPED: string = "shipped";
   private static readonly OUTSIDE: string = "outside";
@@ -53,7 +54,7 @@ export default class PackageArchivesFixture {
       "assets/fixture-icons/icon-dark.ico": "ico\n",
       "assets/dictionaries/dictionaries.json": "{\"dictionaries\":[]}\n",
       "src/angular.json": "{}\n",
-      "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", version: "0.3.0", displayName: "Tasks", description: "Used by the tests.", parts: ["runtime"], dependencies: [], contributes: {} }),
+      "src/modules/tasks/module.json": JSON.stringify({ id: "tasks", version: "0.3.0", displayName: "Tasks", description: "Used by the tests.", parts: ["runtime", "cli"], dependencies: [], contributes: {} }),
       ...Object.fromEntries(PackageArchivesFixture.PACKAGES.map(t => [`${t.directory}/package.json`, JSON.stringify({
         name: t.name,
         version: "__VERSION__",
