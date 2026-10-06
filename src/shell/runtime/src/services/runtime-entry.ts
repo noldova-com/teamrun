@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 
 import { DataDirectoryOwnedException } from "../exceptions/data-directory-owned.exception.js";
+import { UpdateInProgressException } from "../exceptions/update-in-progress.exception.js";
 import { RuntimeOptions } from "../models/runtime-options.js";
 import { Resources } from "../resources.js";
 import { RuntimeHost } from "./lifetime/runtime-host.js";
@@ -39,7 +40,7 @@ export class RuntimeEntry {
       if (failure instanceof DataDirectoryOwnedException)
         return Resources.ownedExitCode;
       error.write(`${String(failure)}\n`);
-      return Resources.failureExitCode;
+      return failure instanceof UpdateInProgressException ? Resources.updatingExitCode : Resources.failureExitCode;
     }
 
     const stop = (): void => host.requestStop(Resources.stoppedBySignal);

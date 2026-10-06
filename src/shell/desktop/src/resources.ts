@@ -119,22 +119,6 @@ export class Resources {
   public static readonly deviceDirectoryArgument: string = "--device-dir=";
   public static readonly handoverArguments: readonly string[] = [Resources.dataDirectoryArgument, Resources.userDataArgument, Resources.deviceDirectoryArgument];
   public static readonly windowsPlatform: string = "win32";
-  public static readonly localAppDataVariable: string = "LOCALAPPDATA";
-  public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
-  public static get windowsDeviceFolder(): readonly string[] {
-    return ProductInfo.current.windowsDeviceFolder.split(Resources.folderSeparator);
-  }
-
-  public static get macDeviceFolder(): readonly string[] {
-    return ["Library", "Application Support", ...ProductInfo.current.macosDeviceFolder.split(Resources.folderSeparator)];
-  }
-
-  public static readonly xdgStateVariable: string = "XDG_STATE_HOME";
-  public static readonly xdgStateDefault: readonly string[] = [".local", "state"];
-  public static get linuxDeviceFolder(): readonly string[] {
-    return ProductInfo.current.linuxDeviceFolder.split(Resources.folderSeparator);
-  }
-
   public static readonly deviceFileName: string = "device.json";
   public static readonly deviceIdField: string = "id";
   public static readonly createOnlyFlag: string = "wx";

@@ -17,8 +17,11 @@ import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, DataDirectoryLocator, PreShellDataFoundException, RuntimeBuild, RuntimeEntry, RuntimeHandoverException } from "@noldova/teamrun-shell-runtime";
-import { DeviceIdentity, type IIpcEvent, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
+import {
+  ConnectionException, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
+  UpdateBarrierState, UpdateBarrierStatus
+} from "@noldova/teamrun-shell-runtime";
+import { type IIpcEvent, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
@@ -449,6 +452,31 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async givesItsLauncherTheInstallationInTheDeviceFolderItIsGiven(): Promise<void> {
+    const folder = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const environment = { SystemRoot: process.env["SystemRoot"] };
+      const installations: Installation[] = [];
+      DesktopStartFixture.start(
+        new FakeElectron(), new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), undefined, undefined, undefined, undefined, installations);
+      const [installation] = installations;
+      Assert.isDefined(installation);
+      const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), environment).stampAsync([[process.pid, "desktop"]]);
+      Assert.isDefined(holder);
+      await mkdir(installation.folder, { recursive: true });
+      await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing).toJson()));
+
+      const status = await installation.checkAsync(RuntimeBuild.identity.productVersion);
+
+      Assert.areEqual(join(folder, "installations"), dirname(installation.folder));
+      Assert.areEqual(UpdateBarrierStatus.Held, status);
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
   public async opensItsWindowWithTheDevicesLastAppearanceAndKeepsTheOneItsWindowReports(): Promise<void> {
     const appearance = new FakeAppearanceStore();
     appearance.kept = { "shell.mode": "Dark" };
@@ -679,7 +707,7 @@ export class DesktopApplicationTests {
     await second.app.becomeReadyAsync();
 
     Assert.areEqual(JSON.stringify(["/devices/this"]), JSON.stringify(given.folders));
-    Assert.areEqual(JSON.stringify([DeviceIdentity.locateFolder("win32", environment, "C:\\Users\\person")]), JSON.stringify(located.folders));
+    Assert.areEqual(JSON.stringify([DeviceFolder.locate("win32", environment, "C:\\Users\\person")]), JSON.stringify(located.folders));
   }
 
   @TestMethod

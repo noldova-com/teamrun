@@ -17,7 +17,7 @@ import type {
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -2183,24 +2183,6 @@ export declare class DeviceIdentityException extends Exception {
  */
 export declare class DeviceIdentity {
   /**
-   * The device-local folder that keeps the identity: `%LOCALAPPDATA%\Noldova\TeamRun` on Windows,
-   * `~/Library/Application Support/Noldova/TeamRun` on macOS and `$XDG_STATE_HOME/noldova/teamrun` (by default
-   * `~/.local/state/noldova/teamrun`) on Linux.
-   *
-   * @param platform The operating system, as Node.js names it.
-   * @param environment The environment, which may set `LOCALAPPDATA` or `XDG_STATE_HOME`.
-   * @param homeFolder The person's home folder.
-   * @returns The folder.
-   * @example
-   * ```ts
-   * import { DeviceIdentity } from "@noldova/teamrun-shell-desktop";
-   *
-   * export const folder: string = DeviceIdentity.locateFolder("linux", {}, "/home/person");
-   * ```
-   */
-  public static locateFolder(platform: string, environment: NodeJS.ProcessEnv, homeFolder: string): string;
-
-  /**
    * Reads the identity from the folder's `device.json`, creating the folder and a new identity when there is none.
    *
    * @param folder The folder that keeps the identity.
@@ -3034,7 +3016,7 @@ export declare class DesktopApplication {
    * @param process The desktop's process; `--data-dir=` in its arguments gives the data directory.
    * @param moduleUrl The URL of the desktop's compiled entry point, which locates the window, the preload and, in a
    * development run, the checkout.
-   * @param createLauncher Creates the runtime launcher for the chosen settings.
+   * @param createLauncher Creates the runtime launcher for the chosen settings and the installation, in the device folder, that the desktop's program belongs to.
    * @param readDeviceAsync Reads this device's identity from a folder: the one `--device-dir=` in the process's
    * arguments gives, otherwise the operating system's local application data. A failure leaves window bounds unkept.
    * @param createAppearanceStore Creates the store of this device's last appearance preferences in the same folder. The
@@ -3052,7 +3034,7 @@ export declare class DesktopApplication {
    *     electron,
    *     process,
    *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
-   *     t => new RuntimeLauncher(t, RuntimeBuild.identity),
+   *     (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, undefined, installation),
    *     t => DeviceIdentity.readOrCreateAsync(t),
    *     t => new AppearanceStore(t),
    *     t => PathCommand.forBundle(t, () => Promise.resolve()));
@@ -3063,7 +3045,7 @@ export declare class DesktopApplication {
     electron: IElectron,
     process: IDesktopProcess,
     moduleUrl: string,
-    createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
+    createLauncher: (settings: LaunchSettings, installation: Installation) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
     createPathCommand: (executablePath: string) => PathCommand): void;

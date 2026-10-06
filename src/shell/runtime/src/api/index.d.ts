@@ -12,10 +12,10 @@ import type { DatabaseSync, SQLInputValue, SQLOutputValue, StatementResultingCha
 import type { Readable, Writable } from "node:stream";
 
 import { type ArgumentException, type ArgumentOutOfRangeException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
-import type { JsonValue } from "@noldova/teamrun-foundation-json";
+import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type {
   BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, ProgramStatus, ProgramStatusList, QualifiedName, Response,
-  RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingEntry, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy, WorkReport
+  RunningWork, RuntimeHandover, SettingChange, SettingDefinition, SettingEntry, SettingKey, SettingScope, SettingValue, SettingsSnapshot, StopPolicy, UpdateProcess, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 
 /**
@@ -1887,6 +1887,376 @@ export declare class BuildMismatchException extends Exception {
 }
 
 /**
+ * Where an installation's update stands in its launch barrier.
+ */
+export declare enum UpdateBarrierState {
+  /**
+   * The update is saving and stopping the installation's processes.
+   */
+  Preparing = "Preparing",
+
+  /**
+   * Every runtime has exited, and the installation's desktops quit.
+   */
+  Closing = "Closing",
+
+  /**
+   * Every process has exited, and the update was handed to the installer.
+   */
+  HandedOff = "HandedOff"
+}
+
+/**
+ * What an installation's launch barrier means for a client that wants to
+ * start a runtime.
+ */
+export declare enum UpdateBarrierStatus {
+  /**
+   * No barrier holds, or a barrier left behind was settled and removed.
+   */
+  None = "None",
+
+  /**
+   * An update is under way: the barrier's holder still runs.
+   */
+  Held = "Held",
+
+  /**
+   * An update handed to the installer may still be installing or did not
+   * finish, or the barrier cannot be read; it is removed only once the
+   * person confirms.
+   */
+  Unfinished = "Unfinished"
+}
+
+/**
+ * Thrown when an installation's launch barrier keeps a client from starting
+ * a runtime.
+ */
+export declare class UpdateInProgressException extends Exception {
+  /**
+   * The exception's name, `"UpdateInProgressException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Whether an update is under way or may not have finished.
+   */
+  public readonly status: UpdateBarrierStatus;
+
+  /**
+   * Creates the exception.
+   *
+   * @param status `Held` or `Unfinished`.
+   * @example
+   * ```ts
+   * import { UpdateBarrierStatus, UpdateInProgressException } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function refuse(): never {
+   *   throw new UpdateInProgressException(UpdateBarrierStatus.Held);
+   * }
+   * ```
+   */
+  public constructor(status: UpdateBarrierStatus);
+}
+
+/**
+ * An authenticated connection as the runtime's server lists it.
+ */
+export declare class ConnectedClient {
+  /**
+   * The connection's number, unique for the runtime's lifetime.
+   */
+  public readonly connection: number;
+
+  /**
+   * The name the client gave in its handshake, such as `desktop` or `cli`.
+   */
+  public readonly client: string;
+
+  /**
+   * Creates the entry.
+   *
+   * @param connection The connection's number.
+   * @param client The client's name.
+   * @example
+   * ```ts
+   * import { ConnectedClient } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const desktop: ConnectedClient = new ConnectedClient(1, "desktop");
+   * ```
+   */
+  public constructor(connection: number, client: string);
+}
+
+/**
+ * An installation's launch barrier, `barrier.json` in the installation's
+ * folder: who holds it, the version being installed and where the update
+ * stands.
+ */
+export declare class UpdateBarrier {
+  /**
+   * The desktop that coordinates the update, by process id and start.
+   */
+  public readonly holder: UpdateProcess;
+
+  /**
+   * The version being installed.
+   */
+  public readonly version: string;
+
+  /**
+   * Where the update stands.
+   */
+  public readonly state: UpdateBarrierState;
+
+  /**
+   * Creates the barrier.
+   *
+   * @param holder The coordinating desktop.
+   * @param version The version being installed; not whitespace only.
+   * @param state Where the update stands.
+   * @throws {ArgumentException} When the version is empty or whitespace only.
+   * @example
+   * ```ts
+   * import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   * import { UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const barrier: UpdateBarrier = new UpdateBarrier(new UpdateProcess(4120, 1500, 1501, "desktop"), "0.2.0", UpdateBarrierState.Preparing);
+   * ```
+   */
+  public constructor(holder: UpdateProcess, version: string, state: UpdateBarrierState);
+
+  /**
+   * Reads a barrier from its file's JSON.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The barrier.
+   * @throws JsonException When a field is missing or invalid, or another field is present; its path names the field.
+   * @example
+   * ```ts
+   * import { UpdateBarrier } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function parse(text: string): UpdateBarrier {
+   *   return UpdateBarrier.fromJson(JSON.parse(text));
+   * }
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): UpdateBarrier;
+
+  /**
+   * Returns the file's JSON.
+   *
+   * @returns The `holder`, `version` and `state` fields.
+   * @example
+   * ```ts
+   * import type { UpdateBarrier } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function format(barrier: UpdateBarrier): string {
+   *   return JSON.stringify(barrier.toJson());
+   * }
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The device folder, which keeps what belongs to the device rather than to a
+ * data directory: its identity, its last appearance preferences and each
+ * installation's record and launch barrier.
+ */
+export declare class DeviceFolder {
+  /**
+   * Returns the device folder in the operating system's local application
+   * data: `%LOCALAPPDATA%` on Windows, `~/Library/Application Support` on
+   * macOS and `$XDG_STATE_HOME`, or `~/.local/state`, on Linux, each with the
+   * product's folder for that platform.
+   *
+   * @param platform The platform, as `process.platform` names it.
+   * @param environment The environment variables.
+   * @param homeFolder The person's home folder.
+   * @returns The folder's path.
+   * @example
+   * ```ts
+   * import os from "node:os";
+   *
+   * import { DeviceFolder } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const folder: string = DeviceFolder.locate(process.platform, process.env, os.homedir());
+   * ```
+   */
+  public static locate(platform: string, environment: NodeJS.ProcessEnv, homeFolder: string): string;
+}
+
+/**
+ * One installation's folder in the device folder: the record of the data
+ * directories its runtimes have owned and its launch barrier.
+ */
+export declare class Installation {
+  /**
+   * The installation's folder.
+   */
+  public readonly folder: string;
+
+  /**
+   * The launch barrier's file, `barrier.json` in the folder.
+   */
+  public readonly barrierFile: string;
+
+  /**
+   * The record's folder, `data-directories` in the folder, with one file for
+   * each data directory.
+   */
+  public readonly recordFolder: string;
+
+  /**
+   * Creates the installation.
+   *
+   * @param folder The installation's folder.
+   * @param isRunningAsync Whether a barrier's holder still runs.
+   * @example
+   * ```ts
+   * import { Installation, type ProcessPresence } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function open(deviceFolder: string, presence: ProcessPresence): Installation {
+   *   return new Installation(Installation.locate(deviceFolder, process.execPath), t => presence.isRunningAsync(t));
+   * }
+   * ```
+   */
+  public constructor(folder: string, isRunningAsync: (holder: UpdateProcess) => Promise<boolean>);
+
+  /**
+   * Returns an installation's folder: `installations/<id>` in the device
+   * folder, where the id is the first 16 hexadecimal digits of the SHA-256 of
+   * the program's resolved path.
+   *
+   * @param deviceFolder The device folder.
+   * @param programPath The program the installation runs, the AppImage file on Linux.
+   * @returns The folder's path.
+   * @example
+   * ```ts
+   * import { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const folder: string = Installation.locate("/home/person/.local/state/noldova/teamrun", "/opt/TeamRun/teamrun");
+   * ```
+   */
+  public static locate(deviceFolder: string, programPath: string): string;
+
+  /**
+   * Adds a data directory to the record, replacing its file atomically.
+   *
+   * @param dataDirectory The data directory's root.
+   * @returns A promise that settles once the entry is written.
+   * @example
+   * ```ts
+   * import type { DataDirectory, Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function joinAsync(installation: Installation, directory: DataDirectory): Promise<void> {
+   *   return installation.recordAsync(directory.root);
+   * }
+   * ```
+   */
+  public recordAsync(dataDirectory: string): Promise<void>;
+
+  /**
+   * Reads the launch barrier for a client that wants to start a runtime.
+   * A barrier whose holder no longer runs is removed when the update stopped
+   * before the handoff, or when it was handed off for this version; one
+   * handed off for another version, or one that cannot be read, is
+   * `Unfinished` and stays.
+   *
+   * @param version The client's product version.
+   * @returns A promise of the barrier's status.
+   * @example
+   * ```ts
+   * import { type Installation, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function mayStartAsync(installation: Installation): Promise<boolean> {
+   *   return await installation.checkAsync("0.2.0") === UpdateBarrierStatus.None;
+   * }
+   * ```
+   */
+  public checkAsync(version: string): Promise<UpdateBarrierStatus>;
+
+  /**
+   * Whether a readable launch barrier holds and its holder still runs.
+   *
+   * @returns A promise of whether the barrier holds.
+   * @example
+   * ```ts
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isUpdatingAsync(installation: Installation): Promise<boolean> {
+   *   return installation.isHeldAsync();
+   * }
+   * ```
+   */
+  public isHeldAsync(): Promise<boolean>;
+}
+
+/**
+ * Finds processes in the operating system's process table, by process id and
+ * start, as a runtime identifies the programs it owns.
+ */
+export declare class ProcessPresence {
+  private constructor();
+
+  /**
+   * Creates the presence with the platform's process table reader.
+   *
+   * @param platform The platform, as `process.platform` names it.
+   * @param command Runs `ps` or PowerShell.
+   * @param environment The environment PowerShell runs with on Windows.
+   * @returns The presence.
+   * @example
+   * ```ts
+   * import { ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const presence: ProcessPresence = ProcessPresence.create(process.platform, new SystemCommand(), process.env);
+   * ```
+   */
+  public static create(platform: string, command: SystemCommand, environment: NodeJS.ProcessEnv): ProcessPresence;
+
+  /**
+   * Returns the processes that still run with the range their start falls
+   * in, leaving out those the table no longer lists.
+   *
+   * @param processes Each process's id and role.
+   * @returns A promise of the processes found.
+   * @example
+   * ```ts
+   * import type { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   * import type { ProcessPresence } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function stampAsync(presence: ProcessPresence): Promise<readonly UpdateProcess[]> {
+   *   return presence.stampAsync([[process.pid, "cli"]]);
+   * }
+   * ```
+   */
+  public stampAsync(processes: readonly (readonly [number, string])[]): Promise<readonly UpdateProcess[]>;
+
+  /**
+   * Whether a process still runs: the table lists its id with a start that
+   * can fall in the process's range.
+   *
+   * @param process The process.
+   * @returns A promise of whether it runs.
+   * @example
+   * ```ts
+   * import type { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   * import type { ProcessPresence } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function isGoneAsync(presence: ProcessPresence, process: UpdateProcess): Promise<boolean> {
+   *   return presence.isRunningAsync(process).then(t => !t);
+   * }
+   * ```
+   */
+  public isRunningAsync(process: UpdateProcess): Promise<boolean>;
+}
+
+/**
  * Thrown when no runtime owns the data directory and the client was told not
  * to start one.
  */
@@ -3209,11 +3579,17 @@ export declare class RequestContext {
   public readonly signal: AbortSignal;
 
   /**
+   * The calling connection's number, unique for the runtime's lifetime, so a handler can tell which connection answered.
+   */
+  public readonly connection: number;
+
+  /**
    * Creates the context.
    *
    * @param client The calling client's name; it must contain a non-whitespace character.
    * @param payload The payload.
    * @param signal The cancellation signal.
+   * @param connection The calling connection's number.
    * @throws {ArgumentException} When the client name is empty or whitespace only.
    * @example
    * ```ts
@@ -3221,11 +3597,11 @@ export declare class RequestContext {
    * import { type IMethodHandler, RequestContext } from "@noldova/teamrun-shell-runtime";
    *
    * export function callDirectlyAsync(handler: IMethodHandler, payload: JsonValue): Promise<JsonValue> {
-   *   return handler.handleAsync(new RequestContext("test", payload, AbortSignal.timeout(1_000)));
+   *   return handler.handleAsync(new RequestContext("test", payload, AbortSignal.timeout(1_000), 1));
    * }
    * ```
    */
-  public constructor(client: string, payload: JsonValue, signal: AbortSignal);
+  public constructor(client: string, payload: JsonValue, signal: AbortSignal, connection: number);
 }
 
 /**
@@ -3376,6 +3752,12 @@ export declare class RuntimeOptions {
   public readonly takeoverMilliseconds: number;
 
   /**
+   * The folder of the installation the runtime belongs to, or `null` when no
+   * launcher named one.
+   */
+  public readonly installationFolder: string | null;
+
+  /**
    * Creates the options.
    *
    * @param dataDirectory The data directory.
@@ -3384,6 +3766,7 @@ export declare class RuntimeOptions {
    * @param declarationsFile The build's module declarations. Defaults to the build's file beside the installed runtime.
    * @param startLogName The start log's file name, `start-<UUID>.log`, or `null`. Defaults to `null`.
    * @param takeoverMilliseconds How long to keep trying to take over from an owner without a discovery file, in milliseconds. Defaults to 5 seconds.
+   * @param installationFolder The folder of the installation the runtime belongs to, whose record it joins and whose launch barrier it checks once it owns the data directory, or `null`. Defaults to `null`.
    * @throws {ArgumentException} When the start log's name is not of that form.
    * @example
    * ```ts
@@ -3392,12 +3775,12 @@ export declare class RuntimeOptions {
    * export const options = new RuntimeOptions(new DataDirectory("/home/person/.noldova/teamrun"), 60_000, new ServerSettings());
    * ```
    */
-  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings, declarationsFile?: string, startLogName?: string | null, takeoverMilliseconds?: number);
+  public constructor(dataDirectory: DataDirectory, idleGraceMilliseconds?: number, serverSettings?: ServerSettings, declarationsFile?: string, startLogName?: string | null, takeoverMilliseconds?: number, installationFolder?: string | null);
 
   /**
    * Reads the options from entry arguments.
    *
-   * @param entryArguments `--data-dir <absolute path>`, and optionally `--idle-grace <milliseconds>` and `--start-log <start log name>`.
+   * @param entryArguments `--data-dir <absolute path>`, and optionally `--idle-grace <milliseconds>`, `--start-log <start log name>` and `--installation-dir <folder>`.
    * @returns The options.
    * @throws {ArgumentException} When the data directory is missing or not absolute, or an argument is unknown, lacks its value or is not valid.
    * @example
@@ -3435,12 +3818,26 @@ export declare class ServerSettings {
   public readonly maximumRequestTimeout: number;
 
   /**
+   * How long the runtime waits for its other clients to save before it
+   * answers `shell.update`, in milliseconds.
+   */
+  public readonly updateSaveWait: number;
+
+  /**
+   * How often the runtime reads its installation's launch barrier while it
+   * prepares for an update, in milliseconds.
+   */
+  public readonly updateBarrierInterval: number;
+
+  /**
    * Creates the settings.
    *
    * @param maximumFrameLength The largest frame in characters. Defaults to 16 MiB.
    * @param handshakeTimeout Milliseconds before a handshake. Defaults to 5 seconds.
    * @param defaultRequestTimeout The default request limit in milliseconds. Defaults to 10 minutes.
    * @param maximumRequestTimeout The longest request limit in milliseconds. Defaults to 1 hour.
+   * @param updateSaveWait How long to wait for other clients to save before an update, in milliseconds. Defaults to 6 seconds.
+   * @param updateBarrierInterval How often to read the launch barrier while preparing for an update, in milliseconds. Defaults to 1 second.
    * @throws {ArgumentOutOfRangeException} When a value is not a positive integer, or the default limit exceeds the longest.
    * @example
    * ```ts
@@ -3449,7 +3846,7 @@ export declare class ServerSettings {
    * export const settings = new ServerSettings(1024 * 1024, 5_000, 60_000, 600_000);
    * ```
    */
-  public constructor(maximumFrameLength?: number, handshakeTimeout?: number, defaultRequestTimeout?: number, maximumRequestTimeout?: number);
+  public constructor(maximumFrameLength?: number, handshakeTimeout?: number, defaultRequestTimeout?: number, maximumRequestTimeout?: number, updateSaveWait?: number, updateBarrierInterval?: number);
 }
 
 /**
@@ -4178,6 +4575,7 @@ export declare class RuntimeLauncher {
    * @param settings How to start and attach.
    * @param identity The client's build identity.
    * @param starter Starts the runtime's process. Defaults to {@link ChildProcessStarter}; the desktop passes one that keeps its own handles out of the runtime on Windows.
+   * @param installation The installation the client belongs to, or `null`. Before starting a runtime the launcher checks its launch barrier, and it gives the runtime the installation's folder. Defaults to `null`.
    * @example
    * ```ts
    * import { type IRuntimeClientListener, type LaunchSettings, RuntimeBuild, type RuntimeClient, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
@@ -4187,7 +4585,7 @@ export declare class RuntimeLauncher {
    * }
    * ```
    */
-  public constructor(settings: LaunchSettings, identity: BuildIdentity, starter?: IProcessStarter);
+  public constructor(settings: LaunchSettings, identity: BuildIdentity, starter?: IProcessStarter, installation?: Installation | null);
 
   /**
    * Returns a connection to the data directory's runtime of this build, starting one when none runs. An older build's runtime is asked to stop and replaced.
@@ -4287,6 +4685,11 @@ export declare class RuntimeServer implements IEventSink {
   public get sessionCount(): number;
 
   /**
+   * The authenticated connections of the runtime's build, in the order they connected.
+   */
+  public get clients(): readonly ConnectedClient[];
+
+  /**
    * Listens on a loopback port the system assigns.
    *
    * @returns A promise of the endpoint.
@@ -4350,6 +4753,37 @@ export declare class RuntimeServer implements IEventSink {
    * ```
    */
   public admit(): void;
+
+  /**
+   * Starts preparing for an update: every later handshake is answered with the failure and the connection ends, and an
+   * authenticated connection may call only `shell.updateSaved`, `shell.work` and `shell.stop`; any other request is
+   * answered with the failure.
+   *
+   * @param failure The `Updating` failure.
+   * @example
+   * ```ts
+   * import { Failure, FailureCode } from "@noldova/teamrun-shell-protocol";
+   * import type { RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function prepare(server: RuntimeServer): void {
+   *   server.beginUpdate(new Failure(FailureCode.Updating, "TeamRun is preparing to install an update."));
+   * }
+   * ```
+   */
+  public beginUpdate(failure: Failure): void;
+
+  /**
+   * Stops preparing for an update, so handshakes and requests are handled as before.
+   * @example
+   * ```ts
+   * import type { RuntimeServer } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function resume(server: RuntimeServer): void {
+   *   server.endUpdate();
+   * }
+   * ```
+   */
+  public endUpdate(): void;
 
   /**
    * Sends an event to every authenticated connection of the runtime's build. An event too large for one frame, or one
@@ -6199,6 +6633,42 @@ export declare class ProcessSupervisor {
    * ```
    */
   public onChanged(listener: () => void): Registration;
+
+  /**
+   * The programs running and those whose process group still runs, as
+   * processes an update must see exit, each started between its request and
+   * the return of the call that started it.
+   */
+  public get updateProcesses(): readonly UpdateProcess[];
+
+  /**
+   * Refuses to start programs while the runtime prepares for an update.
+   *
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function prepare(supervisor: ProcessSupervisor): void {
+   *   supervisor.pause();
+   * }
+   * ```
+   */
+  public pause(): void;
+
+  /**
+   * Starts programs again once an update the runtime prepared for has
+   * stopped.
+   *
+   * @example
+   * ```ts
+   * import type { ProcessSupervisor } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function resume(supervisor: ProcessSupervisor): void {
+   *   supervisor.resume();
+   * }
+   * ```
+   */
+  public resume(): void;
 
   /**
    * Starts a program for a module; see

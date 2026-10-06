@@ -18,8 +18,10 @@ import "@noldova/teamrun-foundation-core";
 import { type BuildIdentity, Failure, FailureCode, NotificationBroadcast, PreShellData, RuntimeHandover, ShellEvents, ShellMethods } from "@noldova/teamrun-shell-protocol";
 
 import { DataDirectoryState } from "../../enums/data-directory-state.js";
+import { UpdateBarrierStatus } from "../../enums/update-barrier-status.js";
 import { WindowStateKind } from "../../enums/window-state-kind.js";
 import { DataDirectoryOwnedException } from "../../exceptions/data-directory-owned.exception.js";
+import { UpdateInProgressException } from "../../exceptions/update-in-progress.exception.js";
 import type { IIdleParticipant } from "../../interfaces/i-idle-participant.js";
 import { AppImageSource } from "../../models/app-image-source.js";
 import { CapabilityToken } from "../../models/capability-token.js";
@@ -32,6 +34,7 @@ import { RuntimeBuild } from "../../models/runtime-build.js";
 import { RuntimeDiscovery } from "../../models/runtime-discovery.js";
 import type { RunningProgram } from "../../models/running-program.js";
 import type { RuntimeOptions } from "../../models/runtime-options.js";
+import type { ServerSettings } from "../../models/server-settings.js";
 import { Resources } from "../../resources.js";
 import { SystemCommand } from "../commands/system-command.js";
 import { DataDirectoryInspector } from "../data-directory/data-directory-inspector.js";
@@ -40,6 +43,8 @@ import { ShellDatabase } from "../database/shell-database.js";
 import { ShellMigrations } from "../database/shell-migrations.js";
 import { DiscoveryPublisher } from "../discovery/discovery-publisher.js";
 import { FolderProtectorFactory } from "../discovery/folder-protector-factory.js";
+import { Installation } from "../installation/installation.js";
+import { ProcessPresence } from "../installation/process-presence.js";
 import { RuntimeServer } from "../endpoint/runtime-server.js";
 import { ModuleDeclarationReader } from "../modules/module-declaration.reader.js";
 import { CommandsMethod } from "../modules/commands-method.js";
@@ -80,6 +85,9 @@ import { IdleMonitor } from "./idle-monitor.js";
 import { MoveAsideMethod } from "./move-aside-method.js";
 import { RuntimeLog } from "./runtime-log.js";
 import { StopMethod } from "./stop-method.js";
+import { UpdateMethod } from "./update-method.js";
+import { UpdatePreparation } from "./update-preparation.js";
+import { UpdateSavedMethod } from "./update-saved-method.js";
 
 export class RuntimeHost implements IIdleParticipant {
   private readonly lock: OwnershipLock;
@@ -99,6 +107,10 @@ export class RuntimeHost implements IIdleParticipant {
   private notificationSettings: NotificationSettings = new NotificationSettings(null);
   private readonly workEvent: EventChannel;
   private readonly programsEvent: EventChannel;
+  private readonly serverSettings: ServerSettings;
+  private readonly updating: EventChannel;
+  private readonly updateEnded: EventChannel;
+  private preparation: UpdatePreparation | null = null;
 
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
@@ -148,6 +160,9 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.requestStop(t)));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     this.methods.register(ShellMethods.work, new WorkMethod(this.work));
+    this.serverSettings = options.serverSettings;
+    this.updating = this.events.declare(ShellEvents.updating);
+    this.updateEnded = this.events.declare(ShellEvents.updateEnded);
     this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
     this.methods.register(ShellMethods.runCommand, new RunCommandMethod(this.commands));
     if (!Object.isNull(database))
@@ -175,6 +190,7 @@ export class RuntimeHost implements IIdleParticipant {
     let database: ShellDatabase | null = null;
     try {
       log = await RuntimeLog.openAsync(lock, options.startLogName);
+      await RuntimeHost.joinInstallationAsync(options, lock, platform, environment);
       await AppImageCopyCleanup.removeAsync(lock.dataDirectory, log.diagnostics);
       const inspection = await DataDirectoryInspector.inspectAsync(options.dataDirectory);
       if (inspection.state !== DataDirectoryState.PreShell)
@@ -213,6 +229,17 @@ export class RuntimeHost implements IIdleParticipant {
   private workChanged(): void {
     this.workEvent.publish(this.work.report.toJson());
     this.idle.check();
+  }
+
+  private static async joinInstallationAsync(options: RuntimeOptions, lock: OwnershipLock, platform: string, environment: NodeJS.ProcessEnv): Promise<void> {
+    if (Object.isNull(options.installationFolder))
+      return;
+    const presence = ProcessPresence.create(platform, new SystemCommand(), environment);
+    const installation = new Installation(options.installationFolder, t => presence.isRunningAsync(t));
+    await installation.recordAsync(lock.dataDirectory.root);
+    const status = await installation.checkAsync(RuntimeBuild.identity.productVersion);
+    if (status !== UpdateBarrierStatus.None)
+      throw new UpdateInProgressException(status);
   }
 
   private static async acquireAsync(options: RuntimeOptions): Promise<OwnershipLock> {
@@ -264,6 +291,12 @@ export class RuntimeHost implements IIdleParticipant {
     this.processes = processes;
     processes.onChanged(() => this.programsEvent.publish(processes.status.toJson()));
     this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));
+    const preparation = new UpdatePreparation(
+      this.server, ProcessPresence.create(this.platform, new SystemCommand(), this.environment), processes, this.updating, this.updateEnded,
+      this.serverSettings.updateSaveWait, this.serverSettings.updateBarrierInterval);
+    this.preparation = preparation;
+    this.methods.register(ShellMethods.update, new UpdateMethod(preparation));
+    this.methods.register(ShellMethods.updateSaved, new UpdateSavedMethod(preparation));
     await processes.cleanUpAsync();
     await this.modules.activateAsync(settings, processes);
   }
@@ -311,6 +344,7 @@ export class RuntimeHost implements IIdleParticipant {
   private async stopAsync(): Promise<void> {
     this.isStopping = true;
     this.idle[Symbol.dispose]();
+    this.preparation?.[Symbol.dispose]();
     this.work.cancelAll();
     try {
       await this.server.closeAsync();

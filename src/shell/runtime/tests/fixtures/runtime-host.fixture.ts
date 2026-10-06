@@ -62,8 +62,8 @@ export class RuntimeHostFixture implements AsyncDisposable {
   }
 
   public async startAsync(idleGraceMilliseconds: number = 30_000, declarationsFile?: string, takeoverMilliseconds?: number,
-    environment: NodeJS.ProcessEnv = process.env): Promise<RuntimeHost> {
-    const options = new RuntimeOptions(this.dataDirectory, idleGraceMilliseconds, new ServerSettings(), declarationsFile, null, takeoverMilliseconds);
+    environment: NodeJS.ProcessEnv = process.env, serverSettings: ServerSettings = new ServerSettings(), installationFolder: string | null = null): Promise<RuntimeHost> {
+    const options = new RuntimeOptions(this.dataDirectory, idleGraceMilliseconds, serverSettings, declarationsFile, null, takeoverMilliseconds, installationFolder);
     this.currentHost = await RuntimeHost.startAsync(options, process.platform, environment);
     return this.currentHost;
   }

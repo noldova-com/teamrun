@@ -19,7 +19,21 @@ import {
   type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey,
   ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import {
+  AppImageSource,
+  ConnectionException,
+  type DataDirectory,
+  DataDirectoryLocator,
+  DeviceFolder,
+  DiagnosticRedactor,
+  Installation,
+  LaunchSettings,
+  LogText,
+  ProcessPresence,
+  RuntimeBuild,
+  RuntimeEntry,
+  SystemCommand
+} from "@noldova/teamrun-shell-runtime";
 
 import { PathCommandException } from "../exceptions/path-command.exception.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
@@ -46,7 +60,6 @@ import { AppIcons } from "./app-icons.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
-import { DeviceIdentity } from "./device-identity.js";
 import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
 import { OpenWindow } from "./open-window.js";
@@ -109,8 +122,7 @@ export class DesktopApplication {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
-    this.deviceFolder = DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument)
-      ?? DeviceIdentity.locateFolder(process.platform, process.env, process.homeFolder);
+    this.deviceFolder = DesktopApplication.locateDeviceFolder(process);
     this.appearanceStore = createAppearanceStore(this.deviceFolder);
     this.process = process;
     this.settings = settings;
@@ -130,7 +142,7 @@ export class DesktopApplication {
     electron: IElectron,
     process: IDesktopProcess,
     moduleUrl: string,
-    createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
+    createLauncher: (settings: LaunchSettings, installation: Installation) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
     createPathCommand: (executablePath: string) => PathCommand): void {
@@ -155,11 +167,14 @@ export class DesktopApplication {
       RuntimeEntry.entryPath,
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
+    const presence = ProcessPresence.create(process.platform, new SystemCommand(), process.env);
+    const installation = new Installation(
+      Installation.locate(DesktopApplication.locateDeviceFolder(process), AppImageSource.locateProgram(process.env, process.execPath)), t => presence.isRunningAsync(t));
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
     const application = new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, createPathCommand, icons);
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createAppearanceStore, createPathCommand, icons);
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -678,6 +693,10 @@ export class DesktopApplication {
 
   private static isModuleId(value: unknown): value is string {
     return Object.isString(value) && Resources.moduleIdPattern.test(value);
+  }
+
+  private static locateDeviceFolder(process: IDesktopProcess): string {
+    return DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument) ?? DeviceFolder.locate(process.platform, process.env, process.homeFolder);
   }
 
   private static readArgument(argv: readonly string[], prefix: string): string | undefined {

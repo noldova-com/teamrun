@@ -11,8 +11,10 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity } from "@noldova/teamrun-shell-protocol";
-import { DataDirectory, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
+import { BuildIdentity, ShellMethods, UpdateReady, UpdateRequest } from "@noldova/teamrun-shell-protocol";
+import {
+  DataDirectory, Installation, LaunchSettings, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeLauncher, SystemCommand, UpdateBarrier, UpdateBarrierState
+} from "@noldova/teamrun-shell-runtime";
 
 import { CliFixture } from "../fixtures/cli.fixture.js";
 import { ProbeBuildFixture } from "../fixtures/probe-build.fixture.js";
@@ -194,5 +196,51 @@ export class CliFailureTests {
     const run = fixture.runAsync(fixture.withDataDirectory(["commands"]), null, fixture.environment, "", starter);
 
     Assert.areEqual("The starter broke.", (await Assert.throwsAsync(() => run, RangeError)).message);
+  }
+
+  @TestMethod
+  public async reportsAnUpdateStillUnderWayAfterWaitingForIt(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    const device = path.join(fixture.root, "device");
+    await CliFailureTests.holdBarrierAsync(Installation.locate(device, process.execPath));
+    const started = Date.now();
+
+    const waited = await fixture.runAsync(fixture.withDataDirectory(["commands", "--device-dir", device, "--json"]), null, fixture.environment, "", undefined, 300);
+
+    Assert.areEqual(8, waited.code);
+    Assert.areEqual(JSON.stringify({ code: "Updating", message: "TeamRun is installing an update." }), waited.error.trim());
+    Assert.isTrue(Date.now() - started >= 300);
+    Assert.isFalse(existsSync(new DataDirectory(fixture.dataDirectory).logsFolder), "no runtime was started");
+  }
+
+  @TestMethod
+  public async answersARuntimePreparingForAnUpdateAndReportsTheUpdate(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0");
+    await fixture.startHostAsync(build.declarationsFile);
+    const installation = Installation.locate(fixture.deviceFolder, process.execPath);
+    await CliFailureTests.holdBarrierAsync(installation);
+    const settings = new LaunchSettings(new DataDirectory(fixture.dataDirectory), process.execPath, RuntimeEntry.entryPath, fixture.environment, process.platform);
+    const desktop = await new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", { onEvent: () => undefined, onDisconnected: () => undefined });
+
+    const running = fixture.runAsync(fixture.withDataDirectory(["run", "probe.wait", "--json"]));
+    await ProbeBuildFixture.waitUntilWaitingAsync(ProbeBuildFixture.markerPath(fixture.dataDirectory));
+    const prepared = await desktop.callAsync(ShellMethods.update, new UpdateRequest(installation).toJson());
+    const answered = await running;
+    const refused = await fixture.runAsync(fixture.withDataDirectory(["status", "--json"]), null, fixture.environment, "", undefined, 300);
+    desktop.close();
+
+    Assert.areEqual(`${process.pid} cli`, UpdateReady.fromJson(prepared.payload).processes.map(t => `${t.processId} ${t.role}`).join("|"));
+    Assert.areEqual(8, answered.code);
+    Assert.areEqual("Updating", JSON.parse(answered.error).code);
+    Assert.areEqual(8, refused.code);
+    Assert.areEqual(JSON.stringify({ code: "Updating", message: "TeamRun is preparing to install an update." }), refused.error.trim());
+  }
+
+  private static async holdBarrierAsync(folder: string): Promise<void> {
+    const [holder] = await ProcessPresence.create(process.platform, new SystemCommand(), process.env).stampAsync([[process.pid, "desktop"]]);
+    Assert.isDefined(holder);
+    await mkdir(folder, { recursive: true });
+    await writeFile(path.join(folder, "barrier.json"), JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing).toJson()));
   }
 }

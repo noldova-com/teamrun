@@ -29,6 +29,8 @@ import {
   RuntimeEntry,
   RuntimeHandoverException,
   RuntimeLauncher,
+  UpdateBarrierStatus,
+  UpdateInProgressException,
   WorkInProgressException
 } from "@noldova/teamrun-shell-runtime";
 
@@ -39,6 +41,8 @@ import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 import { RuntimeLaunchFixture } from "../../fixtures/runtime-launch.fixture.js";
 import { RuntimeServerFixture } from "../../fixtures/runtime-server.fixture.js";
 import { ScriptedStarterFixture } from "../../fixtures/scripted-starter.fixture.js";
+import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
+import { UpdateBarrierFixture } from "../../fixtures/update-barrier.fixture.js";
 
 @TestClass
 export class RuntimeLauncherTests {
@@ -71,6 +75,35 @@ export class RuntimeLauncherTests {
     Assert.isFalse(OwnershipLock.isOwned(launch.dataDirectory));
     Assert.isFalse(existsSync(launch.dataDirectory.discoveryFile));
     Assert.areEqual("runtime.log", (await readdir(launch.dataDirectory.logsFolder)).join(","), "the start log is removed once attached");
+  }
+
+  @TestMethod
+  public async startsARuntimeThatJoinsItsInstallation(): Promise<void> {
+    await using launch = await RuntimeLaunchFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = UpdateBarrierFixture.open(folder.path);
+    const client = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter, installation).attachAsync("desktop", new ClientListenerFixture());
+
+    const recorded = await readdir(installation.recordFolder);
+    await client.stopAsync(StopPolicy.IfIdle);
+
+    Assert.areEqual(1, recorded.length);
+  }
+
+  @TestMethod
+  public async startsNoRuntimeWhileAnUpdateHoldsItsInstallation(): Promise<void> {
+    await using launch = await RuntimeLaunchFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = UpdateBarrierFixture.open(folder.path);
+    await UpdateBarrierFixture.holdAsync(installation);
+
+    const exception = await Assert.throwsAsync(
+      () => new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter, installation).attachAsync("desktop", new ClientListenerFixture()),
+      UpdateInProgressException);
+
+    Assert.areEqual(UpdateBarrierStatus.Held, exception.status);
+    Assert.isFalse(existsSync(launch.dataDirectory.discoveryFile));
+    Assert.isFalse(existsSync(installation.recordFolder));
   }
 
   @TestMethod

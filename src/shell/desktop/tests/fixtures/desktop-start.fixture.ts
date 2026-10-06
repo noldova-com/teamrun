@@ -14,7 +14,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import type { MenuItemConstructorOptions } from "electron";
 
 import { Assert } from "@noldova/teamrun-foundation-testing";
-import type { LaunchSettings } from "@noldova/teamrun-shell-runtime";
+import type { Installation, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 import { DesktopApplication, DesktopSettings, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
 
 import { FakeAppearanceStore } from "./fake-appearance-store.fixture.js";
@@ -40,10 +40,12 @@ export class DesktopStartFixture {
     launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(),
     device: FakeDeviceIdentity = new FakeDeviceIdentity(),
     appearance: FakeAppearanceStore = new FakeAppearanceStore(),
-    pathCommand: FakePathCommand = new FakePathCommand()): LaunchSettings[] {
+    pathCommand: FakePathCommand = new FakePathCommand(),
+    installations: Installation[] = []): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
-    DesktopApplication.start(electron, process, DesktopStartFixture.MODULE_URL, t => {
+    DesktopApplication.start(electron, process, DesktopStartFixture.MODULE_URL, (t, installation) => {
       settings.push(t);
+      installations.push(installation);
       return launcher;
     }, t => device.readAsync(t), t => appearance.create(t), t => pathCommand.create(t));
     return settings;

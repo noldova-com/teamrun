@@ -13,6 +13,7 @@ import type { BuildIdentity } from "@noldova/teamrun-shell-protocol";
 import { ChildProcessStarter, type IProcessStarter } from "@noldova/teamrun-shell-runtime";
 
 import type { IDesktopOpener } from "../interfaces/i-desktop-opener.js";
+import { Resources } from "../resources.js";
 import { DesktopOpener } from "../services/desktop-opener.js";
 
 export class CliContext {
@@ -28,6 +29,8 @@ export class CliContext {
   public readonly signals: EventEmitter;
   public readonly runtimeStarter: IProcessStarter;
   public readonly desktopOpener: IDesktopOpener;
+  public readonly processId: number;
+  public readonly updateWaitMilliseconds: number;
 
   public constructor(
     environment: NodeJS.ProcessEnv,
@@ -41,7 +44,9 @@ export class CliContext {
     input: Readable,
     signals: EventEmitter,
     runtimeStarter: IProcessStarter = new ChildProcessStarter(),
-    desktopOpener: IDesktopOpener = new DesktopOpener()) {
+    desktopOpener: IDesktopOpener = new DesktopOpener(),
+    processId: number = process.pid,
+    updateWaitMilliseconds: number = Resources.updateWait) {
     this.environment = environment;
     this.platform = platform;
     this.homeFolder = homeFolder;
@@ -54,5 +59,7 @@ export class CliContext {
     this.signals = signals;
     this.runtimeStarter = runtimeStarter;
     this.desktopOpener = desktopOpener;
+    this.processId = processId;
+    this.updateWaitMilliseconds = updateWaitMilliseconds;
   }
 }

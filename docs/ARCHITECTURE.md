@@ -472,6 +472,10 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
 - A stopping runtime releases ownership last, after closing its databases and its log, so a data directory that no one owns holds no file its runtime opened.
 - A starting runtime that finds the directory owned leaves it to an owner that has published discovery.
   An owner without discovery is starting or stopping, so the new runtime keeps trying to take over for up to five seconds and leaves as soon as that owner publishes discovery.
+- The device folder keeps what belongs to the device rather than to a data directory: its identity, its last appearance preferences and each installation's record and launch barrier.
+  It is in the operating system's local application data by default; `--device-dir` names another for the desktop and the command line, as `--data-dir` names a data directory, and test runs give one of their own.
+- The launcher gives the runtime it starts its installation's folder.
+  Once it owns the directory and before it publishes discovery, the runtime adds the directory to its installation's record and checks the launch barrier, releasing ownership and exiting while the barrier holds, so a runtime whose launcher found no barrier cannot slip into an update that began meanwhile ([Stopping for an update](#stopping-for-an-update)).
 - Discovery metadata is published atomically and identifies the endpoint, the owner process and the program it runs from, the product and protocol versions and the runtime's build.
 - A new owner removes the discovery metadata an earlier owner left behind before it listens, because on macOS and Linux it reuses that owner's socket path.
   A launcher whose token is refused tries again only when the metadata has changed since it read it, at most three times.
@@ -525,6 +529,10 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
     Any other request is answered with `BuildMismatch`.
   - When the policy is "only if idle" and work is in progress, `shell.stop` is answered with a `Conflict` failure whose details list the work in progress.
     Otherwise the runtime answers, cancels its work and stops.
+- A runtime of the same build can be asked to prepare for an update with `shell.update`.
+  It then refuses every new handshake and every new request with an `Updating` failure, except `shell.updateSaved`, `shell.work` and `shell.stop`, and announces `shell.updating` to its clients.
+  Only while updating, it reads its installation's launch barrier every second, and when the barrier is gone or its holder no longer runs, it goes back to normal and announces `shell.updateEnded`.
+  [Stopping for an update](#stopping-for-an-update) owns the rest of the exchange.
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
 - Reconnect from durable records, allowing for missed events.
@@ -561,7 +569,7 @@ The runtime owns the process and ends it; the part does not.
   The runtime's log names what had to be killed and what still ran 5 seconds later.
 - **When.**
   A part's programs end when it deactivates, when it fails to activate and when the runtime stops; the part may stop one sooner, or abort the request's signal.
-  Once its programs begin to end, the part can start no more, and once the runtime begins to stop, no part can.
+  Once its programs begin to end, the part can start no more, and once the runtime begins to stop or to prepare for an update, no part can until it goes back to normal.
   On macOS and Linux a program that exits with an error has the rest of its group ended at once.
   After a clean exit the group stays until the part deactivates, and the runtime notes which processes it holds then: it is ended only while one of them still runs in it, which shows that the group was never emptied and its id never reused; otherwise the runtime's log names the group's processes and they are left running.
   On Windows nothing a program started is followed after the program exits; when it exits during the grace period, its children that started by the time the runtime saw it exit are killed with their trees.
@@ -582,6 +590,7 @@ The runtime owns the process and ends it; the part does not.
 ### Launching the runtime
 
 The runtime must not keep the files, sockets or pipes of the client that started it.
+No launcher starts a runtime while its installation's launch barrier holds ([Stopping for an update](#stopping-for-an-update)).
 
 - **Linux:** starting a detached runtime requires executable Bash at `/bin/bash` and a readable, searchable `/proc/self/fd` from a mounted `/proc`.
   The launcher checks these before spawning and reports a missing requirement immediately.
@@ -634,6 +643,8 @@ The desktop cuts such text to its first 65,536 characters.
 - It refuses another build's runtime and names it, unless asked to take over; it then takes over only an older build's idle runtime, never stopping work.
   The rule that the person is never asked to find and quit another TeamRun is the desktop's.
 - It reports data from before the shell and never moves it.
+- While its installation's launch barrier holds, it starts no runtime and waits up to 30 seconds for the barrier to go, then exits with the code its document gives for an update in progress.
+  A runtime that answers `Updating` counts the same way.
 - Run from a development checkout through the checkout's launcher, it uses the checkout's data directory.
   Without that launcher it is a packaged build.
 
@@ -670,6 +681,7 @@ The ownership database of section 6 is separate.
 | Shortcuts, settings and their values per scope | The shell, in its database |
 | The commands each device last ran from command search | The shell, in its database, the 20 newest per device |
 | The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
+| The data directories an installation's runtimes have owned, and its launch barrier | The installation's folder beside the device's identity, outside every data directory ([Stopping for an update](#stopping-for-an-update)) |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory; the window keeps the transient state of the shell's own tabs, such as Settings' page, under the tab's key while the tab is open, through moves, and drops it when the tab closes |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |
@@ -755,6 +767,8 @@ A part whose steps have not settled after 4 seconds does not block closing: the 
 The window answers from the saves alone, without waiting for its notifications to be posted.
 The desktop waits at most 5 seconds for the window's answer, and a window that is gone or does not answer by then does not block closing.
 The window's own layout is the exception: a failed save of the layout is logged and closing proceeds, because losing the last layout change is minor.
+
+Restarting for an update runs the same saves in every window of the installation, but an update is never worth an unsaved change: a part whose save fails or has not settled after 4 seconds, and a window that is gone or does not answer within 5 seconds, stop the update and keep TeamRun open ([Stopping for an update](#stopping-for-an-update)).
 
 ## 10. Build, installation and updates
 
@@ -934,16 +948,80 @@ Each target is packaged on its own platform and processor.
 - Download and restart/install are explicit user actions; ordinary application close does not install an update.
   Section 9 owns the choice the person makes while work is in progress.
 
-Before replacing application files, coordinate every runtime and desktop using that installation, across data directories:
+The updater and the desktop's update stop divide an update at the person's Restart to update:
 
-1. Confirm that no work is in progress, which the person's choice under section 9 ensures; then block new launches and requests, and freeze editing.
-2. Acknowledge durable unsaved state and preferences, which the windows save as section 9 describes.
-3. Stop the processes modules own, flush and close databases, and verify process exit.
-4. Create verified recovery backups.
+- The updater owns checking the feed, downloading, validating, the update's states and everything the person sees of them, and the handoff, which replaces the application files the way its platform does.
+- The update stop owns everything from the work question to the handoff: it stops every process of the installation, as [Stopping for an update](#stopping-for-an-update) describes, and then calls the handoff.
+- On Windows and macOS the platform's installer starts the new version.
+  After an AppImage update the update stop starts it, once the old process has exited, from outside the old AppImage and without its open descriptors, because a process holding the old version's files keeps the replaced AppImage mounted.
+- A failure before the handoff returns to the updater with its reason.
+  The updater shows it, keeps the download and offers Restart to update again.
 
-Failure before installer handoff resumes surviving clients safely; uncertainty must not be treated as successful shutdown.
-A runtime of the old version keeps working from its own copy of the replaced AppImage until the new version takes it over, and its copy ends with it ([Launching the runtime](#launching-the-runtime)).
-After an AppImage update, the new version starts only once the old process has exited, from outside the old AppImage and without its open descriptors; a process holding the old version's files keeps the replaced AppImage mounted.
+An AppImage replaced by other means while its runtime runs leaves that runtime working from its own copy until a new version takes it over, and its copy ends with it ([Launching the runtime](#launching-the-runtime)).
+
+### Stopping for an update
+
+An installation is one copy of TeamRun's program: the program a runtime names as the one it runs from, the AppImage file on Linux.
+Every desktop, runtime and command line started from it belongs to it, whatever their data directory.
+Before the handoff replaces its files, every process of the installation stops, its unsaved state saved, and each stop is verified, never assumed from an acknowledgement.
+
+**Installation record.**
+Each installation has a folder `installations/<id>` beside the device's identity, outside every data directory, where the id is the first 16 hexadecimal digits of the SHA-256 of the program's canonical path.
+Its `data-directories` folder lists the canonical data directories the installation's runtimes have owned, one file for each, named after the same digest of the directory's path, so runtimes that start together never overwrite each other's entries; a runtime adds its own before it publishes discovery (section 6).
+An entry proves nothing by itself: a directory whose discovery names another program, or that no runtime owns, is skipped, and one that no longer exists is dropped.
+
+**Launch barrier.**
+The installation's `barrier.json`, created exclusively, holds the coordinating desktop's process id and start time, the version being installed and the state `Preparing`, `Closing` or `HandedOff`.
+While it holds:
+
+- No launcher starts a runtime, and a runtime that finds it after taking ownership releases ownership and exits.
+- A desktop that starts tells the person that TeamRun is installing an update and exits.
+- The command line waits for it as section 6 describes.
+
+A barrier whose holder no longer runs, matched by process id and start time, is settled by the next desktop or command line of the installation:
+
+- `Preparing` or `Closing`: the update stopped before the handoff.
+  The barrier is removed and the desktop's log says so.
+- `HandedOff`, found by the version being installed: the update finished, and the barrier is removed.
+- `HandedOff`, found by any other version: the update may still be installing or may have failed.
+  The desktop says so and removes the barrier only when the person confirms; the command line exits with the code for an update in progress.
+  An installer's failure never clears the barrier by itself.
+
+**Order.**
+The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use:
+
+1. **Work.**
+   It reads `shell.work` from each runtime and, when any work is in progress, asks section 9's question in its window, listing the work by data directory.
+   Cancelling ends the update with nothing changed.
+2. **Barrier.**
+   It creates the barrier as `Preparing`; an existing barrier whose holder runs means another update is under way, and the update fails.
+   It reads the record again, and a runtime that came into use meanwhile with work in progress fails the update.
+   A directory owned without discovery gets five seconds to publish it or let go, as for a starting runtime (section 6), and fails the update otherwise.
+   It then asks each runtime `shell.update`, naming the installation's folder, so no new client, request or program starts.
+3. **Saves.**
+   Every client told `shell.updating` answers with `shell.updateSaved`, giving its process id.
+   A desktop first freezes its windows under the update card ([UI standards](UI-STANDARDS.md#8-component-metrics-and-behavior)) and runs section 9's saves, and names any window and module whose save failed or did not answer.
+   The command line answers at once and exits with the code for an update in progress.
+   The runtime waits at most 6 seconds for every client, then answers `shell.update` with the outcome and the process id and start time of every client, every program it holds and its AppImage copy's mount; a client that does not answer fails the update.
+   The handshake carries no process id, because every build must accept the handshake protocol version 1 defines (section 6).
+4. **Stop.**
+   It asks each runtime `shell.stop` with the policy "stop the work".
+   The runtime deactivates its parts, ends their programs, flushes and closes its databases, releases ownership and exits.
+5. **Verify.**
+   It waits up to 10 seconds for every runtime and every process step 3 listed except the desktops to exit, checking each by process id and start time as [Programs modules run](#programs-modules-run) identifies a process.
+   It then sets the barrier to `Closing`, and waits up to 10 more seconds for every other desktop to see it, quit and be verified the same way.
+6. **Handoff.**
+   It sets the barrier to `HandedOff` and calls the handoff.
+   After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage.
+
+A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and a missing barrier unfreezes it and reconnects.
+A runtime that is still running goes back to normal when the barrier goes, as section 6 describes, and its desktops unfreeze on `shell.updateEnded`.
+
+**Failure.**
+Any failure before the handoff, including a process that cannot be checked or a step that runs out of time, stops the update.
+The update stop removes the barrier, so every surviving runtime and desktop resumes, and returns the reason to the updater.
+A desktop whose runtime has already stopped reconnects, starting it again.
+Uncertainty never counts as a stop.
 
 ### Installation scope
 
