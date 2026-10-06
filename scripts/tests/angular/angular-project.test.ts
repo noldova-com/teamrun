@@ -14,6 +14,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import AngularProject from "../../angular/angular-project.ts";
+import RetriedTest from "../../angular/retried-test.ts";
 import ProcessResult from "../../processes/process-result.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import NpmCommand from "../../toolchain/npm-command.ts";
@@ -126,7 +127,7 @@ class AngularProjectTests {
       const runner = new ProcessRunnerFixture([], [AngularProjectTests.FAILED, AngularProjectTests.FAILED, AngularProjectTests.INSTALLED]);
       const output = new TextOutputFixture();
 
-      await MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(output), () => `${runner.captured.length} attempts started`);
+      await MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(output), output, () => `${runner.captured.length} attempts started`);
 
       assert.equal(runner.captured.length, 3);
       assert.equal(output.text, `Installing the browser for the Angular tests...\n${AngularProjectTests.pausing(1)}${AngularProjectTests.pausing(2)}`);
@@ -137,9 +138,10 @@ class AngularProjectTests {
       await repository.writeAsync({ "src/node_modules/.teamrun-install": AngularProjectTests.formatRecord("{}\n"), "src/node_modules/@angular/cli/bin/ng.js": "" });
       const attempts = [1, 2, 3, 4].map(number => new ProcessResult(1, "", `Error: Download failed: attempt ${number}\n`));
       const runner = new ProcessRunnerFixture([], attempts);
+      const output = new TextOutputFixture();
 
       await assert.rejects(
-        MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(new TextOutputFixture()), () => `${runner.captured.length} attempts started`),
+        MockPausesFixture.settleAsync(t, () => AngularProjectTests.create(repository, runner).prepareAsync(output), output, () => `${runner.captured.length} attempts started`),
         new ProcessException("The browser for the Angular tests could not be installed in 4 attempts; the last failed with exit code 1: Error: Download failed: attempt 4."));
 
       assert.equal(runner.captured.length, 4);
@@ -152,8 +154,8 @@ class AngularProjectTests {
       const reporting = new AngularReportRunnerFixture(JSON.stringify({ testResults: [{ name: path.join(directory, "shell", "b.spec.ts") }, { name: path.join(directory, "a.spec.ts") }] }), [0]);
       await repository.writeAsync({ "_build/angular-tests.json": "stale" });
 
-      const run = await AngularProjectTests.create(repository, reporting).testAsync();
-      const silent = await AngularProjectTests.create(repository, new ProcessRunnerFixture([1])).testAsync();
+      const run = await AngularProjectTests.create(repository, reporting).testAsync([], false);
+      const silent = await AngularProjectTests.create(repository, new ProcessRunnerFixture([1])).testAsync([], false);
 
       assert.deepEqual([run.isSuccessful, run.collected], [true, ["a.spec.ts", "shell/b.spec.ts"]]);
       assert.deepEqual([silent.isSuccessful, silent.exitCode, silent.collected], [false, 1, null]);
@@ -162,13 +164,41 @@ class AngularProjectTests {
       assert.equal(AngularProject.LOG_FILE, "_build/angular-tests.log");
     });
 
+    test("a retrying run asks the tests to retry once, and each test that passed after failing is flaky with its first failure", async t => {
+      const repository = await AngularProjectTests.createProjectAsync(t);
+      const directory = path.join(repository.directory, "src");
+      const report = JSON.stringify({
+        testResults: [
+          {
+            name: path.join(directory, "shell", "a.spec.ts"),
+            assertionResults: [
+              { status: "passed", fullName: "A retries", failureMessages: ["Error: first", "Error: second"] },
+              { status: "passed", fullName: "A passes", failureMessages: [] },
+              { status: "failed", fullName: "A fails", failureMessages: ["Error: always"] },
+              { status: "passed", fullName: "A reports no failures" }
+            ]
+          },
+          { name: path.join(directory, "b.spec.ts") }
+        ]
+      });
+      const runner = new AngularReportRunnerFixture(report, [0, 0]);
+
+      const retrying = await AngularProjectTests.create(repository, runner).testAsync([], true);
+      const single = await AngularProjectTests.create(repository, runner).testAsync([], false);
+
+      assert.deepEqual(retrying.retried, [new RetriedTest("shell/a.spec.ts", "A retries", "Error: first")]);
+      assert.deepEqual(single.collected, ["b.spec.ts", "shell/a.spec.ts"]);
+      assert.deepEqual([runner.environments[0]?.["TEAMRUN_TEST_RETRY"], runner.environments[1]], ["1", undefined]);
+      assert.equal(AngularProject.RETRY_VARIABLE, "TEAMRUN_TEST_RETRY");
+    });
+
     test("tests selected by path run through the CLI's include option, without the coverage gate", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
       const directory = path.join(repository.directory, "src");
       const report = path.join(repository.directory, "_build", "angular-tests.json");
       const reporting = new AngularReportRunnerFixture(JSON.stringify({ testResults: [{ name: path.join(directory, "a.spec.ts") }] }), [0]);
 
-      const run = await AngularProjectTests.create(repository, reporting).testAsync(["a.spec.ts", "shell/b.spec.ts"]);
+      const run = await AngularProjectTests.create(repository, reporting).testAsync(["a.spec.ts", "shell/b.spec.ts"], false);
 
       assert.deepEqual(run.collected, ["a.spec.ts"]);
       assert.deepEqual(reporting.runs, [[
@@ -184,11 +214,11 @@ class AngularProjectTests {
       const runner = new class extends ProcessRunnerFixture {
         public override runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string): Promise<number | null> {
           isCachePresent = existsSync(path.join(directory, "node_modules", ".vite"));
-          return super.runLoggedAsync(command, commandArguments, directory, log);
+          return super.runLoggedAsync(command, commandArguments, directory, log, new TextOutputFixture(), new TextOutputFixture());
         }
       }();
 
-      await AngularProjectTests.create(repository, runner).testAsync();
+      await AngularProjectTests.create(repository, runner).testAsync([], false);
 
       assert.equal(isCachePresent, false);
     });
@@ -196,8 +226,8 @@ class AngularProjectTests {
     test("a report that is not JSON or lists no test files is refused", async t => {
       const repository = await AngularProjectTests.createProjectAsync(t);
 
-      await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{", [0])).testAsync(), AngularProjectTests.notJson("_build/angular-tests.json"));
-      await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{\"testResults\":[{}]}", [0])).testAsync(),
+      await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{", [0])).testAsync([], false), AngularProjectTests.notJson("_build/angular-tests.json"));
+      await assert.rejects(AngularProjectTests.create(repository, new AngularReportRunnerFixture("{\"testResults\":[{}]}", [0])).testAsync([], false),
         new ProcessException("The Angular test report _build/angular-tests.json lists no test files."));
     });
 
