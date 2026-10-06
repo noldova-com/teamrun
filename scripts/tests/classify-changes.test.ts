@@ -22,6 +22,8 @@ import SourceTreeFixture from "./fixtures/source-tree.fixture.ts";
 import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 
 class ClassifyChangesTests {
+  private static readonly EVENTS: readonly string[] = ["push", "pull_request", "merge_group", "workflow_dispatch"];
+
   public static register(): void {
     test("the selected scope goes to the step output, the step summary and the log", async t => {
       const repository = await RepositoryFixture.createAsync();
@@ -90,6 +92,39 @@ class ClassifyChangesTests {
       assert.equal(plans.get("macOS x64"), null);
     });
 
+    test("every event plans UI workflows only for targets it builds, since a target's UI workflows run inside its build and test jobs", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.commitAsync({ "src/index.ts": "export {};\n" });
+      const names = new Map(new BuildMatrix("workflow_dispatch").targets.map(u => [u.key, u.name]));
+
+      for (const eventName of ClassifyChangesTests.EVENTS) {
+        const outputs = await ClassifyChangesTests.classifyAsync(repository.directory, eventName);
+
+        const targets: readonly { target: string; ui: unknown }[] = JSON.parse(outputs.get("targets") ?? "");
+        const uiTargets = (outputs.get("ui-targets") ?? "").split(" ").filter(u => u.length > 0).map(u => names.get(u));
+        assert.ok(uiTargets.length > 0, eventName);
+        assert.deepEqual(uiTargets, targets.filter(u => u.ui !== null).map(u => u.target), eventName);
+      }
+    });
+
+    test("no target both reuses its Build job's builds for its UI shards and plans its own UI build, so their build artifacts cannot share a name", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      await repository.commitAsync({ "src/index.ts": "export {};\n" });
+      const plans: { target: string; shared: boolean; builds: boolean }[] = [];
+
+      for (const eventName of ClassifyChangesTests.EVENTS) {
+        const outputs = await ClassifyChangesTests.classifyAsync(repository.directory, eventName);
+        const targets: readonly { target: string; ui: { shared: boolean; build: readonly unknown[] } | null }[] = JSON.parse(outputs.get("targets") ?? "");
+        plans.push(...targets.flatMap(u => u.ui === null ? [] : [{ target: `${eventName} ${u.target}`, shared: u.ui.shared, builds: u.ui.build.length > 0 }]));
+      }
+
+      assert.deepEqual(plans.filter(u => u.shared && u.builds), []);
+      assert.ok(plans.some(u => u.shared), JSON.stringify(plans));
+      assert.ok(plans.some(u => u.builds), JSON.stringify(plans));
+    });
+
     test("missing or empty output and summary files fail before classifying", async () => {
       const classifier = new ChangeClassifier(new Git("unused", new ProcessRunner()));
       for (const environment of [{}, { GITHUB_OUTPUT: "", GITHUB_STEP_SUMMARY: "summary.md" }, { GITHUB_OUTPUT: "output.txt" }, { GITHUB_OUTPUT: "output.txt", GITHUB_STEP_SUMMARY: "" }]) {
@@ -149,6 +184,14 @@ class ClassifyChangesTests {
       assert.equal(outputs.get("ui-deferred"), "");
       assert.equal(refused.status, 1);
     });
+  }
+
+  private static async classifyAsync(directory: string, eventName: string): Promise<ReadonlyMap<string, string>> {
+    const outputPath = path.join(directory, "output.txt");
+    await writeFile(outputPath, "");
+    const classify = new ClassifyChanges(new ChangeClassifier(new Git(directory, new ProcessRunner())), new TextOutputFixture());
+    assert.equal(await classify.runAsync({ GITHUB_OUTPUT: outputPath, GITHUB_STEP_SUMMARY: path.join(directory, "summary.md"), EVENT_NAME: eventName }), 0);
+    return new Map((await readFile(outputPath, "utf8")).trim().split("\n").map(t => [t.slice(0, t.indexOf("=")), t.slice(t.indexOf("=") + 1)]));
   }
 }
 
