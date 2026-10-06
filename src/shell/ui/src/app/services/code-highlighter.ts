@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Injectable } from "@angular/core";
+import { DestroyRef, Injectable, inject } from "@angular/core";
 import type { ShikiPrimitive } from "@shikijs/primitive";
 import type { ThemeRegistrationRaw } from "@shikijs/primitive/types";
 
@@ -33,6 +33,10 @@ export class CodeHighlighter {
 
   private readonly languages: Map<string, Promise<void>> = new Map();
   private shiki: Promise<readonly [typeof import("@shikijs/primitive"), ShikiPrimitive]> | null = null;
+
+  public constructor() {
+    inject(DestroyRef).onDestroy(() => void this.shiki?.then(([, primitive]) => primitive.dispose()));
+  }
 
   public async tokensAsync(code: string, language: CodeLanguage): Promise<readonly CodeToken[]> {
     const [shiki, primitive] = await this.startAsync();

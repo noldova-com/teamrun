@@ -62,6 +62,18 @@ describe("CodeHighlighter", () => {
     expect(results).toEqual(CodeLanguage.all.map(t => [t.id, true, true]));
   });
 
+  it("releases its highlighter with its injector, so highlighters made one after another never pile up", async () => {
+    const warn = vi.spyOn(console, "warn");
+    const language = CodeLanguage.named("ts") as CodeLanguage;
+
+    for (let index = 0; index < 12; index++) {
+      await TestBed.inject(CodeHighlighter).tokensAsync("let a;", language);
+      TestBed.resetTestingModule();
+    }
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("gives each colored token its kind and place, across line breaks, and leaves plain text out", async () => {
     const tokens = await TestBed.inject(CodeHighlighter).tokensAsync("return 1;\r\nlet a;", CodeLanguage.named("ts") as CodeLanguage);
 
