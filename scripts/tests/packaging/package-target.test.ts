@@ -17,7 +17,7 @@ class PackageTargetTests {
     test("each platform and processor names its packages without a version", () => {
       const names = [["win32", "x64"], ["win32", "arm64"], ["darwin", "x64"], ["darwin", "arm64"], ["linux", "x64"], ["linux", "arm64"]]
         .map(([platform, architecture]) => PackageTarget.fromProcess(String(platform), String(architecture)))
-        .map(t => t.extensions.map(extension => t.formatFileName("TeamRun", extension)));
+        .map(t => t.listFileNames("TeamRun"));
 
       assert.deepEqual(names, [
         ["TeamRun-windows-x64.exe"],
@@ -29,10 +29,19 @@ class PackageTargetTests {
       ]);
     });
 
+    test("every target is listed, each platform on x64 and then ARM64", () => {
+      assert.deepEqual(PackageTarget.listAll().map(t => `${t.platform}-${t.architecture}`),
+        ["windows-x64", "windows-arm64", "macos-x64", "macos-arm64", "linux-x64", "linux-arm64"]);
+    });
+
     test("each platform names the formats it is packaged in", () => {
       assert.deepEqual(
         ["windows", "macos", "linux"].map(t => new PackageTarget(t, "x64").formats),
         [["nsis"], ["dmg", "zip"], ["AppImage"]]);
+    });
+
+    test("each platform names the package its updates install from", () => {
+      assert.deepEqual(["windows", "macos", "linux"].map(t => new PackageTarget(t, "arm64").updateExtension), ["exe", "zip", "AppImage"]);
     });
 
     test("a platform or processor without packages is refused, naming it", () => {

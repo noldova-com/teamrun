@@ -9,6 +9,7 @@
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 
 import { CliFixture } from "../fixtures/cli.fixture.js";
+import { ProbeBuildFixture } from "../fixtures/probe-build.fixture.js";
 
 @TestClass
 export class CommandLineTests {
@@ -29,6 +30,21 @@ export class CommandLineTests {
   }
 
   @TestMethod
+  public async runsACommandWithATimeoutOfWholeSecondsUpToTheLimit(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0");
+    await fixture.startHostAsync(build.declarationsFile);
+
+    const longest = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.echo", "1", "--timeout", "3600", "--json"]));
+    const padded = await fixture.runAsync(fixture.withDataDirectory(["run", "probe.echo", "2", "--timeout", "0060", "--json"]));
+
+    Assert.areEqual(0, longest.code, longest.error);
+    Assert.areEqual("1\n", longest.output);
+    Assert.areEqual(0, padded.code, padded.error);
+    Assert.areEqual("2\n", padded.output);
+  }
+
+  @TestMethod
   public async refusesAnInvalidCommandLineWithTheUsageExitCode(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     const cases: readonly (readonly [readonly string[], string])[] = [
@@ -43,9 +59,15 @@ export class CommandLineTests {
       [["run"], "The run command needs the name of a command to run."],
       [["run", "probe.echo", "{}", "extra"], "\"extra\" was not expected."],
       [["run", "probe.echo", "{}", "--args-file", "a.json"], "The command's arguments were given more than once."],
-      [["run", "probe.echo", "--timeout", "0"], "The --timeout option takes a number of seconds from 1 to 3600."],
-      [["run", "probe.echo", "--timeout", "3601"], "The --timeout option takes a number of seconds from 1 to 3600."],
-      [["run", "probe.echo", "--timeout", "soon"], "The --timeout option takes a number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "0"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "0.5"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "1.5"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "-1"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "3601"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "soon"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "1e400"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "1e3"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
+      [["run", "probe.echo", "--timeout", "0x10"], "The --timeout option takes a whole number of seconds from 1 to 3600."],
       [["run", "probe.echo", "--timeout"], "The --timeout option needs a value."],
       [["status", "--data-dir="], "The --data-dir option needs a value."]
     ];
