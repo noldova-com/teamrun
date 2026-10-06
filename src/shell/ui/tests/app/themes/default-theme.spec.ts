@@ -143,8 +143,11 @@ describe("DefaultTheme contrast", () => {
   }
 
   function ratio(theme: Theme, mode: ThemeMode, foreground: string, grounds: readonly string[]): number {
-    const opaque: readonly number[] = [255, 255, 255, 1];
-    const ground = grounds.reduce<readonly number[]>((sum, t) => over(channels(theme, mode, t), sum), opaque);
+    const [surface = "", ...fills] = grounds;
+    const base = channels(theme, mode, surface);
+    if (base[3] !== 1)
+      throw new Error(`The surface ${surface} under a pair must be opaque.`);
+    const ground = fills.reduce<readonly number[]>((sum, t) => over(channels(theme, mode, t), sum), base);
     const format = (color: readonly number[]): string => `rgb(${color.slice(0, 3).join(", ")})`;
     return AppearanceFixture.contrast(format(over(channels(theme, mode, foreground), ground)), format(ground));
   }
@@ -156,6 +159,10 @@ describe("DefaultTheme contrast", () => {
       .map(([pair, measured, minimum]) => `${pair} is ${measured.toFixed(2)}:1, under ${minimum}:1`)));
 
     expect(failures).toEqual([]);
+  });
+
+  it("refuses a pair whose surface is translucent, since nothing lies beneath it to composite over", () => {
+    expect(() => ratio(DefaultTheme.theme, ThemeMode.Light, "text", ["toolbar-hover"])).toThrow("The surface toolbar-hover under a pair must be opaque.");
   });
 
   it("checks or exempts every color of the theme, each exemption with its reason", () => {
