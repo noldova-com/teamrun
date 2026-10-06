@@ -190,13 +190,17 @@ class ScriptTestCheckTests {
       assert.equal(output.text, "Running the failed script tests once more.\nFlaky, passed when run again: once (scripts/tests/alpha.test.ts)\n");
     });
 
-    test("script tests that fail again fail the check and record nothing, even when their coverage passes", async t => {
+    test("script tests that fail again fail the check, and the tests that passed then are still recorded as flaky", async t => {
       const repository = await ScriptTestCheckTests.createRepositoryAsync(t);
-      const runner = new RerunRunnerFixture([1, 1, 0], []);
+      const state = JSON.stringify([{}, { "scripts/tests/alpha.test.ts:3:1": { name: "once", children: [], passed_on_attempt: 1 } }]);
+      const silent = new RerunRunnerFixture([1, 1, 0], []);
+      const runner = new RerunRunnerFixture([1, 1, 0], [{ report: "TAP version 13\n" }, { report: "TAP version 13\n", state }]);
 
+      assert.equal(await new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), silent, {}, new FlakyRecord(repository.directory, {})).runAsync(new TextOutputFixture()), false);
+      assert.deepEqual([silent.runs.length, existsSync(ScriptTestCheckTests.record(repository))], [3, false]);
       assert.equal(await new ScriptTestCheck(repository.directory, new PackageBuildFixture(repository.directory), runner, {}, new FlakyRecord(repository.directory, {})).runAsync(new TextOutputFixture()), false);
 
-      assert.deepEqual([runner.runs.length, existsSync(ScriptTestCheckTests.record(repository))], [3, false]);
+      assert.deepEqual(FlakyRecord.parse(await readFile(ScriptTestCheckTests.record(repository), "utf8")), [new FlakyTest("Script tests", "scripts/tests/alpha.test.ts", "once", "")]);
     });
 
     test("a rerun that passes without naming a flaky test records the whole run with its first report, or with no failure when it wrote none", async t => {

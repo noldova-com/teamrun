@@ -66,7 +66,7 @@ class AngularTestCheckTests {
       assert.equal(output.text, "");
     });
 
-    test("with flaky tests recorded, the Angular tests retry once and a passing run records the tests that passed only on retry", async t => {
+    test("with flaky tests recorded, the Angular tests retry once and record the tests that passed only on retry, whether or not the run passed", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       const retried = new RetriedTest("a.spec.ts", "A retries", "Error: first");
@@ -78,7 +78,7 @@ class AngularTestCheckTests {
       assert.equal(await new AngularTestCheck(failing, new FlakyRecord(repository.directory, {})).runAsync(new TextOutputFixture()), false);
 
       assert.deepEqual([project.retrying, failing.retrying], [[true], [true]]);
-      assert.deepEqual(FlakyRecord.parse(await readFile(path.join(repository.directory, "_build", "flaky-tests.json"), "utf8")), [new FlakyTest("Angular tests", "a.spec.ts", "A retries", "Error: first")]);
+      assert.deepEqual(FlakyRecord.parse(await readFile(path.join(repository.directory, "_build", "flaky-tests.json"), "utf8")), [new FlakyTest("Angular tests", "a.spec.ts", "A retries", "Error: first"), new FlakyTest("Angular tests", "a.spec.ts", "A retries", "Error: first")]);
       assert.equal(output.text, "Flaky, passed when run again: A retries (a.spec.ts)\n");
     });
 

@@ -252,17 +252,26 @@ class PackageTestCheckTests {
       assert.equal(existsSync(PackageTestCheckTests.record(repository)), false);
     });
 
-    test("package tests that fail again, or whose second results are missing or name a failure, fail the check and record nothing", async t => {
+    test("package tests that fail again fail the check and record only the tests that passed then, and second results that are missing or incomplete record nothing", async t => {
       const repository = await PackageTestCheckTests.createRepositoryAsync(t, true);
-      const first = JSON.stringify({ isComplete: true, failed: [{ identity: "AlphaTests.fails", file: "a.js", failure: "once" }] });
+      const always = { identity: "AlphaTests.always", file: "a.js", failure: "always" };
+      const first = JSON.stringify({ isComplete: true, failed: [{ identity: "AlphaTests.fails", file: "a.js", failure: "once" }, always] });
+      const unrecorded = [[1, undefined], [1, JSON.stringify({ isComplete: false, failed: [] })], [0, first]] as const;
 
-      for (const [exitCode, second] of [[1, JSON.stringify({ isComplete: true, failed: [] })], [0, undefined], [0, first]] as const) {
+      for (const [exitCode, second] of unrecorded) {
         const runner = new ResultsRunnerFixture([1, exitCode, 0], [first, second]);
 
         assert.equal(await PackageTestCheckTests.createRecording(repository, runner).runAsync(new TextOutputFixture()), false);
         assert.equal(runner.runs.length, 3);
       }
       assert.equal(existsSync(PackageTestCheckTests.record(repository)), false);
+      const output = new TextOutputFixture();
+      const runner = new ResultsRunnerFixture([1, 1, 0], [first, JSON.stringify({ isComplete: true, failed: [always] })]);
+
+      assert.equal(await PackageTestCheckTests.createRecording(repository, runner).runAsync(output), false);
+
+      assert.deepEqual(FlakyRecord.parse(await readFile(PackageTestCheckTests.record(repository), "utf8")), [new FlakyTest("Package tests", "a.js", "AlphaTests.fails", "once")]);
+      assert.ok(output.text.endsWith("Flaky, passed when run again: AlphaTests.fails (a.js)\n"), output.text);
     });
   }
 

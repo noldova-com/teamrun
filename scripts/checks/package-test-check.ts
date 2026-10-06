@@ -130,10 +130,13 @@ export default class PackageTestCheck implements ISelectableCheck {
     await rm(results, { force: true });
     const selection = path.join(this.root, ...PackageTestCheck.SELECTION_SEGMENTS);
     const rerun = { ...recording, [PackageTestCheck.FILTERS_VARIABLE]: JSON.stringify(first.failed.map(t => t.identity)), [PackageTestCheck.SELECTION_VARIABLE]: selection };
-    if (await this.runner.runAsync(process.execPath, commandArguments, this.root, rerun) !== 0 || (await this.readResultsAsync(results))?.failed.length !== 0)
+    const isPassing = await this.runner.runAsync(process.execPath, commandArguments, this.root, rerun) === 0;
+    const second = await this.readResultsAsync(results);
+    if (second === null || !second.isComplete)
       return false;
-    await flaky.addAsync(first.failed.map(t => new FlakyTest(PackageTestCheck.RUNNER, t.file, t.identity, t.failure)), output);
-    return true;
+    const failedAgain = new Set(second.failed.map(t => t.identity));
+    await flaky.addAsync(first.failed.filter(t => !failedAgain.has(t.identity)).map(t => new FlakyTest(PackageTestCheck.RUNNER, t.file, t.identity, t.failure)), output);
+    return isPassing && failedAgain.size === 0;
   }
 
   private async readResultsAsync(file: string): Promise<{ isComplete: boolean; failed: readonly { identity: string; file: string; failure: string }[] } | null> {

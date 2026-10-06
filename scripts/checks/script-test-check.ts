@@ -106,11 +106,10 @@ export default class ScriptTestCheck implements ISelectableCheck {
       return true;
     const firstReport = existsSync(report) ? await readFile(report, ScriptTestCheck.REPORT_ENCODING) : "";
     output.write(ScriptTestCheck.RERUNNING);
-    if (await this.runner.runAsync(process.execPath, commandArguments, this.root, environment) !== 0)
-      return false;
+    const isPassing = await this.runner.runAsync(process.execPath, commandArguments, this.root, environment) === 0;
     const tests = existsSync(state) ? ScriptTestState.readTests(this.root, await readFile(state, ScriptTestCheck.REPORT_ENCODING), firstReport) : [];
-    await flaky.addAsync(tests.length > 0 ? tests : [new FlakyTest(ScriptTestState.RUNNER, ScriptTestCheck.TESTS_PATH, ScriptTestCheck.UNNAMED, firstReport)], output);
-    return true;
+    await flaky.addAsync(tests.length > 0 || !isPassing ? tests : [new FlakyTest(ScriptTestState.RUNNER, ScriptTestCheck.TESTS_PATH, ScriptTestCheck.UNNAMED, firstReport)], output);
+    return isPassing;
   }
 
   private static reportingTo(report: string): readonly string[] {
