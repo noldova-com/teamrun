@@ -17,9 +17,9 @@ export class KitStylesheetFixture {
   }
 
   public static async ensureAsync(link: HTMLLinkElement | null = document.querySelector(KitStylesheetFixture.SELECTOR)): Promise<void> {
-    if (KitStylesheetFixture.isApplied)
-      return;
-    await KitStylesheetFixture.loadAsync(link ?? KitStylesheetFixture.add());
+    if (!KitStylesheetFixture.isApplied)
+      await KitStylesheetFixture.loadAsync(link ?? KitStylesheetFixture.add());
+    await Promise.all([...document.fonts].map(t => t.load()));
   }
 
   private static add(): HTMLLinkElement {
