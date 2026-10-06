@@ -153,7 +153,7 @@ export default class AngularProject {
       exitCode,
       results === null ? null : new AngularTestReport(this.describe(report), t => this.specName(path.resolve(t))).read(results),
       existsSync(coverage) ? await this.readCoverageAsync(coverage) : null,
-      results === null ? [] : results.flatMap(t => this.readRetried(t)));
+      results === null ? [] : results.flatMap((t, i) => this.readRetried(new JsonFields(t, this.describe(report), [`test file ${i + 1}`]))));
   }
 
   public async specFilesAsync(): Promise<readonly string[]> {
@@ -201,12 +201,11 @@ export default class AngularProject {
     return { unit: AngularProject.COVERAGE_UNIT, covered: statements.count("covered"), total: statements.count("total") };
   }
 
-  private readRetried(result: unknown): readonly RetriedTest[] {
-    const file = this.specName(path.resolve(String(AngularProject.field(result, "name"))));
-    const assertions = AngularProject.field(result, "assertionResults");
-    return (Array.isArray(assertions) ? assertions : [])
-      .filter(t => AngularProject.field(t, "status") === AngularProject.PASSED_STATUS && Array.isArray(AngularProject.field(t, "failureMessages")) && (AngularProject.field(t, "failureMessages") as unknown[]).length > 0)
-      .map(t => new RetriedTest(file, String(AngularProject.field(t, "fullName")), String((AngularProject.field(t, "failureMessages") as unknown[])[0])));
+  private readRetried(result: JsonFields): readonly RetriedTest[] {
+    const file = this.specName(path.resolve(result.text("name")));
+    return result.objects("assertionResults")
+      .filter(t => t.text("status") === AngularProject.PASSED_STATUS && t.has("failureMessages") && t.list("failureMessages").length > 0)
+      .map(t => new RetriedTest(file, t.text("fullName"), String(t.list("failureMessages")[0])));
   }
 
   private async readJsonAsync(file: string): Promise<unknown> {
