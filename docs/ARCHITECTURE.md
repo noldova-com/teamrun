@@ -536,8 +536,9 @@ The shell posts kinds of its own, `shell.saveFailed` and `shell.saveUnfinished` 
   It then refuses every new handshake with an `Updating` failure and announces `shell.updating` to its clients.
   A client keeps its requests until it answers `shell.updateSaved`, so it can save; from then on, its requests other than `shell.updateSaved`, `shell.work` and `shell.stop` are refused with `Updating`.
   A second `shell.update` is refused with `Updating`, and one that names a folder other than an absolute path with `InvalidParams`.
-  Only while updating, it reads its installation's launch barrier every second, and only once the barrier is confirmed gone does it go back to normal and announce `shell.updateEnded`.
-  A barrier it cannot read or parse keeps it updating.
+  Only while updating, it reads its installation's launch barrier every second.
+  It goes back to normal and announces `shell.updateEnded` once the barrier is confirmed missing, or once its holder is confirmed to have exited while the barrier is `Preparing` or `Closing`.
+  A `HandedOff` barrier keeps it updating until the barrier is gone, whatever its holder, and so does any doubt: a barrier it cannot read or parse, or a holder it cannot look up.
   [Stopping for an update](#stopping-for-an-update) owns the rest of the exchange.
 - Work may outlive clients until the idle policy permits shutdown.
 - Explicit shutdown cancels owned work, resolves waiters, flushes state and closes resources; acknowledgement does not prove process exit.
@@ -1034,7 +1035,7 @@ The update stop of the desktop where the person chose Restart to update coordina
    After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage.
 
 A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and a missing barrier unfreezes it and reconnects.
-A runtime that is still running goes back to normal when the barrier goes, as section 6 describes, and its desktops unfreeze on `shell.updateEnded`.
+A runtime that is still running goes back to normal when the barrier goes or its holder exits before the handoff, as section 6 describes, and its desktops unfreeze on `shell.updateEnded`.
 
 **Failure.**
 Any failure before the handoff, including a process that cannot be checked or a step that runs out of time, stops the update.

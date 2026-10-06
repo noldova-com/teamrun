@@ -83,8 +83,12 @@ export class Installation {
     return await this.removeStaleAsync(text, version);
   }
 
-  public async isGoneAsync(): Promise<boolean> {
-    return Object.isNull(await this.readBarrierAsync());
+  public async hasEndedAsync(): Promise<boolean> {
+    const text = await this.readBarrierAsync();
+    if (Object.isNull(text))
+      return true;
+    const barrier = UpdateBarrier.fromJson(JSON.parse(text));
+    return barrier.state !== UpdateBarrierState.HandedOff && !await this.isRunningAsync(barrier.holder);
   }
 
   private async removeStaleAsync(text: string, version: string): Promise<UpdateBarrierStatus> {

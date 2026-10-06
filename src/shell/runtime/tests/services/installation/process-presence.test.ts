@@ -49,6 +49,17 @@ export class ProcessPresenceTests {
   }
 
   @TestMethod
+  public async readsNothingOfAnyPlatformUntilItChecksAProcess(): Promise<void> {
+    const command = new SystemCommandFixture([]);
+    const presences = ["linux", "darwin", "win32"].map(t => ProcessPresence.create(t, command, {}));
+
+    const stamps = await Promise.all(presences.map(t => t.stampAsync([])));
+
+    Assert.areEqual("0 0 0", stamps.map(t => t.length).join(" "));
+    Assert.areEqual(0, command.calls.length);
+  }
+
+  @TestMethod
   public async findsAProcessOnlyWhenItsIdIsListedWithAStartThatCanFallInItsRange(): Promise<void> {
     const table = ProcessPresenceTests.WINDOWS_TABLE;
     const presence = ProcessPresence.create("win32", new SystemCommandFixture([table, table, table, table]), { SystemRoot: "C:/Windows" });

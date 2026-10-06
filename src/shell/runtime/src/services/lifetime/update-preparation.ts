@@ -101,9 +101,9 @@ export class UpdatePreparation implements Disposable {
 
   private watchBarrier(installation: Installation): void {
     this.watched = installation;
-    this.watch = setTimeout(() => void installation.isGoneAsync().catch(() => false).then(isGone => {
+    this.watch = setTimeout(() => void installation.hasEndedAsync().catch(() => false).then(hasEnded => {
       if (this.watched === installation) {
-        if (isGone)
+        if (hasEnded)
           this.end();
         else
           this.watchBarrier(installation);

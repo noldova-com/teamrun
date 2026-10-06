@@ -88,7 +88,7 @@ export class InstallationTests {
     const installation = InstallationTests.open(folder.path);
 
     Assert.areEqual(UpdateBarrierStatus.None, await installation.checkAsync("0.2.0"));
-    Assert.isTrue(await installation.isGoneAsync());
+    Assert.isTrue(await installation.hasEndedAsync());
   }
 
   @TestMethod
@@ -98,7 +98,7 @@ export class InstallationTests {
     await InstallationTests.writeAsync(installation, new UpdateBarrier(InstallationTests.RUNNING, "0.3.0", UpdateBarrierState.HandedOff));
 
     Assert.areEqual(UpdateBarrierStatus.Held, await installation.checkAsync("0.2.0"));
-    Assert.isFalse(await installation.isGoneAsync());
+    Assert.isFalse(await installation.hasEndedAsync());
     Assert.isTrue(existsSync(installation.barrierFile));
   }
 
@@ -115,11 +115,11 @@ export class InstallationTests {
     const results: string[] = [];
     for (const barrier of barriers) {
       await InstallationTests.writeAsync(installation, barrier);
-      const isGone = await installation.isGoneAsync();
-      results.push(`${isGone} ${await installation.checkAsync("0.2.0")} ${await installation.isGoneAsync()}`);
+      const hasEnded = await installation.hasEndedAsync();
+      results.push(`${hasEnded} ${await installation.checkAsync("0.2.0")} ${await installation.hasEndedAsync()}`);
     }
 
-    Assert.areEqual(["false None true", "false None true", "false None true"].join("|"), results.join("|"));
+    Assert.areEqual(["true None true", "true None true", "false None true"].join("|"), results.join("|"));
     Assert.areEqual("", (await readdir(installation.folder)).join(","));
   }
 
@@ -162,12 +162,13 @@ export class InstallationTests {
     const installation = InstallationTests.open(folder.path);
 
     await InstallationTests.writeAsync(installation, new UpdateBarrier(InstallationTests.GONE, "0.3.0", UpdateBarrierState.HandedOff));
-    const handedOff = `${await installation.isGoneAsync()} ${await installation.checkAsync("0.2.0")}`;
+    const handedOff = `${await installation.hasEndedAsync()} ${await installation.checkAsync("0.2.0")}`;
     await writeFile(installation.barrierFile, "{\"holder\":");
-    const unreadable = `${await installation.isGoneAsync()} ${await installation.checkAsync("0.2.0")}`;
+    await Assert.throwsAsync(() => installation.hasEndedAsync(), SyntaxError);
+    const unreadable = await installation.checkAsync("0.2.0");
 
     Assert.areEqual("false Unfinished", handedOff);
-    Assert.areEqual("false Unfinished", unreadable);
+    Assert.areEqual(UpdateBarrierStatus.Unfinished, unreadable);
     Assert.isTrue(existsSync(installation.barrierFile));
   }
 
@@ -178,10 +179,22 @@ export class InstallationTests {
     await mkdir(installation.barrierFile, { recursive: true });
 
     const error = await Assert.throwsAsync(() => installation.checkAsync("0.2.0"), Error) as NodeJS.ErrnoException;
-    const watched = await Assert.throwsAsync(() => installation.isGoneAsync(), Error) as NodeJS.ErrnoException;
+    const watched = await Assert.throwsAsync(() => installation.hasEndedAsync(), Error) as NodeJS.ErrnoException;
 
     Assert.areEqual("EISDIR", error.code);
     Assert.areEqual("EISDIR", watched.code);
+  }
+
+  @TestMethod
+  public async passesOnAHolderThatCannotBeLookedUp(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const failing = new Installation(path.join(folder.path, "installation"), () => Promise.reject(new Error("ps failed")));
+    await InstallationTests.writeAsync(failing, new UpdateBarrier(InstallationTests.GONE, "0.3.0", UpdateBarrierState.Closing));
+
+    const error = await Assert.throwsAsync(() => failing.hasEndedAsync(), Error);
+
+    Assert.areEqual("ps failed", error.message);
+    Assert.isTrue(existsSync(failing.barrierFile));
   }
 
   private static open(folder: string): Installation {

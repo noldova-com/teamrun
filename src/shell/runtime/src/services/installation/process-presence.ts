@@ -10,6 +10,7 @@ import "@noldova/teamrun-foundation-core";
 import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
 
 import type { IProcessTableReader } from "../../interfaces/i-process-table.reader.js";
+import type { ProcessTable } from "../../models/process-table.js";
 import { Resources } from "../../resources.js";
 import type { SystemCommand } from "../commands/system-command.js";
 import { PosixProcessTableReader } from "../process/posix-process-table.reader.js";
@@ -18,14 +19,15 @@ import { WindowsPowerShell } from "../process/windows-power-shell.js";
 import { WindowsProcessTableReader } from "../process/windows-process-table.reader.js";
 
 export class ProcessPresence {
-  private readonly reader: IProcessTableReader;
+  private readonly createReader: () => IProcessTableReader;
+  private reader: IProcessTableReader | null = null;
 
-  private constructor(reader: IProcessTableReader) {
-    this.reader = reader;
+  private constructor(createReader: () => IProcessTableReader) {
+    this.createReader = createReader;
   }
 
   public static create(platform: string, command: SystemCommand, environment: NodeJS.ProcessEnv): ProcessPresence {
-    return new ProcessPresence(platform === Resources.windowsPlatform
+    return new ProcessPresence(() => platform === Resources.windowsPlatform
       ? new WindowsProcessTableReader(new WindowsPowerShell(command, environment))
       : new PosixProcessTableReader(command, ProcessClock.create(platform)));
   }
@@ -33,7 +35,7 @@ export class ProcessPresence {
   public async stampAsync(processes: readonly (readonly [number, string])[]): Promise<readonly UpdateProcess[]> {
     if (processes.length === 0)
       return [];
-    const table = await this.reader.readAsync();
+    const table = await this.readTableAsync();
     return processes.flatMap(([processId, role]) => {
       const entry = table.find(processId);
       return Object.isUndefined(entry) ? [] : [new UpdateProcess(processId, entry.earliest, entry.latest, role)];
@@ -41,7 +43,12 @@ export class ProcessPresence {
   }
 
   public async isRunningAsync(process: UpdateProcess): Promise<boolean> {
-    const entry = (await this.reader.readAsync()).find(process.processId);
+    const entry = (await this.readTableAsync()).find(process.processId);
     return !Object.isUndefined(entry) && entry.earliest <= process.latest && process.earliest <= entry.latest;
+  }
+
+  private readTableAsync(): Promise<ProcessTable> {
+    this.reader ??= this.createReader();
+    return this.reader.readAsync();
   }
 }

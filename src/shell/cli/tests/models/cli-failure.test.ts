@@ -205,7 +205,7 @@ export class CliFailureTests {
     await CliFailureTests.holdBarrierAsync(Installation.locate(device, process.execPath, process.platform));
     const started = Date.now();
 
-    const waited = await fixture.runAsync(fixture.withDataDirectory(["commands", "--device-dir", device, "--json"]), null, fixture.environment, "", undefined, 300);
+    const waited = await fixture.runAsync(fixture.withDataDirectory(["commands", "--device-dir", device, "--json"]), null, { ...fixture.environment, SystemRoot: process.env["SystemRoot"] }, "", undefined, 300);
 
     Assert.areEqual(8, waited.code);
     Assert.areEqual(JSON.stringify({ code: "Updating", message: "TeamRun is installing an update." }), waited.error.trim());

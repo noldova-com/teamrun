@@ -2186,21 +2186,23 @@ export declare class Installation {
   public checkAsync(version: string): Promise<UpdateBarrierStatus>;
 
   /**
-   * Whether the launch barrier is confirmed missing. A barrier that cannot be
-   * parsed, or whose holder no longer runs, is still there.
+   * Whether the update the launch barrier stands for has ended: the barrier
+   * is missing, or its holder has exited before the handoff. A barrier
+   * handed off, whatever its holder, stands until it is removed.
    *
-   * @returns A promise of whether there is no barrier.
-   * @throws Error When the barrier cannot be read for any reason but its absence.
+   * @returns A promise of whether the update has ended.
+   * @throws Error When the barrier cannot be read or parsed for any reason but
+   * its absence, or its holder cannot be looked up.
    * @example
    * ```ts
    * import type { Installation } from "@noldova/teamrun-shell-runtime";
    *
    * export function hasEndedAsync(installation: Installation): Promise<boolean> {
-   *   return installation.isGoneAsync();
+   *   return installation.hasEndedAsync();
    * }
    * ```
    */
-  public isGoneAsync(): Promise<boolean>;
+  public hasEndedAsync(): Promise<boolean>;
 
   /**
    * Removes the launch barrier, if there is one.
@@ -2243,7 +2245,8 @@ export declare class ProcessPresence {
   private constructor();
 
   /**
-   * Creates the presence with the platform's process table reader.
+   * Creates the presence with the platform's process table reader. It reads
+   * nothing, not even the boot's identity, until it first looks up a process.
    *
    * @param platform The platform, as `process.platform` names it.
    * @param command Runs `ps` or PowerShell.

@@ -7,13 +7,14 @@
  */
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { FailureCode, Request, ShellEvents, ShellMethods, UpdateReady, UpdateRequest, UpdateSaved } from "@noldova/teamrun-shell-protocol";
-import { RuntimeBuild, ServerSettings } from "@noldova/teamrun-shell-runtime";
+import { RuntimeBuild, ServerSettings, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
 
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
@@ -41,7 +42,31 @@ export class UpdatePreparationTests {
   }
 
   @TestMethod
-  public goesBackToNormalOnlyOnceTheBarrierIsGone(): Promise<void> {
+  public endsOnceTheHolderOfABarrierBeforeItsHandoffHasExited(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      await using folder = await TemporaryFolderFixture.createAsync();
+      const installation = UpdateBarrierFixture.open(folder.path);
+      await fixture.startAsync(30_000, undefined, undefined, process.env, new ServerSettings(undefined, undefined, undefined, undefined, 5_000, 20), installation.folder);
+      const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const holder = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000);"], { stdio: "ignore" });
+      await once(holder, "spawn");
+      await UpdateBarrierFixture.holdAsync(installation, Number(holder.pid), UpdateBarrierState.Closing);
+      desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
+      await RuntimeHostFixture.readMessagesAsync(desktop, 2);
+
+      const [, whileHeld] = await fixture.handshakeAsync("held", RuntimeBuild.identity);
+      holder.kill();
+      await UpdateBarrierFixture.readEventAsync(desktop, ShellEvents.updateEnded);
+      const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
+
+      Assert.areEqual(FailureCode.Updating, whileHeld.failure?.code);
+      Assert.isFalse(late.hasFailed);
+      Assert.isTrue(existsSync(installation.barrierFile));
+    });
+  }
+
+  @TestMethod
+  public keepsUpdatingAfterTheHandoffWhateverItsHolderAndEndsOnceTheBarrierIsGone(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
       await using folder = await TemporaryFolderFixture.createAsync();
       const installation = UpdateBarrierFixture.open(folder.path);
@@ -50,7 +75,7 @@ export class UpdatePreparationTests {
       const [cli] = await fixture.handshakeAsync("cli", RuntimeBuild.identity);
       const holder = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000);"], { stdio: "ignore" });
       await once(holder, "spawn");
-      await UpdateBarrierFixture.holdAsync(installation, Number(holder.pid));
+      await UpdateBarrierFixture.holdAsync(installation, Number(holder.pid), UpdateBarrierState.HandedOff);
       desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
       await UpdateBarrierFixture.readEventAsync(cli, ShellEvents.updating);
       await RuntimeHostFixture.callAsync(cli, "cli:1", ShellMethods.updateSaved, new UpdateSaved(process.pid, []).toJson());

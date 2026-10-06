@@ -21,11 +21,11 @@ export class UpdateBarrierFixture {
     return new Installation(path.join(folder, "installation"), t => UpdateBarrierFixture.PRESENCE.isRunningAsync(t));
   }
 
-  public static async holdAsync(installation: Installation, processId: number = process.pid): Promise<void> {
+  public static async holdAsync(installation: Installation, processId: number = process.pid, state: UpdateBarrierState = UpdateBarrierState.Preparing): Promise<void> {
     const [holder] = await UpdateBarrierFixture.PRESENCE.stampAsync([[processId, "desktop"]]);
     Assert.isDefined(holder);
     await mkdir(installation.folder, { recursive: true });
-    await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", UpdateBarrierState.Preparing).toJson()));
+    await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(holder, "0.3.0", state).toJson()));
   }
 
   public static async readEventAsync(connection: RawConnectionFixture, name: QualifiedName): Promise<Event> {
