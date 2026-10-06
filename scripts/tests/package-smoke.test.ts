@@ -176,8 +176,10 @@ class PackageSmokeTests {
         assert.deepEqual(runner.desktop.signals, ["SIGTERM"]);
         assert.deepEqual(temporaryFolder.platforms, ["linux"]);
         assert.deepEqual([runner.checked, runner.killed], [[5151, 5151], []]);
-        assert.equal(output.text, [
-          `Installed: ${appImage}`,
+        const lines = output.text.split("\n");
+        assert.match(lines[0] ?? "", /^Installed in \d+\.\d s: /);
+        assert.equal([lines[0]?.slice(lines[0].indexOf(": ") + 2), ...lines.slice(1)].join("\n"), [
+          appImage,
           "teamrun status before the start: no runtime.",
           `teamrun status after the start: version 0.0.7 in ${path.join(runner.folder, "data")}.`,
           "The desktop quit.",
@@ -203,7 +205,9 @@ class PackageSmokeTests {
       assert.deepEqual(temporaryFolder.platforms, ["win32"]);
       assert.deepEqual(runner.starts, [[program, `--data-dir=${path.join(runner.folder, "data")}`]]);
       assert.deepEqual(runner.desktop.signals, []);
-      assert.ok(output.text.startsWith(`Installed: ${program}\n`));
+      const installed = output.text.split("\n")[0] ?? "";
+      assert.match(installed, /^Installed in \d+\.\d s: /);
+      assert.equal(installed.slice(installed.indexOf(": ") + 2), program);
     });
 
     test("on macOS the app comes out of the disk image, the screen is captured with the window, and the desktop is asked to quit", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
@@ -280,7 +284,7 @@ class PackageSmokeTests {
 
       assert.deepEqual(exitCodes, [1, 1, 1]);
       assert.equal(early.starts.length, 0);
-      assert.match(outputs[0].text, /^Installed: .+\nteamrun status before the start exited with 0 instead of 3:\n\{"build"/);
+      assert.match(outputs[0].text, /^Installed in \d+\.\d s: .+\nteamrun status before the start exited with 0 instead of 3:\n\{"build"/);
       assert.match(outputs[1].text, /\nThe desktop exited with 4 before its runtime answered:\n.+desktop\.log:\nThe desktop's log\.\n$/);
       assert.match(outputs[2].text, /\nThe desktop's runtime did not answer teamrun status within 60000 ms; the last answer was exit code 1:\nThe runtime could not start\.\n.+desktop\.log:\nThe desktop's log\.\n$/);
       assert.equal(silent.statuses, 1 + 60_000 / 500 + 1);

@@ -95,9 +95,7 @@ export default class ReleasePublisher {
       await this.requireTagAsync(version.tag, revision);
     }
     catch (error) {
-      if (!(error instanceof ReleaseException))
-        throw error;
-      throw new ReleaseException(`${version.tag} is public now, but it no longer matches what was published: ${error.message} Check it by hand; a published release is never replaced.`,
+      throw new ReleaseException(`${version.tag} is public now, but checking it after publishing failed: ${String(error)} Check it by hand; a published release is never replaced.`,
         { cause: error });
     }
     this.output.write(`Published ${version.tag} from ${revision} with ${digests.size} files.\n`);

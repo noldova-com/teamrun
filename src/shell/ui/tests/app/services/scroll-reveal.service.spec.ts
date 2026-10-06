@@ -13,6 +13,7 @@ import { AppearanceService } from "../../../src/app/services/appearance.service"
 import { ScrollRevealService } from "../../../src/app/services/scroll-reveal.service";
 import { AppearanceFixture } from "../../fixtures/appearance.fixture";
 import { MotionFixture } from "../../fixtures/motion.fixture";
+import { PointerFixture } from "../../fixtures/pointer.fixture";
 
 describe("ScrollRevealService", () => {
   const hidden = AppearanceFixture.hiddenThumb;
@@ -79,7 +80,7 @@ describe("ScrollRevealService", () => {
     const scroll = waitForScroll(area);
     await userEvent.wheel(area, { delta: { y: 200 } });
     await scroll;
-    await userEvent.hover(park);
+    await PointerFixture.hoverAsync(park);
 
     expect([area.matches(":hover"), isScrolling(area), readThumb(area)]).toEqual([false, true, shown]);
     vi.advanceTimersByTime(1000);
@@ -166,7 +167,7 @@ describe("ScrollRevealService", () => {
     try {
       const scroll = waitForScroll(area);
       await userEvent.wheel(still, { delta: { y: 200 } });
-      await userEvent.hover(park);
+      await PointerFixture.hoverAsync(park);
       area.scrollTop = 100;
       await scroll;
 
