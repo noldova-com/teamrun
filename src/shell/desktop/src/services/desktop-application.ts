@@ -17,7 +17,7 @@ import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey,
-  ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
+  SettingValue, ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 import {
   AppImageSource,
@@ -32,6 +32,7 @@ import {
   ProcessPresence,
   RuntimeBuild,
   RuntimeEntry,
+  ShellSettings,
   SystemCommand
 } from "@noldova/teamrun-shell-runtime";
 
@@ -62,6 +63,7 @@ import { Resources } from "../resources.js";
 import { AppIcons } from "./app-icons.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
+import { DeviceSettingFollower } from "./device-setting-follower.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
@@ -74,6 +76,8 @@ import { SenderPolicy } from "./sender-policy.js";
 import { SpellChecker } from "./spell-checker.js";
 import { SpellingDictionaries } from "./spelling-dictionaries.js";
 import { SystemNotifier } from "./system-notifier.js";
+import { TrayController } from "./tray-controller.js";
+import { TrayHostWatcher } from "./tray-host-watcher.js";
 import { UpdateBarrierGate } from "./update-barrier-gate.js";
 import { UpdateBarrierWatch } from "./update-barrier-watch.js";
 import { WindowFactory } from "./window-factory.js";
@@ -106,6 +110,9 @@ export class DesktopApplication {
   private readonly gate: UpdateBarrierGate;
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
+  private readonly tray: TrayController;
+  private readonly trayHosts: TrayHostWatcher;
+  private readonly trayIcon: DeviceSettingFollower;
   private readonly spelling: SpellChecker;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly deviceFolder: string;
@@ -161,6 +168,11 @@ export class DesktopApplication {
     this.watch = new UpdateBarrierWatch(updates, () => !Object.isNull(this.startup.connection), Resources.updateBarrierInterval);
     this.recordDesktopAsync = recordDesktopAsync;
     this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
+    this.tray = new TrayController(electron.tray, electron.menu, icons, process.platform,
+      { open: () => this.reopen(), openNotification: t => this.openNotification(t), setDoNotDisturb: t => void this.setDoNotDisturbAsync(t), quit: () => electron.app.quit() }, t => this.log.write(t));
+    this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.tray.setHostAvailable(t));
+    this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
+      t => this.tray.setEnabled(t === true), t => this.log.write(t));
     this.spelling = spelling;
   }
 
@@ -228,6 +240,8 @@ export class DesktopApplication {
     app.on(Resources.windowAllClosedEvent, () => app.quit());
     app.on(Resources.willQuitEvent, () => {
       this.watch.stop();
+      this.trayHosts.stop();
+      this.tray.dispose();
       this.startup.close();
     });
     void app.whenReady().then(() => this.ready());
@@ -290,6 +304,9 @@ export class DesktopApplication {
         return;
       }
       this.hasPassedBarrier = true;
+      this.tray.setHostAvailable(this.trayHosts.isAvailable);
+      this.tray.setEnabled(this.trayIcon.value === true);
+      this.trayHosts.start();
       this.open();
       this.watch.start();
       void this.startup.startAsync();
@@ -384,6 +401,10 @@ export class DesktopApplication {
       this.notifier.reset();
     if (!isReady)
       this.quit.release();
+    if (isReady && !this.isReady)
+      void this.refreshTrayAsync();
+    else if (!isReady)
+      this.tray.clear();
     this.isReady = isReady;
     for (const open of this.windows.values())
       if (!open.window.isDestroyed()) {
@@ -407,7 +428,9 @@ export class DesktopApplication {
 
   private receiveWork(event: Event): void {
     try {
-      this.quit.receive(WorkReport.fromJson(event.payload));
+      const report = WorkReport.fromJson(event.payload);
+      this.quit.receive(report);
+      this.tray.receiveWork(report);
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -503,6 +526,7 @@ export class DesktopApplication {
   private readSettingForDevice(event: Event): JsonValue | undefined {
     try {
       const change = SettingChange.fromJson(event.payload);
+      this.trayIcon.receive(change, this.knownDevice);
       if (Object.isNull(change.key.device))
         return event.payload;
       return change.key.device === this.knownDevice ? new SettingChange(new SettingKey(change.key.name, change.key.scope), change.value, change.isSet).toJson() : undefined;
@@ -526,7 +550,9 @@ export class DesktopApplication {
     try {
       const broadcast = NotificationBroadcast.fromJson(event.payload);
       this.notifier.receive(broadcast);
-      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
+      const state = Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice);
+      this.tray.receiveNotifications(state);
+      return state.toJson();
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -543,6 +569,45 @@ export class DesktopApplication {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
       return undefined;
     }
+  }
+
+  private async refreshTrayAsync(): Promise<void> {
+    const epoch = this.notifier.epoch;
+    const device = await this.device;
+    if (Object.isNull(device))
+      return;
+    const [work, notifications] = await Promise.all([
+      this.callAsync(ShellMethods.work, null),
+      this.callAsync(ShellMethods.notifications, new NotificationsQuery(device).toJson()),
+      this.trayIcon.refreshAsync(device)
+    ]);
+    if (epoch !== this.notifier.epoch)
+      return;
+    try {
+      if (!work.hasFailed)
+        this.tray.receiveWork(WorkReport.fromJson(work.payload));
+      if (!notifications.hasFailed)
+        this.tray.receiveNotifications(NotificationState.fromJson(notifications.payload));
+    }
+    catch (error) {
+      this.log.write(Resources.formatTrayStateNotRead(String(error)));
+    }
+  }
+
+  private async setDoNotDisturbAsync(isOn: boolean): Promise<void> {
+    const device = await this.device;
+    const failure = Object.isNull(device)
+      ? new Failure(FailureCode.Unavailable, Resources.deviceNotIdentified)
+      : (await this.callAsync(ShellMethods.setSetting, new SettingValue(new SettingKey(ShellSettings.doNotDisturb, null, device), isOn).toJson())).failure;
+    if (Object.isUndefined(failure))
+      return;
+    this.log.write(Resources.formatDoNotDisturbNotSet(failure.message));
+    this.tray.rebuildMenu();
+  }
+
+  private reopen(): void {
+    if (Object.isNull(this.focus()))
+      this.open();
   }
 
   private async readNotificationsAsync(name: QualifiedName): Promise<JsonObject> {

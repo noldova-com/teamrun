@@ -31,7 +31,7 @@ export default class PackageConfiguration {
   private static readonly MAC_CATEGORY: string = "public.app-category.developer-tools";
   private static readonly LINUX_CATEGORY: string = "Development";
   private static readonly APPIMAGE_TOOLSET: string = "1.0.3";
-  private static readonly INSTALLER_INCLUDE_SEGMENTS: readonly string[] = ["assets", "installer", "command-path.nsh"];
+  private static readonly INSTALLER_INCLUDE_SEGMENTS: readonly string[] = ["assets", "installer", "installer.nsh"];
   private static readonly WINDOWS_PROGRAM_EXTENSION: string = ".exe";
   private static readonly WINDOWS_COMMAND_FOLDER: string = "%~dp0..";
   private static readonly RESOURCES_FOLDER: string = "resources";

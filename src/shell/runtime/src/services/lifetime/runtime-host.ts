@@ -308,7 +308,7 @@ export class RuntimeHost implements IIdleParticipant {
 
   private registerShellFacilities(database: ShellDatabase): SettingsService {
     const store = new WindowStateStore(database);
-    const settings = new SettingsService(database, [...ShellSettings.all, ...this.modules.settingDefinitions], this.log.diagnostics);
+    const settings = new SettingsService(database, [...ShellSettings.definitionsFor(this.platform), ...this.modules.settingDefinitions], this.log.diagnostics);
     const changed = this.events.declare(ShellEvents.settingsChanged);
     this.notificationSettings = new NotificationSettings(settings);
     settings.onChanged(t => {

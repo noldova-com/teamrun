@@ -7,7 +7,9 @@
  */
 
 import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import { Failure, FailureCode, type QualifiedName, Response, ShellMethods, WindowStateKey, WindowStateWrite } from "@noldova/teamrun-shell-protocol";
+import {
+  Failure, FailureCode, NotificationState, type QualifiedName, Response, SettingEntry, SettingKey, ShellMethods, WindowStateKey, WindowStateWrite
+} from "@noldova/teamrun-shell-protocol";
 import type { IRuntimeConnection } from "@noldova/teamrun-shell-desktop";
 
 export class FakeRuntimeConnection implements IRuntimeConnection {
@@ -43,8 +45,14 @@ export class FakeRuntimeConnection implements IRuntimeConnection {
       return Promise.resolve(Response.success("r", { descriptions: [], sequence: 0 }));
     if (method.text === ShellMethods.stop.text || method.text === ShellMethods.updateSaved.text)
       return Promise.resolve(Response.success("r", null));
+    if (method.text === ShellMethods.notifications.text)
+      return Promise.resolve(Response.success("r", new NotificationState([], false, [], 0).toJson()));
+    if (method.text === ShellMethods.readSetting.text)
+      return Promise.resolve(Response.success("r", new SettingEntry(SettingKey.fromJson(payload).name, true, false).toJson()));
     if (this.isFailing)
       return Promise.resolve(Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
+    if (method.text === ShellMethods.setSetting.text)
+      return Promise.resolve(Response.success("r", null));
     if (method.text === ShellMethods.writeWindowBounds.text || method.text === ShellMethods.writeWindowLayout.text) {
       const write = WindowStateWrite.fromJson(payload);
       this.states.set(`${method.member}:${write.key.device}:${write.key.window}`, write.value);
