@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { Failure, FailureCode, Response, UpdateProcess, UpdateReady } from "@noldova/teamrun-shell-protocol";
-import { Installation, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+import { ConnectionException, Installation, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
 import { type IUpdateTarget, UpdateStop, UpdateStopException } from "@noldova/teamrun-shell-desktop";
 
 import { FakeProcessPresence } from "../fixtures/fake-process-presence.fixture.js";
@@ -29,6 +29,8 @@ export class UpdateStopTests {
   private readonly asked: (readonly string[])[] = [];
   private readonly waits: number[] = [];
   private answer: boolean = true;
+  private rereads: boolean = false;
+  private onAsk?: () => void;
   private time: number = 0;
   private onConnect?: (dataDirectory: string) => Promise<void>;
 
@@ -60,6 +62,7 @@ export class UpdateStopTests {
 
       const isHandedOff = await this.create(installation).runAsync("0.3.0", async () => {
         handedOff = await readFile(installation.barrierFile, "utf8");
+        return null;
       });
 
       Assert.isTrue(isHandedOff);
@@ -85,6 +88,7 @@ export class UpdateStopTests {
 
       const result = await this.create(installation).runAsync("0.3.0", async () => {
         isHandedOff = true;
+        return null;
       });
 
       Assert.isFalse(result);
@@ -104,14 +108,76 @@ export class UpdateStopTests {
       const idle = await this.recordAsync(installation, folder, "idle");
       this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
       this.ready(first, []);
+      this.rereads = true;
 
-      const result = await this.create(installation, t => t === unused).runAsync("0.3.0", () => Promise.resolve());
+      const result = await this.create(installation, t => t === unused).runAsync("0.3.0", () => Promise.resolve(null));
 
       Assert.isTrue(result);
-      Assert.areEqual(1, this.asked.length);
+      Assert.areEqual(JSON.stringify([[`A reply (${first})`], [`A reply (${first})`]]), JSON.stringify(this.asked));
+      Assert.areEqual("shell.work|shell.work|shell.update|shell.work|shell.stop", this.connection(first).calls.join("|"));
       Assert.isFalse(this.connections.has(unused));
-      Assert.areEqual(JSON.stringify({ policy: "StopWork" }), JSON.stringify(this.connection(first).payloads[3]));
-      Assert.areEqual(JSON.stringify({ policy: "IfIdle" }), JSON.stringify(this.connection(idle).payloads[3]));
+      Assert.areEqual(JSON.stringify({ policy: "StopWork" }), JSON.stringify(this.connection(first).payloads[4]));
+      Assert.areEqual("shell.work|shell.work|shell.update|shell.work|shell.stop", this.connection(idle).calls.join("|"));
+      Assert.areEqual(JSON.stringify({ policy: "IfIdle" }), JSON.stringify(this.connection(idle).payloads[4]));
+    });
+  }
+
+  @TestMethod
+  public dropsTheWorkOfARuntimeThatLeavesWhileThePersonWaits(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      const first = await this.recordAsync(installation, folder, "first");
+      const second = await this.recordAsync(installation, folder, "second");
+      this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
+      this.connection(second).answers.set("shell.work", Response.success("r", { descriptions: ["A command"], sequence: 1 }));
+      this.rereads = true;
+      this.onAsk = () => {
+        this.connection(second).rejection = new ConnectionException("The connection closed.");
+      };
+
+      const result = await this.create(installation, t => t === second && this.asked.length > 0).runAsync("0.3.0", () => Promise.resolve(null));
+
+      Assert.isTrue(result);
+      Assert.areEqual(JSON.stringify([`A command (${second})`, `A reply (${first})`]), JSON.stringify([...this.asked[0] ?? []].sort()));
+      Assert.areEqual(JSON.stringify([`A reply (${first})`]), JSON.stringify(this.asked[1]));
+      Assert.isTrue(this.connection(second).isClosed);
+      Assert.areEqual("shell.work|shell.work", this.connection(second).calls.join("|"));
+      Assert.areEqual("shell.work|shell.work|shell.update|shell.work|shell.stop", this.connection(first).calls.join("|"));
+    });
+  }
+
+  @TestMethod
+  public stopsWorkThatStartedWhileThePersonWaitedOnceTheirListShowedIt(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      const first = await this.recordAsync(installation, folder, "first");
+      this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
+      this.rereads = true;
+      this.onAsk = () => {
+        this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply", "A command"], sequence: 2 }));
+      };
+
+      const result = await this.create(installation).runAsync("0.3.0", () => Promise.resolve(null));
+
+      Assert.isTrue(result);
+      Assert.areEqual(JSON.stringify([`A reply (${first})`, `A command (${first})`]), JSON.stringify(this.asked[1]));
+      Assert.areEqual("shell.work|shell.work|shell.update|shell.work|shell.stop", this.connection(first).calls.join("|"));
+      Assert.areEqual(JSON.stringify({ policy: "StopWork" }), JSON.stringify(this.connection(first).payloads[4]));
+    });
+  }
+
+  @TestMethod
+  public failsWhenTheWorkCannotBeReadAgainForAnotherReason(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      const first = await this.recordAsync(installation, folder, "first");
+      this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
+      this.rereads = true;
+      this.onAsk = () => {
+        this.connection(first).rejection = new Error("The frame was not valid.");
+      };
+
+      const failure = await this.failAsync(installation);
+
+      Assert.areEqual("The frame was not valid.", failure.message);
+      Assert.isFalse(existsSync(installation.barrierFile));
     });
   }
 
@@ -243,6 +309,51 @@ export class UpdateStopTests {
   }
 
   @TestMethod
+  public recordsTheProcessThatTookTheHandoffSoTheBarrierHoldsWhileItRuns(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      await this.recordAsync(installation, folder, "first");
+
+      const result = await this.create(installation).runAsync("0.3.0", () => Promise.resolve(5200));
+
+      Assert.isTrue(result);
+      Assert.areEqual(JSON.stringify(new UpdateBarrier(
+        new UpdateProcess(UpdateStopTests.SELF, 1500, 1501, "desktop"), "0.3.0", UpdateBarrierState.HandedOff, new UpdateProcess(5200, 1500, 1501, "handoff")).toJson()), this.readBarrier(installation));
+    });
+  }
+
+  @TestMethod
+  public keepsTheBarrierWithoutItsHandoffWhenThatProcessCannotBeFound(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      await this.recordAsync(installation, folder, "first");
+      this.presence.onStamp = t => {
+        if (t[0]?.[1] === "handoff")
+          throw new Error("The process table could not be read.");
+      };
+
+      const result = await this.create(installation).runAsync("0.3.0", () => Promise.resolve(5200));
+
+      Assert.isTrue(result);
+      Assert.areEqual(JSON.stringify(new UpdateBarrier(new UpdateProcess(UpdateStopTests.SELF, 1500, 1501, "desktop"), "0.3.0", UpdateBarrierState.HandedOff, null).toJson()), this.readBarrier(installation));
+    });
+  }
+
+  @TestMethod
+  public stillReportsTheHandoffWhenItsProcessCannotBeRecorded(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      await this.recordAsync(installation, folder, "first");
+      this.presence.onStamp = t => {
+        if (t[0]?.[1] === "handoff")
+          rmSync(installation.folder, { recursive: true, force: true });
+      };
+
+      const result = await this.create(installation).runAsync("0.3.0", () => Promise.resolve(5200));
+
+      Assert.isTrue(result);
+      Assert.isFalse(existsSync(installation.barrierFile));
+    });
+  }
+
+  @TestMethod
   public removesTheBarrierWhenTheHandoffFails(): Promise<void> {
     return this.runAsync(async (installation, folder) => {
       await this.recordAsync(installation, folder, "first");
@@ -262,9 +373,12 @@ export class UpdateStopTests {
         await this.onConnect?.(t);
         return isUnused(t) ? null : this.target(t);
       },
-      t => {
+      async (t, read) => {
         this.asked.push(t);
-        return Promise.resolve(this.answer);
+        this.onAsk?.();
+        if (this.rereads)
+          this.asked.push(await read());
+        return this.answer;
       },
       UpdateStopTests.SELF,
       "0.2.0",
@@ -306,7 +420,7 @@ export class UpdateStopTests {
   }
 
   private async failAsync(installation: Installation): Promise<UpdateStopException> {
-    return await Assert.throwsAsync(() => this.create(installation).runAsync("0.3.0", () => Promise.resolve()), UpdateStopException) as UpdateStopException;
+    return await Assert.throwsAsync(() => this.create(installation).runAsync("0.3.0", () => Promise.resolve(null)), UpdateStopException) as UpdateStopException;
   }
 
   private async runAsync(test: (installation: Installation, folder: string) => Promise<void>): Promise<void> {

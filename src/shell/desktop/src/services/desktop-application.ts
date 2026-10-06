@@ -162,6 +162,7 @@ export class DesktopApplication {
       readBarrierAsync: () => installation.readAsync(),
       hasUpdateEndedAsync: () => installation.hasEndedAsync(),
       saveAsync: () => this.saveForUpdateAsync(),
+      passBarrierAsync: t => this.passBarrierAsync(() => this.gate.askAsync(t)),
       quit: () => electron.app.exit(Resources.quitExitCode)
     };
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }), updates);

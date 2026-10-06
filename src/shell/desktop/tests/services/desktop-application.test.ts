@@ -19,7 +19,7 @@ import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-founda
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
-  UpdateBarrierState, UpdateBarrierStatus
+  UpdateBarrierState, UpdateBarrierStatus, UpdateInProgressException
 } from "@noldova/teamrun-shell-runtime";
 import { type IIpcEvent, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
 
@@ -244,9 +244,9 @@ export class DesktopApplicationTests {
 
     Assert.areEqual("false,true,0", [untrusted, waiting, requestsWhileWorking].join(","));
     Assert.areEqual(JSON.stringify([
-      { descriptions: ["Indexing the project"], isWaiting: false },
-      { descriptions: ["Indexing the project"], isWaiting: true },
-      { descriptions: ["Indexing the project", "Saving the notes"], isWaiting: true },
+      { descriptions: ["Indexing the project"], isWaiting: false, isUpdate: false },
+      { descriptions: ["Indexing the project"], isWaiting: true, isUpdate: false },
+      { descriptions: ["Indexing the project", "Saving the notes"], isWaiting: true, isUpdate: false },
       null
     ]), JSON.stringify(DesktopApplicationTests.quitQuestions(window)));
     Assert.areEqual(2000, connection.timeouts[connection.calls.lastIndexOf("shell.work")]);
@@ -557,6 +557,19 @@ export class DesktopApplicationTests {
     finally {
       await rm(folder, { recursive: true, force: true });
     }
+  }
+
+  @TestMethod
+  public async quitsAndLogsWhenItCannotTellThePersonThatTheRuntimeStartFoundAnUpdate(): Promise<void> {
+    const electron = new FakeElectron();
+    electron.dialog.failure = new Error("No display");
+    const process = new FakeDesktopProcess("linux");
+
+    await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new UpdateInProgressException(UpdateBarrierStatus.Held)), electron, undefined, process);
+    await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+    Assert.areEqual(1, electron.dialog.boxes.length);
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The launch barrier could not be settled: Error: No display").length);
   }
 
   @TestMethod

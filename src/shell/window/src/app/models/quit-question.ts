@@ -13,15 +13,17 @@ import { Resources } from "../../resources";
 export class QuitQuestion {
   public readonly descriptions: readonly string[];
   public readonly isWaiting: boolean;
+  public readonly isUpdate: boolean;
 
-  public constructor(descriptions: readonly string[], isWaiting: boolean) {
+  public constructor(descriptions: readonly string[], isWaiting: boolean, isUpdate: boolean) {
     this.descriptions = [...descriptions];
     this.isWaiting = isWaiting;
+    this.isUpdate = isUpdate;
   }
 
   public static fromJson(value: unknown): QuitQuestion {
     const json = JsonReader.fromValue(value);
-    return new QuitQuestion(json.readStringArray(Resources.descriptionsField), json.readBoolean(Resources.isWaitingField));
+    return new QuitQuestion(json.readStringArray(Resources.descriptionsField), json.readBoolean(Resources.isWaitingField), json.readBoolean(Resources.isUpdateField));
   }
 
   public get shown(): readonly string[] {
