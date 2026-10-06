@@ -7,12 +7,16 @@
  */
 
 import { LiveAnnouncer } from "@angular/cdk/a11y";
-import { ChangeDetectionStrategy, Component, DestroyRef, ErrorHandler, type Signal, ViewEncapsulation, type WritableSignal, computed, inject, input, model, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ErrorHandler, type ResourceRef, type Signal, ViewEncapsulation, type WritableSignal, computed, inject, input, model, resource,
+  signal } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
 import { CopyState } from "../../enums/copy-state";
+import { CodeLanguage } from "../../models/code-language";
+import type { CodeToken } from "../../models/code-token";
 import { ClipboardWriter } from "../../services/clipboard-writer";
+import { CodeHighlighter } from "../../services/code-highlighter";
 import { Resources } from "../../../resources";
 import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { ToolbarItemDirective } from "../toolbar/toolbar-item.directive";
@@ -35,6 +39,7 @@ export class CodeBlockComponent {
   private readonly clipboard: ClipboardWriter = inject(ClipboardWriter);
   private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly highlighter: CodeHighlighter = inject(CodeHighlighter);
   private readonly copyState: WritableSignal<CopyState> = signal(CopyState.Ready);
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -46,6 +51,14 @@ export class CodeBlockComponent {
   public readonly code = input.required<string>();
   public readonly language = input<string | null>(null);
   public readonly wrapped = model<boolean>(false);
+
+  protected readonly tokens: ResourceRef<readonly CodeToken[] | undefined> = resource({
+    params: () => {
+      const language = CodeLanguage.named(this.language());
+      return Object.isNull(language) ? undefined : { code: this.code(), language };
+    },
+    loader: ({ params }) => this.highlighter.tokensAsync(params.code, params.language)
+  });
 
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.clearCopyTimer());

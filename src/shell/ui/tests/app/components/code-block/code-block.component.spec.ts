@@ -13,10 +13,12 @@ import { userEvent } from "vitest/browser";
 
 import { CodeBlockComponent } from "../../../../src/app/components/code-block/code-block.component";
 import { ClipboardWriter } from "../../../../src/app/services/clipboard-writer";
+import { CodeTokenKind } from "../../../../src/app/enums/code-token-kind";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import type { ClipboardWriterFixture } from "../../../fixtures/clipboard-writer.fixture";
+import { ForcedColorsFixture } from "../../../fixtures/forced-colors.fixture";
 import { GalleryFixture } from "../../../fixtures/gallery.fixture";
 
 @Component({
@@ -284,6 +286,75 @@ describe("CodeBlockComponent", () => {
 
     expect(feedback).toBeDefined();
     expect(cleared).toHaveBeenCalledWith(feedback);
+  });
+
+  const tokens = (): readonly (readonly [string, string | null])[] =>
+    [...body().querySelectorAll("code > span")].map(t => [t.textContent, [...t.classList].find(name => name.startsWith("tr-code-token-"))?.slice("tr-code-token-".length) ?? null] as const);
+  const probe = (kind: CodeTokenKind): HTMLElement => {
+    const span = (body().querySelector("code") as HTMLElement).appendChild(document.createElement("span"));
+    span.className = `tr-code-token tr-code-token-${kind}`;
+    return span;
+  };
+
+  it("colors the tokens of a language it knows by their kind, keeping the code's text exactly, and Copy still copies the code as bound", async () => {
+    await renderAsync();
+    const code = "// greet\r\n@sealed class Box {}\nexport function greet(name: string): string {\n  return `Hello, ${name}` + /a+/g.source + 1;\n}\n";
+
+    await changeAsync(() => host.code.set(code));
+    await copyAsync();
+
+    expect(tokens()).toEqual(expect.arrayContaining([
+      ["//", "comment"], ["@", "meta"], ["class", "keyword"], ["Box", "type"], ["export", "control"], ["function", "keyword"], ["greet", "function"], ["name", "variable"],
+      ["string", "type"], ["return", "control"], ["Hello, ", "string"], ["a", "regex"], ["1", "number"], ["{", null]
+    ]));
+    expect(body().querySelector("code")?.textContent).toBe(code);
+    expect(clipboard.texts).toEqual([code]);
+  });
+
+  it("leaves code plain, exactly as bound, for a language it doesn't know or none", async () => {
+    await renderAsync();
+    await changeAsync(() => host.language.set("Klingon"));
+    const unknown = [body().querySelectorAll("span").length, body().querySelector("code")?.textContent];
+    await changeAsync(() => host.language.set(null));
+
+    expect(unknown).toEqual([0, host.code()]);
+    expect([body().querySelectorAll("span").length, body().querySelector("code")?.textContent]).toEqual([0, host.code()]);
+  });
+
+  it("shows changed code at once, plain until its tokens arrive, and never with the tokens of the code before it", async () => {
+    await renderAsync();
+    const colored = tokens().length;
+
+    host.code.set("let changed = 2;");
+    fixture.detectChanges();
+    const meanwhile = [body().querySelectorAll("span").length, body().querySelector("code")?.textContent];
+    await fixture.whenStable();
+
+    expect(colored).toBeGreaterThan(0);
+    expect(meanwhile).toEqual([0, "let changed = 2;"]);
+    expect(tokens()).toEqual(expect.arrayContaining([["let", "keyword"], ["changed", "variable"], ["2", "number"]]));
+  });
+
+  for (const mode of AppearanceFixture.modes)
+    for (const theme of AppearanceFixture.themes)
+      it(`paints each kind of token in its own color from the ${theme.id} theme in ${mode} mode`, async () => {
+        AppearanceFixture.apply(theme, mode);
+        await renderAsync();
+        const kinds = Object.values(CodeTokenKind);
+
+        expect(kinds.map(t => getComputedStyle(probe(t)).color))
+          .toEqual(kinds.map(t => AppearanceFixture.readColor(theme, mode, `teamrun.code${t[0]?.toUpperCase()}${t.slice(1)}Foreground`)));
+      });
+
+  it("paints every kind of token in the system's text color in forced colors", async () => {
+    await renderAsync();
+    await ForcedColorsFixture.activateAsync();
+    const kinds = Object.values(CodeTokenKind);
+    const shown = kinds.map(t => getComputedStyle(probe(t)).color);
+    const text = ForcedColorsFixture.resolve("CanvasText");
+    await ForcedColorsFixture.resetAsync();
+
+    expect(shown).toEqual(kinds.map(() => text));
   });
 
   for (const mode of AppearanceFixture.modes)

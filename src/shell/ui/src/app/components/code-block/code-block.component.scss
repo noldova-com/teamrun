@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 .tr-code-block {
   display: flex;
   flex-direction: column;
@@ -65,6 +67,52 @@
 @container scroll-state(scrollable: inline) {
   .tr-code-block-body > code {
     padding-bottom: max(0px, var(--tr-space-2) - var(--tr-scrollbar-size));
+  }
+}
+
+.tr-code-token-comment {
+  color: var(--tr-code-comment);
+}
+
+.tr-code-token-keyword {
+  color: var(--tr-code-keyword);
+}
+
+.tr-code-token-control {
+  color: var(--tr-code-control);
+}
+
+.tr-code-token-string {
+  color: var(--tr-code-string);
+}
+
+.tr-code-token-number {
+  color: var(--tr-code-number);
+}
+
+.tr-code-token-type {
+  color: var(--tr-code-type);
+}
+
+.tr-code-token-function {
+  color: var(--tr-code-function);
+}
+
+.tr-code-token-variable {
+  color: var(--tr-code-variable);
+}
+
+.tr-code-token-regex {
+  color: var(--tr-code-regex);
+}
+
+.tr-code-token-meta {
+  color: var(--tr-code-meta);
+}
+
+@include forced-colors {
+  .tr-code-token {
+    color: CanvasText;
   }
 }
 

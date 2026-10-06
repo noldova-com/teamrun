@@ -877,6 +877,9 @@ Restarting for an update runs the same saves in every window of the installation
 - The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires.
   The build installs it from its lockfile, separately from the packages, and the Angular CLI builds and tests the Angular parts.
   A package never imports from the Angular project's dependencies; it imports only what its own manifest declares.
+- The kit colors code with Shiki's tokenizer `@shikijs/primitive`, its JavaScript regular-expression engine `@shikijs/engine-javascript` and its grammars `@shikijs/langs`, which the Angular project pins.
+  The window loads the tokenizer with the first block it colors, and each grammar as a chunk of its own when a block first uses it; the kit's code language list names the grammars it ships.
+  None of them needs WebAssembly or `eval`, which the window's content security policy refuses.
 - Development starts and the UI workflows run under the product's name and icon, never Electron's.
   `npm start` and `npm run test:ui` prepare a copy of Electron's distribution in `_build/development-app`, labelled from the product identity, and start it:
   - On Windows, the executable is named after the product and carries its version information and icon.
