@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
 import { ShellMethods } from "@noldova/teamrun-shell-protocol";
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 

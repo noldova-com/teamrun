@@ -35,9 +35,9 @@ export class CommandLine {
     start: boolean = true,
     takeOver: boolean = false,
     timeoutMilliseconds: number | null = null,
-    commandName: string = "",
+    commandName: string = String.empty,
     argumentsSource: ArgumentsSource = ArgumentsSource.None,
-    argumentsText: string = "") {
+    argumentsText: string = String.empty) {
     this.command = command;
     this.dataDirectory = dataDirectory;
     this.isJson = isJson;
@@ -61,7 +61,7 @@ export class CommandLine {
       const separator = argument.indexOf(Resources.valueSeparator);
       const name = separator < 0 ? argument : argument.slice(0, separator);
       if (CommandLine.SWITCHES.includes(name) && separator < 0)
-        options.set(name, "");
+        options.set(name, String.empty);
       else if (CommandLine.VALUE_OPTIONS.includes(name)) {
         const value = separator < 0 ? queue.shift() : argument.slice(separator + 1);
         if (Object.isUndefined(value) || value.length === 0)
