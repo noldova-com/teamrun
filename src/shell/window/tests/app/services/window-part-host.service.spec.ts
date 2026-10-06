@@ -44,6 +44,7 @@ import { BarItemsService } from "../../../src/app/services/bar-items.service";
 import { CommandService } from "../../../src/app/services/command.service";
 import { LayoutStoreService } from "../../../src/app/services/layout-store.service";
 import { LayoutService } from "../../../src/app/services/layout.service";
+import { LiveViewService } from "../../../src/app/services/live-view.service";
 import { MenuService } from "../../../src/app/services/menu.service";
 import { ModuleStatusService } from "../../../src/app/services/module-status.service";
 import { TabLabelService } from "../../../src/app/services/tab-label.service";
@@ -688,6 +689,22 @@ describe("WindowPartHostService", () => {
     expect(host.findContribution(new ViewTab("notes.list"))?.context?.moduleId).toBe("notes");
   });
 
+  it("destroys the live views of a part it rebuilds before deactivating the part, and keeps those of a part that continues", async () => {
+    const notes = notesPart(log);
+    const clock = clockPart(log);
+    notes.onReconnect = () => true;
+    const { host } = start([source("notes", notes), source("clock", clock)], [status("notes"), status("clock")]);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const tabs = [new ViewTab("notes.list"), new DocumentTab("notes.note", "1"), new ViewTab("clock.list"), new DocumentTab("clock.note", "1"), ShellDocuments.settingsTab];
+    vi.spyOn(TestBed.inject(LiveViewService), "destroy").mockImplementation(owns => log.push(`destroy ${tabs.filter(owns).map(t => t.name).join(",")}`));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect(log).toEqual(["activate notes", "activate clock", "reconnect notes", "reconnect clock", "destroy clock.list", "deactivate clock", "activate clock"]);
+  });
+
   it("keeps a part that continues when the runtime is ready again, with its context and its tabs' revisions, and moves on only the rebuilt module's tabs", async () => {
     const notes = notesPart(log);
     const clock = clockPart(log);
@@ -1028,6 +1045,24 @@ describe("WindowPartHostService", () => {
 
     expect(seen).toEqual([[], ["tasks"]]);
     expect(TestBed.inject(ModuleStatusService).modules().map(t => t.id)).toEqual(["tasks"]);
+  });
+
+  it("shows the tab a window part marks as working until the part is withdrawn", async () => {
+    let marks = 0;
+    const notes = new WindowPartFixture("notes", log, t => {
+      if (marks++ === 0)
+        t.markWorking("notes.list");
+    });
+    const { host } = start([source("notes", notes, [], ["notes.list"])], [status("notes")]);
+    const labels = TestBed.inject(TabLabelService);
+    await vi.waitFor(() => expect(host.generation()).toBe(1));
+    const shown = labels.isWorking(new ViewTab("notes.list"));
+
+    bridge.publishStartup({ kind: "Connecting", details: [] });
+    bridge.publishStartup({ kind: "Ready", details: [] });
+    await vi.waitFor(() => expect(host.generation()).toBe(2));
+
+    expect([shown, labels.isWorking(new ViewTab("notes.list"))]).toEqual([true, false]);
   });
 
   it("shows the badge a window part sets on its view, set again when the part reactivates", async () => {
