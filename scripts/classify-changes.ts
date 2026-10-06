@@ -49,24 +49,27 @@ export default class ClassifyChanges {
     const eventName = environment[ClassifyChanges.EVENT_VARIABLE];
     const scope = await this.classifier.classifyAsync(eventName, environment[ClassifyChanges.BASE_VARIABLE], environment[ClassifyChanges.HEAD_VARIABLE]);
     const matrix = new BuildMatrix(eventName);
-    const targets = JSON.stringify(matrix.targets.map(t => ({ ...ClassifyChanges.describe(t), jobs: TestJobPlan.plan(t) })));
+    const targets = JSON.stringify(matrix.targets.map(t => ({ ...ClassifyChanges.describe(t), jobs: TestJobPlan.plan(t), ui: matrix.uiTargets.includes(t) ? ClassifyChanges.planUi(matrix, t) : null })));
     const table = matrix.targets.map(t => [t.name, t.runner, t.operatingSystem, t.architecture].join(ClassifyChanges.CELL_SEPARATOR)).join(ClassifyChanges.ROW_SEPARATOR);
     const uiTargets = matrix.uiTargets.map(t => t.key).join(ClassifyChanges.KEY_SEPARATOR);
-    const uiPlan = JSON.stringify(Object.fromEntries(matrix.uiTargets.map(t => {
-      const shards = matrix.uiShards(t);
-      return [t.key, {
-        build: shards.some(s => s.isPrebuilt) ? [ClassifyChanges.describe(t)] : [],
-        shards: shards.map(s => ({ ...ClassifyChanges.describe(t), shard: s.index, shards: s.count, grep: s.grep, prebuilt: s.isPrebuilt }))
-      }];
-    })));
     const deferred = matrix.deferred.map(t => t.name).join(ClassifyChanges.TARGET_SEPARATOR);
     const uiDeferred = matrix.uiDeferred.map(t => t.name).join(ClassifyChanges.TARGET_SEPARATOR);
     await appendFile(outputPath,
-      `run-code=${scope.runCode}\nrun-ui=${scope.runUi}\ntargets=${targets}\ntarget-table=${table}\nui-targets=${uiTargets}\nui-plan=${uiPlan}\ndeferred=${deferred}\nui-deferred=${uiDeferred}\n`);
+      `run-code=${scope.runCode}\nrun-ui=${scope.runUi}\ntargets=${targets}\ntarget-table=${table}\nui-targets=${uiTargets}\ndeferred=${deferred}\nui-deferred=${uiDeferred}\n`);
     const summary = `${scope.summary}\n${scope.selection.summary} ${ClassifyChanges.NOT_APPLIED}\n`;
     await appendFile(summaryPath, summary);
     this.output.write(summary);
     return 0;
+  }
+
+  private static planUi(matrix: BuildMatrix, target: BuildTarget): object {
+    const shards = matrix.uiShards(target);
+    const isShared = target.splitsTests && shards.some(t => t.isPrebuilt);
+    return {
+      shared: isShared,
+      build: !isShared && shards.some(t => t.isPrebuilt) ? [ClassifyChanges.describe(target)] : [],
+      shards: shards.map(t => ({ ...ClassifyChanges.describe(target), shard: t.index, shards: t.count, grep: t.grep, prebuilt: t.isPrebuilt }))
+    };
   }
 
   private static describe(target: BuildTarget): object {

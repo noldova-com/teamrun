@@ -93,15 +93,14 @@ class TestTests {
         outputs.push(output);
       }
 
+      const whole = new TextOutputFixture();
+      assert.equal(await new Test((await TestTests.createRepositoryAsync(t)).directory, new AngularReportRunnerFixture(TestTests.REPORT, [0, 0]), whole, {}).runAsync([]), 0, whole.text);
+
+      const order = [...whole.text.matchAll(/^(.+): passed$/gm)].map(u => String(u[1]));
       const titles = outputs.map(t => [...t.text.matchAll(/^(.+): passed$/gm)].map(u => u[1]));
-      assert.deepEqual(titles, [
-        ["Package tests and coverage"],
-        ["Script tests and coverage"],
-        [
-          "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages",
-          "Script types", "API declarations", "API documentation", "API examples", "Angular tests and coverage", "Packaged build leaves out the Gallery"
-        ]
-      ]);
+      const separate = ["Package tests and coverage", "Script tests and coverage"];
+      assert.deepEqual(titles, [[separate[0]], [separate[1]], order.filter(u => !separate.includes(u))]);
+      assert.ok(order.length > separate.length + 1, whole.text);
       for (const [index, output] of outputs.entries())
         assert.ok(output.text.startsWith(`Part run: ${parts[index]}. Only all 3 parts together are the complete gate.\n`), output.text);
     });
