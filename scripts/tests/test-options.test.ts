@@ -17,19 +17,27 @@ class TestOptionsTests {
     test("no arguments select the complete gate once", () => {
       const options = TestOptions.parse([]);
 
-      assert.deepEqual([options.isDocuments, options.filters, options.repeat], [false, [], 1]);
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.isRerunningFailed], [false, [], 1, false]);
     });
 
     test("documents alone selects the document checks", () => {
       const options = TestOptions.parse(["documents"]);
 
-      assert.deepEqual([options.isDocuments, options.filters, options.repeat], [true, [], 1]);
+      assert.deepEqual([options.isDocuments, options.filters, options.repeat, options.isRerunningFailed], [true, [], 1, false]);
     });
 
     test("filters accumulate in the order given and a repeat count applies to the selection", () => {
       const options = TestOptions.parse(["--filter", "alpha", "--repeat", "5", "--filter", "category:fast"]);
 
       assert.deepEqual([options.isDocuments, options.filters, options.repeat], [false, ["alpha", "category:fast"], 5]);
+    });
+
+    test("--rerun-failed takes no value and goes with the complete gate or a selection, wherever it is given", () => {
+      const alone = TestOptions.parse(["--rerun-failed"]);
+      const between = TestOptions.parse(["--filter", "alpha", "--rerun-failed", "--repeat", "2"]);
+
+      assert.deepEqual([alone.filters, alone.repeat, alone.isRerunningFailed], [[], 1, true]);
+      assert.deepEqual([between.filters, between.repeat, between.isRerunningFailed], [["alpha"], 2, true]);
     });
 
     test("documents after the first argument is a filter's text, not the document checks", () => {
@@ -52,6 +60,8 @@ class TestOptionsTests {
         [["--repeat", "2.5"], "--repeat takes a whole number from 1."],
         [["--repeat", "two"], "--repeat takes a whole number from 1."],
         [["--repeat", "2", "--repeat", "3"], "--repeat may be given only once."],
+        [["--rerun-failed", "--rerun-failed"], "--rerun-failed may be given only once."],
+        [["documents", "--rerun-failed"], "documents takes no other option."],
         [["coverage"], "\"coverage\" is not an option of npm test."],
         [["--filter", "alpha", "extra"], "\"extra\" is not an option of npm test."],
         [["--repeat", "2", "documents"], "\"documents\" is not an option of npm test."]

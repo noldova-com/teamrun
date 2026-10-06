@@ -85,10 +85,10 @@ export default class ProcessRunner {
     ProcessRunner.signal(processId, ProcessRunner.KILL_SIGNAL);
   }
 
-  public runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string, output: Writable, errorOutput: Writable): Promise<number | null> {
+  public runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string, output: Writable, errorOutput: Writable, environment?: NodeJS.ProcessEnv): Promise<number | null> {
     return new Promise<number | null>((resolve, reject) => {
       const file = createWriteStream(log);
-      const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: ["inherit", "pipe", "pipe"] });
+      const child = spawn(command, [...commandArguments], { cwd: directory, env: environment, shell: false, stdio: ["inherit", "pipe", "pipe"] });
       let failure: ProcessException | null = null;
       const forward = (target: Writable, chunk: Buffer): void => {
         target.write(chunk);

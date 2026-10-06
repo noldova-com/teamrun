@@ -11,19 +11,24 @@ import type { Writable } from "node:stream";
 import AngularProject from "../angular/angular-project.ts";
 import ProcessException from "../processes/process.exception.ts";
 import CheckSelection from "./check-selection.ts";
+import type FlakyRecord from "./flaky-record.ts";
+import FlakyTest from "./flaky-test.ts";
 import type ISelectableCheck from "./interfaces/selectable-check.ts";
 
 export default class AngularTestCheck implements ISelectableCheck {
+  private static readonly RUNNER: string = "Angular tests";
   private static readonly UNIT: string = "spec files";
   private static readonly NO_REPORT: string = "The Angular tests passed but wrote no report of the spec files they ran.\n";
   private static readonly LOG_HINT: string = `The Angular tests' full output is in ${AngularProject.LOG_FILE}.\n`;
 
   private readonly project: AngularProject;
+  private readonly flaky: FlakyRecord | null;
 
   public readonly title: string = "Angular tests and coverage";
 
-  public constructor(project: AngularProject) {
+  public constructor(project: AngularProject, flaky: FlakyRecord | null) {
     this.project = project;
+    this.flaky = flaky;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
@@ -54,9 +59,10 @@ export default class AngularTestCheck implements ISelectableCheck {
 
   private async checkAsync(output: Writable, include: readonly string[] = []): Promise<boolean> {
     try {
-      const run = await this.project.testAsync(include);
+      const run = await this.project.testAsync(include, this.flaky !== null);
       if (!run.isSuccessful)
         return false;
+      await this.flaky?.addAsync(run.retried.map(t => new FlakyTest(AngularTestCheck.RUNNER, t.file, t.name, t.failure)), output);
       if (run.collected === null) {
         output.write(AngularTestCheck.NO_REPORT);
         return false;

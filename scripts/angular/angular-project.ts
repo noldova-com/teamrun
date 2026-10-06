@@ -16,9 +16,11 @@ import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessException from "../processes/process.exception.ts";
 import type NpmCommand from "../toolchain/npm-command.ts";
 import AngularTestRun from "./angular-test-run.ts";
+import RetriedTest from "./retried-test.ts";
 
 export default class AngularProject {
   public static readonly LOG_FILE: string = "_build/angular-tests.log";
+  public static readonly RETRY_VARIABLE: string = "TEAMRUN_TEST_RETRY";
 
   private static readonly FOLDER: string = "src";
   private static readonly WORKSPACE_FILE: string = "angular.json";
@@ -38,6 +40,8 @@ export default class AngularProject {
   private static readonly NO_COVERAGE_OPTION: string = "--no-coverage";
   private static readonly REPORT_SEGMENTS: readonly string[] = ["_build", "angular-tests.json"];
   private static readonly TEST_TARGET: string = "test";
+  private static readonly PASSED_STATUS: string = "passed";
+  private static readonly RETRY_ON: string = "1";
   private static readonly OPTIONS_PATH: readonly string[] = ["architect", AngularProject.TEST_TARGET, "options"];
   private static readonly BUILD_ARGUMENTS: readonly string[] = ["build"];
   private static readonly OUTPUT_PATH_OPTION: string = "--output-path";
@@ -120,7 +124,7 @@ export default class AngularProject {
       throw new ProcessException(`The window built in ${shown} has no files to check.`);
   }
 
-  public async testAsync(include: readonly string[] = []): Promise<AngularTestRun> {
+  public async testAsync(include: readonly string[], isRetrying: boolean): Promise<AngularTestRun> {
     const report = path.join(this.root, ...AngularProject.REPORT_SEGMENTS);
     await rm(report, { force: true });
     await rm(path.join(this.directory, AngularProject.DEPENDENCY_CACHE), { recursive: true, force: true });
@@ -131,8 +135,12 @@ export default class AngularProject {
       this.directory,
       path.join(this.root, AngularProject.LOG_FILE),
       process.stdout,
-      process.stderr);
-    return new AngularTestRun(exitCode, existsSync(report) ? await this.readCollectedAsync(report) : null);
+      process.stderr,
+      isRetrying ? { ...process.env, [AngularProject.RETRY_VARIABLE]: AngularProject.RETRY_ON } : undefined);
+    if (!existsSync(report))
+      return new AngularTestRun(exitCode, null, []);
+    const results = await this.readResultsAsync(report);
+    return new AngularTestRun(exitCode, results.map(t => this.specName(path.resolve(String(AngularProject.field(t, "name"))))).sort(), results.flatMap(t => this.readRetried(t)));
   }
 
   public async specFilesAsync(): Promise<readonly string[]> {
@@ -168,11 +176,19 @@ export default class AngularProject {
     return aliases;
   }
 
-  private async readCollectedAsync(report: string): Promise<readonly string[]> {
+  private async readResultsAsync(report: string): Promise<readonly unknown[]> {
     const results = AngularProject.field(await this.readJsonAsync(report), "testResults");
     if (!Array.isArray(results) || results.some(t => typeof AngularProject.field(t, "name") !== "string"))
       throw new ProcessException(`The Angular test report ${this.describe(report)} lists no test files.`);
-    return results.map(t => this.specName(path.resolve(String(AngularProject.field(t, "name"))))).sort();
+    return results;
+  }
+
+  private readRetried(result: unknown): readonly RetriedTest[] {
+    const file = this.specName(path.resolve(String(AngularProject.field(result, "name"))));
+    const assertions = AngularProject.field(result, "assertionResults");
+    return (Array.isArray(assertions) ? assertions : [])
+      .filter(t => AngularProject.field(t, "status") === AngularProject.PASSED_STATUS && Array.isArray(AngularProject.field(t, "failureMessages")) && (AngularProject.field(t, "failureMessages") as unknown[]).length > 0)
+      .map(t => new RetriedTest(file, String(AngularProject.field(t, "fullName")), String((AngularProject.field(t, "failureMessages") as unknown[])[0])));
   }
 
   private async readJsonAsync(file: string): Promise<unknown> {

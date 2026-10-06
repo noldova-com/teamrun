@@ -121,7 +121,7 @@ jobs:
 
       - name: Test
         id: test
-        run: npm test
+        run: npm test -- --rerun-failed
 
       - name: Keep the Angular test output
         id: angular
@@ -177,6 +177,55 @@ jobs:
         if: always() && steps.test.outcome == 'failure' && steps.angular-last.outcome == 'failure'
         run: |
           echo "::warning title=The Angular test output was not kept::The upload failed three times, so it is not attached."
+
+      - name: Keep the flaky test record
+        id: flaky
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flaky-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
+          path: _build/flaky-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the flaky test record again
+        if: always() && steps.flaky.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the flaky test record again
+        id: flaky-again
+        if: always() && steps.flaky.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flaky-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
+          path: _build/flaky-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before keeping the flaky test record a last time
+        if: always() && steps.flaky-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the flaky test record a last time
+        id: flaky-last
+        if: always() && steps.flaky-again.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flaky-tests-${{ matrix.runner }}-${{ matrix.architecture }}-${{ github.run_attempt }}
+          path: _build/flaky-tests.json
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Warn that the flaky test record was not kept
+        if: always() && steps.flaky-last.outcome == 'failure'
+        run: |
+          echo "::warning title=The flaky test record was not kept::The upload failed three times, so no issue is recorded for this job's flaky tests. The tests are not affected."
 
   ui-linux-x64:
     name: UI workflows (Linux x64)
