@@ -346,9 +346,10 @@ The context is merged into each item's arguments, the item's own fields winning,
 The shell's own groups put Close the tab in File, and command search, Left dock, Right dock and Bottom dock as checkbox rows, the bottom dock across the window or between the side docks, and Reset the layout in View, and Settings… in the macOS application menu after About.
 On Windows and Linux, Edit holds Undo, Redo, Cut, Copy, Paste and Select all: each acts on the field that had focus before a menu took it, with the field's selection restored first, and is enabled only when that field allows it, such as Copy only with a selection and Paste only into a field that can be written.
 The text field menu, `shell.field`, holds Cut, Copy, Paste and Select all, acting and enabled the same way, on every platform.
-On a misspelled word it starts with the spell checker's suggestions, each replacing the word.
+On a misspelled word it starts with the spell checker's suggestions, each replacing the word, and Add to dictionary.
 Only the desktop knows the word and its suggestions, from the window's `context-menu` event, so the window leaves a field's right click, menu key and Shift+F10 to the desktop, which sends the word and suggestions back.
 The window opens the menu when that message matches the click or key it noted, or opens the menu without suggestions after 300 ms, so a missing message cannot lose the menu and a late one cannot open it elsewhere.
+Add to dictionary adds the word to the spell checker's user dictionary: on Linux that is TeamRun's own file in the profile, and on Windows and macOS it is the system's, which every program shares.
 It opens as the context menu of a text field or rich text anywhere in the window outside overlays, anchored to the field, unless the field's own context menu has taken the right click or key, and returns focus to the field when it closes.
 The tab menu is built from the shell's groups in `shell.tab` the same way, for the tab it was opened on: Keep open, Move to, Split and Dock, Move left and Move right, then the close commands.
 Rows that can never apply to that tab are left out, such as Keep open on a kept tab and Move to, Split and Dock on a document.

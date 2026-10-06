@@ -277,6 +277,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.readSpellingChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.spelling.toJson());
     this.electron.ipcMain.on(Resources.spellingChannel, (event, isChecking, languages) => this.keepSpelling(event, isChecking, languages));
     this.electron.ipcMain.handle(Resources.replaceMisspellingChannel, (event, text) => this.replaceMisspelling(event, text));
+    this.electron.ipcMain.handle(Resources.addToDictionaryChannel, (event, word) => this.addToDictionary(event, word));
     this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
     this.electron.ipcMain.handle(Resources.updateSaveAnswerChannel, (event, requestId, problems) => this.findTrusted(event)?.updateSaves.answer(requestId, problems) ?? false);
@@ -367,6 +368,10 @@ export class DesktopApplication {
       return false;
     open.window.webContents.replaceMisspelling(text);
     return true;
+  }
+
+  private addToDictionary(event: IIpcEvent, word: unknown): boolean {
+    return !Object.isNull(this.findTrusted(event)) && Object.isString(word) && Resources.dictionaryWordPattern.test(word) && this.spelling.addWord(word);
   }
 
   private forwardFieldMenu(open: OpenWindow, params: IContextMenuParams): void {

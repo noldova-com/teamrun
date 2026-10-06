@@ -1667,7 +1667,7 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async forwardsEachMenuOfItsOwnWindowAndReplacesAWordOnlyForIt(): Promise<void> {
+  public async forwardsEachMenuOfItsOwnWindowAndReplacesOrAddsAWordOnlyForIt(): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
     const trusted = DesktopStartFixture.trustedEvent("linux");
     const untrusted = { sender: { id: 1 }, senderFrame: null };
@@ -1681,15 +1681,21 @@ export class DesktopApplicationTests {
       electron.ipcMain.invoke("teamrun:replaceMisspelling", untrusted, "world"),
       electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, ""),
       electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, 5),
-      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, "x".repeat(101))
+      electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, "x".repeat(101)),
+      electron.ipcMain.invoke("teamrun:addToDictionary", trusted, "TeamRun"),
+      electron.ipcMain.invoke("teamrun:addToDictionary", untrusted, "TeamRun"),
+      electron.ipcMain.invoke("teamrun:addToDictionary", trusted, "two words"),
+      electron.ipcMain.invoke("teamrun:addToDictionary", trusted, "x".repeat(101)),
+      electron.ipcMain.invoke("teamrun:addToDictionary", trusted, 5)
     ];
 
     Assert.areEqual(JSON.stringify([
       ["teamrun:fieldMenu", { x: 10, y: 20, isKeyboard: false, word: "wrold", suggestions: ["world", "wold"] }],
       ["teamrun:fieldMenu", { x: 3, y: 4, isKeyboard: true, word: "", suggestions: [] }]
     ]), JSON.stringify(contents.sent.filter(t => t[0] === "teamrun:fieldMenu")));
-    Assert.areEqual("true,false,false,false,false", answers.join(","));
+    Assert.areEqual("true,false,false,false,false,true,false,false,false,false", answers.join(","));
     Assert.areEqual("replaceMisspelling world", contents.calls.filter(t => t.startsWith("replace")).join("|"));
+    Assert.areEqual("add TeamRun", electron.defaultSession.spellCalls.filter(t => t.startsWith("add")).join("|"));
   }
 
   @TestMethod

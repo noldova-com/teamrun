@@ -65,7 +65,7 @@ describe("ShellCommandsService", () => {
 
   const tab = (key: string): JsonValue => ({ tab: key });
 
-  it("replaces the misspelled word in the field that had focus, enabled only with its replacement", async () => {
+  it("replaces the misspelled word in the field that had focus and adds a word to the dictionary, each enabled only with its word", async () => {
     const host = document.createElement("div");
     host.innerHTML = "<input type=\"text\" value=\"Meetng notes\"><div class=\"cdk-overlay-container\"><button type=\"button\">Meeting</button></div>";
     document.body.append(host);
@@ -75,15 +75,22 @@ describe("ShellCommandsService", () => {
     row.focus();
 
     const replaceEnabled = [null, {}, { text: "" }, { text: "Meeting" }].map(t => enabled("shell.replaceMisspelling", t));
+    const addEnabled = [null, {}, { word: "" }, { word: "Meetng" }].map(t => enabled("shell.addToDictionary", t));
     await runAsync("shell.replaceMisspelling", { text: "Meeting" });
     const focusAfterReplace = document.activeElement;
     await runAsync("shell.replaceMisspelling", {});
+    row.focus();
+    await runAsync("shell.addToDictionary", { word: "Meetng" });
+    const focusAfterAdd = document.activeElement;
+    await runAsync("shell.addToDictionary", null);
     host.remove();
     await runAsync("shell.replaceMisspelling", { text: "Meeting" });
 
     expect(replaceEnabled).toEqual([false, false, false, true]);
-    expect(focusAfterReplace).toBe(field);
+    expect(addEnabled).toEqual([false, false, false, true]);
+    expect([focusAfterReplace, focusAfterAdd]).toEqual([field, field]);
     expect(bridge.replacements).toEqual(["Meeting"]);
+    expect(bridge.addedWords).toEqual(["Meetng"]);
   });
 
   it("offers the shell's tab and layout commands, each with a title and an icon and none with a default key", () => {
@@ -92,7 +99,7 @@ describe("ShellCommandsService", () => {
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
       "shell.dockTabBottom", "shell.moveTabToGroup", "shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
-      "shell.copy", "shell.paste", "shell.selectAll", "shell.replaceMisspelling", "shell.showCommands", "shell.openSettings", "shell.installCommand", "shell.openModules", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft",
+      "shell.copy", "shell.paste", "shell.selectAll", "shell.replaceMisspelling", "shell.addToDictionary", "shell.showCommands", "shell.openSettings", "shell.installCommand", "shell.openModules", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft",
       "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
       "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
