@@ -5812,6 +5812,11 @@ export declare class ShellSettings {
   public static readonly spellCheckLanguages: QualifiedName;
 
   /**
+   * Whether the desktop checks for updates by itself, a device setting, `shell.updateChecks`.
+   */
+  public static readonly updateChecks: QualifiedName;
+
+  /**
    * The shell's setting definitions, in the order Settings shows them. The tray icon's title names the place the
    * platform shows it, the notification area on Windows, the menu bar on macOS and the tray elsewhere, and it is on
    * by default except on macOS.
