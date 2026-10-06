@@ -9,11 +9,12 @@
 import { Component, signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
-import { DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, DefaultTheme, ThemeMode } from "@noldova/teamrun-shell-ui";
 
 import { WorkspaceComponent } from "../../../../src/app/components/workspace/workspace.component";
 import { DockSide } from "../../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../../src/app/enums/panel-edge";
+import { SplitAxis } from "../../../../src/app/enums/split-axis";
 import { Layout } from "../../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
 import { LayoutService } from "../../../../src/app/services/layout.service";
@@ -22,6 +23,7 @@ import { WindowPartHostService } from "../../../../src/app/services/window-part-
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
+import { FixtureTheme } from "../../../../../ui/tests/fixtures/fixture-theme";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { WindowPartHostFixture } from "../../../fixtures/window-part-host.fixture";
 
@@ -216,6 +218,34 @@ describe("WorkspaceComponent", () => {
     const [, , width, height] = boundsOf(groupsOf(fixture)[0] ?? fixture.nativeElement);
     AppearanceFixture.expectPixels(width ?? 0, 800 - 2 * AppearanceFixture.toPixels(0.25));
     AppearanceFixture.expectPixels(height ?? 0, 500 - AppearanceFixture.toPixels(0.25));
+  });
+
+  it("takes its dock sizes, minimums, strip and gaps from the theme's look and lays out again when the theme changes", async () => {
+    const fixture = await renderAsync(LayoutFixture.createRegistry());
+    const appearance = TestBed.inject(AppearanceService);
+    const layout = TestBed.inject(LayoutService);
+    fixture.componentInstance.width.set(2000);
+    await settleAsync(fixture);
+    const shown = (): readonly number[] => {
+      const geometry = layout.geometry();
+      const metrics = geometry.metrics;
+      return [geometry.dock(DockSide.Left).x, geometry.dock(DockSide.Left).width, geometry.dock(DockSide.Right).width, metrics.gap, metrics.dockMinimum, metrics.strip,
+        metrics.documentMinimum, metrics.groupMinimums[SplitAxis.Horizontal], metrics.groupMinimums[SplitAxis.Vertical], metrics.dockSizes[DockSide.Bottom]];
+    };
+    const standard = shown();
+
+    appearance.setTheme(FixtureTheme.theme);
+    await settleAsync(fixture);
+    const themed = shown();
+    const [x, , width] = boundsOf(groupsOf(fixture).find(t => t.classList.contains("tr-panel-card-shell")) ?? fixture.nativeElement);
+    appearance.setTheme(DefaultTheme.theme);
+    await settleAsync(fixture);
+
+    expect(standard).toEqual([0.25, 26, 25, 0.25, 10, 2.75, 13.75, 10, 6.25, 16.25]);
+    expect(themed).toEqual([0.375, 20, 18, 0.375, 8, 3, 11, 8.5, 5, 12]);
+    AppearanceFixture.expectPixels(x ?? 0, AppearanceFixture.toPixels(0.375));
+    AppearanceFixture.expectPixels(width ?? 0, AppearanceFixture.toPixels(20));
+    expect(shown()).toEqual(standard);
   });
 
   it("shows docked groups on the shell surface and leaves the documents without the empty-window card", async () => {

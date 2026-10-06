@@ -18,6 +18,7 @@ import { DockYield } from "./dock-yield";
 import type { GroupFrame } from "./group-frame";
 import type { Layout } from "./layout";
 import { LayoutFit } from "./layout-fit";
+import type { LayoutMetrics } from "./layout-metrics";
 import type { SplitHandle } from "./split-handle";
 import type { ViewRegistry } from "./view-registry";
 
@@ -32,22 +33,23 @@ export class LayoutGeometry {
   private readonly iconSides: ReadonlySet<DockSide>;
   private readonly yielded: DockYield;
   private readonly railBounds: ReadonlyMap<DockSide, Bounds>;
+  public readonly metrics: LayoutMetrics;
   public readonly area: Bounds;
   public readonly middle: Bounds;
   public readonly frames: readonly GroupFrame[];
   public readonly handles: readonly SplitHandle[];
 
-  public constructor(width: number, height: number, layout: Layout, registry: ViewRegistry, iconSides: ReadonlySet<DockSide> = new Set(), yielded: DockYield = DockYield.none) {
+  public constructor(width: number, height: number, layout: Layout, registry: ViewRegistry, metrics: LayoutMetrics, iconSides: ReadonlySet<DockSide> = new Set(), yielded: DockYield = DockYield.none) {
     const visible = layout.withVisibleTabs(registry);
-    const margin = Resources.panelMargin;
-    const gap = Resources.panelGap;
+    const margin = metrics.margin;
+    const gap = metrics.gap;
     const sides = [visible.dock(DockSide.Left), visible.dock(DockSide.Right)];
     const railed = new Set(sides.filter(t => iconSides.has(t.side) && !Object.isNull(t.root)).map(t => t.side));
-    const rail = (side: DockSide): number => railed.has(side) ? Resources.dockStripSize + gap : 0;
+    const rail = (side: DockSide): number => railed.has(side) ? metrics.strip + gap : 0;
     const isFull = visible.bottomSpan === BottomDockSpan.Full;
-    const across = LayoutFit.of(width, 2 * margin + rail(DockSide.Left) + rail(DockSide.Right), sides, visible.middle.minimumLength(SplitAxis.Horizontal), railed, yielded);
-    const upright = Math.max(visible.middle.minimumLength(SplitAxis.Vertical), ...(isFull ? this.uprightMinimums(sides, across) : []));
-    const down = LayoutFit.of(height, margin, [visible.dock(DockSide.Bottom)], upright);
+    const across = LayoutFit.of(width, 2 * margin + rail(DockSide.Left) + rail(DockSide.Right), sides, visible.middle.minimumLength(SplitAxis.Horizontal, metrics), metrics, railed, yielded);
+    const upright = Math.max(visible.middle.minimumLength(SplitAxis.Vertical, metrics), ...(isFull ? this.uprightMinimums(sides, across, metrics) : []));
+    const down = LayoutFit.of(height, margin, [visible.dock(DockSide.Bottom)], upright, metrics);
     const inner = Math.max(0, height - margin);
     const sideHeight = isFull ? down.middle : inner;
     const left = Math.max(0, across.track(DockSide.Left) - gap);
@@ -66,15 +68,16 @@ export class LayoutGeometry {
     this.area = area;
     this.iconSides = iconSides;
     this.yielded = yielded;
-    this.railBounds = new Map([...railed].map(t => [t, new Bounds(t === DockSide.Left ? margin : width - margin - Resources.dockStripSize, 0, Resources.dockStripSize, sideHeight)]));
+    this.metrics = metrics;
+    this.railBounds = new Map([...railed].map(t => [t, new Bounds(t === DockSide.Left ? margin : width - margin - metrics.strip, 0, metrics.strip, sideHeight)]));
     this.dockBounds = {
       [DockSide.Left]: new Bounds(margin + rail(DockSide.Left), 0, left, sideHeight),
       [DockSide.Right]: new Bounds(width - margin - rail(DockSide.Right) - right, 0, right, sideHeight),
       [DockSide.Bottom]: new Bounds(bottomSpan.x, middle.bottom + gap, bottomSpan.width, Math.max(0, down.track(DockSide.Bottom) - gap))
     };
     for (const dock of visible.docks.filter(t => !this.isCollapsed(t.side)))
-      dock.root?.arrange(this.dockBounds[dock.side], dock.side, frames, handles);
-    visible.middle.arrange(middle, null, frames, handles);
+      dock.root?.arrange(this.dockBounds[dock.side], dock.side, frames, handles, metrics);
+    visible.middle.arrange(middle, null, frames, handles, metrics);
     this.middle = middle;
     this.frames = frames;
     this.handles = handles;
@@ -97,7 +100,7 @@ export class LayoutGeometry {
   }
 
   public withBottomSpan(span: BottomDockSpan): LayoutGeometry {
-    return span === this.layout.bottomSpan ? this : new LayoutGeometry(this.width, this.height, this.layout.withBottomSpan(span), this.registry, this.iconSides, this.yielded);
+    return span === this.layout.bottomSpan ? this : new LayoutGeometry(this.width, this.height, this.layout.withBottomSpan(span), this.registry, this.metrics, this.iconSides, this.yielded);
   }
 
   public isShown(side: DockSide): boolean {
@@ -120,13 +123,13 @@ export class LayoutGeometry {
     const dock = this.layout.dock(side);
     const edge = Resources.dockEdges[side];
     if (this.isShown(side) && !this.isCollapsed(side))
-      return this.dock(side).edgeHalf(edge);
+      return this.dock(side).edgeHalf(edge, this.metrics.gap);
     const span = this.spanOf(side);
-    return span.edgeStrip(edge, Math.min(span.length(dock.axis), dock.size ?? Resources.defaultDockSizes[side]));
+    return span.edgeStrip(edge, Math.min(span.length(dock.axis), dock.size ?? this.metrics.dockSizes[side]));
   }
 
-  private uprightMinimums(sides: readonly Dock[], across: LayoutFit): readonly number[] {
-    return sides.flatMap(t => Object.isNull(t.root) || t.isCollapsed || across.isCollapsed(t.side) ? [] : [t.root.minimumLength(SplitAxis.Vertical)]);
+  private uprightMinimums(sides: readonly Dock[], across: LayoutFit, metrics: LayoutMetrics): readonly number[] {
+    return sides.flatMap(t => Object.isNull(t.root) || t.isCollapsed || across.isCollapsed(t.side) ? [] : [t.root.minimumLength(SplitAxis.Vertical, metrics)]);
   }
 
   private spanOf(side: DockSide): Bounds {
@@ -139,7 +142,7 @@ export class LayoutGeometry {
   }
 
   private railTrack(side: DockSide): number {
-    return this.railBounds.has(side) ? Resources.dockStripSize + Resources.panelGap : 0;
+    return this.railBounds.has(side) ? this.metrics.strip + this.metrics.gap : 0;
   }
 
   private fitOf(side: DockSide): LayoutFit {

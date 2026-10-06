@@ -14,6 +14,7 @@ import type { PanelEdge } from "../../enums/panel-edge";
 import type { SplitAxis } from "../../enums/split-axis";
 import type { Bounds } from "./bounds";
 import type { GroupFrame } from "./group-frame";
+import type { LayoutMetrics } from "./layout-metrics";
 import type { SplitHandle } from "./split-handle";
 import type { SplitNode } from "./split.node";
 import type { TabGroup } from "./tab-group";
@@ -35,7 +36,7 @@ export abstract class LayoutNode {
 
   public abstract get cornerGroup(): TabGroup;
 
-  public abstract minimumLength(axis: SplitAxis): number;
+  public abstract minimumLength(axis: SplitAxis, metrics: LayoutMetrics): number;
 
   public abstract withGroup(group: TabGroup): LayoutNode;
 
@@ -47,7 +48,7 @@ export abstract class LayoutNode {
 
   public abstract withVisibleTabs(registry: ViewRegistry): LayoutNode | null;
 
-  public abstract arrange(bounds: Bounds, side: DockSide | null, frames: GroupFrame[], handles: SplitHandle[]): void;
+  public abstract arrange(bounds: Bounds, side: DockSide | null, frames: GroupFrame[], handles: SplitHandle[], metrics: LayoutMetrics): void;
 
   public abstract toJson(): JsonObject;
 }

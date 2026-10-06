@@ -10,6 +10,7 @@ import type { JsonObject } from "@noldova/teamrun-foundation-json";
 
 import { Resources } from "../../../resources";
 import type { SplitAxis } from "../../enums/split-axis";
+import type { LayoutMetrics } from "./layout-metrics";
 import type { Tab } from "./tab";
 import { TabGroup } from "./tab-group";
 
@@ -30,8 +31,8 @@ export class DocumentGroup extends TabGroup {
     return true;
   }
 
-  public override minimumLength(axis: SplitAxis): number {
-    return Math.max(super.minimumLength(axis), Resources.documentMinimumSize);
+  public override minimumLength(axis: SplitAxis, metrics: LayoutMetrics): number {
+    return Math.max(super.minimumLength(axis, metrics), metrics.documentMinimum);
   }
 
   public override toJson(): JsonObject {

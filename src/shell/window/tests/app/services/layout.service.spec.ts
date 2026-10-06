@@ -12,8 +12,10 @@ import { TestBed } from "@angular/core/testing";
 import { BottomDockSpan } from "../../../src/app/enums/bottom-dock-span";
 import { DockSide } from "../../../src/app/enums/dock-side";
 import { PanelEdge } from "../../../src/app/enums/panel-edge";
+import { SplitAxis } from "../../../src/app/enums/split-axis";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { Layout } from "../../../src/app/models/layout/layout";
+import { LayoutMetrics } from "../../../src/app/models/layout/layout-metrics";
 import { LayoutReader } from "../../../src/app/models/layout/layout.reader";
 import { ToolbarLayout } from "../../../src/app/models/layout/toolbar-layout";
 import { ViewTab } from "../../../src/app/models/layout/view-tab";
@@ -24,6 +26,7 @@ import { LayoutService } from "../../../src/app/services/layout.service";
 import { Resources } from "../../../src/resources";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../fixtures/layout-metrics.fixture";
 
 describe("LayoutService", () => {
   let bridge: DesktopBridgeFixture;
@@ -43,6 +46,7 @@ describe("LayoutService", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     service = TestBed.inject(LayoutService);
+    service.setMetrics(LayoutMetricsFixture.standard);
     store = TestBed.inject(LayoutStoreService);
     service.setRegistry(registry);
   });
@@ -70,6 +74,20 @@ describe("LayoutService", () => {
 
     expect(service.geometry().middle.width).toBeGreaterThan(0);
     expect(service.geometry().frames.map(t => t.group.id)).toEqual([0]);
+  });
+
+  it("lays out again with the metrics it is given, and resizes a dock to no less than their dock minimum", async () => {
+    await loadAsync(Layout.createDefault(registry));
+    service.setViewport(120, 60);
+    service.resizeDock(DockSide.Bottom, 4);
+    const standard = [service.geometry().dock(DockSide.Left).width, service.geometry().dock(DockSide.Right).width, service.layout().dock(DockSide.Bottom).size];
+
+    service.setMetrics(new LayoutMetrics(0.5, 0.5, 8, 3, 12, { [SplitAxis.Horizontal]: 9, [SplitAxis.Vertical]: 5 }, { [DockSide.Left]: 20, [DockSide.Right]: 18, [DockSide.Bottom]: 12 }));
+    service.resizeDock(DockSide.Bottom, 4);
+
+    expect(standard).toEqual([26, 25, 10]);
+    expect([service.geometry().dock(DockSide.Left).width, service.geometry().dock(DockSide.Right).width, service.layout().dock(DockSide.Bottom).size]).toEqual([20, 18, 8]);
+    expect(service.geometry().dock(DockSide.Left).x).toBe(0.5);
   });
 
   it("opens again in the restored layout the documents the person opened before it, the last one active, and changes nothing else", async () => {

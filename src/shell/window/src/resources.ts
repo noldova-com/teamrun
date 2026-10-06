@@ -30,22 +30,23 @@ export class Resources {
   public static readonly windowPartSourcesToken: string = "The build's window parts";
   public static readonly documentsGroupId: number = 0;
   public static readonly layoutFormatVersion: number = 1;
-  public static readonly panelGap: number = 0.25;
-  public static readonly panelMargin: number = 0.25;
-  public static readonly dockMinimumSize: number = 10;
-  public static readonly dockStripSize: number = 2.75;
-  public static readonly documentMinimumSize: number = 13.75;
   public static readonly middlePreferredSize: number = 30;
   public static readonly dockReopenMargin: number = 2;
-  public static readonly groupMinimumLengths: Readonly<Record<SplitAxis, number>> = {
-    [SplitAxis.Horizontal]: 10,
-    [SplitAxis.Vertical]: 6.25
+  public static readonly panelGapLook: string = "panel-card-gap";
+  public static readonly panelMarginLook: string = "panel-card-margin";
+  public static readonly dockMinimumLook: string = "dock-min-size";
+  public static readonly dockStripLook: string = "dock-strip-size";
+  public static readonly documentMinimumLook: string = "document-min-size";
+  public static readonly groupMinimumLooks: Readonly<Record<SplitAxis, string>> = {
+    [SplitAxis.Horizontal]: "group-min-width",
+    [SplitAxis.Vertical]: "group-min-height"
   };
-  public static readonly defaultDockSizes: Readonly<Record<DockSide, number>> = {
-    [DockSide.Left]: 26,
-    [DockSide.Right]: 25,
-    [DockSide.Bottom]: 16.25
+  public static readonly dockSizeLooks: Readonly<Record<DockSide, string>> = {
+    [DockSide.Left]: "dock-left-width",
+    [DockSide.Right]: "dock-right-width",
+    [DockSide.Bottom]: "dock-bottom-height"
   };
+  public static readonly lookProbeElement: string = "div";
   public static readonly dockEdges: Readonly<Record<DockSide, PanelEdge>> = {
     [DockSide.Left]: PanelEdge.Left,
     [DockSide.Right]: PanelEdge.Right,
@@ -873,6 +874,10 @@ export class Resources {
 
   public static formatRecordingLabel(title: string, hint: string): string {
     return `${hint} for ${title}`;
+  }
+
+  public static formatLookValue(name: string): string {
+    return `var(--tr-${name})`;
   }
 
   public static formatRemoveKeyLabel(title: string): string {

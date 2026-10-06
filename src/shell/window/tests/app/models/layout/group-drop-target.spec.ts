@@ -12,11 +12,12 @@ import { Layout } from "../../../../src/app/models/layout/layout";
 import { LayoutGeometry } from "../../../../src/app/models/layout/layout-geometry";
 import { TabDropTarget } from "../../../../src/app/models/layout/tab-drop-target";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("GroupDropTarget", () => {
   const registry = LayoutFixture.createRegistry();
   const layout = Layout.createDefault(registry).openDocument(LayoutFixture.plan).openDocument(LayoutFixture.todo);
-  const geometry = new LayoutGeometry(120, 60, layout, registry);
+  const geometry = new LayoutGeometry(120, 60, layout, registry, LayoutMetricsFixture.standard);
 
   it("moves the tab to the end of the group and previews the whole group", () => {
     expect(new GroupDropTarget(0).place(layout, LayoutFixture.plan).documents.tabs).toEqual([LayoutFixture.todo, LayoutFixture.plan]);

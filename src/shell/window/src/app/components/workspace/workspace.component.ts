@@ -12,6 +12,7 @@ import { AppearanceService } from "@noldova/teamrun-shell-ui";
 
 import { DockSide } from "../../enums/dock-side";
 import type { GroupFrame } from "../../models/layout/group-frame";
+import { LayoutMetrics } from "../../models/layout/layout-metrics";
 import { LayoutService } from "../../services/layout.service";
 import { StartupService } from "../../services/startup.service";
 import { TabFocusService } from "../../services/tab-focus.service";
@@ -61,6 +62,10 @@ export class WorkspaceComponent {
     observer.observe(this.element);
     inject(DestroyRef).onDestroy(() => observer.disconnect());
     effect(() => {
+      appearance.theme();
+      this.layout.setMetrics(this.measure(appearance.typography().rootSize));
+    });
+    effect(() => {
       const rem = appearance.typography().rootSize;
       this.layout.setViewport(this.width() / rem, this.height() / rem);
     });
@@ -86,6 +91,14 @@ export class WorkspaceComponent {
 
   protected isEmptyDocuments(frame: GroupFrame): boolean {
     return frame.group.isDocuments && this.layout.registry().views.length === 0;
+  }
+
+  private measure(rootSize: number): LayoutMetrics {
+    const probe = this.element.ownerDocument.createElement(Resources.lookProbeElement);
+    this.element.append(probe);
+    const metrics = LayoutMetrics.measure(probe, rootSize);
+    probe.remove();
+    return metrics;
   }
 
   private restoreFocus(): void {
