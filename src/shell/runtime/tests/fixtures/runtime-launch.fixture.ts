@@ -12,6 +12,7 @@ import path from "node:path";
 import { Wait } from "@noldova/teamrun-foundation-testing";
 import { ClientSettings, DataDirectory, DiscoveryReader, LaunchSettings, OwnershipLock, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
+import { RecordingStarterFixture } from "./recording-starter.fixture.js";
 import { SocketFolderFixture } from "./socket-folder.fixture.js";
 
 export class RuntimeLaunchFixture implements AsyncDisposable {
@@ -21,6 +22,7 @@ export class RuntimeLaunchFixture implements AsyncDisposable {
   private readonly root: string;
 
   public readonly dataDirectory: DataDirectory;
+  public readonly starter: RecordingStarterFixture = new RecordingStarterFixture();
 
   private constructor(root: string) {
     this.root = root;
@@ -66,16 +68,11 @@ export class RuntimeLaunchFixture implements AsyncDisposable {
   }
 
   public async [Symbol.asyncDispose](): Promise<void> {
-    await Wait.untilAsync(async () => {
-      if (!OwnershipLock.isOwned(this.dataDirectory))
-        return true;
-      const discovery = await DiscoveryReader.readAsync(this.dataDirectory).catch(() => null);
-      if (discovery !== null && RuntimeLaunchFixture.isRunning(discovery.processId)) {
-        process.kill(discovery.processId);
-        await RuntimeLaunchFixture.waitForExitAsync(discovery.processId);
-      }
-      return false;
-    }, RuntimeLaunchFixture.EXIT_TIMEOUT);
+    const running = await this.starter.stopAsync(RuntimeLaunchFixture.EXIT_TIMEOUT);
+    if (running.length > 0)
+      throw new Error(`The runtime processes ${running.join(", ")} were still running ${RuntimeLaunchFixture.EXIT_TIMEOUT} ms after they were killed, so ${this.root} was kept.`);
+    if (OwnershipLock.isOwned(this.dataDirectory))
+      throw new Error(`A process the fixture did not start owns ${this.dataDirectory.root}, so ${this.root} was kept.`);
     await rm(this.root, { recursive: true, force: true, maxRetries: 20, retryDelay: RuntimeLaunchFixture.POLL_INTERVAL });
   }
 }
