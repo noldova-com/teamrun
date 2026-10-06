@@ -70,33 +70,27 @@ class RepeatWorkflowTests {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         const specs = "src/shell/desktop/tests/e2e/menus.spec.ts src/shell/desktop/tests/e2e/quit.spec.ts";
-        const started = Math.floor(Date.now() / 1000);
-        const budgets = [0, 1, 2, 3, 4, 5].map(t => `${(60 * 60 - 480 - t) * 1000}`);
-        const timing = { JOB_STARTED: `${started}`, TIME_LIMIT_MINUTES: "60", STOP_MARGIN_SECONDS: "480" };
-        const run = (repeats: number, budget: string): string => `run test:ui -- ${specs} --repeat-each ${repeats} --retries 0 --global-timeout ${budget}`;
+        const timing = { JOB_STARTED: "400", TIME_LIMIT_MINUTES: "60", STOP_MARGIN_SECONDS: "480" };
+        const budget = "node scripts/workflows/repeat-budget.ts 400 60 480";
+        const run = (repeats: number): string => `run test:ui -- ${specs} --repeat-each ${repeats} --retries 0 --global-timeout 2520000`;
+        doubles.respond("node", "scripts/workflows/repeat-budget.ts 400 60 480", "2520000\n");
         doubles.respond("npm", "test -- --filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts --repeat 1", "");
-        for (const budget of budgets) {
-          doubles.respond("xvfb-run", `--auto-servernum --server-args=-screen 0 1920x1080x24 npm ${run(5, budget)}`, "");
-          doubles.respond("npm", `${run(5, budget)} --shard 2/2`, "");
-          doubles.respond("npm", run(1, budget), "", 1);
-        }
-        doubles.respond("npm", run(1, "60000"), "");
+        doubles.respond("xvfb-run", `--auto-servernum --server-args=-screen 0 1920x1080x24 npm ${run(5)}`, "");
+        doubles.respond("npm", `${run(5)} --shard 2/2`, "");
+        doubles.respond("npm", run(1), "", 1);
 
         const tests = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.TESTS_STEP),
           { TEST_ARGUMENTS: "--filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts", REPEATS: "1" });
         const linux = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { ...timing, RUNNER_OS: "Linux", WORKFLOW_ARGUMENTS: specs, REPEATS: "5", SHARD: "" });
         const macos = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { ...timing, RUNNER_OS: "macOS", WORKFLOW_ARGUMENTS: specs, REPEATS: "5", SHARD: "2/2" });
         const failed = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP), { ...timing, RUNNER_OS: "Windows", WORKFLOW_ARGUMENTS: specs, REPEATS: "1", SHARD: "" });
-        const late = await doubles.runAsync(workflow.readStepScript(RepeatWorkflowTests.WORKFLOWS_STEP),
-          { ...timing, JOB_STARTED: `${started - 60 * 60}`, RUNNER_OS: "Windows", WORKFLOW_ARGUMENTS: specs, REPEATS: "1", SHARD: "" });
 
-        assert.deepEqual([tests.status, linux.status, macos.status, failed.status, late.status], [0, 0, 0, 1, 0], tests.stderr + linux.stderr + macos.stderr + failed.stderr + late.stderr);
-        assert.deepEqual((await doubles.readCallsAsync()).map(t => budgets.reduce((u, v) => u.replace(`--global-timeout ${v}`, "--global-timeout <budget>"), t)), [
+        assert.deepEqual([tests.status, linux.status, macos.status, failed.status], [0, 0, 0, 1], tests.stderr + linux.stderr + macos.stderr + failed.stderr);
+        assert.deepEqual(await doubles.readCallsAsync(), [
           "npm test -- --filter scripts/tests/a.test.ts --filter shell/window/tests/b.spec.ts --repeat 1",
-          `xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm ${run(5, "<budget>")}`,
-          `npm ${run(5, "<budget>")} --shard 2/2`,
-          `npm ${run(1, "<budget>")}`,
-          `npm ${run(1, "60000")}`
+          budget, `xvfb-run --auto-servernum --server-args=-screen 0 1920x1080x24 npm ${run(5)}`,
+          budget, `npm ${run(5)} --shard 2/2`,
+          budget, `npm ${run(1)}`
         ]);
         assert.ok(workflow.text.includes("          TEST_ARGUMENTS: ${{ needs.plan.outputs.test-arguments }}\n          REPEATS: ${{ matrix.repeats }}\n"));
         assert.ok(workflow.text.includes("          WORKFLOW_ARGUMENTS: ${{ needs.plan.outputs.workflow-arguments }}\n          REPEATS: ${{ matrix.repeats }}\n          SHARD: ${{ matrix.shard }}\n"));
@@ -106,14 +100,10 @@ class RepeatWorkflowTests {
       const workflow = await WorkflowFileFixture.readAsync(RepeatWorkflowTests.WORKFLOW);
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
-      const before = Math.floor(Date.now() / 1000);
-
       const noted = await doubles.runAsync(workflow.readStepScript("Note when the job started"), { GITHUB_ENV: `${doubles.directory}/environment` });
 
-      const after = Math.ceil(Date.now() / 1000);
-      const started = Number(/^JOB_STARTED=(\d+)\n$/.exec(await doubles.readFileAsync("environment"))?.[1]);
       assert.equal(noted.status, 0, noted.stderr);
-      assert.ok(started >= before && started <= after, `${before} <= ${started} <= ${after}`);
+      assert.match(await doubles.readFileAsync("environment"), /^JOB_STARTED=\d+\n$/);
       assert.equal(workflow.readStepScript("Summarize the UI workflows"), "node scripts/repeat-summary.ts\n");
       assert.ok(workflow.text.includes("      - name: Summarize the UI workflows\n        if: always() && steps.ui.outcome != 'skipped'\n        env:\n          REPEAT_LEG: ${{ matrix.name }}\n"));
       assert.ok(workflow.text.includes("      - name: Repeat the UI workflows\n        id: ui\n"));

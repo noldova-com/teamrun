@@ -135,11 +135,8 @@ jobs:
           REPEATS: ${{ matrix.repeats }}
           SHARD: ${{ matrix.shard }}
         run: |
-          budget=$(( TIME_LIMIT_MINUTES * 60 - ($(date +%s) - JOB_STARTED) - STOP_MARGIN_SECONDS ))
-          if [ "$budget" -lt 60 ]; then
-            budget=60
-          fi
-          set -- $WORKFLOW_ARGUMENTS --repeat-each "$REPEATS" --retries 0 --global-timeout "$(( budget * 1000 ))"
+          budget=$(node scripts/workflows/repeat-budget.ts "$JOB_STARTED" "$TIME_LIMIT_MINUTES" "$STOP_MARGIN_SECONDS")
+          set -- $WORKFLOW_ARGUMENTS --repeat-each "$REPEATS" --retries 0 --global-timeout "$budget"
           if [ -n "$SHARD" ]; then
             set -- "$@" --shard "$SHARD"
           fi
