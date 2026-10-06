@@ -52,8 +52,9 @@ export class Resources {
   public static readonly activateMember: "activateAsync" = "activateAsync";
   public static readonly deactivateMember: "deactivateAsync" = "deactivateAsync";
 
-  public static readonly ownCommands: ReadonlyMap<string, CliCommand> = new Map(Object.values(CliCommand)
-    .flatMap(t => CommandLineNames.ownCommands.filter(u => u === t.toLowerCase()).map(u => [u, t] satisfies [string, CliCommand])));
+  public static readonly ownCommands: ReadonlyMap<string, Exclude<CliCommand, CliCommand.Module>> = new Map(Object.values(CliCommand)
+    .filter((t): t is Exclude<CliCommand, CliCommand.Module> => t !== CliCommand.Module)
+    .flatMap(t => CommandLineNames.ownCommands.filter(u => u === t.toLowerCase()).map(u => [u, t] satisfies [string, Exclude<CliCommand, CliCommand.Module>])));
   public static readonly flagPrefix: string = "--";
   public static readonly dataDirectoryFlag: string = `${Resources.flagPrefix}${CommandLineNames.dataDirectory}`;
   public static readonly deviceDirectoryFlag: string = `${Resources.flagPrefix}${CommandLineNames.deviceDirectory}`;

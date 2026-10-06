@@ -39,4 +39,14 @@ export class ResourcesTests {
     for (const part of parts)
       Assert.isTrue(help.output.includes(part), part);
   }
+
+  @TestMethod
+  public async takesEachNameTheBuildReservesAsItsOwnCommand(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    const names = ["status", "commands", "run", "open", "help"];
+
+    const results = await Promise.all(names.map(t => fixture.runAsync([t, "--frobnicate"])));
+
+    Assert.areEqual(JSON.stringify(names.map(() => [2, true])), JSON.stringify(results.map(t => [t.code, t.error.startsWith("\"--frobnicate\" is not an option.\n")])));
+  }
 }
