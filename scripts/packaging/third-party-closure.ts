@@ -47,7 +47,7 @@ export default class ThirdPartyClosure {
   }
 
   public collect(manifests: readonly PackageManifest[]): readonly LockedPackage[] {
-    const found = new Map<string, LockedPackage>();
+    const found = new Map<string, readonly [LockedPackage, Readonly<Record<string, unknown>>]>();
     for (const manifest of manifests)
       for (const name of manifest.externalDependencies.keys()) {
         if (this.resolve(ThirdPartyClosure.ROOT, name) === null)
@@ -56,15 +56,14 @@ export default class ThirdPartyClosure {
       }
 
     const shipped = new Map<string, LockedPackage>();
-    for (const locked of found.values()) {
+    for (const [locked] of found.values()) {
       const other = shipped.get(locked.name);
       if (other === undefined)
         shipped.set(locked.name, locked);
       else if (other.version !== locked.version)
         throw new PackagingException(`The stage installs one version of each third-party package, but the shipped packages need ${other.id} at ${other.location} and ${locked.id} at ${locked.location}.`);
     }
-    for (const locked of found.values()) {
-      const entry = this.readEntry(locked.location);
+    for (const [locked, entry] of found.values()) {
       const optional = ThirdPartyClosure.readRecord(entry, "peerDependenciesMeta");
       const missing = Object.keys(ThirdPartyClosure.readRecord(entry, "peerDependencies"))
         .find(t => t !== ThirdPartyClosure.ELECTRON && !shipped.has(t) && ThirdPartyClosure.readRecord(optional, t)["optional"] !== true);
@@ -92,23 +91,23 @@ export default class ThirdPartyClosure {
     return required.length === 0 || required.includes(value);
   }
 
-  private visit(found: Map<string, LockedPackage>, from: string, name: string, isOptional: boolean): void {
-    const location = this.resolve(from, name);
-    if (location === null) {
+  private visit(found: Map<string, readonly [LockedPackage, Readonly<Record<string, unknown>>]>, from: string, name: string, isOptional: boolean): void {
+    const resolved = this.resolve(from, name);
+    if (resolved === null) {
       if (isOptional)
         return;
       throw new PackagingException(`${from} needs ${name}, which ${ThirdPartyClosure.LOCKFILE} does not lock.`);
     }
+    const [location, entry] = resolved;
     if (found.has(location))
       return;
-    const entry = this.readEntry(location);
     if (!this.fits(entry)) {
       if (isOptional)
         return;
       throw new PackagingException(`${location} in ${ThirdPartyClosure.LOCKFILE} does not run on ${this.target.id}, yet a shipped package needs it.`);
     }
 
-    found.set(location, new LockedPackage(location, entry));
+    found.set(location, [new LockedPackage(location, entry), entry]);
     const optional = Object.keys(ThirdPartyClosure.readRecord(entry, "optionalDependencies"));
     for (const dependency of Object.keys(ThirdPartyClosure.readRecord(entry, "dependencies")).filter(t => !optional.includes(t)))
       this.visit(found, location, dependency, false);
@@ -116,19 +115,15 @@ export default class ThirdPartyClosure {
       this.visit(found, location, dependency, true);
   }
 
-  private resolve(from: string, name: string): string | null {
+  private resolve(from: string, name: string): readonly [string, Readonly<Record<string, unknown>>] | null {
     const candidate = path.posix.join(from, ThirdPartyClosure.FOLDER, name);
-    if (ThirdPartyClosure.isRecord(this.packages[candidate]))
-      return candidate;
+    const entry = this.packages[candidate];
+    if (ThirdPartyClosure.isRecord(entry))
+      return [candidate, entry];
     if (from === ThirdPartyClosure.ROOT)
       return null;
     const parent = from.lastIndexOf(ThirdPartyClosure.NESTED_FOLDER);
     return this.resolve(parent < 0 ? ThirdPartyClosure.ROOT : from.slice(0, parent), name);
-  }
-
-  private readEntry(location: string): Readonly<Record<string, unknown>> {
-    const entry = this.packages[location];
-    return ThirdPartyClosure.isRecord(entry) ? entry : {};
   }
 
   private fits(entry: Readonly<Record<string, unknown>>): boolean {

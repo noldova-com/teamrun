@@ -68,9 +68,13 @@ export default class ThirdPartyPackage {
     catch (error) {
       throw new PackagingException(`The package.json in the tarball of ${locked.id} could not be read as JSON, so it cannot ship.`, { cause: error });
     }
-    if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest))
+    if (!ThirdPartyPackage.isRecord(manifest))
       throw new PackagingException(`The package.json in the tarball of ${locked.id} is not a JSON object, so it cannot ship.`);
     return manifest;
+  }
+
+  private static isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 
   private static async readReviewedAsync(locked: LockedPackage, reviewedLicenses: string): Promise<string> {
