@@ -62,6 +62,7 @@ export { DesktopApplication } from "../services/desktop-application.js";
 export { DesktopLog } from "../services/desktop-log.js";
 export { DetachedStart } from "../services/detached-start.js";
 export { DeviceIdentity } from "../services/device-identity.js";
+export { LinkPolicy } from "../services/link-policy.js";
 export { MainProcessRecovery } from "../services/main-process-recovery.js";
 export { OpenWindow } from "../services/open-window.js";
 export { PathCommand } from "../services/path-command.js";

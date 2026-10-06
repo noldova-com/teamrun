@@ -25,6 +25,8 @@ export interface IWindowPartHost {
 
   log(moduleId: string, message: string): void;
 
+  openLinkAsync(url: string): Promise<void>;
+
   isCommandRegistered(name: string): boolean;
 
   declaresDynamicMenuGroup(moduleId: string, group: string): boolean;

@@ -111,6 +111,10 @@ export class DesktopBridgeService implements ClipboardWriter {
     return this.bridge.openLogFolder();
   }
 
+  public openLinkAsync(url: string): Promise<boolean> {
+    return this.bridge.openLink(url);
+  }
+
   public installCommandAsync(): Promise<boolean> {
     return this.bridge.installCommand();
   }
@@ -180,6 +184,7 @@ export class DesktopBridgeService implements ClipboardWriter {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readBuild))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.copyText))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLogFolder))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLink))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.installCommand))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.keepAppearance))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onNotificationOpened))) &&
