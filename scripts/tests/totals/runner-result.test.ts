@@ -37,7 +37,7 @@ class RunnerResultTests {
       const totals = result.toTotals("package", "Package tests", { unit: "blocks", covered: 1, total: 2 }, ["@noldova/teamrun-foundation-alpha/alpha.test.js", "@noldova/teamrun-foundation-alpha/beta.test.js"]);
 
       assert.deepEqual(JSON.parse(totals.toJson()), {
-        version: 1,
+        version: 2,
         runner: "package",
         title: "Package tests",
         discovered: 9,

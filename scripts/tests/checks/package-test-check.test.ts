@@ -149,7 +149,7 @@ class PackageTestCheckTests {
 
       assert.deepEqual(recorded, [true, ""]);
       assert.deepEqual(totals, {
-        version: 1,
+        version: 2,
         runner: "package",
         title: "Package tests",
         discovered: 3,

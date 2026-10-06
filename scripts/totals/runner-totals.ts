@@ -19,7 +19,7 @@ import JsonFields from "./json-fields.ts";
 import TotalsException from "./totals.exception.ts";
 
 export default class RunnerTotals {
-  public static readonly VERSION: number = 1;
+  public static readonly VERSION: number = 2;
 
   private static readonly FOLDER_SEGMENTS: readonly string[] = ["_build", "totals"];
   private static readonly EXTENSION: string = ".json";
@@ -102,13 +102,13 @@ export default class RunnerTotals {
     return totals;
   }
 
-  public static formatTable(totals: readonly RunnerTotals[], rerunPassed: ReadonlyMap<string, number> = new Map()): string {
+  public static formatTable(totals: readonly RunnerTotals[], rerunPassed: ReadonlyMap<string, number>): string {
     const skips = totals.filter(t => t.skips.length > 0).map(t =>
       `\n<details><summary>${RunnerTotals.escape(t.title)} skipped (${t.skips.length})</summary>\n\n${t.skips.map(u => `- ${RunnerTotals.escape(u.test)}: ${RunnerTotals.escape(u.reason)}\n`).join("")}\n</details>\n`);
     return `${RunnerTotals.TABLE_HEADER}${totals.map(t => `| ${RunnerTotals.escape(t.title)} | ${t.discovered} | ${t.executed} | ${t.passed} | ${t.failed}${RunnerTotals.formatRerun(rerunPassed.get(t.title) ?? 0)} | ${t.skipped} | ${t.unselected} | ${t.unreached} | ${t.formatCoverage()} |\n`).join("")}${skips.join("")}`;
   }
 
-  public formatLine(rerunPassed: number = 0): string {
+  public formatLine(rerunPassed: number): string {
     return `${this.title}: ${this.discovered} discovered, ${this.executed} executed, ${this.passed} passed, ${this.failed} failed${RunnerTotals.formatRerun(rerunPassed)}, ${this.skipped} skipped, ${this.unselected} unselected, ${this.unreached} unreached; coverage ${this.formatCoverage()}.\n` +
       this.skips.map(t => `  Skipped ${t.test}: ${t.reason}\n`).join("");
   }

@@ -99,7 +99,7 @@ class AngularTestCheckTests {
       assert.equal(output.text, `Angular tests have no result for these files:\n  shell/b.spec.ts\n  shell/c.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
     });
 
-    test("the check names the duplicate tests and the empty spec files of a run, even one that failed", async t => {
+    test("the check names the duplicate tests of a run, even one that failed", async t => {
       const output = new TextOutputFixture();
       const result = RunnerResult.parse(JSON.stringify({
         passed: 2,
@@ -108,13 +108,12 @@ class AngularTestCheckTests {
         unreached: 0,
         skips: [],
         files: ["a.spec.ts", "b.spec.ts"],
-        duplicates: [{ file: "a.spec.ts", names: ["A", "same"] }],
-        empty: ["b.spec.ts"]
+        duplicates: [{ file: "a.spec.ts", names: ["A", "same"] }]
       }), "report");
       const check = new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(1, result, null, []), ["a.spec.ts", "b.spec.ts"], await AngularTestCheckTests.createRootAsync(t)), null);
 
       assert.equal(await check.runAsync(output), false);
-      assert.equal(output.text, `Angular tests name more than one test the same:\n  a.spec.ts › A › same\nAngular tests found no tests in these files:\n  b.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
+      assert.equal(output.text, `Angular tests name more than one test the same:\n  a.spec.ts › A › same\n${AngularTestCheckTests.LOG_HINT}`);
     });
 
     test("the check fails when a passing run wrote no report, or its report or workspace cannot be read", async t => {
@@ -199,7 +198,7 @@ class AngularTestCheckTests {
       assert.equal(await new AngularTestCheck(new AngularProjectFixture(new TotalsException("The report has no count passed."), [], root), null).runAsync(unreadable), false);
 
       assert.deepEqual(recorded, {
-        version: 1,
+        version: 2,
         runner: "angular",
         title: "Angular tests",
         discovered: 3,

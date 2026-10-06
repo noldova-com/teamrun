@@ -29,7 +29,7 @@ class RunnerTotalsTests {
 
       assert.equal(totals.executed, 6);
       assert.deepEqual(totals.problems, []);
-      assert.equal(RunnerTotals.VERSION, 1);
+      assert.equal(RunnerTotals.VERSION, 2);
     });
 
     test("totals that select more than they discovered, do not add up, or name a different number of skipped tests have a problem", () => {
@@ -67,7 +67,7 @@ class RunnerTotalsTests {
       await RunnerTotals.clearAsync(root);
 
       assert.deepEqual(record, {
-        version: 1,
+        version: 2,
         runner: "script",
         title: "Script tests",
         discovered: 10,
@@ -92,8 +92,11 @@ class RunnerTotalsTests {
     test("a record of another version, or one that is not a record, is refused with its path", async t => {
       const repository = await RunnerTotalsTests.createRepositoryAsync(t);
       const record = JSON.parse(RunnerTotalsTests.create(RunnerTotalsTests.COUNTS).toJson());
+      const { duplicates, empty, missing, ...firstVersion } = record;
 
-      assert.throws(() => RunnerTotals.parse(JSON.stringify({ ...record, version: 2 }), "totals.json"), new TotalsException("totals.json is version 2 of the test totals, not 1."));
+      assert.deepEqual([duplicates, empty, missing], [[], [], []]);
+      assert.throws(() => RunnerTotals.parse(JSON.stringify({ ...firstVersion, version: 1 }), "totals.json"), new TotalsException("totals.json is version 1 of the test totals, not 2."));
+      assert.throws(() => RunnerTotals.parse(JSON.stringify({ ...record, version: 3 }), "totals.json"), new TotalsException("totals.json is version 3 of the test totals, not 2."));
       assert.throws(() => RunnerTotals.parse(JSON.stringify({ ...record, coverage: { unit: "blocks", covered: 1 } }), "totals.json"), new TotalsException("totals.json, coverage, has no count total."));
       await repository.writeAsync({ "_build/totals/script.json": "{" });
       await assert.rejects(RunnerTotals.readAllAsync(repository.directory, ["script"]), new TotalsException("_build/totals/script.json is not JSON."));
@@ -104,7 +107,7 @@ class RunnerTotalsTests {
       const unmeasured = new RunnerTotals("package", "Package | tests", { discovered: 1, passed: 1, failed: 0, skipped: 0, unselected: 0, unreached: 0 }, [], [], null, RunnerTotalsTests.NO_FINDINGS);
       const empty = new RunnerTotals("angular", "Angular tests", { discovered: 0, passed: 0, failed: 0, skipped: 0, unselected: 0, unreached: 0 }, [], [], { unit: "statements", covered: 0, total: 0 }, RunnerTotalsTests.NO_FINDINGS);
 
-      assert.equal(RunnerTotals.formatTable([unmeasured, script, empty]),
+      assert.equal(RunnerTotals.formatTable([unmeasured, script, empty], new Map()),
         "| Tests | Discovered | Executed | Passed | Failed | Skipped | Unselected | Unreached | Coverage |\n|---|---|---|---|---|---|---|---|---|\n" +
         "| Package &#124; tests | 1 | 1 | 1 | 0 | 0 | 0 | 0 | Not measured |\n" +
         "| Script tests | 10 | 6 | 5 | 1 | 1 | 2 | 1 | 75.0% of 4 blocks |\n" +
@@ -123,7 +126,7 @@ class RunnerTotalsTests {
     test("a line sums up the runner for the console, with each skipped test and its reason after it, and any failed tests that passed when run again", () => {
       const script = RunnerTotalsTests.create(RunnerTotalsTests.COUNTS);
 
-      assert.equal(script.formatLine(),
+      assert.equal(script.formatLine(0),
         "Script tests: 10 discovered, 6 executed, 5 passed, 1 failed, 1 skipped, 2 unselected, 1 unreached; coverage 75.0% of 4 blocks.\n" +
         "  Skipped scripts/tests/a.test.ts › waits: Waits for <b> | c.\n");
       assert.ok(script.formatLine(1).startsWith("Script tests: 10 discovered, 6 executed, 5 passed, 1 failed (1 passed when run again; see the flaky record), 1 skipped,"));

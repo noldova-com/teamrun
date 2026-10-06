@@ -144,7 +144,7 @@ class ScriptTestCheckTests {
 
       assert.deepEqual(recorded, [true, ""]);
       assert.deepEqual(totals, {
-        version: 1,
+        version: 2,
         runner: "script",
         title: "Script tests",
         discovered: 4,

@@ -22,7 +22,6 @@ export default class AngularTestReport {
   private readonly name: (file: string) => string;
   private readonly skips: IRunnerSkip[] = [];
   private readonly tests: TestNames = new TestNames();
-  private readonly empty: string[] = [];
   private passed: number = 0;
   private failed: number = 0;
   private unreached: number = 0;
@@ -34,7 +33,7 @@ export default class AngularTestReport {
 
   public read(results: readonly unknown[]): RunnerResult {
     const files = results.map((t, i) => this.readFile(new JsonFields(t, this.source, [`test file ${i + 1}`])));
-    return new RunnerResult(new JsonFields({ passed: this.passed, failed: this.failed, skipped: this.skips.length, unreached: this.unreached, skips: this.skips, files: files.sort(), duplicates: this.tests.duplicates, empty: this.empty.sort() }, this.source));
+    return new RunnerResult(new JsonFields({ passed: this.passed, failed: this.failed, skipped: this.skips.length, unreached: this.unreached, skips: this.skips, files: files.sort(), duplicates: this.tests.duplicates }, this.source));
   }
 
   private readFile(result: JsonFields): string {
@@ -43,8 +42,6 @@ export default class AngularTestReport {
     const statuses = assertions.map(t => AngularTestReport.firstStatus(t));
     const failed = result.text("status") === AngularTestReport.FAILED;
     this.failed += Number(failed && !statuses.includes(AngularTestReport.FAILED));
-    if (!failed && assertions.length === 0)
-      this.empty.push(file);
     assertions.forEach(t => this.count(file, [...t.texts("ancestorTitles"), t.text("title")], AngularTestReport.firstStatus(t)));
     return file;
   }

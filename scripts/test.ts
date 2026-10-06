@@ -90,7 +90,7 @@ export default class Test {
       return Test.USAGE_EXIT_CODE;
     }
     if (options.isDocuments)
-      return await this.runChecksAsync(this.createDocumentChecks(), Test.DOCUMENTS_NOTICE);
+      return await this.runChecksAsync(this.createDocumentChecks(), Test.DOCUMENTS_NOTICE, null);
 
     const flaky = options.isRerunningFailed ? new FlakyRecord(this.root, this.environment) : null;
     await flaky?.clearAsync();
@@ -112,7 +112,7 @@ export default class Test {
     return 0;
   }
 
-  private async runChecksAsync(checks: readonly ICheck[], notice: string | null, flaky: FlakyRecord | null = null): Promise<number> {
+  private async runChecksAsync(checks: readonly ICheck[], notice: string | null, flaky: FlakyRecord | null): Promise<number> {
     if (notice !== null)
       this.output.write(notice);
     const earlier = (await flaky?.readAsync())?.length ?? 0;
