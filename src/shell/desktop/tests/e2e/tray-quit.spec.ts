@@ -43,7 +43,9 @@ async function closeIntoTheTrayAsync(desktop: DesktopApplicationFixture): Promis
 
 async function startAgainAsync(desktop: DesktopApplicationFixture): Promise<number | null> {
   const launch = await desktop.application.evaluate(() => ({ executablePath: process.execPath, argv: process.argv, workingDirectory: process.cwd(), environment: process.env }));
-  const second = spawn(launch.executablePath, launch.argv.slice(launch.argv.findIndex(t => t.endsWith("main.js"))), { cwd: launch.workingDirectory, env: launch.environment, stdio: "ignore" });
+  const main = launch.argv.findIndex(t => t.endsWith("main.js"));
+  expect(main, `TeamRun's arguments name its main.js: ${JSON.stringify(launch.argv)}`).toBeGreaterThan(0);
+  const second = spawn(launch.executablePath, launch.argv.slice(main), { cwd: launch.workingDirectory, env: launch.environment, stdio: "ignore" });
   return await new Promise<number | null>(resolve => second.once("exit", resolve));
 }
 

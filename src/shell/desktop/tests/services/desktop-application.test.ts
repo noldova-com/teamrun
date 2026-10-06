@@ -495,20 +495,75 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async opensNoWindowFromTheHintOrAnotherStartWhileQuitting(): Promise<void> {
+  public async opensNoWindowFromTheHintTheIconOrAnotherStartWhileAQuitRunsOrOnceItExits(): Promise<void> {
     const fixture = new TrayFixture("win32");
     await fixture.startAsync();
     const window = DesktopStartFixture.firstWindow(fixture.electron);
     window.close();
     await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
     await Condition.waitAsync(() => window.isGone && fixture.electron.notifications.created.length === 1);
+    const stopping = Promise.withResolvers<Response>();
+    fixture.connection.deferred.set("shell.stop", () => stopping.promise);
 
     fixture.click("Quit TeamRun");
+    await Condition.waitAsync(() => fixture.connection.calls.includes("shell.stop"));
+    fixture.electron.notifications.created[0]?.click();
+    fixture.electron.app.emit("second-instance");
+    fixture.click("Open TeamRun");
+    fixture.send("settingsChanged", { name: "shell.trayIcon", device: FakeDeviceIdentity.ID, value: false, isSet: true });
+    const windowsWhileQuitting = fixture.electron.windows.length;
+    stopping.resolve(Response.success("r", null));
     await Condition.waitAsync(() => fixture.electron.app.calls.includes("quit"));
     fixture.electron.notifications.created[0]?.click();
     fixture.electron.app.emit("second-instance");
 
+    Assert.areEqual(1, windowsWhileQuitting);
     Assert.areEqual(1, fixture.electron.windows.length);
+  }
+
+  @TestMethod
+  public async showsNoTrayHintForAWindowThatClosesWhileAQuitRuns(): Promise<void> {
+    const fixture = new TrayFixture("win32");
+    await fixture.startAsync();
+    const window = DesktopStartFixture.firstWindow(fixture.electron);
+    const stopping = Promise.withResolvers<Response>();
+    fixture.connection.deferred.set("shell.stop", () => stopping.promise);
+
+    fixture.click("Quit TeamRun");
+    await DesktopStartFixture.answerSaveAsync(fixture.electron, "win32", window, 1);
+    await Condition.waitAsync(() => fixture.connection.calls.includes("shell.stop"));
+    window.destroy();
+    await setImmediate();
+    const hintsWhileQuitting = fixture.electron.notifications.created.length;
+    stopping.resolve(Response.success("r", null));
+    await Condition.waitAsync(() => fixture.electron.app.calls.includes("quit"));
+
+    Assert.areEqual(0, hintsWhileQuitting);
+    Assert.areEqual(0, fixture.electron.notifications.created.length);
+    Assert.isFalse(fixture.files.state.writes.some(t => Object.hasOwn(t, "trayCloseHintShown")));
+  }
+
+  @TestMethod
+  public async opensNoWindowFromTheDockWhileAQuitRunsOnMacOS(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const stopping = Promise.withResolvers<Response>();
+    connection.deferred.set("shell.stop", () => stopping.promise);
+    const electron = await DesktopStartFixture.startReadyAsync("darwin", new FakeRuntimeLauncher(connection));
+    const window = DesktopStartFixture.firstWindow(electron);
+    window.close();
+    await DesktopStartFixture.answerSaveAsync(electron, "darwin", window, 1);
+    await Condition.waitAsync(() => window.isGone);
+
+    electron.app.quit();
+    await Condition.waitAsync(() => connection.calls.includes("shell.stop"));
+    electron.app.emit("activate");
+    const windowsWhileQuitting = electron.windows.length;
+    stopping.resolve(Response.success("r", null));
+    await Condition.waitAsync(() => electron.app.calls.includes("quit"));
+    electron.app.emit("activate");
+
+    Assert.areEqual(1, windowsWhileQuitting);
+    Assert.areEqual(1, electron.windows.length);
   }
 
   @TestMethod

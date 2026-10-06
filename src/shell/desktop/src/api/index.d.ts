@@ -587,6 +587,11 @@ export declare class QuitFlow implements ICloseGuard {
   public constructor(host: IQuitHost, asker: QuitCoordinator);
 
   /**
+   * Whether a quit is running: from {@link QuitFlow.quitAsync} until TeamRun exits or stays open.
+   */
+  public get isQuitting(): boolean;
+
+  /**
    * See {@link ICloseGuard.canCloseAsync}. While a quit runs, closing the window that asks its question cancels the
    * quit; the window is then judged as any other once the quit has ended, and stays open when TeamRun exits.
    *

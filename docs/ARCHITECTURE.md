@@ -828,6 +828,7 @@ While the icon shows on Windows or Linux, closing the last window leaves TeamRun
 The first time this happens on a device, once the window has saved and closed, an operating system notification says that TeamRun is still running and can be opened again or quit from its icon in the notification area on Windows or the tray on Linux, and a click on it opens TeamRun.
 The desktop keeps the notification while it shows and records the hint in `device-state.json` (section 7) once the operating system has shown it, and does not show it again; a device that cannot show notifications, or whose system refuses this one, records nothing and logs the refusal.
 When the icon goes away while no window is open, the desktop opens a window, so TeamRun never runs without a way back to it.
+From the moment TeamRun starts to quit until it exits or stays open, a window that closes shows no hint, and only the quit's own question opens a window: not the hint, the icon, a second start, the icon going away or, on macOS, the Dock.
 On Linux, while no host is registered, Settings notes on the setting's row that the desktop shows no tray icons, so the icon appears once it does.
 
 ## 9. Active work, closing and shutdown

@@ -108,18 +108,22 @@ export class QuitFlowTests {
     host.isLastWindow = false;
     host.prompt = prompt;
     const flow = QuitFlowTests.create(host, new WorkReport(["Indexing"], 1));
+    const quittingBefore = flow.isQuitting;
 
     const first = flow.quitAsync();
     const second = flow.quitAsync();
     const isSame = first === second;
+    const quittingMeanwhile = flow.isQuitting;
     saving.resolve();
     await Condition.waitAsync(() => prompt.shown.length === 1);
     const closing = flow.canCloseAsync(prompt);
     await first;
     const canClose = await closing;
+    const quittingAfter = flow.isQuitting;
     await flow.quitAsync();
 
     Assert.isTrue(isSame);
+    Assert.areEqual("false,true,false", [quittingBefore, quittingMeanwhile, quittingAfter].join(","));
     Assert.isTrue(canClose);
     Assert.areEqual("Indexing,none", prompt.shown.join(","));
     Assert.areEqual("save,stop IfIdle,prompt,save,stop IfIdle,exit", host.calls.join(","));

@@ -25,6 +25,10 @@ export class QuitFlow implements ICloseGuard {
     this.asker = asker;
   }
 
+  public get isQuitting(): boolean {
+    return !Object.isNull(this.quitting);
+  }
+
   public async canCloseAsync(prompt: IQuitPrompt): Promise<boolean> {
     if (!Object.isNull(this.quitting)) {
       this.asker.dismiss(prompt);

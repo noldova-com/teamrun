@@ -325,7 +325,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
     this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
-      if (this.hasPassedBarrier && this.windows.size === 0)
+      if (this.hasPassedBarrier && this.windows.size === 0 && !this.isQuitting)
         this.open();
     });
     void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync(), this.recordSelfAsync(), this.deviceState.readAsync()]).then(([isClear, , , state]) => {
@@ -510,12 +510,16 @@ export class DesktopApplication {
     void this.quitFlow.quitAsync();
   }
 
+  private get isQuitting(): boolean {
+    return this.isExiting || this.quitFlow.isQuitting;
+  }
+
   private keepsRunningWithoutWindows(): boolean {
     return this.settings.platform === Resources.macPlatform || this.tray.isShown;
   }
 
   private closeToBackground(): void {
-    if (this.windows.size === 0 && !this.isExiting && this.settings.platform !== Resources.macPlatform && this.tray.isShown)
+    if (this.windows.size === 0 && !this.isQuitting && this.settings.platform !== Resources.macPlatform && this.tray.isShown)
       void this.deviceState.showOnceAsync(Resources.trayCloseHintKey, () => this.showTrayCloseHintAsync());
   }
 
@@ -551,7 +555,7 @@ export class DesktopApplication {
   }
 
   private followTrayIcon(isShown: boolean): void {
-    if (!isShown && this.windows.size === 0 && !this.isExiting && !this.keepsRunningWithoutWindows())
+    if (!isShown && this.windows.size === 0 && !this.isQuitting && !this.keepsRunningWithoutWindows())
       this.open();
   }
 
@@ -728,7 +732,7 @@ export class DesktopApplication {
   }
 
   private reopen(): void {
-    if (this.hasPassedBarrier && !this.isExiting && Object.isNull(this.focus()))
+    if (this.hasPassedBarrier && !this.isExiting && Object.isNull(this.focus()) && !this.quitFlow.isQuitting)
       this.open();
   }
 
