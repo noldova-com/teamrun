@@ -218,7 +218,7 @@ class ReleasePublisherTests {
       const reason = `The tag v0.0.2 appeared on ${ReleasePublisherTests.OTHER_REVISION}, not on ${ReleasePublisherTests.REVISION}, so the draft stays unpublished.`;
 
       await assert.rejects(ReleasePublisherTests.publishAsync(t, tagged, release, new TextOutputFixture()),
-        new ReleaseException(`The tag v0.0.2 already exists, on ${ReleasePublisherTests.OTHER_REVISION}, without a release; a published tag is never moved.`));
+        new ReleaseException(`The tag v0.0.2 already points at ${ReleasePublisherTests.OTHER_REVISION}, but no release uses it. A tag is never moved here; remove it by hand only if nothing was published from it.`));
       for (const github of [continued, racing, created])
         await assert.rejects(ReleasePublisherTests.publishAsync(t, github, release, new TextOutputFixture()), new ReleaseException(reason));
 
@@ -252,28 +252,34 @@ class ReleasePublisherTests {
       assert.deepEqual([invalid, failing].map(t => [t.writes.some(u => u.startsWith("PATCH ")), t.releases.map(u => u.isDraft), t.tags.has("v0.0.2")]), [[false, [true], false], [false, [true], false]]);
     });
 
-    test("an annotated tag, a tag that cannot be read, a release GitHub keeps as a draft, a tag removed or a file added while publishing stops publication", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
+    test("an annotated tag, a tag that cannot be read before or after publishing, a release GitHub keeps as a draft, a tag removed or a file added while publishing stops publication, and a public release is named as public", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
       const release = await ReleasePublisherTests.createAsync(t);
       const annotated = new ReleaseGitHubFixture();
       const unreadable = new ReleaseGitHubFixture();
       const kept = new ReleaseGitHubFixture();
       const untagged = new ReleaseGitHubFixture();
       const added = new ReleaseGitHubFixture();
+      const unreadableAfter = new ReleaseGitHubFixture();
       annotated.tags.set("v0.0.2", ReleasePublisherTests.REVISION);
       annotated.tagType = "tag";
       unreadable.isTagReadFailing = true;
       kept.isPublishingIgnored = true;
       untagged.isTagDeletedOnPublish = true;
       added.assetOnPublish = "notes.txt";
+      unreadableAfter.isTagReadFailingOnPublish = true;
 
       await assert.rejects(ReleasePublisherTests.publishAsync(t, annotated, release, new TextOutputFixture()),
         new ReleaseException("The tag v0.0.2 is annotated; a release's tag points straight at its commit."));
       await assert.rejects(ReleasePublisherTests.publishAsync(t, unreadable, release, new TextOutputFixture()), (error: unknown) => error instanceof GitHubException && error.status === 500);
       await assert.rejects(ReleasePublisherTests.publishAsync(t, kept, release, new TextOutputFixture()), new ReleaseException("GitHub kept v0.0.2 as a draft when it was published."));
       await assert.rejects(ReleasePublisherTests.publishAsync(t, untagged, release, new TextOutputFixture()),
-        new ReleaseException(`The tag v0.0.2 points at nothing, not at ${ReleasePublisherTests.REVISION}.`));
+        new ReleaseException(`v0.0.2 is public now, but it no longer matches what was published: The tag v0.0.2 points at nothing, not at ${ReleasePublisherTests.REVISION}. `
+          + "Check it by hand; a published release is never replaced."));
       await assert.rejects(ReleasePublisherTests.publishAsync(t, added, release, new TextOutputFixture()),
-        new ReleaseException("v0.0.2 on GitHub differs from the built files. Missing: none. Not part of the release: notes.txt."));
+        new ReleaseException("v0.0.2 is public now, but it no longer matches what was published: v0.0.2 on GitHub differs from the built files. Missing: none. "
+          + "Not part of the release: notes.txt. Check it by hand; a published release is never replaced."));
+      await assert.rejects(ReleasePublisherTests.publishAsync(t, unreadableAfter, release, new TextOutputFixture()), (error: unknown) => error instanceof GitHubException && error.status === 500);
+      assert.deepEqual(unreadableAfter.releases.map(t => t.isDraft), [false]);
       assert.deepEqual([annotated, unreadable].map(t => t.writes), [[], []]);
     });
   }
