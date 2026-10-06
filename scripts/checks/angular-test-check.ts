@@ -59,19 +59,14 @@ export default class AngularTestCheck implements ISelectableCheck {
   private async checkAsync(output: Writable, include: readonly string[] = []): Promise<boolean> {
     try {
       const run = await this.project.testAsync(include);
-      const recorded = include.length > 0 || run.result === null || await run.result.toTotals(AngularTestCheck.RUNNER, AngularTestCheck.TOTALS_TITLE, run.coverage).recordAsync(this.project.root, output);
-      if (!run.isSuccessful)
-        return false;
-      if (run.collected === null) {
-        output.write(AngularTestCheck.NO_REPORT);
+      if (run.result === null) {
+        if (run.isSuccessful)
+          output.write(AngularTestCheck.NO_REPORT);
         return false;
       }
-      const collected = new Set(run.collected);
-      const missing = (include.length === 0 ? await this.project.specFilesAsync() : include).filter(t => !collected.has(t));
-      if (missing.length === 0)
-        return recorded;
-      output.write(`The Angular tests did not run ${missing.length} of the spec files under src/:\n${missing.map(t => `  ${t}\n`).join("")}`);
-      return false;
+      const totals = run.result.toTotals(AngularTestCheck.RUNNER, AngularTestCheck.TOTALS_TITLE, run.coverage, include.length === 0 ? await this.project.specFilesAsync() : include);
+      const recorded = include.length === 0 ? await totals.recordAsync(this.project.root, output) : totals.report(output);
+      return recorded && run.isSuccessful;
     }
     catch (error) {
       if (!(error instanceof ProcessException || error instanceof TotalsException))

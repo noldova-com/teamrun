@@ -75,7 +75,25 @@ class AngularTestCheckTests {
       const check = new AngularTestCheck(new AngularProjectFixture(AngularTestCheckTests.run(0, ["a.spec.ts"]), ["a.spec.ts", "shell/b.spec.ts", "shell/c.spec.ts"], await AngularTestCheckTests.createRootAsync(t)));
 
       assert.equal(await check.runAsync(output), false);
-      assert.equal(output.text, `The Angular tests did not run 2 of the spec files under src/:\n  shell/b.spec.ts\n  shell/c.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
+      assert.equal(output.text, `Angular tests have no result for these files:\n  shell/b.spec.ts\n  shell/c.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
+    });
+
+    test("the check names the duplicate tests and the empty spec files of a run, even one that failed", async t => {
+      const output = new TextOutputFixture();
+      const result = RunnerResult.parse(JSON.stringify({
+        passed: 2,
+        failed: 1,
+        skipped: 0,
+        unreached: 0,
+        skips: [],
+        files: ["a.spec.ts", "b.spec.ts"],
+        duplicates: [{ file: "a.spec.ts", names: ["A", "same"] }],
+        empty: ["b.spec.ts"]
+      }), "report");
+      const check = new AngularTestCheck(new AngularProjectFixture(new AngularTestRun(1, result, null), ["a.spec.ts", "b.spec.ts"], await AngularTestCheckTests.createRootAsync(t)));
+
+      assert.equal(await check.runAsync(output), false);
+      assert.equal(output.text, `Angular tests name more than one test the same:\n  a.spec.ts › A › same\nAngular tests found no tests in these files:\n  b.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
     });
 
     test("the check fails when a passing run wrote no report, or its report or workspace cannot be read", async t => {
@@ -120,7 +138,7 @@ class AngularTestCheckTests {
 
       assert.deepEqual([failing.isPassing, failing.selected, partial.isPassing, partial.selected], [false, 1, false, 2]);
       assert.equal(failed.text, AngularTestCheckTests.LOG_HINT);
-      assert.equal(incomplete.text, `The Angular tests did not run 1 of the spec files under src/:\n  b.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
+      assert.equal(incomplete.text, `Angular tests have no result for these files:\n  b.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
     });
 
     test("a filtered run fails when the spec files cannot be listed, and lets an unexpected failure through", async () => {
@@ -171,7 +189,10 @@ class AngularTestCheckTests {
         unreached: 0,
         skips: [{ test: "a.spec.ts › A › waits", reason: "No reason given." }],
         files: ["a.spec.ts"],
-        coverage: { unit: "statements", covered: 7, total: 8 }
+        coverage: { unit: "statements", covered: 7, total: 8 },
+        duplicates: [],
+        empty: [],
+        missing: []
       });
       assert.equal(failed.text, AngularTestCheckTests.LOG_HINT);
       assert.equal(disagreed.text, `Angular tests name 0 skipped tests but count 1.\n${AngularTestCheckTests.LOG_HINT}`);

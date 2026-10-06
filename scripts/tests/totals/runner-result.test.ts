@@ -25,10 +25,16 @@ class RunnerResultTests {
   };
 
   public static register(): void {
-    test("a runner's result becomes its totals, naming each skipped test by its file and names", () => {
-      const result = RunnerResult.parse(JSON.stringify({ ...RunnerResultTests.OUTCOMES, discovered: 9, selected: 6 }), "result.json");
+    test("a runner's result becomes its totals, naming each skipped and duplicate test by its file and names, and each expected file without a result", () => {
+      const result = RunnerResult.parse(JSON.stringify({
+        ...RunnerResultTests.OUTCOMES,
+        discovered: 9,
+        selected: 6,
+        duplicates: [{ file: "@noldova/teamrun-foundation-alpha/alpha.test.js", names: ["AlphaTests", "twice"] }],
+        empty: ["@noldova/teamrun-foundation-alpha/empty.test.js"]
+      }), "result.json");
 
-      const totals = result.toTotals("package", "Package tests", { unit: "blocks", covered: 1, total: 2 });
+      const totals = result.toTotals("package", "Package tests", { unit: "blocks", covered: 1, total: 2 }, ["@noldova/teamrun-foundation-alpha/alpha.test.js", "@noldova/teamrun-foundation-alpha/beta.test.js"]);
 
       assert.deepEqual(JSON.parse(totals.toJson()), {
         version: 1,
@@ -43,16 +49,20 @@ class RunnerResultTests {
         unreached: 1,
         skips: [{ test: "@noldova/teamrun-foundation-alpha/alpha.test.js › AlphaTests.waits", reason: "Waits for the shell." }],
         files: ["@noldova/teamrun-foundation-alpha/alpha.test.js"],
-        coverage: { unit: "blocks", covered: 1, total: 2 }
+        coverage: { unit: "blocks", covered: 1, total: 2 },
+        duplicates: ["@noldova/teamrun-foundation-alpha/alpha.test.js › AlphaTests › twice"],
+        empty: ["@noldova/teamrun-foundation-alpha/empty.test.js"],
+        missing: ["@noldova/teamrun-foundation-alpha/beta.test.js"]
       });
       assert.deepEqual([result.discovered, result.selected], [9, 6]);
     });
 
-    test("a runner that does not filter discovers and selects every test it reports", () => {
+    test("a runner that does not filter discovers and selects every test it reports, and one that names no duplicate or empty file has none", () => {
       const result = RunnerResult.parse(JSON.stringify(RunnerResultTests.OUTCOMES), "result.json");
 
       assert.deepEqual([result.discovered, result.selected], [6, 6]);
-      assert.equal(result.toTotals("script", "Script tests", null).problem, null);
+      assert.deepEqual([result.duplicates, result.empty], [[], []]);
+      assert.deepEqual(result.toTotals("script", "Script tests", null, result.files).problems, []);
     });
 
     test("a result is read from its file, and a missing or malformed one is refused with its path", async t => {

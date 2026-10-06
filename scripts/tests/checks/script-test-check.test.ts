@@ -41,13 +41,14 @@ class ReportRunnerFixture extends ProcessRunnerFixture {
 }
 
 class ScriptTestCheckTests {
+  private static readonly FILES: readonly string[] = ["scripts/tests/alpha.test.ts", "scripts/tests/beta.test.ts", "scripts/tests/deep/gamma.test.ts"];
   private static readonly RESULT: string = JSON.stringify({
     passed: 2,
     failed: 1,
     skipped: 1,
     unreached: 0,
     skips: [{ file: "scripts/tests/alpha.test.ts", names: ["outer", "later"], reason: "To do." }],
-    files: ["scripts/tests/alpha.test.ts"]
+    files: ScriptTestCheckTests.FILES
   });
 
   public static register(): void {
@@ -95,7 +96,7 @@ class ScriptTestCheckTests {
       assert.equal(check.title, "Script tests and coverage");
     });
 
-    test("the runner's result and the measured coverage become the script tests' totals, and a passing run fails without a readable result or with counts that disagree", async t => {
+    test("the runner's result and the measured coverage become the script tests' totals, and a passing run fails without a readable result, with counts that disagree or without a result for every script test file", async t => {
       const repository = await ScriptTestCheckTests.createRepositoryAsync(t);
       const build = new PackageBuildFixture(repository.directory);
       const run = async (report: string | null, coverage: string | null): Promise<readonly unknown[]> => {
@@ -107,7 +108,8 @@ class ScriptTestCheckTests {
       const totals = JSON.parse(await readFile(path.join(repository.directory, "_build", "totals", "script.json"), "utf8"));
       const unmeasured = await run(ScriptTestCheckTests.RESULT, null);
       const unmeasuredTotals = JSON.parse(await readFile(path.join(repository.directory, "_build", "totals", "script.json"), "utf8"));
-      const disagreeing = await run(JSON.stringify({ passed: 1, failed: 0, skipped: 1, unreached: 0, skips: [], files: [] }), null);
+      const disagreeing = await run(JSON.stringify({ passed: 1, failed: 0, skipped: 1, unreached: 0, skips: [], files: ScriptTestCheckTests.FILES }), null);
+      const incomplete = await run(JSON.stringify({ passed: 1, failed: 0, skipped: 0, unreached: 0, skips: [], files: ["scripts/tests/beta.test.ts"] }), null);
       const unwritten = await run(null, null);
       const unreadable = await run("{", null);
 
@@ -124,12 +126,16 @@ class ScriptTestCheckTests {
         unselected: 0,
         unreached: 0,
         skips: [{ test: "scripts/tests/alpha.test.ts › outer › later", reason: "To do." }],
-        files: ["scripts/tests/alpha.test.ts"],
-        coverage: { unit: "files", covered: 3, total: 4 }
+        files: ScriptTestCheckTests.FILES,
+        coverage: { unit: "files", covered: 3, total: 4 },
+        duplicates: [],
+        empty: [],
+        missing: []
       });
       assert.deepEqual(unmeasured, [true, ""]);
       assert.equal(unmeasuredTotals.coverage, null);
       assert.deepEqual(disagreeing, [false, "Script tests name 0 skipped tests but count 1.\n"]);
+      assert.deepEqual(incomplete, [false, "Script tests have no result for these files:\n  scripts/tests/alpha.test.ts\n  scripts/tests/deep/gamma.test.ts\n"]);
       assert.deepEqual(unwritten, [false, "The test runner wrote no result to _build/script-tests.json.\n"]);
       assert.deepEqual(unreadable, [false, "_build/script-tests.json is not JSON.\n"]);
     });

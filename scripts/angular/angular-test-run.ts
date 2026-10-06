@@ -23,8 +23,4 @@ export default class AngularTestRun {
   public get isSuccessful(): boolean {
     return this.exitCode === 0;
   }
-
-  public get collected(): readonly string[] | null {
-    return this.result?.files ?? null;
-  }
 }

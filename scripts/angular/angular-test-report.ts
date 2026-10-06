@@ -9,6 +9,7 @@
 import type IRunnerSkip from "../totals/interfaces/runner-skip.ts";
 import JsonFields from "../totals/json-fields.ts";
 import RunnerResult from "../totals/runner-result.ts";
+import TestNames from "../totals/test-names.ts";
 import TotalsException from "../totals/totals.exception.ts";
 
 export default class AngularTestReport {
@@ -20,6 +21,8 @@ export default class AngularTestReport {
   private readonly source: string;
   private readonly name: (file: string) => string;
   private readonly skips: IRunnerSkip[] = [];
+  private readonly tests: TestNames = new TestNames();
+  private readonly empty: string[] = [];
   private passed: number = 0;
   private failed: number = 0;
   private unreached: number = 0;
@@ -31,20 +34,24 @@ export default class AngularTestReport {
 
   public read(results: readonly unknown[]): RunnerResult {
     const files = results.map((t, i) => this.readFile(new JsonFields(t, this.source, [`test file ${i + 1}`])));
-    return new RunnerResult(new JsonFields({ passed: this.passed, failed: this.failed, skipped: this.skips.length, unreached: this.unreached, skips: this.skips, files: files.sort() }, this.source));
+    return new RunnerResult(new JsonFields({ passed: this.passed, failed: this.failed, skipped: this.skips.length, unreached: this.unreached, skips: this.skips, files: files.sort(), duplicates: this.tests.duplicates, empty: this.empty.sort() }, this.source));
   }
 
   private readFile(result: JsonFields): string {
     const file = this.name(result.text("name"));
     const assertions = result.objects("assertionResults");
     const statuses = assertions.map(t => t.text("status"));
-    this.failed += Number(result.text("status") === AngularTestReport.FAILED && !statuses.includes(AngularTestReport.FAILED));
+    const failed = result.text("status") === AngularTestReport.FAILED;
+    this.failed += Number(failed && !statuses.includes(AngularTestReport.FAILED));
+    if (!failed && assertions.length === 0)
+      this.empty.push(file);
     assertions.forEach(t => this.count(file, [...t.texts("ancestorTitles"), t.text("title")], t.text("status")));
     return file;
   }
 
   private count(file: string, names: readonly string[], status: string): void {
     const reason = AngularTestReport.REASONS.get(status);
+    this.tests.add(file, names);
     if (status === AngularTestReport.PASSED)
       this.passed++;
     else if (status === AngularTestReport.FAILED)

@@ -74,7 +74,7 @@ export default class ScriptTestCheck implements ISelectableCheck {
     const covered = await new CoverageRun(this.root, this.runner).measureAsync(coverage, CoverageRun.formatProjectArguments(ScriptTestCheck.PROJECT, scripts, scripts, CoverageRun.NO_EXCLUSIONS, [ScriptTestCheck.TESTS_FOLDER]), environment);
     try {
       const result = await RunnerResult.readAsync(this.root, resultFile);
-      return await result.toTotals(ScriptTestCheck.RUNNER, ScriptTestCheck.TOTALS_TITLE, await CoverageRun.readCountAsync(this.root, coverageResult)).recordAsync(this.root, output) && testsPassed && covered;
+      return await result.toTotals(ScriptTestCheck.RUNNER, ScriptTestCheck.TOTALS_TITLE, await CoverageRun.readCountAsync(this.root, coverageResult), await this.listAsync()).recordAsync(this.root, output) && testsPassed && covered;
     }
     catch (error) {
       if (!(error instanceof TotalsException))
@@ -85,10 +85,7 @@ export default class ScriptTestCheck implements ISelectableCheck {
   }
 
   public async runSelectedAsync(filters: readonly string[]): Promise<CheckSelection> {
-    const files: string[] = [];
-    for await (const file of glob(ScriptTestCheck.TEST_PATTERN, { cwd: this.root }))
-      files.push(file.split(path.sep).join(path.posix.sep));
-    files.sort();
+    const files = await this.listAsync();
     const named = files.filter(t => filters.some(u => t.includes(u)));
     if (named.length > 0)
       return new CheckSelection(await this.runner.runAsync(process.execPath, [...ScriptTestCheck.SELECTED_ARGUMENTS, ...named], this.root) === 0, ScriptTestCheck.UNIT, files.length, named.length);
@@ -105,5 +102,12 @@ export default class ScriptTestCheck implements ISelectableCheck {
       return new CheckSelection(false, ScriptTestCheck.UNIT, files.length, 0);
     const unselected = (await readFile(report, ScriptTestCheck.REPORT_ENCODING)).match(ScriptTestCheck.UNSELECTED_PATTERN)?.length ?? 0;
     return new CheckSelection(exitCode === 0, ScriptTestCheck.UNIT, files.length, files.length - unselected);
+  }
+
+  private async listAsync(): Promise<readonly string[]> {
+    const files: string[] = [];
+    for await (const file of glob(ScriptTestCheck.TEST_PATTERN, { cwd: this.root }))
+      files.push(file.split(path.sep).join(path.posix.sep));
+    return files.sort();
   }
 }

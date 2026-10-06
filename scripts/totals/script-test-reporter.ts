@@ -11,6 +11,7 @@ import { Transform, type TransformCallback } from "node:stream";
 import type { TestEvent } from "node:test/reporters";
 
 import type IRunnerSkip from "./interfaces/runner-skip.ts";
+import TestNames from "./test-names.ts";
 
 export default class ScriptTestReporter extends Transform {
   private static readonly CANCELLED: string = "cancelledByParent";
@@ -21,6 +22,8 @@ export default class ScriptTestReporter extends Transform {
   private readonly root: string;
   private readonly names: Map<string, string[]> = new Map();
   private readonly files: Set<string> = new Set();
+  private readonly tested: Set<string> = new Set();
+  private readonly tests: TestNames = new TestNames();
   private readonly skips: IRunnerSkip[] = [];
   private passed: number = 0;
   private failed: number = 0;
@@ -47,19 +50,23 @@ export default class ScriptTestReporter extends Transform {
   }
 
   public override _flush(done: TransformCallback): void {
-    this.push(JSON.stringify({ passed: this.passed, failed: this.failed, skipped: this.skipped, unreached: this.unreached, skips: this.skips, files: [...this.files].sort() }));
+    this.push(JSON.stringify({ passed: this.passed, failed: this.failed, skipped: this.skipped, unreached: this.unreached, skips: this.skips, files: [...this.files].sort(), duplicates: this.tests.duplicates, empty: [...this.files].filter(t => !this.tested.has(t)).sort() }));
     done();
   }
 
   private count(event: TestEvent & { type: "test:pass" | "test:fail" }, file: string): void {
     const data = event.data;
+    if (event.type === "test:pass" && data.nesting === 0 && data.name === file)
+      return;
     const names = [...(this.names.get(file) ?? []).slice(0, data.nesting), data.name];
+    this.tests.add(file, names);
+    this.tested.add(file);
     if (data.todo !== undefined)
       this.skip(file, names, data.todo === true ? `${ScriptTestReporter.TODO}.` : `${ScriptTestReporter.TODO}: ${String(data.todo)}`);
     else if (data.skip !== undefined)
       this.skip(file, names, data.skip === true ? ScriptTestReporter.NO_REASON : String(data.skip));
     else if (event.type === "test:pass")
-      this.passed += Number(data.nesting > 0 || data.name !== file);
+      this.passed++;
     else if ("failureType" in event.data.details.error && event.data.details.error.failureType === ScriptTestReporter.CANCELLED)
       this.unreached++;
     else
