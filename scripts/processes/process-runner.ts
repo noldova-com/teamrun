@@ -7,7 +7,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { closeSync, createWriteStream, openSync } from "node:fs";
+import { closeSync, createWriteStream, openSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
@@ -20,6 +20,11 @@ export default class ProcessRunner {
   private static readonly OUTPUT_LIMIT: number = 16 * 1024 * 1024;
   private static readonly MISSING_PROCESS_CODE: string = "ESRCH";
   private static readonly KILL_SIGNAL: NodeJS.Signals = "SIGKILL";
+  private static readonly END_SIGNAL: NodeJS.Signals = "SIGTERM";
+  private static readonly PROCESS_FOLDER: string = "/proc";
+  private static readonly TASK_FOLDER: string = "task";
+  private static readonly CHILDREN_FILE: string = "children";
+  private static readonly SEPARATOR: RegExp = /\s+/;
 
   public captureAsync(command: string, commandArguments: readonly string[], directory: string, timeout: number, environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
     return new Promise<ProcessResult>((resolve, reject) => {
@@ -83,6 +88,15 @@ export default class ProcessRunner {
 
   public kill(processId: number): void {
     ProcessRunner.signal(processId, ProcessRunner.KILL_SIGNAL);
+  }
+
+  public end(processId: number): void {
+    ProcessRunner.signal(processId, ProcessRunner.END_SIGNAL);
+  }
+
+  public listChildren(processId: number): readonly number[] {
+    const file = path.posix.join(ProcessRunner.PROCESS_FOLDER, String(processId), ProcessRunner.TASK_FOLDER, String(processId), ProcessRunner.CHILDREN_FILE);
+    return readFileSync(file, "utf8").split(ProcessRunner.SEPARATOR).filter(t => t.length > 0).map(Number);
   }
 
   public runLoggedAsync(command: string, commandArguments: readonly string[], directory: string, log: string, output: Writable, errorOutput: Writable, environment?: NodeJS.ProcessEnv): Promise<number | null> {

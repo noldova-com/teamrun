@@ -71,6 +71,7 @@ class DesktopFixture extends StartedProcess {
 
 class SmokeRunnerFixture extends InstallRunnerFixture {
   private static readonly MOUNTER: number = 6161;
+  private static readonly PROGRAM: number = 4343;
 
   private readonly answers: Answer[];
   private copies: string[] = [];
@@ -80,6 +81,7 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
   public readonly starts: (readonly string[])[] = [];
   public readonly checked: number[] = [];
   public readonly killed: number[] = [];
+  public readonly ended: number[] = [];
   public runtimeChecks: number = 1;
   public discovery: Discovery = "written";
   public killing: Killing = "ends";
@@ -127,6 +129,16 @@ class SmokeRunnerFixture extends InstallRunnerFixture {
       throw new Error(`EPERM: operation not permitted, kill ${processId}`);
     if (this.killing === "ends")
       this.runtimeChecks = 0;
+  }
+
+  public override end(processId: number): void {
+    this.ended.push(processId);
+    if (processId === SmokeRunnerFixture.PROGRAM)
+      this.desktop.close();
+  }
+
+  public override listChildren(processId: number): readonly number[] {
+    return processId === this.desktop.id ? [SmokeRunnerFixture.PROGRAM] : [];
   }
 
   public override async startAsync(command: string, commandArguments: readonly string[], directory: string, log: string): Promise<StartedProcess> {
@@ -225,17 +237,20 @@ class PackageSmokeTests {
         assert.equal(existsSync(runner.folder), false);
       });
 
-    test("on Linux with APPIMAGE_EXTRACT_AND_RUN the runtime holds its own extraction of the AppImage, which ends with it", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
-      const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
-      const runner = new SmokeRunnerFixture(["none", "running", "none"]);
-      runner.copy = "extraction";
-      const output = new TextOutputFixture();
+    test("on Linux with APPIMAGE_EXTRACT_AND_RUN the desktop's program is asked to quit, since the AppImage passes no signal on, and the runtime holds its own extraction, which ends with it",
+      { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+        const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
+        const runner = new SmokeRunnerFixture(["none", "running", "none"]);
+        runner.copy = "extraction";
+        const output = new TextOutputFixture();
 
-      const exitCode = await PackageSmokeTests.runAsync(t, repository, "linux", runner, output, "x64", { APPIMAGE_EXTRACT_AND_RUN: "1" });
+        const exitCode = await PackageSmokeTests.runAsync(t, repository, "linux", runner, output, "x64", { APPIMAGE_EXTRACT_AND_RUN: "1" });
 
-      assert.equal(exitCode, 0, output.text);
-      assert.match(output.text, /\nThe desktop quit\.\nThe runtime holds its own extraction of the AppImage in .+teamrun-runtime-Ab3dE6, 0\.5 MiB\.\nThe runtime stopped once idle\.\nThe runtime's copy of the AppImage ended with it\.\n$/);
-    });
+        assert.equal(exitCode, 0, output.text);
+        assert.equal(runner.desktop.signals.join(","), "");
+        assert.equal(runner.ended.join(","), "4343");
+        assert.match(output.text, /\nThe desktop quit\.\nThe runtime holds its own extraction of the AppImage in .+teamrun-runtime-Ab3dE6, 0\.5 MiB\.\nThe runtime stopped once idle\.\nThe runtime's copy of the AppImage ended with it\.\n$/);
+      });
 
     test("on Linux a runtime without exactly one copy, with a copy of the other kind or one that is gone, or a copy that outlives the runtime by 10 s fails the smoke check",
       { timeout: PackageSmokeTests.TIMEOUT }, async t => {

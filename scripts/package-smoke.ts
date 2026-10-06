@@ -89,6 +89,10 @@ export default class PackageSmoke {
     this.output = output;
   }
 
+  private get extractsAndRuns(): boolean {
+    return this.environment[PackageSmoke.EXTRACT_AND_RUN_VARIABLE] === PackageSmoke.EXTRACT_AND_RUN_VALUE;
+  }
+
   public async runAsync(smokeArguments: readonly string[]): Promise<number> {
     if (smokeArguments.length > 0) {
       this.output.write(PackageSmoke.USAGE);
@@ -175,7 +179,7 @@ export default class PackageSmoke {
       throw new PackagingException(`After the desktop quit, ${logs} held ${records.length} copy records of the runtime's AppImage instead of one.`);
     const record = path.join(logs, name);
     const line = (await readFile(record, "utf8")).trim();
-    if (this.environment[PackageSmoke.EXTRACT_AND_RUN_VARIABLE] === PackageSmoke.EXTRACT_AND_RUN_VALUE) {
+    if (this.extractsAndRuns) {
       const [, extraction = ""] = PackageSmoke.EXTRACTION_RECORD.exec(line) ?? [];
       if (!existsSync(extraction))
         throw new PackagingException(`The runtime's copy record ${record} names no extraction of the AppImage that is still there: ${line}`);
@@ -338,11 +342,16 @@ export default class PackageSmoke {
   }
 
   private async quitAsync(target: PackageTarget, desktop: StartedProcess, folder: string): Promise<void> {
-    if (target.platform !== PackageTarget.WINDOWS) {
-      desktop.signal(PackageSmoke.QUIT_SIGNAL);
+    if (target.platform === PackageTarget.WINDOWS) {
+      await this.runner.requireAsync(PackageSmoke.CLOSE, [PackageSmoke.PROCESS_OPTION, String(desktop.id)], folder, PackageSmoke.COMMAND_LIMIT);
       return;
     }
-    await this.runner.requireAsync(PackageSmoke.CLOSE, [PackageSmoke.PROCESS_OPTION, String(desktop.id)], folder, PackageSmoke.COMMAND_LIMIT);
+    if (target.platform === PackageTarget.LINUX && this.extractsAndRuns) {
+      for (const child of this.runner.listChildren(desktop.id))
+        this.runner.end(child);
+      return;
+    }
+    desktop.signal(PackageSmoke.QUIT_SIGNAL);
   }
 }
 
