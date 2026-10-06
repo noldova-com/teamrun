@@ -11,6 +11,7 @@ import type { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 
+import "@noldova/teamrun-foundation-core";
 import { RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
 
 import { ExitCode } from "../enums/exit-code.js";
@@ -27,7 +28,7 @@ export class CliEntry {
       running.stdout, running.stderr, running.stdin, running);
   }
 
-  public static async settleAsync(run: Promise<number>, error: Writable, exit: Pick<NodeJS.Process, "exitCode">): Promise<void> {
+  public static async settleAsync(run: Promise<number>, output: Writable, error: Writable, exit: Pick<NodeJS.Process, "exitCode"> & { exit(): void }): Promise<void> {
     try {
       exit.exitCode = await run;
     }
@@ -35,8 +36,10 @@ export class CliEntry {
       error.write(`${inspect(failure)}\n`);
       exit.exitCode = ExitCode.Failed;
     }
+    await Promise.all([output, error].map(t => new Promise<void>(resolve => t.write(String.empty, () => resolve()))));
+    exit.exit();
   }
 }
 
 if (import.meta.main)
-  void CliEntry.settleAsync(new Cli(CliEntry.createContext(process)).runAsync(process.argv.slice(2)), process.stderr, process);
+  void CliEntry.settleAsync(new Cli(CliEntry.createContext(process)).runAsync(process.argv.slice(2)), process.stdout, process.stderr, process);

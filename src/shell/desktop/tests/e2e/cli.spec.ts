@@ -41,4 +41,21 @@ test.describe("the command line", () => {
     expect(await desktop.readRuntimeProcessIdAsync()).toBeGreaterThan(0);
     await desktop.checkpointAsync("cli-window");
   });
+
+  test("runs a module's own command through its command-line part and prints its help", async ({ desktop }) => {
+    const text = await runAsync(["clock", "show-time", "--prefix", "Now", "--data-dir", desktop.dataDirectory]);
+    const json = await runAsync(["clock", "show-time", "--json", "--data-dir", desktop.dataDirectory]);
+    const help = await runAsync(["help", "clock", "show-time"]);
+    const unknown = await runAsync(["clock", "rewind", "--data-dir", desktop.dataDirectory]);
+
+    expect(text.code, text.error).toBe(0);
+    expect(text.output).toMatch(/^Now \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\.\r?\n$/);
+    expect(json.code, json.error).toBe(0);
+    expect(Date.parse((JSON.parse(json.output) as { time: string }).time)).not.toBeNaN();
+    expect(help.code, help.error).toBe(0);
+    expect(help.output).toContain("Usage: teamrun clock show-time [--prefix <text>]");
+    expect(help.output).toContain("--prefix <text>  The words before the time. Default: \"It is\".");
+    expect(unknown.code).toBe(2);
+    expect(unknown.error).toContain("\"rewind\" is not a command of clock.");
+  });
 });

@@ -12,6 +12,7 @@ import { type Failure, FailureCode } from "@noldova/teamrun-shell-protocol";
 import {
   BuildMismatchException,
   ConnectionException,
+  DeclarationsFormatException,
   LaunchException,
   NoRuntimeException,
   PreShellDataFoundException,
@@ -21,6 +22,8 @@ import {
 } from "@noldova/teamrun-shell-runtime";
 
 import { ExitCode } from "../enums/exit-code.js";
+import { CliCommandException } from "../exceptions/cli-command.exception.js";
+import { ModuleNotActiveException } from "../exceptions/module-not-active.exception.js";
 import { UsageException } from "../exceptions/usage.exception.js";
 import { Resources } from "../resources.js";
 
@@ -61,8 +64,12 @@ export class CliFailure {
       return new CliFailure(ExitCode.DataDirectoryUnusable, FailureCode.PreShellData, error.message, error.data.toJson());
     if (error instanceof ConnectionException)
       return CliFailure.fromConnection(error);
-    if (error instanceof LaunchException)
+    if (error instanceof LaunchException || error instanceof DeclarationsFormatException)
       return new CliFailure(ExitCode.Failed, Resources.failedCode, error.message);
+    if (error instanceof ModuleNotActiveException)
+      return new CliFailure(ExitCode.ModuleNotActive, Resources.moduleNotActiveCode, error.message, error.toJson());
+    if (error instanceof CliCommandException)
+      return new CliFailure(ExitCode.Failed, error.code, error.message, error.details);
     if (CliFailure.isUnusableDirectory(error))
       return new CliFailure(ExitCode.DataDirectoryUnusable, Resources.dataDirectoryUnusableCode, Resources.formatDataDirectoryUnusable((error as Error).message));
     throw error;
