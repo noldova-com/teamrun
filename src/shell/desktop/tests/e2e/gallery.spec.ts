@@ -279,6 +279,43 @@ test.describe("gallery", () => {
     }
   });
 
+  test("in the narrowest window a select's list never scrolls sideways, and an option too long for it ends with an ellipsis and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await desktop.useViewportAsync(640, 480);
+    await SettingsFixture.openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const select = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Select\"] tr-select.tr-gallery-narrow");
+      await select.scrollIntoViewIfNeeded();
+      await select.locator(".tr-select-button").click();
+      const list = scope(window, mode).locator(".cdk-overlay-container .tr-select-list");
+      await expect(list).toBeVisible();
+      const option = list.locator(".tr-select-option[data-value=\"long\"]");
+      const fit = await list.evaluate(t => ({ hiddenWidth: t.scrollWidth - t.clientWidth, isInside: t.getBoundingClientRect().right <= document.documentElement.clientWidth, overflow: getComputedStyle(t).overflowX }));
+
+      expect(fit).toEqual({ hiddenWidth: 0, isInside: true, overflow: "hidden" });
+      expect(await truncationAsync(option)).toEqual({ isInside: true, isCut: true, overflow: "ellipsis" });
+      const title = (await option.textContent())?.trim() ?? "";
+      await expect(list.getByRole("option", { name: title })).toBeVisible();
+      const tooltip = scope(window, mode).locator(".cdk-overlay-container tr-tooltip");
+      await option.hover();
+      await expect(tooltip).toHaveText(title);
+      const covered = await tooltip.evaluate(t => {
+        const area = t.getBoundingClientRect();
+        return [...document.querySelectorAll(".tr-select-list .tr-select-option")].filter(u => {
+          const row = u.getBoundingClientRect();
+          return row.left < area.right && area.left < row.right && row.top < area.bottom && area.top < row.bottom;
+        }).map(u => u.getAttribute("data-value"));
+      });
+      expect(covered).toEqual([]);
+      await desktop.checkpointAsync(`select-list-long-option-${mode.toLowerCase()}`);
+      await window.mouse.move(0, 0);
+      await expect(tooltip).toHaveCount(0);
+      await window.keyboard.press("Escape");
+      await expect(list).toHaveCount(0);
+    }
+  });
+
   test("a button's label too long for it starts at its start padding, ends with an ellipsis and shows in full in its tooltip, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
@@ -296,6 +333,97 @@ test.describe("gallery", () => {
       await button.hover();
       await expect(scope(window, mode).locator(".cdk-overlay-container tr-tooltip")).toHaveText(await button.innerText());
       await desktop.checkpointAsync(`button-long-label-${mode.toLowerCase()}`);
+      await window.mouse.move(0, 0);
+    }
+  });
+
+  test("a configuration table shows its heading and Add above its explanation and separated rows, grows a row for long text and scrolls sideways only when narrow, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    await SettingsFixture.openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const specimen = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Configuration table\"]");
+      const table = specimen.getByRole("table", { name: "Environment variables", exact: true });
+      const narrow = specimen.getByRole("table", { name: "Narrow environment variables" });
+      const areas = specimen.locator(".tr-configuration-table-scroll");
+      await specimen.scrollIntoViewIfNeeded();
+
+      await expect(specimen.getByRole("heading", { name: "Environment variables" })).toBeVisible();
+      await expect(table.getByRole("columnheader")).toHaveText(["Name", "Value", "Scope", ""]);
+      await expect(table.getByRole("columnheader").last()).toHaveAttribute("aria-label", "Actions");
+      await expect(table.getByRole("button", { name: "Remove NOTES_HOME" })).toBeVisible();
+      await expect(areas).toHaveCount(2);
+      await expect(narrow.getByRole("row")).toHaveCount(3);
+      const [wide, small] = [areas.first(), areas.last()];
+      const [heading, add, explanation, grid] = await Promise.all([
+        specimen.locator(".tr-configuration-table-heading").boundingBox(),
+        specimen.locator(".tr-configuration-table-actions button").boundingBox(),
+        specimen.locator(".tr-configuration-table-explanation").boundingBox(),
+        table.boundingBox()
+      ]);
+      const measured = await wide.evaluate((t: HTMLElement) => {
+        const find = (selector: string, root: ParentNode = t): HTMLElement => {
+          const found = root.querySelector<HTMLElement>(selector);
+          if (found === null)
+            throw new Error(`The configuration table has no ${selector}.`);
+          return found;
+        };
+        const baseline = (host: Element): number => {
+          const probe = document.createElement("span");
+          probe.style.display = "inline-block";
+          host.prepend(probe);
+          const bottom = probe.getBoundingClientRect().bottom;
+          probe.remove();
+          return bottom;
+        };
+        const row = find("tbody tr");
+        const first = document.createRange();
+        first.selectNodeContents(find("tbody td"));
+        const scope = document.createRange();
+        scope.selectNodeContents(find("td:nth-child(3)", row));
+        const label = baseline(find("td:last-child button [data-truncates]", row));
+        return {
+          firstLeft: first.getBoundingClientRect().left,
+          removeRight: find("tbody tr td:last-child button:last-child").getBoundingClientRect().right,
+          rowHeights: [...t.querySelectorAll("tbody tr")].map(r => r.getBoundingClientRect().height),
+          baselines: [...row.querySelectorAll("td:not(:last-child)")].map(c => Math.round(baseline(c) - label)),
+          scopeLines: scope.getClientRects().length,
+          separators: [...new Set([...t.querySelectorAll("th, td")].map(c => getComputedStyle(c).borderBottomStyle))],
+          overflow: t.scrollWidth - t.clientWidth
+        };
+      });
+      const measuredNarrow = await small.evaluate((t: HTMLElement) => {
+        const cell = t.querySelectorAll("tbody tr")[1]?.children[1];
+        if (cell === undefined)
+          throw new Error("The narrow configuration table has no second row with a second cell.");
+        const token = document.createRange();
+        token.selectNodeContents(cell);
+        return { tokenLines: token.getClientRects().length, overflow: t.scrollWidth - t.clientWidth };
+      });
+      if (heading === null || add === null || explanation === null || grid === null)
+        throw new Error("The configuration table's heading, Add, explanation or table is not shown.");
+
+      const edges = [measured.firstLeft - grid.x, grid.x + grid.width - measured.removeRight, heading.x - grid.x, grid.x + grid.width - (add.x + add.width)].map(t => Math.round(t));
+      expect(edges).toEqual([0, 0, 0, 0]);
+      expect(measured.baselines).toEqual([0, 0, 0]);
+      expect([measured.scopeLines, measuredNarrow.tokenLines]).toEqual([1, 1]);
+      expect(measured.separators).toEqual(["solid"]);
+      expect(add.y).toBeLessThan(heading.y + heading.height);
+      expect(add.y + add.height).toBeGreaterThan(heading.y);
+      expect(add.x).toBeGreaterThan(heading.x + heading.width);
+      expect(explanation.y).toBeGreaterThanOrEqual(Math.max(heading.y + heading.height, add.y + add.height));
+      expect(grid.y).toBeGreaterThanOrEqual(explanation.y + explanation.height);
+      expect(measured.rowHeights.at(-1)).toBeGreaterThan(Math.max(...measured.rowHeights.slice(0, -1)));
+      expect(measured.overflow).toBeLessThanOrEqual(0);
+      expect(measuredNarrow.overflow).toBeGreaterThan(0);
+      await small.evaluate(t => {
+        t.scrollTo({ left: t.scrollWidth });
+        t.scrollIntoView({ block: "end" });
+      });
+      await expect(narrow.getByRole("button", { name: "Remove LANG" })).toBeInViewport();
+      expect(await ScrollAreaFixture.thumbChangesOnHoverAsync(window, small, "horizontal")).toBe(true);
+      await ScrollAreaFixture.revealThumbColorAsync(window, small);
+      await desktop.checkpointAsync(`configuration-table-${mode.toLowerCase()}`);
       await window.mouse.move(0, 0);
     }
   });

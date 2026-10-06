@@ -11,6 +11,11 @@
   gap: var(--tr-space-6);
 }
 
+.tr-gallery-table {
+  width: min(36rem, calc(100% - var(--tr-space-1)));
+  margin-inline-end: var(--tr-space-1);
+}
+
 .tr-gallery-narrow {
   max-width: 12rem;
 }
@@ -26,4 +31,10 @@
 
 .tr-gallery-error {
   color: var(--tr-error);
+}
+
+.tr-gallery-table-actions {
+  display: flex;
+  gap: var(--tr-space-2);
+  justify-content: flex-end;
 }

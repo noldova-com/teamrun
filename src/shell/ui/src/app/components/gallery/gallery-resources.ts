@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/teamrun-foundation-core";
+
 export class GalleryResources {
   public static readonly scopeClass: string = "tr-theme-scope";
   public static readonly overlayContainerClass: string = "cdk-overlay-container";
@@ -55,7 +57,7 @@ export class GalleryResources {
     selectOptions: [
       { value: "one", title: "First option" },
       { value: "two", title: "Second option" },
-      { value: "long", title: "An option whose title is far too long to fit the width its select gives it" }
+      { value: "long", title: "An option whose title is far too long to fit the width its select gives it, and longer still than the narrowest window can show on one line" }
     ],
     progress: "Progress",
     determinate: "Half done",
@@ -85,6 +87,21 @@ export class GalleryResources {
       { value: "long", title: "An option whose title is far too long to fit the width its group gives it" }
     ],
     choicePillInitial: "light",
+    configurationTable: "Configuration table",
+    configurationAdd: "Add",
+    configurationName: "Name",
+    configurationValue: "Value",
+    configurationScope: "Scope",
+    configurationActions: "Actions",
+    configurationEdit: "Edit",
+    configurationRemove: "Remove",
+    configurationWideTable: { heading: "Environment variables", label: "Environment variables", explanation: "Each variable is set for the programs the shell starts, after the system's own.", rowCount: 3, isNarrow: false, hasAdd: true },
+    configurationNarrowTable: { heading: String.empty, label: "Narrow environment variables", explanation: String.empty, rowCount: 2, isNarrow: true, hasAdd: false },
+    configurationRows: [
+      { name: "EDITOR", value: "code --wait", scope: "Every project", edit: "Edit EDITOR", remove: "Remove EDITOR" },
+      { name: "LANG", value: "en_GB.UTF-8", scope: "Every project", edit: "Edit LANG", remove: "Remove LANG" },
+      { name: "NOTES_HOME", value: "A value that is far too long to fit the width of its cell, so its row grows to hold it", scope: "This project", edit: "Edit NOTES_HOME", remove: "Remove NOTES_HOME" }
+    ],
     tab: "Tab",
     tabNormal: "Notes",
     tabSelected: "Outline",

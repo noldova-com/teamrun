@@ -118,8 +118,8 @@ export class CommandLine {
     if (Object.isUndefined(value))
       return null;
     const seconds = Number(value);
-    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > Resources.maximumTimeoutSeconds)
+    if (!Resources.wholeSecondsPattern.test(value) || seconds < Resources.minimumTimeoutSeconds || seconds > Resources.maximumTimeoutSeconds)
       throw new UsageException(Resources.timeoutInvalid);
-    return Math.round(seconds * Resources.millisecondsPerSecond);
+    return seconds * Resources.millisecondsPerSecond;
   }
 }
