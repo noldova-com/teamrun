@@ -448,9 +448,9 @@ export class Resources {
   public static readonly enabledField: string = "enabled";
   public static readonly checkField: string = "check";
   public static readonly checkedField: string = "checked";
-  public static readonly commandRowType: string = "command";
-  public static readonly submenuRowType: string = "submenu";
-  public static readonly separatorRowType: string = "separator";
+  public static readonly commandRowType: string = "Command";
+  public static readonly submenuRowType: string = "Submenu";
+  public static readonly separatorRowType: string = "Separator";
   public static readonly menuRowPathSeparator: string = "/";
   public static readonly menuTitleSeparator: string = " › ";
   public static readonly menuGlyph: string = "menu";

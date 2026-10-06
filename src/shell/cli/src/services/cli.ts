@@ -127,7 +127,7 @@ export class Cli {
 
   private async openAsync(commandLine: CommandLine): Promise<string> {
     const directory = this.locate(commandLine);
-    const checkout = this.context.environment[Resources.checkoutVariable] ?? "";
+    const checkout = this.context.environment[Resources.checkoutVariable] ?? String.empty;
     const desktopArguments = [
       ...String.isNullOrWhitespace(checkout) ? [] : [path.join(checkout, ...Resources.desktopMainSegments)],
       `${Resources.dataDirectoryFlag}${Resources.valueSeparator}${directory.root}`
@@ -144,7 +144,7 @@ export class Cli {
   }
 
   private locate(commandLine: CommandLine): DataDirectory {
-    const checkout = this.context.environment[Resources.checkoutVariable] ?? "";
+    const checkout = this.context.environment[Resources.checkoutVariable] ?? String.empty;
     const explicit = Object.isNull(commandLine.dataDirectory) ? undefined : path.resolve(commandLine.dataDirectory);
     return DataDirectoryLocator.locate(String.isNullOrWhitespace(checkout), this.context.environment, this.context.homeFolder, checkout, explicit);
   }

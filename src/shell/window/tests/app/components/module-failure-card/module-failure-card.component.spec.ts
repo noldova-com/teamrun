@@ -24,9 +24,10 @@ describe("ModuleFailureCardComponent", () => {
     return fixture.nativeElement;
   }
 
-  it("names the module that didn't start and says why, with an error icon", () => {
+  it("names the module that didn't start and says why, with an error icon, on the kit's card", () => {
     const card = render("It depends on tasks, which is not active.");
 
+    expect(card.querySelector(".tr-module-failure-card")?.tagName).toBe("TR-CARD");
     expect(card.querySelector("h2")?.textContent).toMatch(/^\s*error\s*Clock didn't start\s*$/);
     expect(card.querySelector(".tr-module-failure-card-icon")?.getAttribute("aria-hidden")).toBe("true");
     expect(card.querySelector(".tr-module-failure-card-cause")?.textContent).toBe("It depends on tasks, which is not active.");

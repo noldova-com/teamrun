@@ -113,7 +113,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("darwin");
     const window = DesktopStartFixture.firstWindow(electron);
     electron.ipcMain.send("teamrun:menuBar", DesktopStartFixture.trustedEvent("darwin"),
-      { menus: [{ place: "shell.file", title: "File", rows: [{ type: "command", id: "shell.file/shell.close/0", label: "Close the tab", key: null, enabled: true, check: "None", checked: false }] }] });
+      { menus: [{ place: "shell.file", title: "File", rows: [{ type: "Command", id: "shell.file/shell.close/0", label: "Close the tab", key: null, enabled: true, check: "None", checked: false }] }] });
     const file = electron.menu.templates.at(-1)?.[1]?.submenu;
 
     window.destroy();
@@ -1376,10 +1376,10 @@ export class DesktopApplicationTests {
     const trusted = DesktopStartFixture.trustedEvent("linux");
     const window = DesktopStartFixture.firstWindow(electron);
 
-    const answers = ["undo", "redo", "cut", "copy", "paste", "selectAll", "reload", 5].map(t => electron.ipcMain.invoke("teamrun:edit", trusted, t));
-    const refused = electron.ipcMain.invoke("teamrun:edit", { sender: { id: 1 }, senderFrame: null }, "copy");
+    const answers = ["Undo", "Redo", "Cut", "Copy", "Paste", "SelectAll", "undo", "reload", 5].map(t => electron.ipcMain.invoke("teamrun:edit", trusted, t));
+    const refused = electron.ipcMain.invoke("teamrun:edit", { sender: { id: 1 }, senderFrame: null }, "Copy");
 
-    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false, false]), JSON.stringify(answers));
+    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false, false, false]), JSON.stringify(answers));
     Assert.areEqual(false, refused);
     Assert.areEqual(JSON.stringify(["undo", "redo", "cut", "copy", "paste", "selectAll"]), JSON.stringify(window.webContents.calls));
   }

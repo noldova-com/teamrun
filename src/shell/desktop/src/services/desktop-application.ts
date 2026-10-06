@@ -55,12 +55,12 @@ import { WindowRecovery } from "./window-recovery.js";
 
 export class DesktopApplication {
   private static readonly EDITS: ReadonlyMap<string, (contents: IWindowContents) => void> = new Map<string, (contents: IWindowContents) => void>([
-    ["undo", t => t.undo()],
-    ["redo", t => t.redo()],
-    ["cut", t => t.cut()],
-    ["copy", t => t.copy()],
-    ["paste", t => t.paste()],
-    ["selectAll", t => t.selectAll()]
+    ["Undo", t => t.undo()],
+    ["Redo", t => t.redo()],
+    ["Cut", t => t.cut()],
+    ["Copy", t => t.copy()],
+    ["Paste", t => t.paste()],
+    ["SelectAll", t => t.selectAll()]
   ]);
   private static readonly UNOWNED_STATES: readonly StartupStateKind[] = [StartupStateKind.Connecting, StartupStateKind.PreShellData, StartupStateKind.Failed];
 

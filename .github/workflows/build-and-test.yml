@@ -300,9 +300,92 @@ jobs:
             esac
           done <<< "$keys"
 
+  totals:
+    name: Test totals
+    needs: [changes, validate]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && needs.changes.outputs.run-code == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js to add up the totals
+        id: node
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to add up the totals again
+        if: steps.node.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to add up the totals again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to add up the totals a last time
+        if: steps.node-again.outcome == 'failure'
+        run: sleep 30
+
+      - name: Set up Node.js to add up the totals a last time
+        if: steps.node-again.outcome == 'failure'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Fetch the totals records
+        id: fetch
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: totals-*
+          path: _build/run-totals
+
+      - name: Wait before fetching the totals records again
+        if: steps.fetch.outcome == 'failure'
+        run: sleep 15
+
+      - name: Fetch the totals records again
+        id: fetch-again
+        if: steps.fetch.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: totals-*
+          path: _build/run-totals
+
+      - name: Wait before fetching the totals records a last time
+        if: steps.fetch-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Fetch the totals records a last time
+        if: steps.fetch-again.outcome == 'failure'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: totals-*
+          path: _build/run-totals
+
+      - name: Add up the totals
+        env:
+          TARGETS: ${{ needs.changes.outputs.targets }}
+          RUN_UI: ${{ needs.changes.outputs.run-ui }}
+          VALIDATION_RESULT: ${{ needs.validate.result }}
+        run: node scripts/run-totals.ts
+
   result:
     name: Build and test (all targets)
-    needs: [changes, validate]
+    needs: [changes, validate, totals]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -313,6 +396,7 @@ jobs:
           RUN_CODE: ${{ needs.changes.outputs.run-code }}
           RUN_UI: ${{ needs.changes.outputs.run-ui }}
           VALIDATION_RESULT: ${{ needs.validate.result }}
+          TOTALS_RESULT: ${{ needs.totals.result }}
           UI_TARGETS: ${{ needs.changes.outputs.ui-targets }}
           DEFERRED: ${{ needs.changes.outputs.deferred }}
           UI_DEFERRED: ${{ needs.changes.outputs.ui-deferred }}
@@ -332,18 +416,18 @@ jobs:
               ui=failure
             fi
           fi
-          case "$CHANGES_RESULT:$RUN_CODE:$RUN_UI:$VALIDATION_RESULT:$ui" in
-            success:false:false:skipped:skipped)
+          case "$CHANGES_RESULT:$RUN_CODE:$RUN_UI:$VALIDATION_RESULT:$ui:$TOTALS_RESULT" in
+            success:false:false:skipped:skipped:skipped)
               echo 'Only Markdown documentation changed: the document checks passed, and the build and test targets were skipped.' >> "$GITHUB_STEP_SUMMARY"
               ;;
-            success:true:false:success:skipped)
+            success:true:false:success:skipped:success)
               echo "Only documentation, CI and test tooling or repository configuration changed: the document checks passed, the build and tests passed on $covered The UI workflows were not required." >> "$GITHUB_STEP_SUMMARY"
               ;;
-            success:true:true:success:success)
+            success:true:true:success:success:success)
               echo "The document checks passed, and the build, tests and UI workflows passed on $covered" >> "$GITHUB_STEP_SUMMARY"
               ;;
             *)
-              echo '::error::The document checks, the change classification, a build and test target or a UI workflow shard did not complete successfully.'
+              echo '::error::The document checks, the change classification, a build and test target, a UI workflow shard or the test totals did not complete successfully.'
               exit 1
               ;;
           esac

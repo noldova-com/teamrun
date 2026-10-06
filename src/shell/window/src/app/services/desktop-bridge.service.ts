@@ -11,6 +11,7 @@ import { Injectable } from "@angular/core";
 import { nameof } from "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import { FailureCode } from "@noldova/teamrun-shell-protocol";
+import type { ClipboardWriter } from "@noldova/teamrun-shell-ui";
 
 import type { EditAction } from "../enums/edit-action";
 import type { QuitChoice } from "../enums/quit-choice";
@@ -25,7 +26,7 @@ import type { WindowAppearance } from "../models/window-appearance";
 import { Resources } from "../../resources";
 
 @Injectable({ providedIn: "root" })
-export class DesktopBridgeService {
+export class DesktopBridgeService implements ClipboardWriter {
   private readonly bridge: IDesktopBridge = DesktopBridgeService.find();
 
   public get platform(): string {
@@ -102,7 +103,7 @@ export class DesktopBridgeService {
     return BuildInfo.fromJson(await this.bridge.readBuild());
   }
 
-  public copyTextAsync(text: string): Promise<boolean> {
+  public writeTextAsync(text: string): Promise<boolean> {
     return this.bridge.copyText(text);
   }
 
