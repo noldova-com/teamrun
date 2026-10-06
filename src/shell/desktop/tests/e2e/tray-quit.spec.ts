@@ -17,6 +17,7 @@ import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 
 const HINT_REFUSED: RegExp = /The operating system did not show the hint that TeamRun is still running/;
+const PLAYWRIGHT_DEBUGGING: RegExp = /^--(inspect|remote-debugging-port)=/;
 
 interface ITrayBridge {
   readTrayAvailable(): Promise<unknown>;
@@ -41,12 +42,15 @@ async function closeIntoTheTrayAsync(desktop: DesktopApplicationFixture): Promis
   return outcome;
 }
 
-async function startAgainAsync(desktop: DesktopApplicationFixture): Promise<number | null> {
+async function startAgainAsync(desktop: DesktopApplicationFixture): Promise<void> {
   const launch = await desktop.application.evaluate(() => ({ executablePath: process.execPath, argv: process.argv, workingDirectory: process.cwd(), environment: process.env }));
-  const main = launch.argv.findIndex(t => t.endsWith("main.js"));
-  expect(main, `TeamRun's arguments name its main.js: ${JSON.stringify(launch.argv)}`).toBeGreaterThan(0);
-  const second = spawn(launch.executablePath, launch.argv.slice(main), { cwd: launch.workingDirectory, env: launch.environment, stdio: "ignore" });
-  return await new Promise<number | null>(resolve => second.once("exit", resolve));
+  const args = launch.argv.slice(1).filter(t => !PLAYWRIGHT_DEBUGGING.test(t));
+  expect(args.some(t => t.endsWith("main.js")), `TeamRun's arguments name its main.js: ${JSON.stringify(launch.argv)}`).toBe(true);
+  const second = spawn(launch.executablePath, args, { cwd: launch.workingDirectory, env: launch.environment, stdio: ["ignore", "ignore", "pipe"] });
+  let errors = "";
+  second.stderr?.setEncoding("utf8").on("data", (t: string) => errors += t);
+  const ended = await new Promise<[number | null, string | null]>(resolve => second.once("close", (code, signal) => resolve([code, signal])));
+  expect(ended, `The second start ended with ${JSON.stringify(ended)} and wrote: ${errors}`).toEqual([0, null]);
 }
 
 test.describe("closing and quitting beside the tray icon", () => {
@@ -82,9 +86,9 @@ test.describe("closing and quitting beside the tray icon", () => {
     await closeIntoTheTrayAsync(desktop);
     const reopened = desktop.application.waitForEvent("window");
 
-    expect(await startAgainAsync(desktop)).toBe(0);
+    await startAgainAsync(desktop);
     await expect((await reopened).locator("tr-window")).toBeVisible();
-    expect(await startAgainAsync(desktop)).toBe(0);
+    await startAgainAsync(desktop);
 
     expect(await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
   });
