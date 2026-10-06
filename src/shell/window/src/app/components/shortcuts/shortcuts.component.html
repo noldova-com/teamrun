@@ -34,7 +34,7 @@ LICENSE file in the root directory of this source tree.
           <td class="tr-shortcut-owner"><tr-highlighted-text [text]="row.owner" [query]="query()" /></td>
           <td>
             <button type="button" class="tr-shortcut-key" tr-button [variant]="secondary" [class.tr-shortcut-key-recording]="isRecording"
-              [attr.aria-label]="formatKeyLabel(row, isRecording)" (click)="record(row)" (keydown)="press(row, $event)" (keyup)="release(row, $event)" (blur)="stopRecording(row)">
+              [attr.aria-label]="formatKeyLabel(row, isRecording)" [attr.aria-describedby]="describeKey(row, rowNotice !== null)" (click)="record(row)" (keydown)="press(row, $event)" (keyup)="release(row, $event)" (blur)="stopRecording(row)">
               @if (isRecording) {
                 {{ hint() }}
               } @else {
@@ -42,11 +42,11 @@ LICENSE file in the root directory of this source tree.
               }
             </button>
             @if (row.collision; as collision) {
-              <span class="tr-shortcut-collision">{{ collision }}</span>
+              <span class="tr-shortcut-collision" [id]="collisionId(row)">{{ collision }}</span>
             }
             @if (rowNotice) {
               <div class="tr-shortcut-notice" role="alert">
-                <span class="tr-shortcut-notice-text">{{ rowNotice.text }}</span>
+                <span class="tr-shortcut-notice-text" [id]="noticeId(row)">{{ rowNotice.text }}</span>
                 @if (rowNotice.holder; as holder) {
                   <span class="tr-shortcut-notice-actions">
                     <button type="button" tr-button [variant]="primary" (click)="useHere(rowNotice, holder)">{{ resources.useKeyHereLabel }}</button>
