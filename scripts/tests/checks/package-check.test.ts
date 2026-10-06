@@ -54,7 +54,7 @@ class PackageCheckTests {
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
       await PackageTreeFixture.writePackageAsync(repository, "foundation-alpha", [], false);
-      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env);
+      const build = new PackageBuild(repository.directory, new ProcessRunner(), process.env, process.platform, process.arch);
       const readBuildAsync = async (): Promise<unknown> => JSON.parse(await readFile(path.join(repository.directory, "_build", "product.json"), "utf8")).build;
 
       assert.equal(await PackageCheckTests.create(repository.directory).runAsync(new TextOutputFixture()), true);
@@ -85,7 +85,7 @@ class PackageCheckTests {
   }
 
   private static create(root: string): PackageCheck {
-    return new PackageCheck(new PackageBuild(root, new ProcessRunner(), process.env));
+    return new PackageCheck(new PackageBuild(root, new ProcessRunner(), process.env, process.platform, process.arch));
   }
 }
 

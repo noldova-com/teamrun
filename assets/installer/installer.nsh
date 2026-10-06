@@ -1,3 +1,4 @@
+!include "FileFunc.nsh"
 !include "LogicLib.nsh"
 !include "WinMessages.nsh"
 !include "WordFunc.nsh"
@@ -8,9 +9,61 @@
 
 !define /math COMMAND_PATH_LIMIT ${NSIS_MAX_STRLEN} - 1
 !define COMMAND_FOLDER "$INSTDIR\bin"
+!define REMOVE_ATTEMPTS 60
+!define REMOVE_PAUSE 500
 
 !macro announceEnvironment
   SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
+!macroend
+
+!macro listLeftovers RESULT
+  StrCpy ${RESULT} ""
+  ClearErrors
+  FindFirst $R3 $R4 "$INSTDIR\*.*"
+  ${DoUntil} $R4 == ""
+    ${If} $R4 != "."
+    ${AndIf} $R4 != ".."
+    ${AndIf} $R4 != "${UNINSTALL_FILENAME}"
+      StrCpy ${RESULT} "${RESULT}, $R4"
+    ${EndIf}
+    FindNext $R3 $R4
+  ${Loop}
+  FindClose $R3
+  StrCpy ${RESULT} ${RESULT} "" 2
+!macroend
+
+!macro removeProgramFiles
+  Push $R0
+  Push $R1
+  Push $R2
+  Push $R3
+  Push $R4
+  SetOutPath $TEMP
+  StrCpy $R0 0
+  ${Do}
+    RMDir /r $INSTDIR
+    !insertmacro listLeftovers $R1
+    ${If} $R1 == ""
+    ${OrIf} $R0 >= ${REMOVE_ATTEMPTS}
+      ${ExitDo}
+    ${EndIf}
+    Sleep ${REMOVE_PAUSE}
+    IntOp $R0 $R0 + 1
+  ${Loop}
+  ${If} $R1 != ""
+    DetailPrint "Other programs still use $R1 in $INSTDIR, so the uninstall left them there."
+    ${GetParameters} $R2
+    ClearErrors
+    ${GetOptions} $R2 "/S" $R3
+    ${If} ${Errors}
+      MessageBox MB_OK|MB_ICONEXCLAMATION "${PRODUCT_NAME} is uninstalled, but other programs still use $R1 in $INSTDIR. Delete that folder once nothing uses it."
+    ${EndIf}
+  ${EndIf}
+  Pop $R4
+  Pop $R3
+  Pop $R2
+  Pop $R1
+  Pop $R0
 !macroend
 
 !macro customInstall
@@ -88,5 +141,6 @@
     ${EndIf}
     Pop $R1
     Pop $R0
+    !insertmacro removeProgramFiles
   ${EndIf}
 !macroend

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 :host {
   display: block;
 }
@@ -46,6 +48,8 @@
 
 .tr-shortcut-key-recording {
   border-color: var(--tr-accent);
+
+  @include forced-focus;
 }
 
 .tr-shortcut-collision,

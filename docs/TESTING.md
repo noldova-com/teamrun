@@ -156,8 +156,10 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
   - It selects, from the change since the merge base, each changed test and UI workflow file, the test that mirrors each changed production file, and every test that imports a changed fixture or other test support file, directly or through another.
     A `Repeat:` line in the pull request's description adds test and UI workflow files by their path from the repository's root, such as the UI workflows a change to the desktop affects.
     The line is read when the label is added and on each push.
-  - Linux x64 and Windows x64 each run the selection in five parallel jobs, one pass each, and macOS ARM64 runs the five passes in one job, since macOS runners are scarce.
-    Each job builds and runs the selected tests through `npm test -- --filter` and the selected UI workflows with `--retries 0`.
+  - Linux x64 and Windows x64 each run the selection in five parallel jobs, one pass each, and macOS ARM64 runs the five passes in as few jobs as its time limit allows, since macOS runners are scarce.
+    It uses one job unless five passes of the selected UI tests, counted in their files, would take more than about 40 minutes there; then two jobs each run a Playwright shard of them five times, and only the first repeats the selected tests.
+    Each job builds and runs the selected tests through `npm test -- --filter` and the selected UI workflows with `--retries 0` and a global timeout that stops them before the job's time limit.
+    Each job's summary counts its UI tests and says when they ran out of time, so a stop for time doesn't read as a failing test.
   - The check "Repeat (all targets)" passes at once without the label and in a merge group, and with the label only when every repeat job passed, so a labelled pull request doesn't merge before its repeats.
   - The repeats show that the selection passes five times on each of those targets, and nothing about tests outside it.
     The [nightly run](#ci-levels) also repeats every test and UI workflow five times on every target, which catches what a change's own repeats miss.
@@ -167,8 +169,10 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
 | `scripts/tests/fixtures/repository.fixture.ts` | Between bounded attempts to remove a fixture repository that Windows still holds open. |
 | `src/foundation/testing/tests/fixtures/execution/entry-lifetime.fixture.ts` | One fixture test outlasts its time limit on purpose, so the runner's time limit is tested. |
 | `src/shell/desktop/tests/e2e/teardown.spec.ts` | Three workflows block the main process on purpose. Two test the harness's handling of a main process that stops answering. The third makes it fail first, so a request's failure is tested to carry the main-process failure the desktop log holds. A fourth leaves work running, so a quit that stops at the question about it is reported as that question, with its window and text, and not as a silent main process. |
+| `src/shell/desktop/tests/services/update-barrier-watch.test.ts` | A started watch checks the barrier every millisecond, and the test waits 20 ms once the watch has quit the desktop, and again once it is stopped, so the watch is tested to check no more. |
 | `src/shell/runtime/tests/services/client/runtime-launcher.test.ts` | A runtime publishes itself 600 ms after the launcher starts, so the launcher's wait past its own timeout is tested. |
 | `src/shell/runtime/tests/services/lifetime/runtime-host.test.ts` | Another holder releases the data directory, or publishes discovery, 200 ms after the runtime starts, so the runtime's wait for either is tested. |
+| `src/shell/runtime/tests/services/lifetime/update-preparation.test.ts` | An update's barrier stays unreadable, unparsable, handed off by a process that has exited, or held by one that cannot be looked up, for 200 ms, ten times the interval at which the runtime reads it, so the runtime is tested to keep updating until the barrier is gone. |
 
 ## 4. Results and reporting
 
@@ -218,7 +222,8 @@ The coverage and configuration requirements are:
 
 | Scope | Requirement |
 |---|---|
-| Foundation packages, including Testing itself, plus the shell's `protocol`, `runtime` and `cli` | 100% of executable production code; CLI verification includes arguments, failure paths and process exit |
+| Foundation packages, including Testing itself, plus the shell's `protocol` and `cli` | 100% of executable production code; CLI verification includes arguments, failure paths and process exit |
+| `src/shell/runtime` | 100% of executable production code, except `services/process/windows-process-api.ts`, which loads the Windows addon that reads the process table and ends processes; it runs only on Windows, where the process tests drive it and the addon natively. Package tests drive the Windows process table and ending through a fake of its interface. The package's manifest declares that exclusion with its reason under `teamrun.coverageExclusions`. No coverage is measured for the addon's C source |
 | Repository-owned executable automation, including build, test, packaging and release logic | 100% executable-code coverage, with behavior and process-boundary checks appropriate to the operation |
 | YAML and other non-executable configuration | Applicable schema/configuration validation and workflow checks; no executable-code coverage percentage |
 | A module's `protocol`, `runtime` and `cli` | 100% of executable production code. Where a part drives an external tool, doubles cover parsing, routing and lifecycle; behavior only the real tool can exercise needs separately authorized live verification and explicit accounting of uncovered lines |

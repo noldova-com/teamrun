@@ -16,6 +16,8 @@ export interface IDesktopBridge {
   notifyAppearance(appearance: JsonObject): void;
   onCloseRequest(listener: (requestId: string) => void): () => void;
   answerClose(requestId: string, isSaved: boolean): Promise<boolean>;
+  onUpdateSaveRequest(listener: (requestId: string) => void): () => void;
+  answerUpdateSave(requestId: string, problems: readonly string[]): Promise<boolean>;
   readStartup(): Promise<unknown>;
   onStartup(listener: (state: unknown) => void): () => void;
   actOnStartup(action: string): Promise<boolean>;
@@ -29,6 +31,11 @@ export interface IDesktopBridge {
   openLink(url: string): Promise<boolean>;
   installCommand(): Promise<boolean>;
   keepAppearance(preferences: JsonObject): void;
+  readSpelling(): Promise<unknown>;
+  keepSpelling(isChecking: boolean, languages: readonly string[]): void;
+  onFieldMenu(listener: (request: unknown) => void): () => void;
+  replaceMisspelling(text: string): Promise<boolean>;
+  addToDictionary(word: string): Promise<boolean>;
   edit(action: string): Promise<boolean>;
   setMenuBar(menuBar: JsonObject): void;
   onMenuCommand(listener: (id: string) => void): () => void;

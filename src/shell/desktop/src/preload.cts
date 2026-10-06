@@ -38,6 +38,14 @@ contextBridge.exposeInMainWorld("teamrun", {
   answerClose(requestId: string, isSaved: boolean): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:closeAnswer", requestId, isSaved) as Promise<boolean>;
   },
+  onUpdateSaveRequest(listener: (requestId: string) => void): () => void {
+    const handler = (_event: IpcRendererEvent, requestId: string): void => listener(requestId);
+    ipcRenderer.on("teamrun:updateSaveRequest", handler);
+    return () => ipcRenderer.removeListener("teamrun:updateSaveRequest", handler);
+  },
+  answerUpdateSave(requestId: string, problems: readonly string[]): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:updateSaveAnswer", requestId, problems) as Promise<boolean>;
+  },
   readStartup(): Promise<unknown> {
     return ipcRenderer.invoke("teamrun:readStartup");
   },
@@ -80,6 +88,23 @@ contextBridge.exposeInMainWorld("teamrun", {
   },
   keepAppearance(preferences: unknown): void {
     ipcRenderer.send("teamrun:keepAppearance", preferences);
+  },
+  readSpelling(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readSpelling");
+  },
+  keepSpelling(isChecking: boolean, languages: readonly string[]): void {
+    ipcRenderer.send("teamrun:spelling", isChecking, languages);
+  },
+  onFieldMenu(listener: (request: unknown) => void): () => void {
+    const handler = (_event: IpcRendererEvent, request: unknown): void => listener(request);
+    ipcRenderer.on("teamrun:fieldMenu", handler);
+    return () => ipcRenderer.removeListener("teamrun:fieldMenu", handler);
+  },
+  replaceMisspelling(text: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:replaceMisspelling", text) as Promise<boolean>;
+  },
+  addToDictionary(word: string): Promise<boolean> {
+    return ipcRenderer.invoke("teamrun:addToDictionary", word) as Promise<boolean>;
   },
   edit(action: string): Promise<boolean> {
     return ipcRenderer.invoke("teamrun:edit", action) as Promise<boolean>;

@@ -18,6 +18,7 @@ import type { IMenuHost } from "./i-menu-host.js";
 import type { INotificationHost } from "./i-notification-host.js";
 import type { ISessionHost } from "./i-session-host.js";
 import type { IShellHost } from "./i-shell-host.js";
+import type { ITrayHost } from "./i-tray-host.js";
 
 export interface IElectron {
   readonly app: IApplicationHost;
@@ -29,6 +30,7 @@ export interface IElectron {
   readonly shell: IShellHost;
   readonly dialog: IDialogHost;
   readonly notifications: INotificationHost;
+  readonly tray: ITrayHost;
 
   createWindow(options: BrowserWindowConstructorOptions): IDesktopWindow;
 }

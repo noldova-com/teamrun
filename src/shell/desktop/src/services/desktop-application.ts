@@ -17,17 +17,35 @@ import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey,
-  ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
+  SettingValue, ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, type DataDirectory, DataDirectoryLocator, DiagnosticRedactor, LaunchSettings, LogText, RuntimeBuild, RuntimeEntry } from "@noldova/teamrun-shell-runtime";
+import {
+  AppImageSource,
+  ConnectionException,
+  type DataDirectory,
+  DataDirectoryLocator,
+  DeviceFolder,
+  DiagnosticRedactor,
+  Installation,
+  LaunchSettings,
+  LogText,
+  ProcessPresence,
+  RuntimeBuild,
+  RuntimeEntry,
+  ShellSettings,
+  SystemCommand
+} from "@noldova/teamrun-shell-runtime";
 
 import { PathCommandException } from "../exceptions/path-command.exception.js";
+import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
+import type { IContextMenuParams } from "../interfaces/i-context-menu-params.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import type { IAppearanceStore } from "../interfaces/i-appearance-store.js";
 import type { IElectron } from "../interfaces/i-electron.js";
 import type { IIpcEvent } from "../interfaces/i-ipc-event.js";
 import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
+import type { IUpdateHost } from "../interfaces/i-update-host.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
 import { PathCommandOutcome } from "../enums/path-command-outcome.js";
@@ -45,8 +63,8 @@ import { Resources } from "../resources.js";
 import { AppIcons } from "./app-icons.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
+import { DeviceSettingFollower } from "./device-setting-follower.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
-import { DeviceIdentity } from "./device-identity.js";
 import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
 import { OpenWindow } from "./open-window.js";
@@ -55,7 +73,13 @@ import { QuitCoordinator } from "./quit-coordinator.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
+import { SpellChecker } from "./spell-checker.js";
+import { SpellingDictionaries } from "./spelling-dictionaries.js";
 import { SystemNotifier } from "./system-notifier.js";
+import { TrayController } from "./tray-controller.js";
+import { TrayHostWatcher } from "./tray-host-watcher.js";
+import { UpdateBarrierGate } from "./update-barrier-gate.js";
+import { UpdateBarrierWatch } from "./update-barrier-watch.js";
 import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
 
@@ -81,8 +105,15 @@ export class DesktopApplication {
   private readonly policy: SenderPolicy;
   private readonly factory: WindowFactory;
   private readonly startup: RuntimeStartup;
+  private readonly watch: UpdateBarrierWatch;
+  private readonly recordDesktopAsync: () => Promise<boolean>;
+  private readonly gate: UpdateBarrierGate;
   private readonly notifier: SystemNotifier;
   private readonly quit: QuitCoordinator;
+  private readonly tray: TrayController;
+  private readonly trayHosts: TrayHostWatcher;
+  private readonly trayIcon: DeviceSettingFollower;
+  private readonly spelling: SpellChecker;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly deviceFolder: string;
   private readonly appearanceStore: IAppearanceStore;
@@ -93,6 +124,7 @@ export class DesktopApplication {
   private device: Promise<string | null> = Promise.resolve(null);
   private knownDevice: string | null = null;
   private isReady: boolean = false;
+  private hasPassedBarrier: boolean = false;
 
   private constructor(
     electron: IElectron,
@@ -105,12 +137,14 @@ export class DesktopApplication {
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
     createPathCommand: (executablePath: string) => PathCommand,
-    icons: AppIcons) {
+    icons: AppIcons,
+    spelling: SpellChecker,
+    installation: Installation,
+    recordDesktopAsync: () => Promise<boolean>) {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
-    this.deviceFolder = DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument)
-      ?? DeviceIdentity.locateFolder(process.platform, process.env, process.homeFolder);
+    this.deviceFolder = DesktopApplication.locateDeviceFolder(process);
     this.appearanceStore = createAppearanceStore(this.deviceFolder);
     this.process = process;
     this.settings = settings;
@@ -122,18 +156,36 @@ export class DesktopApplication {
     this.policy = new SenderPolicy(settings.windowUrl);
     this.factory = new WindowFactory(settings, this.policy, electron, taskbar, icons);
     this.notifier = new SystemNotifier(electron.notifications, log, () => icons.window, () => this.isAnyWindowFocused(), t => this.openNotification(t));
-    this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }));
+    this.gate = new UpdateBarrierGate(installation, RuntimeBuild.identity.productVersion, electron.dialog, t => log.write(t));
+    const updates: IUpdateHost = {
+      processId: process.processId,
+      readBarrierAsync: () => installation.readAsync(),
+      hasUpdateEndedAsync: () => installation.hasEndedAsync(),
+      saveAsync: () => this.saveForUpdateAsync(),
+      passBarrierAsync: t => this.passBarrierAsync(() => this.gate.askAsync(t)),
+      quit: () => electron.app.exit(Resources.quitExitCode)
+    };
+    this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }), updates);
+    this.watch = new UpdateBarrierWatch(updates, () => !Object.isNull(this.startup.connection), Resources.updateBarrierInterval);
+    this.recordDesktopAsync = recordDesktopAsync;
     this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
+    this.tray = new TrayController(electron.tray, electron.menu, icons, process.platform,
+      { open: () => this.reopen(), openNotification: t => this.openNotification(t), setDoNotDisturb: t => void this.setDoNotDisturbAsync(t), quit: () => electron.app.quit() }, t => this.log.write(t));
+    this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.tray.setHostAvailable(t));
+    this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
+      t => this.tray.setEnabled(t === true), t => this.log.write(t));
+    this.spelling = spelling;
   }
 
   public static start(
     electron: IElectron,
     process: IDesktopProcess,
     moduleUrl: string,
-    createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
+    createLauncher: (settings: LaunchSettings, installation: Installation) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
-    createPathCommand: (executablePath: string) => PathCommand): void {
+    createPathCommand: (executablePath: string) => PathCommand,
+    recordDesktopAsync: (installation: Installation) => Promise<boolean>): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
@@ -147,7 +199,8 @@ export class DesktopApplication {
       process.homeFolder,
       join(moduleDirectory, ...Resources.repositoryRootSegments),
       DesktopApplication.readArgument(process.argv, Resources.dataDirectoryArgument));
-    if (Object.isUndefined(DesktopApplication.readArgument(process.argv, Resources.userDataArgument)))
+    const userData = DesktopApplication.readArgument(process.argv, Resources.userDataArgument);
+    if (Object.isUndefined(userData))
       electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
     const launchSettings = new LaunchSettings(
       dataDirectory,
@@ -155,11 +208,21 @@ export class DesktopApplication {
       RuntimeEntry.entryPath,
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
+    const presence = ProcessPresence.create(process.platform, new SystemCommand());
+    const installation = new Installation(
+      Installation.locate(DesktopApplication.locateDeviceFolder(process), AppImageSource.locateProgram(process.env, process.execPath), process.platform), t => presence.isRunningAsync(t));
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
+    const profileFolder = userData ?? dataDirectory.profileFolder;
+    const languages = process.platform === Resources.macPlatform
+      ? []
+      : SpellingDictionaries.install(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.dictionaryFolderSegments), profileFolder, t => log.write(t));
+    const spelling = new SpellChecker(
+      () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings), readDeviceAsync, createAppearanceStore, createPathCommand, icons);
+      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createAppearanceStore, createPathCommand, icons,
+      spelling, installation, () => recordDesktopAsync(installation));
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -176,11 +239,27 @@ export class DesktopApplication {
     app.enableSandbox();
     app.on(Resources.secondInstanceEvent, () => this.focus());
     app.on(Resources.windowAllClosedEvent, () => app.quit());
-    app.on(Resources.willQuitEvent, () => this.startup.close());
+    app.on(Resources.willQuitEvent, () => {
+      this.watch.stop();
+      this.trayHosts.stop();
+      this.tray.dispose();
+      this.startup.close();
+    });
     void app.whenReady().then(() => this.ready());
   }
 
+  private async passBarrierAsync(pass: () => Promise<boolean>): Promise<boolean> {
+    try {
+      return await pass();
+    }
+    catch (error) {
+      this.log.write(Resources.formatBarrierUnsettled(String(error)));
+      return false;
+    }
+  }
+
   private ready(): void {
+    this.spelling.start();
     const session = this.electron.session.defaultSession;
     ApplicationMenu.install(this.electron.menu, this.settings);
     this.electron.app.dock?.setIcon(this.icons.dock);
@@ -196,8 +275,13 @@ export class DesktopApplication {
     this.electron.ipcMain.on(Resources.readyChannel, (event, appearance) => this.show(event, appearance));
     this.electron.ipcMain.on(Resources.appearanceChannel, (event, appearance) => this.repaint(event, appearance));
     this.electron.ipcMain.on(Resources.keepAppearanceChannel, (event, preferences) => this.keepAppearance(event, preferences));
+    this.electron.ipcMain.handle(Resources.readSpellingChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.spelling.toJson());
+    this.electron.ipcMain.on(Resources.spellingChannel, (event, isChecking, languages) => this.keepSpelling(event, isChecking, languages));
+    this.electron.ipcMain.handle(Resources.replaceMisspellingChannel, (event, text) => this.replaceMisspelling(event, text));
+    this.electron.ipcMain.handle(Resources.addToDictionaryChannel, (event, word) => this.addToDictionary(event, word));
     this.electron.ipcMain.on(Resources.menuBarChannel, (event, menuBar) => this.showMenuBar(event, menuBar));
     this.electron.ipcMain.handle(Resources.closeAnswerChannel, (event, requestId, isSaved) => this.answerClose(event, requestId, isSaved));
+    this.electron.ipcMain.handle(Resources.updateSaveAnswerChannel, (event, requestId, problems) => this.findTrusted(event)?.updateSaves.answer(requestId, problems) ?? false);
     this.electron.ipcMain.handle(Resources.quitAnswerChannel, (event, choice) => this.answerQuit(event, choice));
     this.electron.ipcMain.on(Resources.moduleLogChannel, (event, moduleId, message) => this.writeModuleLog(event, moduleId, message));
     this.electron.ipcMain.on(Resources.windowErrorChannel, (event, moduleId, text) => this.writeWindowError(event, moduleId, text));
@@ -213,13 +297,32 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
     this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
-      if (this.windows.size === 0)
+      if (this.hasPassedBarrier && this.windows.size === 0)
         this.open();
     });
-    void this.readAppearanceAsync().then(() => {
+    void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync(), this.recordSelfAsync()]).then(([isClear]) => {
+      if (!isClear) {
+        this.electron.app.exit(Resources.quitExitCode);
+        return;
+      }
+      this.hasPassedBarrier = true;
+      this.tray.setHostAvailable(this.trayHosts.isAvailable);
+      this.tray.setEnabled(this.trayIcon.value === true);
+      this.trayHosts.start();
       this.open();
+      this.watch.start();
       void this.startup.startAsync();
     });
+  }
+
+  private async recordSelfAsync(): Promise<void> {
+    try {
+      if (!await this.recordDesktopAsync())
+        this.log.write(Resources.formatDesktopUnrecorded(Resources.updateHolderNotFound));
+    }
+    catch (error) {
+      this.log.write(Resources.formatDesktopUnrecorded(String(error)));
+    }
   }
 
   private async readAppearanceAsync(): Promise<void> {
@@ -250,11 +353,44 @@ export class DesktopApplication {
     this.appearanceStore.writeAsync(json).catch((error: unknown) => this.log.write(Resources.formatAppearanceUnsaved(String(error))));
   }
 
+  private keepSpelling(event: IIpcEvent, isChecking: unknown, languages: unknown): void {
+    if (Object.isNull(this.findTrusted(event)))
+      return;
+    if (!Object.isBoolean(isChecking) || !Array.isArray(languages) || !languages.every(t => Object.isString(t))) {
+      this.log.write(Resources.formatSpellingRejected(Resources.spellingInvalid));
+      return;
+    }
+    this.spelling.apply(isChecking, languages);
+  }
+
+  private replaceMisspelling(event: IIpcEvent, text: unknown): boolean {
+    const open = this.findTrusted(event);
+    if (Object.isNull(open) || !Object.isString(text) || text.length === 0 || text.length > Resources.spellingTextLimit)
+      return false;
+    open.window.webContents.replaceMisspelling(text);
+    return true;
+  }
+
+  private addToDictionary(event: IIpcEvent, word: unknown): boolean {
+    return !Object.isNull(this.findTrusted(event)) && Object.isString(word) && Resources.dictionaryWordPattern.test(word) && this.spelling.addWord(word);
+  }
+
+  private forwardFieldMenu(open: OpenWindow, params: IContextMenuParams): void {
+    open.window.webContents.send(Resources.fieldMenuChannel, {
+      [Resources.xField]: params.x,
+      [Resources.yField]: params.y,
+      [Resources.isKeyboardField]: params.menuSourceType === Resources.keyboardMenuSource,
+      [Resources.wordField]: params.misspelledWord,
+      [Resources.suggestionsField]: [...params.dictionarySuggestions]
+    });
+  }
+
   private open(): void {
     const window = this.factory.create(WindowState.createDefault(ScreenArea.of(this.electron.screen.getPrimaryDisplay().workArea)), this.appearance);
     const contentsId = window.webContents.id;
     const open = new OpenWindow(window, this.electron.screen, this.log, this.quit, this.settings.platform);
     window.webContents.on(Resources.didStartLoadingEvent, () => this.notifier.hold());
+    window.webContents.on(Resources.contextMenuEvent, (_event, params) => this.forwardFieldMenu(open, params));
     new WindowRecovery(open, this.electron.dialog, this.log, this.process, () => this.electron.app.quit(), () => this.openLogFolderAsync(), Resources.reloadCrashLimit, Resources.rendererEndLimit);
     this.windows.set(contentsId, open);
     window.once(Resources.closedEvent, () => this.windows.delete(contentsId));
@@ -271,6 +407,10 @@ export class DesktopApplication {
       this.notifier.reset();
     if (!isReady)
       this.quit.release();
+    if (isReady && !this.isReady)
+      void this.refreshTrayAsync();
+    else if (!isReady)
+      this.tray.clear();
     this.isReady = isReady;
     for (const open of this.windows.values())
       if (!open.window.isDestroyed()) {
@@ -294,7 +434,9 @@ export class DesktopApplication {
 
   private receiveWork(event: Event): void {
     try {
-      this.quit.receive(WorkReport.fromJson(event.payload));
+      const report = WorkReport.fromJson(event.payload);
+      this.quit.receive(report);
+      this.tray.receiveWork(report);
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -390,6 +532,7 @@ export class DesktopApplication {
   private readSettingForDevice(event: Event): JsonValue | undefined {
     try {
       const change = SettingChange.fromJson(event.payload);
+      this.trayIcon.receive(change, this.knownDevice);
       if (Object.isNull(change.key.device))
         return event.payload;
       return change.key.device === this.knownDevice ? new SettingChange(new SettingKey(change.key.name, change.key.scope), change.value, change.isSet).toJson() : undefined;
@@ -413,7 +556,9 @@ export class DesktopApplication {
     try {
       const broadcast = NotificationBroadcast.fromJson(event.payload);
       this.notifier.receive(broadcast);
-      return (Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice)).toJson();
+      const state = Object.isNull(this.knownDevice) ? new NotificationState(broadcast.notifications, false, broadcast.mutedModules, broadcast.sequence) : broadcast.stateFor(this.knownDevice);
+      this.tray.receiveNotifications(state);
+      return state.toJson();
     }
     catch (error) {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
@@ -430,6 +575,45 @@ export class DesktopApplication {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
       return undefined;
     }
+  }
+
+  private async refreshTrayAsync(): Promise<void> {
+    const epoch = this.notifier.epoch;
+    const device = await this.device;
+    if (Object.isNull(device))
+      return;
+    const [work, notifications] = await Promise.all([
+      this.callAsync(ShellMethods.work, null),
+      this.callAsync(ShellMethods.notifications, new NotificationsQuery(device).toJson()),
+      this.trayIcon.refreshAsync(device)
+    ]);
+    if (epoch !== this.notifier.epoch)
+      return;
+    try {
+      if (!work.hasFailed)
+        this.tray.receiveWork(WorkReport.fromJson(work.payload));
+      if (!notifications.hasFailed)
+        this.tray.receiveNotifications(NotificationState.fromJson(notifications.payload));
+    }
+    catch (error) {
+      this.log.write(Resources.formatTrayStateNotRead(String(error)));
+    }
+  }
+
+  private async setDoNotDisturbAsync(isOn: boolean): Promise<void> {
+    const device = await this.device;
+    const failure = Object.isNull(device)
+      ? new Failure(FailureCode.Unavailable, Resources.deviceNotIdentified)
+      : (await this.callAsync(ShellMethods.setSetting, new SettingValue(new SettingKey(ShellSettings.doNotDisturb, null, device), isOn).toJson())).failure;
+    if (Object.isUndefined(failure))
+      return;
+    this.log.write(Resources.formatDoNotDisturbNotSet(failure.message));
+    this.tray.rebuildMenu();
+  }
+
+  private reopen(): void {
+    if (Object.isNull(this.focus()))
+      this.open();
   }
 
   private async readNotificationsAsync(name: QualifiedName): Promise<JsonObject> {
@@ -461,12 +645,20 @@ export class DesktopApplication {
     if (kind === StartupStateKind.Connecting)
       return;
     if (kind === StartupStateKind.Ready && this.restored.has(open))
-      await open.bounds.saveUnsavedAsync().catch((error: unknown) => this.log.write(Resources.formatBoundsUnsaved(String(error))));
+      await open.bounds.saveUnsavedAsync().catch((error: unknown) => {
+        if (!(error instanceof WindowStateUnavailableException))
+          this.log.write(Resources.formatBoundsUnsaved(String(error)));
+      });
     else if (kind === StartupStateKind.Ready) {
       this.restored.add(open);
       const device = await this.device;
       if (!Object.isNull(device))
-        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => this.log.write(Resources.formatBoundsNotRestored(String(error))));
+        await open.bounds.restoreAsync(this.createBoundsStore(device)).catch((error: unknown) => {
+          if (error instanceof WindowStateUnavailableException)
+            this.restored.delete(open);
+          else
+            this.log.write(Resources.formatBoundsNotRestored(String(error)));
+        });
     }
     open.settle();
   }
@@ -618,6 +810,11 @@ export class DesktopApplication {
     return open;
   }
 
+  private async saveForUpdateAsync(): Promise<readonly string[]> {
+    const problems = await Promise.all([...this.windows.values()].map((t, index) => t.updateSaves.requestAsync(index + 1)));
+    return problems.flat();
+  }
+
   private answerClose(event: IIpcEvent, requestId: unknown, isSaved: unknown): boolean {
     return this.findTrusted(event)?.coordinator.answer(requestId, isSaved) ?? false;
   }
@@ -678,6 +875,10 @@ export class DesktopApplication {
 
   private static isModuleId(value: unknown): value is string {
     return Object.isString(value) && Resources.moduleIdPattern.test(value);
+  }
+
+  private static locateDeviceFolder(process: IDesktopProcess): string {
+    return DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument) ?? DeviceFolder.locate(process.platform, process.env, process.homeFolder);
   }
 
   private static readArgument(argv: readonly string[], prefix: string): string | undefined {

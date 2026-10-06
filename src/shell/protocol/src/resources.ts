@@ -37,7 +37,15 @@ export class Resources {
   public static readonly detailsField: string = "details";
   public static readonly executablePathField: string = "executablePath";
   public static readonly policyField: string = "policy";
+  public static readonly keepsWhileSharedField: string = "keepsWhileShared";
+  public static readonly keptForField: string = "keptFor";
   public static readonly descriptionsField: string = "descriptions";
+  public static readonly installationField: string = "installation";
+  public static readonly problemsField: string = "problems";
+  public static readonly processesField: string = "processes";
+  public static readonly earliestField: string = "earliest";
+  public static readonly latestField: string = "latest";
+  public static readonly roleField: string = "role";
   public static readonly locationField: string = "location";
   public static readonly stateField: string = "state";
   public static readonly causeField: string = "cause";
@@ -104,6 +112,7 @@ export class Resources {
   public static readonly notificationSequenceInvalid: string = "A notification's sequence must be a whole number from 1.";
   public static readonly currentSequenceInvalid: string = "The notifications' sequence must be a whole number from 0.";
   public static readonly workSequenceInvalid: string = "The work's sequence must be a whole number from 0.";
+  public static readonly keptForInvalid: string = "The number of other clients a runtime is kept for must be a whole number from 1.";
   public static readonly commandSequenceInvalid: string = "The commands' sequence must be a whole number from 0.";
   public static readonly processIdInvalid: string = "A running program's process id must be a whole number from 1.";
   public static readonly programStartInvalid: string = "A running program's start must be a date and time.";
@@ -176,6 +185,10 @@ export class Resources {
   public static readonly modulesMember: string = "modules";
   public static readonly workMember: string = "work";
   public static readonly programsMember: string = "programs";
+  public static readonly updateMember: string = "update";
+  public static readonly updateSavedMember: string = "updateSaved";
+  public static readonly updatingMember: string = "updating";
+  public static readonly updateEndedMember: string = "updateEnded";
   public static readonly readWindowBoundsMember: string = "readWindowBounds";
   public static readonly writeWindowBoundsMember: string = "writeWindowBounds";
   public static readonly readWindowLayoutMember: string = "readWindowLayout";
@@ -215,6 +228,7 @@ export class Resources {
 
   public static readonly nameInvalid: string = "A name must be an owner, a dot and a member, such as \"shell.handshake\": the owner is \"shell\" or a module id in lowercase kebab-case, and the member starts with a lowercase letter followed by letters and digits.";
   public static readonly protocolVersionInvalid: string = "The protocol version must be a positive integer.";
+  public static readonly processStartInvalid: string = "A process's earliest start must be a finite number no later than its latest start.";
   public static readonly stampedProtocolVersionInvalid: string = "The package's protocol version was not stamped by the build.";
   public static readonly timeoutInvalid: string = "The time limit must be a positive integer of milliseconds.";
   public static readonly maximumFrameLengthInvalid: string = "The maximum frame length must be a positive integer.";

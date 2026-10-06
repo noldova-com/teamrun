@@ -8,6 +8,7 @@
 
 import { TestBed } from "@angular/core/testing";
 
+import { DocumentHeading } from "../../../src/app/models/document-heading";
 import { DocumentTab } from "../../../src/app/models/layout/document-tab";
 import { TabLabel } from "../../../src/app/models/layout/tab-label";
 import { ViewBadge } from "../../../src/app/models/view-badge";
@@ -65,6 +66,15 @@ describe("TabLabelService", () => {
     expect(labels.of(LayoutFixture.todo).title).toBe("Todo");
     labels.setTitle(LayoutFixture.settings, "Settings");
     expect(labels.of(LayoutFixture.settings)).toEqual(new TabLabel("Settings", Resources.documentGlyph));
+  });
+
+  it("keeps a document's breadcrumb with its title, and gives any other tab its label's title with none", () => {
+    const labels = TestBed.inject(TabLabelService);
+    labels.register("files.tree", new TabLabel("Files", "folder"));
+    labels.setHeading(LayoutFixture.plan, new DocumentHeading("Plan", ["Notes", "Drafts"]));
+
+    expect([labels.headingOf(LayoutFixture.plan).text, labels.of(LayoutFixture.plan).title]).toEqual(["Notes › Drafts › Plan", "Plan"]);
+    expect(labels.headingOf(LayoutFixture.files)).toEqual(new DocumentHeading("Files"));
   });
 
   it("falls back to the instance or the name with a generic icon", () => {

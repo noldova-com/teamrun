@@ -11,6 +11,7 @@ import { Injectable, type WritableSignal, signal } from "@angular/core";
 import "@noldova/teamrun-foundation-core";
 
 import { Resources } from "../../resources";
+import { DocumentHeading } from "../models/document-heading";
 import type { Tab } from "../models/layout/tab";
 import { TabLabel } from "../models/layout/tab-label";
 import type { ViewBadge } from "../models/view-badge";
@@ -19,6 +20,7 @@ import type { ViewBadge } from "../models/view-badge";
 export class TabLabelService {
   private readonly labels: WritableSignal<ReadonlyMap<string, TabLabel>> = signal(new Map());
   private readonly titles: WritableSignal<ReadonlyMap<string, string>> = signal(new Map());
+  private readonly breadcrumbs: WritableSignal<ReadonlyMap<string, readonly string[]>> = signal(new Map());
   private readonly badges: WritableSignal<ReadonlyMap<string, ViewBadge>> = signal(new Map());
   private readonly working: WritableSignal<ReadonlySet<string>> = signal(new Set());
 
@@ -44,6 +46,15 @@ export class TabLabelService {
 
   public setTitle(tab: Tab, title: string): void {
     this.titles.update(t => new Map([...t, [tab.key, title]]));
+  }
+
+  public setHeading(tab: Tab, heading: DocumentHeading): void {
+    this.setTitle(tab, heading.title);
+    this.breadcrumbs.update(t => new Map([...t, [tab.key, heading.breadcrumb]]));
+  }
+
+  public headingOf(tab: Tab): DocumentHeading {
+    return new DocumentHeading(this.of(tab).title, this.breadcrumbs().get(tab.key) ?? []);
   }
 
   public of(tab: Tab): TabLabel {

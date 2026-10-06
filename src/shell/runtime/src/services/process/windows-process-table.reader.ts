@@ -8,37 +8,55 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import { SystemCommandException } from "../../exceptions/system-command.exception.js";
 import type { IProcessTableReader } from "../../interfaces/i-process-table.reader.js";
+import type { IWindowsProcessApi } from "../../interfaces/i-windows-process-api.js";
 import { ProcessTable } from "../../models/process-table.js";
 import { ProcessTableEntry } from "../../models/process-table-entry.js";
 import { Resources } from "../../resources.js";
-import type { WindowsPowerShell } from "./windows-power-shell.js";
+import type { ProcessClock } from "./process-clock.js";
 
 export class WindowsProcessTableReader implements IProcessTableReader {
-  private readonly shell: WindowsPowerShell;
+  private readonly api: IWindowsProcessApi;
+  private readonly clock: ProcessClock;
 
-  public constructor(shell: WindowsPowerShell) {
-    this.shell = shell;
+  public constructor(api: IWindowsProcessApi, clock: ProcessClock) {
+    this.api = api;
+    this.clock = clock;
   }
 
-  public static parse(row: string): ProcessTableEntry {
-    const match = Resources.windowsProcessTableRowPattern.exec(row);
-    if (Object.isNull(match))
-      throw new SystemCommandException(Resources.formatProcessTableRowUnreadable(row));
-    const [, processId, parentId, started, executable] = match;
-    const time = Number(started);
-    return new ProcessTableEntry(
-      Number(processId),
-      Number(parentId),
-      null,
-      time,
-      time - Resources.windowsStartMargin,
-      time + Resources.windowsStartMargin,
-      String.isNullOrEmpty(executable) ? null : String(executable));
+  public static toMilliseconds(fileTime: bigint): number {
+    return Number(fileTime / Resources.fileTimeUnitsPerMillisecond) - Resources.fileTimeEpochMilliseconds;
   }
 
   public async readAsync(): Promise<ProcessTable> {
-    return new ProcessTable((await this.shell.runAsync(Resources.windowsProcessTableScript)).map(t => WindowsProcessTableReader.parse(t)));
+    const taken = this.clock.now();
+    const listed = this.api.listProcesses();
+    return new ProcessTable(listed.flatMap(([processId, parentId]) => {
+      const entry = this.read(processId, parentId);
+      return Object.isNull(entry) || entry.earliest > taken ? [] : [entry];
+    }));
+  }
+
+  private read(processId: number, parentId: number): ProcessTableEntry | null {
+    const handle = this.api.openProcess(processId, Resources.windowsQueryAccess);
+    if (Object.isNumber(handle))
+      return null;
+    try {
+      const created = this.api.readCreationTime(handle);
+      if (Object.isNull(created))
+        return null;
+      const started = WindowsProcessTableReader.toMilliseconds(created);
+      return new ProcessTableEntry(
+        processId,
+        parentId,
+        null,
+        started,
+        started - Resources.windowsStartMargin,
+        started + Resources.windowsStartMargin,
+        this.api.readImagePath(handle));
+    }
+    finally {
+      this.api.closeHandle(handle);
+    }
   }
 }

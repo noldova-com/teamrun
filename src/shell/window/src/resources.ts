@@ -226,6 +226,13 @@ export class Resources {
   public static readonly appearancePage: string = "Appearance";
   public static readonly themeSetting: string = "shell.theme";
   public static readonly modeSetting: string = "shell.mode";
+  public static readonly spellCheckSetting: string = "shell.spellCheck";
+  public static readonly spellCheckLanguagesSetting: string = "shell.spellCheckLanguages";
+  public static readonly languagesField: string = "languages";
+  public static readonly fallbackField: string = "fallback";
+  public static readonly xField: string = "x";
+  public static readonly yField: string = "y";
+  public static readonly isKeyboardField: string = "isKeyboard";
   public static readonly interfaceFontSetting: string = "shell.interfaceFont";
   public static readonly codeFontSetting: string = "shell.codeFont";
   public static readonly panelSizeSetting: string = "shell.panelSize";
@@ -252,7 +259,14 @@ export class Resources {
   public static readonly choicePillMinimum: number = 2;
   public static readonly choicePillLimit: number = 4;
   public static readonly noLanguagesNote: string = "No spelling languages are offered on this device.";
+  public static readonly macSpellingNote: string = "On macOS the system chooses the spelling languages.";
+
+  public static formatSpellingFallback(language: string): string {
+    return `None of this device's languages has a dictionary here, so words are checked in ${language}.`;
+  }
+
   public static readonly settingErrorIdPrefix: string = "tr-setting-error-";
+  public static readonly settingDescriptionIdPrefix: string = "tr-setting-description-";
   public static readonly shortcutsExplanation: string = "The keys that run commands. Choose a key to record a new one; your keys apply on every device.";
   public static readonly resetAllShortcutsLabel: string = "Reset all shortcuts";
   public static readonly removeKeyLabel: string = "Remove";
@@ -410,6 +424,10 @@ export class Resources {
   public static readonly countParameter: string = "count";
   public static readonly descriptionParameter: string = "description";
   public static readonly badgeCountInvalid: string = "A badge's count must be a whole number from 1, or null for a dot.";
+  public static readonly breadcrumbParameter: string = "breadcrumb";
+  public static readonly invalidBreadcrumb: string = "A breadcrumb is a list of segments that are not blank.";
+  public static readonly breadcrumbSeparator: string = " › ";
+  public static readonly breadcrumbGlyph: string = "chevron_right";
   public static readonly textParameter: string = "text";
   public static readonly tooltipParameter: string = "tooltip";
   public static readonly commandParameter: string = "command";
@@ -503,6 +521,7 @@ export class Resources {
   public static readonly windowRowMinimumDragRem: number = 6;
   public static readonly altKey: string = "Alt";
   public static readonly functionKey: string = "F10";
+  public static readonly contextMenuKey: string = "ContextMenu";
   public static readonly ariaExpandedAttribute: string = "aria-expanded";
   public static readonly trueValue: string = "true";
   public static readonly fileMenu: string = "shell.file";
@@ -521,6 +540,19 @@ export class Resources {
   public static readonly fieldMenuTitle: string = "Text field";
   public static readonly fieldEditingGroup: string = "shell.fieldEditing";
   public static readonly fieldEditActions: readonly EditAction[] = [EditAction.Cut, EditAction.Copy, EditAction.Paste, EditAction.SelectAll];
+  public static readonly fieldSpellingGroup: string = "shell.fieldSpelling";
+  public static readonly replaceMisspellingCommand: string = "shell.replaceMisspelling";
+  public static readonly replaceMisspellingTitle: string = "Replace the misspelled word";
+  public static readonly addToDictionaryCommand: string = "shell.addToDictionary";
+  public static readonly addToDictionaryTitle: string = "Add to dictionary";
+  public static readonly addToDictionaryGlyph: string = "library_add";
+  public static readonly noSuggestionsLabel: string = "No suggestions";
+  public static readonly textArgument: string = "text";
+  public static readonly wordArgument: string = "word";
+  public static readonly suggestionsArgument: string = "suggestions";
+  public static readonly suggestionLimit: number = 5;
+  public static readonly fieldMenuWait: number = 300;
+  public static readonly fieldMenuSlack: number = 1;
   public static readonly closeGroup: string = "shell.close";
   public static readonly tabMoveToMenu: string = "shell.tabMoveTo";
   public static readonly tabSplitMenu: string = "shell.tabSplit";
@@ -632,6 +664,8 @@ export class Resources {
   public static readonly windowPartSaveFailed: string = `Its window part failed to save while ${productName} was closing.`;
   public static readonly windowPartSaveFailedLate: string = `Its window part failed to save after ${productName} stopped waiting for it.`;
   public static readonly windowPartSaveUnfinished: string = `Its window part did not finish saving within 4 seconds while ${productName} was closing; ${productName} closed without it.`;
+  public static readonly windowPartSaveFailedForUpdate: string = `Its window part failed to save while ${productName} was preparing to install an update.`;
+  public static readonly windowPartSaveUnfinishedForUpdate: string = `Its window part did not finish saving within 4 seconds while ${productName} was preparing to install an update; the update stopped.`;
   public static readonly partSaveTimeout: number = 4000;
   public static readonly partSaveUnfinishedText: string = `${productName} closed after waiting 4 seconds for it.`;
   public static readonly windowLogLimit: number = 65536;
@@ -687,6 +721,12 @@ export class Resources {
     ["views", "Views"],
     [Resources.notificationsKind, "Notification kinds"]
   ];
+  public static readonly programsTitle: string = "Running programs";
+  public static readonly noPrograms: string = "No programs are running.";
+  public static readonly programExited: string = "Exited, its processes still run";
+  public static readonly pathSeparators: RegExp = /[\\/]/u;
+  public static readonly minuteDuration: number = 60_000;
+  public static readonly programStartFormat: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
   public static readonly moduleSelector: string = "[data-module]";
   public static readonly moduleData: string = "module";
   public static readonly bridgeName: string = "teamrun";
@@ -710,6 +750,7 @@ export class Resources {
   public static readonly stopWorkAction: string = "stopWork";
   public static readonly retryAction: string = "retry";
   public static readonly startingTitle: string = `Starting ${Resources.productName}…`;
+  public static readonly updatingText: string = `Saving your work and closing ${Resources.productName}`;
   public static readonly preShellDataTitle: string = `Data from an earlier ${Resources.productName}`;
   public static readonly preShellDataText: string =
     `This release does not open data that an earlier ${Resources.productName} wrote. Moving it aside keeps all of it in a new folder beside it, ` +
@@ -727,6 +768,7 @@ export class Resources {
   public static readonly missingBridge: string = "The window needs the desktop's bridge, which the preload provides.";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly isWaitingField: string = "isWaiting";
+  public static readonly isUpdateField: string = "isUpdate";
   public static readonly quitTitle: string = "Work is still running";
   public static readonly quitText: string = `${Resources.productName} is still working on:`;
   public static readonly quitHint: string = "Wait for it to finish, or stop it now.";
@@ -734,6 +776,9 @@ export class Resources {
   public static readonly quitWaitingText: string = `${Resources.productName} quits when this work finishes:`;
   public static readonly waitThenQuit: string = "Wait, then quit";
   public static readonly stopWorkAndQuit: string = "Stop the work and quit";
+  public static readonly updateWaitingText: string = `${Resources.productName} updates when this work finishes:`;
+  public static readonly waitThenUpdate: string = "Wait, then update";
+  public static readonly stopWorkAndUpdate: string = "Stop the work and update";
   public static readonly cancel: string = "Cancel";
   public static readonly quitListLimit: number = 5;
   public static readonly waitFocusSelector: string = "[data-tr-quit=Wait]";
@@ -743,8 +788,16 @@ export class Resources {
     return `${moduleName} couldn't save, so ${Resources.productName} stayed open`;
   }
 
+  public static formatPartSaveFailedForUpdate(moduleName: string): string {
+    return `${moduleName} couldn't save`;
+  }
+
   public static formatPartSaveUnfinished(moduleName: string): string {
     return `${moduleName} didn't finish saving`;
+  }
+
+  public static formatWindowTitle(title: string): string {
+    return `${title} — ${Resources.productName}`;
   }
 
   public static formatMoreWork(count: number): string {
@@ -757,6 +810,30 @@ export class Resources {
 
   public static formatModuleDidNotStart(displayName: string): string {
     return `${displayName} didn't start`;
+  }
+
+  public static formatRunningFor(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    if (minutes < 1)
+      return "Running for less than a minute";
+    if (hours < 1)
+      return `Running for ${minutes} min`;
+    if (days < 1)
+      return minutes % 60 === 0 ? `Running for ${hours} h` : `Running for ${hours} h ${minutes % 60} min`;
+    return hours % 24 === 0 ? `Running for ${days} d` : `Running for ${days} d ${hours % 24} h`;
+  }
+
+  public static formatProgramStarted(time: string): string {
+    return `Started ${time}`;
+  }
+
+  public static formatProcessId(processId: number): string {
+    return `Process ${processId}`;
+  }
+
+  public static formatProgramCount(count: number): string {
+    return count === 1 ? "1 program" : `${count} programs`;
   }
 
   public static formatProductVersion(productVersion: string): string {
@@ -863,6 +940,10 @@ export class Resources {
 
   public static formatForeignName(moduleId: string, name: string): string {
     return `The module ${moduleId} may use only its own methods and events and those of the modules it depends on, not ${name}.`;
+  }
+
+  public static formatUpdatingTitle(version: string): string {
+    return `Installing ${Resources.productName} ${version}`;
   }
 
   public static formatNewerBuild(version: string): string {

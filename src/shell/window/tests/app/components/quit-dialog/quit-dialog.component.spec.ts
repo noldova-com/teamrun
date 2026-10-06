@@ -38,7 +38,7 @@ describe("QuitDialogComponent", () => {
   }
 
   it("asks what to do with the work in progress, with waiting as the focused choice, and passes on each answer", async () => {
-    quit.bridge.askToQuit({ descriptions: ["Indexing the project", "Saving the notes"], isWaiting: false });
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project", "Saving the notes"], isWaiting: false, isUpdate: false });
     await vi.waitFor(() => expect(document.activeElement).toBe(button("Wait")));
 
     const asked = [title(), items(), buttons(), document.querySelector(".tr-dialog-body")?.textContent?.includes("Wait for it to finish, or stop it now.")];
@@ -58,18 +58,32 @@ describe("QuitDialogComponent", () => {
   });
 
   it("waits with the list the desktop keeps current, moves focus to Cancel and lists at most five pieces of work", async () => {
-    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: false });
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: false, isUpdate: false });
     await vi.waitFor(() => expect(document.activeElement).toBe(button("Wait")));
 
-    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true });
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true, isUpdate: false });
     await vi.waitFor(() => expect(document.activeElement).toBe(button("Cancel")));
     const waiting = [title(), buttons(), document.querySelector(".tr-quit-text")?.textContent?.trim()];
-    quit.bridge.askToQuit({ descriptions: ["One", "Two", "Three", "Four", "Five", "Six", "Seven"], isWaiting: true });
+    quit.bridge.askToQuit({ descriptions: ["One", "Two", "Three", "Four", "Five", "Six", "Seven"], isWaiting: true, isUpdate: false });
     await vi.waitFor(() => expect(items().length).toBe(6));
 
     expect(waiting).toEqual(["Waiting for the work to finish", ["Stop the work and quit", "Cancel"], "TeamRun quits when this work finishes:"]);
     expect(items()).toEqual(["One", "Two", "Three", "Four", "Five", "and 2 more"]);
     expect(document.activeElement).toBe(button("Cancel"));
     expect(document.querySelectorAll("[role=dialog]").length).toBe(1);
+  });
+
+  it("asks the same question before an update, with choices that name the update", async () => {
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project (/work/data)"], isWaiting: false, isUpdate: true });
+    await vi.waitFor(() => expect(document.activeElement).toBe(button("Wait")));
+    const asked = [title(), items(), buttons()];
+
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project (/work/data)"], isWaiting: true, isUpdate: true });
+    await vi.waitFor(() => expect(document.activeElement).toBe(button("Cancel")));
+
+    expect(asked).toEqual(["Work is still running", ["Indexing the project (/work/data)"], ["Wait, then update", "Stop the work and update", "Cancel"]]);
+    expect([title(), buttons(), document.querySelector(".tr-quit-text")?.textContent?.trim()]).toEqual([
+      "Waiting for the work to finish", ["Stop the work and update", "Cancel"], "TeamRun updates when this work finishes:"
+    ]);
   });
 });

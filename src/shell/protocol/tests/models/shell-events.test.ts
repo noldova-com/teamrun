@@ -28,6 +28,11 @@ export class ShellEventsTests {
   }
 
   @TestMethod
+  public namesTheUpdateEvents(): void {
+    Assert.areEqual("shell.updating|shell.updateEnded", [ShellEvents.updating.text, ShellEvents.updateEnded.text].join("|"));
+  }
+
+  @TestMethod
   public namesTheCommandsEvent(): void {
     Assert.areEqual("shell.commandsChanged", ShellEvents.commandsChanged.text);
   }

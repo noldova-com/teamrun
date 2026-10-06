@@ -14,6 +14,7 @@ import { QuitChoice } from "../../../src/app/enums/quit-choice";
 import { DesktopBridgeException } from "../../../src/app/exceptions/desktop-bridge.exception";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../../../src/app/exceptions/runtime-request.exception";
+import type { FieldMenuRequest } from "../../../src/app/models/field-menu-request";
 import type { QuitQuestion } from "../../../src/app/models/quit-question";
 import { WindowAppearance } from "../../../src/app/models/window-appearance";
 import { DesktopBridgeService } from "../../../src/app/services/desktop-bridge.service";
@@ -28,6 +29,8 @@ describe("DesktopBridgeService", () => {
     notifyAppearance: (): void => undefined,
     onCloseRequest: (): (() => void) => () => undefined,
     answerClose: (): Promise<boolean> => Promise.resolve(true),
+    onUpdateSaveRequest: (): (() => void) => () => undefined,
+    answerUpdateSave: (): Promise<boolean> => Promise.resolve(true),
     readStartup: (): Promise<unknown> => Promise.resolve(null),
     onStartup: (): (() => void) => () => undefined,
     actOnStartup: (): Promise<boolean> => Promise.resolve(true),
@@ -41,6 +44,11 @@ describe("DesktopBridgeService", () => {
     openLink: (): Promise<boolean> => Promise.resolve(true),
     installCommand: (): Promise<boolean> => Promise.resolve(true),
     keepAppearance: (): void => undefined,
+    readSpelling: (): Promise<unknown> => Promise.resolve(null),
+    keepSpelling: (): void => undefined,
+    onFieldMenu: (): (() => void) => () => undefined,
+    replaceMisspelling: (): Promise<boolean> => Promise.resolve(true),
+    addToDictionary: (): Promise<boolean> => Promise.resolve(true),
     onNotificationOpened: (): (() => void) => () => undefined,
     onQuitQuestion: (): (() => void) => () => undefined,
     answerQuit: (): Promise<boolean> => Promise.resolve(true),
@@ -55,6 +63,8 @@ describe("DesktopBridgeService", () => {
     ["no notifyAppearance", { ...complete, notifyAppearance: null }],
     ["no onCloseRequest", { ...complete, onCloseRequest: null }],
     ["no answerClose", { ...complete, answerClose: null }],
+    ["no onUpdateSaveRequest", { ...complete, onUpdateSaveRequest: null }],
+    ["no answerUpdateSave", { ...complete, answerUpdateSave: null }],
     ["no readStartup", { ...complete, readStartup: null }],
     ["no onStartup", { ...complete, onStartup: null }],
     ["no actOnStartup", { ...complete, actOnStartup: null }],
@@ -68,6 +78,11 @@ describe("DesktopBridgeService", () => {
     ["no openLink", { ...complete, openLink: null }],
     ["no installCommand", { ...complete, installCommand: null }],
     ["no keepAppearance", { ...complete, keepAppearance: null }],
+    ["no readSpelling", { ...complete, readSpelling: null }],
+    ["no keepSpelling", { ...complete, keepSpelling: null }],
+    ["no onFieldMenu", { ...complete, onFieldMenu: null }],
+    ["no replaceMisspelling", { ...complete, replaceMisspelling: null }],
+    ["no addToDictionary", { ...complete, addToDictionary: null }],
     ["no onNotificationOpened", { ...complete, onNotificationOpened: null }],
     ["no onQuitQuestion", { ...complete, onQuitQuestion: null }],
     ["no answerQuit", { ...complete, answerQuit: null }],
@@ -124,6 +139,21 @@ describe("DesktopBridgeService", () => {
     expect(requests).toEqual(["first"]);
     expect(await service.answerCloseAsync("first", false)).toBe(true);
     expect(bridge.answers).toEqual(["first:false"]);
+  });
+
+  it("passes an update's save requests on until unsubscribed and answers them with what did not save", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+    const requests: string[] = [];
+
+    const unsubscribe = service.onUpdateSaveRequest(t => requests.push(t));
+    bridge.requestUpdateSave("first");
+    unsubscribe();
+    bridge.requestUpdateSave("second");
+
+    expect(requests).toEqual(["first"]);
+    expect(await service.answerUpdateSaveAsync("first", ["Notes couldn't save"])).toBe(true);
+    expect(bridge.updateSaveAnswers).toEqual(["first:Notes couldn't save"]);
   });
 
   it("reads and follows the startup state until unsubscribed, and passes the person's choice on", async () => {
@@ -253,13 +283,41 @@ describe("DesktopBridgeService", () => {
     expect(bridge.keptAppearances).toEqual([{ "shell.mode": "Light" }]);
   });
 
+  it("reads the spelling languages the desktop offers and keeps the window's spelling preferences", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.spelling = Promise.resolve({ languages: ["en-US"], fallback: "en-US" });
+    const service = TestBed.inject(DesktopBridgeService);
+
+    const offer = await service.readSpellingAsync();
+    service.keepSpelling(true, ["en-US"]);
+
+    expect([offer.languages, offer.fallback]).toEqual([["en-US"], "en-US"]);
+    expect(bridge.keptSpellings).toEqual([[true, ["en-US"]]]);
+  });
+
+  it("passes on the desktop's field menus as requests, and replaces or adds a word through the desktop", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+    const requests: FieldMenuRequest[] = [];
+
+    const stop = service.onFieldMenu(t => requests.push(t));
+    bridge.publishFieldMenu({ x: 10, y: 20, isKeyboard: false, word: "wrold", suggestions: ["world"] });
+    stop();
+    bridge.publishFieldMenu({ x: 1, y: 2, isKeyboard: true, word: "", suggestions: [] });
+    const answers = [await service.replaceMisspellingAsync("world"), await service.addToDictionaryAsync("TeamRun")];
+
+    expect(requests.map(t => [t.x, t.y, t.isKeyboard, t.toContext()])).toEqual([[10, 20, false, { word: "wrold", suggestions: ["world"] }]]);
+    expect(answers).toEqual([true, true]);
+    expect([bridge.replacements, bridge.addedWords]).toEqual([["world"], ["TeamRun"]]);
+  });
+
   it("passes on the question about work in progress or its end, answers it and writes a module's log lines through the desktop", async () => {
     const bridge = DesktopBridgeFixture.install();
     const service = TestBed.inject(DesktopBridgeService);
     const questions: (QuitQuestion | null)[] = [];
 
     const stop = service.onQuitQuestion(t => questions.push(t));
-    bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true });
+    bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true, isUpdate: false });
     bridge.askToQuit(null);
     stop();
     bridge.askToQuit(null);

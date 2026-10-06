@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { rm, writeFile } from "node:fs/promises";
+import { access, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
@@ -80,7 +80,7 @@ test.describe("settings", () => {
     await window.getByRole("treeitem", { name: "Appearance", exact: true }).focus();
     await window.keyboard.press("ArrowDown");
     await window.keyboard.press("Enter");
-    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications", "Background"]);
     await expect(window.getByRole("treeitem", { name: "Notifications", exact: true })).toHaveAttribute("aria-selected", "true");
     await window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true }).click();
     await expect(window.getByRole("treeitem", { name: "Keyboard shortcuts", exact: true })).toHaveAttribute("aria-selected", "true");
@@ -94,15 +94,24 @@ test.describe("settings", () => {
     await desktop.checkpointAsync("settings-shortcuts");
   });
 
-  test("Appearance's Spelling group checks spelling by default and says when no spelling language is offered", async ({ desktop }) => {
+  test("Appearance's Spelling group checks spelling by default and offers the shipped dictionaries, or says that macOS chooses the languages", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openAsync(window);
     const group = window.locator(".tr-settings-group").filter({ has: window.locator(".tr-settings-group-title", { hasText: "Spelling" }) });
+    const languages = row(window, "shell.spellCheckLanguages");
 
     await group.scrollIntoViewIfNeeded();
 
     await expect(group.getByRole("checkbox", { name: /Underline misspelled words/ })).toBeChecked();
-    await expect(group.locator(".tr-setting-row-note")).toHaveText("No spelling languages are offered on this device.");
+    if (process.platform === "darwin") {
+      await expect(languages.locator(".tr-setting-row-note")).toHaveText("On macOS the system chooses the spelling languages.");
+      await expect(languages.getByRole("checkbox")).toHaveCount(0);
+    } else {
+      await expect(languages.getByRole("checkbox", { name: "English (United States)" })).not.toBeChecked();
+      const notes = await languages.locator(".tr-setting-row-note").allTextContents();
+      expect(notes.filter(t => t !== "None of this device's languages has a dictionary here, so words are checked in English (United States).")).toEqual([]);
+      await access(path.join(desktop.dataDirectory, "desktop", "Dictionaries", "en-US-10-1.bdic"));
+    }
     await desktop.checkpointAsync("settings-spelling");
   });
 
@@ -234,8 +243,10 @@ test.describe("settings", () => {
       }, { message: `${where}: the scrollbar's width to 0.375rem` }).toBeLessThan(0.5);
     };
     for (const [key, page] of [["view/notes.list", "tr-notes-list"], ["document/notes.note/1", "tr-notes-note"]] as const) {
-      await window.locator(`tr-tab[data-tab-key='${key}']`).click();
+      const tab = window.locator(`tr-tab[data-tab-key='${key}']`);
+      await tab.click();
       const area = window.locator(`tr-tab-group:has(tr-tab[data-tab-key='${key}']) tr-tab-content`);
+      await expect(tab).toHaveAttribute("aria-selected", "true");
       await expect(area.locator(page)).toBeVisible();
       await expectAtEdgeAsync(area, key);
     }
@@ -297,7 +308,7 @@ test.describe("settings", () => {
     await expect(window.locator(".tr-settings-result-title")).toHaveText(["Clock"]);
     await window.getByRole("treeitem", { name: "Notifications", exact: true }).click();
     await expect(window.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
-    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications"]);
+    await expect(window.locator(".tr-settings-group-title")).toHaveText(["Notifications", "Background"]);
   });
 
   test("Keyboard shortcuts shows each command's id under its title, and a search by a part found only in an id finds the row and underlines that part", async ({ desktop }) => {

@@ -17,8 +17,8 @@ export class PreloadTests {
     const api = FakePreloadElectron.load("{\"background\":\"#181818\"}").api("teamrun");
 
     Assert.areEqual([
-      "platform", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "readStartup", "onStartup", "actOnStartup", "readLayout",
-      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "keepAppearance", "edit", "setMenuBar", "onMenuCommand",
+      "platform", "appearance", "notifyReady", "notifyAppearance", "onCloseRequest", "answerClose", "onUpdateSaveRequest", "answerUpdateSave", "readStartup", "onStartup", "actOnStartup", "readLayout",
+      "writeLayout", "request", "onEvent", "readBuild", "copyText", "openLogFolder", "openLink", "installCommand", "keepAppearance", "readSpelling", "keepSpelling", "onFieldMenu", "replaceMisspelling", "addToDictionary", "edit", "setMenuBar", "onMenuCommand",
       "onNotificationOpened", "onQuitQuestion", "answerQuit", "logModule", "logError"
     ].join(","), Object.keys(api).join(","));
     Assert.areEqual(process.platform, api["platform"]);
@@ -40,6 +40,7 @@ export class PreloadTests {
     PreloadTests.invoke(api["notifyReady"], "ready");
     PreloadTests.invoke(api["notifyAppearance"], "appearance");
     PreloadTests.invoke(api["keepAppearance"], "preferences");
+    PreloadTests.invoke(api["keepSpelling"], true, ["en-US"]);
     PreloadTests.invoke(api["setMenuBar"], "menus");
     PreloadTests.invoke(api["logModule"], "clock", "line");
     PreloadTests.invoke(api["logError"], null, "error");
@@ -48,6 +49,7 @@ export class PreloadTests {
       ["teamrun:ready", "ready"],
       ["teamrun:appearance", "appearance"],
       ["teamrun:keepAppearance", "preferences"],
+      ["teamrun:spelling", true, ["en-US"]],
       ["teamrun:menuBar", "menus"],
       ["teamrun:moduleLog", "clock", "line"],
       ["teamrun:windowError", null, "error"]
@@ -61,6 +63,7 @@ export class PreloadTests {
 
     const replies = await Promise.all([
       PreloadTests.invoke(api["answerClose"], "request", true),
+      PreloadTests.invoke(api["answerUpdateSave"], "request", ["Notes couldn't save"]),
       PreloadTests.invoke(api["readStartup"]),
       PreloadTests.invoke(api["actOnStartup"], "retry"),
       PreloadTests.invoke(api["readLayout"]),
@@ -71,12 +74,16 @@ export class PreloadTests {
       PreloadTests.invoke(api["openLogFolder"]),
       PreloadTests.invoke(api["openLink"], "https://example.com/"),
       PreloadTests.invoke(api["installCommand"]),
+      PreloadTests.invoke(api["readSpelling"]),
+      PreloadTests.invoke(api["replaceMisspelling"], "world"),
+      PreloadTests.invoke(api["addToDictionary"], "TeamRun"),
       PreloadTests.invoke(api["edit"], "Copy"),
       PreloadTests.invoke(api["answerQuit"], "wait")
     ]);
 
     Assert.areEqual(JSON.stringify([
       ["teamrun:closeAnswer", "request", true],
+      ["teamrun:updateSaveAnswer", "request", ["Notes couldn't save"]],
       ["teamrun:readStartup"],
       ["teamrun:startupAction", "retry"],
       ["teamrun:readLayout"],
@@ -87,6 +94,9 @@ export class PreloadTests {
       ["teamrun:openLogFolder"],
       ["teamrun:openLink", "https://example.com/"],
       ["teamrun:installCommand"],
+      ["teamrun:readSpelling"],
+      ["teamrun:replaceMisspelling", "world"],
+      ["teamrun:addToDictionary", "TeamRun"],
       ["teamrun:edit", "Copy"],
       ["teamrun:quitAnswer", "wait"]
     ]), JSON.stringify(electron.invoked));
@@ -95,9 +105,11 @@ export class PreloadTests {
 
   @TestMethod
   @TestData("onCloseRequest", "teamrun:closeRequest", 1)
+  @TestData("onUpdateSaveRequest", "teamrun:updateSaveRequest", 1)
   @TestData("onStartup", "teamrun:startupState", 1)
   @TestData("onEvent", "teamrun:runtimeEvent", 2)
   @TestData("onMenuCommand", "teamrun:menuCommand", 1)
+  @TestData("onFieldMenu", "teamrun:fieldMenu", 1)
   @TestData("onNotificationOpened", "teamrun:notificationOpened", 1)
   @TestData("onQuitQuestion", "teamrun:quitQuestion", 1)
   public passesEachEventToItsListenerUntilTheListenerIsRemoved(member: string, channel: string, valueCount: number): void {

@@ -34,4 +34,8 @@ export class StartupState {
   public get isReady(): boolean {
     return this.kind === StartupStateKind.Ready;
   }
+
+  public get canSave(): boolean {
+    return this.isReady || this.kind === StartupStateKind.Updating;
+  }
 }

@@ -16,8 +16,8 @@ import type {
 
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
+import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -52,6 +52,11 @@ export declare enum StartupStateKind {
    * The runtime could not be started or reached; the person may try again.
    */
   Failed = "Failed",
+
+  /**
+   * TeamRun is saving the window's work and closing for an update.
+   */
+  Updating = "Updating",
 
   /**
    * The desktop is connected to the runtime.
@@ -237,32 +242,113 @@ export declare class QuitQuestion {
   public readonly isWaiting: boolean;
 
   /**
+   * Whether TeamRun asks before it stops for an update rather than before it quits.
+   */
+  public readonly isUpdate: boolean;
+
+  /**
    * Creates the question.
    *
    * @param descriptions The work in progress.
    * @param isWaiting Whether the person chose to wait.
+   * @param isUpdate Whether TeamRun asks before it stops for an update.
    * @example
    * ```ts
    * import { QuitQuestion } from "@noldova/teamrun-shell-desktop";
    *
-   * export const question: QuitQuestion = new QuitQuestion(["Indexing the project"], false);
+   * export const question: QuitQuestion = new QuitQuestion(["Indexing the project"], false, false);
    * ```
    */
-  public constructor(descriptions: readonly string[], isWaiting: boolean);
+  public constructor(descriptions: readonly string[], isWaiting: boolean, isUpdate: boolean);
 
   /**
    * Returns the form the window receives.
    *
-   * @returns The `descriptions` and `isWaiting` fields.
+   * @returns The `descriptions`, `isWaiting` and `isUpdate` fields.
    * @example
    * ```ts
    * import type { JsonObject } from "@noldova/teamrun-foundation-json";
    * import { QuitQuestion } from "@noldova/teamrun-shell-desktop";
    *
-   * export const json: JsonObject = new QuitQuestion([], true).toJson();
+   * export const json: JsonObject = new QuitQuestion([], true, false).toJson();
    * ```
    */
   public toJson(): JsonObject;
+}
+
+/**
+ * Stops every process of the installation before an update replaces its files, then calls the updater's handoff:
+ * it asks about work in progress, holds the launch barrier, has every runtime's clients save, stops every runtime and
+ * verifies by process id and start that each process has exited.
+ */
+export declare class UpdateStop {
+  /**
+   * Creates the update stop.
+   *
+   * @param installation The installation whose record and launch barrier it uses.
+   * @param presence Finds processes in the process table.
+   * @param connectAsync Connects to the runtime of a recorded data directory as the client `update`, without starting
+   * one; resolves `null` when the directory is not in use by this installation.
+   * @param askAsync Asks the person about the work in progress, listed by data directory, and can read it again to
+   * keep the list current while the person waits for it; resolves the work the person agreed to stop, the list shown
+   * when they chose Stop or empty when they waited until none was left, or `null` to cancel the update.
+   * @param processId The coordinating desktop's process id.
+   * @param productVersion The coordinating desktop's product version.
+   * @param now Reads the current time, in milliseconds.
+   * @param wait Resolves after the given number of milliseconds.
+   * @example
+   * ```ts
+   * import { setTimeout as delay } from "node:timers/promises";
+   *
+   * import { UpdateStop } from "@noldova/teamrun-shell-desktop";
+   * import { type Installation, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function create(installation: Installation): UpdateStop {
+   *   return new UpdateStop(
+   *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(null),
+   *     process.pid, "0.2.0", Date.now, t => delay(t));
+   * }
+   * ```
+   */
+  public constructor(
+    installation: Installation,
+    presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
+    connectAsync: (dataDirectory: string) => Promise<IUpdateTarget | null>,
+    askAsync: (work: readonly string[], readWorkAsync: () => Promise<readonly string[]>) => Promise<readonly string[] | null>,
+    processId: number,
+    productVersion: string,
+    now: () => number,
+    wait: (milliseconds: number) => Promise<void>);
+
+  /**
+   * Stops the installation for an update and calls the handoff. It holds the launch barrier as `Preparing`, asks each
+   * runtime `shell.update`, then reads each runtime's work again: work the person did not agree to stop fails the
+   * update, and `shell.stop` stops the work of a runtime that still has the work they agreed to stop and otherwise
+   * stops only if idle. It waits up to 10 seconds for every runtime and every process they listed except the desktops to exit,
+   * sets the barrier to `Closing`, waits up to 10 more seconds for the other desktops, those the runtimes listed and
+   * those recorded in the installation that still run, then sets it to `HandedOff`. Every connection closes when it
+   * ends. When the handoff names the process that took over, the barrier records it, so the barrier holds while that
+   * process runs; when that process cannot be found or the record cannot be written, the barrier stays without it.
+   *
+   * @param version The version being installed.
+   * @param handOffAsync The updater's handoff, which starts what replaces the application's files and resolves that
+   * process's id, or `null` when the platform does not give one.
+   * @returns A promise of `true` once the handoff has run, or `false` when the person cancelled at the question about
+   * work, with nothing changed.
+   * @throws {UpdateStopException} Rejected with the reason when another update holds the barrier, work started
+   * meanwhile, a runtime refused or something did not save, a process or desktop did not exit in time or could not be
+   * checked, or the handoff failed; the barrier it held is removed first, so every surviving runtime and desktop
+   * resumes. Once the handoff has run, the barrier stays.
+   * @example
+   * ```ts
+   * import type { UpdateStop } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function restartAsync(stop: UpdateStop, handOffAsync: () => Promise<number | null>): Promise<boolean> {
+   *   return stop.runAsync("0.3.0", handOffAsync);
+   * }
+   * ```
+   */
+  public runAsync(version: string, handOffAsync: () => Promise<number | null>): Promise<boolean>;
 }
 
 /**
@@ -420,6 +506,11 @@ export interface IDesktopProcess {
   readonly processId: number;
 
   /**
+   * Runs other programs for the desktop, such as `gdbus` to find a Linux tray.
+   */
+  readonly programs: IProgramHost;
+
+  /**
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
@@ -483,6 +574,118 @@ export interface IDesktopProcess {
    * ```
    */
   onUnhandledRejection(listener: (reason: unknown) => void): void;
+}
+
+/**
+ * What the desktop's runtime startup needs to follow an update that another
+ * desktop, or this one, coordinates.
+ */
+export interface IUpdateHost {
+  /**
+   * The desktop's process id, which it reports once its windows have saved.
+   */
+  readonly processId: number;
+
+  /**
+   * Reads the installation's launch barrier.
+   *
+   * @returns A promise of the barrier, or `null` when there is none.
+   * @throws Error Rejected when the barrier cannot be read.
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function readVersionAsync(host: IUpdateHost): Promise<string | undefined> {
+   *   return (await host.readBarrierAsync())?.version;
+   * }
+   * ```
+   */
+  readBarrierAsync(): Promise<UpdateBarrier | null>;
+
+  /**
+   * Tells whether the update has ended, as {@link Installation.hasEndedAsync} does: the barrier is gone, or its holder
+   * exited before the handoff.
+   *
+   * @returns A promise of whether the update has ended.
+   * @throws Error Rejected when the barrier cannot be read or its holder cannot be looked up.
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function isOverAsync(host: IUpdateHost): Promise<boolean> {
+   *   return host.hasUpdateEndedAsync();
+   * }
+   * ```
+   */
+  hasUpdateEndedAsync(): Promise<boolean>;
+
+  /**
+   * Asks every window to save for the update.
+   *
+   * @returns A promise of what did not save, empty when everything saved.
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isSavedAsync(host: IUpdateHost): Promise<boolean> {
+   *   return (await host.saveAsync()).length === 0;
+   * }
+   * ```
+   */
+  saveAsync(): Promise<readonly string[]>;
+
+  /**
+   * Tells the person about the launch barrier a runtime start found, and settles it when they confirm, as
+   * {@link UpdateBarrierGate.askAsync} does.
+   *
+   * @param status What the barrier means for this installation.
+   * @returns A promise of `true` to start the runtime again, `false` when the desktop quits.
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   * import { UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function askAsync(host: IUpdateHost): Promise<boolean> {
+   *   return host.passBarrierAsync(UpdateBarrierStatus.Held);
+   * }
+   * ```
+   */
+  passBarrierAsync(status: UpdateBarrierStatus): Promise<boolean>;
+
+  /**
+   * Quits the desktop at once, without asking about work or saving again.
+   *
+   * @example
+   * ```ts
+   * import type { IUpdateHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function close(host: IUpdateHost): void {
+   *   host.quit();
+   * }
+   * ```
+   */
+  quit(): void;
+}
+
+/**
+ * One runtime of the installation that an update stops: its data directory,
+ * its process and the update stop's connection to it as the client `update`.
+ */
+export interface IUpdateTarget {
+  /**
+   * The data directory the runtime owns.
+   */
+  readonly dataDirectory: string;
+
+  /**
+   * The runtime's process, by process id and start.
+   */
+  readonly runtime: UpdateProcess;
+
+  /**
+   * The connection to the runtime.
+   */
+  readonly connection: IRuntimeConnection;
 }
 
 /**
@@ -827,6 +1030,21 @@ export interface IApplicationHost {
   requestSingleInstanceLock(): boolean;
 
   /**
+   * Lists the operating system's preferred languages, most preferred first.
+   *
+   * @returns Language tags such as `en-US` or `de`.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function firstLanguage(app: IApplicationHost): string | undefined {
+   *   return app.getPreferredSystemLanguages()[0];
+   * }
+   * ```
+   */
+  getPreferredSystemLanguages(): string[];
+
+  /**
    * Runs every renderer in the sandbox.
    *
    * @example
@@ -1001,13 +1219,80 @@ export interface IPermissionHost {
 }
 
 /**
+ * Turns spell checking on and off and chooses its dictionaries, as an Electron session provides it.
+ */
+export interface ISpellCheckHost {
+  /**
+   * Turns spell checking on or off for every window of the session.
+   *
+   * @param isEnabled Whether misspelled words are marked.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stopChecking(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerEnabled(false);
+   * }
+   * ```
+   */
+  setSpellCheckerEnabled(isEnabled: boolean): void;
+
+  /**
+   * Chooses the languages words are checked in. macOS ignores it, because its system checker chooses.
+   *
+   * @param languages Language tags whose dictionaries the session has, such as `en-US`.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkInEnglish(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerLanguages(["en-US"]);
+   * }
+   * ```
+   */
+  setSpellCheckerLanguages(languages: string[]): void;
+
+  /**
+   * Sets the address a dictionary that is not in the profile's `Dictionaries` folder would be downloaded from.
+   *
+   * @param url The address, ending in `/`.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function downloadNothing(host: ISpellCheckHost): void {
+   *   host.setSpellCheckerDictionaryDownloadURL("file:///home/ada/.teamrun/desktop/Dictionaries/");
+   * }
+   * ```
+   */
+  setSpellCheckerDictionaryDownloadURL(url: string): void;
+
+  /**
+   * Adds a word to the session's dictionary, so it is no longer marked. On Linux that dictionary is the profile's own
+   * file; with the Windows or macOS system checker it is the system's user dictionary, which other applications share.
+   *
+   * @param word The word to add.
+   * @returns Whether the session took the word.
+   * @example
+   * ```ts
+   * import type { ISpellCheckHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function learn(host: ISpellCheckHost): boolean {
+   *   return host.addWordToSpellCheckerDictionary("TeamRun");
+   * }
+   * ```
+   */
+  addWordToSpellCheckerDictionary(word: string): boolean;
+}
+
+/**
  * Electron's `session` module, as far as the desktop uses it.
  */
 export interface ISessionHost {
   /**
    * The session the window's web contents use.
    */
-  readonly defaultSession: IPermissionHost;
+  readonly defaultSession: IPermissionHost & ISpellCheckHost;
 }
 
 /**
@@ -1105,6 +1390,36 @@ export interface IShellHost {
 }
 
 /**
+ * What Electron reports about a right click or a context menu key in a page, as far as the desktop uses it.
+ */
+export interface IContextMenuParams {
+  /**
+   * The horizontal position of the menu in the page, in CSS pixels.
+   */
+  readonly x: number;
+
+  /**
+   * The vertical position of the menu in the page, in CSS pixels.
+   */
+  readonly y: number;
+
+  /**
+   * The misspelled word under the menu, or empty when there is none.
+   */
+  readonly misspelledWord: string;
+
+  /**
+   * The spell checker's suggestions for the misspelled word, best first.
+   */
+  readonly dictionarySuggestions: string[];
+
+  /**
+   * What asked for the menu, such as `mouse` or `keyboard`.
+   */
+  readonly menuSourceType: string;
+}
+
+/**
  * A window's web contents, as Electron's `WebContents` provides them.
  */
 export interface IWindowContents {
@@ -1184,6 +1499,24 @@ export interface IWindowContents {
    * ```
    */
   on(event: "did-start-loading", listener: () => void): unknown;
+
+  /**
+   * Listens for the page asking for a context menu, which Electron reports only when the page did not cancel the
+   * request.
+   *
+   * @param event The event's name.
+   * @param listener Receives Electron's event and what it reports about the menu.
+   * @returns Electron's own return value, which the desktop does not use.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function follow(contents: IWindowContents, words: string[]): void {
+   *   contents.on("context-menu", (_event, params) => words.push(params.misspelledWord));
+   * }
+   * ```
+   */
+  on(event: "context-menu", listener: (event: unknown, params: IContextMenuParams) => void): unknown;
 
   /**
    * Decides what happens when the page asks to open a window.
@@ -1360,6 +1693,21 @@ export interface IWindowContents {
   selectAll(): void;
 
   /**
+   * Replaces the misspelled word around the page's selection, as one step that Undo reverts.
+   *
+   * @param text The replacement.
+   * @example
+   * ```ts
+   * import type { IWindowContents } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function correct(contents: IWindowContents): void {
+   *   contents.replaceMisspelling("world");
+   * }
+   * ```
+   */
+  replaceMisspelling(text: string): void;
+
+  /**
    * Returns the operating system's id of the page's renderer process.
    *
    * @returns The process id.
@@ -1457,6 +1805,109 @@ export interface ISystemNotification {
    * ```
    */
   on(event: "failed", listener: (event: unknown, error: string) => void): unknown;
+}
+
+/**
+ * An icon in the Windows notification area, the macOS menu bar or the Linux tray, as Electron's `Tray` provides it.
+ */
+export interface ITray {
+  /**
+   * Shows another image.
+   *
+   * @param image The image file: `.ico` on Windows, a template `.png` on macOS, `.png` on Linux.
+   * @example
+   * ```ts
+   * import type { ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function showIdle(tray: ITray): void {
+   *   tray.setImage("/teamrun/assets/icons/tray/tray-idle.png");
+   * }
+   * ```
+   */
+  setImage(image: string): void;
+
+  /**
+   * Sets the text shown when the pointer rests on the icon.
+   *
+   * @param toolTip The text.
+   * @example
+   * ```ts
+   * import type { ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(tray: ITray): void {
+   *   tray.setToolTip("TeamRun: 2 running");
+   * }
+   * ```
+   */
+  setToolTip(toolTip: string): void;
+
+  /**
+   * Sets the icon's menu.
+   *
+   * @param menu A menu that {@link IMenuHost.buildFromTemplate} built.
+   * @example
+   * ```ts
+   * import type { IMenuHost, ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function offerQuit(tray: ITray, menu: IMenuHost, quit: () => void): void {
+   *   tray.setContextMenu(menu.buildFromTemplate([{ label: "Quit TeamRun", click: quit }]));
+   * }
+   * ```
+   */
+  setContextMenu(menu: unknown): void;
+
+  /**
+   * Listens for a click on the icon.
+   *
+   * @param event `click`.
+   * @param listener Called on each click.
+   * @returns The tray, for chaining.
+   * @example
+   * ```ts
+   * import type { ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function openOnClick(tray: ITray, open: () => void): void {
+   *   tray.on("click", open);
+   * }
+   * ```
+   */
+  on(event: "click", listener: () => void): unknown;
+
+  /**
+   * Removes the icon.
+   *
+   * @example
+   * ```ts
+   * import type { ITray } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function hide(tray: ITray): void {
+   *   tray.destroy();
+   * }
+   * ```
+   */
+  destroy(): void;
+}
+
+/**
+ * Creates tray icons, as Electron's `Tray` constructor does.
+ */
+export interface ITrayHost {
+  /**
+   * Shows a new icon.
+   *
+   * @param image The icon's image file.
+   * @returns The icon.
+   * @throws Error when the operating system cannot show it.
+   * @example
+   * ```ts
+   * import type { ITray, ITrayHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function show(host: ITrayHost): ITray {
+   *   return host.create("/teamrun/assets/icons/tray/tray-idle.png");
+   * }
+   * ```
+   */
+  create(image: string): ITray;
 }
 
 /**
@@ -2131,6 +2582,11 @@ export interface IElectron {
   readonly notifications: INotificationHost;
 
   /**
+   * The tray, for the icon in the Windows notification area, the macOS menu bar or the Linux tray.
+   */
+  readonly tray: ITrayHost;
+
+  /**
    * The displays, for placing a window on one that shows it.
    */
   readonly screen: IDisplayHost;
@@ -2182,24 +2638,6 @@ export declare class DeviceIdentityException extends Exception {
  * to a device, such as window bounds, never travels with the data.
  */
 export declare class DeviceIdentity {
-  /**
-   * The device-local folder that keeps the identity: `%LOCALAPPDATA%\Noldova\TeamRun` on Windows,
-   * `~/Library/Application Support/Noldova/TeamRun` on macOS and `$XDG_STATE_HOME/noldova/teamrun` (by default
-   * `~/.local/state/noldova/teamrun`) on Linux.
-   *
-   * @param platform The operating system, as Node.js names it.
-   * @param environment The environment, which may set `LOCALAPPDATA` or `XDG_STATE_HOME`.
-   * @param homeFolder The person's home folder.
-   * @returns The folder.
-   * @example
-   * ```ts
-   * import { DeviceIdentity } from "@noldova/teamrun-shell-desktop";
-   *
-   * export const folder: string = DeviceIdentity.locateFolder("linux", {}, "/home/person");
-   * ```
-   */
-  public static locateFolder(platform: string, environment: NodeJS.ProcessEnv, homeFolder: string): string;
-
   /**
    * Reads the identity from the folder's `device.json`, creating the folder and a new identity when there is none.
    *
@@ -2500,6 +2938,20 @@ export declare class StartupState {
   public static failed(message: string): StartupState;
 
   /**
+   * The state while TeamRun saves the window's work and closes for an update.
+   *
+   * @param version The version being installed.
+   * @returns The state.
+   * @example
+   * ```ts
+   * import { StartupState } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const state: StartupState = StartupState.updating("0.3.0");
+   * ```
+   */
+  public static updating(version: string): StartupState;
+
+  /**
    * The state once connected.
    *
    * @returns The state.
@@ -2775,6 +3227,134 @@ export declare class CloseCoordinator {
 }
 
 /**
+ * Asks in the window where an update began whether to wait for the work in progress or to stop it, listing the work by
+ * data directory. Waiting keeps the list current, reading the work again every interval, and goes on once none is
+ * left; Cancel, or a window that can no longer ask, ends the update with nothing changed.
+ */
+export declare class UpdateWorkQuestion {
+  /**
+   * Creates the question.
+   *
+   * @param prompt The window that asks.
+   * @param readWorkAsync Reads the work again while the person waits; a runtime that has gone leaves the list.
+   * @param interval How long to wait between readings of the work, in milliseconds.
+   * @param wait Resolves after the given number of milliseconds, or rejects when the signal aborts.
+   * @example
+   * ```ts
+   * import { setTimeout as delay } from "node:timers/promises";
+   *
+   * import { type IQuitPrompt, UpdateWorkQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(prompt: IQuitPrompt, readWorkAsync: () => Promise<readonly string[]>): UpdateWorkQuestion {
+   *   return new UpdateWorkQuestion(prompt, readWorkAsync, 1000, (t, signal) => delay(t, undefined, { signal }));
+   * }
+   * ```
+   */
+  public constructor(prompt: IQuitPrompt, readWorkAsync: () => Promise<readonly string[]>, interval: number, wait: (milliseconds: number, signal: AbortSignal) => Promise<void>);
+
+  /**
+   * Shows the question and settles with the person's choice. It asks once; withdraws the question when it settles.
+   *
+   * @param work The work in progress, each named with its data directory.
+   * @returns A promise of the work the person agreed to stop: the list shown when they chose Stop, or empty when they
+   * waited until none was left, which agrees to nothing; `null` when they cancelled.
+   * @throws Error Rejected with the error of a reading that fails while the person waits.
+   * @example
+   * ```ts
+   * import type { UpdateWorkQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function askAsync(question: UpdateWorkQuestion): Promise<readonly string[] | null> {
+   *   return question.askAsync(["Indexing the project (/work/data)"]);
+   * }
+   * ```
+   */
+  public askAsync(work: readonly string[]): Promise<readonly string[] | null>;
+
+  /**
+   * Takes the person's choice from the window that asks.
+   *
+   * @param prompt The window that answered.
+   * @param choice `Wait`, `Stop` or `Cancel`.
+   * @returns `true` when the answer was taken; `false` for another window, an unknown choice, a second Wait or a
+   * question already settled.
+   * @example
+   * ```ts
+   * import { type IQuitPrompt, QuitChoice, type UpdateWorkQuestion } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stop(question: UpdateWorkQuestion, prompt: IQuitPrompt): boolean {
+   *   return question.answer(prompt, QuitChoice.Stop);
+   * }
+   * ```
+   */
+  public answer(prompt: IQuitPrompt, choice: unknown): boolean;
+}
+
+/**
+ * Asks one window to save before TeamRun stops for an update, and collects what did not save: a window that is gone
+ * or does not answer in time counts as not saved, since an update is never worth an unsaved change.
+ */
+export declare class UpdateSaveCoordinator {
+  /**
+   * Creates the coordinator.
+   *
+   * @param send Sends a save request with its id to the window; returns `false` when the window is gone.
+   * @param timeout How long to wait for an answer, in milliseconds; a positive integer.
+   * @throws ArgumentOutOfRangeException synchronously when the timeout is not a positive integer.
+   * @example
+   * ```ts
+   * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const coordinator: UpdateSaveCoordinator = new UpdateSaveCoordinator(() => true, 5000);
+   * ```
+   */
+  public constructor(send: (requestId: string) => boolean, timeout: number);
+
+  /**
+   * Asks the window to save.
+   *
+   * @param window The window's number among the desktop's open windows, from 1, which names it when it is gone or
+   * does not answer.
+   * @returns A promise of what did not save: the window's own list, or one problem naming the window when it is gone
+   * or did not answer in time; empty when everything saved.
+   * @example
+   * ```ts
+   * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * const coordinator = new UpdateSaveCoordinator(t => coordinator.answer(t, []), 5000);
+   * export const problems: readonly string[] = await coordinator.requestAsync(1);
+   * ```
+   */
+  public requestAsync(window: number): Promise<readonly string[]>;
+
+  /**
+   * Takes the window's answer to a request.
+   *
+   * @param requestId The request's id, as the window sent it.
+   * @param problems What the window could not save, as text.
+   * @returns `true` when the answer settled a waiting request; `false` for an unknown or late id or a malformed answer.
+   * @example
+   * ```ts
+   * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const isAccepted: boolean = new UpdateSaveCoordinator(() => true, 5000).answer("unknown", []);
+   * ```
+   */
+  public answer(requestId: unknown, problems: unknown): boolean;
+
+  /**
+   * Settles every waiting request as not saved, as when the window is gone.
+   *
+   * @example
+   * ```ts
+   * import { UpdateSaveCoordinator } from "@noldova/teamrun-shell-desktop";
+   *
+   * new UpdateSaveCoordinator(() => true, 5000).release();
+   * ```
+   */
+  public release(): void;
+}
+
+/**
  * One open window: it shows once its page has painted and its startup has settled, or unpainted after a limit; asks
  * its guard whether it may close, then its page to save; and keeps its bounds.
  */
@@ -2788,6 +3368,11 @@ export declare class OpenWindow implements IQuitPrompt {
    * Asks the page to save before the window closes.
    */
   public readonly coordinator: CloseCoordinator;
+
+  /**
+   * Asks the page to save before TeamRun stops for an update.
+   */
+  public readonly updateSaves: UpdateSaveCoordinator;
 
   /**
    * Restores and keeps the window's bounds.
@@ -2829,7 +3414,7 @@ export declare class OpenWindow implements IQuitPrompt {
    * import { type OpenWindow, QuitQuestion } from "@noldova/teamrun-shell-desktop";
    *
    * export function ask(open: OpenWindow): boolean {
-   *   return open.show(new QuitQuestion(["Indexing the project"], false));
+   *   return open.show(new QuitQuestion(["Indexing the project"], false, false));
    * }
    * ```
    */
@@ -2907,6 +3492,74 @@ export declare class OpenWindow implements IQuitPrompt {
    * ```
    */
   public showNow(): void;
+}
+
+/**
+ * Checks the installation's launch barrier when the desktop starts, before it opens a window. While another desktop
+ * holds the barrier, it tells the person with the operating system's message box that TeamRun is installing an update,
+ * and the desktop exits. A barrier whose holder is gone after a handoff to another version may mean an installer is
+ * still running, so it asks the person and removes the barrier only when they choose to open TeamRun. A barrier left
+ * before the handoff is removed silently, and the desktop's log says so.
+ */
+export declare class UpdateBarrierGate {
+  /**
+   * Creates the gate.
+   *
+   * @param installation The installation whose launch barrier it checks.
+   * @param productVersion The desktop's product version, which settles a barrier handed off to it.
+   * @param dialog Shows the operating system's message box.
+   * @param log Writes a line to the desktop's log.
+   * @example
+   * ```ts
+   * import { type IDialogHost, UpdateBarrierGate } from "@noldova/teamrun-shell-desktop";
+   * import type { Installation } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function create(installation: Installation, dialog: IDialogHost): UpdateBarrierGate {
+   *   return new UpdateBarrierGate(installation, "0.2.0", dialog, t => console.log(t));
+   * }
+   * ```
+   */
+  public constructor(installation: Pick<Installation, "readAsync" | "readTextAsync" | "checkAsync" | "removeAsync">, productVersion: string, dialog: IDialogHost, log: (text: string) => void);
+
+  /**
+   * Checks the barrier and, when it holds, asks as {@link askAsync} does. A barrier that cannot be read lets the
+   * desktop start, and the runtime's launch reports it.
+   *
+   * @returns A promise of `true` when the desktop may start, `false` when it exits.
+   * @throws Error Rejected when the message box fails or the barrier cannot be removed.
+   * @example
+   * ```ts
+   * import type { UpdateBarrierGate } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function startAsync(gate: UpdateBarrierGate, open: () => void): Promise<void> {
+   *   if (await gate.passAsync())
+   *     open();
+   * }
+   * ```
+   */
+  public passAsync(): Promise<boolean>;
+
+  /**
+   * Tells the person what a barrier means: `Held` shows that TeamRun is installing an update, with OK; `Unfinished`
+   * asks with Quit, the default, and Open TeamRun; `None` asks nothing. Open TeamRun reads and judges the barrier
+   * again, since the person may have taken minutes, and removes it only while it is unchanged: a barrier that holds
+   * by then is reported as `Held` is, and one that replaced it is judged in turn. When it cannot be removed, the
+   * desktop's log says why and an error box tells the person that TeamRun will quit.
+   *
+   * @param status What the barrier means for this installation.
+   * @returns A promise of `true` when the desktop may start, `false` when it exits.
+   * @throws Error Rejected when a message box fails.
+   * @example
+   * ```ts
+   * import type { UpdateBarrierGate } from "@noldova/teamrun-shell-desktop";
+   * import { UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function askAsync(gate: UpdateBarrierGate): Promise<boolean> {
+   *   return gate.askAsync(UpdateBarrierStatus.Unfinished);
+   * }
+   * ```
+   */
+  public askAsync(status: UpdateBarrierStatus): Promise<boolean>;
 }
 
 /**
@@ -3034,7 +3687,7 @@ export declare class DesktopApplication {
    * @param process The desktop's process; `--data-dir=` in its arguments gives the data directory.
    * @param moduleUrl The URL of the desktop's compiled entry point, which locates the window, the preload and, in a
    * development run, the checkout.
-   * @param createLauncher Creates the runtime launcher for the chosen settings.
+   * @param createLauncher Creates the runtime launcher for the chosen settings and the installation, in the device folder, that the desktop's program belongs to.
    * @param readDeviceAsync Reads this device's identity from a folder: the one `--device-dir=` in the process's
    * arguments gives, otherwise the operating system's local application data. A failure leaves window bounds unkept.
    * @param createAppearanceStore Creates the store of this device's last appearance preferences in the same folder. The
@@ -3042,20 +3695,24 @@ export declare class DesktopApplication {
    * window reports.
    * @param createPathCommand Creates the service that links the command line on the macOS PATH for the program the
    * desktop runs from; the window's "Install command in PATH" command runs it and shows what happened.
+   * @param recordDesktopAsync Records this desktop in its installation, as {@link DesktopRecord.recordAsync} does, while
+   * the desktop checks the launch barrier, so an update waits for it to quit. A desktop it could not record is logged
+   * and starts anyway.
    * @example
    * ```ts
-   * import { RuntimeBuild, RuntimeLauncher } from "@noldova/teamrun-shell-runtime";
-   * import { AppearanceStore, DesktopApplication, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
+   * import { ProcessPresence, RuntimeBuild, RuntimeLauncher, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { AppearanceStore, DesktopApplication, DesktopRecord, DeviceIdentity, type IDesktopProcess, type IElectron, PathCommand } from "@noldova/teamrun-shell-desktop";
    *
    * export function launch(electron: IElectron, process: IDesktopProcess): void {
    *   DesktopApplication.start(
    *     electron,
    *     process,
    *     "file:///repository/node_modules/@noldova/teamrun-shell-desktop/main.js",
-   *     t => new RuntimeLauncher(t, RuntimeBuild.identity),
+   *     (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, installation),
    *     t => DeviceIdentity.readOrCreateAsync(t),
    *     t => new AppearanceStore(t),
-   *     t => PathCommand.forBundle(t, () => Promise.resolve()));
+   *     t => PathCommand.forBundle(t, () => Promise.resolve()),
+   *     t => DesktopRecord.recordAsync(t, ProcessPresence.create(process.platform, new SystemCommand()), process.processId));
    * }
    * ```
    */
@@ -3063,10 +3720,106 @@ export declare class DesktopApplication {
     electron: IElectron,
     process: IDesktopProcess,
     moduleUrl: string,
-    createLauncher: (settings: LaunchSettings) => IRuntimeLauncher,
+    createLauncher: (settings: LaunchSettings, installation: Installation) => IRuntimeLauncher,
     readDeviceAsync: (folder: string) => Promise<string>,
     createAppearanceStore: (folder: string) => IAppearanceStore,
-    createPathCommand: (executablePath: string) => PathCommand): void;
+    createPathCommand: (executablePath: string) => PathCommand,
+    recordDesktopAsync: (installation: Installation) => Promise<boolean>): void;
+}
+
+/**
+ * Records a desktop in its installation, so an update can find it while it has no runtime connection.
+ */
+export declare class DesktopRecord {
+  /**
+   * Stamps the desktop's process with its start time and records it in the installation.
+   *
+   * @param installation The installation the desktop's program belongs to.
+   * @param presence Stamps the desktop's process.
+   * @param processId The desktop's process id.
+   * @returns A promise of whether the desktop was recorded; false when its process is not in the process table.
+   * @throws Error Rejected when the process table cannot be read or the record cannot be written.
+   * @example
+   * ```ts
+   * import { type Installation, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { DesktopRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function recordAsync(installation: Installation): Promise<boolean> {
+   *   return DesktopRecord.recordAsync(installation, ProcessPresence.create(process.platform, new SystemCommand()), process.pid);
+   * }
+   * ```
+   */
+  public static recordAsync(installation: Pick<Installation, "recordDesktopAsync">, presence: Pick<ProcessPresence, "stampAsync">, processId: number): Promise<boolean>;
+}
+
+/**
+ * Quits a desktop that has no runtime connection once another desktop's update reaches `Closing`, so it does not
+ * keep running the installation's files through the handoff.
+ */
+export declare class UpdateBarrierWatch {
+  /**
+   * Creates the watch.
+   *
+   * @param updates The desktop's side of an update: its process id, the barrier, whether the update has ended and how
+   * to quit.
+   * @param isConnected Whether the desktop has a runtime connection, which tells it about an update itself.
+   * @param interval How often, in milliseconds, it reads the barrier.
+   * @throws ArgumentOutOfRangeException synchronously when the interval is not a positive integer.
+   * @example
+   * ```ts
+   * import { type IUpdateHost, UpdateBarrierWatch } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(updates: IUpdateHost, isConnected: () => boolean): UpdateBarrierWatch {
+   *   return new UpdateBarrierWatch(updates, isConnected, 1000);
+   * }
+   * ```
+   */
+  public constructor(updates: Pick<IUpdateHost, "processId" | "readBarrierAsync" | "hasUpdateEndedAsync" | "quit">, isConnected: () => boolean, interval: number);
+
+  /**
+   * Starts checking the barrier every interval; starting it again changes nothing.
+   *
+   * @example
+   * ```ts
+   * import type { UpdateBarrierWatch } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function begin(watch: UpdateBarrierWatch): void {
+   *   watch.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Stops checking the barrier.
+   *
+   * @example
+   * ```ts
+   * import type { UpdateBarrierWatch } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(watch: UpdateBarrierWatch): void {
+   *   watch.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+
+  /**
+   * Checks the barrier once, unless the desktop is connected or a check is still running. It quits the desktop, and
+   * stops, when the barrier is `Closing` for another desktop whose update has not ended; a barrier it cannot read, or
+   * an update it cannot tell has ended, keeps the desktop running.
+   *
+   * @returns A promise of whether it quit the desktop.
+   * @example
+   * ```ts
+   * import type { UpdateBarrierWatch } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkAsync(watch: UpdateBarrierWatch): Promise<boolean> {
+   *   return watch.checkAsync();
+   * }
+   * ```
+   */
+  public checkAsync(): Promise<boolean>;
 }
 
 /**
@@ -3104,6 +3857,144 @@ export interface IAppearanceStore {
    * ```
    */
   writeAsync(preferences: JsonObject): Promise<void>;
+}
+
+/**
+ * Puts the dictionaries that ship with the desktop where Electron's spell checker finds them.
+ */
+export declare class SpellingDictionaries {
+  /**
+   * Puts each dictionary the folder's `dictionaries.json` lists into the profile's `Dictionaries` folder, where
+   * Electron's spell checker finds it, unless it is already there. It runs before the application is ready, because
+   * Electron reads that folder as it becomes ready. A dictionary whose entry is not valid or whose file cannot be copied
+   * is left out and logged.
+   *
+   * @param sourceFolder The folder of the shipped dictionaries.
+   * @param profileFolder The profile folder, Electron's `userData`.
+   * @param log Receives each line to log.
+   * @returns The languages of the dictionaries in the profile, in the list's order; none when the list cannot be read.
+   * @example
+   * ```ts
+   * import { SpellingDictionaries } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function install(profile: string): readonly string[] {
+   *   return SpellingDictionaries.install("/opt/teamrun/assets/dictionaries", profile, line => console.error(line));
+   * }
+   * ```
+   */
+  public static install(sourceFolder: string, profileFolder: string, log: (text: string) => void): readonly string[];
+
+  /**
+   * Gives the profile's `Dictionaries` folder as a `file:` URL ending in a slash, the address the spell checker gives
+   * Chromium for downloads. Chromium cannot download from a `file:` URL, so a missing dictionary fails at once without
+   * a connection, and no local process can answer in its place as one listening on a loopback port could.
+   *
+   * @param profileFolder The profile folder, Electron's `userData`.
+   * @returns The folder's `file:` URL with a trailing slash.
+   * @example
+   * ```ts
+   * import { SpellingDictionaries } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function addressOf(profile: string): string {
+   *   return SpellingDictionaries.addressOf(profile);
+   * }
+   * ```
+   */
+  public static addressOf(profileFolder: string): string;
+}
+
+/**
+ * Applies the spelling settings to the window's session. On Windows and Linux it checks only in shipped languages and
+ * points the dictionary download address at the profile's own dictionary folder as a `file:` URL, from which Chromium
+ * cannot download, so a dictionary is never downloaded; on macOS the system checker chooses the languages and only
+ * checking on or off applies.
+ */
+export declare class SpellChecker {
+  /**
+   * Creates the spell checker.
+   *
+   * @param host Gives the session once the application is ready.
+   * @param languages The shipped languages in the profile, in their order.
+   * @param address The dictionary download address, the profile's own dictionary folder as a `file:` URL, which Chromium cannot download from.
+   * @param platform The operating system, as `process.platform` names it.
+   * @param readSystemLanguages Lists the operating system's preferred languages.
+   * @param log Receives each line to log.
+   * @example
+   * ```ts
+   * import { type ISpellCheckHost, SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(session: ISpellCheckHost): SpellChecker {
+   *   return new SpellChecker(() => session, ["en-US"], "file:///home/ada/.teamrun/desktop/Dictionaries/", "linux", () => ["en-US"], line => console.error(line));
+   * }
+   * ```
+   */
+  public constructor(host: () => ISpellCheckHost, languages: readonly string[], address: string, platform: string, readSystemLanguages: () => readonly string[], log: (text: string) => void);
+
+  /**
+   * Points the dictionary download at the profile's own dictionary folder and checks in the languages an empty choice means, before any window opens.
+   *
+   * @example
+   * ```ts
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function start(checker: SpellChecker): void {
+   *   checker.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Turns checking on or off and checks in the chosen languages that ship, in their shipped order. With none of them,
+   * it checks in the operating system's languages that ship, or else in the first shipped language. A language list
+   * the session refuses is logged.
+   *
+   * @param isChecking Whether misspelled words are marked.
+   * @param chosen The chosen language tags.
+   * @example
+   * ```ts
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkInEnglish(checker: SpellChecker): void {
+   *   checker.apply(true, ["en-US"]);
+   * }
+   * ```
+   */
+  public apply(isChecking: boolean, chosen: readonly string[]): void;
+
+  /**
+   * Adds a word to the session's dictionary on every platform. On Linux that dictionary is TeamRun's own file in the
+   * profile; on Windows and macOS it is the system's user dictionary, which other applications share.
+   *
+   * @param word The word to add.
+   * @returns Whether the session took the word.
+   * @example
+   * ```ts
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function learn(checker: SpellChecker): boolean {
+   *   return checker.addWord("TeamRun");
+   * }
+   * ```
+   */
+  public addWord(word: string): boolean;
+
+  /**
+   * Describes what the window may offer.
+   *
+   * @returns `languages`, the shipped languages, none on macOS; and `fallback`, the language an empty choice checks in
+   * when none of the operating system's languages ships, or `null`.
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import type { SpellChecker } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function describe(checker: SpellChecker): JsonObject {
+   *   return checker.toJson();
+   * }
+   * ```
+   */
+  public toJson(): JsonObject;
 }
 
 /**
@@ -3175,16 +4066,17 @@ export declare class RuntimeStartup {
    * @param log Receives each launch or connection failure, and the full description of any other failure.
    * @param now Reads the current time, in milliseconds.
    * @param wait Resolves after the given number of milliseconds, or rejects once the signal aborts.
+   * @param updates Reads the launch barrier, saves the windows and quits, while it follows an update.
    * @example
    * ```ts
    * import { setTimeout as delay } from "node:timers/promises";
    *
-   * import { type IRuntimeLauncher, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
+   * import { type IRuntimeLauncher, type IUpdateHost, RuntimeStartup } from "@noldova/teamrun-shell-desktop";
    *
-   * export function create(launcher: IRuntimeLauncher): RuntimeStartup {
+   * export function create(launcher: IRuntimeLauncher, updates: IUpdateHost): RuntimeStartup {
    *   return new RuntimeStartup(
    *     launcher, state => console.log(state.kind), () => false, 2000, event => console.log(event.name.text), message => console.error(message),
-   *     Date.now, (milliseconds, signal) => delay(milliseconds, undefined, { signal }));
+   *     Date.now, (milliseconds, signal) => delay(milliseconds, undefined, { signal }), updates);
    * }
    * ```
    */
@@ -3196,7 +4088,8 @@ export declare class RuntimeStartup {
     forward: (event: Event) => void,
     log: (message: string) => void,
     now: () => number,
-    wait: (milliseconds: number, signal: AbortSignal) => Promise<void>);
+    wait: (milliseconds: number, signal: AbortSignal) => Promise<void>,
+    updates: IUpdateHost);
 
   /**
    * The latest state.
@@ -3215,6 +4108,12 @@ export declare class RuntimeStartup {
    * shown as a failure with its cause and an offer to try again, which counts afresh. A start or reconnection that
    * fails for any reason other than data from before the shell, an older build's work or a newer build is logged, an
    * unexpected failure in full, and shows the failure with an offer to try again.
+   *
+   * When the runtime announces `shell.updating`, the state becomes {@link StartupStateKind.Updating} with the version
+   * the launch barrier names, the windows save, and the runtime is told what did not save with `shell.updateSaved`;
+   * `shell.updateEnded` makes it ready again. A runtime that disconnects meanwhile is not reconnected: the launch
+   * barrier is read every second instead, and the desktop quits once it is `Closing` and held by another desktop, or
+   * reconnects once it is gone.
    *
    * @returns A promise that settles once the state is ready or shows why not.
    * @example
@@ -3521,6 +4420,250 @@ export declare class PathCommandException extends Exception {
    * import { PathCommandException } from "@noldova/teamrun-shell-desktop";
    *
    * export const failure: PathCommandException = new PathCommandException("The teamrun command could not be linked at /usr/local/bin/teamrun.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * Runs other programs for the desktop, without a shell or a window.
+ */
+export interface IProgramHost {
+  /**
+   * Runs a program to its end.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @returns A promise of the program's standard output.
+   * @throws ProgramException, through the promise, when the program cannot start, ends with an error or runs too long.
+   * @example
+   * ```ts
+   * import type { IProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readVersionAsync(programs: IProgramHost): Promise<string> {
+   *   return programs.runAsync("/usr/bin/gdbus", ["--version"], process.env);
+   * }
+   * ```
+   */
+  runAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): Promise<string>;
+
+  /**
+   * Starts a program that keeps running and passes its standard output on as it comes.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param onOutput Receives each piece of the program's standard output.
+   * @param onExit Called once, when the program ends or cannot start.
+   * @returns The running program.
+   * @example
+   * ```ts
+   * import type { IProgramHost, StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function monitor(programs: IProgramHost): StartedProgram {
+   *   return programs.start("/usr/bin/gdbus", ["monitor", "--session"], process.env, t => console.log(t), () => console.log("ended"));
+   * }
+   * ```
+   */
+  start(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onOutput: (text: string) => void, onExit: () => void): StartedProgram;
+}
+
+/**
+ * A program that an {@link IProgramHost} started.
+ */
+export declare class StartedProgram {
+  /**
+   * Creates the running program.
+   *
+   * @param end Ends the program.
+   * @example
+   * ```ts
+   * import { StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const program: StartedProgram = new StartedProgram(() => undefined);
+   * ```
+   */
+  public constructor(end: () => void);
+
+  /**
+   * Ends the program; its host's exit callback follows once it has ended.
+   *
+   * @example
+   * ```ts
+   * import type { StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function end(program: StartedProgram): void {
+   *   program.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+}
+
+/**
+ * Runs other programs as child processes of the desktop.
+ */
+export declare class ChildProgramHost implements IProgramHost {
+  /**
+   * Creates the host.
+   *
+   * @param timeout How long, in milliseconds, a program run to its end may take before it is ended and fails.
+   * @example
+   * ```ts
+   * import { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const programs: ChildProgramHost = new ChildProgramHost(5000);
+   * ```
+   */
+  public constructor(timeout: number);
+
+  /**
+   * Runs a program to its end.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @returns A promise of the program's standard output.
+   * @throws ProgramException, through the promise, when the program cannot start, ends with an error, runs longer than
+   * the timeout or writes more than 64 KiB.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readVersionAsync(programs: ChildProgramHost): Promise<string> {
+   *   return programs.runAsync("/usr/bin/gdbus", ["--version"], process.env);
+   * }
+   * ```
+   */
+  public runAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv): Promise<string>;
+
+  /**
+   * Starts a program that keeps running and passes its standard output on as it comes.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param onOutput Receives each piece of the program's standard output.
+   * @param onExit Called once, when the program ends or cannot start.
+   * @returns The running program.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost, StartedProgram } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function monitor(programs: ChildProgramHost): StartedProgram {
+   *   return programs.start("/usr/bin/gdbus", ["monitor", "--session"], process.env, t => console.log(t), () => console.log("ended"));
+   * }
+   * ```
+   */
+  public start(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onOutput: (text: string) => void, onExit: () => void): StartedProgram;
+}
+
+/**
+ * The exception a program host gives when a program cannot start, ends with an error or runs too long.
+ */
+export declare class ProgramException extends Exception {
+  /**
+   * The exception's name, `"ProgramException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message What went wrong, naming the program.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { ProgramException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: ProgramException = new ProgramException("/usr/bin/gdbus failed: spawn /usr/bin/gdbus ENOENT");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * Tells whether the desktop has somewhere to show a tray icon. Windows and macOS always have one. On Linux it asks the
+ * session bus, through `/usr/bin/gdbus`, whether a StatusNotifierWatcher has a host registered, and asks again whenever
+ * the watcher's name changes owner or the watcher signals a host coming or going. A missing `gdbus`, a missing watcher
+ * or a failed answer means no host. When the monitor ends, it asks once and starts the monitor again after a wait that
+ * begins at a second and doubles up to a minute, back to a second once the monitor is heard again.
+ */
+export declare class TrayHostWatcher {
+  /**
+   * Creates the watcher.
+   *
+   * @param platform The platform, as `process.platform` names it.
+   * @param programs Runs `gdbus`.
+   * @param environment The environment `gdbus` runs in, which names the session bus.
+   * @param delayAsync Waits the given milliseconds before the monitor starts again.
+   * @param onChange Called with the new answer whenever it changes.
+   * @example
+   * ```ts
+   * import { ChildProgramHost, TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const watcher: TrayHostWatcher = new TrayHostWatcher(process.platform, new ChildProgramHost(5000), process.env,
+   *   t => new Promise<void>(resolve => setTimeout(resolve, t)), t => console.log(t));
+   * ```
+   */
+  public constructor(platform: string, programs: IProgramHost, environment: NodeJS.ProcessEnv, delayAsync: (milliseconds: number) => Promise<void>, onChange: (isAvailable: boolean) => void);
+
+  /**
+   * Whether a tray host is there: always on Windows and macOS; on Linux, not until the session bus says so.
+   */
+  public get isAvailable(): boolean;
+
+  /**
+   * Starts watching the session bus on Linux; elsewhere, and when it already watches, it does nothing.
+   *
+   * @example
+   * ```ts
+   * import type { TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(watcher: TrayHostWatcher): void {
+   *   watcher.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Stops watching, ends the monitor and ignores answers that arrive afterward; the last answer stays.
+   *
+   * @example
+   * ```ts
+   * import type { TrayHostWatcher } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function close(watcher: TrayHostWatcher): void {
+   *   watcher.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+}
+
+/**
+ * The exception thrown when an update cannot stop the installation; its message is the reason the updater shows.
+ */
+export declare class UpdateStopException extends Exception {
+  /**
+   * The exception's name, `"UpdateStopException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message Why the update stopped.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { UpdateStopException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: UpdateStopException = new UpdateStopException("Another update of TeamRun is under way.");
    * ```
    */
   public constructor(message: string, options?: ExceptionOptions);

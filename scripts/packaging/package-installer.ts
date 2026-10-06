@@ -13,6 +13,7 @@ import path from "node:path";
 import type ProductIdentity from "../packages/product-identity.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import ProcessTimeoutException from "../processes/process-timeout.exception.ts";
+import FileHolders from "./file-holders.ts";
 import InstalledPackage from "./installed-package.ts";
 import PackageConfiguration from "./package-configuration.ts";
 import PackageLayout from "./package-layout.ts";
@@ -73,17 +74,21 @@ export default class PackageInstaller {
   public async uninstallWindowsAsync(product: ProductIdentity, folder: string): Promise<void> {
     const installFolder = this.locateWindowsFolder(product);
     const uninstaller = path.join(installFolder, `${PackageInstaller.UNINSTALLER_PREFIX}${product.name}${PackageInstaller.WINDOWS_PROGRAM_EXTENSION}`);
-    await this.runner.requireAsync(uninstaller, [...PackageInstaller.SILENT_INSTALL, `${PackageInstaller.IN_PLACE_OPTION}${installFolder}`], folder, PackageInstaller.LIMIT,
-      this.createInstallerEnvironment());
+    const environment = this.createInstallerEnvironment();
+    await this.runner.requireAsync(uninstaller, [...PackageInstaller.SILENT_INSTALL, `${PackageInstaller.IN_PLACE_OPTION}${installFolder}`], folder, PackageInstaller.LIMIT, environment);
     try {
       await rm(uninstaller, { maxRetries: PackageInstaller.REMOVE_RETRIES, retryDelay: PackageInstaller.REMOVE_RETRY_DELAY });
     }
     catch (error) {
       throw new PackagingException(`The uninstaller ${uninstaller} could not be removed after it ran: ${String(error)}`, { cause: error });
     }
-    const left = await readdir(installFolder, { recursive: true });
-    if (left.length > 0)
-      throw new PackagingException(`The uninstaller left ${left.sort().join(", ")} in ${installFolder}.`);
+    const left = await readdir(installFolder, { recursive: true, withFileTypes: true });
+    if (left.length > 0) {
+      const files = left.filter(t => t.isFile()).map(t => path.join(t.parentPath, t.name)).sort();
+      const names = left.map(t => path.relative(installFolder, path.join(t.parentPath, t.name))).sort();
+      const holders = files.length === 0 ? "" : `\n${await new FileHolders(this.runner, folder, environment).describeAsync(files)}`;
+      throw new PackagingException(`The uninstaller left ${names.join(", ")} in ${installFolder}.${holders}`);
+    }
     await rmdir(installFolder);
   }
 

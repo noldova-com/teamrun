@@ -17,7 +17,7 @@ import type ICheck from "./interfaces/i-check.ts";
 
 export default class LicenseHeaderCheck implements ICheck {
   private static readonly HEADERS: ReadonlyMap<string, string> = new Map([
-    ...[...SourceFile.SCRIPT_EXTENSIONS, ...SourceFile.STYLE_EXTENSIONS].map(t => [t, LicenseHeader.BLOCK] as const),
+    ...[...SourceFile.SCRIPT_EXTENSIONS, ...SourceFile.STYLE_EXTENSIONS, SourceFile.C_EXTENSION].map(t => [t, LicenseHeader.BLOCK] as const),
     [".html", LicenseHeader.MARKUP],
     ...[".yml", ".yaml"].map(t => [t, LicenseHeader.YAML] as const)
   ]);

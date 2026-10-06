@@ -21,16 +21,20 @@ export class ServerSettingsTests {
     Assert.areEqual(5_000, settings.handshakeTimeout);
     Assert.areEqual(600_000, settings.defaultRequestTimeout);
     Assert.areEqual(3_600_000, settings.maximumRequestTimeout);
+    Assert.areEqual(6_000, settings.updateSaveWait);
+    Assert.areEqual(1_000, settings.updateBarrierInterval);
   }
 
   @TestMethod
   public keepsTheGivenLimits(): void {
-    const settings = new ServerSettings(1_024, 100, 200, 200);
+    const settings = new ServerSettings(1_024, 100, 200, 200, 30, 40);
 
     Assert.areEqual(1_024, settings.maximumFrameLength);
     Assert.areEqual(100, settings.handshakeTimeout);
     Assert.areEqual(200, settings.defaultRequestTimeout);
     Assert.areEqual(200, settings.maximumRequestTimeout);
+    Assert.areEqual(30, settings.updateSaveWait);
+    Assert.areEqual(40, settings.updateBarrierInterval);
   }
 
   @TestMethod
@@ -39,6 +43,8 @@ export class ServerSettingsTests {
     Assert.areEqual("handshakeTimeout", Assert.throws(() => new ServerSettings(1, 0.5), ArgumentOutOfRangeException).parameterName);
     Assert.areEqual("defaultRequestTimeout", Assert.throws(() => new ServerSettings(1, 1, -1), ArgumentOutOfRangeException).parameterName);
     Assert.areEqual("maximumRequestTimeout", Assert.throws(() => new ServerSettings(1, 1, 1, 0), ArgumentOutOfRangeException).parameterName);
+    Assert.areEqual("updateSaveWait", Assert.throws(() => new ServerSettings(1, 1, 1, 1, 0), ArgumentOutOfRangeException).parameterName);
+    Assert.areEqual("updateBarrierInterval", Assert.throws(() => new ServerSettings(1, 1, 1, 1, 1, 0), ArgumentOutOfRangeException).parameterName);
   }
 
   @TestMethod

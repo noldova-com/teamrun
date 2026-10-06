@@ -14,6 +14,14 @@ import { MainProcessFailureKind } from "./enums/main-process-failure-kind.js";
 
 export class Resources {
   public static readonly folderSeparator: string = "/";
+  public static get updateUnderWay(): string {
+    return `Another update of ${Resources.applicationName} is under way.`;
+  }
+
+  public static get updateHolderNotFound(): string {
+    return `${Resources.applicationName} could not find its own process in the process table.`;
+  }
+
   public static get applicationName(): string {
     return ProductInfo.current.name;
   }
@@ -24,6 +32,61 @@ export class Resources {
 
   public static get developmentAppUserModelId(): string {
     return ProductInfo.current.developmentApplicationId;
+  }
+
+  public static get updateInstalling(): string {
+    return `${Resources.applicationName} is installing an update.`;
+  }
+
+  public static get updateInstallingDetail(): string {
+    return `Open ${Resources.applicationName} again once the update has finished.`;
+  }
+
+  public static get updateUnfinished(): string {
+    return `An update of ${Resources.applicationName} may still be installing, or it did not finish.`;
+  }
+
+  public static get updateUnfinishedDetail(): string {
+    return `If no installer is still running, open ${Resources.applicationName} to go on with the version you have.`;
+  }
+
+  public static get openApplicationButton(): string {
+    return `Open ${Resources.applicationName}`;
+  }
+
+  public static readonly okButton: string = "OK";
+  public static readonly updateStoppedBeforeHandoff: string = "An update stopped before its handoff, so its launch barrier was removed.";
+  public static readonly updateBarrierCleared: string = "The person chose to open the application after an unfinished update, so its launch barrier was removed.";
+  public static get updateBarrierNotCleared(): string {
+    return `${Resources.applicationName} could not clear the unfinished update, so it will quit.`;
+  }
+
+  public static get updateBarrierNotClearedDetail(): string {
+    return `Open ${Resources.applicationName} again in a moment. If this keeps happening, its log has the reason.`;
+  }
+
+  public static formatBarrierNotCleared(message: string): string {
+    return `The launch barrier of an unfinished update could not be removed: ${message}`;
+  }
+
+  public static formatBarrierUnreadable(message: string): string {
+    return `The launch barrier could not be read: ${message}`;
+  }
+
+  public static formatBarrierUnsettled(message: string): string {
+    return `The launch barrier could not be settled: ${message}`;
+  }
+
+  public static formatWindowSaveUnanswered(window: number): string {
+    return `Window ${window} did not finish saving within 5 seconds.`;
+  }
+
+  public static formatWindowSaveGone(window: number): string {
+    return `Window ${window} closed before it saved.`;
+  }
+
+  public static formatDesktopUnrecorded(message: string): string {
+    return `This desktop could not be recorded in its installation, so an update may not wait for it: ${message}`;
   }
 
   public static readonly checkoutHashAlgorithm: string = "sha256";
@@ -41,6 +104,8 @@ export class Resources {
   public static readonly appearanceChannel: string = "teamrun:appearance";
   public static readonly closeRequestChannel: string = "teamrun:closeRequest";
   public static readonly closeAnswerChannel: string = "teamrun:closeAnswer";
+  public static readonly updateSaveRequestChannel: string = "teamrun:updateSaveRequest";
+  public static readonly updateSaveAnswerChannel: string = "teamrun:updateSaveAnswer";
   public static readonly startupStateChannel: string = "teamrun:startupState";
   public static readonly readStartupChannel: string = "teamrun:readStartup";
   public static readonly startupActionChannel: string = "teamrun:startupAction";
@@ -79,7 +144,8 @@ export class Resources {
     ShellMethods.setSetting.text,
     ShellMethods.resetSetting.text,
     ShellMethods.recentCommands.text,
-    ShellMethods.recordCommand.text
+    ShellMethods.recordCommand.text,
+    ShellMethods.programs.text
   ];
   public static readonly deviceMethods: readonly string[] = [
     ShellMethods.settings.text,
@@ -100,6 +166,7 @@ export class Resources {
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
   public static readonly layoutNotObject: string = "The layout must be a JSON object.";
   public static readonly clientName: string = "desktop";
+  public static readonly handoffRole: string = "handoff";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
   public static readonly waitAction: string = "wait";
@@ -118,22 +185,6 @@ export class Resources {
   public static readonly deviceDirectoryArgument: string = "--device-dir=";
   public static readonly handoverArguments: readonly string[] = [Resources.dataDirectoryArgument, Resources.userDataArgument, Resources.deviceDirectoryArgument];
   public static readonly windowsPlatform: string = "win32";
-  public static readonly localAppDataVariable: string = "LOCALAPPDATA";
-  public static readonly windowsLocalAppData: readonly string[] = ["AppData", "Local"];
-  public static get windowsDeviceFolder(): readonly string[] {
-    return ProductInfo.current.windowsDeviceFolder.split(Resources.folderSeparator);
-  }
-
-  public static get macDeviceFolder(): readonly string[] {
-    return ["Library", "Application Support", ...ProductInfo.current.macosDeviceFolder.split(Resources.folderSeparator)];
-  }
-
-  public static readonly xdgStateVariable: string = "XDG_STATE_HOME";
-  public static readonly xdgStateDefault: readonly string[] = [".local", "state"];
-  public static get linuxDeviceFolder(): readonly string[] {
-    return ProductInfo.current.linuxDeviceFolder.split(Resources.folderSeparator);
-  }
-
   public static readonly deviceFileName: string = "device.json";
   public static readonly deviceIdField: string = "id";
   public static readonly createOnlyFlag: string = "wx";
@@ -144,6 +195,30 @@ export class Resources {
   public static readonly appearanceLimit: number = 4096;
   public static readonly appearanceTooLarge: string = "The appearance preferences are larger than 4096 characters.";
   public static readonly keepAppearanceChannel: string = "teamrun:keepAppearance";
+  public static readonly readSpellingChannel: string = "teamrun:readSpelling";
+  public static readonly spellingChannel: string = "teamrun:spelling";
+  public static readonly fieldMenuChannel: string = "teamrun:fieldMenu";
+  public static readonly replaceMisspellingChannel: string = "teamrun:replaceMisspelling";
+  public static readonly addToDictionaryChannel: string = "teamrun:addToDictionary";
+  public static readonly dictionaryFolderSegments: readonly string[] = ["assets", "dictionaries"];
+  public static readonly dictionariesFile: string = "dictionaries.json";
+  public static readonly dictionariesFolder: string = "Dictionaries";
+  public static readonly dictionariesField: string = "dictionaries";
+  public static readonly languageField: string = "language";
+  public static readonly fileField: string = "file";
+  public static readonly languagesField: string = "languages";
+  public static readonly fallbackField: string = "fallback";
+  public static readonly isKeyboardField: string = "isKeyboard";
+  public static readonly wordField: string = "word";
+  public static readonly suggestionsField: string = "suggestions";
+  public static readonly keyboardMenuSource: string = "keyboard";
+  public static readonly spellingTextLimit: number = 100;
+  public static readonly languageTagPattern: RegExp = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/;
+  public static readonly dictionaryFilePattern: RegExp = /^[A-Za-z0-9-]+\.bdic$/;
+  public static readonly dictionaryWordPattern: RegExp = /^\S{1,100}$/u;
+  public static readonly urlSeparator: string = "/";
+  public static readonly listSeparator: string = ", ";
+  public static readonly spellingInvalid: string = "The spelling preferences must be whether to check and a list of language tags.";
   public static readonly uuidPattern: RegExp = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   public static readonly hashPrefix: string = "#";
   public static readonly queryPrefix: string = "?";
@@ -157,6 +232,17 @@ export class Resources {
   public static readonly windowsIcon: string = "icon-dark.ico";
   public static readonly windowIcon: string = "icon-dark-512.png";
   public static readonly dockIcon: string = "icon-dock-512.png";
+  public static readonly trayFolder: string = "tray";
+  public static readonly trayIconPrefix: string = "tray-";
+  public static readonly trayWindowsExtension: string = ".ico";
+  public static readonly trayMacSuffix: string = "Template.png";
+  public static readonly trayLinuxExtension: string = ".png";
+  public static readonly trayWorkRows: number = 5;
+  public static readonly trayNotificationRows: number = 3;
+  public static readonly trayLabelLimit: number = 60;
+  public static readonly trayEllipsis: string = "…";
+  public static readonly noWorkLabel: string = "No work running";
+  public static readonly doNotDisturbLabel: string = "Do not disturb";
   public static readonly preloadFileName: string = "preload.cjs";
   public static readonly repositoryRootSegments: readonly string[] = ["..", "..", ".."];
   public static readonly windowIndexSegments: readonly string[] = ["_build", "window", "browser", "index.html"];
@@ -173,6 +259,8 @@ export class Resources {
   public static readonly closedEvent: "closed" = "closed";
   public static readonly clickEvent: "click" = "click";
   public static readonly failedEvent: "failed" = "failed";
+  public static readonly dataEvent: "data" = "data";
+  public static readonly errorEvent: "error" = "error";
   public static readonly secondInstanceEvent: "second-instance" = "second-instance";
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
@@ -192,11 +280,13 @@ export class Resources {
   public static readonly rendererEndLimit: number = 5_000;
   public static readonly renderProcessGoneEvent: "render-process-gone" = "render-process-gone";
   public static readonly didStartLoadingEvent: "did-start-loading" = "did-start-loading";
+  public static readonly contextMenuEvent: "context-menu" = "context-menu";
   public static readonly unresponsiveEvent: "unresponsive" = "unresponsive";
   public static readonly responsiveEvent: "responsive" = "responsive";
   public static readonly cleanExitReason: string = "clean-exit";
   public static readonly warningBoxType: "warning" = "warning";
   public static readonly infoBoxType: "info" = "info";
+  public static readonly errorBoxType: "error" = "error";
   public static get commandName(): string {
     return ProductInfo.current.slug;
   }
@@ -278,13 +368,31 @@ export class Resources {
   public static readonly deviceNotIdentified: string = "This device has no identity, so the window's layout and Do not disturb are not kept.";
   public static readonly descriptionsField: string = "descriptions";
   public static readonly isWaitingField: string = "isWaiting";
+  public static readonly isUpdateField: string = "isUpdate";
   public static readonly windowMinimumWidth: number = 640;
   public static readonly windowMinimumHeight: number = 480;
   public static readonly windowWidth: number = 1280;
   public static readonly windowHeight: number = 800;
   public static readonly windowAreaShare: number = 0.9;
   public static readonly closeAnswerTimeout: number = 5000;
+  public static readonly updateBarrierInterval: number = 1000;
+  public static readonly updatePrepareTimeout: number = 15000;
+  public static readonly updateExitWait: number = 10000;
+  public static readonly updateExitInterval: number = 250;
+  public static readonly workSeparator: string = "; ";
   public static readonly workQueryTimeout: number = 2000;
+  public static readonly programTimeout: number = 5000;
+  public static readonly programOutputLimit: number = 65536;
+  public static readonly gdbusPath: string = "/usr/bin/gdbus";
+  public static readonly trayHostQueryArguments: readonly string[] = [
+    "call", "--session", "--dest", "org.kde.StatusNotifierWatcher", "--object-path", "/StatusNotifierWatcher",
+    "--method", "org.freedesktop.DBus.Properties.Get", "org.kde.StatusNotifierWatcher", "IsStatusNotifierHostRegistered"
+  ];
+  public static readonly trayHostMonitorArguments: readonly string[] = ["monitor", "--session", "--dest", "org.kde.StatusNotifierWatcher"];
+  public static readonly trayHostRegisteredAnswer: string = "(<true>,)";
+  public static readonly trayMonitorFirstDelay: number = 1000;
+  public static readonly trayMonitorLongestDelay: number = 60_000;
+  public static readonly trayMonitorDelayGrowth: number = 2;
   public static readonly windowLogLimit: number = 65536;
   public static readonly windowErrorBurst: number = 10;
   public static readonly windowErrorPeriod: number = 60000;
@@ -316,6 +424,7 @@ export class Resources {
   public static readonly invalidWindowState: string = "The saved window state is not valid.";
   public static readonly positionPairMessage: string = "A window position has both coordinates or neither.";
   public static readonly windowUrlParameter: string = "windowUrl";
+  public static readonly intervalParameter: string = "interval";
   public static readonly timeoutParameter: string = "timeout";
   public static readonly backgroundField: string = "background";
   public static readonly titleBarField: string = "titleBar";
@@ -373,6 +482,39 @@ export class Resources {
 
   public static formatEventNotForwarded(name: string, reason: string): string {
     return `The runtime's event ${name} could not be passed to the window: ${reason}`;
+  }
+
+  public static get openApplicationLabel(): string {
+    return `Open ${Resources.applicationName}`;
+  }
+
+  public static get quitApplicationLabel(): string {
+    return `Quit ${Resources.applicationName}`;
+  }
+
+  public static formatMoreWork(count: number): string {
+    return `and ${count} more`;
+  }
+
+  public static formatTrayToolTip(running: number, unread: number): string {
+    const parts = [...running > 0 ? [`${running} running`] : [], ...unread > 0 ? [`${unread} unread`] : []];
+    return parts.length === 0 ? Resources.applicationName : `${Resources.applicationName}: ${parts.join(", ")}`;
+  }
+
+  public static formatSettingNotRead(name: string, reason: string): string {
+    return `The setting ${name} could not be read for this device, so the desktop keeps its last value: ${reason}`;
+  }
+
+  public static formatTrayNotShown(reason: string): string {
+    return `The tray icon could not be shown: ${reason}`;
+  }
+
+  public static formatTrayStateNotRead(reason: string): string {
+    return `The tray icon could not read the runtime's work and notifications: ${reason}`;
+  }
+
+  public static formatDoNotDisturbNotSet(reason: string): string {
+    return `Do not disturb could not be changed from the tray: ${reason}`;
   }
 
   public static formatWorkNotRead(reason: string): string {
@@ -435,6 +577,10 @@ export class Resources {
     return `The ${Resources.commandName} command could not be linked at ${link}: ${reason}`;
   }
 
+  public static formatProgramFailed(file: string, reason: string): string {
+    return `${file} failed: ${reason}`;
+  }
+
   public static formatSystemNotificationFailed(reason: string): string {
     return `The operating system did not show a notification: ${reason}`;
   }
@@ -451,8 +597,52 @@ export class Resources {
     return `The runtime starter could not start the runtime: ${failure}`;
   }
 
+  public static formatUpdateWork(description: string, dataDirectory: string): string {
+    return `${description} (${dataDirectory})`;
+  }
+
+  public static formatWorkStartedMeanwhile(work: string): string {
+    return `Work started while ${Resources.applicationName} prepared to update: ${work}`;
+  }
+
+  public static formatUpdateRefused(dataDirectory: string, message: string): string {
+    return `The runtime of ${dataDirectory} could not prepare for the update: ${message}`;
+  }
+
+  public static formatUpdateUnsaved(dataDirectory: string, problems: string): string {
+    return `Not everything of ${dataDirectory} was saved: ${problems}`;
+  }
+
+  public static formatProcessesNotExited(processes: string): string {
+    return `These processes did not exit within 10 seconds: ${processes}`;
+  }
+
+  public static formatUpdateSavedUnsent(message: string): string {
+    return `The runtime was not told that the windows had saved for the update: ${message}`;
+  }
+
   public static formatRuntimeNotStarted(reason: string): string {
     return `The runtime could not be started or reached, so the window offers to try again: ${reason}`;
+  }
+
+  public static formatDictionariesUnread(reason: string): string {
+    return `The list of shipped dictionaries could not be read, so no spelling language is offered: ${reason}`;
+  }
+
+  public static formatDictionaryUncopied(reason: string): string {
+    return `A shipped dictionary could not be put in the profile, so its language is not offered: ${reason}`;
+  }
+
+  public static formatDictionaryFieldInvalid(value: string): string {
+    return `"${value}" is not a language tag or a dictionary file name.`;
+  }
+
+  public static formatSpellingLanguagesRefused(languages: string, reason: string): string {
+    return `The spell checker refused the languages ${languages}: ${reason}`;
+  }
+
+  public static formatSpellingRejected(reason: string): string {
+    return `The window's spelling preferences were rejected: ${reason}`;
   }
 
   public static formatAppearanceUnread(reason: string): string {

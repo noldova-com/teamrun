@@ -28,12 +28,12 @@ describe("QuitService", () => {
     const service = TestBed.inject(QuitService);
     const initial = service.question();
 
-    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true });
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: true, isUpdate: false });
     await vi.waitFor(() => expect(service.question()).not.toBeNull());
     service.answer(QuitChoice.Stop);
 
     expect(initial).toBeNull();
-    expect(service.question()).toEqual(new QuitQuestion(["Indexing the project"], true));
+    expect(service.question()).toEqual(new QuitQuestion(["Indexing the project"], true, false));
     await vi.waitFor(() => expect(quit.bridge.quitAnswers).toEqual(["Stop"]));
   });
 
@@ -41,14 +41,14 @@ describe("QuitService", () => {
     const service = TestBed.inject(QuitService);
 
     quit.stopListening();
-    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: false });
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: false, isUpdate: false });
 
     expect(service.question()).toBeNull();
     expect(QuitFixture.findDialog()).toBeNull();
   });
 
   it("closes when the desktop takes the question away and returns focus to where it was", async () => {
-    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: false });
+    quit.bridge.askToQuit({ descriptions: ["Indexing the project"], isWaiting: false, isUpdate: false });
     await vi.waitFor(() => expect(QuitFixture.findDialog()).not.toBeNull());
 
     quit.bridge.askToQuit(null);

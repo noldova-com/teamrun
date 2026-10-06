@@ -57,6 +57,7 @@ describe("SettingsComponent", () => {
   let settings: FakeSettingsService;
   let errors: unknown[];
   let gallery: Type<unknown> | null;
+  let bridge: DesktopBridgeFixture;
 
   function render(mode: ThemeMode = ThemeMode.Light, height: string = String.empty): HTMLElement {
     AppearanceFixture.apply(DefaultTheme.theme, mode);
@@ -92,7 +93,7 @@ describe("SettingsComponent", () => {
   }
 
   beforeEach(() => {
-    DesktopBridgeFixture.install("linux");
+    bridge = DesktopBridgeFixture.install("linux");
     settings = new FakeSettingsService();
     errors = [];
     gallery = null;
@@ -363,6 +364,22 @@ describe("SettingsComponent", () => {
       AppearanceFixture.expectLook(inset, DefaultTheme.theme, "settings-content-inset", "padding-left");
   });
 
+  it("starts each group title, on a page and in search results, where its setting rows' headings start, inside their padding", async () => {
+    const host = render();
+    const offsets = (heading: string): readonly number[] => [...host.querySelectorAll(".tr-settings-group")].map(t => {
+      const title = t.querySelector(heading) as HTMLElement;
+      const start = title.getBoundingClientRect().left + parseFloat(getComputedStyle(title).paddingInlineStart);
+      return Math.round(start - (t.querySelector(".tr-setting-row-heading") as HTMLElement).getBoundingClientRect().left);
+    });
+
+    const appearance = offsets(".tr-settings-group-title");
+    await searchAsync("clock");
+    const results = offsets(".tr-settings-result-group");
+
+    expect([appearance.length > 1, results.length]).toEqual([true, 2]);
+    expect([...appearance, ...results]).toEqual([...appearance, ...results].map(() => 0));
+  });
+
   it("searches only for what its own field holds", async () => {
     render();
     await searchAsync("tick");
@@ -470,6 +487,18 @@ describe("SettingsComponent", () => {
     expect([(element().querySelector(".tr-settings-search-field") as HTMLInputElement).value, texts(".tr-settings-result-title")]).toEqual(["", []]);
   });
 
+  it("offers the desktop's spelling languages on the Spelling languages row and says which one checks words when none of the device's languages is offered", async () => {
+    bridge.spelling = Promise.resolve({ languages: ["en-US"], fallback: "en-US" });
+    settings.definitions.set([...SettingsFixture.all, SettingsFixture.spellCheckLanguages]);
+    render();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const row = element().querySelector("[data-setting='shell.spellCheckLanguages']") as HTMLElement;
+
+    expect([...row.querySelectorAll(".tr-checkbox-text")].map(t => t.textContent?.trim())).toEqual(["English (United States)"]);
+    expect(row.querySelector(".tr-setting-row-note")?.textContent).toBe("None of this device's languages has a dictionary here, so words are checked in English (United States).");
+  });
+
   it("runs an action's command from its row, stores nothing, and finds the row by its label", async () => {
     const runs: string[] = [];
     settings.definitions.set([...SettingsFixture.all, SettingsFixture.alarms]);
@@ -524,7 +553,7 @@ describe("SettingsComponent", () => {
     AppearanceFixture.expectLook(getComputedStyle(element().querySelector(".tr-settings-pages") as Element).width, DefaultTheme.theme, "settings-pages-width", "width");
     expect(heading.marginTop).toBe("0px");
     AppearanceFixture.expectLook(heading.marginBottom, DefaultTheme.theme, "settings-heading-space", "margin-bottom");
-    expect(heading.paddingLeft).toBe("0px");
+    AppearanceFixture.expectLook(heading.paddingLeft, DefaultTheme.theme, "settings-item-padding", "padding-left", "padding");
     expect(heading.fontWeight).toBe("600");
     expect(heading.fontSize).toBe(`${parseFloat(getComputedStyle(document.body).fontSize) * 2}px`);
     expect(heading.color).toBe(AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "settings.headerForeground"));

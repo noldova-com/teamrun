@@ -18,6 +18,7 @@ import {
   AttachOptions,
   BuildMismatchException,
   ConnectionException,
+  type IProcessStarter,
   LaunchException,
   LaunchSettings,
   MethodFailureException,
@@ -29,6 +30,8 @@ import {
   RuntimeEntry,
   RuntimeHandoverException,
   RuntimeLauncher,
+  UpdateBarrierStatus,
+  UpdateInProgressException,
   WorkInProgressException
 } from "@noldova/teamrun-shell-runtime";
 
@@ -39,6 +42,8 @@ import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 import { RuntimeLaunchFixture } from "../../fixtures/runtime-launch.fixture.js";
 import { RuntimeServerFixture } from "../../fixtures/runtime-server.fixture.js";
 import { ScriptedStarterFixture } from "../../fixtures/scripted-starter.fixture.js";
+import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
+import { UpdateBarrierFixture } from "../../fixtures/update-barrier.fixture.js";
 
 @TestClass
 export class RuntimeLauncherTests {
@@ -60,7 +65,7 @@ export class RuntimeLauncherTests {
   @TestMethod
   public async startsARuntimeAndStopsItOnRequest(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
-    const client = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
+    const client = await UpdateBarrierFixture.createLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
     const processId = await launch.readProcessIdAsync();
 
     const response = await client.stopAsync(StopPolicy.IfIdle);
@@ -74,14 +79,84 @@ export class RuntimeLauncherTests {
   }
 
   @TestMethod
+  public async startsARuntimeThatJoinsItsInstallation(): Promise<void> {
+    await using launch = await RuntimeLaunchFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = UpdateBarrierFixture.open(folder.path);
+    const client = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, installation, launch.starter).attachAsync("desktop", new ClientListenerFixture());
+
+    const recorded = await readdir(installation.recordFolder);
+    await client.stopAsync(StopPolicy.IfIdle);
+
+    Assert.areEqual(1, recorded.length);
+  }
+
+  @TestMethod
+  public async startsNoRuntimeWhileAnUpdateHoldsItsInstallation(): Promise<void> {
+    await using launch = await RuntimeLaunchFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = UpdateBarrierFixture.open(folder.path);
+    await UpdateBarrierFixture.holdAsync(installation);
+
+    const exception = await Assert.throwsAsync(
+      () => new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, installation, launch.starter).attachAsync("desktop", new ClientListenerFixture()),
+      UpdateInProgressException);
+
+    Assert.areEqual(UpdateBarrierStatus.Held, exception.status);
+    Assert.isFalse(existsSync(launch.dataDirectory.discoveryFile));
+    Assert.isFalse(existsSync(installation.recordFolder));
+  }
+
+  @TestMethod
+  public async reportsAnUpdateWhenTheRuntimeItStartedExitsForABarrierThatAppearedMeanwhile(): Promise<void> {
+    await using launch = await RuntimeLaunchFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = UpdateBarrierFixture.open(folder.path);
+    const starter: IProcessStarter = {
+      startAsync: async (executable, launchArguments, environment, errorFile) => {
+        await UpdateBarrierFixture.holdAsync(installation);
+        return await launch.starter.startAsync(executable, launchArguments, environment, errorFile);
+      }
+    };
+
+    const exception = await Assert.throwsAsync(
+      () => new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, installation, starter).attachAsync("desktop", new ClientListenerFixture()),
+      UpdateInProgressException);
+
+    Assert.areEqual(UpdateBarrierStatus.Held, exception.status);
+    Assert.isFalse(existsSync(launch.dataDirectory.discoveryFile));
+    Assert.areEqual(1, (await readdir(installation.recordFolder)).length);
+  }
+
+  @TestMethod
+  public async reportsTheExitWhenTheBarrierCannotBeReadOnceTheRuntimeItStartedHasExited(): Promise<void> {
+    await using launch = await RuntimeLaunchFixture.createAsync();
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const installation = UpdateBarrierFixture.open(folder.path);
+    const starter: IProcessStarter = {
+      startAsync: async (executable, launchArguments, environment, errorFile) => {
+        await mkdir(installation.barrierFile, { recursive: true });
+        return await launch.starter.startAsync(executable, launchArguments, environment, errorFile);
+      }
+    };
+
+    const exception = await Assert.throwsAsync(
+      () => new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, installation, starter).attachAsync("desktop", new ClientListenerFixture()),
+      LaunchException);
+
+    Assert.isTrue(exception.message.includes("EISDIR"), exception.message);
+    Assert.isFalse(existsSync(launch.dataDirectory.discoveryFile));
+  }
+
+  @TestMethod
   public async clientsStartingTogetherShareOneRuntime(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
-    const launchers = [1, 2, 3].map(() => new RuntimeLauncher(launch.createSettings(1_000), RuntimeBuild.identity, launch.starter));
+    const launchers = [1, 2, 3].map(() => UpdateBarrierFixture.createLauncher(launch.createSettings(1_000), RuntimeBuild.identity, launch.starter));
 
     const clients = await Promise.all(launchers.map((t, index) => t.attachAsync(`client${index}`, new ClientListenerFixture())));
     const processId = await launch.readProcessIdAsync();
     const listener = new ClientListenerFixture();
-    const late = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("late", listener);
+    const late = await UpdateBarrierFixture.createLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("late", listener);
 
     Assert.areEqual(3, clients.filter(t => t.isConnected).length);
     Assert.areEqual(processId, await launch.readProcessIdAsync());
@@ -94,7 +169,7 @@ export class RuntimeLauncherTests {
   public async anIdleRuntimeEndsItsProcess(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
     const listener = new ClientListenerFixture();
-    const client = await new RuntimeLauncher(launch.createSettings(300), RuntimeBuild.identity, launch.starter).attachAsync("desktop", listener);
+    const client = await UpdateBarrierFixture.createLauncher(launch.createSettings(300), RuntimeBuild.identity, launch.starter).attachAsync("desktop", listener);
     const processId = await launch.readProcessIdAsync();
 
     client.close();
@@ -109,11 +184,11 @@ export class RuntimeLauncherTests {
   public async aNewerBuildTakesOverAnOlderRuntime(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
     await using older = await RuntimeBuildFixture.createAsync("0.0.0");
-    const olderClient = await new RuntimeLauncher(launch.createSettings(30_000, older.entryPath), older.identity, launch.starter).attachAsync("older", new ClientListenerFixture());
+    const olderClient = await UpdateBarrierFixture.createLauncher(launch.createSettings(30_000, older.entryPath), older.identity, launch.starter).attachAsync("older", new ClientListenerFixture());
     const olderProcessId = await launch.readProcessIdAsync();
     olderClient.close();
 
-    const client = await new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
+    const client = await UpdateBarrierFixture.createLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
     const processId = await launch.readProcessIdAsync();
 
     Assert.isNull(client.handover);
@@ -127,11 +202,11 @@ export class RuntimeLauncherTests {
   public async anOlderBuildHandsOverToANewerRuntime(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
     await using newer = await RuntimeBuildFixture.createAsync("999.0.0");
-    const newerClient = await new RuntimeLauncher(launch.createSettings(30_000, newer.entryPath), newer.identity, launch.starter).attachAsync("newer", new ClientListenerFixture());
+    const newerClient = await UpdateBarrierFixture.createLauncher(launch.createSettings(30_000, newer.entryPath), newer.identity, launch.starter).attachAsync("newer", new ClientListenerFixture());
     const processId = await launch.readProcessIdAsync();
 
     const handover = await Assert.throwsAsync(
-      () => new RuntimeLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture()),
+      () => UpdateBarrierFixture.createLauncher(launch.createSettings(), RuntimeBuild.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture()),
       RuntimeHandoverException);
 
     Assert.areEqual("999.0.0", handover.handover.identity.productVersion);
@@ -146,7 +221,7 @@ export class RuntimeLauncherTests {
   public async aModuleWhoseRuntimePartImportsTheRuntimesApiActivatesInTheRuntimesProcess(): Promise<void> {
     await using launch = await RuntimeLaunchFixture.createAsync();
     await using build = await RuntimeBuildFixture.createWithModuleAsync("0.0.0", "probe", "probe.count", RuntimeLauncherTests.PROBE_PART);
-    const client = await new RuntimeLauncher(launch.createSettings(30_000, build.entryPath), build.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
+    const client = await UpdateBarrierFixture.createLauncher(launch.createSettings(30_000, build.entryPath), build.identity, launch.starter).attachAsync("desktop", new ClientListenerFixture());
     const processId = await launch.readProcessIdAsync();
 
     const response = await client.callAsync(RuntimeLauncherTests.PROBE_COUNT, null);
@@ -164,7 +239,7 @@ export class RuntimeLauncherTests {
       host.work.begin("Indexing the project");
       const newer = new BuildIdentity("999.0.0", BuildIdentity.supportedProtocolVersion, "newer-build");
 
-      const exception = await Assert.throwsAsync(() => new RuntimeLauncher(settings, newer).attachAsync("desktop", new ClientListenerFixture()), WorkInProgressException);
+      const exception = await Assert.throwsAsync(() => UpdateBarrierFixture.createLauncher(settings, newer).attachAsync("desktop", new ClientListenerFixture()), WorkInProgressException);
 
       Assert.areEqual("Indexing the project", exception.work.descriptions.join(","));
       Assert.isTrue(OwnershipLock.isOwned(fixture.dataDirectory), "the runtime keeps running");
@@ -177,7 +252,7 @@ export class RuntimeLauncherTests {
       const settings = new LaunchSettings(fixture.dataDirectory, path.join(fixture.root, "missing-program"), RuntimeEntry.entryPath, {}, process.platform, 1_000, 1_000, 25);
 
       const exception = await Assert.throwsAsync(
-        () => new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(false)),
+        () => UpdateBarrierFixture.createLauncher(settings, RuntimeBuild.identity).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(false)),
         NoRuntimeException);
 
       Assert.areEqual(`No runtime is running for ${fixture.dataDirectory.root}.`, exception.message);
@@ -190,7 +265,7 @@ export class RuntimeLauncherTests {
     return RuntimeLauncherTests.runWithHostAsync(async (fixture, settings) => {
       const host = await fixture.startAsync();
 
-      const client = await new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(false));
+      const client = await UpdateBarrierFixture.createLauncher(settings, RuntimeBuild.identity).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(false));
 
       Assert.isTrue(client.isConnected);
       Assert.isFalse((await client.stopAsync(StopPolicy.IfIdle)).hasFailed);
@@ -205,7 +280,7 @@ export class RuntimeLauncherTests {
       const newer = new BuildIdentity("999.0.0", BuildIdentity.supportedProtocolVersion, "newer-build");
 
       const exception = await Assert.throwsAsync(
-        () => new RuntimeLauncher(settings, newer).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(true, false)),
+        () => UpdateBarrierFixture.createLauncher(settings, newer).attachAsync("cli", new ClientListenerFixture(), StopPolicy.IfIdle, new AttachOptions(true, false)),
         BuildMismatchException);
 
       Assert.areEqual(RuntimeBuild.identity.fingerprint, exception.handover.identity.fingerprint);
@@ -220,7 +295,7 @@ export class RuntimeLauncherTests {
       await mkdir(fixture.dataDirectory.root, { recursive: true });
       await writeFile(path.join(fixture.dataDirectory.root, "teamrun.db"), "old data");
       await fixture.startAsync();
-      const launcher = new RuntimeLauncher(settings, RuntimeBuild.identity);
+      const launcher = UpdateBarrierFixture.createLauncher(settings, RuntimeBuild.identity);
 
       const exception = await Assert.throwsAsync(() => launcher.attachAsync("desktop", new ClientListenerFixture()), PreShellDataFoundException);
       const client = await launcher.moveAsideAsync("desktop", new ClientListenerFixture());
@@ -242,7 +317,7 @@ export class RuntimeLauncherTests {
       fake.server.methods.register(ShellMethods.moveAside, { handleAsync: () => Promise.reject(new MethodFailureException(new Failure(FailureCode.Internal, "The disk is full."))) });
 
       const exception = await Assert.throwsAsync(
-        () => new RuntimeLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).moveAsideAsync("desktop", new ClientListenerFixture()),
+        () => UpdateBarrierFixture.createLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).moveAsideAsync("desktop", new ClientListenerFixture()),
         LaunchException);
 
       Assert.areEqual("The runtime could not move the old data aside: The disk is full.", exception.message);
@@ -256,7 +331,7 @@ export class RuntimeLauncherTests {
         fake.server.methods.register(ShellMethods.stop, { handleAsync: () => Promise.reject(new MethodFailureException(failure)) });
 
         const exception = await Assert.throwsAsync(
-          () => new RuntimeLauncher(fake.createSettings(), FakeRuntimeFixture.NEWER).attachAsync("desktop", new ClientListenerFixture(), StopPolicy.StopWork),
+          () => UpdateBarrierFixture.createLauncher(fake.createSettings(), FakeRuntimeFixture.NEWER).attachAsync("desktop", new ClientListenerFixture(), StopPolicy.StopWork),
           LaunchException);
 
         Assert.areEqual(`The other build's runtime refused to stop: ${failure.message}`, exception.message);
@@ -270,7 +345,7 @@ export class RuntimeLauncherTests {
       fake.server.methods.register(ShellMethods.stop, { handleAsync: () => Promise.resolve(null) });
 
       const exception = await Assert.throwsAsync(
-        () => new RuntimeLauncher(fake.createSettings(300), FakeRuntimeFixture.NEWER).attachAsync("desktop", new ClientListenerFixture()),
+        () => UpdateBarrierFixture.createLauncher(fake.createSettings(300), FakeRuntimeFixture.NEWER).attachAsync("desktop", new ClientListenerFixture()),
         LaunchException);
 
       Assert.areEqual("The other build's runtime did not stop in time.", exception.message);
@@ -283,7 +358,7 @@ export class RuntimeLauncherTests {
       await fake.server.server.closeAsync();
 
       const exception = await Assert.throwsAsync(
-        () => new RuntimeLauncher(fake.createSettings(300, 600), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
+        () => UpdateBarrierFixture.createLauncher(fake.createSettings(300, 600), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
         LaunchException);
 
       Assert.areEqual("A runtime held the data directory but was not reachable within 0.6 s.", exception.message);
@@ -294,7 +369,7 @@ export class RuntimeLauncherTests {
   public passesOnARefusedConnection(): Promise<void> {
     return RuntimeLauncherTests.runWithFakeAsync(async fake => {
       const exception = await Assert.throwsAsync(
-        () => new RuntimeLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
+        () => UpdateBarrierFixture.createLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
         ConnectionException);
 
       Assert.areEqual(FailureCode.Unauthorized, exception.failure?.code);
@@ -307,7 +382,7 @@ export class RuntimeLauncherTests {
       const earlier = readFileSync(fake.dataDirectory.discoveryFile, "utf8");
       fake.server.onChange = () => writeFileSync(fake.dataDirectory.discoveryFile, earlier.replace("earlier-token", RuntimeServerFixture.TOKEN));
 
-      const client = await new RuntimeLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture());
+      const client = await UpdateBarrierFixture.createLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture());
 
       Assert.isTrue(client.isConnected);
       client.close();
@@ -328,7 +403,7 @@ export class RuntimeLauncherTests {
       };
 
       const exception = await Assert.throwsAsync(
-        () => new RuntimeLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
+        () => UpdateBarrierFixture.createLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
         ConnectionException);
 
       Assert.areEqual(FailureCode.Unauthorized, exception.failure?.code);
@@ -340,7 +415,7 @@ export class RuntimeLauncherTests {
   public passesOnUnreadableDiscovery(): Promise<void> {
     return RuntimeLauncherTests.runWithFakeAsync(async fake => {
       await Assert.throwsAsync(
-        () => new RuntimeLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
+        () => UpdateBarrierFixture.createLauncher(fake.createSettings(), RuntimeServerFixture.IDENTITY).attachAsync("desktop", new ClientListenerFixture()),
         Error);
     }, undefined, "tcp://127.0.0.1:port");
   }
@@ -351,7 +426,7 @@ export class RuntimeLauncherTests {
       const missing = path.join(fixture.root, "missing-program");
       const settings = new LaunchSettings(fixture.dataDirectory, missing, RuntimeEntry.entryPath, {}, "win32", 1_000, 1_000, 25);
 
-      const exception = await Assert.throwsAsync(() => new RuntimeLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", new ClientListenerFixture()), LaunchException);
+      const exception = await Assert.throwsAsync(() => UpdateBarrierFixture.createLauncher(settings, RuntimeBuild.identity).attachAsync("desktop", new ClientListenerFixture()), LaunchException);
 
       Assert.areEqual(`The runtime could not be started with ${missing}.`, exception.message);
       Assert.isInstanceOf(exception.cause, Error);
@@ -365,7 +440,7 @@ export class RuntimeLauncherTests {
     const started = Date.now();
     const publishing = delay(600).then(() => fake.publishAsync());
 
-    const client = await new RuntimeLauncher(fake.createSettings(200, 5_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture());
+    const client = await UpdateBarrierFixture.createLauncher(fake.createSettings(200, 5_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture());
     client.close();
     await publishing;
     const processId = Number(starter.processIds[0]);
@@ -383,7 +458,7 @@ export class RuntimeLauncherTests {
     const started = Date.now();
     const publishing = delay(600).then(() => fake.publishAsync());
 
-    const client = await new RuntimeLauncher(fake.createSettings(200, 5_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture());
+    const client = await UpdateBarrierFixture.createLauncher(fake.createSettings(200, 5_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture());
     client.close();
     await publishing;
 
@@ -398,7 +473,7 @@ export class RuntimeLauncherTests {
     const started = Date.now();
 
     const exception = await Assert.throwsAsync(
-      () => new RuntimeLauncher(fake.createSettings(200, 800), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture()),
+      () => UpdateBarrierFixture.createLauncher(fake.createSettings(200, 800), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture()),
       LaunchException);
     const processId = Number(starter.processIds[0]);
     process.kill(processId);
@@ -414,7 +489,7 @@ export class RuntimeLauncherTests {
     await using fake = await FakeRuntimeFixture.ownAsync();
     const starter = new ScriptedStarterFixture(`setTimeout(() => { console.error("The database is damaged."); process.exit(1); }, 400);`);
     const attaching = Assert.throwsAsync(
-      () => new RuntimeLauncher(fake.createSettings(200, 5_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture()),
+      () => UpdateBarrierFixture.createLauncher(fake.createSettings(200, 5_000), RuntimeServerFixture.IDENTITY, starter).attachAsync("desktop", new ClientListenerFixture()),
       LaunchException);
 
     Assert.isTrue(await Wait.untilAsync(() => starter.processIds.length > 0, 5_000), "The launcher started no runtime within 5 s.");

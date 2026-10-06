@@ -18,20 +18,22 @@ import { FakeDisplayHost } from "./fake-display-host.fixture.js";
 import { FakeIpcHost } from "./fake-ipc-host.fixture.js";
 import { FakeMenuHost } from "./fake-menu-host.fixture.js";
 import { FakeNotificationHost } from "./fake-notification-host.fixture.js";
-import { FakePermissionHost } from "./fake-permission-host.fixture.js";
+import { FakeSession } from "./fake-session.fixture.js";
 import { FakeShellHost } from "./fake-shell-host.fixture.js";
+import { FakeTrayHost } from "./fake-tray-host.fixture.js";
 
 export class FakeElectron implements IElectron {
   public readonly app: FakeApplicationHost;
   public readonly ipcMain: FakeIpcHost = new FakeIpcHost();
-  public readonly permissions: FakePermissionHost = new FakePermissionHost();
-  public readonly session: ISessionHost = { defaultSession: this.permissions };
+  public readonly defaultSession: FakeSession = new FakeSession();
+  public readonly session: ISessionHost = { defaultSession: this.defaultSession };
   public readonly menu: FakeMenuHost = new FakeMenuHost();
   public readonly screen: FakeDisplayHost = new FakeDisplayHost();
   public readonly clipboard: FakeClipboardHost = new FakeClipboardHost();
   public readonly shell: FakeShellHost = new FakeShellHost();
   public readonly dialog: FakeDialogHost = new FakeDialogHost();
   public readonly notifications: FakeNotificationHost = new FakeNotificationHost();
+  public readonly tray: FakeTrayHost = new FakeTrayHost();
   public readonly windows: FakeDesktopWindow[] = [];
 
   public constructor(hasLock: boolean = true, isPackaged: boolean = false) {

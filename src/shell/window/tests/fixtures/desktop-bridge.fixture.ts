@@ -19,13 +19,20 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly menuListeners: Set<(id: string) => void> = new Set();
   private readonly openedListeners: Set<(id: string) => void> = new Set();
   private readonly quitListeners: Set<(question: unknown) => void> = new Set();
+  private readonly fieldMenuListeners: Set<(request: unknown) => void> = new Set();
+  private readonly updateSaveListeners: Set<(requestId: string) => void> = new Set();
 
   public platform: string;
   public appearance: unknown = null;
   public readonly keptAppearances: JsonObject[] = [];
+  public spelling: Promise<unknown> = Promise.resolve({ languages: [], fallback: null });
+  public readonly keptSpellings: (readonly [boolean, readonly string[]])[] = [];
+  public readonly replacements: string[] = [];
+  public readonly addedWords: string[] = [];
   public readonly appearances: JsonObject[] = [];
   public readonly changes: JsonObject[] = [];
   public readonly answers: string[] = [];
+  public readonly updateSaveAnswers: string[] = [];
   public readonly actions: string[] = [];
   public startup: unknown = { kind: "Ready", details: [] };
   public layout: unknown = null;
@@ -36,7 +43,8 @@ export class DesktopBridgeFixture implements IDesktopBridge {
     ["shell.commands", { payload: { commands: [], sequence: 0 } }],
     ["shell.notifications", { payload: { notifications: [], isDoNotDisturb: false, mutedModules: [], sequence: 0 } }],
     ["shell.settings", { payload: { definitions: [], entries: [] } }],
-    ["shell.recentCommands", { payload: { ids: [] } }]
+    ["shell.recentCommands", { payload: { ids: [] } }],
+    ["shell.programs", { payload: { programs: [], sequence: 0 } }]
   ]);
   public build: unknown = { productVersion: "1.2.3", fingerprint: "abc123" };
   public readonly copied: string[] = [];
@@ -74,8 +82,16 @@ export class DesktopBridgeFixture implements IDesktopBridge {
     return this.listeners.size + this.startupListeners.size + this.eventListeners.size + this.menuListeners.size + this.openedListeners.size;
   }
 
+  public get fieldMenuListenerCount(): number {
+    return this.fieldMenuListeners.size;
+  }
+
   public get closeListenerCount(): number {
     return this.listeners.size;
+  }
+
+  public get updateSaveListenerCount(): number {
+    return this.updateSaveListeners.size;
   }
 
   public notifyReady(appearance: JsonObject): void {
@@ -93,6 +109,16 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public answerClose(requestId: string, isSaved: boolean): Promise<boolean> {
     this.answers.push(`${requestId}:${isSaved}`);
+    return Promise.resolve(true);
+  }
+
+  public onUpdateSaveRequest(listener: (requestId: string) => void): () => void {
+    this.updateSaveListeners.add(listener);
+    return () => this.updateSaveListeners.delete(listener);
+  }
+
+  public answerUpdateSave(requestId: string, problems: readonly string[]): Promise<boolean> {
+    this.updateSaveAnswers.push(`${requestId}:${problems.join("|")}`);
     return Promise.resolve(true);
   }
 
@@ -141,6 +167,34 @@ export class DesktopBridgeFixture implements IDesktopBridge {
 
   public keepAppearance(preferences: JsonObject): void {
     this.keptAppearances.push(preferences);
+  }
+
+  public readSpelling(): Promise<unknown> {
+    return this.spelling;
+  }
+
+  public keepSpelling(isChecking: boolean, languages: readonly string[]): void {
+    this.keptSpellings.push([isChecking, languages]);
+  }
+
+  public onFieldMenu(listener: (request: unknown) => void): () => void {
+    this.fieldMenuListeners.add(listener);
+    return () => this.fieldMenuListeners.delete(listener);
+  }
+
+  public replaceMisspelling(text: string): Promise<boolean> {
+    this.replacements.push(text);
+    return Promise.resolve(true);
+  }
+
+  public addToDictionary(word: string): Promise<boolean> {
+    this.addedWords.push(word);
+    return Promise.resolve(true);
+  }
+
+  public publishFieldMenu(request: unknown): void {
+    for (const listener of this.fieldMenuListeners)
+      listener(request);
   }
 
   public openLogFolder(): Promise<boolean> {
@@ -218,6 +272,11 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public publishStartup(state: unknown): void {
     for (const listener of this.startupListeners)
       listener(state);
+  }
+
+  public requestUpdateSave(requestId: string): void {
+    for (const listener of this.updateSaveListeners)
+      listener(requestId);
   }
 
   public requestClose(requestId: string): void {
