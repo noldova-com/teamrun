@@ -36,8 +36,10 @@ export class ChoicePillsComponent {
   }
 
   protected move(event: KeyboardEvent, group: HTMLElement): void {
+    if (!(event.target instanceof HTMLButtonElement))
+      return;
     const pills = [...group.querySelectorAll<HTMLButtonElement>(Resources.choicePillSelector)];
-    const target = Resources.choicePillTargets.get(event.key)?.(pills.indexOf(event.target as HTMLButtonElement), pills.length - 1);
+    const target = Resources.choicePillTargets.get(event.key)?.(pills.indexOf(event.target), pills.length - 1);
     if (Object.isUndefined(target))
       return;
     event.preventDefault();

@@ -76,7 +76,9 @@ export class WorkspaceComponent {
   }
 
   protected remember(event: FocusEvent): void {
-    const target = event.target as HTMLElement;
+    const target = event.target;
+    if (!(target instanceof HTMLElement))
+      return;
     const group = target.closest<HTMLElement>(Resources.tabGroupSelector)?.dataset[Resources.tabGroupData];
     this.focused = target;
     this.focusedGroup = Object.isUndefined(group) ? null : Number(group);
