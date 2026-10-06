@@ -27,6 +27,7 @@ import ModuleFolderCheck from "./checks/module-folder-check.ts";
 import ModuleImportCheck from "./checks/module-import-check.ts";
 import NameUniquenessCheck from "./checks/name-uniqueness-check.ts";
 import PackageCheck from "./checks/package-check.ts";
+import PackageLayoutCheck from "./checks/package-layout-check.ts";
 import PackageTestCheck from "./checks/package-test-check.ts";
 import PackagedBuildCheck from "./checks/packaged-build-check.ts";
 import ProductIdentityCheck from "./checks/product-identity-check.ts";
@@ -196,6 +197,7 @@ export default class Test {
     const documents = new DocumentCheck(this.root, files);
     const { default: ApiCatalog } = await import("./api/api-catalog.ts");
     const { default: ApiServer } = await import("./api/api-server.ts");
+    const { default: AngularFileCheck } = await import("./checks/angular-file-check.ts");
     const { default: ApiDeclarationCheck } = await import("./checks/api-declaration-check.ts");
     const { default: ApiDocumentationCheck } = await import("./checks/api-documentation-check.ts");
     const { default: ApiExampleCheck } = await import("./checks/api-example-check.ts");
@@ -217,6 +219,7 @@ export default class Test {
       new TestWaitCheck(this.root, files),
       new FieldOrderCheck(this.root, files),
       new BucketNameCheck(files, syntax),
+      new AngularFileCheck(files, syntax),
       new EnumValueCheck(files, syntax),
       new GitHubConfigurationCheck(this.root, files),
       new ModuleFolderCheck(this.root, modules),
@@ -229,6 +232,7 @@ export default class Test {
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
       new DependencyPinCheck(this.root, files),
+      new PackageLayoutCheck(this.root, new PackageCatalog(this.root)),
       new PackageCheck(build),
       ...selection === undefined || selection.packages.length > 0 ? [new PackageTestCheck(this.root, build, this.runner, this.environment, flaky, selection?.packages)] : [],
       new TypeCheck(this.root, this.runner),
