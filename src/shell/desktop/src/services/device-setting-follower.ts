@@ -37,8 +37,9 @@ export class DeviceSettingFollower {
     const response = await this.readAsync(new SettingKey(this.name, null, device));
     if (generation !== this.generation)
       return;
-    if (response.hasFailed) {
-      this.log(Resources.formatSettingNotRead(this.name.text, response.failure?.message ?? String.empty));
+    const failure = response.failure;
+    if (!Object.isUndefined(failure)) {
+      this.log(Resources.formatSettingNotRead(this.name.text, failure.message));
       return;
     }
     try {

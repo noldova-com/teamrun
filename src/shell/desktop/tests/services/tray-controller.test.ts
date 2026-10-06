@@ -211,4 +211,20 @@ export class TrayControllerTests {
     Assert.isTrue(tray.isDestroyed);
     Assert.areEqual(1, fixture.process.programs.stops);
   }
+
+  @TestMethod
+  public async asksAgainWhenTheLinuxTrayHostMonitorEndsAndRemovesTheIconWhenTheHostIsGone(): Promise<void> {
+    const fixture = new TrayFixture("linux");
+    await fixture.startAsync();
+    await fixture.process.programs.answerAsync("(<true>,)\n");
+    const shown = fixture.electron.tray.shown;
+
+    fixture.process.programs.exit();
+    await fixture.process.programs.answerAsync("(<false>,)\n");
+
+    Assert.isDefined(shown);
+    Assert.isTrue(shown?.isDestroyed === true);
+    Assert.isUndefined(fixture.electron.tray.shown);
+    Assert.areEqual(2, fixture.process.programs.runs.length);
+  }
 }

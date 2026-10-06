@@ -44,10 +44,6 @@ export class TrayController {
     this.log = log;
   }
 
-  public get isShown(): boolean {
-    return !Object.isNull(this.tray);
-  }
-
   public setEnabled(isEnabled: boolean): void {
     this.isEnabled = isEnabled;
     this.update();

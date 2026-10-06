@@ -134,7 +134,7 @@ export class DesktopApplication {
     this.quit = new QuitCoordinator(t => this.isLastOpen(t), () => this.readWorkAsync(), () => this.stopWorkAsync());
     this.tray = new TrayController(electron.tray, electron.menu, icons, process.platform,
       { open: () => this.reopen(), openNotification: t => this.openNotification(t), setDoNotDisturb: t => void this.setDoNotDisturbAsync(t), quit: () => electron.app.quit() }, t => this.log.write(t));
-    this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t), t => this.tray.setHostAvailable(t));
+    this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.tray.setHostAvailable(t));
     this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.tray.setEnabled(t === true), t => this.log.write(t));
   }
