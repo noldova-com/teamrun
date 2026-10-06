@@ -42,12 +42,12 @@ class TestTests {
 
       assert.equal(exitCode, 0, output.text);
       const titles = [
-        "Documents", "License headers", "Test waits", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
+        "Documents", "License headers", "Test waits", "Field order", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages", "Package tests and coverage",
         "Script types", "API declarations", "API documentation", "API examples",
         "Script tests and coverage", "Angular tests and coverage", "Packaged build leaves out the Gallery"
       ];
       assert.deepEqual([...output.text.matchAll(/^(.+): (passed|failed)$/gm)].map(t => `${t[1]}: ${t[2]}`), titles.map(t => `${t}: passed`));
-      assert.ok(output.text.endsWith("\n21 of 21 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n22 of 22 checks passed.\n"));
       for (const part of ["src/shell/ui", "src/shell/window"]) {
         assert.ok(output.text.includes(`\n${part}: matches its declarations\n`), output.text);
         assert.ok(output.text.includes(`\n${part}: documents every public member\n`), output.text);
@@ -55,6 +55,30 @@ class TestTests {
       }
       assert.equal(runner.runs.length, 5);
       assert.equal(await readFile(summaryPath, "utf8"), `| Check | Result |\n|---|---|\n${titles.map(t => `| ${t} | Passed |\n`).join("")}`);
+    });
+
+    test("each part runs only its own checks, in the complete gate's order, and says that only all parts together are the complete gate", async t => {
+      const repository = await TestTests.createRepositoryAsync(t);
+      const parts = ["packages", "scripts", "angular-and-checks"];
+      const outputs: TextOutputFixture[] = [];
+
+      for (const part of parts) {
+        const output = new TextOutputFixture();
+        assert.equal(await new Test(repository.directory, new AngularReportRunnerFixture(TestTests.REPORT, [0, 0]), output, {}).runAsync(["--part", part]), 0, output.text);
+        outputs.push(output);
+      }
+
+      const titles = outputs.map(t => [...t.text.matchAll(/^(.+): passed$/gm)].map(u => u[1]));
+      assert.deepEqual(titles, [
+        ["Package tests and coverage"],
+        ["Script tests and coverage"],
+        [
+          "Documents", "License headers", "Test waits", "GitHub configuration", "Module folders", "Shell names no module", "Product identity", "Module imports", "Window imports", "Test mirrors", "Unique names", "Declared dependencies", "Packages",
+          "Script types", "API declarations", "API documentation", "API examples", "Angular tests and coverage", "Packaged build leaves out the Gallery"
+        ]
+      ]);
+      for (const [index, output] of outputs.entries())
+        assert.ok(output.text.startsWith(`Part run: ${parts[index]}. Only all 3 parts together are the complete gate.\n`), output.text);
     });
 
     test("a failing check fails the gate after the remaining checks have run", async t => {
@@ -67,7 +91,7 @@ class TestTests {
       assert.equal(exitCode, 1);
       assert.ok(output.text.includes("\nScript types: failed\n"));
       assert.ok(output.text.includes("\nScript tests and coverage: passed\n"));
-      assert.ok(output.text.endsWith("\n20 of 21 checks passed.\n"));
+      assert.ok(output.text.endsWith("\n21 of 22 checks passed.\n"));
       assert.equal(runner.runs.length, 5);
     });
 
@@ -212,7 +236,7 @@ class TestTests {
         const output = new TextOutputFixture();
 
         assert.equal(await new Test("unused", new ProcessRunnerFixture(), output, {}).runAsync(selection), 2);
-        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>]]\n`);
+        assert.equal(output.text, `${reason}Usage: npm test [-- documents | [--filter <text>]... [--repeat <count>] | --part <part> [--repeat <count>]]\n`);
       }
     });
 

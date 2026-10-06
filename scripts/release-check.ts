@@ -24,6 +24,8 @@ export default class ReleaseCheck {
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly MAIN: string = "main";
   private static readonly ON_MAIN: readonly string[] = ["identical", "ahead"];
+  private static readonly BUILD_RUNS: string = "/actions/workflows/build-and-test.yml/runs?event=push&branch=main&per_page=1&head_sha=";
+  private static readonly SUCCESS: string = "success";
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
@@ -77,7 +79,17 @@ export default class ReleaseCheck {
     const status = GitHubJson.text(GitHubJson.object(comparison, "the comparison with main"), "status", "the comparison with main");
     if (!ReleaseCheck.ON_MAIN.includes(status))
       throw new ReleaseException(`${request.revision} is not on ${ReleaseCheck.MAIN}; ${ReleaseCheck.MAIN} is ${status} compared with it.`);
-    this.output.write(`${request.version.tag} of ${request.repository} from ${request.revision}: the version is new and the revision is on ${ReleaseCheck.MAIN}.\n`);
+
+    const runs = GitHubJson.children(GitHubJson.object(await api.readAsync(`${ReleaseCheck.BUILD_RUNS}${request.revision}`), "Build and test runs"), "workflow_runs", "Build and test runs");
+    const run = runs.at(0);
+    if (run === undefined)
+      throw new ReleaseException(`No Build and test run on ${ReleaseCheck.MAIN} has checked ${request.revision}; release a revision whose run on ${ReleaseCheck.MAIN} passed.`);
+    const conclusion = GitHubJson.nullableText(run, "conclusion", "the Build and test run") ?? GitHubJson.text(run, "status", "the Build and test run");
+    if (conclusion !== ReleaseCheck.SUCCESS)
+      throw new ReleaseException(`The Build and test run on ${ReleaseCheck.MAIN} for ${request.revision} is ${conclusion}, not ${ReleaseCheck.SUCCESS}; `
+        + `release a revision whose run on ${ReleaseCheck.MAIN} passed.`);
+    this.output.write(`${request.version.tag} of ${request.repository} from ${request.revision}: the version is new, the revision is on ${ReleaseCheck.MAIN} `
+      + `and its Build and test run there passed.\n`);
   }
 }
 

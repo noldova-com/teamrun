@@ -11,6 +11,8 @@ import { cp, mkdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
 export default class BuildVariantFixture {
+  public static readonly noModules: string = "no-modules";
+
   private static readonly BUILD_FOLDER: string = path.resolve("_build");
   private static readonly VARIANTS_FOLDER: string = path.join(BuildVariantFixture.BUILD_FOLDER, "variants");
   private static readonly SWAPPED_FOLDER: string = path.join(BuildVariantFixture.BUILD_FOLDER, "swapped-build");
@@ -18,8 +20,6 @@ export default class BuildVariantFixture {
   private static readonly DECLARATIONS_SEGMENTS: readonly string[] = ["modules", "declarations.json"];
   private static readonly DECLARATIONS_FILE: string = "declarations.json";
   private static readonly PRODUCT_FILE: string = "product.json";
-
-  public static readonly noModules: string = "no-modules";
 
   public static async swapInAsync(name: string): Promise<void> {
     await BuildVariantFixture.restoreAsync();

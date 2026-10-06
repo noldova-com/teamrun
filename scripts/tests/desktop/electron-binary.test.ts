@@ -14,6 +14,7 @@ import { test, type TestContext } from "node:test";
 import ElectronBinary from "../../desktop/electron-binary.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import ProcessResult from "../../processes/process-result.ts";
+import MockPausesFixture from "../fixtures/mock-pauses.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
@@ -40,8 +41,6 @@ class InstallerRunnerFixture extends ProcessRunnerFixture {
 
 class ElectronBinaryTests {
   private static readonly ATTEMPTS: number = 4;
-  private static readonly PAUSE: number = 15_000;
-  private static readonly POLLS: number = 1_000;
   private static readonly FAILED: ProcessResult = new ProcessResult(1, "", "HTTPError: Response code 500\n");
   private static readonly SUCCEEDED: ProcessResult = new ProcessResult(0, "", "");
 
@@ -89,21 +88,7 @@ class ElectronBinaryTests {
       const runner = new InstallerRunnerFixture([ElectronBinaryTests.FAILED, ElectronBinaryTests.FAILED, ElectronBinaryTests.SUCCEEDED]);
       const output = new TextOutputFixture();
 
-      t.mock.timers.enable({ apis: ["setTimeout"] });
-      try {
-        const run = new ElectronBinary(repository.directory, runner).installAsync(output);
-        for (const attempts of [1, 2]) {
-          await ElectronBinaryTests.waitForPauseAsync(output, attempts);
-          t.mock.timers.tick(ElectronBinaryTests.PAUSE - 1);
-          await new Promise(resolve => setImmediate(resolve));
-          assert.equal(runner.captured.length, attempts);
-          t.mock.timers.tick(1);
-        }
-        await run;
-      }
-      finally {
-        t.mock.timers.reset();
-      }
+      await ElectronBinaryTests.runAsync(t, runner, output, new ElectronBinary(repository.directory, runner));
 
       assert.equal(runner.captured.length, 3);
       assert.equal(output.text, `Installing Electron's binary...\n${ElectronBinaryTests.pausing(1)}${ElectronBinaryTests.pausing(2)}`);
@@ -136,36 +121,11 @@ class ElectronBinaryTests {
   }
 
   private static pausing(attempt: number): string {
-    return `Electron's binary could not be installed (attempt ${attempt} of ${ElectronBinaryTests.ATTEMPTS}); trying again in ${ElectronBinaryTests.PAUSE / 1000} seconds.\n`;
+    return `Electron's binary could not be installed (attempt ${attempt} of ${ElectronBinaryTests.ATTEMPTS}); trying again in ${MockPausesFixture.PAUSE / 1000} seconds.\n`;
   }
 
-  private static async runAsync(t: TestContext, runner: InstallerRunnerFixture, output: TextOutputFixture, binary: ElectronBinary): Promise<void> {
-    t.mock.timers.enable({ apis: ["setTimeout"] });
-    try {
-      let isDone = false;
-      const run = binary.installAsync(output);
-      const finish = (): void => {
-        isDone = true;
-      };
-      run.then(finish, finish);
-      for (let poll = 0; !isDone; poll++) {
-        assert.ok(poll < ElectronBinaryTests.POLLS, `the install did not settle; ${runner.captured.length} attempts started; the output is ${JSON.stringify(output.text)}`);
-        await new Promise(resolve => setImmediate(resolve));
-        t.mock.timers.tick(ElectronBinaryTests.PAUSE);
-      }
-      await run;
-    }
-    finally {
-      t.mock.timers.reset();
-    }
-  }
-
-  private static async waitForPauseAsync(output: TextOutputFixture, attempt: number): Promise<void> {
-    const pausing = ElectronBinaryTests.pausing(attempt);
-    for (let poll = 0; !output.text.includes(pausing); poll++) {
-      assert.ok(poll < ElectronBinaryTests.POLLS, `no pause after attempt ${attempt}; the output is ${JSON.stringify(output.text)}`);
-      await new Promise(resolve => setImmediate(resolve));
-    }
+  private static runAsync(t: TestContext, runner: InstallerRunnerFixture, output: TextOutputFixture, binary: ElectronBinary): Promise<void> {
+    return MockPausesFixture.settleAsync(t, () => binary.installAsync(output), () => `${runner.captured.length} attempts started; the output is ${JSON.stringify(output.text)}`);
   }
 
   private static async createAsync(t: TestContext): Promise<RepositoryFixture> {

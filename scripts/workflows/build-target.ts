@@ -20,6 +20,7 @@ export default class BuildTarget {
   public readonly runsSmokeOnPullRequests: boolean;
   public readonly runsUiOnPushes: boolean;
   public readonly uiShardCount: number;
+  public readonly splitsTests: boolean;
 
   public constructor(name: string, runner: string, architecture: string, options: IBuildTargetOptions) {
     this.name = name;
@@ -29,6 +30,7 @@ export default class BuildTarget {
     this.runsSmokeOnPullRequests = options.runsSmokeOnPullRequests;
     this.runsUiOnPushes = options.runsUiOnPushes;
     this.uiShardCount = options.uiShardCount;
+    this.splitsTests = options.splitsTests;
   }
 
   public get key(): string {
