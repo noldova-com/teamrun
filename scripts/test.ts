@@ -25,6 +25,7 @@ import ModuleFolderCheck from "./checks/module-folder-check.ts";
 import ModuleImportCheck from "./checks/module-import-check.ts";
 import NameUniquenessCheck from "./checks/name-uniqueness-check.ts";
 import PackageCheck from "./checks/package-check.ts";
+import PackageLayoutCheck from "./checks/package-layout-check.ts";
 import PackageTestCheck from "./checks/package-test-check.ts";
 import PackagedBuildCheck from "./checks/packaged-build-check.ts";
 import ProductIdentityCheck from "./checks/product-identity-check.ts";
@@ -209,6 +210,7 @@ export default class Test {
       new NameUniquenessCheck(tree, modules),
       new DeclaredDependencyCheck(tree),
       new DependencyPinCheck(this.root, files),
+      new PackageLayoutCheck(this.root, new PackageCatalog(this.root)),
       new PackageCheck(build),
       ...selection === undefined || selection.packages.length > 0 ? [new PackageTestCheck(this.root, build, this.runner, this.environment, selection?.packages)] : [],
       new TypeCheck(this.root, this.runner),
