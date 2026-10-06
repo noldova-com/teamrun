@@ -97,6 +97,32 @@ describe("SettingRowComponent", () => {
     expect([button?.disabled, runs]).toEqual([true, 0]);
   });
 
+  it("describes every kind of control by its description, which a boolean's checkbox takes as its label instead", () => {
+    const controls: readonly (readonly [SettingDefinition, JsonValue, string])[] = [
+      [SettingsFixture.mode, "Dark", "[role=radiogroup]"],
+      [SettingsFixture.accent, "Blue", ".tr-select-button"],
+      [SettingsFixture.panelSize, 14, "input"],
+      [SettingsFixture.greeting, "Noon", "input"],
+      [SettingsFixture.alarms, null, "button"],
+      [SettingsFixture.mutedModules, [], "[role=group]"]
+    ];
+    const described = controls.map(([definition, value, selector]) => {
+      const row = render(definition, value);
+      const ids = row.querySelector(`.tr-setting-row-control ${selector}`)?.getAttribute("aria-describedby")?.split(" ") ?? [];
+      return [definition.name.text, ids.map(t => document.getElementById(t)?.textContent?.trim())];
+    });
+    const languages = render(SettingsFixture.spellCheckLanguages, []);
+    fixture.componentRef.setInput("languages", [new SelectOption("en-US", "English (United States)")]);
+    fixture.detectChanges();
+    const languageIds = languages.querySelector(".tr-setting-row-control [role=group]")?.getAttribute("aria-describedby")?.split(" ") ?? [];
+    const languagesDescribed = languageIds.map(t => document.getElementById(t)?.textContent?.trim());
+    const boolean = render(SettingsFixture.doNotDisturb, false);
+
+    expect(languagesDescribed).toEqual([SettingsFixture.spellCheckLanguages.description]);
+    expect(described).toEqual(controls.map(([definition]) => [definition.name.text, [definition.description]]));
+    expect([boolean.querySelector(".tr-setting-row-description"), boolean.querySelector("input")?.getAttribute("aria-describedby")]).toEqual([null, null]);
+  });
+
   it("changes a boolean with its checkbox, labelled by the description", async () => {
     render(SettingsFixture.doNotDisturb, false);
 
@@ -144,7 +170,8 @@ describe("SettingRowComponent", () => {
       field.dispatchEvent(new Event("change"));
       fixture.detectChanges();
       const alert = row.querySelector("[role=alert]");
-      shown.push([field.value, alert?.textContent?.trim() ?? "", String(field.getAttribute("aria-invalid")), String(field.getAttribute("aria-describedby") === alert?.id)]);
+      const description = row.querySelector(".tr-setting-row-description")?.id;
+      shown.push([field.value, alert?.textContent?.trim() ?? "", String(field.getAttribute("aria-invalid")), String(field.getAttribute("aria-describedby") === `${description} ${alert?.id}`)]);
     }
 
     expect(shown).toEqual([

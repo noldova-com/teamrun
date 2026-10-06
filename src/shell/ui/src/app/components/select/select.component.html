@@ -7,7 +7,7 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <button #button type="button" class="tr-select-button" aria-haspopup="listbox" [attr.aria-expanded]="isOpen()" [disabled]="disabled()"
-  [attr.aria-label]="label() + ', ' + title()" (click)="toggle(button, list)">
+  [attr.aria-label]="label() + ', ' + title()" [attr.aria-describedby]="describedBy()" (click)="toggle(button, list)">
   <span class="tr-select-value" data-truncates>{{ title() }}</span>
   <span class="tr-select-arrow material-symbols-rounded" aria-hidden="true">{{ resources.selectGlyph }}</span>
 </button>

@@ -18,6 +18,7 @@ export class GalleryResources {
   public static readonly focusedCheckbox: string = ".tr-checkbox-box";
   public static readonly focusedSelect: string = ".tr-select-button";
   public static readonly dialogTitleIdPrefix: string = "tr-gallery-dialog-";
+  public static readonly fieldMessageIdPrefix: string = "tr-gallery-field-message-";
   public static readonly text = {
     gallery: "Gallery",
     defaultState: "Default",

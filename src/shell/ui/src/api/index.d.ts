@@ -768,6 +768,13 @@ export declare class ChoicePillsComponent {
   public readonly label: InputSignal<string>;
 
   /**
+   * The id, or space-separated ids, of the elements that describe the group,
+   * such as a setting's description and its {@link FieldMessageComponent};
+   * nothing describes it when null, the default.
+   */
+  public readonly describedBy: InputSignal<string | null>;
+
+  /**
    * Emits the value of the option the person chooses, by pointer or by
    * keyboard, only when it differs from {@link ChoicePillsComponent.value}.
    */
@@ -1559,6 +1566,35 @@ export declare class DragGesture {
    * ```
    */
   public static hasStarted(startX: number, startY: number, x: number, y: number): boolean;
+}
+
+/**
+ * A validation message below a field, `tr-field-message`: error-colored text
+ * that wraps anywhere rather than widen its row, an alert that is announced
+ * when it appears. The field names it in `aria-describedby` and takes
+ * `aria-invalid="true"` while it shows.
+ *
+ * @example
+ * ```ts
+ * import { Component, type WritableSignal, signal } from "@angular/core";
+ * import { FieldMessageComponent, TextFieldComponent } from "@noldova/teamrun-shell-ui";
+ *
+ * @Component({
+ *   selector: "tr-port-field",
+ *   imports: [FieldMessageComponent, TextFieldComponent],
+ *   template: `
+ *     <input tr-text-field type="number" aria-label="Port" [attr.aria-invalid]="error() ? true : null" [attr.aria-describedby]="error() ? 'port-error' : null" />
+ *     @if (error(); as message) {
+ *       <tr-field-message id="port-error">{{ message }}</tr-field-message>
+ *     }
+ *   `
+ * })
+ * export class PortFieldComponent {
+ *   protected readonly error: WritableSignal<string | null> = signal(null);
+ * }
+ * ```
+ */
+export declare class FieldMessageComponent {
 }
 
 /**
@@ -2911,6 +2947,13 @@ export declare class SelectComponent {
   public readonly label: InputSignal<string>;
 
   /**
+   * The id, or space-separated ids, of the elements that describe the button,
+   * such as a setting's description and its {@link FieldMessageComponent};
+   * nothing describes it when null, the default.
+   */
+  public readonly describedBy: InputSignal<string | null>;
+
+  /**
    * Whether the button is disabled; false when not bound.
    */
   public readonly disabled: InputSignal<boolean>;
@@ -3130,7 +3173,8 @@ export declare class TabComponent {
 /**
  * The kit's text field, `input[tr-text-field]`, which styles a native input
  * and leaves its value, events and validation to it. The input needs an
- * accessible name, and `aria-invalid="true"` gives it the error border.
+ * accessible name, and `aria-invalid="true"` gives it the error border; a
+ * {@link FieldMessageComponent} below it explains the error.
  *
  * @example
  * ```ts
