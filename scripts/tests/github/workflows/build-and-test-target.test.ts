@@ -25,6 +25,8 @@ class BuildAndTestTargetTests {
   private static readonly BUILD_UPLOAD_SETTINGS: readonly string[] = [BuildAndTestTargetTests.BUILD_ARTIFACT, "path: build.tar", "retention-days: 3", "if-no-files-found: error", "overwrite: true"];
   private static readonly PACKED: string = "_build/archives _build/modules _build/packages _build/product.json _build/records _build/tests _build/window " +
     "node_modules/.package-lock.json node_modules/@noldova src/generated";
+  private static readonly UI_PACKED: string = "_build/variants _build/ui-builds.record";
+  private static readonly UI_BUILD_STEP: string = "Build the test build and its variants for the UI workflows";
   private static readonly SPOTLIGHT_STEPS: readonly string[] = ["Stop Spotlight indexing before building", "Stop Spotlight indexing before testing"];
   private static readonly BUILD_STEP: string = "Build for the tests";
   private static readonly PREBUILT: Readonly<Record<string, string>> = { prebuilt: "true" };
@@ -37,17 +39,19 @@ class BuildAndTestTargetTests {
   ];
 
   public static register(): void {
-    test("a call takes the target's runner, architecture and planned test jobs, reads the repository only and uses only pinned actions and the shared setup", async () => {
+    test("a call takes the target's runner, architecture, planned test jobs and UI shards, reads the repository only and uses only pinned actions, the shared setup and the UI workflows", async () => {
       const text = (await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW)).text;
 
       assert.ok(text.includes("on:\n  workflow_call:\n    inputs:\n      runner:\n        description: The runner label of the target.\n        type: string\n        required: true\n" +
         "      architecture:\n        description: The CPU architecture of the target.\n        type: string\n        required: true\n" +
-        "      jobs:\n        description: The target's test jobs, as the classification plans them.\n        type: string\n        required: true\n\npermissions:\n  contents: read\n"));
+        "      jobs:\n        description: The target's test jobs, as the classification plans them.\n        type: string\n        required: true\n" +
+        "      ui:\n        description: The target's UI workflow shards, as the classification plans them, or null when its UI workflows don't run.\n        type: string\n        required: true\n\n" +
+        "permissions:\n  contents: read\n"));
       assert.deepEqual(text.match(/^ *\S+: (read|write)$/gm), ["  contents: read"]);
       assert.equal(text.match(/persist-credentials: false/g)?.length, 2);
       assert.doesNotMatch(text, /concurrency|secrets|token/);
       for (const use of text.matchAll(/uses: (\S+)/g))
-        assert.match(use[1] ?? "", /^(actions\/[a-z-]+@[0-9a-f]{40}|\.\/\.github\/actions\/prepare)$/);
+        assert.match(use[1] ?? "", /^(actions\/[a-z-]+@[0-9a-f]{40}|\.\/\.github\/actions\/prepare|\.\/\.github\/workflows\/ui-workflows\.yml)$/);
     });
 
     test("a target builds once when its jobs reuse a build, and each job runs its part of the tests, or all of them, rerunning the failed ones once", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {
@@ -70,11 +74,13 @@ class BuildAndTestTargetTests {
       assert.ok(text.includes("          PART: ${{ matrix.part }}\n"));
       assert.equal(workflow.readStepScript("Build"), "npm run build\n");
       assert.equal(workflow.readStepScript(BuildAndTestTargetTests.BUILD_STEP), "npm run build\n");
+      assert.equal(workflow.readStepScript(BuildAndTestTargetTests.UI_BUILD_STEP), "npm run test:ui -- --list\n");
+      assert.ok(text.includes(`      - name: ${BuildAndTestTargetTests.UI_BUILD_STEP}\n        id: ui-builds\n        if: inputs.ui != 'null' && fromJSON(inputs.ui).shared\n`));
       const [build, tests] = [text.slice(text.indexOf("  build:\n"), text.indexOf("  tests:\n")), text.slice(text.indexOf("  tests:\n"))];
       for (const job of [build, tests])
         assert.equal(job.split(BuildAndTestTargetTests.ACTION_STEP).length, 2);
       assert.doesNotMatch(build, /npm test/);
-      const order = ["Build", "Pack the build", "Keep the build for the test parts", "Fetch the build", "Unpack the build", BuildAndTestTargetTests.BUILD_STEP, BuildAndTestTargetTests.TEST_STEP]
+      const order = ["Build", BuildAndTestTargetTests.UI_BUILD_STEP, "Pack the build", "Keep the build", "Fetch the build", "Unpack the build", BuildAndTestTargetTests.BUILD_STEP, BuildAndTestTargetTests.TEST_STEP]
         .map(t => text.indexOf(`      - name: ${t}\n`));
       assert.ok(order.every((position, index) => position > 0 && (index === 0 || position > (order[index - 1] ?? 0))), order.join(","));
     });
@@ -95,23 +101,27 @@ class BuildAndTestTargetTests {
       ]);
     });
 
-    test("the packed build holds the outputs the parts reuse and unpacks to the same files", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {
+    test("the packed build holds the outputs the parts reuse, and the UI builds when the Build job made them, and unpacks to the same files", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW);
-      const doubles = await CommandDoublesFixture.createAsync();
-      t.after(() => doubles.disposeAsync());
-      const paths = BuildAndTestTargetTests.PACKED.split(" ");
-      const listing = `for path in ${BuildAndTestTargetTests.PACKED}; do if [ -d "$path" ]; then cat "$path/content"; else cat "$path"; fi; done\n`;
-      await doubles.runAsync(paths.map(t => t.includes(".") ? `mkdir -p "$(dirname ${t})" && echo ${t} > ${t}\n` : `mkdir -p ${t} && echo ${t} > ${t}/content\n`).join(""));
+      const all = `${BuildAndTestTargetTests.PACKED} ${BuildAndTestTargetTests.UI_PACKED}`;
+      const listing = `for path in ${all}; do if [ -d "$path" ]; then cat "$path/content"; elif [ -f "$path" ]; then cat "$path"; fi; done\n`;
 
-      const packed = await doubles.runAsync(workflow.readStepScript("Pack the build"));
-      await doubles.runAsync(`rm -rf ${BuildAndTestTargetTests.PACKED}\n`);
-      const removed = await doubles.runAsync(listing);
-      const unpacked = await doubles.runAsync(workflow.readStepScript("Unpack the build"));
-      const restored = await doubles.runAsync(listing);
-      const archive = await doubles.runAsync("test -e build.tar\n");
+      for (const [uiBuilds, packedPaths] of [["false", BuildAndTestTargetTests.PACKED], ["true", all]] as const) {
+        const doubles = await CommandDoublesFixture.createAsync();
+        t.after(() => doubles.disposeAsync());
+        await doubles.runAsync(all.split(" ").map(u => u.includes(".") ? `mkdir -p "$(dirname ${u})" && echo ${u} > ${u}\n` : `mkdir -p ${u} && echo ${u} > ${u}/content\n`).join(""));
 
-      assert.deepEqual([packed.status, removed.status, unpacked.status, restored.status, archive.status], [0, 1, 0, 0, 1], packed.stderr + unpacked.stderr + restored.stderr);
-      assert.equal(restored.stdout, paths.map(t => `${t}\n`).join(""));
+        const packed = await doubles.runAsync(workflow.readStepScript("Pack the build"), { UI_BUILDS: uiBuilds });
+        await doubles.runAsync(`rm -rf ${all}\n`);
+        const removed = await doubles.runAsync(listing);
+        const unpacked = await doubles.runAsync(workflow.readStepScript("Unpack the build"));
+        const restored = await doubles.runAsync(listing);
+        const archive = await doubles.runAsync("test -e build.tar\n");
+
+        assert.deepEqual([packed.status, removed.stdout, unpacked.status, restored.status, archive.status], [0, "", 0, 0, 1], packed.stderr + unpacked.stderr + restored.stderr);
+        assert.equal(restored.stdout, packedPaths.split(" ").map(u => `${u}\n`).join(""), uiBuilds);
+      }
+      assert.ok(workflow.text.includes("      - name: Pack the build\n        env:\n          UI_BUILDS: ${{ steps.ui-builds.outcome == 'success' }}\n"));
     });
 
     test("every macOS job stops Spotlight indexing before checking out", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {
@@ -132,7 +142,7 @@ class BuildAndTestTargetTests {
       const workflow = await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW);
 
       for (const [first, pause, action, settings] of [
-        ["Keep the build for the test parts", "Wait before keeping the build", BuildAndTestTargetTests.UPLOAD_ACTION, BuildAndTestTargetTests.BUILD_UPLOAD_SETTINGS],
+        ["Keep the build", "Wait before keeping the build", BuildAndTestTargetTests.UPLOAD_ACTION, BuildAndTestTargetTests.BUILD_UPLOAD_SETTINGS],
         ["Fetch the build", "Wait before fetching the build", BuildAndTestTargetTests.DOWNLOAD_ACTION, [BuildAndTestTargetTests.BUILD_ARTIFACT]]
       ] as const) {
         const [again, last] = [`${first} again`, `${first} a last time`];
