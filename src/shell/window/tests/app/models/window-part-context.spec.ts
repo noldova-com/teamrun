@@ -9,6 +9,7 @@
 import { Component, type Type } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
+import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { CommandRun, NotificationAction, NotificationPost, NotificationSeverity, QualifiedName, SettingChange, SettingKey, SettingScope } from "@noldova/teamrun-shell-protocol";
 
@@ -218,6 +219,7 @@ describe("WindowPartContext", () => {
     expect(() => context.registerDocument(new DocumentContribution("notes.page", load))).toThrowError("The module notes does not declare the document notes.page.");
     expect(() => context.openDocument("clock.page", "1", "Page")).toThrowError(WindowPartAccessException);
     expect(() => context.keepDocument("clock.page", "1")).toThrowError(WindowPartAccessException);
+    expect(() => context.updateDocument("clock.page", "1", { title: "Page" })).toThrowError(WindowPartAccessException);
     expect(context.views).toEqual([]);
     expect(host.calls).toEqual([]);
   });
@@ -225,10 +227,27 @@ describe("WindowPartContext", () => {
   it("opens its own documents through the host, as previews when asked, and keeps them", () => {
     context.openDocument("notes.note", "1", "Note 1");
     context.openDocument("notes.note", "2", "Note 2", { preview: true });
-    context.openDocument("notes.note", "3", "Note 3", { preview: false });
+    context.openDocument("notes.note", "3", "Note 3", { preview: false, breadcrumb: ["Notes", "Drafts"] });
     context.keepDocument("notes.note", "2");
 
-    expect(host.calls).toEqual(["open notes notes.note 1 Note 1", "open notes notes.note 2 Note 2 as a preview", "open notes notes.note 3 Note 3", "keep notes notes.note 2"]);
+    expect(host.calls).toEqual(["open notes notes.note 1 Note 1", "open notes notes.note 2 Note 2 as a preview", "open notes notes.note 3 Notes › Drafts › Note 3", "keep notes notes.note 2"]);
+  });
+
+  it("changes its own documents' titles and breadcrumbs through the host, passing on only what changes", () => {
+    context.updateDocument("notes.note", "1", { title: "Plan" });
+    context.updateDocument("notes.note", "1", { breadcrumb: ["Notes"] });
+    context.updateDocument("notes.note", "2", { title: "Todo", breadcrumb: [] });
+    context.updateDocument("notes.note", "3", {});
+
+    expect(host.calls).toEqual(["update notes notes.note 1 Plan -", "update notes notes.note 1 - [Notes]", "update notes notes.note 2 Todo []", "update notes notes.note 3 - -"]);
+  });
+
+  it("refuses a blank title or breadcrumb segment before it reaches the host", () => {
+    expect(() => context.openDocument("notes.note", "1", " ")).toThrowError(ArgumentException);
+    expect(() => context.openDocument("notes.note", "1", "Note 1", { breadcrumb: ["Notes", ""] })).toThrowError("A breadcrumb is a list of segments that are not blank.");
+    expect(() => context.updateDocument("notes.note", "1", { title: "" })).toThrowError(ArgumentException);
+    expect(() => context.updateDocument("notes.note", "1", { breadcrumb: [" "] })).toThrowError(ArgumentException);
+    expect(host.calls).toEqual([]);
   });
 
   it("shows its own, its dependencies' and the shell's views and documents in a dialog through the host, and refuses another module's", async () => {

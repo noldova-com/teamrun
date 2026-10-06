@@ -32,7 +32,18 @@ LICENSE file in the root directory of this source tree.
     <ng-container [ngTemplateOutlet]="actionButton" [ngTemplateOutletContext]="{ $implicit: action }" />
   }
 </div>
-<div class="tr-window-row-breadcrumb"></div>
+<div class="tr-window-row-breadcrumb">
+  @let current = heading();
+  @if (current !== null) {
+    <div class="tr-window-row-heading" role="group" [attr.aria-label]="current.text" [trTooltip]="current.text" [trTooltipSide]="below" [trTooltipTruncated]="true">
+      @for (segment of current.breadcrumb; track $index) {
+        <span class="tr-window-row-segment" data-truncates aria-hidden="true">{{ segment }}</span>
+        <span class="tr-window-row-separator material-symbols-rounded" aria-hidden="true">{{ resources.breadcrumbGlyph }}</span>
+      }
+      <span class="tr-window-row-title" data-truncates aria-hidden="true">{{ current.title }}</span>
+    </div>
+  }
+</div>
 <div #end class="tr-window-row-actions">
   @for (action of bars.endActions(); track action.name) {
     <ng-container [ngTemplateOutlet]="actionButton" [ngTemplateOutletContext]="{ $implicit: action }" />

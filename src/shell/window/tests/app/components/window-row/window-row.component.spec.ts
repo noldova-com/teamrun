@@ -8,26 +8,33 @@
 
 import { Component, ErrorHandler, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 
 import { JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
-import { AppearanceService, DefaultTheme, DialogService, ModePreference, type Theme, ThemeMode, Typography } from "@noldova/teamrun-shell-ui";
+import { AppearanceService, DefaultTheme, DialogService, ModePreference, type Theme, ThemeMode, TooltipDirective, Typography } from "@noldova/teamrun-shell-ui";
 
 import { WindowRowComponent } from "../../../../src/app/components/window-row/window-row.component";
 import { TopBarSide } from "../../../../src/app/enums/top-bar-side";
 import { BuildTokens } from "../../../../src/app/models/build-tokens";
 import { CommandContribution } from "../../../../src/app/models/command-contribution";
+import { DocumentHeading } from "../../../../src/app/models/document-heading";
 import { MenuDeclarations } from "../../../../src/app/models/menu-declarations";
+import { ShellDocuments } from "../../../../src/app/models/shell-documents";
 import { TopBarAction } from "../../../../src/app/models/top-bar-action";
 import { TopBarActionContribution } from "../../../../src/app/models/top-bar-action-contribution";
 import { TopBarActionState } from "../../../../src/app/models/top-bar-action-state";
 import { BarItemsService } from "../../../../src/app/services/bar-items.service";
 import { CommandSearchService } from "../../../../src/app/services/command-search.service";
 import { CommandService } from "../../../../src/app/services/command.service";
+import { LayoutService } from "../../../../src/app/services/layout.service";
 import { MenuService } from "../../../../src/app/services/menu.service";
 import { SettingsService } from "../../../../src/app/services/settings.service";
+import { TabLabelService } from "../../../../src/app/services/tab-label.service";
+import { Resources } from "../../../../src/resources";
 import { AppearanceFixture } from "../../../../../ui/tests/fixtures/appearance.fixture";
 import { FixtureTheme } from "../../../../../ui/tests/fixtures/fixture-theme";
 import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
+import { LayoutFixture } from "../../../fixtures/layout.fixture";
 
 @Component({
   template: `<button type="button" class="inside">Keep working</button>`
@@ -67,6 +74,26 @@ describe("WindowRowComponent", () => {
         expect(style.color).toBe(AppearanceFixture.readColor(theme, mode, "titleBar.activeForeground"));
         AppearanceFixture.expectLook(style.height, theme, "window-row-height", "height");
       });
+
+  for (const mode of AppearanceFixture.modes)
+    it(`mutes the breadcrumb on the title bar and keeps it readable in ${mode} mode`, () => {
+      DesktopBridgeFixture.install();
+      apply(DefaultTheme.theme, mode);
+      useHeadings().openDocument(LayoutFixture.plan);
+
+      const row = render();
+      const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+      const paint = (color: string): string => {
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        const [red, green, blue] = context.getImageData(0, 0, 1, 1).data;
+        return `rgb(${red}, ${green}, ${blue})`;
+      };
+      const [segment, title] = [".tr-window-row-segment", ".tr-window-row-title"].map(t => paint(getComputedStyle(row.querySelector(t) as HTMLElement).color));
+
+      expect(segment).not.toBe(title);
+      expect(AppearanceFixture.contrast(segment ?? "", getComputedStyle(row).backgroundColor)).toBeGreaterThanOrEqual(4.5);
+    });
 
   it("shows the modules' top bar actions in order as icon buttons that run their commands, outside the drag region", async () => {
     const runs: JsonValue[] = [];
@@ -520,5 +547,86 @@ describe("WindowRowComponent", () => {
       .toEqual(["shell.app", "shell.file", "shell.edit", "shell.view", "shell.window", "shell.help"]);
     expect(runs).toEqual([{ template: "plan" }]);
     expect(bridge.listenerCount).toBe(listeners);
+  });
+
+  function useHeadings(): LayoutService {
+    const layout = TestBed.inject(LayoutService);
+    const labels = TestBed.inject(TabLabelService);
+    layout.setRegistry(LayoutFixture.createRegistry());
+    labels.register(ShellDocuments.settings.name, ShellDocuments.settingsLabel);
+    labels.setHeading(LayoutFixture.plan, new DocumentHeading("Plan", ["Notes", "Drafts"]));
+    labels.setHeading(LayoutFixture.todo, new DocumentHeading("A todo list for the release that goes on and on", ["The notes of the whole team", "Everything that is not done yet"]));
+    return layout;
+  }
+
+  it("shows the active document's breadcrumb and title, follows the active document, and names the window after it", async () => {
+    DesktopBridgeFixture.install("win32");
+    apply();
+    const layout = useHeadings();
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    const row: HTMLElement = fixture.nativeElement;
+    const read = (): (string | null)[] => {
+      const heading = row.querySelector(".tr-window-row-breadcrumb .tr-window-row-heading");
+      return [heading?.getAttribute("aria-label") ?? null, [...heading?.querySelectorAll(".tr-window-row-segment, .tr-window-row-title") ?? []].map(t => t.textContent).join("|"), document.title];
+    };
+    fixture.detectChanges();
+    const empty = read();
+
+    layout.openDocument(LayoutFixture.plan);
+    fixture.detectChanges();
+    const plan = read();
+    const heading = row.querySelector(".tr-window-row-heading") as HTMLElement;
+    const styles = [heading, row.querySelector(".tr-window-row-title")].map(t => getComputedStyle(t as HTMLElement)).map(t => [t.getPropertyValue("app-region"), t.fontWeight]);
+    const hidden = heading.querySelectorAll("[aria-hidden='true']").length;
+    TestBed.inject(TabLabelService).setHeading(LayoutFixture.plan, new DocumentHeading("Launch plan"));
+    fixture.detectChanges();
+    const renamed = read();
+    layout.openDocument(ShellDocuments.settingsTab);
+    fixture.detectChanges();
+    const settings = read();
+    layout.activate(LayoutFixture.files);
+    fixture.detectChanges();
+
+    expect(empty).toEqual([null, "", Resources.productName]);
+    expect(plan).toEqual(["Notes › Drafts › Plan", "Notes|Drafts|Plan", Resources.formatWindowTitle("Plan")]);
+    expect([styles[0]?.[0], styles[1]?.[1]]).toEqual(["no-drag", "600"]);
+    expect(hidden).toBe(5);
+    expect(renamed).toEqual(["Launch plan", "Launch plan", Resources.formatWindowTitle("Launch plan")]);
+    expect(settings).toEqual(["Settings", "Settings", Resources.formatWindowTitle("Settings")]);
+    expect(read()).toEqual(["Settings", "Settings", Resources.formatWindowTitle("Settings")]);
+  });
+
+  it("cuts the breadcrumb before the title, leaves 6rem for dragging, and shows the whole heading in a tooltip only when cut", async () => {
+    DesktopBridgeFixture.install("win32");
+    apply();
+    const layout = useHeadings();
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    const row: HTMLElement = fixture.nativeElement;
+    row.style.width = "1600px";
+    layout.openDocument(LayoutFixture.todo);
+    fixture.detectChanges();
+    await settle(fixture);
+    const tooltip = fixture.debugElement.query(By.css(".tr-window-row-heading")).injector.get(TooltipDirective);
+    const isCut = (selector: string): boolean[] => [...row.querySelectorAll<HTMLElement>(selector)].map(t => t.scrollWidth > t.clientWidth);
+    tooltip.show();
+    const wide = [isCut(".tr-window-row-segment"), isCut(".tr-window-row-title"), tooltip.isShown];
+
+    row.style.width = "640px";
+    await settle(fixture);
+    const middle = [isCut(".tr-window-row-segment"), isCut(".tr-window-row-title")];
+    row.style.width = "300px";
+    await settle(fixture);
+    const heading = row.querySelector(".tr-window-row-heading") as HTMLElement;
+    const actions = row.querySelector(".tr-window-row-actions") as HTMLElement;
+    const drag = actions.getBoundingClientRect().left - heading.getBoundingClientRect().right;
+    tooltip.show();
+    await vi.waitFor(() => expect(document.querySelector(".cdk-overlay-container tr-tooltip")?.textContent?.trim()).toBe(heading.getAttribute("aria-label")));
+    tooltip.hide();
+
+    expect(wide).toEqual([[false, false], [false], false]);
+    expect(middle).toEqual([[true, true], [false]]);
+    expect(isCut(".tr-window-row-title")).toEqual([true]);
+    expect(getComputedStyle(row.querySelector(".tr-window-row-title") as HTMLElement).textOverflow).toBe("ellipsis");
+    expect(drag).toBeGreaterThanOrEqual(AppearanceFixture.toPixels(6) - 0.5);
   });
 });

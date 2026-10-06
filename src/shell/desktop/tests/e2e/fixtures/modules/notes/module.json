@@ -7,7 +7,7 @@
   "dependencies": [],
   "contributes": {
     "methods": ["notes.options", "notes.holdOptions", "notes.heldOptions", "notes.releaseOptions"],
-    "commands": ["notes.newNote", "notes.openNote", "notes.sortByTitle", "notes.sortByWeek", "notes.wrapLines", "notes.showListInDialog", "notes.showNoteInDialog", "notes.showSettingsInDialog"],
+    "commands": ["notes.newNote", "notes.openNote", "notes.moveNote", "notes.sortByTitle", "notes.sortByWeek", "notes.wrapLines", "notes.showListInDialog", "notes.showNoteInDialog", "notes.showSettingsInDialog"],
     "notifications": ["notes.saveFailed"],
     "views": [
       "notes.list", "notes.outline", "notes.search", "notes.changes", "notes.tasks", "notes.bookmarks", "notes.teammates", "notes.conversation",
