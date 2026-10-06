@@ -10,7 +10,8 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
 import { open } from "node:fs/promises";
 
-import type { IProcessStarter } from "@noldova/teamrun-shell-runtime";
+import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+import { type IProcessStarter, LaunchException } from "@noldova/teamrun-shell-runtime";
 
 export class RecordingStarterFixture implements IProcessStarter {
   private readonly children: ChildProcess[] = [];
@@ -23,7 +24,12 @@ export class RecordingStarterFixture implements IProcessStarter {
     const errors = await open(errorFile, "a");
     try {
       const child = spawn(executable, [...launchArguments], { detached: true, stdio: ["ignore", "ignore", errors.fd], windowsHide: true, env: environment });
-      await once(child, "spawn");
+      try {
+        await once(child, "spawn");
+      }
+      catch (error) {
+        throw new LaunchException(`The runtime could not be started with ${executable}.`, new ExceptionOptions(error));
+      }
       this.children.push(child);
       return Number(child.pid);
     }
@@ -37,12 +43,15 @@ export class RecordingStarterFixture implements IProcessStarter {
     for (const child of this.children) {
       if (RecordingStarterFixture.hasExited(child))
         continue;
-      const exited = once(child, "exit", { signal: AbortSignal.timeout(limitMilliseconds) });
+      const limit = AbortSignal.timeout(limitMilliseconds);
+      const exited = once(child, "exit", { signal: limit });
       child.kill();
       try {
         await exited;
       }
-      catch {
+      catch (error) {
+        if (!limit.aborted)
+          throw error;
         running.push(Number(child.pid));
       }
     }
