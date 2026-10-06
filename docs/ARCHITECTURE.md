@@ -989,8 +989,8 @@ Each target is packaged on its own platform and processor.
 - **Tools.** electron-builder downloads its packaging tools into `_build/package/tool-cache` and checks each against the SHA-256 it pins.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
 - **Signing (Windows).**
-  `npm run package` makes unsigned packages; `npm run package -- --signed` signs a Windows package and refuses any other target.
-  It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing account `noldova-signing` and its certificate profile `TeamRun`, and checks them before anything is built.
+  `npm run package` makes unsigned packages; `npm run package -- --signed` signs a Windows or macOS package and refuses a Linux one.
+  It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing endpoint, account and certificate profile in `scripts/packaging/trusted-signing-module.ts`, and checks them before anything is built.
   Packaging takes them out of its own environment as it starts, so staging, the module's preparation and the signature check run without them; only electron-builder receives them, and only with `--signed`.
   - It downloads Microsoft's TrustedSigning PowerShell module 0.5.8 from the PowerShell Gallery, and from nuget.org the three packages that module would otherwise install unchecked as it first signs: `Microsoft.Windows.SDK.BuildTools` 10.0.26100.4188, `Microsoft.Trusted.Signing.Client` 1.0.95 and `sign` 0.9.1-beta.24469.1.
     It checks each package against the SHA-512 its gallery published before expanding any, and expands them into `_build/package/signing`, where signing finds the tools in place and downloads nothing.
@@ -999,6 +999,14 @@ Each target is packaged on its own platform and processor.
     Besides the program and the installer, it signs the native addons in `app.asar.unpacked`.
   - Afterwards PowerShell 7 reads the Authenticode signatures of the installer, the unpacked program and every addon.
     Packaging fails unless each is valid, timestamped and signed by a subject that has every field of `teamrun.product.windowsPublisher`.
+- **Signing (macOS).**
+  `npm run package -- --signed` signs a macOS package with a Developer ID Application certificate and notarizes it with an App Store Connect API key.
+  It needs `MAC_CERTIFICATE` (the certificate and its private key as a base64 PKCS #12), `MAC_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8` (the key's text), `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`, and checks them before anything is built.
+  Packaging takes them out of its environment as it starts, together with the Windows credentials; only electron-builder receives them.
+  - The key is written to a file in `_build/package/signing` that only its owner can read, and that folder is removed once packaging ends, whether it succeeded or not.
+  - electron-builder signs the app and its helpers with the hardened runtime and `assets/macos/entitlements.plist`, which allows only the JIT that V8 needs, then notarizes the app and staples the ticket.
+    A signed package keeps its signature after the fuses are flipped, so it is not signed ad hoc again.
+  - Afterwards packaging opens the disk image and expands the archive, and checks each app: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl` must accept it as notarized; and `stapler` must find its ticket.
 
 ### Publication
 

@@ -41,6 +41,8 @@ export default class PackageConfiguration {
   private static readonly MAC_PROGRAM_SEGMENTS: readonly string[] = ["..", "MacOS"];
   private static readonly EXECUTABLE_MODE: number = 0o755;
   private static readonly SIGNING_HASH: string = "sha256";
+  private static readonly SIGN_HOOK_SEGMENTS: readonly string[] = ["scripts", "packaging", "windows-sign-hook.ts"];
+  private static readonly ENTITLEMENTS_SEGMENTS: readonly string[] = ["assets", "macos", "entitlements.plist"];
   private static readonly FUSES: Readonly<Record<string, boolean>> = {
     runAsNode: true,
     enableCookieEncryption: false,
@@ -59,10 +61,10 @@ export default class PackageConfiguration {
   private readonly output: string;
   private readonly electronDistribution: string;
   private readonly electronVersion: string;
-  private readonly signHook: string | null;
+  private readonly isSigned: boolean;
 
   public constructor(root: string, manifest: RootManifest, target: PackageTarget, stage: string, output: string, electronDistribution: string, electronVersion: string,
-    signHook: string | null) {
+    isSigned: boolean) {
     this.root = root;
     this.manifest = manifest;
     this.target = target;
@@ -70,7 +72,7 @@ export default class PackageConfiguration {
     this.output = output;
     this.electronDistribution = electronDistribution;
     this.electronVersion = electronVersion;
-    this.signHook = signHook;
+    this.isSigned = isSigned;
   }
 
   public get fileNames(): readonly string[] {
@@ -103,10 +105,10 @@ export default class PackageConfiguration {
       npmRebuild: false,
       nodeGypRebuild: false,
       buildDependenciesFromSource: false,
-      electronFuses: this.target.platform === PackageTarget.MACOS ? { ...PackageConfiguration.FUSES, resetAdHocDarwinSignature: true } : PackageConfiguration.FUSES,
+      electronFuses: this.target.platform === PackageTarget.MACOS && !this.isSigned ? { ...PackageConfiguration.FUSES, resetAdHocDarwinSignature: true } : PackageConfiguration.FUSES,
       extraResources: this.listLicenses(),
       publish: null,
-      ...(this.signHook === null ? {} : { forceCodeSigning: true }),
+      ...(this.isSigned ? { forceCodeSigning: true } : {}),
       ...this.describePlatform()
     };
   }
@@ -137,10 +139,14 @@ export default class PackageConfiguration {
             icon: path.join(icons, ProductIdentity.WINDOWS_ICON_FILE),
             artifactName,
             extraFiles: [{ from: this.windowsCommand, to: `${PackageConfiguration.COMMAND_FOLDER}/${this.windowsCommandName}` }],
-            ...(this.signHook === null ? {} : {
-              signtoolOptions: { sign: this.signHook, signingHashAlgorithms: [PackageConfiguration.SIGNING_HASH], publisherName: product.windowsPublisher },
+            ...(this.isSigned ? {
+              signtoolOptions: {
+                sign: path.join(this.root, ...PackageConfiguration.SIGN_HOOK_SEGMENTS),
+                signingHashAlgorithms: [PackageConfiguration.SIGNING_HASH],
+                publisherName: product.windowsPublisher
+              },
               signExts: [WindowsAddonBuilder.ADDON_EXTENSION]
-            })
+            } : {})
           },
           nsis: {
             oneClick: true,
@@ -159,7 +165,13 @@ export default class PackageConfiguration {
             icon: path.join(icons, ProductIdentity.MAC_ICON_FILE),
             category: PackageConfiguration.MAC_CATEGORY,
             artifactName,
-            extraResources: [{ from: this.macCommand, to: `${PackageConfiguration.COMMAND_FOLDER}/${product.slug}` }]
+            extraResources: [{ from: this.macCommand, to: `${PackageConfiguration.COMMAND_FOLDER}/${product.slug}` }],
+            ...(this.isSigned ? {
+              hardenedRuntime: true,
+              entitlements: path.join(this.root, ...PackageConfiguration.ENTITLEMENTS_SEGMENTS),
+              entitlementsInherit: path.join(this.root, ...PackageConfiguration.ENTITLEMENTS_SEGMENTS),
+              notarize: true
+            } : {})
           }
         };
       default:
