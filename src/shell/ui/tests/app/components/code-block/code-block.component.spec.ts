@@ -351,13 +351,23 @@ describe("CodeBlockComponent", () => {
 
   it("never lets the tokens of older code that arrive after those of newer code land", async () => {
     const answers = new Map<string, (tokens: readonly CodeToken[]) => void>();
-    vi.spyOn(TestBed.inject(CodeHighlighter), "tokensAsync").mockImplementation(code => new Promise(resolve => answers.set(code, resolve)));
+    vi.spyOn(TestBed.inject(CodeHighlighter), "tokensAsync").mockImplementation(code => code.startsWith("let ")
+      ? new Promise(resolve => answers.set(code, resolve))
+      : Promise.resolve([]));
     await renderAsync();
-    await changeAsync(() => host.code.set("let older;"));
-    await changeAsync(() => host.code.set("let newer;"));
+    for (const code of ["let older;", "let newer;"]) {
+      host.code.set(code);
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        expect(answers.has(code)).toBe(true);
+      });
+    }
 
     answers.get("let newer;")?.([new CodeToken(4, "newer", CodeTokenKind.Variable)]);
-    await fixture.whenStable();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(tokens()).toEqual([["newer", "variable"]]);
+    });
     answers.get("let older;")?.([new CodeToken(4, "older", CodeTokenKind.Type)]);
     await fixture.whenStable();
 
