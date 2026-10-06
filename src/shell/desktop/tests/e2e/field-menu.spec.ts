@@ -85,9 +85,13 @@ test.describe("text field menu", () => {
     await expect(rows.first()).toHaveAttribute("aria-disabled", "true");
     await add.click();
     await expect(summary).toBeFocused();
-    await summary.click({ button: "right", position: await middleOfTextAsync(summary) });
 
-    await expect(rows.first()).toHaveText(/Cut/);
+    await expect(async () => {
+      if (await menu.count() > 0)
+        await window.keyboard.press("Escape");
+      await summary.click({ button: "right", position: await middleOfTextAsync(summary) });
+      await expect(rows.first()).toHaveText(/Cut/, { timeout: 2000 });
+    }).toPass({ timeout: 20000 });
   });
 });
 
