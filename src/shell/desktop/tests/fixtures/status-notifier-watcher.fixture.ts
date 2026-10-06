@@ -160,12 +160,14 @@ export class StatusNotifierWatcherFixture {
   private received: Buffer = Buffer.alloc(0);
   private serial: number = 0;
   private isHostRegistered: boolean;
+  private failure: Error | null = null;
 
   public gets: number = 0;
 
   private constructor(socket: Socket, isHostRegistered: boolean) {
     this.socket = socket;
     this.isHostRegistered = isHostRegistered;
+    socket.on("error", (t: Error) => this.failure ??= t);
   }
 
   public static async connectAsync(address: string, isHostRegistered: boolean): Promise<StatusNotifierWatcherFixture> {
@@ -191,9 +193,11 @@ export class StatusNotifierWatcherFixture {
   }
 
   public async leaveAsync(): Promise<void> {
-    const closed = once(this.socket, "close");
-    this.socket.end();
+    const closed = new Promise(resolve => this.socket.once("close", resolve));
+    this.socket.destroy();
     await closed;
+    if (this.failure !== null)
+      throw new Error(`The fixture watcher's connection to the private session bus failed: ${this.failure.message}`, { cause: this.failure });
   }
 
   private async authenticateAsync(): Promise<void> {
