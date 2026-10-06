@@ -49,13 +49,28 @@ class RepeatPlanTests {
 
       const summary = "Repeated test files:\n- scripts/tests/desktop/electron-binary.test.ts\nRepeated UI workflow files:\n- src/shell/desktop/tests/e2e/quit.spec.ts\n";
       assert.deepEqual(outputs, [
-        `legs=${JSON.stringify(RepeatMatrix.plan())}`,
+        `legs=${JSON.stringify(RepeatMatrix.plan(0))}`,
         "test-arguments=--filter scripts/tests/desktop/electron-binary.test.ts",
         "workflow-arguments=src/shell/desktop/tests/e2e/quit.spec.ts",
         ""
       ]);
       assert.equal(await readFile(path.join(repository.directory, "summary.md"), "utf8"), summary);
       assert.equal(log.text, summary);
+    });
+
+    test("the selected UI workflows' test count decides the macOS jobs, one up to the 40-minute boundary and two past it", async t => {
+      const repository = await RepeatPlanTests.createAsync(t);
+      const base = await repository.commitAsync(RepeatPlanTests.BASE);
+      const serialLegs = (outputs: readonly string[]): readonly string[] =>
+        (JSON.parse(outputs[0]?.slice("legs=".length) ?? "") as readonly { readonly name: string; readonly runner: string }[]).filter(t => t.runner === "macos-15").map(t => t.name);
+
+      const fits = await repository.commitAsync({ "src/shell/desktop/tests/e2e/quit.spec.ts": "test(\"quits\", async () => {});\n".repeat(133) });
+      const one = await RepeatPlanTests.runAsync(repository, new TextOutputFixture(), { BASE_SHA: base, HEAD_SHA: fits }, 0);
+      const overflows = await repository.commitAsync({ "src/shell/desktop/tests/e2e/quit.spec.ts": "test(\"quits\", async () => {});\n".repeat(134) });
+      const two = await RepeatPlanTests.runAsync(repository, new TextOutputFixture(), { BASE_SHA: base, HEAD_SHA: overflows }, 0);
+
+      assert.deepEqual(serialLegs(one), ["macOS ARM64, 5 passes"]);
+      assert.deepEqual(serialLegs(two), ["macOS ARM64, 5 passes, shard 1 of 2", "macOS ARM64, 5 passes, shard 2 of 2"]);
     });
 
     test("a change that affects no test plans no job", async t => {
