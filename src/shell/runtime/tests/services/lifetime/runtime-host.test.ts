@@ -16,7 +16,9 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import {
   BuildIdentity, Event, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, Request, SettingKey, SettingValue, ShellMethods, StopPolicy, StopRequest
 } from "@noldova/teamrun-shell-protocol";
-import { DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions } from "@noldova/teamrun-shell-runtime";
+import {
+  DataDirectoryOwnedException, DeclarationsFormatException, OwnershipLock, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHost, RuntimeOptions, SystemCommand
+} from "@noldova/teamrun-shell-runtime";
 
 import { PlatformFixture } from "../../fixtures/platform.fixture.js";
 import { ProgramFixture } from "../../fixtures/program.fixture.js";
@@ -218,7 +220,7 @@ export class RuntimeHostTests {
     return RuntimeHostFixture.runAsync(async fixture => {
       const otherPlatform = process.platform === "win32" ? "linux" : "win32";
 
-      await Assert.throwsAsync(() => RuntimeHost.startAsync(new RuntimeOptions(fixture.dataDirectory), otherPlatform, {}), Error);
+      await Assert.throwsAsync(() => RuntimeHost.startAsync(new RuntimeOptions(fixture.dataDirectory), otherPlatform, {}, ProcessPresence.create(otherPlatform, new SystemCommand())), Error);
 
       Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
       Assert.isFalse(existsSync(fixture.dataDirectory.discoveryFile));

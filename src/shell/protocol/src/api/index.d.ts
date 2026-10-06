@@ -123,6 +123,12 @@ export declare enum FailureCode {
   Disconnected = "Disconnected",
 
   /**
+   * The runtime is preparing for an update, so it accepts no new client and
+   * no request other than `shell.updateSaved`, `shell.work` and `shell.stop`.
+   */
+  Updating = "Updating",
+
+  /**
    * The runtime failed unexpectedly.
    */
   Internal = "Internal"
@@ -805,6 +811,295 @@ export declare class KeptRuntime {
 }
 
 /**
+ * The payload of `shell.update`, which asks a runtime of the same build to
+ * prepare for an update.
+ */
+export declare class UpdateRequest {
+  /**
+   * The installation's folder in the device folder. While it prepares, the
+   * runtime reads the folder's launch barrier every second and goes back to
+   * normal once the barrier is gone or its holder no longer runs.
+   */
+  public readonly installation: string;
+
+  /**
+   * Creates the request.
+   *
+   * @param installation The installation's folder; not whitespace only.
+   * @throws ArgumentException synchronously when the folder is empty or
+   * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { UpdateRequest } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const request: UpdateRequest = new UpdateRequest("/home/person/.local/state/noldova/teamrun/installations/0123456789abcdef");
+   * ```
+   */
+  public constructor(installation: string);
+
+  /**
+   * Reads a request from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The request.
+   * @throws JsonException synchronously when the installation is missing or
+   * blank, or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { UpdateRequest } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const request: UpdateRequest = UpdateRequest.fromJson({ installation: "/tmp/installation" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): UpdateRequest;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `installation` field.
+   *
+   * @example
+   * ```ts
+   * import { Request, ShellMethods, UpdateRequest } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const update: Request = new Request("r1", ShellMethods.update, new UpdateRequest("/tmp/installation").toJson());
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `shell.updateSaved`, a client's answer to `shell.updating`.
+ */
+export declare class UpdateSaved {
+  /**
+   * The client's process id.
+   */
+  public readonly processId: number;
+
+  /**
+   * What kept the client's unsaved state from being saved, such as a module
+   * whose save failed or a window that did not answer; empty when everything
+   * was saved.
+   */
+  public readonly problems: readonly string[];
+
+  /**
+   * Creates the answer.
+   *
+   * @param processId The client's process id; a positive integer.
+   * @param problems What kept the state from being saved, each not
+   * whitespace only; copied.
+   * @throws ArgumentOutOfRangeException synchronously when the process id is
+   * not a positive integer.
+   * @throws ArgumentException synchronously when a problem is empty or
+   * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { UpdateSaved } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const saved: UpdateSaved = new UpdateSaved(4120, []);
+   * ```
+   */
+  public constructor(processId: number, problems: readonly string[]);
+
+  /**
+   * Reads an answer from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The answer.
+   * @throws JsonException synchronously when a field is missing or invalid,
+   * or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { UpdateSaved } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const saved: UpdateSaved = UpdateSaved.fromJson({ processId: 4120, problems: [] });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): UpdateSaved;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `processId` and `problems` fields.
+   *
+   * @example
+   * ```ts
+   * import { Request, ShellMethods, UpdateSaved } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const saved: Request = new Request("r2", ShellMethods.updateSaved, new UpdateSaved(4120, []).toJson());
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A process that must exit before an update replaces the application, as a
+ * runtime preparing for the update reports it.
+ */
+export declare class UpdateProcess {
+  /**
+   * The process id.
+   */
+  public readonly processId: number;
+
+  /**
+   * The earliest the process can have started, on the clock the operating
+   * system's process table uses.
+   */
+  public readonly earliest: number;
+
+  /**
+   * The latest the process can have started, on the same clock.
+   */
+  public readonly latest: number;
+
+  /**
+   * What the process is: a client's kind, such as `desktop` or `cli`,
+   * `program` for a program a module runs, or `copy` for the mount of an
+   * AppImage copy.
+   */
+  public readonly role: string;
+
+  /**
+   * Creates the process.
+   *
+   * @param processId The process id; a positive integer.
+   * @param earliest The earliest start; finite.
+   * @param latest The latest start; finite and no earlier than the earliest.
+   * @param role What the process is; not whitespace only.
+   * @throws ArgumentOutOfRangeException synchronously when the process id is
+   * not a positive integer, or a start is not finite or the earliest is later
+   * than the latest.
+   * @throws ArgumentException synchronously when the role is empty or
+   * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const desktop: UpdateProcess = new UpdateProcess(4120, 1500.25, 1501.5, "desktop");
+   * ```
+   */
+  public constructor(processId: number, earliest: number, latest: number, role: string);
+
+  /**
+   * Reads a process from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The process.
+   * @throws JsonException synchronously when a field is missing or invalid,
+   * or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const program: UpdateProcess = UpdateProcess.fromJson({ processId: 4188, earliest: 1600, latest: 1601, role: "program" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): UpdateProcess;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `processId`, `earliest`, `latest` and `role` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new UpdateProcess(4188, 1600, 1601, "program").toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A runtime's answer to `shell.update`: whether every client saved its
+ * state, and the processes that must exit before the update replaces the
+ * application.
+ */
+export declare class UpdateReady {
+  /**
+   * What kept a client's state from being saved, or a client that did not
+   * answer; empty when the runtime is ready.
+   */
+  public readonly problems: readonly string[];
+
+  /**
+   * Every client, every program the runtime's modules run and the mount of
+   * its AppImage copy.
+   */
+  public readonly processes: readonly UpdateProcess[];
+
+  /**
+   * Whether no problem stands in the update's way.
+   */
+  public get isReady(): boolean;
+
+  /**
+   * Creates the answer.
+   *
+   * @param problems What stands in the update's way, each not whitespace
+   * only; copied.
+   * @param processes The processes that must exit; copied.
+   * @throws ArgumentException synchronously when a problem is empty or
+   * whitespace only.
+   *
+   * @example
+   * ```ts
+   * import { UpdateProcess, UpdateReady } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const ready: UpdateReady = new UpdateReady([], [new UpdateProcess(4120, 1500.25, 1501.5, "desktop")]);
+   * ```
+   */
+  public constructor(problems: readonly string[], processes: readonly UpdateProcess[]);
+
+  /**
+   * Reads an answer from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The answer.
+   * @throws JsonException synchronously when a field is missing or invalid,
+   * or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { UpdateReady } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const ready: UpdateReady = UpdateReady.fromJson({ problems: [], processes: [] });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): UpdateReady;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `problems` and `processes` fields.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { UpdateReady } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new UpdateReady([], []).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
  * Which window's state a request reads or writes: the device that recorded
  * it and the window on that device. State tied to a display or a window is
  * kept for the device and window that recorded it.
@@ -1462,6 +1757,19 @@ export declare class ShellEvents {
   public static readonly work: QualifiedName;
 
   /**
+   * `shell.updating`: the runtime is preparing for an update. Every client
+   * answers with `shell.updateSaved`: a desktop once its windows have saved,
+   * the command line at once. It has no payload.
+   */
+  public static readonly updating: QualifiedName;
+
+  /**
+   * `shell.updateEnded`: the update the runtime prepared for stopped before
+   * the runtime did, so the runtime works as before. It has no payload.
+   */
+  public static readonly updateEnded: QualifiedName;
+
+  /**
    * `shell.commandsChanged`: a runtime command was registered or withdrawn,
    * or its enabled or checked state changed; its payload is the whole
    * `CommandList`, with a sequence greater than any list before it.
@@ -1548,6 +1856,20 @@ export declare class ShellMethods {
    * answers with a `ProgramStatusList`.
    */
   public static readonly programs: QualifiedName;
+
+  /**
+   * `shell.update`: asks a runtime of the same build to prepare for an
+   * update; its payload is an `UpdateRequest`. The runtime announces
+   * `shell.updating`, waits for every other client's `shell.updateSaved` and
+   * answers with an `UpdateReady`.
+   */
+  public static readonly update: QualifiedName;
+
+  /**
+   * `shell.updateSaved`: a client's answer to `shell.updating`; its payload
+   * is an `UpdateSaved`.
+   */
+  public static readonly updateSaved: QualifiedName;
 
   /**
    * `shell.commands`: asks the runtime for the commands its active modules'

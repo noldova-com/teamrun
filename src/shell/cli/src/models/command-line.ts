@@ -14,7 +14,7 @@ import { UsageException } from "../exceptions/usage.exception.js";
 import { Resources } from "../resources.js";
 
 export class CommandLine {
-  private static readonly VALUE_OPTIONS: readonly string[] = [Resources.dataDirectoryFlag, Resources.timeoutFlag, Resources.argumentsFileFlag];
+  private static readonly VALUE_OPTIONS: readonly string[] = [Resources.dataDirectoryFlag, Resources.deviceDirectoryFlag, Resources.timeoutFlag, Resources.argumentsFileFlag];
   private static readonly SWITCHES: readonly string[] = [Resources.jsonFlag, Resources.noStartFlag, Resources.takeOverFlag, Resources.helpFlag];
   private static readonly ATTACHING: readonly CliCommand[] = [CliCommand.Commands, CliCommand.Run];
 
@@ -27,6 +27,7 @@ export class CommandLine {
   public readonly commandName: string;
   public readonly argumentsSource: ArgumentsSource;
   public readonly argumentsText: string;
+  public readonly deviceDirectory: string | null;
 
   public constructor(
     command: CliCommand,
@@ -37,7 +38,8 @@ export class CommandLine {
     timeoutMilliseconds: number | null = null,
     commandName: string = String.empty,
     argumentsSource: ArgumentsSource = ArgumentsSource.None,
-    argumentsText: string = String.empty) {
+    argumentsText: string = String.empty,
+    deviceDirectory: string | null = null) {
     this.command = command;
     this.dataDirectory = dataDirectory;
     this.isJson = isJson;
@@ -47,6 +49,7 @@ export class CommandLine {
     this.commandName = commandName;
     this.argumentsSource = argumentsSource;
     this.argumentsText = argumentsText;
+    this.deviceDirectory = deviceDirectory;
   }
 
   public static parse(commandLineArguments: readonly string[]): CommandLine {
@@ -111,7 +114,8 @@ export class CommandLine {
       CommandLine.parseTimeout(options.get(Resources.timeoutFlag)),
       commandName,
       source,
-      file ?? (source === ArgumentsSource.Inline ? argumentsValue : undefined));
+      file ?? (source === ArgumentsSource.Inline ? argumentsValue : undefined),
+      options.get(Resources.deviceDirectoryFlag) ?? null);
   }
 
   private static parseTimeout(value: string | undefined): number | null {

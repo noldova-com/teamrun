@@ -48,11 +48,16 @@ export class WindowComponent {
     inject(RecentCommandsService);
     const destroyed = inject(DestroyRef);
     destroyed.onDestroy(this.bridge.onCloseRequest(t => void this.closeAsync(t)));
+    destroyed.onDestroy(this.bridge.onUpdateSaveRequest(t => void this.saveForUpdateAsync(t)));
     destroyed.onDestroy(inject(QuitService).listen());
     destroyed.onDestroy(inject(LinkService).listen());
   }
 
   private async closeAsync(requestId: string): Promise<void> {
     await this.bridge.answerCloseAsync(requestId, await this.closing.saveAsync());
+  }
+
+  private async saveForUpdateAsync(requestId: string): Promise<void> {
+    await this.bridge.answerUpdateSaveAsync(requestId, await this.closing.saveForUpdateAsync());
   }
 }

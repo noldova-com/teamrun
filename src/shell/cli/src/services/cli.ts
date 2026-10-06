@@ -9,21 +9,29 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { text } from "node:stream/consumers";
+import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { CommandList, CommandRun, ModuleStatusList, QualifiedName, ShellMethods, StopPolicy, WorkReport } from "@noldova/teamrun-shell-protocol";
+import { CommandList, CommandRun, FailureCode, ModuleStatusList, QualifiedName, ShellEvents, ShellMethods, StopPolicy, UpdateSaved, WorkReport } from "@noldova/teamrun-shell-protocol";
 import {
+  AppImageSource,
   AttachOptions,
+  ConnectionException,
   type DataDirectory,
   DataDirectoryLocator,
-  type IRuntimeClientListener,
+  DeviceFolder,
+  Installation,
   LaunchException,
   LaunchSettings,
   MethodFailureException,
+  ProcessPresence,
   type RuntimeClient,
-  RuntimeLauncher
+  RuntimeLauncher,
+  SystemCommand,
+  UpdateBarrierStatus,
+  UpdateInProgressException
 } from "@noldova/teamrun-shell-runtime";
 
 import { ArgumentsSource } from "../enums/arguments-source.js";
@@ -39,9 +47,9 @@ import { CliOutput } from "./cli-output.js";
 
 export class Cli {
   private static readonly IGNORE: () => void = () => undefined;
-  private static readonly LISTENER: IRuntimeClientListener = { onEvent: Cli.IGNORE, onDisconnected: Cli.IGNORE };
 
   private readonly context: CliContext;
+  private isUpdating: boolean = false;
 
   public constructor(context: CliContext) {
     this.context = context;
@@ -77,7 +85,7 @@ export class Cli {
       }
     }
     catch (error) {
-      return this.fail(output, error, false);
+      return this.fail(output, this.isUpdating ? new UpdateInProgressException(UpdateBarrierStatus.Held) : error, false);
     }
   }
 
@@ -89,7 +97,7 @@ export class Cli {
 
   private async readStatusAsync(commandLine: CommandLine): Promise<StatusReport> {
     const directory = this.locate(commandLine);
-    const client = await this.attachAsync(directory, new AttachOptions(false, false));
+    const client = await this.attachAsync(commandLine, directory, new AttachOptions(false, false));
     try {
       const modules = ModuleStatusList.fromJson(await Cli.callAsync(client, ShellMethods.modules, null));
       const work = WorkReport.fromJson(await Cli.callAsync(client, ShellMethods.work, null));
@@ -101,7 +109,7 @@ export class Cli {
   }
 
   private async readCommandsAsync(commandLine: CommandLine): Promise<CommandList> {
-    const client = await this.attachAsync(this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
+    const client = await this.attachAsync(commandLine, this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
     try {
       return CommandList.fromJson(await Cli.callAsync(client, ShellMethods.commands, null));
     }
@@ -112,7 +120,7 @@ export class Cli {
 
   private async runCommandAsync(commandLine: CommandLine): Promise<JsonValue> {
     const run = new CommandRun(Cli.parseName(commandLine.commandName), await this.readArgumentsAsync(commandLine));
-    const client = await this.attachAsync(this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
+    const client = await this.attachAsync(commandLine, this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
     const controller = new AbortController();
     const interrupt = (): void => controller.abort();
     this.context.signals.on(Resources.interruptSignal, interrupt);
@@ -149,10 +157,55 @@ export class Cli {
     return DataDirectoryLocator.locate(String.isNullOrWhitespace(checkout), this.context.environment, this.context.homeFolder, checkout, explicit);
   }
 
-  private attachAsync(directory: DataDirectory, options: AttachOptions): Promise<RuntimeClient> {
-    const environment = { ...this.context.environment, [Resources.runAsNodeVariable]: Resources.runAsNodeValue };
-    const settings = new LaunchSettings(directory, this.context.executablePath, this.context.runtimeEntryPath, environment, this.context.platform);
-    return new RuntimeLauncher(settings, this.context.identity, this.context.runtimeStarter).attachAsync(Resources.clientName, Cli.LISTENER, StopPolicy.IfIdle, options);
+  private async attachAsync(commandLine: CommandLine, directory: DataDirectory, options: AttachOptions): Promise<RuntimeClient> {
+    const launcher = this.createLauncher(commandLine, directory);
+    const deadline = Date.now() + this.context.updateWaitMilliseconds;
+    for (;;) {
+      try {
+        return await this.connectAsync(launcher, options);
+      }
+      catch (error) {
+        if (!Cli.isUpdateUnderWay(error) || Date.now() >= deadline)
+          throw error;
+      }
+      await delay(Resources.updatePollInterval);
+    }
+  }
+
+  private createLauncher(commandLine: CommandLine, directory: DataDirectory): RuntimeLauncher {
+    const context = this.context;
+    const environment = { ...context.environment, [Resources.runAsNodeVariable]: Resources.runAsNodeValue };
+    const settings = new LaunchSettings(directory, context.executablePath, context.runtimeEntryPath, environment, context.platform);
+    const deviceFolder = Object.isNull(commandLine.deviceDirectory)
+      ? DeviceFolder.locate(context.platform, context.environment, context.homeFolder)
+      : path.resolve(commandLine.deviceDirectory);
+    const presence = ProcessPresence.create(context.platform, new SystemCommand());
+    const installation = new Installation(Installation.locate(deviceFolder, AppImageSource.locateProgram(context.environment, context.executablePath), context.platform), t => presence.isRunningAsync(t));
+    return new RuntimeLauncher(settings, context.identity, installation, context.runtimeStarter);
+  }
+
+  private async connectAsync(launcher: RuntimeLauncher, options: AttachOptions): Promise<RuntimeClient> {
+    const attached = Promise.withResolvers<RuntimeClient>();
+    const client = await launcher.attachAsync(Resources.clientName, {
+      onEvent: event => {
+        if (event.name.equals(ShellEvents.updating))
+          void attached.promise.then(t => this.answerUpdate(t));
+      },
+      onDisconnected: Cli.IGNORE
+    }, StopPolicy.IfIdle, options);
+    attached.resolve(client);
+    return client;
+  }
+
+  private answerUpdate(client: RuntimeClient): void {
+    this.isUpdating = true;
+    const close = (): void => client.close();
+    void client.callAsync(ShellMethods.updateSaved, new UpdateSaved(this.context.processId, []).toJson()).then(close, close);
+  }
+
+  private static isUpdateUnderWay(error: unknown): boolean {
+    return (error instanceof UpdateInProgressException && error.status === UpdateBarrierStatus.Held)
+      || (error instanceof ConnectionException && error.failure?.code === FailureCode.Updating);
   }
 
   private async readArgumentsAsync(commandLine: CommandLine): Promise<JsonValue> {

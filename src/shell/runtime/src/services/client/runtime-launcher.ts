@@ -16,12 +16,14 @@ import "@noldova/teamrun-foundation-core";
 import { type BuildIdentity, FailureCode, type RuntimeHandover, RunningWork, StopPolicy } from "@noldova/teamrun-shell-protocol";
 
 import { BuildRelation } from "../../enums/build-relation.js";
+import { UpdateBarrierStatus } from "../../enums/update-barrier-status.js";
 import { BuildMismatchException } from "../../exceptions/build-mismatch.exception.js";
 import { ConnectionException } from "../../exceptions/connection.exception.js";
 import { LaunchException } from "../../exceptions/launch.exception.js";
 import { NoRuntimeException } from "../../exceptions/no-runtime.exception.js";
 import { PreShellDataFoundException } from "../../exceptions/pre-shell-data-found.exception.js";
 import { RuntimeHandoverException } from "../../exceptions/runtime-handover.exception.js";
+import { UpdateInProgressException } from "../../exceptions/update-in-progress.exception.js";
 import { WorkInProgressException } from "../../exceptions/work-in-progress.exception.js";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { IRuntimeClientListener } from "../../interfaces/i-runtime-client-listener.js";
@@ -34,6 +36,7 @@ import { StartedRuntime } from "../../models/started-runtime.js";
 import { Resources } from "../../resources.js";
 import { DiagnosticRedactor } from "../diagnostics/diagnostic-redactor.js";
 import { DiscoveryReader } from "../discovery/discovery.reader.js";
+import type { Installation } from "../installation/installation.js";
 import { OwnershipLock } from "../ownership/ownership-lock.js";
 import { ChildProcessStarter } from "../process/child-process-starter.js";
 import { BuildComparer } from "./build-comparer.js";
@@ -43,11 +46,13 @@ export class RuntimeLauncher {
   private readonly settings: LaunchSettings;
   private readonly identity: BuildIdentity;
   private readonly starter: IProcessStarter;
+  private readonly installation: Installation;
 
-  public constructor(settings: LaunchSettings, identity: BuildIdentity, starter: IProcessStarter = new ChildProcessStarter()) {
+  public constructor(settings: LaunchSettings, identity: BuildIdentity, installation: Installation, starter: IProcessStarter = new ChildProcessStarter()) {
     this.settings = settings;
     this.identity = identity;
     this.starter = starter;
+    this.installation = installation;
   }
 
   public async attachAsync(clientName: string, listener: IRuntimeClientListener, policy: StopPolicy = StopPolicy.IfIdle, options: AttachOptions = new AttachOptions()): Promise<RuntimeClient> {
@@ -101,10 +106,11 @@ export class RuntimeLauncher {
       else if (Object.isNull(started)) {
         if (!options.start)
           throw new NoRuntimeException(this.settings.dataDirectory.root);
+        await this.requireNoUpdateAsync();
         started = await this.startAsync();
       }
       else if (!started.isRunning && !OwnershipLock.isOwned(this.settings.dataDirectory))
-        throw await RuntimeLauncher.describeExitAsync(started);
+        throw await this.describeExitAsync(started);
       const timeout = this.readTimeout(deadline, limit);
       if (!Object.isNull(timeout)) {
         await RuntimeLauncher.forgetAsync(started);
@@ -128,9 +134,13 @@ export class RuntimeLauncher {
       await rm(started.startLog, { force: true });
   }
 
-  private static async describeExitAsync(started: StartedRuntime): Promise<LaunchException> {
+  private async describeExitAsync(started: StartedRuntime): Promise<LaunchException> {
     const text = await readFile(started.startLog, Resources.utf8Encoding);
     await rm(started.startLog, { force: true });
+    await this.requireNoUpdateAsync().catch((error: unknown) => {
+      if (error instanceof UpdateInProgressException)
+        throw error;
+    });
     const reason = new DiagnosticRedactor(homedir()).redact(text.slice(-Resources.startLogTailLength).trim());
     return new LaunchException(String.isNullOrWhitespace(reason) ? Resources.runtimeExitedWithoutReason : Resources.formatRuntimeExited(reason));
   }
@@ -175,6 +185,12 @@ export class RuntimeLauncher {
     }
   }
 
+  private async requireNoUpdateAsync(): Promise<void> {
+    const status = await this.installation.checkAsync(this.identity.productVersion);
+    if (status !== UpdateBarrierStatus.None)
+      throw new UpdateInProgressException(status);
+  }
+
   private async startAsync(): Promise<StartedRuntime> {
     const directory = this.settings.dataDirectory;
     const unique = randomUUID();
@@ -186,7 +202,9 @@ export class RuntimeLauncher {
       Resources.idleGraceArgument,
       String(this.settings.idleGraceMilliseconds),
       Resources.startLogArgument,
-      startLogName
+      startLogName,
+      Resources.installationArgument,
+      this.installation.folder
     ], this.settings.environment, path.join(directory.logsFolder, Resources.formatCopyRecordName(unique)));
     await mkdir(directory.logsFolder, { recursive: true });
     const startLog = path.join(directory.logsFolder, startLogName);

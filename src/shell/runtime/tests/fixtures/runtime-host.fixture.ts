@@ -16,7 +16,9 @@ import {
   type BuildIdentity, Event, Handshake, NotificationBroadcast, NotificationPost, NotificationReference, NotificationSeverity, NotificationState, NotificationsQuery, QualifiedName, Request, Response,
   ShellMethods, WireDecoder
 } from "@noldova/teamrun-shell-protocol";
-import { DataDirectory, DiscoveryReader, Endpoint, type RuntimeDiscovery, RuntimeEntry, RuntimeHost, RuntimeOptions, ServerSettings } from "@noldova/teamrun-shell-runtime";
+import {
+  DataDirectory, DiscoveryReader, Endpoint, ProcessPresence, type RuntimeDiscovery, RuntimeEntry, RuntimeHost, RuntimeOptions, ServerSettings, SystemCommand
+} from "@noldova/teamrun-shell-runtime";
 
 import { RawConnectionFixture } from "./raw-connection.fixture.js";
 import { SocketFolderFixture } from "./socket-folder.fixture.js";
@@ -62,9 +64,10 @@ export class RuntimeHostFixture implements AsyncDisposable {
   }
 
   public async startAsync(idleGraceMilliseconds: number = 30_000, declarationsFile?: string, takeoverMilliseconds?: number,
-    environment: NodeJS.ProcessEnv = process.env): Promise<RuntimeHost> {
-    const options = new RuntimeOptions(this.dataDirectory, idleGraceMilliseconds, new ServerSettings(), declarationsFile, null, takeoverMilliseconds);
-    this.currentHost = await RuntimeHost.startAsync(options, process.platform, environment);
+    environment: NodeJS.ProcessEnv = process.env, serverSettings: ServerSettings = new ServerSettings(), installationFolder: string | null = null,
+    presence: ProcessPresence = ProcessPresence.create(process.platform, new SystemCommand())): Promise<RuntimeHost> {
+    const options = new RuntimeOptions(this.dataDirectory, idleGraceMilliseconds, serverSettings, declarationsFile, null, takeoverMilliseconds, installationFolder);
+    this.currentHost = await RuntimeHost.startAsync(options, process.platform, environment, presence);
     return this.currentHost;
   }
 
