@@ -8,6 +8,11 @@
 
 import { ErrorHandler, type Provider } from "@angular/core";
 
+import { ClipboardWriter } from "../src/app/services/clipboard-writer";
+import { ClipboardWriterFixture } from "./fixtures/clipboard-writer.fixture";
 import { ThrowingErrorHandler } from "./throwing-error-handler";
 
-export default [{ provide: ErrorHandler, useClass: ThrowingErrorHandler }] satisfies Provider[];
+export default [
+  { provide: ErrorHandler, useClass: ThrowingErrorHandler },
+  { provide: ClipboardWriter, useClass: ClipboardWriterFixture }
+] satisfies Provider[];

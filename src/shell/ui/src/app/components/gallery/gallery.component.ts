@@ -13,6 +13,7 @@ import { ChangeDetectionStrategy, Component, Injector, type Signal, computed, in
 import { ThemeMode } from "../../enums/theme-mode";
 import type { Theme } from "../../models/theme";
 import { DefaultTheme } from "../../themes/default-theme";
+import { GalleryContentComponent } from "./gallery-content.component";
 import { GalleryFormsComponent } from "./gallery-forms.component";
 import { GalleryNavigationComponent } from "./gallery-navigation.component";
 import { GalleryOverlayContainer } from "./gallery-overlay-container";
@@ -29,7 +30,7 @@ interface GalleryScope {
 
 @Component({
   selector: "tr-gallery",
-  imports: [GalleryFormsComponent, GalleryNavigationComponent, GalleryOverlaysComponent, GalleryScopeDirective, NgTemplateOutlet],
+  imports: [GalleryContentComponent, GalleryFormsComponent, GalleryNavigationComponent, GalleryOverlaysComponent, GalleryScopeDirective, NgTemplateOutlet],
   templateUrl: "./gallery.component.html",
   styleUrl: "./gallery.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
