@@ -560,7 +560,7 @@ The runtime owns the process and ends it; the part does not.
 - **Identity.**
   A process is a record's when its id matches and its start can fall between the request and the return of the call that started it.
   Start times are compared on the clock the process table uses: on Linux, time since boot; on macOS and Windows, the wall clock.
-  They are compared with the table's precision: on Windows the table gives each process's creation time to the millisecond, compared within 50 ms, and leaves out a process created after the table was read; on macOS and Linux `ps` gives whole seconds, so a start is known only within a second on each side, widened by the time `ps` takes.
+  They are compared with the table's precision: on Windows the table gives each process's creation time to the millisecond, compared within 50 ms, and leaves out a process created more than 50 ms after it read its clock, since a clock of coarser resolution can lag the creation time; on macOS and Linux `ps` gives whole seconds, so a start is known only within a second on each side, widened by the time `ps` takes.
   On Windows, which reuses process ids quickly, a process an earlier runtime left must also run the recorded executable.
   Any other process is left alone.
   The boot is the kernel's boot id on Linux and the system's start time elsewhere.
