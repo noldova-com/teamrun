@@ -124,17 +124,20 @@ class PackageInstallerTests {
       assert.equal(existsSync(installFolder), false);
     });
 
-    test("on Windows an uninstaller that fails, leaves files behind or cannot be removed after it ran fails the uninstall, naming the reason", async t => {
+    test("on Windows an uninstaller that fails, leaves files or folders behind or cannot be removed after it ran fails the uninstall, naming the reason, "
+      + "and asks what holds only the files", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
       const failing = PackageInstallerTests.createRunner(t, ["Uninstall Fixture Studio.exe"]);
       const leaving = PackageInstallerTests.createRunner(t);
+      const emptying = PackageInstallerTests.createRunner(t);
       const staying = PackageInstallerTests.createRunner(t);
       const local = path.join(repository.directory, "local");
       const installFolder = path.join(local, "Programs", "fixture-studio");
       const environment = { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS };
-      for (const runner of [failing, leaving, staying])
+      for (const runner of [failing, leaving, emptying, staying])
         runner.localAppData = local;
       leaving.uninstallLeaves = ["resources/app.asar", "Fixture Studio.exe"];
+      emptying.uninstallLeaves = ["resources/locales/", "bin/"];
       staying.uninstallerStays = true;
 
       await PackageInstallerTests.installAsync(repository, failing, "win32", "x64", environment);
@@ -144,6 +147,11 @@ class PackageInstallerTests {
       await assert.rejects(PackageInstallerTests.uninstallAsync(repository, leaving, environment),
         new PackagingException(`The uninstaller left ${["Fixture Studio.exe", "resources", path.join("resources", "app.asar")].join(", ")} in ${installFolder}.\n`
           + "What holds them now:\nFixture Studio.exe: process 4 MsMpEng.exe, service WinDefend."));
+      await rm(installFolder, { recursive: true, force: true });
+      await PackageInstallerTests.installAsync(repository, emptying, "win32", "x64", environment);
+      await assert.rejects(PackageInstallerTests.uninstallAsync(repository, emptying, environment),
+        new PackagingException(`The uninstaller left ${["bin", "resources", path.join("resources", "locales")].join(", ")} in ${installFolder}.`));
+      assert.deepEqual(emptying.calls.filter(([name]) => name === "powershell.exe"), []);
       await rm(installFolder, { recursive: true, force: true });
       await PackageInstallerTests.installAsync(repository, staying, "win32", "x64", environment);
       const uninstaller = path.join(installFolder, "Uninstall Fixture Studio.exe");
