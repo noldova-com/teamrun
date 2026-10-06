@@ -29,6 +29,7 @@ import type { ToolbarLayout } from "../models/layout/toolbar-layout";
 import type { SplitHandle } from "../models/layout/split-handle";
 import type { Tab } from "../models/layout/tab";
 import type { TabGroup } from "../models/layout/tab-group";
+import { TabDropTarget } from "../models/layout/tab-drop-target";
 import { TabReveal } from "../models/layout/tab-reveal";
 import { ViewRegistry } from "../models/layout/view-registry";
 import { LayoutStoreService } from "./layout-store.service";
@@ -48,6 +49,7 @@ export class LayoutService {
   private readonly metrics: WritableSignal<LayoutMetrics | null> = signal(null);
   private readonly currentGroupId: WritableSignal<number | null> = signal(null);
   private readonly revealedState: WritableSignal<TabReveal | null> = signal(null);
+  private readonly hiddenState: WritableSignal<Tab | null> = signal(null);
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private saved: Layout | null = null;
   private early: EarlyDocument[] | null = [];
@@ -57,13 +59,18 @@ export class LayoutService {
   public readonly layout: Signal<Layout> = this.layoutState.asReadonly();
   public readonly revealed: Signal<TabReveal | null> = this.revealedState.asReadonly();
   public readonly registry: Signal<ViewRegistry> = this.registryState.asReadonly();
+  public readonly hidden: Signal<Tab | null> = this.hiddenState.asReadonly();
   public readonly iconSides: Signal<ReadonlySet<DockSide>> = computed(() =>
     new Set([...Resources.dockStyleSettings].filter(([, name]) => this.settings.values().get(name) === DockStyle.Icons).map(([side]) => side)));
   public readonly isMeasured: Signal<boolean> = computed(() => !Object.isNull(this.metrics()));
   public readonly previewTabs: Signal<boolean> = computed(() => this.settings.values().get(Resources.previewTabsSetting) !== false);
   private readonly kept: WritableSignal<DockSide | null> = signal(null);
+  private readonly shownLayout: Signal<Layout> = computed(() => {
+    const hidden = this.hiddenState();
+    return Object.isNull(hidden) ? this.layoutState() : this.layoutState().close(hidden);
+  });
   public readonly geometry: Signal<LayoutGeometry> = linkedSignal({
-    source: () => ({ width: this.width(), height: this.height(), layout: this.layoutState(), registry: this.registryState(), metrics: this.metrics(), iconSides: this.iconSides(), kept: this.kept() }),
+    source: () => ({ width: this.width(), height: this.height(), layout: this.shownLayout(), registry: this.registryState(), metrics: this.metrics(), iconSides: this.iconSides(), kept: this.kept() }),
     computation: (source, previous?: { readonly value: LayoutGeometry }) => new LayoutGeometry(source.width, source.height, source.layout, source.registry, source.metrics ?? LayoutMetrics.none, source.iconSides,
       new DockYield(source.layout.middleSize ?? Resources.middlePreferredSize, previous?.value.closedSides ?? new Set(), source.kept))
   });
@@ -129,6 +136,17 @@ export class LayoutService {
     for (const early of this.reopening)
       this.openDocument(early.tab, early.isPreview);
     this.reopening = [];
+  }
+
+  public openInCurrentGroup(tab: Tab): void {
+    const current = this.currentGroup();
+    const group = current.accepts(tab) ? current : this.layoutState().documents;
+    this.place(tab, new TabDropTarget(group.id, group.tabs.length));
+    this.activate(tab);
+  }
+
+  public hide(tab: Tab | null): void {
+    this.hiddenState.set(tab);
   }
 
   public restoreDocument(tab: DocumentTab, isPreview: boolean): void {

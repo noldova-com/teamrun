@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { FocusMonitor } from "@angular/cdk/a11y";
 import type { DialogRef } from "@angular/cdk/dialog";
 import { Component, signal } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
@@ -13,8 +14,10 @@ import { page, userEvent } from "vitest/browser";
 
 import { ButtonComponent } from "../../../../src/app/components/button/button.component";
 import { DialogComponent } from "../../../../src/app/components/dialog/dialog.component";
+import { IconButtonComponent } from "../../../../src/app/components/icon-button/icon-button.component";
 import { ButtonVariant } from "../../../../src/app/enums/button-variant";
 import { DialogSize } from "../../../../src/app/enums/dialog-size";
+import { DefaultTheme } from "../../../../src/app/models/default-theme";
 import { DialogService } from "../../../../src/app/services/dialog.service";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 
@@ -49,6 +52,19 @@ class LargeDialogHostComponent {
   public readonly title = signal("Notes");
 
   public dismissals: number = 0;
+}
+
+@Component({
+  imports: [DialogComponent, IconButtonComponent],
+  template: `
+    <tr-dialog title="Notes" [size]="large">
+      <button type="button" tr-icon-button trDialogControl icon="push_pin" label="Pin"></button>
+      <p class="tr-dialog-probe">Plan</p>
+    </tr-dialog>
+  `
+})
+class ControlledDialogHostComponent {
+  protected readonly large: DialogSize = DialogSize.Large;
 }
 
 describe("DialogComponent", () => {
@@ -200,7 +216,7 @@ describe("DialogComponent", () => {
     expect([plain.hasAttribute("data-truncates"), getComputedStyle(plain).whiteSpace]).toEqual([false, "normal"]);
   });
 
-  it("gives a large dialog a title bar whose close button asks its owner to close, and leaves Escape to a control that handled it", async () => {
+  it("gives a large dialog a title bar whose close button asks its owner to close, and leaves Escape to a control that handled it and to the shown tooltip of Close", async () => {
     AppearanceFixture.apply();
     const opened = await openLargeAsync();
     const field = document.querySelector(".tr-dialog-field") as HTMLInputElement;
@@ -211,12 +227,49 @@ describe("DialogComponent", () => {
     field.focus();
     await userEvent.keyboard("{Escape}");
     const afterHandledEscape = opened.componentInstance?.dismissals;
-    (document.querySelector(".tr-dialog-close") as HTMLElement).focus();
+    TestBed.inject(FocusMonitor).focusVia(document.querySelector(".tr-dialog-close") as HTMLElement, "keyboard");
+    await vi.waitFor(() => expect(document.querySelector("tr-tooltip")?.textContent?.trim()).toBe("Close"));
+    await userEvent.keyboard("{Escape}");
+    await vi.waitFor(() => expect(document.querySelector("tr-tooltip")).toBeNull());
+    const afterTooltipEscape = opened.componentInstance?.dismissals;
     await userEvent.keyboard("{Escape}");
 
     expect(document.getElementById(container().getAttribute("aria-labelledby") ?? "")?.textContent).toBe("Notes");
-    expect([afterClick, afterHandledEscape, opened.componentInstance?.dismissals]).toEqual([1, 1, 2]);
+    expect([afterClick, afterHandledEscape, afterTooltipEscape, opened.componentInstance?.dismissals]).toEqual([1, 1, 1, 2]);
     expect(document.querySelector("tr-dialog")?.classList.contains("tr-dialog-large")).toBe(true);
+  });
+
+  it("ends a large dialog's title bar with its own controls, Maximize and Close, each named and with a tooltip, and fills the window less its margin until Restore", async () => {
+    AppearanceFixture.apply();
+    reference = TestBed.inject(DialogService).open(ControlledDialogHostComponent, ".tr-dialog-close");
+    await vi.waitFor(() => expect(document.activeElement?.classList.contains("tr-dialog-close")).toBe(true));
+    const dialog = document.querySelector("tr-dialog") as HTMLElement;
+    const controls = [...dialog.querySelectorAll<HTMLButtonElement>(".tr-dialog-header button")];
+    const names = (): readonly (string | null)[] => controls.map(t => t.getAttribute("aria-label"));
+    const bounds = (): readonly number[] => {
+      const rectangle = dialog.getBoundingClientRect();
+      return [rectangle.left, rectangle.width, rectangle.height];
+    };
+    const share = (name: string, property: "width" | "height"): number => pixels(DefaultTheme.theme.readLook(name) ?? String.empty, property);
+    const gap = share("space-2", "width");
+    const tips = controls.slice(1).map(t => document.getElementById(t.getAttribute("aria-describedby") ?? String.empty)?.textContent);
+    const large = bounds();
+    const largeNames = names();
+
+    await userEvent.click(page.getByRole("button", { name: "Maximize" }));
+    await vi.waitFor(() => expect(names()).toEqual(["Pin", "Restore", "Close"]));
+    const maximized = bounds();
+    await userEvent.click(page.getByRole("button", { name: "Restore" }));
+    await vi.waitFor(() => expect(names()).toEqual(largeNames));
+
+    expect(largeNames).toEqual(["Pin", "Maximize", "Close"]);
+    expect(tips).toEqual(["Maximize", "Close"]);
+    expect(dialog.querySelector(".tr-dialog-body .tr-dialog-probe")).not.toBeNull();
+    AppearanceFixture.expectPixels(maximized[0] ?? 0, gap);
+    AppearanceFixture.expectPixels(maximized[1] ?? 0, window.innerWidth - gap * 2);
+    AppearanceFixture.expectPixels(maximized[2] ?? 0, window.innerHeight - share("window-row-height", "height") - share("status-bar-height", "height") - gap * 2);
+    expect(large[1]).toBeLessThan(maximized[1] ?? 0);
+    expect(bounds()).toEqual(large);
   });
 
   for (const theme of AppearanceFixture.themes)

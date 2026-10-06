@@ -127,6 +127,20 @@ describe("DockComponent", () => {
     expect(query("tr-sash")).not.toBeNull();
   });
 
+  it("leaves the view a dialog shows out of its strip until the dialog closes", async () => {
+    await renderAsync(DockSide.Left, Layout.createDefault(registry).openView(LayoutFixture.search, registry).toggleDock(DockSide.Left));
+    const host: HTMLElement = fixture.nativeElement;
+    const labels = (): readonly (string | null)[] => [...host.querySelectorAll(".tr-dock-strip-view")].map(t => t.getAttribute("aria-label"));
+
+    layout.hide(LayoutFixture.search);
+    fixture.detectChanges();
+    const hidden = labels();
+    layout.hide(null);
+    fixture.detectChanges();
+
+    expect([hidden, labels()]).toEqual([["files.tree"], ["files.tree", "files.search"]]);
+  });
+
   it("opens a dock the narrow window closed from its strip and closes the other dock instead", async () => {
     await renderAsync(DockSide.Left);
     layout.setViewport(40, 40);

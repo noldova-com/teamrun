@@ -245,9 +245,10 @@ A window part asks with `showInDialogAsync(name, { instance, title })` for its o
 The person has no way of their own to open one.
 Asking while any dialog is open is refused.
 
-A view or document already open in a tab moves into the dialog: its tab stays where it is with an empty panel, and its content returns there when the dialog closes, so the saved layout never changes.
+A view or document already open in a tab moves into the dialog, and its tab leaves the tab strip while the dialog shows: its group shows what it would if the tab had closed, but the saved layout keeps the tab in its place, and the view returns there when the dialog closes.
 One that was not open closes with the dialog.
 It moves there as the same live view, as when a tab moves between groups ([Window](#8-window)).
+The dialog's title bar offers Open in main window, which closes the dialog and shows the view in a tab with focus: the tab it came from, made active, or else a new tab at the end of the current group, or of the documents when that group can't hold it.
 The dialog closes when its view's module goes away or the tab it came from closes.
 When a document other than its own opens or is activated while it shows, as when a command run from the view opens one, the dialog closes, the view returns to its place, and the document's tab shows active with focus.
 When it closes and the control that opened it is gone, as when the view showed itself, focus goes to the view's tab.

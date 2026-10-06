@@ -33,7 +33,7 @@ async function expectInsideAsync(window: Page, locator: Locator): Promise<void> 
 }
 
 test.describe("view dialog", () => {
-  test("an open document moves into a large dialog, works there while the window behind stays still, and returns to its tab on Escape", async ({ desktop }) => {
+  test("an open document moves into a large dialog and out of its tab strip, works there while the window behind stays still, maximizes, and returns to its tab on Escape", async ({ desktop }) => {
     const window = desktop.window;
     const tab = window.locator("tr-tab[data-tab-key=\"document/notes.note/1\"]");
     const other = window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]");
@@ -43,6 +43,8 @@ test.describe("view dialog", () => {
     await showAsync(window, "Show note 1 in a dialog");
 
     await expect(dialog(window)).toHaveAccessibleName("Note 1");
+    await expect(tab).toHaveCount(0);
+    await expect(other).toHaveAttribute("aria-selected", "true");
     await expect(dialog(window).getByRole("textbox", { name: "Tag" })).toBeFocused();
     await expect(window.locator("[data-fixture-content=notes-note-1]")).toHaveCount(1);
     await expect(dialog(window).locator("[data-fixture-content=notes-note-1]")).toBeVisible();
@@ -64,13 +66,26 @@ test.describe("view dialog", () => {
     await window.keyboard.type("!");
     await expect(summary).toHaveValue("Plan the week!");
     await expect(dialog(window)).toBeVisible();
-    await expect(tab).toBeAttached();
-    await expect(other).toHaveAttribute("aria-selected", "false");
+    await expect(tab).toHaveCount(0);
+    await expect(other).toHaveAttribute("aria-selected", "true");
     await expect(window.locator("[data-fixture-content=notes-list]")).toBeAttached();
     await desktop.checkpointAsync("view-dialog-note-light");
     await WindowModeFixture.setAsync(window, "Dark");
     await desktop.checkpointAsync("view-dialog-note-dark");
     await WindowModeFixture.setAsync(window, "Light");
+    await dialog(window).getByRole("button", { name: "Maximize" }).click();
+    await expect(dialog(window).getByRole("button", { name: "Restore" })).toBeVisible();
+    const maximized = await window.locator("tr-dialog").boundingBox();
+    expect(maximized?.x ?? Infinity).toBeLessThan(20);
+    expect(maximized?.width ?? 0).toBeGreaterThan(1920 - 40);
+    expect(maximized?.height ?? 0).toBeGreaterThan(bounds?.height ?? Infinity);
+    await desktop.checkpointAsync("view-dialog-note-maximized-light");
+    await WindowModeFixture.setAsync(window, "Dark");
+    await desktop.checkpointAsync("view-dialog-note-maximized-dark");
+    await WindowModeFixture.setAsync(window, "Light");
+    await dialog(window).getByRole("button", { name: "Restore" }).click();
+    await expect(dialog(window).getByRole("button", { name: "Maximize" })).toBeVisible();
+    expect(await window.locator("tr-dialog").boundingBox()).toEqual(bounds);
 
     await summary.focus();
     await window.keyboard.press("Escape");
@@ -121,6 +136,12 @@ test.describe("view dialog", () => {
     await dialog(window).getByRole("button", { name: "Close" }).click();
     await expect(dialog(window)).toHaveCount(0);
     await expect(window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]")).toHaveCount(0);
+
+    await showAsync(window, "Show Settings in a dialog");
+    await dialog(window).getByRole("button", { name: "Open in main window" }).click();
+    await expect(dialog(window)).toHaveCount(0);
+    await expect(window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]")).toHaveAttribute("aria-selected", "true");
+    await expect(window.locator("tr-tab[data-tab-key=\"document/shell.settings\"]")).toBeFocused();
 
     await desktop.zoomAsync(2, 320);
     try {
