@@ -899,6 +899,9 @@ Each target is packaged on its own platform and processor.
   On macOS the system's spell checker chooses the languages, and the desktop copies and offers none.
 - **Installation.**
   The Windows installer installs for the current user without elevation and keeps the data directory when TeamRun is uninstalled.
+  Uninstalling tries for up to 30 seconds to remove the program's files, since another program, such as a virus scanner reading a freshly updated file, can hold one for a moment.
+  A file still held after that stays, and the uninstall says so: an interactive uninstall shows which files are left in which folder, and a silent one, run with `/S`, shows no message.
+  Without elevation the uninstaller cannot have Windows remove a file at the next restart.
 - **Command on the PATH (Windows).**
   The install folder holds `bin\teamrun.cmd`, named after the slug.
   It runs the installed program in Node mode with the command line's entry, waits for it and returns its exit code, so `teamrun` works from cmd and PowerShell.
@@ -908,7 +911,7 @@ Each target is packaged on its own platform and processor.
   Uninstalling removes exactly that entry, and the value itself when nothing else is left.
   A `Path` that cannot be read, or is too long for the installer's strings, is left unchanged.
   The [command line's document](../src/shell/cli/README.md#5-installed-teamrun) says what cmd does to its arguments.
-  The installer's include is `assets/installer/command-path.nsh`.
+  The installer's include is `assets/installer/installer.nsh`.
 - **Command on the PATH (macOS).**
   The bundle holds `Contents/Resources/bin/teamrun`, named after the slug.
   The script follows the links to itself back to the bundle and runs the bundle's program in Node mode with the command line's entry.
