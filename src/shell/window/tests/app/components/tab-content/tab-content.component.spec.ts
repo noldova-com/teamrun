@@ -177,6 +177,36 @@ describe("TabContentComponent", () => {
     expect(TestShellDocumentComponent.contexts).toEqual([null]);
   });
 
+  it("keeps its content when it is given an equal tab", async () => {
+    host.contributions.set(new ViewTab("notes.list").key, new ContributionMatch(() => Promise.resolve(TestViewComponent), context, ContentPadding.Default));
+    const fixture = TestBed.createComponent(TabContentComponent);
+    fixture.componentRef.setInput("tab", new ViewTab("notes.list"));
+    await fixture.whenStable();
+    const element: HTMLElement = fixture.nativeElement;
+    const shown = element.querySelector(".view");
+
+    fixture.componentRef.setInput("tab", new ViewTab("notes.list"));
+    await fixture.whenStable();
+
+    expect(element.querySelector(".view")).toBe(shown);
+    expect(TestViewComponent.contexts).toEqual([context]);
+  });
+
+  it("tells its page whether the page is shown", async () => {
+    const tab = new ViewTab("notes.list");
+    host.contributions.set(tab.key, new ContributionMatch(() => Promise.resolve(TestPageComponent), null, ContentPadding.Default));
+    const fixture = TestBed.createComponent(TabContentComponent);
+    fixture.componentRef.setInput("tab", tab);
+    await fixture.whenStable();
+    const shown = fixture.debugElement.query(By.directive(TestPageComponent)).injector.get(WindowPartTokens.shown);
+    const states = [shown()];
+
+    fixture.componentRef.setInput("isShown", false);
+    states.push(shown());
+
+    expect(states).toEqual([true, false]);
+  });
+
   it("shows why a failed module's view is empty", async () => {
     const tab = new ViewTab("clock.face");
     host.failures.set(tab.key, new ModuleFailure("clock", "Clock", ModuleState.Failed, "Its runtime part failed to activate.", ["clock.face"]));

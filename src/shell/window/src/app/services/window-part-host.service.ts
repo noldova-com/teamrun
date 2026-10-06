@@ -48,6 +48,7 @@ import { CommandService } from "./command.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { DocumentOpenerService } from "./document-opener.service";
 import { LayoutService } from "./layout.service";
+import { LiveViewService } from "./live-view.service";
 import { MenuService } from "./menu.service";
 import { ModuleStatusService } from "./module-status.service";
 import { SettingsService } from "./settings.service";
@@ -58,6 +59,7 @@ import { ViewDialogService } from "./view-dialog.service";
 export class WindowPartHostService implements IWindowPartHost {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly layout: LayoutService = inject(LayoutService);
+  private readonly liveViews: LiveViewService = inject(LiveViewService);
   private readonly opener: DocumentOpenerService = inject(DocumentOpenerService);
   private readonly labels: TabLabelService = inject(TabLabelService);
   private readonly commands: CommandService = inject(CommandService);
@@ -473,6 +475,7 @@ export class WindowPartHostService implements IWindowPartHost {
 
   private async deactivateAsync(activations: readonly WindowPartActivation[]): Promise<void> {
     for (const activation of [...activations].reverse()) {
+      this.liveViews.destroy(t => WindowPartHostService.owns(activation.context, t));
       this.activations.splice(this.activations.indexOf(activation), 1);
       this.changedModules.add(activation.context.moduleId);
       try {
@@ -485,6 +488,11 @@ export class WindowPartHostService implements IWindowPartHost {
         activation.context.withdraw();
       }
     }
+  }
+
+  private static owns(context: WindowPartContext, tab: Tab): boolean {
+    const contributions = tab instanceof DocumentTab ? context.documents : context.views;
+    return contributions.some(t => t.name === tab.name);
   }
 
   private static match(contribution: ViewContribution | DocumentContribution, context: WindowPartContext | null, modulePadding?: ContentPadding): ContributionMatch {
