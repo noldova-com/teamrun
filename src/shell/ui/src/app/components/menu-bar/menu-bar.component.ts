@@ -11,7 +11,7 @@ import { ChangeDetectionStrategy, Component, input } from "@angular/core";
 
 @Component({
   selector: "tr-menu-bar",
-  template: "<ng-content />",
+  templateUrl: "./menu-bar.component.html",
   styleUrl: "./menu-bar.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
   hostDirectives: [CdkMenuBar],
