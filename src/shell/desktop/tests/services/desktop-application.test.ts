@@ -246,7 +246,7 @@ export class DesktopApplicationTests {
       { descriptions: ["Indexing the project", "Saving the notes"], isWaiting: true },
       null
     ]), JSON.stringify(DesktopApplicationTests.quitQuestions(window)));
-    Assert.areEqual(2000, connection.timeouts[connection.calls.indexOf("shell.work")]);
+    Assert.areEqual(2000, connection.timeouts[connection.calls.lastIndexOf("shell.work")]);
     Assert.isFalse(connection.calls.includes("shell.stop"));
   }
 
@@ -300,7 +300,7 @@ export class DesktopApplicationTests {
     await Condition.waitAsync(() => DesktopApplicationTests.closeRequests(second).length === 1);
 
     Assert.areEqual(0, DesktopApplicationTests.quitQuestions(first).length);
-    Assert.areEqual(2000, slow.timeouts[slow.calls.indexOf("shell.work")]);
+    Assert.areEqual(2000, slow.timeouts[slow.calls.lastIndexOf("shell.work")]);
     Assert.areEqual(
       1,
       DesktopStartFixture.readErrors(process, "The runtime's work could not be read before quitting, so TeamRun quits without asking: ConnectionException: The runtime did not answer shell.work in time.").length);
@@ -832,6 +832,8 @@ export class DesktopApplicationTests {
       connection.answers.set(name, Response.success("r", name));
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(connection));
     const event = DesktopStartFixture.trustedEvent("linux");
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const answers = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", {}),
@@ -839,7 +841,7 @@ export class DesktopApplicationTests {
       await DesktopApplicationTests.requestAsync(electron, event, "shell.setSetting", { name: "shell.panelSize", value: 15 }),
       await DesktopApplicationTests.requestAsync(electron, event, "shell.resetSetting", { name: "shell.panelSize", device: "another" })
     ];
-    const sent = connection.calls.flatMap((t, index) => t.includes("Setting") || t === "shell.settings" ? [connection.payloads[index]] : []);
+    const sent = connection.calls.flatMap((t, index) => index >= start && (t.includes("Setting") || t === "shell.settings") ? [connection.payloads[index]] : []);
 
     Assert.areEqual("shell.settings,shell.readSetting,shell.setSetting,shell.resetSetting", answers.map(t => t.payload).join(","));
     Assert.areEqual(JSON.stringify([
@@ -858,6 +860,8 @@ export class DesktopApplicationTests {
     device.failure = new Error("The identity file is not JSON.");
     const anonymous = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), device);
     const event = DesktopStartFixture.trustedEvent("linux");
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const failures = [
       await DesktopApplicationTests.requestAsync(electron, event, "shell.settings", null),
@@ -874,7 +878,7 @@ export class DesktopApplicationTests {
       { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." },
       { code: "Unavailable", message: "This device has no identity, so a request that belongs to it cannot be made." }
     ]), JSON.stringify(failures));
-    Assert.isFalse(connection.calls.some(t => t.includes("etting") || t.includes("ommand")));
+    Assert.isFalse(connection.calls.slice(start).some(t => t.includes("etting") || t.includes("ommand")));
   }
 
   @TestMethod
@@ -896,7 +900,7 @@ export class DesktopApplicationTests {
       answers.push(String((await DesktopApplicationTests.requestAsync(electron, event, method, payload)).failure?.code));
 
     Assert.areEqual(JSON.stringify(["Unauthorized", "InvalidMessage", "InvalidMessage", "InvalidMessage", "Unauthorized", "Unauthorized"]), JSON.stringify(answers));
-    Assert.areEqual(JSON.stringify(["shell.readWindowBounds"]), JSON.stringify(connection.calls));
+    Assert.areEqual(JSON.stringify(["shell.readWindowBounds"]), JSON.stringify(connection.calls.filter(t => !["shell.work", "shell.notifications", "shell.readSetting"].includes(t))));
   }
 
   @TestMethod
@@ -930,12 +934,14 @@ export class DesktopApplicationTests {
     const unidentified = new FakeDeviceIdentity();
     unidentified.failure = new Error("The identity file is not JSON.");
     const lost = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(new FakeRuntimeConnection()), new FakeElectron(), unidentified);
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+    const start = connection.calls.length;
 
     const state = await DesktopApplicationTests.requestAsync(electron, event, "shell.notifications", {});
     const quiet = await DesktopApplicationTests.requestAsync(electron, event, "shell.setDoNotDisturb", { isOn: true });
     const noDevice = await DesktopApplicationTests.requestAsync(lost, event, "shell.notifications", {});
 
-    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
+    const sent = connection.calls.map((t, index) => `${t} ${JSON.stringify(connection.payloads[index])}`).slice(start).filter(t => t.startsWith("shell.notifications") || t.startsWith("shell.setDoNotDisturb"));
     Assert.areEqual(JSON.stringify([`shell.notifications {"device":"${FakeDeviceIdentity.ID}"}`]), JSON.stringify(sent));
     Assert.areEqual("{\"notifications\":[],\"isDoNotDisturb\":true,\"mutedModules\":[\"notes\"],\"sequence\":2}", JSON.stringify(state.payload));
     Assert.areEqual(FailureCode.Unauthorized, quiet.failure?.code);

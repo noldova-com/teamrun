@@ -221,6 +221,7 @@ export class Resources {
   public static readonly menuBarSetting: string = "menuBar";
   public static readonly doNotDisturbSetting: string = "doNotDisturb";
   public static readonly mutedModulesSetting: string = "mutedModules";
+  public static readonly trayIconSetting: string = "trayIcon";
   public static readonly keyBindingsSetting: string = "keyBindings";
   public static readonly recentCommandCountSetting: string = "recentCommandCount";
   public static readonly spellCheckSetting: string = "spellCheck";
@@ -234,10 +235,20 @@ export class Resources {
   public static readonly commandSearchGroup: string = "Command search";
   public static readonly spellingGroup: string = "Spelling";
   public static readonly notificationsGroup: string = "Notifications";
+  public static readonly backgroundGroup: string = "Background";
   public static readonly shortcutsGroup: string = "Keys";
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
   public static readonly themeTitle: string = "Theme";
+  public static formatTrayIconTitle(productName: string, platform: string): string {
+    const place = platform === Resources.windowsPlatform ? "the notification area" : platform === Resources.macPlatform ? "the menu bar" : "the tray";
+    return `Show ${productName} in ${place}`;
+  }
+
+  public static formatTrayIconDescription(productName: string): string {
+    return `An icon that shows when work is running or notifications are unread, with a menu to open ${productName}, turn on Do not disturb or quit.`;
+  }
+
   public static formatThemeDescription(productName: string): string {
     return `The colors and look of ${productName}.`;
   }
@@ -280,6 +291,7 @@ export class Resources {
   public static readonly doNotDisturbDescription: string = "Holds back notifications on this device; they still collect in the list.";
   public static readonly mutedModulesTitle: string = "Notifications from modules";
   public static readonly mutedModulesDescription: string = "A module turned off still adds its notifications to the list, without toasts or operating system notifications.";
+  public static readonly macPlatform: string = "darwin";
   public static readonly keyBindingsTitle: string = "Keyboard shortcuts";
   public static readonly keyBindingsDescription: string = "The keys you chose for commands, in place of their default keys, on every device.";
   public static readonly spellCheckTitle: string = "Check spelling";
