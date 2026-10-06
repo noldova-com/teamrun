@@ -202,10 +202,13 @@ export class Resources {
   public static readonly scriptRunner: string = "/usr/bin/osascript";
   public static readonly administratorScript: readonly string[] = [
     "-e", "on run argv",
-    "-e", "do shell script \"/bin/mkdir -p \" & quoted form of (item 2 of argv) & \" && /bin/ln -sfh \" & quoted form of (item 1 of argv) & \" \" & quoted form of (item 3 of argv) with prompt (item 4 of argv) with administrator privileges",
+    "-e", "set commandLink to quoted form of (item 3 of argv)",
+    "-e", "do shell script \"[ -e \" & commandLink & \" ] && [ ! -L \" & commandLink & \" ] && exit 3; /bin/mkdir -p \" & quoted form of (item 2 of argv) & \" && /bin/ln -sfh \" & quoted form of (item 1 of argv) & \" \" & commandLink with prompt (item 4 of argv) with administrator privileges",
     "-e", "end run"
   ];
   public static readonly userCancelledCode: string = "(-128)";
+  public static readonly occupiedExitCode: string = "(3)";
+  public static readonly missingErrorCode: string = "ENOENT";
   public static readonly errorCodeField: "code" = "code";
   public static readonly deniedErrorCodes: readonly string[] = ["EACCES", "EPERM"];
   public static get commandInstalled(): string {

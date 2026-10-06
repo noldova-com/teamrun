@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Stats } from "node:fs";
 import type { Writable } from "node:stream";
 
 import type {
@@ -1920,6 +1921,94 @@ export interface IParentPort {
 }
 
 /**
+ * The file operations {@link PathCommand} links the command with, as Node.js's `fs/promises` provides them.
+ */
+export interface IPathCommandFiles {
+  /**
+   * Reads a file's own status, without following a link.
+   *
+   * @param file The file to read.
+   * @returns Its status; rejects with an error whose `code` is `ENOENT` when nothing is there.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isLinkAsync(files: IPathCommandFiles, file: string): Promise<boolean> {
+   *   return (await files.lstat(file)).isSymbolicLink();
+   * }
+   * ```
+   */
+  lstat(file: string): Promise<Stats>;
+
+  /**
+   * Reads where a link points.
+   *
+   * @param link The link to read.
+   * @returns The path it points to.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function targetAsync(files: IPathCommandFiles): Promise<string> {
+   *   return files.readlink("/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  readlink(link: string): Promise<string>;
+
+  /**
+   * Removes a file or a link.
+   *
+   * @param file The file to remove.
+   * @returns A promise that settles once it is removed.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function unlinkAsync(files: IPathCommandFiles): Promise<void> {
+   *   return files.rm("/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  rm(file: string): Promise<void>;
+
+  /**
+   * Makes a folder and any folders above it that are missing.
+   *
+   * @param folder The folder to make.
+   * @param options Always recursive.
+   * @returns The first folder it made, or `undefined` when all were there.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function prepareAsync(files: IPathCommandFiles): Promise<void> {
+   *   await files.mkdir("/usr/local/bin", { recursive: true });
+   * }
+   * ```
+   */
+  mkdir(folder: string, options: { readonly recursive: true }): Promise<string | undefined>;
+
+  /**
+   * Makes a link.
+   *
+   * @param target The path the link points to.
+   * @param link The link to make.
+   * @returns A promise that settles once the link is made; rejects with an error whose `code` of `EACCES` or `EPERM`
+   * makes {@link PathCommand.installAsync} ask for an administrator.
+   * @example
+   * ```ts
+   * import type { IPathCommandFiles } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function linkAsync(files: IPathCommandFiles): Promise<void> {
+   *   return files.symlink("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun");
+   * }
+   * ```
+   */
+  symlink(target: string, link: string): Promise<void>;
+}
+
+/**
  * An Electron utility process, as the desktop uses one.
  */
 export interface IUtilityProcess {
@@ -3302,16 +3391,20 @@ export declare class PathCommand {
    *
    * @param target The command inside the app bundle.
    * @param link The link to make on the PATH.
+   * @param files The file operations it links with.
    * @param runProgramAsync Runs a program to its end, for the system's administrator prompt, and rejects with an error
    * whose message holds the program's standard error when it fails; `(-128)` in it means the person cancelled.
    * @example
    * ```ts
+   * import { lstat, mkdir, readlink, rm, symlink } from "node:fs/promises";
+   *
    * import { PathCommand } from "@noldova/teamrun-shell-desktop";
    *
-   * export const command: PathCommand = new PathCommand("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun", () => Promise.resolve());
+   * export const command: PathCommand = new PathCommand("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun",
+   *   { lstat, readlink, rm, mkdir, symlink }, () => Promise.resolve());
    * ```
    */
-  public constructor(target: string, link: string, runProgramAsync: (program: string, args: readonly string[]) => Promise<void>);
+  public constructor(target: string, link: string, files: IPathCommandFiles, runProgramAsync: (program: string, args: readonly string[]) => Promise<void>);
 
   /**
    * The link this service makes.
@@ -3328,8 +3421,8 @@ export declare class PathCommand {
   public get linkPath(): string;
 
   /**
-   * Creates the service for the bundle the desktop runs from: the command is `Contents/Resources/bin/teamrun` and the
-   * link `/usr/local/bin/teamrun`.
+   * Creates the service for the bundle the desktop runs from, with Node.js's file operations: the command is
+   * `Contents/Resources/bin/teamrun` and the link `/usr/local/bin/teamrun`.
    *
    * @param executablePath The program the desktop runs from, in `Contents/MacOS`.
    * @param runProgramAsync Runs a program to its end, for the system's administrator prompt, and rejects with an error
@@ -3346,7 +3439,8 @@ export declare class PathCommand {
 
   /**
    * Links the command on the PATH. A link to elsewhere is replaced; a file that is not a link is left alone. When the
-   * link's folder cannot be written, the system's administrator prompt makes the folder and the link.
+   * link's folder cannot be written or read, the system's administrator prompt makes the folder and the link, and
+   * leaves alone a file that is not a link, which it finds there with administrator rights.
    *
    * @returns A promise of what happened.
    * @throws PathCommandException, through the promise, when the link cannot be read or made, or the administrator
@@ -3362,25 +3456,6 @@ export declare class PathCommand {
    * ```
    */
   public installAsync(): Promise<PathCommandOutcome>;
-
-  /**
-   * Makes the link, making its folder when needed, after removing the link that is there when one is.
-   *
-   * @param isReplacing Whether a link to elsewhere is there to remove first.
-   * @returns A promise that settles once the link is made, or rejects with the file system's error, whose `code` of
-   * `EACCES` or `EPERM` makes {@link PathCommand.installAsync} ask for an administrator.
-   * @example
-   * ```ts
-   * import { PathCommand } from "@noldova/teamrun-shell-desktop";
-   *
-   * export class LockedPathCommand extends PathCommand {
-   *   protected override writeLinkAsync(): Promise<void> {
-   *     return Promise.reject(Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" }));
-   *   }
-   * }
-   * ```
-   */
-  protected writeLinkAsync(isReplacing: boolean): Promise<void>;
 }
 
 /**

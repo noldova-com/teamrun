@@ -8,13 +8,15 @@
 
 import { PathCommand, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
 
+import { PathCommandFilesFixture } from "./path-command-files.fixture.js";
+
 export class FakePathCommand extends PathCommand {
   public readonly executablePaths: string[] = [];
   public outcome: PathCommandOutcome = PathCommandOutcome.Missing;
   public failure: Error | null = null;
 
   public constructor() {
-    super("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun", () => Promise.resolve());
+    super("/Applications/TeamRun.app/Contents/Resources/bin/teamrun", "/usr/local/bin/teamrun", new PathCommandFilesFixture(), () => Promise.resolve());
   }
 
   public create(executablePath: string): PathCommand {

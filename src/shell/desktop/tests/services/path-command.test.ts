@@ -14,7 +14,7 @@ import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { PathCommand, PathCommandException, PathCommandOutcome } from "@noldova/teamrun-shell-desktop";
 
-import { RefusedPathCommand } from "../fixtures/refused-path-command.fixture.js";
+import { PathCommandFilesFixture } from "../fixtures/path-command-files.fixture.js";
 
 @TestClass
 export class PathCommandTests {
@@ -23,7 +23,7 @@ export class PathCommandTests {
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
       const link = path.join(folder, "usr", "local", "bin", "teamrun");
       const ran: (readonly string[])[] = [];
-      const command = new PathCommand(target, link, (program, args) => {
+      const command = new PathCommand(target, link, new PathCommandFilesFixture(), (program, args) => {
         ran.push([program, ...args]);
         return Promise.resolve();
       });
@@ -45,7 +45,10 @@ export class PathCommandTests {
       await symlink(path.join(folder, "old", "teamrun"), stale);
       await writeFile(file, "someone else's teamrun\n");
 
-      const outcomes = [await new PathCommand(target, stale, () => Promise.resolve()).installAsync(), await new PathCommand(target, file, () => Promise.resolve()).installAsync()];
+      const outcomes = [
+        await new PathCommand(target, stale, new PathCommandFilesFixture(), () => Promise.resolve()).installAsync(),
+        await new PathCommand(target, file, new PathCommandFilesFixture(), () => Promise.resolve()).installAsync()
+      ];
 
       Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.Occupied].join(), outcomes.join());
       Assert.areEqual(target, await readlink(stale));
@@ -57,7 +60,7 @@ export class PathCommandTests {
     return PathCommandTests.runInFolderAsync(async folder => {
       const link = path.join(folder, "teamrun");
 
-      const outcome = await new PathCommand(path.join(folder, "missing"), link, () => Promise.resolve()).installAsync();
+      const outcome = await new PathCommand(path.join(folder, "missing"), link, new PathCommandFilesFixture(), () => Promise.resolve()).installAsync();
 
       Assert.areEqual(PathCommandOutcome.Missing, outcome);
       Assert.isFalse(await PathCommandTests.existsAsync(link));
@@ -65,27 +68,48 @@ export class PathCommandTests {
   }
 
   @TestMethod
-  public asksForAnAdministratorWhenTheFolderCannotBeWrittenAndReportsACancelledPrompt(): Promise<void> {
+  public asksForAnAdministratorWhenTheFolderCannotBeWrittenAndReportsACancelledPromptAndAFileThatIsNotALink(): Promise<void> {
     return PathCommandTests.runInFolderAsync(async (folder, target) => {
       const link = path.join(folder, "bin", "teamrun");
       const ran: (readonly string[])[] = [];
       const answers = [
         ["EACCES", (): Promise<void> => Promise.resolve()],
-        ["EPERM", (): Promise<void> => Promise.reject(new Error("Command failed: /usr/bin/osascript\n0:200: execution error: User canceled. (-128)"))]
+        ["EPERM", (): Promise<void> => Promise.reject(new Error("Command failed: /usr/bin/osascript\n0:200: execution error: User canceled. (-128)"))],
+        ["EACCES", (): Promise<void> => Promise.reject(new Error("Command failed: /usr/bin/osascript\n0:300: execution error: The command exited with a non-zero status. (3)"))]
       ] as const;
 
       const outcomes = [];
-      for (const [code, answer] of answers)
-        outcomes.push(await new RefusedPathCommand(target, link, (program, args) => {
+      for (const [code, answer] of answers) {
+        const files = new PathCommandFilesFixture();
+        files.writingRefusal = code;
+        outcomes.push(await new PathCommand(target, link, files, (program, args) => {
           ran.push([program, ...args]);
           return answer();
-        }, code).installAsync());
+        }).installAsync());
+      }
 
-      Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.Cancelled].join(), outcomes.join());
+      Assert.areEqual([PathCommandOutcome.Installed, PathCommandOutcome.Cancelled, PathCommandOutcome.Occupied].join(), outcomes.join());
       Assert.areEqual("/usr/bin/osascript", ran[0]?.[0]);
       Assert.areEqual([target, path.join(folder, "bin"), link].join(), ran[0]?.slice(-4, -1).join());
       Assert.areEqual(`TeamRun wants to link ${link} to its teamrun command, so that terminals can run it.`, ran[0]?.at(-1));
       Assert.isTrue(ran[0]?.some(t => t.includes("with administrator privileges")) === true);
+      Assert.isTrue(ran[0]?.some(t => t.includes("[ -e \" & commandLink & \" ] && [ ! -L \" & commandLink & \" ] && exit 3;")) === true);
+    });
+  }
+
+  @TestMethod
+  public asksForAnAdministratorWhenTheLinkCannotBeReadAndFailsWithTheReasonForAnotherReadingError(): Promise<void> {
+    return PathCommandTests.runInFolderAsync(async (folder, target) => {
+      const link = path.join(folder, "bin", "teamrun");
+      const outcomes: string[] = [];
+
+      for (const code of ["EACCES", "EIO"]) {
+        const files = new PathCommandFilesFixture();
+        files.readingRefusal = code;
+        outcomes.push(await new PathCommand(target, link, files, () => Promise.resolve()).installAsync().then(t => t, (t: unknown) => String((t as PathCommandException).message)));
+      }
+
+      Assert.areEqual([PathCommandOutcome.Installed, `The teamrun command could not be linked at ${link}: Error: EIO: refused by the test`].join("|"), outcomes.join("|"));
     });
   }
 
@@ -95,33 +119,21 @@ export class PathCommandTests {
       const link = path.join(folder, "bin", "teamrun");
       const messages: string[] = [];
 
-      for (const command of [
-        new RefusedPathCommand(target, link, () => Promise.resolve(), "ENOTDIR"),
-        new RefusedPathCommand(target, link, () => Promise.reject(new Error("Command failed: /usr/bin/osascript\nThe administrator user name or password was incorrect.")), "EACCES")
-      ]) {
-        const error = await command.installAsync().then(() => null, (t: unknown) => t);
+      for (const [code, runProgramAsync] of [
+        ["ENOTDIR", (): Promise<void> => Promise.resolve()],
+        ["EACCES", (): Promise<void> => Promise.reject(new Error("Command failed: /usr/bin/osascript\nThe administrator user name or password was incorrect."))]
+      ] as const) {
+        const files = new PathCommandFilesFixture();
+        files.writingRefusal = code;
+        const error = await new PathCommand(target, link, files, runProgramAsync).installAsync().then(() => null, (t: unknown) => t);
         Assert.isTrue(error instanceof PathCommandException);
         messages.push(String((error as PathCommandException).message));
       }
 
       Assert.areEqual([
-        `The teamrun command could not be linked at ${link}: Error: ENOTDIR: the link could not be made`,
+        `The teamrun command could not be linked at ${link}: Error: ENOTDIR: refused by the test`,
         `The teamrun command could not be linked at ${link}: Error: Command failed: /usr/bin/osascript\nThe administrator user name or password was incorrect.`
       ].join("|"), messages.join("|"));
-    });
-  }
-
-  @TestMethod
-  public findsNoLinkWhereItsFolderCannotBeReadAndFailsWithTheReasonTheLinkCannotBeMade(): Promise<void> {
-    return PathCommandTests.runInFolderAsync(async (folder, target) => {
-      const file = path.join(folder, "file");
-      await writeFile(file, "not a folder\n");
-      const link = path.join(file, "bin", "teamrun");
-
-      const error = await new PathCommand(target, link, () => Promise.reject(new Error("No administrator is asked."))).installAsync().then(() => null, (t: unknown) => t);
-
-      Assert.isTrue(error instanceof PathCommandException);
-      Assert.isTrue(String((error as PathCommandException).message).startsWith(`The teamrun command could not be linked at ${link}: Error: `));
     });
   }
 
