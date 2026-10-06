@@ -268,12 +268,57 @@ jobs:
           echo "::warning title=The main window screenshot was not kept::The upload failed three times, so it is not attached. The tests are not affected."
 
       - name: Summarize the UI workflows
+        id: summary
         if: always() && steps.ui.outcome != 'skipped'
         env:
           UI_TARGET: ${{ matrix.target }}, ${{ matrix.shard }} of ${{ matrix.shards }}
+          UI_SHARD: ${{ matrix.shard }}/${{ matrix.shards }}
+          GREP: ${{ matrix.grep }}
           SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}
           SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}
         run: node scripts/ui-summary.ts
+
+      - name: Keep the UI workflow totals
+        id: totals
+        if: always() && steps.summary.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: totals-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          path: _build/totals/ui.json
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the UI workflow totals again
+        if: always() && steps.summary.outcome != 'skipped' && steps.totals.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the UI workflow totals again
+        id: totals-again
+        if: always() && steps.summary.outcome != 'skipped' && steps.totals.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: totals-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          path: _build/totals/ui.json
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Wait before keeping the UI workflow totals a last time
+        if: always() && steps.summary.outcome != 'skipped' && steps.totals-again.outcome == 'failure'
+        run: sleep 15
+
+      - name: Keep the UI workflow totals a last time
+        if: always() && steps.summary.outcome != 'skipped' && steps.totals-again.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: totals-ui-${{ matrix.runner }}-${{ matrix.architecture }}-${{ matrix.shard }}
+          path: _build/totals/ui.json
+          retention-days: 3
+          if-no-files-found: error
+          overwrite: true
 
       - name: Keep the flaky test record
         id: flaky

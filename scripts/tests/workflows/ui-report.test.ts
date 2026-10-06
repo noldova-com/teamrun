@@ -16,7 +16,7 @@ import UiReportException from "../../workflows/ui-report.exception.ts";
 
 class UiReportTests {
   private static readonly STATS: object = { duration: 12345.6 };
-  private static readonly TOTALS: RunnerTotals = new RunnerTotals("ui", "UI workflows", { discovered: 6, passed: 5, failed: 0, skipped: 1, unselected: 0, unreached: 0 }, [{ test: "e2e/a.spec.ts › waits", reason: "Later." }], ["e2e/a.spec.ts"], null, { duplicates: [], empty: [], missing: [] });
+  private static readonly TOTALS: RunnerTotals = new RunnerTotals("ui", "UI workflows", { discovered: 6, passed: 5, failed: 0, rerunPassed: 0, skipped: 1, unselected: 0, unreached: 0 }, [{ test: "e2e/a.spec.ts › waits", reason: "Later." }], ["e2e/a.spec.ts"], null, { duplicates: [], empty: [] }, { expected: ["e2e/a.spec.ts"], shard: null });
 
   public static register(): void {
     test("the report keeps the run's duration and platform log lines and names each failure with its first error line", () => {
@@ -78,8 +78,8 @@ class UiReportTests {
       assert.ok(report.formatSummary("Linux x64", UiReportTests.TOTALS, "https://example.com/a", true).endsWith("[Main window screenshot](https://example.com/a)\n"));
     });
 
-    test("the summary says beside the failed count how many tests passed only when run again", () => {
-      const totals = new RunnerTotals("ui", "UI workflows", { discovered: 2, passed: 1, failed: 1, skipped: 0, unselected: 0, unreached: 0 }, [], ["e2e/a.spec.ts"], null, { duplicates: [], empty: [], missing: [] });
+    test("the summary says beside the failed count how many tests the totals record as passing only when run again", () => {
+      const totals = new RunnerTotals("ui", "UI workflows", { discovered: 2, passed: 1, failed: 1, rerunPassed: 1, skipped: 0, unselected: 0, unreached: 0 }, [], ["e2e/a.spec.ts"], null, { duplicates: [], empty: [] }, { expected: ["e2e/a.spec.ts"], shard: "1/2" });
       const report = new UiReport(0, [], 0, [new FlakyTest("UI workflows", "src/shell/desktop/tests/e2e/a.spec.ts", "a.spec.ts › docks", "Error: first")]);
 
       assert.ok(report.formatSummary("Linux x64", totals, undefined, false).includes("| UI workflows | 2 | 2 | 1 | 1 (1 passed when run again; see the flaky record) | 0 | 0 | 0 | Not measured |\n"));

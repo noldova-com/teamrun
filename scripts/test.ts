@@ -130,11 +130,13 @@ export default class Test {
         failures++;
     }
 
-    const totals = await RunnerTotals.readAllAsync(this.root, Test.RUNNERS);
+    const rerunPassed = Test.countByRunner((await flaky?.readAsync() ?? []).slice(earlier));
+    const totals = (await RunnerTotals.readAllAsync(this.root, Test.RUNNERS)).map(t => t.withRerunPassed(rerunPassed.get(t.title) ?? 0));
     if (totals.length > 0) {
-      const rerunPassed = Test.countByRunner((await flaky?.readAsync() ?? []).slice(earlier));
-      this.output.write(`\nTest totals\n${totals.map(t => t.formatLine(rerunPassed.get(t.title) ?? 0)).join("")}`);
-      summary += `\n${RunnerTotals.formatTable(totals, rerunPassed)}`;
+      for (const runner of totals)
+        await runner.writeAsync(this.root);
+      this.output.write(`\nTest totals\n${totals.map(t => t.formatLine()).join("")}`);
+      summary += `\n${RunnerTotals.formatTable(totals)}`;
     }
     this.output.write(`\n${checks.length - failures} of ${checks.length} checks passed.\n`);
     await this.writeSummaryAsync(summary);

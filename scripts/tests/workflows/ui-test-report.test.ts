@@ -67,12 +67,13 @@ class UiTestReportTests {
       ]);
 
       const result = await new UiTestReport(root, "report.json").readAsync(report, list);
-      const totals = result.toTotals("ui", "UI workflows", null, result.files);
+      const totals = result.toTotals("ui", "UI workflows", null, result.files, null);
 
       assert.deepEqual([totals.discovered, totals.executed, totals.unselected, totals.files], [5, 2, 3, ["e2e/b.spec.ts"]]);
       assert.deepEqual(totals.duplicates, ["e2e/b.spec.ts › twice"]);
       assert.deepEqual(totals.empty, ["e2e/empty.spec.ts"]);
       assert.deepEqual(totals.missing, []);
+      assert.deepEqual(new UiTestReport(root, "report.json").listFiles(list), ["e2e/a.spec.ts", "e2e/b.spec.ts", "e2e/nested/c.spec.ts"]);
     });
 
     test("a report without the fields it reads is refused with its source", async t => {
