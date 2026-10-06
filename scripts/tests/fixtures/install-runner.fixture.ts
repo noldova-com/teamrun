@@ -27,6 +27,7 @@ export default class InstallRunnerFixture extends ProcessRunner {
   public pathEntries: number = 1;
   public uninstallLeaves: readonly string[] = [];
   public uninstallKeepsPath: boolean = false;
+  public uninstallerStays: boolean = false;
   public readonly calls: (readonly string[])[] = [];
   public readonly limits: number[] = [];
   public readonly installerEnvironments: (NodeJS.ProcessEnv | undefined)[] = [];
@@ -96,17 +97,23 @@ export default class InstallRunnerFixture extends ProcessRunner {
   private async installAsync(): Promise<void> {
     for (const file of ["Fixture Studio.exe", InstallRunnerFixture.UNINSTALLER, path.join("bin", "fixture-studio.cmd"), ...this.libraries])
       await InstallRunnerFixture.createAsync(path.join(this.installFolder, file));
-    const entries = (this.userPath ?? "").split(";").filter(t => t.length > 0 && t !== this.commandFolder);
-    this.userPath = [...entries, ...Array<string>(this.pathEntries).fill(this.commandFolder)].join(";");
+    const value = this.userPath ?? "";
+    const added = Array<string>(this.pathEntries).fill(this.commandFolder).join(";");
+    if (value.split(";").includes(this.commandFolder) || added.length === 0)
+      this.userPath = value;
+    else if (value.length === 0)
+      this.userPath = added;
+    else
+      this.userPath = value.endsWith(";") ? `${value}${added};` : `${value};${added}`;
   }
 
   private async uninstallAsync(): Promise<ProcessResult> {
     await rm(this.installFolder, { recursive: true, force: true });
     for (const file of this.uninstallLeaves)
       await InstallRunnerFixture.createAsync(path.join(this.installFolder, file));
-    await InstallRunnerFixture.createAsync(path.join(this.installFolder, InstallRunnerFixture.UNINSTALLER));
+    await InstallRunnerFixture.createAsync(path.join(this.installFolder, InstallRunnerFixture.UNINSTALLER, ...(this.uninstallerStays ? ["locked"] : [])));
     if (!this.uninstallKeepsPath) {
-      const rest = (this.userPath ?? "").split(";").filter(t => t !== this.commandFolder).join(";");
+      const rest = `;${this.userPath ?? ""};`.split(`;${this.commandFolder};`).join(";").slice(1, -1);
       this.userPath = rest.length > 0 ? rest : null;
     }
     return new ProcessResult(0, "", "");

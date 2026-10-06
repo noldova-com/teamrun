@@ -29,6 +29,8 @@ export default class PackageInstaller {
   private static readonly SILENT_INSTALL: readonly string[] = ["/S"];
   private static readonly UNINSTALLER_PREFIX: string = "Uninstall ";
   private static readonly IN_PLACE_OPTION: string = "_?=";
+  private static readonly REMOVE_RETRIES: number = 20;
+  private static readonly REMOVE_RETRY_DELAY: number = 500;
   private static readonly MODULE_PATH: string = "PSModulePath";
   private static readonly SYSTEM_ROOT: string = "SystemRoot";
   private static readonly WINDOWS_POWERSHELL_MODULES: readonly string[] = ["System32", "WindowsPowerShell", "v1.0", "Modules"];
@@ -73,7 +75,12 @@ export default class PackageInstaller {
     const uninstaller = path.join(installFolder, `${PackageInstaller.UNINSTALLER_PREFIX}${product.name}${PackageInstaller.WINDOWS_PROGRAM_EXTENSION}`);
     await this.runner.requireAsync(uninstaller, [...PackageInstaller.SILENT_INSTALL, `${PackageInstaller.IN_PLACE_OPTION}${installFolder}`], folder, PackageInstaller.LIMIT,
       this.createInstallerEnvironment());
-    await rm(uninstaller);
+    try {
+      await rm(uninstaller, { maxRetries: PackageInstaller.REMOVE_RETRIES, retryDelay: PackageInstaller.REMOVE_RETRY_DELAY });
+    }
+    catch (error) {
+      throw new PackagingException(`The uninstaller ${uninstaller} could not be removed after it ran: ${String(error)}`, { cause: error });
+    }
     const left = await readdir(installFolder, { recursive: true });
     if (left.length > 0)
       throw new PackagingException(`The uninstaller left ${left.sort().join(", ")} in ${installFolder}.`);

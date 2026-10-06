@@ -204,7 +204,7 @@ class PackageSmokeTests {
         const runner = new SmokeRunnerFixture(["none", "running", "none"]);
         const output = new TextOutputFixture();
         runner.localAppData = path.join(repository.directory, "local");
-        runner.userPath = "C:\\Tools";
+        runner.userPath = "C:\\Tools;";
         const temporaryFolder = new TemporaryFolderFixture(repository.directory);
 
         const exitCode = await PackageSmokeTests.runAsync(t, repository, "win32", runner, output, "x64", {}, temporaryFolder);
@@ -235,7 +235,7 @@ class PackageSmokeTests {
         assert.deepEqual(temporaryFolder.platforms, ["win32"]);
         assert.deepEqual(runner.starts, [[program, `--data-dir=${data}`]]);
         assert.deepEqual(runner.desktop.signals, []);
-        assert.equal(runner.userPath, "C:\\Tools");
+        assert.equal(runner.userPath, "C:\\Tools;");
         const lines = output.text.split("\n");
         assert.match(lines[0] ?? "", /^Installed in \d+\.\d s: /);
         assert.equal(lines[0]?.slice(lines[0].indexOf(": ") + 2), program);

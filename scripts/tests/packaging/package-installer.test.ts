@@ -124,16 +124,18 @@ class PackageInstallerTests {
       assert.equal(existsSync(installFolder), false);
     });
 
-    test("on Windows an uninstaller that fails or leaves files behind fails the uninstall, naming what it left", async t => {
+    test("on Windows an uninstaller that fails, leaves files behind or cannot be removed after it ran fails the uninstall, naming the reason", async t => {
       const repository = await PackageInstallerTests.createAsync(t);
       const failing = PackageInstallerTests.createRunner(t, ["Uninstall Fixture Studio.exe"]);
       const leaving = PackageInstallerTests.createRunner(t);
+      const staying = PackageInstallerTests.createRunner(t);
       const local = path.join(repository.directory, "local");
       const installFolder = path.join(local, "Programs", "fixture-studio");
       const environment = { LOCALAPPDATA: local, ...PackageInstallerTests.WINDOWS };
-      for (const runner of [failing, leaving])
+      for (const runner of [failing, leaving, staying])
         runner.localAppData = local;
       leaving.uninstallLeaves = ["resources/app.asar", "Fixture Studio.exe"];
+      staying.uninstallerStays = true;
 
       await PackageInstallerTests.installAsync(repository, failing, "win32", "x64", environment);
       await assert.rejects(PackageInstallerTests.uninstallAsync(repository, failing, environment),
@@ -141,6 +143,11 @@ class PackageInstallerTests {
       await PackageInstallerTests.installAsync(repository, leaving, "win32", "x64", environment);
       await assert.rejects(PackageInstallerTests.uninstallAsync(repository, leaving, environment),
         new PackagingException(`The uninstaller left ${["Fixture Studio.exe", "resources", path.join("resources", "app.asar")].join(", ")} in ${installFolder}.`));
+      await rm(installFolder, { recursive: true, force: true });
+      await PackageInstallerTests.installAsync(repository, staying, "win32", "x64", environment);
+      const uninstaller = path.join(installFolder, "Uninstall Fixture Studio.exe");
+      await assert.rejects(PackageInstallerTests.uninstallAsync(repository, staying, environment), (error: unknown) =>
+        error instanceof PackagingException && error.message.startsWith(`The uninstaller ${uninstaller} could not be removed after it ran: `) && error.cause instanceof Error);
     });
 
     test("on macOS the app is copied out of the disk image, which is then detached by force", async t => {

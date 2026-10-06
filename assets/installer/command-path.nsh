@@ -47,8 +47,9 @@
       ${If} ${Errors}
         StrCpy $R2 $R0 1 -1
         ${If} $R0 == ""
-        ${OrIf} $R2 == ";"
-          StrCpy $R0 "$R0${COMMAND_FOLDER}"
+          StrCpy $R0 "${COMMAND_FOLDER}"
+        ${ElseIf} $R2 == ";"
+          StrCpy $R0 "$R0${COMMAND_FOLDER};"
         ${Else}
           StrCpy $R0 "$R0;${COMMAND_FOLDER}"
         ${EndIf}

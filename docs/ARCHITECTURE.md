@@ -440,6 +440,7 @@ A release still contains the shell and every module in its list, and an update r
 - **Command on the PATH (Windows).** The install folder holds `bin\teamrun.cmd`, named after the slug.
   It runs the installed program in Node mode with the command line's entry, waits for it and returns its exit code, so `teamrun` works from cmd and PowerShell.
   The installer adds `bin` to the user's `Path` in `HKCU\Environment` when it is missing, and tells running programs that the environment changed.
+  A `Path` that ends in `;` keeps ending in one, so uninstalling gives back the exact value.
   An update finds the entry and leaves it.
   Uninstalling removes exactly that entry, and the value itself when nothing else is left.
   A `Path` that cannot be read, or is too long for the installer's strings, is left unchanged.
