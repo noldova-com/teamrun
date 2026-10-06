@@ -29,7 +29,7 @@ describe("GalleryComponent", () => {
     expect(GalleryFixture.frames(fixture).map(t => [t.dataset["theme"], t.dataset["mode"]])).toEqual([
       ["shell.default", "Light"], ["shell.default", "Dark"], ["fixture.contrast", "Light"], ["fixture.contrast", "Dark"]
     ]);
-    expect(GalleryFixture.frames(fixture).every(t => t.querySelector("tr-gallery-forms") !== null && t.querySelector("tr-gallery-navigation") !== null && t.querySelector("tr-gallery-overlays") !== null)).toBe(true);
+    expect(GalleryFixture.frames(fixture).every(t => t.querySelector("tr-gallery-forms") !== null && t.querySelector("tr-gallery-navigation") !== null && t.querySelector("tr-gallery-overlays") !== null && t.querySelector("tr-gallery-content") !== null)).toBe(true);
   });
 
   it("shows the default theme alone when it is given no others", async () => {

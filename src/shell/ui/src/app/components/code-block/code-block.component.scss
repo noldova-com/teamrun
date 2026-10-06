@@ -1,0 +1,77 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.tr-code-block {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  border: var(--tr-border-width) solid var(--tr-card-border);
+  border-radius: var(--tr-radius-medium);
+  background-color: var(--tr-code);
+  color: var(--tr-text);
+}
+
+.tr-code-block-header {
+  display: flex;
+  align-items: center;
+  gap: var(--tr-space-2);
+  box-sizing: border-box;
+  min-height: var(--tr-code-header-height);
+  padding-inline: var(--tr-space-3) calc(var(--tr-space-3) - (var(--tr-icon-button-target) - var(--tr-icon)) / 2);
+  border-bottom: var(--tr-border-width) solid var(--tr-card-border);
+  background-color: var(--tr-code-header);
+  color: var(--tr-text-muted);
+  font-size: var(--tr-text-label);
+  line-height: var(--tr-line-label);
+}
+
+.tr-code-block-actions {
+  display: flex;
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.tr-code-block-copied .tr-icon-button-glyph {
+  color: var(--tr-added);
+}
+
+.tr-code-block-body {
+  margin: 0;
+  overflow-x: auto;
+  container-type: scroll-state;
+  font-family: var(--tr-font-mono);
+  font-size: var(--tr-text-code);
+  line-height: var(--tr-line-code);
+  white-space: pre;
+}
+
+.tr-code-block-body > code {
+  display: block;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  padding: var(--tr-space-2) var(--tr-space-3);
+  font: inherit;
+}
+
+@container scroll-state(scrollable: inline) {
+  .tr-code-block-body > code {
+    padding-bottom: max(0px, var(--tr-space-2) - var(--tr-scrollbar-size));
+  }
+}
+
+.tr-code-block-wrapped .tr-code-block-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tr-code-block-wrapped .tr-code-block-body > code {
+  width: auto;
+}

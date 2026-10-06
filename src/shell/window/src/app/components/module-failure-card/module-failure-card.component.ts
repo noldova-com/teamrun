@@ -8,11 +8,14 @@
 
 import { ChangeDetectionStrategy, Component, type InputSignal, input } from "@angular/core";
 
+import { CardComponent } from "@noldova/teamrun-shell-ui";
+
 import type { ModuleFailure } from "../../models/module-failure";
 import { Resources } from "../../../resources";
 
 @Component({
   selector: "tr-module-failure-card",
+  imports: [CardComponent],
   templateUrl: "./module-failure-card.component.html",
   styleUrl: "./module-failure-card.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush

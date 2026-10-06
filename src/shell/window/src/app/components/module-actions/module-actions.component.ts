@@ -71,7 +71,7 @@ export class ModuleActionsComponent {
       Resources.formatBuildDetails(build.productVersion, build.fingerprint),
       Resources.formatModuleDetails(module.id, module.version, module.state, module.cause)
     ];
-    if (!await this.bridge.copyTextAsync(lines.join(Resources.detailsSeparator)))
+    if (!await this.bridge.writeTextAsync(lines.join(Resources.detailsSeparator)))
       return;
     this.clearCopiedTimer();
     this.isCopied.set(true);

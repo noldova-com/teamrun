@@ -447,4 +447,57 @@ test.describe("gallery", () => {
       await window.mouse.move(0, 0);
     }
   });
+
+  test("a code block's Word wrap is pressed by keyboard and wraps its lines, its long line never widens the Settings document, its text keeps equal space over and under it and its end padding when scrolled to the end, and Copy puts its code on the system clipboard, in light and in dark", async ({ desktop }) => {
+    const window = desktop.window;
+    const content = window.locator(".tr-settings-content");
+    await SettingsFixture.openGalleryAsync(window);
+
+    for (const mode of ["Light", "Dark"] as const) {
+      const block = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Code block\"] tr-gallery-cell[aria-label=\"Default\"] tr-code-block");
+      const body = block.locator(".tr-code-block-body");
+      const wrap = block.getByRole("button", { name: "Word wrap" });
+      const overflowAsync = (area: Locator): Promise<number> => area.evaluate(t => t.scrollWidth - t.clientWidth);
+      const edgesAsync = (): Promise<{ top: number; bottom: number; start: number; end: number }> => body.evaluate((t: HTMLElement) => {
+        const range = document.createRange();
+        range.selectNodeContents(t.querySelector("code") as Element);
+        const area = t.getBoundingClientRect();
+        const lines = [...range.getClientRects()];
+        const start = (lines[0] as DOMRect).left - area.left;
+        const scroll = t.scrollLeft;
+        t.scrollLeft = t.scrollWidth;
+        const end = area.right - Math.max(...[...range.getClientRects()].map(u => u.right));
+        t.scrollLeft = scroll;
+        return { top: Math.round((lines[0] as DOMRect).top - area.top), bottom: Math.round(area.bottom - (lines.at(-1) as DOMRect).bottom), start: Math.round(start), end: Math.round(end) };
+      });
+      await block.scrollIntoViewIfNeeded();
+
+      await expect(block.getByRole("toolbar", { name: "Code block actions" }).getByRole("button")).toHaveText(["wrap_text", "content_copy"]);
+      await expect(wrap).toHaveAttribute("aria-pressed", "false");
+      expect(await overflowAsync(body)).toBeGreaterThan(0);
+      expect(await overflowAsync(content)).toBeLessThanOrEqual(0);
+      const scrolling = await edgesAsync();
+      expect([scrolling.bottom, scrolling.end]).toEqual([scrolling.top, scrolling.start]);
+
+      await wrap.focus();
+      await window.keyboard.press("Enter");
+      await expect(wrap).toHaveAttribute("aria-pressed", "true");
+      expect(await overflowAsync(body)).toBeLessThanOrEqual(0);
+      await expect.poll(async () => {
+        const wrapped = await edgesAsync();
+        return [wrapped.top, wrapped.bottom];
+      }).toEqual([scrolling.top, scrolling.top]);
+      await desktop.checkpointAsync(`code-block-wrapped-${mode.toLowerCase()}`);
+      await window.keyboard.press("Space");
+      await expect(wrap).toHaveAttribute("aria-pressed", "false");
+      expect(await overflowAsync(body)).toBeGreaterThan(0);
+
+      await window.keyboard.press("ArrowRight");
+      await window.keyboard.press("Enter");
+      await expect(block.getByRole("button", { name: "Copied" })).toBeFocused();
+      expect(await desktop.application.evaluate(({ clipboard }) => clipboard.readText())).toBe(await block.locator("code").textContent());
+      await desktop.checkpointAsync(`code-block-copied-${mode.toLowerCase()}`);
+      await expect(block.getByRole("button", { name: "Copy", exact: true })).toBeVisible({ timeout: 5000 });
+    }
+  });
 });
