@@ -177,7 +177,8 @@ export class RuntimeLauncher {
 
   private async startAsync(): Promise<StartedRuntime> {
     const directory = this.settings.dataDirectory;
-    const startLogName = Resources.formatStartLogName(randomUUID());
+    const unique = randomUUID();
+    const startLogName = Resources.formatStartLogName(unique);
     const command = new ProcessLaunchCommand(this.settings.platform, this.settings.executablePath, [
       this.settings.entryPath,
       Resources.dataDirectoryArgument,
@@ -186,7 +187,7 @@ export class RuntimeLauncher {
       String(this.settings.idleGraceMilliseconds),
       Resources.startLogArgument,
       startLogName
-    ]);
+    ], this.settings.environment, path.join(directory.logsFolder, Resources.formatCopyRecordName(unique)));
     await mkdir(directory.logsFolder, { recursive: true });
     const startLog = path.join(directory.logsFolder, startLogName);
     const processId = await this.starter.startAsync(command.executable, command.arguments, this.settings.environment, startLog);

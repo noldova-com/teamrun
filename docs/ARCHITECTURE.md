@@ -318,6 +318,19 @@ A runtime part starts an external program only through its context's `startProce
 The runtime must not keep the files, sockets or pipes of the client that started it.
 
 - **Linux:** starting a detached runtime requires executable Bash at `/bin/bash` and a readable, searchable `/proc/self/fd` from a mounted `/proc`. The launcher checks these before spawning and reports a missing requirement immediately. In the child, before executing the runtime, Bash closes inherited descriptors above standard input, output and error, with its startup files and inherited shell options disabled.
+- **Linux AppImage:** an AppImage runs from a mount, or from an extraction, that ends when the process it started exits, so a runtime started from it would lose its files once its client quits.
+  When the launcher's program runs from an AppImage, the Bash step gives the runtime its own copy:
+  - It mounts the AppImage again with `--appimage-mount`, the way the client got its files.
+    When the client runs from an extraction (`APPIMAGE_EXTRACT_AND_RUN`, or no FUSE), or the mount fails, it extracts the AppImage into a `teamrun-runtime-` folder of its own in the operating system's temporary folder, never in the data directory.
+  - It starts the runtime there as its child, running the program directly, since the AppImage's launcher would put `--no-sandbox` before Node's arguments.
+  - Once the runtime exits, it ends the mount or removes the extraction.
+  - When neither a mount nor an extraction works, the start fails with the reason in the start log.
+  - The Bash step writes each mount's process and each extraction's folder to its copy record, `logs/copy-<UUID>.log` beside the start log, and removes the record once the copy ends.
+    The launcher removes its start log once it connects, so the start log cannot keep them.
+    A runtime that owns the data directory ends any mount an earlier Bash step left running when that Bash no longer runs, and removes any extraction it left.
+    It matches a mount by process id, command line and the AppImage's path, never by name alone.
+    It does this once its log is open, and writes each record it cannot settle there with the reason, leaving the record; the runtime still starts.
+  - A runtime started this way names the AppImage file, not its copy, as the program it runs from.
 - **Windows:** Electron's main process keeps its standard handles inheritable, and Node.js starts every child with handle inheritance on. The desktop therefore starts the runtime through a short-lived Electron utility process, which Chromium starts with only the handles it lists; the utility process starts the runtime, answers with its process id, and ends only once the desktop acknowledges the answer, so its exit never arrives before the answer.
 - **macOS, and the CLI on Windows:** the host's direct process launch.
 
@@ -490,7 +503,9 @@ Before replacing application files, coordinate every runtime and desktop using t
 3. Stop the processes modules own, flush and close databases, and verify process exit.
 4. Create verified recovery backups.
 
-Failure before installer handoff resumes surviving clients safely; uncertainty must not be treated as successful shutdown. After an AppImage update, the new version starts only once the old process has exited, from outside the old AppImage and without its open descriptors; a process holding the old version's files keeps the replaced AppImage mounted.
+Failure before installer handoff resumes surviving clients safely; uncertainty must not be treated as successful shutdown.
+A runtime of the old version keeps working from its own copy of the replaced AppImage until the new version takes it over, and its copy ends with it ([Launching the runtime](#launching-the-runtime)).
+After an AppImage update, the new version starts only once the old process has exited, from outside the old AppImage and without its open descriptors; a process holding the old version's files keeps the replaced AppImage mounted.
 
 ### Installation scope
 
