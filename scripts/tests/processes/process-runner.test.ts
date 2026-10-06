@@ -14,6 +14,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import ProcessRunner from "../../processes/process-runner.ts";
+import ProcessTimeoutException from "../../processes/process-timeout.exception.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
@@ -48,7 +49,7 @@ class ProcessRunnerTests {
 
       await assert.rejects(
         new ProcessRunner().captureAsync(process.execPath, ["-e", "setTimeout(() => {}, 20000)"], tmpdir(), 300),
-        new ProcessException(`"${process.execPath}" did not finish within 300 ms.`));
+        new ProcessTimeoutException(`"${process.execPath}" did not finish within 300 ms.`));
       assert.ok(Date.now() - started < 5_000);
     });
 

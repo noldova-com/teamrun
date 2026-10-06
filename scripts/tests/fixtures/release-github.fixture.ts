@@ -11,10 +11,11 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import ProcessResult from "../../processes/process-result.ts";
+import ProcessTimeoutException from "../../processes/process-timeout.exception.ts";
 import ProcessException from "../../processes/process.exception.ts";
 import GitHubApiFixture from "./github-api.fixture.ts";
 
-type Upload = "uploads" | "fails" | "fails without a status" | "is refused" | "leaves an incomplete file" | "changes the file" | "times out";
+type Upload = "uploads" | "fails" | "fails without a status" | "is refused" | "leaves an incomplete file" | "changes the file" | "times out" | "does not start";
 
 class AssetRecord {
   public readonly id: number;
@@ -57,6 +58,8 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
   private static readonly RELEASE: RegExp = /^\/releases\/(\d+)$/u;
   private static readonly TAG: RegExp = /^\/git\/ref\/tags\/(.+)$/u;
   private static readonly ASSET_PREFIX: string = "/releases/assets/";
+  private static readonly REFERENCES: string = "/git/refs";
+  private static readonly TAG_PREFIX: string = "refs/tags/";
 
   private readonly uploads: Map<string, Upload[]> = new Map<string, Upload[]>();
   private nextId: number = 1;
@@ -65,7 +68,10 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
   public readonly tags: Map<string, string> = new Map<string, string>();
   public tagType: string = "commit";
   public isPublishingIgnored: boolean = false;
-  public isTagCreated: boolean = true;
+  public isTagDeletedOnPublish: boolean = false;
+  public assetOnPublish: string | null = null;
+  public tagOnCreate: string | null = null;
+  public referenceFailure: string | null = null;
   public isTagReadFailing: boolean = false;
   public tagOnUpload: string | null = null;
 
@@ -110,7 +116,9 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
       case "is refused":
         return new ProcessResult(1, "", "HTTP 422: Validation Failed (https://uploads.github.com/)");
       case "times out":
-        throw new ProcessException("\"gh\" did not finish within 900000 ms.");
+        throw new ProcessTimeoutException("\"gh\" did not finish within 900000 ms.");
+      case "does not start":
+        throw new ProcessException("\"gh\" could not start.");
       case "leaves an incomplete file":
         release.assets.push(new AssetRecord(this.nextId++, name, 0, "starter", null));
         return new ProcessResult(1, "", ReleaseGitHubFixture.BAD_GATEWAY);
@@ -128,6 +136,8 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
       return ReleaseGitHubFixture.answer([this.releases]);
     if (method === "POST" && resource === "/releases")
       return ReleaseGitHubFixture.answer(this.addRelease(String(fields.get("tag_name")), String(fields.get("target_commitish")), fields.get("draft") === "true"));
+    if (method === "POST" && resource === ReleaseGitHubFixture.REFERENCES)
+      return this.createReference(String(fields.get("ref")).slice(ReleaseGitHubFixture.TAG_PREFIX.length), String(fields.get("sha")));
     if (method === "GET" && release !== undefined)
       return ReleaseGitHubFixture.answer(release);
     if (method === "PATCH" && release !== undefined)
@@ -149,12 +159,27 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
     return new ProcessResult(0, JSON.stringify(value), "");
   }
 
+  private createReference(tag: string, commit: string): ProcessResult {
+    if (this.referenceFailure !== null)
+      return new ProcessResult(1, "", this.referenceFailure);
+    if (this.tagOnCreate !== null)
+      this.tags.set(tag, this.tagOnCreate);
+    if (this.tags.has(tag))
+      return new ProcessResult(1, "", "gh: Reference already exists (HTTP 422)");
+    this.tags.set(tag, commit);
+    return ReleaseGitHubFixture.answer({ ref: `${ReleaseGitHubFixture.TAG_PREFIX}${tag}`, object: { sha: commit, type: "commit" } });
+  }
+
   private publish(release: ReleaseRecord): ReleaseRecord {
-    if (!this.isPublishingIgnored) {
-      release.isDraft = false;
-      if (this.isTagCreated)
-        this.tags.set(release.tag, release.target);
-    }
+    if (this.isPublishingIgnored)
+      return release;
+    release.isDraft = false;
+    if (!this.tags.has(release.tag))
+      this.tags.set(release.tag, release.target);
+    if (this.isTagDeletedOnPublish)
+      this.tags.delete(release.tag);
+    if (this.assetOnPublish !== null)
+      release.assets.push(new AssetRecord(this.nextId++, this.assetOnPublish, 1, "uploaded", "sha256:00"));
     return release;
   }
 }

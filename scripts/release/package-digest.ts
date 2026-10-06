@@ -24,6 +24,10 @@ export default class PackageDigest {
     this.size = size;
   }
 
+  public static of(bytes: Buffer): PackageDigest {
+    return new PackageDigest(createHash(PackageDigest.SHA256).update(bytes).digest("hex"), createHash(PackageDigest.SHA512).update(bytes).digest("base64"), bytes.length);
+  }
+
   public static async readAsync(file: string): Promise<PackageDigest> {
     const sha256 = createHash(PackageDigest.SHA256);
     const sha512 = createHash(PackageDigest.SHA512);

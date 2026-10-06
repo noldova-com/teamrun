@@ -11,7 +11,7 @@ import type { Writable } from "node:stream";
 import timers from "node:timers/promises";
 
 import type GitHubApi from "../repository/github-api.ts";
-import ProcessException from "../processes/process.exception.ts";
+import ProcessTimeoutException from "../processes/process-timeout.exception.ts";
 import GitHubException from "../repository/github.exception.ts";
 import GitHubJson from "../repository/github-json.ts";
 import GitHubRelease from "./github-release.ts";
@@ -27,8 +27,10 @@ export default class ReleasePublisher {
   private static readonly DIGEST_PREFIX: string = "sha256:";
   private static readonly RETRIED_STATUSES: readonly number[] = [408, 429];
   private static readonly SERVER_ERROR: number = 500;
+  private static readonly EXISTING_REFERENCE: number = 422;
   private static readonly COMMIT_TYPE: string = "commit";
   private static readonly LATEST: string = "true";
+  private static readonly TAG_PREFIX: string = "refs/tags/";
 
   private readonly api: GitHubApi;
   private readonly output: Writable;
@@ -38,8 +40,8 @@ export default class ReleasePublisher {
     this.output = output;
   }
 
-  private static isTransient(error: unknown): error is GitHubException | ProcessException {
-    return error instanceof ProcessException || (error instanceof GitHubException
+  private static isTransient(error: unknown): error is GitHubException | ProcessTimeoutException {
+    return error instanceof ProcessTimeoutException || (error instanceof GitHubException
       && (error.status === null || error.status >= ReleasePublisher.SERVER_ERROR || ReleasePublisher.RETRIED_STATUSES.includes(error.status)));
   }
 
@@ -83,13 +85,12 @@ export default class ReleasePublisher {
     for (const [name, digest] of digests)
       await this.uploadAsync(draft, name, path.join(folder, name), digest);
     ReleasePublisher.requireComplete(await this.readAsync(draft.id), digests);
-    const commit = await this.readTagAsync(version.tag);
-    if (commit !== null && commit !== revision)
-      throw new ReleaseException(`The tag ${version.tag} appeared on ${commit}, not on ${revision}, so the draft stays unpublished.`);
+    await this.createTagAsync(version.tag, revision);
     const published = GitHubRelease.read(await this.api.sendAsync("PATCH", `/releases/${draft.id}`, [["make_latest", ReleasePublisher.LATEST]], [["draft", false]]),
       "the published release");
     if (published.isDraft)
       throw new ReleaseException(`GitHub kept ${version.tag} as a draft when it was published.`);
+    ReleasePublisher.requireComplete(published, digests);
     await this.requireTagAsync(version.tag, revision);
     this.output.write(`Published ${version.tag} from ${revision} with ${digests.size} files.\n`);
   }
@@ -136,6 +137,21 @@ export default class ReleasePublisher {
 
   private async readAsync(id: number): Promise<GitHubRelease> {
     return GitHubRelease.read(await this.api.readAsync(`/releases/${id}`), `release ${id}`);
+  }
+
+  private async createTagAsync(tag: string, revision: string): Promise<void> {
+    try {
+      await this.api.createAsync("/git/refs", [["ref", `${ReleasePublisher.TAG_PREFIX}${tag}`], ["sha", revision]]);
+    }
+    catch (error) {
+      if (!(error instanceof GitHubException && error.status === ReleasePublisher.EXISTING_REFERENCE))
+        throw error;
+      const commit = await this.readTagAsync(tag);
+      if (commit === null)
+        throw error;
+      if (commit !== revision)
+        throw new ReleaseException(`The tag ${tag} appeared on ${commit}, not on ${revision}, so the draft stays unpublished.`);
+    }
   }
 
   private async requireTagAsync(tag: string, revision: string): Promise<void> {

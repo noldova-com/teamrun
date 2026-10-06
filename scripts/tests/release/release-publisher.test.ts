@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test, type TestContext } from "node:test";
 
+import ProcessException from "../../processes/process.exception.ts";
 import PackageDigest from "../../release/package-digest.ts";
 import ReleaseException from "../../release/release.exception.ts";
 import type ReleaseFile from "../../release/release-file.ts";
@@ -41,8 +42,9 @@ class ReleasePublisherTests {
       const [published] = github.releases;
       assert.deepEqual([github.releases.length, published?.isDraft, published?.target, published?.assets.map(t => t.name)], [1, false, ReleasePublisherTests.REVISION, release.names]);
       assert.equal(github.tags.get("v0.0.2"), ReleasePublisherTests.REVISION);
-      assert.deepEqual(github.writes, ["POST /releases", ...release.names.map(t => `UPLOAD ${t}`), "PATCH /releases/1"]);
-      assert.deepEqual(github.fields, ["tag_name=v0.0.2", `target_commitish=${ReleasePublisherTests.REVISION}`, "name=0.0.2", "body=Notes.", "draft=true", "make_latest=true", "draft=false"]);
+      assert.deepEqual(github.writes, ["POST /releases", ...release.names.map(t => `UPLOAD ${t}`), "POST /git/refs", "PATCH /releases/1"]);
+      assert.deepEqual(github.fields, ["tag_name=v0.0.2", `target_commitish=${ReleasePublisherTests.REVISION}`, "name=0.0.2", "body=Notes.", "draft=true",
+        "ref=refs/tags/v0.0.2", `sha=${ReleasePublisherTests.REVISION}`, "make_latest=true", "draft=false"]);
       assert.equal(output.text, `Creating the draft release v0.0.2 for ${ReleasePublisherTests.REVISION}.\nPublished v0.0.2 from ${ReleasePublisherTests.REVISION} with 22 files.\n`);
     });
 
@@ -148,6 +150,18 @@ class ReleasePublisherTests {
       assert.equal(exhausted.releases[0]?.isDraft, true);
     });
 
+    test("an upload whose gh does not start is not retried", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
+      const release = await ReleasePublisherTests.createAsync(t);
+      const github = new ReleaseGitHubFixture();
+      const [first] = release.names;
+      github.upload(String(first), ["does not start"]);
+
+      await assert.rejects(ReleasePublisherTests.publishAsync(t, github, release, new TextOutputFixture()), new ProcessException("\"gh\" could not start."));
+
+      assert.deepEqual(github.writes, ["POST /releases", `UPLOAD ${String(first)}`]);
+      assert.equal(github.releases[0]?.isDraft, true);
+    });
+
     test("an upload that is refused or changes the file stops publication and leaves the release a draft", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
       const release = await ReleasePublisherTests.createAsync(t);
       const refusing = new ReleaseGitHubFixture();
@@ -190,37 +204,67 @@ class ReleasePublisherTests {
       assert.deepEqual([differing, undigested, other, twice].map(t => t.writes), [[], [], [], []]);
     });
 
-    test("a tag on another commit, found before the draft or just before publishing, stops publication and leaves the draft unpublished", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
+    test("a tag on another commit, found before the draft, during the uploads or when the tag is created, stops publication and leaves the draft unpublished", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
       const release = await ReleasePublisherTests.createAsync(t);
       const tagged = new ReleaseGitHubFixture();
       const continued = new ReleaseGitHubFixture();
       const racing = new ReleaseGitHubFixture();
+      const created = new ReleaseGitHubFixture();
       tagged.tags.set("v0.0.2", ReleasePublisherTests.OTHER_REVISION);
       continued.addRelease("v0.0.2", ReleasePublisherTests.REVISION, true);
       continued.tags.set("v0.0.2", ReleasePublisherTests.OTHER_REVISION);
       racing.tagOnUpload = ReleasePublisherTests.OTHER_REVISION;
+      created.tagOnCreate = ReleasePublisherTests.OTHER_REVISION;
       const reason = `The tag v0.0.2 appeared on ${ReleasePublisherTests.OTHER_REVISION}, not on ${ReleasePublisherTests.REVISION}, so the draft stays unpublished.`;
 
       await assert.rejects(ReleasePublisherTests.publishAsync(t, tagged, release, new TextOutputFixture()),
         new ReleaseException(`The tag v0.0.2 already exists, on ${ReleasePublisherTests.OTHER_REVISION}, without a release; a published tag is never moved.`));
-      await assert.rejects(ReleasePublisherTests.publishAsync(t, continued, release, new TextOutputFixture()), new ReleaseException(reason));
-      await assert.rejects(ReleasePublisherTests.publishAsync(t, racing, release, new TextOutputFixture()), new ReleaseException(reason));
+      for (const github of [continued, racing, created])
+        await assert.rejects(ReleasePublisherTests.publishAsync(t, github, release, new TextOutputFixture()), new ReleaseException(reason));
 
       assert.deepEqual(tagged.writes, []);
-      assert.deepEqual([continued, racing].map(t => [t.writes.some(u => u.startsWith("PATCH ")), t.releases.map(u => u.isDraft)]), [[false, [true]], [false, [true]]]);
+      assert.deepEqual([continued, racing, created].map(t => [t.writes.some(u => u.startsWith("PATCH ")), t.releases.map(u => u.isDraft), t.tags.get("v0.0.2")]),
+        [continued, racing, created].map(() => [false, [true], ReleasePublisherTests.OTHER_REVISION]));
     });
 
-    test("an annotated tag, a tag that cannot be read, a release GitHub keeps as a draft or a tag GitHub does not create stops publication", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
+    test("a continued draft whose tag is already on the revision is published with that tag unchanged", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
+      const release = await ReleasePublisherTests.createAsync(t);
+      const github = new ReleaseGitHubFixture();
+      github.addRelease("v0.0.2", ReleasePublisherTests.REVISION, true);
+      github.tags.set("v0.0.2", ReleasePublisherTests.REVISION);
+
+      await ReleasePublisherTests.publishAsync(t, github, release, new TextOutputFixture());
+
+      assert.deepEqual(github.writes.filter(t => !t.startsWith("UPLOAD ")), ["POST /git/refs", "PATCH /releases/1"]);
+      assert.deepEqual([github.releases[0]?.isDraft, github.tags.get("v0.0.2")], [false, ReleasePublisherTests.REVISION]);
+    });
+
+    test("a tag that cannot be created for another reason stops publication with GitHub's answer", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
+      const release = await ReleasePublisherTests.createAsync(t);
+      const invalid = new ReleaseGitHubFixture();
+      const failing = new ReleaseGitHubFixture();
+      invalid.referenceFailure = "gh: Validation Failed (HTTP 422)";
+      failing.referenceFailure = "gh: Server Error (HTTP 500)";
+
+      await assert.rejects(ReleasePublisherTests.publishAsync(t, invalid, release, new TextOutputFixture()), (error: unknown) => error instanceof GitHubException && error.status === 422);
+      await assert.rejects(ReleasePublisherTests.publishAsync(t, failing, release, new TextOutputFixture()), (error: unknown) => error instanceof GitHubException && error.status === 500);
+
+      assert.deepEqual([invalid, failing].map(t => [t.writes.some(u => u.startsWith("PATCH ")), t.releases.map(u => u.isDraft), t.tags.has("v0.0.2")]), [[false, [true], false], [false, [true], false]]);
+    });
+
+    test("an annotated tag, a tag that cannot be read, a release GitHub keeps as a draft, a tag removed or a file added while publishing stops publication", { timeout: ReleasePublisherTests.TIMEOUT }, async t => {
       const release = await ReleasePublisherTests.createAsync(t);
       const annotated = new ReleaseGitHubFixture();
       const unreadable = new ReleaseGitHubFixture();
       const kept = new ReleaseGitHubFixture();
       const untagged = new ReleaseGitHubFixture();
+      const added = new ReleaseGitHubFixture();
       annotated.tags.set("v0.0.2", ReleasePublisherTests.REVISION);
       annotated.tagType = "tag";
       unreadable.isTagReadFailing = true;
       kept.isPublishingIgnored = true;
-      untagged.isTagCreated = false;
+      untagged.isTagDeletedOnPublish = true;
+      added.assetOnPublish = "notes.txt";
 
       await assert.rejects(ReleasePublisherTests.publishAsync(t, annotated, release, new TextOutputFixture()),
         new ReleaseException("The tag v0.0.2 is annotated; a release's tag points straight at its commit."));
@@ -228,6 +272,8 @@ class ReleasePublisherTests {
       await assert.rejects(ReleasePublisherTests.publishAsync(t, kept, release, new TextOutputFixture()), new ReleaseException("GitHub kept v0.0.2 as a draft when it was published."));
       await assert.rejects(ReleasePublisherTests.publishAsync(t, untagged, release, new TextOutputFixture()),
         new ReleaseException(`The tag v0.0.2 points at nothing, not at ${ReleasePublisherTests.REVISION}.`));
+      await assert.rejects(ReleasePublisherTests.publishAsync(t, added, release, new TextOutputFixture()),
+        new ReleaseException("v0.0.2 on GitHub differs from the built files. Missing: none. Not part of the release: notes.txt."));
       assert.deepEqual([annotated, unreadable].map(t => t.writes), [[], []]);
     });
   }

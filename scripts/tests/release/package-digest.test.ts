@@ -27,6 +27,17 @@ class PackageDigestTests {
       assert.deepEqual([digest.sha256, digest.sha512, digest.size],
         [createHash("sha256").update(content).digest("hex"), createHash("sha512").update(content).digest("base64"), Buffer.byteLength(content)]);
     });
+
+    test("bytes already read give the same digest as reading their file", async t => {
+      const repository = await RepositoryFixture.createAsync();
+      t.after(() => repository.disposeAsync());
+      const content = "checksum  TeamRun-linux-x64.AppImage\n";
+      await repository.writeAsync({ "TeamRun-linux-x64.AppImage.sha256": content });
+
+      const read = await PackageDigest.readAsync(path.join(repository.directory, "TeamRun-linux-x64.AppImage.sha256"));
+
+      assert.deepEqual(PackageDigest.of(Buffer.from(content)), read);
+    });
   }
 }
 
