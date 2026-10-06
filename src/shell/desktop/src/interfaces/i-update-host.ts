@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { UpdateBarrier } from "@noldova/teamrun-shell-runtime";
+import type { UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 export interface IUpdateHost {
   readonly processId: number;
@@ -14,5 +14,6 @@ export interface IUpdateHost {
   readBarrierAsync(): Promise<UpdateBarrier | null>;
   hasUpdateEndedAsync(): Promise<boolean>;
   saveAsync(): Promise<readonly string[]>;
+  passBarrierAsync(status: UpdateBarrierStatus): Promise<boolean>;
   quit(): void;
 }

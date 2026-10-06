@@ -13,7 +13,7 @@ export class FakeQuitPrompt implements IQuitPrompt {
   public canShow: boolean = true;
 
   public show(question: QuitQuestion | null): boolean {
-    this.shown.push(question === null ? "none" : `${question.descriptions.join("+")}${question.isWaiting ? " waiting" : ""}`);
+    this.shown.push(question === null ? "none" : `${question.descriptions.join("+")}${question.isWaiting ? " waiting" : ""}${question.isUpdate ? " update" : ""}`);
     return this.canShow;
   }
 }

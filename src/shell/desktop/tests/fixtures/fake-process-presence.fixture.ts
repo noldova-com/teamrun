@@ -15,8 +15,15 @@ export class FakeProcessPresence implements Pick<ProcessPresence, "stampAsync" |
   public isStamping: boolean = true;
   public failure: unknown = null;
   public onCheck?: (process: UpdateProcess) => void;
+  public onStamp?: (processes: readonly (readonly [number, string])[]) => void;
 
   public stampAsync(processes: readonly (readonly [number, string])[]): Promise<readonly UpdateProcess[]> {
+    try {
+      this.onStamp?.(processes);
+    }
+    catch (error) {
+      return Promise.reject(error as Error);
+    }
     return Promise.resolve(this.isStamping ? processes.map(([processId, role]) => new UpdateProcess(processId, 1500, 1501, role)) : []);
   }
 

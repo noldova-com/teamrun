@@ -27,4 +27,9 @@ export class FakeSession extends FakePermissionHost implements ISpellCheckHost {
   public setSpellCheckerDictionaryDownloadURL(url: string): void {
     this.spellCalls.push(`url ${url}`);
   }
+
+  public addWordToSpellCheckerDictionary(word: string): boolean {
+    this.spellCalls.push(`add ${word}`);
+    return true;
+  }
 }
