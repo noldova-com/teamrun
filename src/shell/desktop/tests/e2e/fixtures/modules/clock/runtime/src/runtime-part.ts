@@ -11,7 +11,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 
 import { NotificationPost, NotificationSeverity, QualifiedName } from "@noldova/teamrun-shell-protocol";
-import { type IRuntimePart, type IRuntimePartContext, Migration, ProcessRequest, RuntimeCommand, type WorkItem } from "@noldova/teamrun-shell-runtime";
+import { type IRuntimePart, type IRuntimePartContext, Migration, type OwnedProcess, ProcessRequest, RuntimeCommand, type WorkItem } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "./resources.js";
 
@@ -19,6 +19,7 @@ export class RuntimePart implements IRuntimePart {
   public readonly migrations: readonly Migration[] = [new Migration(Resources.readingsMigration, [Resources.createReadingsStatement])];
   private ticks: number = 0;
   private readonly work: WorkItem[] = [];
+  private readonly programs: OwnedProcess[] = [];
 
   public async activateAsync(context: IRuntimePartContext): Promise<void> {
     if (existsSync(path.join(context.moduleFolder, Resources.failureMarker)))
@@ -69,9 +70,17 @@ export class RuntimePart implements IRuntimePart {
       handleAsync: async () => {
         const owned = await context.startProcessAsync(new ProcessRequest(
           process.execPath, [Resources.evaluateArgument, Resources.programScript], await context.getWorkFolderAsync(), { [Resources.nodeVariable]: "1" }, []));
+        this.programs.push(owned);
         for await (const line of createInterface({ input: owned.output }))
           return { processId: owned.processId, childProcessId: Number(line) };
         throw new Error(Resources.programEndedMessage);
+      }
+    }));
+    context.registerCommand(new RuntimeCommand(Resources.stopProgramCommand, Resources.stopProgramTitle, null, null, {
+      handleAsync: async () => {
+        const programs = this.programs.splice(0);
+        await Promise.all(programs.map(t => t.stopAsync()));
+        return { stopped: programs.length };
       }
     }));
     context.registerCommand(new RuntimeCommand(Resources.finishWorkCommand, Resources.finishWorkTitle, null, null, {

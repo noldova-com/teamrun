@@ -37,6 +37,8 @@ export class Resources {
   public static readonly workBegan: string = "The clock began counting.";
   public static readonly startProgramCommand: string = "clock.startProgram";
   public static readonly startProgramTitle: string = "Start a program";
+  public static readonly stopProgramCommand: string = "clock.stopProgram";
+  public static readonly stopProgramTitle: string = "Stop the programs";
   public static readonly nodeVariable: string = "ELECTRON_RUN_AS_NODE";
   public static readonly evaluateArgument: string = "-e";
   public static readonly programScript: string = [
