@@ -16,6 +16,7 @@ import type { PanelEdge } from "../../enums/panel-edge";
 import type { SplitAxis } from "../../enums/split-axis";
 import type { Bounds } from "./bounds";
 import { GroupFrame } from "./group-frame";
+import type { LayoutMetrics } from "./layout-metrics";
 import { LayoutNode } from "./layout.node";
 import { SplitNode } from "./split.node";
 import type { Tab } from "./tab";
@@ -113,8 +114,8 @@ export class TabGroup extends LayoutNode {
     return this.has(tab) && !tab.equals(this.active) ? this.copy(this.tabs, tab, this.preview) : this;
   }
 
-  public override minimumLength(axis: SplitAxis): number {
-    return Resources.groupMinimumLengths[axis];
+  public override minimumLength(axis: SplitAxis, metrics: LayoutMetrics): number {
+    return metrics.groupMinimums[axis];
   }
 
   public override withGroup(group: TabGroup): LayoutNode {

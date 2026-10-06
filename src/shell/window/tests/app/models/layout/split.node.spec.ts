@@ -20,6 +20,7 @@ import { TabGroup } from "../../../../src/app/models/layout/tab-group";
 import { ViewRegistry } from "../../../../src/app/models/layout/view-registry";
 import { ViewType } from "../../../../src/app/models/layout/view-type";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 describe("SplitNode", () => {
   const { createSplit, weightsOf } = LayoutFixture;
@@ -32,7 +33,7 @@ describe("SplitNode", () => {
   const arrange = (split: SplitNode, bounds: Bounds): { frames: GroupFrame[]; handles: SplitHandle[] } => {
     const frames: GroupFrame[] = [];
     const handles: SplitHandle[] = [];
-    split.arrange(bounds, DockSide.Left, frames, handles);
+    split.arrange(bounds, DockSide.Left, frames, handles, LayoutMetricsFixture.standard);
     return { frames, handles };
   };
 
@@ -74,8 +75,8 @@ describe("SplitNode", () => {
   });
 
   it("adds minimums and gaps along its axis and takes the largest across it", () => {
-    expect(node.minimumLength(SplitAxis.Horizontal)).toBe(20.25);
-    expect(node.minimumLength(SplitAxis.Vertical)).toBe(12.75);
+    expect(node.minimumLength(SplitAxis.Horizontal, LayoutMetricsFixture.standard)).toBe(20.25);
+    expect(node.minimumLength(SplitAxis.Vertical, LayoutMetricsFixture.standard)).toBe(12.75);
   });
 
   it("replaces, removes and splits groups, closing a split left with one part", () => {

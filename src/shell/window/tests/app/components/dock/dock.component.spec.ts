@@ -22,6 +22,7 @@ import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../../fixtures/layout.fixture";
 import { LayoutServiceFixture } from "../../../fixtures/layout-service.fixture";
 import { TooltipFixture } from "../../../fixtures/tooltip.fixture";
+import { LayoutMetricsFixture } from "../../../fixtures/layout-metrics.fixture";
 
 @Component({
   imports: [DockComponent],
@@ -76,7 +77,7 @@ describe("DockComponent", () => {
     const sash = query("tr-sash");
 
     expect(sash?.style.left).toBe(`${bounds.right}rem`);
-    expect(sash?.style.width).toBe(`${Resources.panelGap}rem`);
+    expect(sash?.style.width).toBe(`${LayoutMetricsFixture.standard.gap}rem`);
     expect(sash?.getAttribute("aria-label")).toBe(Resources.resizeDockLabels[DockSide.Left]);
     expect(sash?.getAttribute("aria-valuenow")).toBe(String(26 * 16));
     expect(sash?.getAttribute("aria-valuemin")).toBe(String(10 * 16));
@@ -92,14 +93,14 @@ describe("DockComponent", () => {
   it("grows the right and bottom docks towards the middle", async () => {
     await renderAsync(DockSide.Right);
     const right = layout.geometry().dock(DockSide.Right);
-    expect(query("tr-sash")?.style.left).toBe(`${right.x - Resources.panelGap}rem`);
+    expect(query("tr-sash")?.style.left).toBe(`${right.x - LayoutMetricsFixture.standard.gap}rem`);
     press("ArrowLeft");
     expect(layout.layout().dock(DockSide.Right).size).toBe(25.5);
 
     fixture.componentInstance.side.set(DockSide.Bottom);
     fixture.detectChanges();
     const bottom = layout.geometry().dock(DockSide.Bottom);
-    expect(query("tr-sash")?.style.top).toBe(`${bottom.y - Resources.panelGap}rem`);
+    expect(query("tr-sash")?.style.top).toBe(`${bottom.y - LayoutMetricsFixture.standard.gap}rem`);
     expect(query("tr-sash")?.getAttribute("aria-orientation")).toBe("horizontal");
     press("ArrowUp");
     expect(layout.layout().dock(DockSide.Bottom).size).toBe(16.75);

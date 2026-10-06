@@ -505,6 +505,15 @@ export declare class AppearanceService {
   public readonly mode: Signal<ThemeMode>;
 
   /**
+   * How many times the service has painted the document: 0 until its first
+   * paint, then one more each time it paints the theme and mode or the
+   * typography. Code that reads painted values, such as a look's size in
+   * pixels, reads this signal so it runs again after each paint, and never
+   * before the paint it depends on.
+   */
+  public readonly painted: Signal<number>;
+
+  /**
    * Creates the service, which Angular does the first time it is injected.
    * It paints the appearance at once and erases it when the application is
    * destroyed; the window injects it as it starts.
