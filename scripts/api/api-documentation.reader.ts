@@ -26,6 +26,7 @@ import {
   isMethodDeclaration,
   isMethodSignatureDeclaration,
   isTypePredicateNode,
+  isTypeReferenceNode,
   isVariableDeclaration
 } from "typescript/unstable/ast/is";
 
@@ -133,9 +134,26 @@ export default class ApiDocumentationReader {
         else if (isJSDocParameterTag(tag) && first !== undefined && isJSDocText(first) && first.text.startsWith(ApiDocumentationReader.HYPHEN))
           problems.push(`${ApiDocumentationReader.locate(shown, tag)}: ${name} has a hyphen after @param ${tag.name.getText()}`);
         comments.push(...tag.comment ?? []);
+        if (isJSDocThrowsTag(tag) && tag.typeExpression !== undefined)
+          await this.inspectThrownTypesAsync(shown, name, tag.typeExpression, problems);
       }
       for (const link of comments)
         await this.inspectLinkAsync(shown, name, link, problems);
+    }
+  }
+
+  private async inspectThrownTypesAsync(shown: string, name: string, type: Node, problems: string[]): Promise<void> {
+    const references: Node[] = [];
+    const collect = (node: Node): undefined => {
+      if (isTypeReferenceNode(node))
+        references.push(node.typeName);
+      node.forEachChild(collect);
+    };
+    collect(type);
+    for (const reference of references) {
+      const symbol = await this.project.checker.getSymbolAtLocation(reference);
+      if (symbol === undefined || symbol.declarations.length === 0)
+        problems.push(`${ApiDocumentationReader.locate(shown, reference)}: ${name} has a @throws type that does not resolve: ${reference.getText()}`);
     }
   }
 

@@ -13,10 +13,10 @@ import type {
   TitleBarOverlayOptions, WindowOpenHandlerResponse
 } from "electron";
 
-import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
-import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
+import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { DataDirectory, DiagnosticRedactor, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, IProcessStarter, IRuntimeClientListener, LaunchSettings } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.

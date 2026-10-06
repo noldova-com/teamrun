@@ -11,7 +11,7 @@ import type { EventEmitter } from "node:events";
 import type { DatabaseSync, SQLInputValue, SQLOutputValue, StatementResultingChanges } from "node:sqlite";
 import type { Readable, Writable } from "node:stream";
 
-import { Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
+import { type ArgumentException, type ArgumentOutOfRangeException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import type {
   BuildIdentity, CommandInfo, CommandList, Event, Failure, FailureCode, ModuleStatusList, Notification, NotificationList, NotificationPost, PreShellData, QualifiedName, Response,
