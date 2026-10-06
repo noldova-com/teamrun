@@ -9,6 +9,7 @@
 import { stripVTControlCharacters } from "node:util";
 
 import FlakyTest from "../checks/flaky-test.ts";
+import RunnerTotals from "../totals/runner-totals.ts";
 import UiFailure from "./ui-failure.ts";
 import UiReportException from "./ui-report.exception.ts";
 
@@ -23,20 +24,12 @@ export default class UiReport {
   private static readonly TITLE_SEPARATOR: string = " › ";
   private static readonly MALFORMED: string = "The UI workflow report is not a Playwright JSON report.";
 
-  public readonly passed: number;
-  public readonly failed: number;
-  public readonly flaky: number;
-  public readonly skipped: number;
   public readonly durationMs: number;
   public readonly failures: readonly UiFailure[];
   public readonly platformLogLines: number;
   public readonly flakyTests: readonly FlakyTest[];
 
-  public constructor(passed: number, failed: number, flaky: number, skipped: number, durationMs: number, failures: readonly UiFailure[], platformLogLines: number, flakyTests: readonly FlakyTest[]) {
-    this.passed = passed;
-    this.failed = failed;
-    this.flaky = flaky;
-    this.skipped = skipped;
+  public constructor(durationMs: number, failures: readonly UiFailure[], platformLogLines: number, flakyTests: readonly FlakyTest[]) {
     this.durationMs = durationMs;
     this.failures = [...failures];
     this.platformLogLines = platformLogLines;
@@ -58,24 +51,16 @@ export default class UiReport {
     let platformLogLines = 0;
     for (const suite of UiReport.readList(report, "suites"))
       platformLogLines += UiReport.collect(suite, [], failures, flakyTests);
-    return new UiReport(
-      UiReport.readCount(stats, "expected"),
-      UiReport.readCount(stats, "unexpected"),
-      UiReport.readCount(stats, "flaky"),
-      UiReport.readCount(stats, "skipped"),
-      UiReport.readCount(stats, "duration"),
-      failures,
-      platformLogLines,
-      flakyTests);
+    return new UiReport(UiReport.readCount(stats, "duration"), failures, platformLogLines, flakyTests);
   }
 
-  public formatSummary(target: string, screenshotUrl: string | undefined, isUploadFailed: boolean = false): string {
+  public formatSummary(target: string, totals: RunnerTotals, screenshotUrl: string | undefined, isUploadFailed: boolean): string {
     const lines = [
       `### UI workflows: ${UiReport.escape(target)}`,
       "",
-      "| Passed | Failed | Flaky | Skipped | Duration | Platform log lines |",
-      "|---|---|---|---|---|---|",
-      `| ${this.passed} | ${this.failed} | ${this.flaky} | ${this.skipped} | ${(this.durationMs / 1000).toFixed(1)} s | ${this.platformLogLines} |`,
+      RunnerTotals.formatTable([totals], new Map([[totals.title, this.flakyTests.length]])).trimEnd(),
+      "",
+      `Duration ${(this.durationMs / 1000).toFixed(1)} s, ${this.platformLogLines} platform log lines.`,
       "",
       screenshotUrl === undefined || screenshotUrl.length === 0 ? (isUploadFailed ? "No main-window screenshot link: its upload failed." : "No main-window screenshot was kept.") : `[Main window screenshot](${encodeURI(screenshotUrl)})`
     ];

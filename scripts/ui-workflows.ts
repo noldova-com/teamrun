@@ -18,11 +18,12 @@ import Git from "./repository/git.ts";
 import RepositoryFiles from "./repository/repository-files.ts";
 
 export default class UiWorkflows {
+  public static readonly PLAYWRIGHT_CLI: readonly string[] = ["node_modules", "playwright", "cli.js"];
+  public static readonly PLAYWRIGHT_CONFIG: string = "src/shell/desktop/tests/e2e/playwright.config.ts";
+
   private static readonly BUILD_SCRIPT: readonly string[] = ["scripts", "build.ts"];
   private static readonly TYPESCRIPT_CLI: readonly string[] = ["node_modules", "typescript", "bin", "tsc"];
-  private static readonly PLAYWRIGHT_CLI: readonly string[] = ["node_modules", "playwright", "cli.js"];
   private static readonly E2E_PROJECT: string = "src/shell/desktop/tests/e2e";
-  private static readonly PLAYWRIGHT_CONFIG: string = "src/shell/desktop/tests/e2e/playwright.config.ts";
   private static readonly RECORD_SEGMENTS: readonly string[] = ["_build", "ui-builds.record"];
   private static readonly DECLARATIONS_SEGMENTS: readonly string[] = ["_build", "modules", "declarations.json"];
   private static readonly PRODUCT_SEGMENTS: readonly string[] = ["_build", "product.json"];
