@@ -59,7 +59,7 @@ The run fails when no check selected anything.
 `npm test -- --repeat <count>` runs the selection, or the complete gate without filters, that many times in a row.
 It stops at the first run that fails and says which one.
 `npm test -- --rerun-failed` runs each failed test once more, as [Flakiness and races](#flakiness-and-races) describes; it is made for the complete gate, its parts and a selected run, and with `--filter` only the Angular tests retry.
-Pull request and `main` runs pass `--rerun-failed`, with each test job's `--part`, and never `--repeat`; CI repeats tests only in a labelled pull request's [repeated runs](#flakiness-and-races) and in the [nightly run](#ci-levels).
+Pull request and `main` runs pass `--rerun-failed`, with each test job's `--part`, and never `--repeat`; CI repeats tests only in the [nightly run](#ci-levels).
 `npm run test:ui` hands its arguments to Playwright, so `npm run test:ui -- <file> --repeat-each <count> --retries 0 --max-failures 1` repeats the workflows of a file on a test machine and stops at the first failure, which Playwright names.
 
 `npm test -- --package <name>` selects the tests of a package by its full name, such as `@noldova/teamrun-foundation-core`, and may be given more than once; `--angular-tests` and `--script-tests` select those runners' tests, and `--checks-only` selects no test.
@@ -150,19 +150,6 @@ A test that sometimes fails is a bug in the test or in the code, and no test is 
   Merging stops only while `main` itself fails, or while a flaky failure blocks merging in practice: it failed both of its runs in two or more pull request runs in a day, or a passing run is rare.
   A stop that lasts longer than an hour is reassessed, and the reason it continues is recorded on its issue.
   A pull request held by a stop doesn't hold its author, who moves to their next task.
-- **Repeated runs.**
-  A change to startup, shutdown, processes, windows or inter-process messages, a fix for a flaky test, and a new or changed test of processes, timing or platform behavior pass their affected tests five times in CI before they merge.
-  The reviewer adds the `repeat` label to such a pull request, and the Repeat workflow runs on its head:
-  - It selects, from the change since the merge base, each changed test and UI workflow file, the test that mirrors each changed production file, and every test that imports a changed fixture or other test support file, directly or through another.
-    A `Repeat:` line in the pull request's description adds test and UI workflow files by their path from the repository's root, such as the UI workflows a change to the desktop affects.
-    The line is read when the label is added and on each push.
-  - Linux x64 and Windows x64 each run the selection in five parallel jobs, one pass each, and macOS ARM64 runs the five passes in as few jobs as its time limit allows, since macOS runners are scarce.
-    It uses one job unless five passes of the selected UI tests, counted in their files, would take more than about 40 minutes there; then two jobs each run a Playwright shard of them five times, and only the first repeats the selected tests.
-    Each job builds and runs the selected tests through `npm test -- --filter` and the selected UI workflows with `--retries 0` and a global timeout that stops them before the job's time limit.
-    Each job's summary counts its UI tests and says when they ran out of time, so a stop for time doesn't read as a failing test.
-  - The check "Repeat (all targets)" passes at once without the label and in a merge group, and with the label only when every repeat job passed, so a labelled pull request doesn't merge before its repeats.
-  - The repeats show that the selection passes five times on each of those targets, and nothing about tests outside it.
-    The [nightly run](#ci-levels) also repeats every test and UI workflow five times on every target, which catches what a change's own repeats miss.
 
 | Test file | Why it pauses |
 |---|---|
@@ -210,7 +197,7 @@ A UI test counts by its first result.
 A test whose expected status is skipped is skipped, with its skip annotation's reason.
 A test with no result, or one cut off by an interruption or the global timeout, is unreached, and one that passed only when retried is failed.
 Playwright leaves a spec file without tests out of its list and still passes the run, so the summary compares the list with the files that the config's `testDir`, `testMatch` and `testIgnore` match, and fails on a matched file without tests.
-The nightly and repeat runs don't summarize their shards this way.
+The nightly run doesn't summarize its shards this way.
 
 The gate fails on setup, discovery, execution, cleanup, coverage or reporting failure, or any missing/interrupted required result.
 Skips remain visible with declared reasons and never waive required behavior or coverage; exceptions explicitly name their scope.
@@ -291,11 +278,13 @@ The target's call also runs its UI workflows in parallel shards, by calling `.gi
 When a target splits its tests and its shards reuse a build, its one build job also makes the test build and its variants with `npm run test:ui -- --list`, after `npm run build`, and passes them in the same artifact to the test parts and the shards; the Angular part's own `npm run build` rebuilds the window that the test build replaced.
 Any other target with shards makes their builds in a build job of the UI workflows and passes them, as an artifact of the same run, to the target's shard jobs.
 Each shard runs its part with Playwright's `--shard` and `--require-current`, which fails the shard instead of rebuilding when the builds it received are not current.
-A target whose pull request level is the smoke set has no build job: its one job builds and runs `--grep @smoke` itself.
-The classification plans each target's build and shards, and `scripts/workflows/build-matrix.ts` says which targets run the smoke set on a pull request and which leave their UI workflows to manual and nightly runs on a push to `main`.
+A target whose pull request level is the smoke set has no build job: when it splits its tests, its one smoke job builds and runs `--grep @smoke` itself, and otherwise its Build and test job runs the set as its last step, after `npm test`, so macOS ARM64 takes one macOS job on a pull request.
+The classification plans each target's build and shards, and `scripts/workflows/build-matrix.ts` says which targets run the smoke set on a pull request and which run on a push to `main`.
 Each target's shard count is set in `scripts/workflows/build-matrix.ts`, chosen from measured times so that no shard takes much more than about three minutes, setup included; the PR that changes one records those times.
 A PR's own runs, and a merge group's, build and test Linux x64, Linux ARM64, Windows x64 and macOS ARM64, each running every test once and the UI workflows its [level](#ci-levels) selects.
-Windows ARM64 and macOS x64, whose runners are the slowest and scarcest, are not built or tested on a PR's own runs or in a merge group, which count them as expected skips and name them in the run's summary; they build and test on every push to `main`, where Windows ARM64 also runs every UI workflow, and run in full in manual runs.
+Windows ARM64 and macOS x64, whose runners are the slowest and scarcest, are not built or tested on a PR's own runs or in a merge group, which count them as expected skips and name them in the run's summary.
+Windows ARM64 builds and tests, and runs every UI workflow, on every push to `main`; macOS x64 is skipped there too and named the same way, and runs only in manual runs and every night.
+Both run in full in manual runs.
 A push to `main` is the first run of the targets and UI workflows PRs and merge groups skip; a failure there belongs to the PR that caused it and stops merging until it is fixed.
 PR-description/issue validation still runs.
 Each test job and UI shard whose tests ran keeps its totals records as an artifact of the run, named by its target and part or shard.
@@ -305,12 +294,12 @@ When every target passed, each problem fails the job and with it the aggregate c
 It doesn't run in a cancelled or documentation-only run.
 
 Every run builds and tests in full and reuses no earlier run's result; only a target's test parts and UI shards share that target's build from the same run.
-A push to `main` always builds and tests every target and runs every UI workflow on every target but macOS x64.
+A push to `main` always builds and tests every target but macOS x64, and runs every UI workflow on each of them; macOS x64 runs in manual runs and every night.
 Packaging runs by hand and each night, as [CI levels](#ci-levels) describes, never on a pull request or a push; a release runs only by hand, through the [Release workflow](ARCHITECTURE.md#publication), which builds, tests and packages every target again.
 
 Build, pack and install the selected source before testing its package API; dependencies must resolve to those fresh artifacts.
 Use targeted checks during development.
-CI is the gate: the complete gate, the UI workflows and the repeats [Flakiness and races](#flakiness-and-races) requires run on the pushed head, and green required checks at the pull request's head are the evidence.
+CI is the gate: the complete gate and the UI workflows run on the pushed head, and green required checks at the pull request's head are the evidence.
 Repeat successful checks locally only after a change, failure or unresolved concern.
 
 Before pushing for review:
@@ -319,7 +308,7 @@ Before pushing for review:
   A change that does not touch the UI skips the workflows.
 - Check a configuration change, such as a workflow, with the tool that reads it.
 
-The complete gate, the other UI workflows and the repeats are not run locally before review.
+The complete gate and the other UI workflows are not run locally before review.
 A full run on a machine is for debugging a failure and for the native checks CI can't cover: elevated Windows, the real cursor, OS notifications, macOS-only behavior, and reproducing a CI failure.
 CI's run on every target is the evidence for "natively on Windows, Linux and macOS"; link it.
 Name each machine's OS and CPU in the report of a native run.
@@ -345,9 +334,9 @@ Missing measurements remain unknown; speed alone proves neither allocation nor r
 
 CI runs the tests and checks in full on every run, and the UI workflows at these levels:
 
-- **Pull requests and merge groups:** every UI workflow on Linux x64 and Linux ARM64, in their shards, and only the smoke set on Windows x64 and macOS ARM64, each in one job that makes its own test build and runs the set, with no separate build job or artifact.
-- **Every push to `main`:** every UI workflow on every target but macOS x64, which builds and tests and leaves its UI workflows to manual and nightly runs.
-  The organization runs at most five macOS jobs at a time, and the UI shards of both macOS targets would make every merge wait for them.
+- **Pull requests and merge groups:** every UI workflow on Linux x64 and Linux ARM64, in their shards, and only the smoke set on Windows x64 and macOS ARM64: Windows x64 in one job that makes its own test build and runs the set, and macOS ARM64 as the last step of its Build and test job, with no separate build job or artifact.
+- **Every push to `main`:** every UI workflow on every target but macOS x64, which neither builds nor tests there and runs only in manual runs and every night.
+  The organization runs at most five macOS jobs at a time, and macOS x64's jobs and the UI shards of both macOS targets would make every merge wait for them.
 - **Manual runs:** every UI workflow on every target, macOS x64 included.
   This is the run to start by hand before a release.
 - **Nightly:** the Nightly repeats workflow runs every test and UI workflow five times on every target, without retries, each night and on request; a failing run of the tests does not stop the next one.

@@ -51,7 +51,19 @@ class BuildAndTestTargetTests {
       assert.equal(text.match(/persist-credentials: false/g)?.length, 2);
       assert.doesNotMatch(text, /concurrency|secrets|token/);
       for (const use of text.matchAll(/uses: (\S+)/g))
-        assert.match(use[1] ?? "", /^(actions\/[a-z-]+@[0-9a-f]{40}|\.\/\.github\/actions\/prepare|\.\/\.github\/workflows\/ui-workflows\.yml)$/);
+        assert.match(use[1] ?? "", /^(actions\/[a-z-]+@[0-9a-f]{40}|\.\/\.github\/actions\/(prepare|ui-workflows)|\.\/\.github\/workflows\/ui-workflows\.yml)$/);
+    });
+
+    test("a target whose plan folds its UI workflows runs them as its test job's last step, through the same action as a shard, and calls no UI workflows", async () => {
+      const text = (await WorkflowFileFixture.readAsync(BuildAndTestTargetTests.WORKFLOW)).text;
+      const step = "      - name: Run the smoke set\n        if: ${{ !cancelled() && inputs.ui != 'null' && fromJSON(inputs.ui).folded }}\n        uses: ./.github/actions/ui-workflows\n        with:\n" +
+        "          target: ${{ fromJSON(inputs.ui).shards[0].target }}\n          runner: ${{ inputs.runner }}\n          architecture: ${{ inputs.architecture }}\n" +
+        "          shard: ${{ fromJSON(inputs.ui).shards[0].shard }}\n          shards: ${{ fromJSON(inputs.ui).shards[0].shards }}\n" +
+        "          grep: ${{ fromJSON(inputs.ui).shards[0].grep }}\n          prebuilt: ${{ fromJSON(inputs.ui).shards[0].prebuilt }}\n\n";
+
+      assert.ok(text.includes(`${step}  shared-ui:\n`));
+      assert.ok(text.indexOf("Warn that the flaky test record was not kept") < text.indexOf(step));
+      assert.ok(text.includes("  ui:\n    name: UI workflows\n    if: ${{ inputs.ui != 'null' && !fromJSON(inputs.ui).shared && !fromJSON(inputs.ui).folded }}\n"));
     });
 
     test("a target builds once when its jobs reuse a build, and each job runs its part of the tests, or all of them, rerunning the failed ones once", { timeout: BuildAndTestTargetTests.SCRIPT_TIMEOUT }, async t => {

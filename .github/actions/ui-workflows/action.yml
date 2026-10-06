@@ -1,0 +1,270 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Run UI workflows
+description: Runs a shard or set of the UI workflows and keeps its results, screenshot, summary, totals and flaky test record.
+
+inputs:
+  target:
+    description: The target's name.
+    required: true
+  runner:
+    description: The runner label of the target.
+    required: true
+  architecture:
+    description: The CPU architecture of the target.
+    required: true
+  shard:
+    description: The shard's number.
+    required: true
+  shards:
+    description: The number of shards.
+    required: true
+  grep:
+    description: The tag that selects a set of the UI workflows, or nothing for the shard's part of all of them.
+    required: true
+  prebuilt:
+    description: Whether the job fetched the test build and its variants, so the UI workflows require them to be current.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Start the flaky test record afresh
+      shell: bash
+      run: rm -f _build/flaky-tests.json
+
+    - name: Let Electron's sandbox start on Linux
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+    - name: Test the UI workflows
+      id: ui
+      env:
+        SHARD: ${{ inputs.shard }}/${{ inputs.shards }}
+        REQUIRE_CURRENT: ${{ inputs.prebuilt == 'true' && '--require-current' || '' }}
+        GREP: ${{ inputs.grep }}
+      shell: bash
+      run: |
+        set -- $REQUIRE_CURRENT --shard "$SHARD" --retries 1 ${GREP:+--grep "$GREP"}
+        if [ "$RUNNER_OS" = Linux ]; then
+          xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' npm run test:ui -- "$@"
+        else
+          npm run test:ui -- "$@"
+        fi
+
+    - name: Keep the UI workflow results
+      id: results
+      if: always() && steps.ui.outcome != 'skipped'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}-${{ github.run_attempt }}
+        path: _build/ui
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Wait before keeping the UI workflow results again
+      if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Keep the UI workflow results again
+      id: results-again
+      if: always() && steps.ui.outcome != 'skipped' && steps.results.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}-${{ github.run_attempt }}
+        path: _build/ui
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Wait before keeping the UI workflow results a last time
+      if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Keep the UI workflow results a last time
+      id: results-last
+      if: always() && steps.ui.outcome != 'skipped' && steps.results-again.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}-${{ github.run_attempt }}
+        path: _build/ui
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Warn that the UI workflow results were not kept
+      if: always() && steps.ui.outcome != 'skipped' && steps.results-last.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning title=The UI workflow results were not kept::The upload failed three times, so they are not attached. The tests are not affected."
+
+    - name: Keep the main window screenshot
+      id: screenshot
+      if: always() && steps.ui.outcome != 'skipped'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        path: _build/ui/main-window-*.png
+        archive: false
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Wait before keeping the main window screenshot again
+      if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Keep the main window screenshot again
+      id: screenshot-again
+      if: always() && steps.ui.outcome != 'skipped' && steps.screenshot.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        path: _build/ui/main-window-*.png
+        archive: false
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Wait before keeping the main window screenshot a last time
+      if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Keep the main window screenshot a last time
+      id: screenshot-last
+      if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-again.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        path: _build/ui/main-window-*.png
+        archive: false
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Warn that the main window screenshot was not kept
+      if: always() && steps.ui.outcome != 'skipped' && steps.screenshot-last.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning title=The main window screenshot was not kept::The upload failed three times, so it is not attached. The tests are not affected."
+
+    - name: Summarize the UI workflows
+      id: summary
+      if: always() && steps.ui.outcome != 'skipped'
+      env:
+        UI_TARGET: ${{ inputs.target }}, ${{ inputs.shard }} of ${{ inputs.shards }}
+        UI_SHARD: ${{ inputs.shard }}/${{ inputs.shards }}
+        GREP: ${{ inputs.grep }}
+        SCREENSHOT_URL: ${{ steps.screenshot-last.outputs.artifact-url || steps.screenshot-again.outputs.artifact-url || steps.screenshot.outputs.artifact-url }}
+        SCREENSHOT_UPLOAD_FAILED: ${{ steps.screenshot-last.outcome == 'failure' }}
+      shell: bash
+      run: node scripts/ui-summary.ts
+
+    - name: Keep the UI workflow totals
+      id: totals
+      if: always() && steps.summary.outcome != 'skipped'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: totals-ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}
+        path: _build/totals/ui.json
+        retention-days: 3
+        if-no-files-found: error
+        overwrite: true
+
+    - name: Wait before keeping the UI workflow totals again
+      if: always() && steps.summary.outcome != 'skipped' && steps.totals.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Keep the UI workflow totals again
+      id: totals-again
+      if: always() && steps.summary.outcome != 'skipped' && steps.totals.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: totals-ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}
+        path: _build/totals/ui.json
+        retention-days: 3
+        if-no-files-found: error
+        overwrite: true
+
+    - name: Wait before keeping the UI workflow totals a last time
+      if: always() && steps.summary.outcome != 'skipped' && steps.totals-again.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Keep the UI workflow totals a last time
+      if: always() && steps.summary.outcome != 'skipped' && steps.totals-again.outcome == 'failure'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: totals-ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}
+        path: _build/totals/ui.json
+        retention-days: 3
+        if-no-files-found: error
+        overwrite: true
+
+    - name: Keep the flaky test record
+      id: flaky
+      if: always() && steps.ui.outcome != 'skipped'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: flaky-tests-ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}-${{ github.run_attempt }}
+        path: _build/flaky-tests.json
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Wait before keeping the flaky test record again
+      if: always() && steps.ui.outcome != 'skipped' && steps.flaky.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Keep the flaky test record again
+      id: flaky-again
+      if: always() && steps.ui.outcome != 'skipped' && steps.flaky.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: flaky-tests-ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}-${{ github.run_attempt }}
+        path: _build/flaky-tests.json
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Wait before keeping the flaky test record a last time
+      if: always() && steps.ui.outcome != 'skipped' && steps.flaky-again.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Keep the flaky test record a last time
+      id: flaky-last
+      if: always() && steps.ui.outcome != 'skipped' && steps.flaky-again.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: flaky-tests-ui-${{ inputs.runner }}-${{ inputs.architecture }}-${{ inputs.shard }}-${{ github.run_attempt }}
+        path: _build/flaky-tests.json
+        retention-days: 14
+        if-no-files-found: ignore
+        overwrite: true
+
+    - name: Warn that the flaky test record was not kept
+      if: always() && steps.ui.outcome != 'skipped' && steps.flaky-last.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning title=The flaky test record was not kept::The upload failed three times, so no issue is recorded for this shard's flaky tests. The tests are not affected."
