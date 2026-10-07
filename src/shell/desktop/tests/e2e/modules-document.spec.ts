@@ -18,6 +18,7 @@ import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import ContrastFixture from "./fixtures/contrast.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 
 const colors = {
   Light: { link: "rgb(0, 95, 184)", error: "rgb(161, 38, 13)", selected: ContrastFixture.SELECTED_ROW_BACKGROUND.light, text: "rgb(59, 59, 59)" },
@@ -49,8 +50,7 @@ async function startProgramAsync(dataDirectory: string, ...commandArguments: str
 }
 
 async function setModeAsync(window: Page, mode: string): Promise<void> {
-  await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-    .request("shell.setSetting", { name: "shell.mode", value }), mode);
+  await PageBridgeFixture.evaluateAsync(window, (t, value) => t.request("shell.setSetting", { name: "shell.mode", value }), mode);
 }
 
 test.describe("the Modules document", () => {

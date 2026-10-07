@@ -1272,6 +1272,7 @@ Its `desktops` folder lists the desktops running from the installation, one file
 The installation's `barrier.json` holds the coordinating desktop's process id and start time, the version being installed, the state `Preparing`, `Closing` or `HandedOff` and, once handed off, the process id and start time of the process that took the handoff when the platform gives one.
 It holds while its holder runs, and a `HandedOff` barrier for another version also while the process that took the handoff runs.
 It is written whole to a temporary file and linked into place, which fails when a barrier exists, so of two desktops that create it at once one finds the other's update under way, and each change of state replaces it through a temporary file and a rename, so no reader sees it half-written.
+Windows refuses a rename onto or away from a file another process has open, so every rename of the installation's files, and of the runtime's discovery file, is tried again every 50 ms while it fails as refused or busy, and fails with the system's reason after 40 tries, about 2 seconds.
 While it holds:
 
 - No launcher starts a runtime, and a runtime that finds it after taking ownership releases ownership and exits.

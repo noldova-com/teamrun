@@ -8,7 +8,7 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -205,8 +205,7 @@ export class UpdatePreparationTests {
       const [responses] = await RuntimeHostFixture.readMessagesAsync(desktop, 2);
       const [isRead, [, unreadable]] = await UpdatePreparationTests.readWhileUnreadableAsync(installation.barrierFile,
         () => fixture.handshakeAsync("unreadable", RuntimeBuild.identity));
-      await writeFile(`${installation.barrierFile}.part`, "{\"holder\":");
-      await rename(`${installation.barrierFile}.part`, installation.barrierFile);
+      await writeFile(installation.barrierFile, "{\"holder\":");
       await delay(200);
       const [, unparsable] = await fixture.handshakeAsync("unparsable", RuntimeBuild.identity);
       await rm(installation.barrierFile);

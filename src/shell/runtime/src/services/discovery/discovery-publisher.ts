@@ -10,24 +10,24 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
 
 import type { IFolderProtector } from "../../interfaces/i-folder-protector.js";
 import type { RuntimeDiscovery } from "../../models/runtime-discovery.js";
 import { Resources } from "../../resources.js";
+import { FileRenamer } from "../files/file-renamer.js";
 import type { OwnershipLock } from "../ownership/ownership-lock.js";
 
 export class DiscoveryPublisher {
   private readonly lock: OwnershipLock;
   private readonly protector: IFolderProtector;
-  private readonly replaceFileAsync: (from: string, to: string) => Promise<void>;
+  private readonly renamer: FileRenamer;
 
   public constructor(lock: OwnershipLock, protector: IFolderProtector, replaceFileAsync: (from: string, to: string) => Promise<void> = rename) {
     this.lock = lock;
     this.protector = protector;
-    this.replaceFileAsync = replaceFileAsync;
+    this.renamer = new FileRenamer(replaceFileAsync);
   }
 
   public async publishAsync(discovery: RuntimeDiscovery): Promise<string> {
@@ -63,23 +63,13 @@ export class DiscoveryPublisher {
   }
 
   private async replaceAsync(temporary: string, file: string): Promise<void> {
-    for (let attempt = 1; ; attempt++) {
-      try {
-        await this.replaceFileAsync(temporary, file);
-        return;
-      }
-      catch (error) {
-        if (attempt >= Resources.replaceAttempts || !DiscoveryPublisher.isBusy(error)) {
-          await rm(temporary, { force: true });
-          throw error;
-        }
-      }
-      await delay(Resources.replaceRetryDelay);
+    try {
+      await this.renamer.renameAsync(temporary, file);
     }
-  }
-
-  private static isBusy(error: unknown): boolean {
-    return Object.isObject(error) && Resources.fileErrorCodeField in error && Resources.busyFileErrorCodes.includes(String(error[Resources.fileErrorCodeField]));
+    catch (error) {
+      await rm(temporary, { force: true });
+      throw error;
+    }
   }
 
   private static format(discovery: RuntimeDiscovery): string {

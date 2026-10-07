@@ -8,7 +8,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
-import { link, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
@@ -19,9 +19,11 @@ import { UpdateBarrierState } from "../../enums/update-barrier-state.js";
 import { UpdateBarrierStatus } from "../../enums/update-barrier-status.js";
 import { UpdateBarrier } from "../../models/update-barrier.js";
 import { Resources } from "../../resources.js";
+import { FileRenamer } from "../files/file-renamer.js";
 
 export class Installation {
   private readonly isRunningAsync: (holder: UpdateProcess) => Promise<boolean>;
+  private readonly renamer: FileRenamer = new FileRenamer();
 
   public readonly folder: string;
   public readonly barrierFile: string;
@@ -60,7 +62,7 @@ export class Installation {
     const temporary = path.join(this.recordFolder, Resources.formatTemporaryName(path.basename(file), randomUUID()));
     await mkdir(this.recordFolder, { recursive: true });
     await writeFile(temporary, JSON.stringify({ [Resources.dataDirectoryField]: root }));
-    await rename(temporary, file);
+    await this.renamer.renameAsync(temporary, file);
   }
 
   public async listDataDirectoriesAsync(): Promise<readonly string[]> {
@@ -74,7 +76,7 @@ export class Installation {
     const temporary = path.join(this.desktopFolder, Resources.formatTemporaryName(path.basename(file), randomUUID()));
     await mkdir(this.desktopFolder, { recursive: true });
     await writeFile(temporary, JSON.stringify(desktop.toJson()));
-    await rename(temporary, file);
+    await this.renamer.renameAsync(temporary, file);
   }
 
   public async listDesktopsAsync(): Promise<readonly UpdateProcess[]> {
@@ -104,7 +106,7 @@ export class Installation {
   }
 
   public async replaceAsync(barrier: UpdateBarrier): Promise<void> {
-    await rename(await this.writeTemporaryAsync(barrier), this.barrierFile);
+    await this.renamer.renameAsync(await this.writeTemporaryAsync(barrier), this.barrierFile);
   }
 
   public async releaseAsync(): Promise<void> {
@@ -144,7 +146,7 @@ export class Installation {
 
   public async removeAsync(text: string): Promise<boolean> {
     const claimed = path.join(this.folder, Resources.formatTemporaryName(Resources.barrierFileName, randomUUID()));
-    if (Object.isNull(await Installation.unlessMissingAsync(rename(this.barrierFile, claimed).then(() => claimed))))
+    if (Object.isNull(await Installation.unlessMissingAsync(this.renamer.renameAsync(this.barrierFile, claimed).then(() => claimed))))
       return true;
     const isJudged = await readFile(claimed, Resources.utf8Encoding) === text;
     if (!isJudged)
