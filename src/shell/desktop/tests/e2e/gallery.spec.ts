@@ -201,11 +201,11 @@ test.describe("gallery", () => {
       await window.mouse.down();
       await window.mouse.move(from.x + 8, from.y - 8, { steps: 3 });
       const branch = await centreOf("Project", 0.5);
-      await window.mouse.move(branch.x, branch.y, { steps: 6 });
+      await window.mouse.move(branch.x, branch.y);
       await expect(item("Project")).toHaveClass(/tr-tree-row-drop/u);
       await desktop.checkpointAsync(`gallery-tree-drag-branch-${mode.toLowerCase()}`);
       const target = await centreOf("Readme", 0.1);
-      await window.mouse.move(target.x, target.y, { steps: 6 });
+      await window.mouse.move(target.x, target.y);
       await expect(host.locator(".tr-tree-ghost")).toHaveText(/Notes/u);
       await expect(host.locator(".tr-tree-drop-line")).toBeVisible();
       await desktop.checkpointAsync(`gallery-tree-drag-${mode.toLowerCase()}`);
