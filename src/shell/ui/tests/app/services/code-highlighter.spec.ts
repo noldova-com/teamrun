@@ -8,26 +8,11 @@
 
 import { ErrorHandler } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
-import type { ShikiPrimitive } from "@shikijs/primitive";
 
 import { CodeTokenKind } from "../../../src/app/enums/code-token-kind";
 import { CodeLanguage } from "../../../src/app/models/code-language";
 import { CodeHighlighter } from "../../../src/app/services/code-highlighter";
 import { Resources } from "../../../src/resources";
-
-const primitives = vi.hoisted((): ShikiPrimitive[] => []);
-
-vi.mock("@shikijs/primitive", async importOriginal => {
-  const shiki = await importOriginal<typeof import("@shikijs/primitive")>();
-  return {
-    ...shiki,
-    createShikiPrimitive: (...options: Parameters<typeof shiki.createShikiPrimitive>): ShikiPrimitive => {
-      const primitive = shiki.createShikiPrimitive(...options);
-      primitives.push(primitive);
-      return primitive;
-    }
-  };
-});
 
 describe("CodeHighlighter", () => {
   const signal = new AbortController().signal;
@@ -108,18 +93,19 @@ describe("CodeHighlighter", () => {
     const errors: unknown[] = [];
     const failure = new Error("The grammar's chunk did not load.");
     TestBed.overrideProvider(ErrorHandler, { useValue: { handleError: (error: unknown) => errors.push(error) } });
+    let loads = 0;
+    const flaky: CodeLanguage = { id: typescript.id, aliases: [], load: () => loads++ === 0 ? Promise.reject(failure) : import("@shikijs/langs/typescript") };
     const highlighter = TestBed.inject(CodeHighlighter);
     await highlighter.tokensAsync("echo hi", CodeLanguage.named("sh") as CodeLanguage, signal);
     vi.useFakeTimers({ toFake: ["setTimeout"] });
-    const loadLanguage = vi.spyOn(primitives.at(-1) as ShikiPrimitive, "loadLanguage").mockRejectedValueOnce(failure);
 
     const held: unknown[] = [];
     for (const code of ["let", "let a", "let a;"])
-      held.push(await highlighter.tokensAsync(code, typescript, signal));
+      held.push(await highlighter.tokensAsync(code, flaky, signal));
     vi.advanceTimersByTime(Resources.codeLoadFailureHold);
-    const loaded = await highlighter.tokensAsync("let a;", typescript, signal);
+    const loaded = await highlighter.tokensAsync("let a;", flaky, signal);
 
-    expect([held, errors, loadLanguage.mock.calls.length]).toEqual([[[], [], []], [failure], 2]);
+    expect([held, errors, loads]).toEqual([[[], [], []], [failure], 2]);
     expect(loaded.map(t => t.text)).toEqual(["let", "a"]);
   });
 
