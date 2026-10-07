@@ -30,11 +30,13 @@ export default class UiWorkflows {
   private static readonly TREE_OUTPUTS: readonly (readonly string[])[] = [
     ["_build", "window"],
     ["_build", "variants", "no-modules"],
-    ["_build", "variants", "without-clock"]
+    ["_build", "variants", "without-clock"],
+    ["_build", "variants", "update-feed"]
   ];
   private static readonly BUILDS: readonly (readonly string[])[] = [
     ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--without", "reminder", "--output", "_build/variants/no-modules"],
     ["--test", "--without", "alarm", "--without", "clock", "--output", "_build/variants/without-clock"],
+    ["--test", "--update-feed", "http://127.0.0.1:47324/", "--output", "_build/variants/update-feed"],
     ["--test"]
   ];
   private static readonly CURRENT: string = "The builds of the UI workflows are current.\n";

@@ -851,14 +851,16 @@ Before TeamRun quits, restarts for an update or stops for a newer build (section
 Closing the last window quits TeamRun, except on macOS and while the tray icon shows (section 8), where the window closes once it has saved and TeamRun keeps running.
 Quitting, from the last window, the tray icon, the menu, the command line or the operating system, first has every window save, then asks the runtime to stop only if idle and to keep running while another client uses it (section 6).
 On Linux and macOS the desktop quits this way on SIGTERM and SIGHUP; the runtime stops on SIGINT, SIGTERM and SIGHUP alike.
-A packaged desktop started from a terminal on Linux or macOS, with its standard input, output or error a terminal, starts itself again in its own session with its output dropped and exits at once, before it opens a window or reaches a runtime.
+A packaged desktop started from a terminal, with its standard input, output or error a terminal, starts itself again apart from that terminal with its output dropped and exits, before it opens a window or reaches a runtime.
 The prompt comes back, and closing the terminal leaves TeamRun running; it quits from its window, the tray icon or `teamrun quit`.
-Without that, a desktop that is a shell's job shares its process group with its Chromium processes, and the hang-up of the closing terminal ends them before the desktop can save.
+Without that, on Linux and macOS a desktop that is a shell's job shares its process group with its Chromium processes, and the hang-up of the closing terminal ends them before the desktop can save; on Windows Electron attaches a desktop to the console it was started from, and closing the console ends every process attached to it.
+On Linux and macOS the copy starts at once, in its own session.
+On Windows it starts once Electron is ready, through the utility process that starts the runtime, which gives it none of the desktop's handles, so it holds none of the console's; `ELECTRON_NO_ATTACH_CONSOLE` keeps that utility process and the copy from attaching to the console, and the copy removes the variable from its environment as it starts, so the programs it starts attach to their own consoles as usual.
+The console window then closes with its shell.
 The copy gets the same arguments, environment and working folder; an AppImage starts again from its image file, without the entries the AppImage's launcher added to the environment.
 The desktop takes the single-instance lock before it decides, so a second start hands over to the running desktop as usual, and gives the lock up just before it starts the copy.
 A start that writes to the terminal, with `--enable-logging`, `--remote-debugging-port`, `--remote-debugging-pipe` or `ELECTRON_ENABLE_LOGGING`, stays in the terminal, as does a development run.
 When the copy cannot be started, the desktop keeps running in the terminal and writes why to standard error and its log; a copy that fails after it has started writes to its own desktop log.
-On Windows a desktop started from a console stays attached to it, and closing the console ends the desktop.
 The command line's `teamrun quit` reaches the desktop through the runtime: it asks with `shell.quit`, the runtime announces `shell.quitting`, and the desktop quits as above.
 A desktop that stays open answers `shell.quitAnswered` with why.
 A desktop that quits asks the runtime to stop, and the runtime counts the stop it accepts as the desktop's answer, since that stop can end the runtime at once.
@@ -1066,7 +1068,12 @@ Each target is packaged on its own platform and processor.
   - electron-builder imports the certificate into a temporary keychain and finds its identity there; an unsigned build never looks for a signing identity on the machine.
   - electron-builder signs the app and its helpers with the hardened runtime and `assets/macos/entitlements.plist`, which allows only the JIT that V8 needs, then notarizes the app and staples the ticket.
     A signed package keeps its signature after the fuses are flipped, so it is not signed ad hoc again.
-  - Afterwards packaging opens the disk image and expands the archive, and checks each app: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl` must accept it as notarized; and `stapler` must find its ticket.
+  - electron-builder then signs the disk image with the same certificate.
+    Packaging submits the signed disk image to Apple's notary service with `notarytool` and the same key, waits up to an hour for it to be accepted, and staples the ticket to it, so the first opening of a downloaded disk image needs no network check either.
+    The key's ID and issuer reach `notarytool` as arguments, never in its environment, and no failure message repeats them.
+    Release update information and checksums are computed from the final, stapled files.
+  - Afterwards packaging checks the disk image itself: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl --assess --type open --context context:primary-signature` must accept it as notarized; and `stapler` must find its ticket.
+    It then opens the disk image and expands the archive, and checks each app the same way, with `codesign --deep` and `spctl --assess --type execute`.
 
 ### Publication
 

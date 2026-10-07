@@ -28,6 +28,7 @@ export interface IDesktopProcess {
 
   startDetached(executablePath: string, args: readonly string[], onFailure: (error: Error) => void): void;
   startDetachedAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void>;
+  startApartAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv): Promise<void>;
   endProcess(processId: number): void;
   onUncaughtException(listener: (error: unknown) => void): void;
   onUnhandledRejection(listener: (reason: unknown) => void): void;

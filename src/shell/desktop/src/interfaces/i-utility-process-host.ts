@@ -9,5 +9,5 @@
 import type { IUtilityProcess } from "./i-utility-process.js";
 
 export interface IUtilityProcessHost {
-  fork(modulePath: string, args: string[], options: { stdio: "ignore"; serviceName: string }): IUtilityProcess;
+  fork(modulePath: string, args: string[], options: { stdio: "ignore"; serviceName: string; env: NodeJS.ProcessEnv; cwd?: string }): IUtilityProcess;
 }

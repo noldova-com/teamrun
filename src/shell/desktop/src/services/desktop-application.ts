@@ -150,6 +150,7 @@ export class DesktopApplication {
   private device: Promise<string | null> = Promise.resolve(null);
   private knownDevice: string | null = null;
   private isReady: boolean = false;
+  private updatesStarted: Promise<void> = Promise.resolve();
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
   private runtimeQuit: Promise<void> | null = null;
@@ -250,6 +251,7 @@ export class DesktopApplication {
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
+    TerminalRelaunch.forgetConsole(process);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
     process.onUnhandledRejection(t => recovery.receive(t, MainProcessFailureKind.UnhandledRejection));
     electron.app.setName(Resources.applicationName);
@@ -308,7 +310,7 @@ export class DesktopApplication {
       return;
     }
     app.releaseSingleInstanceLock();
-    void relaunch.startAsync().then(() => app.exit(Resources.quitExitCode), (error: unknown) => this.stayInTerminal(error));
+    void relaunch.startAsync(() => app.whenReady()).then(() => app.exit(Resources.quitExitCode), (error: unknown) => this.stayInTerminal(error));
   }
 
   private stayInTerminal(error: unknown): void {
@@ -410,7 +412,7 @@ export class DesktopApplication {
       this.open();
       this.watch.start();
       if (!Object.isNull(this.updates))
-        void this.startUpdatesAsync(this.updates);
+        this.updatesStarted = this.startUpdatesAsync(this.updates);
       void this.startup.startAsync();
     });
   }
@@ -792,7 +794,6 @@ export class DesktopApplication {
     await this.handoff?.clearAsync();
     updates.follow(this.updateChecks.value);
     await updates.startAsync();
-    await updates.notifyAsync();
   }
 
   private async restartToUpdateAsync(record: UpdateReadyRecord, handoff: IUpdateHandoff): Promise<void> {
@@ -846,6 +847,7 @@ export class DesktopApplication {
     const device = await this.device;
     if (!Object.isNull(device))
       await this.updateChecks.refreshAsync(device);
+    await this.updatesStarted;
     await updates.notifyAsync();
   }
 
