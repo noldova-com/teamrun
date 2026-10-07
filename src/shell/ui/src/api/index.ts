@@ -83,6 +83,7 @@ export { TitleSegment } from "../app/models/title-segment";
 export { TreeMove } from "../app/models/tree-move";
 export { TreeNode } from "../app/models/tree.node";
 export { Typography } from "../app/models/typography";
+export { VirtualListChoice } from "../app/models/virtual-list-choice";
 export { VirtualListPosition } from "../app/models/virtual-list-position";
 export { VirtualListSource } from "../app/models/virtual-list-source";
 export { AnchoredOverlay } from "../app/services/anchored-overlay";

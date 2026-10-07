@@ -30,7 +30,7 @@ function numbered(count: number): ArrayVirtualListSource<string> {
 @Component({
   imports: [VirtualListComponent, VirtualRowDirective],
   template: `
-    <tr-virtual-list label="Items" [source]="source()" [selected]="selected()" (activated)="activations.push($event)" (failed)="errors.push($event)">
+    <tr-virtual-list label="Items" [source]="source()" [selected]="selected()" (activated)="activations.push($event.index); chosen.push($event.item)" (failed)="errors.push($event)">
       <ng-template [trVirtualRow]="source()" let-item let-height="height"><span class="label" [attr.data-height]="height">{{ item }}</span></ng-template>
     </tr-virtual-list>
     <button type="button" class="outside">Outside</button>
@@ -42,6 +42,7 @@ class VirtualListHostComponent {
   public readonly source = signal<VirtualListSource<string>>(numbered(1000));
   public readonly selected = signal<number | null>(null);
   public readonly activations: number[] = [];
+  public readonly chosen: string[] = [];
   public readonly errors: unknown[] = [];
 }
 
@@ -50,7 +51,7 @@ class VirtualListHostComponent {
   template: `
     <button type="button" class="before">Before</button>
     <button type="button" class="off" disabled>Off</button>
-    <tr-virtual-list label="Messages" [kind]="kind" [source]="source()" [position]="position()" (activated)="activations.push($event)" (positionChange)="positions.push($event)">
+    <tr-virtual-list label="Messages" [kind]="kind" [source]="source()" [position]="position()" (activated)="activations.push($event.index)" (positionChange)="positions.push($event)">
       <ng-template [trVirtualRow]="source()" [trVirtualRowDescribed]="true" let-item let-labelId="labelId" let-descriptionId="descriptionId">
         <div class="message" [class.long]="item.startsWith('long')"><span class="label" [id]="labelId">{{ item }}</span> <span [id]="descriptionId">sent</span> <button type="button" class="reply">Reply</button></div>
       </ng-template>
@@ -210,7 +211,7 @@ describe("VirtualListComponent", () => {
     await pressAsync("{Enter}{ArrowDown} ");
 
     expect([start, down, up, pageDown, pageUp, end, home]).toEqual(["1", "2", "1", "11", "1", ["item 999", 29_700], ["item 0", 0]]);
-    expect(host.activations).toEqual([0, 1]);
+    expect([host.activations, host.chosen]).toEqual([[0, 1], ["item 0", "item 1"]]);
   });
 
   it("takes keys pressed before it renders from the row they moved to, and from the focused row once its source changes", async () => {
@@ -258,6 +259,17 @@ describe("VirtualListComponent", () => {
     await userEvent.tab({ shift: true });
 
     expect([first, selected, clicked, focused(), host.activations]).toEqual([["1"], [["4"], "true", true], ["6"], "item 5", [5]]);
+  });
+
+  it("counts a selected position outside the list as no selection", async () => {
+    await renderAsync(numbered(5));
+    host.selected.set(-1);
+    await settleAsync();
+    const before = stops();
+    host.selected.set(5);
+    await settleAsync();
+
+    expect([before, stops()]).toEqual([["1"], ["1"]]);
   });
 
   it("keeps the focused row rendered, at its place, while the view scrolls far from it", async () => {
@@ -428,6 +440,24 @@ describe("VirtualListComponent", () => {
     expect([shown, edge, host.errors, retried, failure(), option("item 0").textContent])
       .toEqual([["These items couldn't load.", "Retry", String.empty, "false"], false, [refusal], [null, "Loading…"], null, "item 0"]);
     expect(announced).toEqual([["These items couldn't load.", "assertive"]]);
+  });
+
+  it("lets the focus leave a row that waits for its items for Retry once its read fails, announcing the wait and then the failure", async () => {
+    const source = new VirtualListSourceFixture(200, 30);
+    await renderAsync(source);
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce");
+    host.list().focus();
+    await settleAsync();
+
+    await source.readAt(0).refuseAsync(new Error("The store went away."));
+    await settleAsync();
+    await userEvent.tab();
+    await settleAsync();
+    const onRetry = document.activeElement?.textContent;
+    const reads = source.reads.length;
+    await pressAsync("{Enter}");
+
+    expect([onRetry, source.reads.length, announce.mock.calls]).toEqual(["Retry", reads + 1, [["Loading…", "polite"], ["These items couldn't load.", "assertive"]]]);
   });
 
   it("shows a failure at the end of the view when the rows before it have loaded", async () => {
