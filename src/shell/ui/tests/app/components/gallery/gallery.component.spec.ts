@@ -43,7 +43,7 @@ describe("GalleryComponent", () => {
   it("shows every component and directive the kit exports, so a new control that is not shown here fails this test", async () => {
     fixture = await GalleryFixture.showAsync();
     const controls = Object.entries(kit).filter(([, value]) => typeof value === "function" && ("ɵcmp" in value || "ɵdir" in value));
-    const held = fixture.debugElement.queryAll(By.all()).flatMap(t => Object.values(t.componentInstance as object)).filter(isSignal).map(t => t());
+    const held = fixture.debugElement.queryAll(By.all()).flatMap(t => Object.values((t.componentInstance ?? {}) as object)).filter(isSignal).map(t => t());
     const isShown = (type: Type<unknown>): boolean => fixture.debugElement.queryAllNodes(By.directive(type)).length > 0 || held.some(t => t instanceof type);
 
     const missing = controls.filter(([, value]) => !isShown(value as Type<unknown>)).map(([name]) => name);

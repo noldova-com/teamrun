@@ -104,13 +104,15 @@ describe("VirtualListComponent", () => {
   });
 
   it("measures each row it renders, gives its template that height, and keeps the estimate for rows it never rendered", async () => {
-    await renderAsync(new ArrayVirtualListSource([`${"long ".repeat(40)}item`, "item 1", "item 2"], t => t, 20));
-    const tall = options()[0] as HTMLElement;
-    const slot = tall.parentElement as HTMLElement;
+    await renderAsync(new ArrayVirtualListSource([`${"long ".repeat(40)}item`, ...Array.from({ length: 999 }, (_, t) => `item ${t + 1}`)], t => t, 20));
+    const slots = options().map(t => t.parentElement as HTMLElement);
+    const tall = slots[0] as HTMLElement;
+    const rendered = slots.reduce((sum, t) => sum + t.getBoundingClientRect().height, 0);
 
-    expect(slot.getBoundingClientRect().height).toBeGreaterThan(100);
-    expect(Number(tall.querySelector(".label")?.getAttribute("data-height"))).toBeCloseTo(slot.getBoundingClientRect().height);
-    expect(Math.abs(viewport().scrollHeight - slot.getBoundingClientRect().height - 60)).toBeLessThan(1);
+    expect(tall.getBoundingClientRect().height).toBeGreaterThan(100);
+    expect(Number(tall.querySelector(".label")?.getAttribute("data-height"))).toBeCloseTo(tall.getBoundingClientRect().height);
+    expect(slots.length).toBeLessThan(1000);
+    expect(Math.abs(viewport().scrollHeight - rendered - (1000 - slots.length) * 20)).toBeLessThan(1);
   });
 
   it("keeps the row being read in place while rows above it are inserted, removed, replaced or measured", async () => {
