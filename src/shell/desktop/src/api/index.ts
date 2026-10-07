@@ -59,6 +59,7 @@ export { DeviceIdentityException } from "../exceptions/device-identity.exception
 export { PathCommandException } from "../exceptions/path-command.exception.js";
 export { ProgramException } from "../exceptions/program.exception.js";
 export { UpdateException } from "../exceptions/update.exception.js";
+export { UpdateHandoffException } from "../exceptions/update-handoff.exception.js";
 export { UpdateStopException } from "../exceptions/update-stop.exception.js";
 export { WindowStateException } from "../exceptions/window-state.exception.js";
 export { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
@@ -97,6 +98,7 @@ export { QuitCoordinator } from "../services/quit-coordinator.js";
 export { QuitFlow } from "../services/quit-flow.js";
 export { UpdateController } from "../services/update-controller.js";
 export { UpdateStop } from "../services/update-stop.js";
+export { AppImageReplacement } from "../services/app-image-replacement.js";
 export { AppImageRestart } from "../services/app-image-restart.js";
 export { UpdateWorkQuestion } from "../services/update-work-question.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";
