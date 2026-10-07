@@ -13,8 +13,11 @@ import { VirtualListReadFixture } from "./virtual-list-read.fixture";
 
 export class VirtualListSourceFixture extends VirtualListSource<string> {
   public readonly reads: VirtualListReadFixture[] = [];
+  public readError: Error | null = null;
 
   public readAsync(start: number, end: number, abort: AbortSignal): Promise<readonly string[]> {
+    if (!Object.isNull(this.readError))
+      throw this.readError;
     const read = new VirtualListReadFixture(start, end, abort);
     this.reads.push(read);
     return read.promise;

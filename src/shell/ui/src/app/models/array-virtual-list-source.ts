@@ -28,26 +28,20 @@ export class ArrayVirtualListSource<T> extends VirtualListSource<T> {
   }
 
   public insert(at: number, items: readonly T[]): void {
-    this.change(this.items.slice(0, at).concat(items, this.items.slice(at)), () => this.reportInserted(at, items.length));
+    this.checkInsert(at, items.length);
+    this.items = this.items.slice(0, at).concat(items, this.items.slice(at));
+    this.reportInserted(at, items.length);
   }
 
   public remove(at: number, count: number): void {
-    this.change(this.items.slice(0, at).concat(this.items.slice(at + count)), () => this.reportRemoved(at, count));
+    this.checkRange(at, count);
+    this.items = this.items.slice(0, at).concat(this.items.slice(at + count));
+    this.reportRemoved(at, count);
   }
 
   public replace(at: number, items: readonly T[]): void {
-    this.change(this.items.slice(0, at).concat(items, this.items.slice(at + items.length)), () => this.reportUpdated(at, items.length));
-  }
-
-  private change(items: readonly T[], report: () => void): void {
-    const before = this.items;
-    this.items = items;
-    try {
-      report();
-    }
-    catch (error) {
-      this.items = before;
-      throw error;
-    }
+    this.checkRange(at, items.length);
+    this.items = this.items.slice(0, at).concat(items, this.items.slice(at + items.length));
+    this.reportUpdated(at, items.length);
   }
 }

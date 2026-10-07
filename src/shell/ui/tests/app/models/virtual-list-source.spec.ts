@@ -79,4 +79,23 @@ describe("VirtualListSource", () => {
     }
     expect([source.length(), log]).toEqual([10, []]);
   });
+
+  it("tells every observer even when one throws, keeps the change, and then throws what the first one threw", () => {
+    const source = new VirtualListSourceFixture(10);
+    const log: string[] = [];
+    const first = new Error("The first observer broke.");
+    const breaking = (error: Error): IVirtualListObserver => ({
+      onInserted: () => {
+        throw error;
+      },
+      onRemoved: () => undefined,
+      onUpdated: () => undefined
+    });
+    source.observe(breaking(first));
+    observe(source, "kept", log);
+    source.observe(breaking(new Error("The second observer broke.")));
+
+    expect(() => source.reportInserted(0, 1)).toThrow(first);
+    expect([source.length(), log]).toEqual([11, ["kept inserted 1 at 0, length 11"]]);
+  });
 });

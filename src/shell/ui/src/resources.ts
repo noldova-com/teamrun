@@ -448,6 +448,10 @@ export class Resources {
     return `A read of the ${end - start} items from ${start} to ${end - 1} answered ${count}.`;
   }
 
+  public static formatVirtualListHeightInvalid(height: number): string {
+    return `A row's height must be a number of pixels of 0 or more, not ${height}.`;
+  }
+
   public static formatBadgeCount(count: number): string {
     return count > Resources.badgeLimit ? Resources.badgeOverflow : String(count);
   }
