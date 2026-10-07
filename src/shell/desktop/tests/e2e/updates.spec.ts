@@ -98,7 +98,7 @@ const openAboutAsync = async (page: Page): Promise<Locator> => {
   return page.getByRole("region", { name: "About TeamRun" });
 };
 
-test("an update made ready before TeamRun started offers Restart to update at once, without asking the feed again, or on a Linux copy that is no AppImage fails with the reason, offers no restart, stops nothing and downloads nothing", async ({}, testInfo) => {
+test("an update made ready before TeamRun started offers Restart to update at once, without asking the feed again, on a Mac copy outside Applications only asks the person to move it, or on a Linux copy that is no AppImage fails with the reason, offers no restart, stops nothing and downloads nothing", async ({}, testInfo) => {
   await withReadyUpdateAsync(testInfo, async ({ feed, launchAsync }) => {
     const desktop = await launchAsync();
     const page = desktop.window;
@@ -117,6 +117,18 @@ test("an update made ready before TeamRun started offers Restart to update at on
       expect(DesktopApplicationFixture.isAlive(runtime ?? 0)).toBe(true);
       expect(await desktop.isVisibleAsync()).toBe(true);
     }
+    else if (process.platform === "darwin") {
+      const runtime = await desktop.readRuntimeProcessIdAsync();
+      await expect(page.locator(".tr-update-item")).toHaveText(/Move to Applications to update$/);
+      expect(await readUpdateAsync(page)).toEqual(expect.objectContaining({ kind: "Available", version: VERSION, reason: null }));
+      const about = await openAboutAsync(page);
+      await expect(about.getByRole("status")).toHaveText(/ to Applications to get updates\.$/);
+      await expect(about.getByRole("button", { name: "Restart to update" })).toHaveCount(0);
+      expect(await PageBridgeFixture.evaluateAsync(page, t => t.actOnUpdate("Restart"))).toBe(false);
+      expect(feed.requests).toEqual([]);
+      expect(await desktop.readRuntimeProcessIdAsync()).toBe(runtime);
+      expect(await desktop.isVisibleAsync()).toBe(true);
+    }
     else {
       await expect(page.locator(".tr-update-item")).toHaveText(/Restart to update$/);
       expect(feed.requests).toEqual([]);
@@ -127,6 +139,7 @@ test("an update made ready before TeamRun started offers Restart to update at on
 
 test("Restart to update asks first while work runs, changes nothing when the person cancels, and stops the work when they choose to", async ({}, testInfo) => {
   test.skip(process.platform === "linux", "The development app on Linux fails before it offers the restart; the first workflow covers it.");
+  test.skip(process.platform === "darwin", "The development app on macOS runs outside Applications, where a ready update only shows as available; the first workflow covers it.");
   test.setTimeout(180_000);
   await withReadyUpdateAsync(testInfo, async ({ launchAsync }) => {
     const desktop = await launchAsync();
@@ -159,6 +172,7 @@ test("Restart to update asks first while work runs, changes nothing when the per
 
 test("Restart to update stops TeamRun in every data directory of the installation, and when the handoff fails, TeamRun runs on with the update ready and the reason", async ({}, testInfo) => {
   test.skip(process.platform === "linux", "The development app on Linux fails before it offers the restart; the first workflow covers it.");
+  test.skip(process.platform === "darwin", "The development app on macOS runs outside Applications, where a ready update only shows as available; the first workflow covers it.");
   test.setTimeout(180_000);
   await withReadyUpdateAsync(testInfo, async ({ launchAsync }) => {
     const other = await launchAsync();

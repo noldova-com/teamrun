@@ -6858,7 +6858,8 @@ export declare class UpdateController {
 
   /**
    * Starts: a ready record whose version is newer than the installed one and whose file is the updater's package and
-   * still has its SHA-512 shows as Ready, without the network; any other record is removed. Then the automatic checks begin: 30 seconds after the
+   * still has its SHA-512 shows as Ready, without the network, or as Available when the application must first move
+   * to an Applications folder; any other record is removed. Then the automatic checks begin: 30 seconds after the
    * start and then every hour, once, or never, as the followed choice says.
    *
    * @returns A promise that settles once the record is read.
@@ -6891,12 +6892,13 @@ export declare class UpdateController {
 
   /**
    * Runs the window's action: `Check` starts a check unless one, a download or a ready update rules it out, and
-   * `Restart` starts the restart that installs the ready update unless one runs, the controller has none or the
-   * application must first move to an Applications folder. A restart clears the reason an earlier one left. A
+   * `Restart` starts the restart that installs the ready update unless one runs or the controller has none, which it
+   * never has while the application must first move to an Applications folder. A restart clears the reason an earlier
+   * one left. A
    * restart that fails leaves the update ready, with its reason, except on a {@link StaleUpdateException}: then the
    * controller removes the ready record and shows the update as failed, so checks run again. Once it holds the lock,
-   * a check that finds a usable ready update another desktop of the installation recorded shows it as ready instead
-   * of reaching the feed.
+   * a check that finds a usable ready update another desktop of the installation recorded shows it as ready, or as
+   * available when the application must move, instead of reaching the feed.
    *
    * @param action The action.
    * @returns Whether the action started.
