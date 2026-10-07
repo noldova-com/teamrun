@@ -1152,7 +1152,8 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
   A test build, and a package made for a native update check, name instead a local feed given to the build when it is made, with `--update-feed <url>`, an HTTPS URL, or an HTTP URL of `localhost`, `127.0.0.1` or `[::1]`, ending in `/`; `release:assets` refuses a package whose product file names any feed but the production one.
   A desktop that never checks shows its updates as off.
-  The desktop gives electron-updater the product version, since it would otherwise compare the feed's version with Electron's, which a development copy reports as Electron's own.
+  A packaged desktop creates electron-updater's updater as electron-updater does by default, so the updater reads the version Electron takes from the package's manifest, the product version, and downloads with electron-updater's own downloader.
+  The development copy and a test build give the updater the product version themselves, since Electron reports its own version there, and with a version given that way electron-updater makes no downloader: they check for updates but cannot download one, so a download is checked only with packages.
   A desktop whose updater can't be created shows its updates as failed and logs why, and starts as usual.
   The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
 - **Versions.**

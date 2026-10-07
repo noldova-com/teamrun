@@ -236,7 +236,7 @@ export class DesktopApplication {
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
-    createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    createUpdater: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
@@ -273,7 +273,7 @@ export class DesktopApplication {
       : SpellingDictionaries.install(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.dictionaryFolderSegments), profileFolder, t => log.write(t));
     const spelling = new SpellChecker(
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
-    const [updater, updatesOff] = DesktopApplication.createUpdater(createUpdater, installation, log);
+    const [updater, updatesOff] = DesktopApplication.createUpdater(createUpdater, installation, isPackaged, log);
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
       spelling, installation, () => recordDesktopAsync(installation), updater, createUpdateLock(installation, t => log.write(t)), updatesOff);
@@ -1111,11 +1111,12 @@ export class DesktopApplication {
   }
 
   private static createUpdater(
-    create: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    create: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
     installation: Installation,
+    isPackaged: boolean,
     log: DesktopLog): [IUpdater | null, UpdateStatus] {
     try {
-      return [create(installation, t => log.write(t)), UpdateStatus.off];
+      return [create(installation, isPackaged, t => log.write(t)), UpdateStatus.off];
     }
     catch (error) {
       log.write(Resources.formatUpdaterNotCreated(String(error)));
