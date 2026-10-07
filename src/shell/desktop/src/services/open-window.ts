@@ -29,6 +29,7 @@ export class OpenWindow implements IQuitPrompt {
   private canClose: boolean = false;
   private isPainted: boolean = false;
   private isSettled: boolean = false;
+  private isReady: boolean = false;
   private settleTimer: NodeJS.Timeout | null = null;
   private paintTimer: NodeJS.Timeout | null = null;
 
@@ -107,6 +108,14 @@ export class OpenWindow implements IQuitPrompt {
     this.showWhenReady();
   }
 
+  public focus(): void {
+    if (!this.isReady)
+      return;
+    if (this.window.isMinimized())
+      this.window.restore();
+    this.window.focus();
+  }
+
   private stopSettleTimer(): void {
     if (!Object.isNull(this.settleTimer))
       clearTimeout(this.settleTimer);
@@ -114,7 +123,10 @@ export class OpenWindow implements IQuitPrompt {
   }
 
   private showWhenReady(): void {
-    if (this.isPainted && this.isSettled && !this.window.isDestroyed() && !this.window.isVisible())
+    if (!this.isPainted || !this.isSettled || this.window.isDestroyed())
+      return;
+    this.isReady = true;
+    if (!this.window.isVisible())
       this.bounds.show();
   }
 

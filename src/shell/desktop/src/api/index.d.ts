@@ -4603,6 +4603,22 @@ export declare class OpenWindow implements IQuitPrompt {
    * ```
    */
   public showNow(): void;
+
+  /**
+   * Brings the window forward, restoring it when minimized. A window not shown yet is left to show once it is
+   * painted and settled, so focusing it never shows it early: it shows focused then, maximized when its restored
+   * bounds were.
+   *
+   * @example
+   * ```ts
+   * import type { OpenWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function bringForward(open: OpenWindow): void {
+   *   open.focus();
+   * }
+   * ```
+   */
+  public focus(): void;
 }
 
 /**
