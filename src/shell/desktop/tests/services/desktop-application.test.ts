@@ -2081,6 +2081,26 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async startsWithItsUpdatesFailedAndTheReasonLoggedWhenItsUpdaterCannotBeCreated(): Promise<void> {
+    const electron = new FakeElectron();
+    const process = new FakeDesktopProcess("linux");
+    DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(), [], () => Promise.resolve(true), () => {
+      throw new Error("ERR_UPDATER_INVALID_VERSION: App version is not a valid semver version: \"0.0\"");
+    });
+    await DesktopStartFixture.openAsync(electron);
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+
+    const state = electron.ipcMain.invoke("teamrun:readUpdate", trusted);
+    const acted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Check");
+
+    Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: null, reason: "TeamRun couldn't start checking for updates.", mustMove: false }), JSON.stringify(state));
+    Assert.isFalse(acted as boolean);
+    Assert.areEqual(1, electron.windows.length);
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process,
+      "The updater could not be created, so this desktop doesn't check for updates: Error: ERR_UPDATER_INVALID_VERSION: App version is not a valid semver version: \"0.0\"").length);
+  }
+
+  @TestMethod
   public postsAReadyUpdateOnceOverItsRuntimeConnection(): Promise<void> {
     return DesktopApplicationTests.withReadyFileAsync(async record => {
       const files = new FakeDeviceFiles();

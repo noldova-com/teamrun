@@ -28,6 +28,7 @@ import { DeviceFileStore } from "./services/device-file-store.js";
 import { DeviceIdentity } from "./services/device-identity.js";
 import { FeedUpdater } from "./services/feed-updater.js";
 import { PathCommand } from "./services/path-command.js";
+import { ProductAppAdapter } from "./services/product-app-adapter.js";
 import { PublisherCheck } from "./services/publisher-check.js";
 import { UpdateCheckLock } from "./services/update-check-lock.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
@@ -86,7 +87,9 @@ DesktopApplication.start(
     const source = FeedSource.create(product.updateFeed, product.name, process.platform, process.arch, t => net.fetch(t));
     if (Object.isNull(source))
       return null;
-    const updater = process.platform === Resources.windowsPlatform ? new NsisUpdater() : process.platform === Resources.macPlatform ? new MacUpdater() : new AppImageUpdater();
+    const adapter = new ProductAppAdapter();
+    const updater = process.platform === Resources.windowsPlatform ? new NsisUpdater(undefined, adapter)
+      : process.platform === Resources.macPlatform ? new MacUpdater(undefined, adapter) : new AppImageUpdater(undefined, adapter);
     const check = new PublisherCheck(product.windowsPublisher, verifySignature, log, Date.now);
     return new FeedUpdater(updater, source, installation.folder, getAppCacheDir(), product.slug, updater instanceof NsisUpdater ? t => check.checkAsync(t) : null, log);
   },
