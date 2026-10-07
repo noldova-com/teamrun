@@ -656,6 +656,7 @@ When a runtime it started exits before it publishes discovery, the launcher read
   - When neither a mount nor an extraction works, the start fails with the reason in the start log.
   - The Bash step writes each mount's process and each extraction's folder to its copy record, `logs/copy-<UUID>.log` beside the start log, and removes the record once the copy ends.
     The launcher removes its start log once it connects, so the start log cannot keep them.
+    The runtime finds its own record by its start log's UUID and, when it prepares for an update, lists its mount's process, matched as below ([Stopping for an update](#stopping-for-an-update)).
     A runtime that owns the data directory ends any mount an earlier Bash step left running when that Bash no longer runs, and removes any extraction it left.
     It matches a mount by process id, command line and the AppImage's path, never by name alone.
     It does this once its log is open, and writes each record it cannot settle there with the reason, leaving the record; the runtime still starts.
@@ -1041,6 +1042,7 @@ Each target is packaged on its own platform and processor.
   It needs `MAC_CERTIFICATE` (the certificate and its private key as a base64 PKCS #12), `MAC_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8` (the key's text), `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`, and checks them before anything is built.
   Packaging takes them out of its environment as it starts, together with the Windows credentials; only electron-builder receives them.
   - The key is written to a file in `_build/package/signing` that only its owner can read, and that folder is removed once packaging ends, whether it succeeded or not.
+  - electron-builder imports the certificate into a temporary keychain and finds its identity there; an unsigned build never looks for a signing identity on the machine.
   - electron-builder signs the app and its helpers with the hardened runtime and `assets/macos/entitlements.plist`, which allows only the JIT that V8 needs, then notarizes the app and staples the ticket.
     A signed package keeps its signature after the fuses are flipped, so it is not signed ad hoc again.
   - Afterwards packaging opens the disk image and expands the archive, and checks each app: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl` must accept it as notarized; and `stapler` must find its ticket.
@@ -1229,7 +1231,10 @@ The update stop of the desktop where the person chose Restart to update coordina
    It then sets the barrier to `Closing`, and waits up to 10 more seconds for every other desktop, those step 3 listed and those the installation's `desktops` folder lists that still run, to see it, quit and be verified the same way.
 6. **Handoff.**
    It sets the barrier to `HandedOff` and calls the handoff, then records in the barrier the process the handoff names as taking over.
-   After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage.
+   After an AppImage update it first starts `/bin/bash` through a runtime launch's Bash step, which closes the descriptors it inherited.
+   That Bash waits until the desktop is no longer its parent, so neither a reused process id nor an exited desktop that is not yet reaped holds it, then starts the replaced AppImage from the root folder.
+   The AppImage starts without the old mount's `APPIMAGE`, `APPDIR`, `ARGV0` and `OWD`, and without the entries the AppImage's `AppRun` added to `PATH`, `XDG_DATA_DIRS`, `LD_LIBRARY_PATH` and `GSETTINGS_SCHEMA_DIR`.
+   A handoff that fails ends that Bash, so TeamRun does not start again when the desktop later quits.
 
 A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and once the update has ended, the barrier missing or its holder gone before the handoff, it unfreezes and reconnects.
 A desktop without a runtime connection, while it reconnects, shows a failed start or is still starting, reads the barrier every second and quits when it is `Closing` for another desktop that still runs.

@@ -292,7 +292,7 @@ class PackageTests {
         assert.deepEqual(builder.environments, [{
           HOME: "fixture-home",
           ELECTRON_BUILDER_CACHE: path.join(folder, "tool-cache"),
-          CSC_IDENTITY_AUTO_DISCOVERY: "false",
+          CSC_IDENTITY_AUTO_DISCOVERY: "true",
           CSC_LINK: "fixture-certificate",
           CSC_KEY_PASSWORD: "fixture-password",
           APPLE_API_KEY: path.join(signing, "notarization-key.p8"),
