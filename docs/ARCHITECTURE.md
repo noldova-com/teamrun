@@ -785,6 +785,8 @@ A read of the saved bounds that ends with the connection is tried again the next
 A new window is 1280 by 800 pixels, but no more than nine tenths of the primary display's work area on each side, and centered on it.
 Saved bounds keep their size when it fits the work area of the display that shows most of the window; a larger size shrinks to no more than nine tenths of that work area on each side, centered on that display, and a saved size below the window's minimum, 640 by 480 pixels, grows to it.
 Bounds that no display shows open centered on the primary display, sized by the same rule, and a window saved maximized opens maximized.
+The desktop process that the system started, and so activated, opens the window, and showing it makes it the focused window; the runtime never opens a window.
+A window still hidden when its saved bounds apply is maximized only as it shows, because maximizing a hidden window shows it without focusing it, and the window would then open unfocused in an active TeamRun.
 A window whose runtime refuses, or is still connecting after two seconds, shows at once with its startup state and applies its bounds once the runtime is ready.
 A window whose page has not reported its paint after ten seconds shows anyway, and the desktop log records whether the page was still loading, had crashed, or loaded without reporting.
 When a window's page stops, the desktop shows the window and asks whether to reload it or quit; when the page stops again within ten seconds of a reload, it offers the log folder instead, so a page that fails while loading never becomes a loop.

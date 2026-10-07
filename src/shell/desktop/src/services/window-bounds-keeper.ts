@@ -25,6 +25,7 @@ export class WindowBoundsKeeper {
   private store: IWindowStateStore | null = null;
   private timer: NodeJS.Timeout | null = null;
   private hasUnsaved: boolean = false;
+  private isMaximizedAtShow: boolean = false;
 
   public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog, holdsPersonsMoves: boolean) {
     this.window = window;
@@ -56,8 +57,16 @@ export class WindowBoundsKeeper {
     const state = WindowState.fromJson(saved);
     const bounds = state.placeOn(areas, ScreenArea.of(this.displays.getPrimaryDisplay().workArea));
     this.window.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
-    if (state.isMaximized)
+    this.isMaximizedAtShow = state.isMaximized && !this.window.isVisible();
+    if (state.isMaximized && !this.isMaximizedAtShow)
       this.window.maximize();
+  }
+
+  public show(): void {
+    if (this.isMaximizedAtShow)
+      this.window.maximize();
+    this.isMaximizedAtShow = false;
+    this.window.show();
   }
 
   public async saveAsync(): Promise<void> {
@@ -71,7 +80,7 @@ export class WindowBoundsKeeper {
     }
     const bounds = this.window.getNormalBounds();
     this.hasUnsaved = true;
-    await this.store.writeAsync(new WindowState(bounds.x, bounds.y, bounds.width, bounds.height, this.window.isMaximized()).toJson());
+    await this.store.writeAsync(new WindowState(bounds.x, bounds.y, bounds.width, bounds.height, this.window.isMaximized() || this.isMaximizedAtShow).toJson());
     this.hasUnsaved = false;
   }
 

@@ -73,6 +73,7 @@ export class FakeDesktopWindow implements IDesktopWindow {
   public maximize(): void {
     this.calls.push("maximize");
     this.isMaximizedNow = true;
+    this.isShown = true;
   }
 
   public change(event: string): void {

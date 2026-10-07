@@ -7197,8 +7197,10 @@ export declare class WindowBoundsKeeper {
 
   /**
    * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display
-   * shows it, otherwise the saved size centered, then maximized when it was. When the person already moved or
-   * resized the window, those bounds stay and are saved instead of the saved ones being applied.
+   * shows it, otherwise the saved size centered, then maximized when it was. A window not shown yet is maximized
+   * only as {@link WindowBoundsKeeper.show} shows it, since maximizing shows a hidden window without focusing it,
+   * and saves count it as maximized meanwhile. When the person already moved or resized the window, those bounds
+   * stay and are saved instead of the saved ones being applied.
    *
    * @param store Where the bounds are kept.
    * @returns A promise that settles once the saved bounds are applied, or at once when none are saved.
@@ -7214,6 +7216,21 @@ export declare class WindowBoundsKeeper {
    * ```
    */
   public restoreAsync(store: IWindowStateStore): Promise<void>;
+
+  /**
+   * Shows the window, maximizing it first when its restored bounds were maximized while it was hidden, so it opens
+   * maximized and focused.
+   *
+   * @example
+   * ```ts
+   * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function reveal(keeper: WindowBoundsKeeper): void {
+   *   keeper.show();
+   * }
+   * ```
+   */
+  public show(): void;
 
   /**
    * Saves the window's current bounds at once, cancelling a pending save; does nothing after the window is gone, or
