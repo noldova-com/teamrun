@@ -91,6 +91,18 @@ describe("VirtualListCache", () => {
     expect([cache.hasFailed, cache.itemAt(99)]).toEqual([false, "item 99"]);
   });
 
+  it("tells whether an item's page failed, and finds the place of the first loaded item that passes a test", async () => {
+    const source = new VirtualListSourceFixture(100);
+    const cache = createCache(source);
+
+    cache.request(0, 100);
+    await source.readAt(0).answerAsync();
+    await source.readAt(1).refuseAsync(new Error("The store went away."));
+
+    expect([cache.isFailed(49), cache.isFailed(50), cache.isFailed(99)]).toEqual([false, true, true]);
+    expect([cache.findIndex(t => t === "item 7"), cache.findIndex(t => t === "item 70")]).toEqual([7, -1]);
+  });
+
   it("moves its items with the items inserted or removed before them, drops changed ones, and stops every read and failure in flight", async () => {
     const source = new VirtualListSourceFixture(200);
     const cache = createCache(source);

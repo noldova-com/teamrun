@@ -44,7 +44,7 @@ describe("GalleryComponent", () => {
     fixture = await GalleryFixture.showAsync();
     const controls = Object.entries(kit).filter(([, value]) => typeof value === "function" && ("ɵcmp" in value || "ɵdir" in value));
 
-    const missing = controls.filter(([, value]) => fixture.debugElement.queryAll(By.directive(value as Type<unknown>)).length === 0).map(([name]) => name);
+    const missing = controls.filter(([, value]) => fixture.debugElement.queryAllNodes(By.directive(value as Type<unknown>)).length === 0).map(([name]) => name);
 
     expect(controls.length).toBeGreaterThan(20);
     expect(missing).toEqual([]);

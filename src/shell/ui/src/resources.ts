@@ -384,6 +384,13 @@ export class Resources {
   public static readonly virtualListEstimate: number = 120;
   public static readonly virtualListPageSize: number = 50;
   public static readonly virtualListCapacity: number = 150;
+  public static readonly virtualListOverscan: number = 600;
+  public static readonly virtualListPrefetch: number = 400;
+  public static readonly virtualListRowSelector: string = "[data-tr-row]";
+  public static readonly virtualListRowKey: string = "trRow";
+  public static readonly virtualListLoading: string = "Loading…";
+  public static readonly virtualListFailed: string = "These items couldn't load.";
+  public static readonly virtualListRetry: string = "Retry";
   public static readonly configurationTableHeadingLevel: number = 3;
   public static readonly scrollOverflow: RegExp = /auto|scroll/u;
   public static readonly reducedMotionQuery: string = "(prefers-reduced-motion: reduce)";
@@ -411,6 +418,10 @@ export class Resources {
 
   public static formatTreeMoveRefused(id: string, parentId: string): string {
     return `The row "${id}" cannot move into "${parentId}": that parent is missing or inside the row.`;
+  }
+
+  public static formatVirtualListOptionSelector(index: number): string {
+    return `[data-tr-row="${index}"] > [role=option]`;
   }
 
   public static formatTreeRowMissing(id: string): string {

@@ -48,6 +48,24 @@ LICENSE file in the root directory of this source tree.
   </tr-gallery-cell>
 </tr-gallery-specimen>
 
+<tr-gallery-specimen [name]="text.virtualList" [size]="sizes.Wide">
+  <tr-gallery-cell [caption]="text.defaultState">
+    <tr-virtual-list class="tr-gallery-list" [label]="text.virtualListLabel" [source]="listItems" [selected]="listSelected()" (activated)="listSelected.set($event)">
+      <ng-template [trVirtualRow]="listItems" let-item>{{ item }}</ng-template>
+    </tr-virtual-list>
+  </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.virtualListLoadingCaption">
+    <tr-virtual-list class="tr-gallery-list" [label]="text.virtualListLoadingCaption" [source]="listLoading">
+      <ng-template [trVirtualRow]="listLoading" let-item>{{ item }}</ng-template>
+    </tr-virtual-list>
+  </tr-gallery-cell>
+  <tr-gallery-cell [caption]="text.error">
+    <tr-virtual-list class="tr-gallery-list" [label]="text.error" [source]="listFailing">
+      <ng-template [trVirtualRow]="listFailing" let-item>{{ item }}</ng-template>
+    </tr-virtual-list>
+  </tr-gallery-cell>
+</tr-gallery-specimen>
+
 <tr-gallery-specimen [name]="text.sectionHeader" [size]="sizes.Wide">
   <tr-gallery-cell [caption]="text.defaultState">
     <div class="tr-gallery-sections">

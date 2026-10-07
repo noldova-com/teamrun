@@ -53,6 +53,17 @@ export class VirtualListCache<T> implements IVirtualListObserver {
     return this.items.get(index);
   }
 
+  public isFailed(index: number): boolean {
+    return this.failed.has(Math.floor(index / this.pageSize));
+  }
+
+  public findIndex(test: (item: T) => boolean): number {
+    for (const [index, item] of this.items)
+      if (test(item))
+        return index;
+    return -1;
+  }
+
   public request(start: number, end: number): void {
     this.wantedStart = start;
     this.wantedEnd = Math.min(end, this.source.length());

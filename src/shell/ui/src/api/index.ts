@@ -47,6 +47,8 @@ export { ToolbarItemDirective } from "../app/components/toolbar/toolbar-item.dir
 export { ToolbarDirective } from "../app/components/toolbar/toolbar.directive";
 export { TooltipDirective } from "../app/components/tooltip/tooltip.directive";
 export { TreeComponent } from "../app/components/tree/tree.component";
+export { VirtualListComponent } from "../app/components/virtual-list/virtual-list.component";
+export { VirtualRowDirective } from "../app/components/virtual-list/virtual-row.directive";
 export { ButtonVariant } from "../app/enums/button-variant";
 export { ChipKind } from "../app/enums/chip-kind";
 export { DialogSize } from "../app/enums/dialog-size";
@@ -62,6 +64,7 @@ export { ThemeException } from "../app/exceptions/theme.exception";
 export { TreeMoveException } from "../app/exceptions/tree-move.exception";
 export { VirtualListException } from "../app/exceptions/virtual-list.exception";
 export type { IVirtualListObserver } from "../app/interfaces/i-virtual-list-observer";
+export type { IVirtualRowContext } from "../app/interfaces/i-virtual-row-context";
 export { ArrayVirtualListSource } from "../app/models/array-virtual-list-source";
 export { ColorToken } from "../app/models/color-token";
 export { DialogTokens } from "../app/models/dialog-tokens";
