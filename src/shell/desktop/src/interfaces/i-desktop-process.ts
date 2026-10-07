@@ -18,6 +18,7 @@ export interface IDesktopProcess {
   readonly platform: string;
   readonly execPath: string;
   readonly homeFolder: string;
+  readonly temporaryFolder: string;
   readonly workingDirectory: string;
   readonly isDefaultApp: boolean;
   readonly errorOutput: Writable;

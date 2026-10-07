@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -19,7 +19,7 @@ import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateReady, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import {
-  ConnectionException, DataDirectory, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
+  ConnectionException, DataDirectory, DataDirectoryLocator, DeviceFolder, Installation, PreShellDataFoundException, ProcessPresence, ProductInfo, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
   RuntimeDiscovery, UpdateBarrierState, UpdateBarrierStatus, UpdateInProgressException
 } from "@noldova/teamrun-shell-runtime";
 import { type IIpcEvent, PathCommandException, PathCommandOutcome, UnusableFolderException, UpdateException, UpdateHandoffException } from "@noldova/teamrun-shell-desktop";
@@ -2162,6 +2162,79 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  @TestData("win32")
+  @TestData("darwin")
+  public async keepsItsFoldersForTheNewVersionThatWindowsOrMacOSStartsWithoutArguments(platform: string): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const kept: unknown[] = [];
+    const before = Date.now();
+    await DesktopApplicationTests.restartToUpdateAsync(platform, handoff, async (electron, desktop) => {
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0") || electron.nativeUpdater.installs > 0);
+
+      Assert.areEqual(JSON.stringify([{ version: "999.0.0", arguments: [`--device-dir=${desktop.temporaryFolder}`] }]),
+        JSON.stringify(kept.map(t => ({ version: Reflect.get(Object(t), "version"), arguments: Reflect.get(Object(t), "arguments") }))));
+      const written = Number(Reflect.get(Object(kept[0]), "written"));
+      Assert.isTrue(written >= before && written <= Date.now(), String(written));
+    }, null, true, process.pid, desktop => {
+      handoff.handOff = async () => {
+        kept.push(await DesktopApplicationTests.readKeptAsync(desktop));
+        return 5230;
+      };
+      return Promise.resolve();
+    });
+  }
+
+  @TestMethod
+  public async keepsNoFoldersOnLinuxWhereTheRestartPassesThemOn(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const kept: unknown[] = [];
+    await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async electron => {
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(JSON.stringify([null]), JSON.stringify(kept));
+    }, null, true, process.pid, desktop => {
+      handoff.handOff = async () => {
+        kept.push(await DesktopApplicationTests.readKeptAsync(desktop));
+        return null;
+      };
+      return Promise.resolve();
+    });
+  }
+
+  @TestMethod
+  public async failsTheUpdateWithoutHandingItOffWhenItCannotKeepItsFolders(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    await DesktopApplicationTests.restartToUpdateAsync("win32", handoff, async electron => {
+      const trusted = DesktopStartFixture.trustedEvent("win32");
+      await Condition.waitAsync(() => Object.isString(Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "reason")));
+
+      Assert.areEqual("TeamRun couldn't keep its data and device folders for the new version, so the update wasn't installed.",
+        Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "reason"));
+      Assert.areEqual(0, handoff.handedOff.length);
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+    }, null, true, process.pid, desktop => mkdir(join(DesktopApplicationTests.keptFile(desktop), "held"), { recursive: true }));
+  }
+
+  @TestMethod
+  public async logsTheKeptFoldersItCouldNotRemoveAfterAHandoffThatFailed(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    await DesktopApplicationTests.restartToUpdateAsync("win32", handoff, async (_electron, desktop) => {
+      await Condition.waitAsync(() => DesktopStartFixture.readErrors(desktop, "The update failed: ").length === 1);
+
+      Assert.areEqual(1, DesktopStartFixture.readErrors(desktop, "The folders kept for the new version could not be removed after the update failed: ").length);
+      Assert.areEqual(JSON.stringify(["The update failed: The installer could not be started."]), JSON.stringify(DesktopStartFixture.readErrors(desktop, "The update failed: ")));
+    }, null, true, process.pid, desktop => {
+      handoff.handOff = async () => {
+        const file = DesktopApplicationTests.keptFile(desktop);
+        await rm(file);
+        await mkdir(join(file, "held"), { recursive: true });
+        throw new UpdateHandoffException("The installer could not be started.");
+      };
+      return Promise.resolve();
+    });
+  }
+
+  @TestMethod
   public async stopsItsTrayHostMonitorAndTrayBeforeItExitsAfterTheHandoff(): Promise<void> {
     const handoff = new FakeUpdateHandoff();
     await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async (electron, desktop) => {
@@ -2195,7 +2268,7 @@ export class DesktopApplicationTests {
   public async stillAsksBeforeQuittingAfterAHandoffThatFailed(platform: string): Promise<void> {
     const handoff = new FakeUpdateHandoff();
     handoff.handOff = () => Promise.reject(new UpdateHandoffException("The installer could not be started."));
-    await DesktopApplicationTests.restartToUpdateAsync(platform, handoff, async electron => {
+    await DesktopApplicationTests.restartToUpdateAsync(platform, handoff, async (electron, desktop) => {
       const trusted = DesktopStartFixture.trustedEvent(platform);
       await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "reason") === "The installer could not be started.");
 
@@ -2207,6 +2280,7 @@ export class DesktopApplicationTests {
       Assert.isTrue(electron.app.calls.includes("quit prevented"));
       Assert.isFalse(electron.app.calls.includes("exit 0"));
       Assert.areEqual(0, electron.nativeUpdater.installs);
+      Assert.isFalse(existsSync(DesktopApplicationTests.keptFile(desktop)));
     });
   }
 
@@ -3015,7 +3089,8 @@ export class DesktopApplicationTests {
     run: (electron: FakeElectron, desktop: FakeDesktopProcess, installation: Installation, launcher: FakeRuntimeLauncher) => Promise<void>,
     target: FakeRuntimeConnection | null = null,
     paints: boolean = true,
-    runtimeProcessId: number = process.pid): Promise<void> {
+    runtimeProcessId: number = process.pid,
+    beforeRestartAsync: (desktop: FakeDesktopProcess) => Promise<unknown> = () => Promise.resolve()): Promise<void> {
     await DesktopApplicationTests.withReadyFileAsync(async record => {
       const folder = await mkdtemp(join(tmpdir(), "teamrun-restart-"));
       try {
@@ -3023,6 +3098,7 @@ export class DesktopApplicationTests {
         files.updateReady.kept = record;
         const desktop = new FakeDesktopProcess(platform, [`--device-dir=${folder}`], { SystemRoot: process.env["SystemRoot"] });
         desktop.processId = process.pid;
+        desktop.temporaryFolder = folder;
         const electron = new FakeElectron();
         const installations: Installation[] = [];
         const launcher = Object.isNull(target) ? new FakeRuntimeLauncher() : new FakeRuntimeLauncher(new FakeRuntimeConnection(), target);
@@ -3042,6 +3118,7 @@ export class DesktopApplicationTests {
         }
         const trusted = DesktopStartFixture.trustedEvent(platform);
         await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "kind") === "Ready");
+        await beforeRestartAsync(desktop);
 
         const isStarted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Restart");
 
@@ -3052,6 +3129,16 @@ export class DesktopApplicationTests {
         await rm(folder, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
       }
     });
+  }
+
+  private static keptFile(desktop: FakeDesktopProcess): string {
+    return join(desktop.temporaryFolder, `${ProductInfo.current.slug}-restart-${basename(Installation.locate(desktop.temporaryFolder, desktop.execPath, desktop.platform))}.json`);
+  }
+
+  private static async readKeptAsync(desktop: FakeDesktopProcess): Promise<unknown> {
+    const file = DesktopApplicationTests.keptFile(desktop);
+    const value: unknown = existsSync(file) ? JSON.parse(await readFile(file, "utf8")) : null;
+    return value;
   }
 
   private static updateStates(window: FakeDesktopWindow): unknown[] {

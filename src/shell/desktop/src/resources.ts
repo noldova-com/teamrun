@@ -381,6 +381,26 @@ export class Resources {
     return `${ProductInfo.current.slug}-restart`;
   }
 
+  public static readonly restartVersionField: string = "version";
+  public static readonly restartArgumentsField: string = "arguments";
+  public static readonly restartWrittenField: string = "written";
+  public static readonly restartArgumentsLimit: number = 600000;
+  public static get restartArgumentsNotWritten(): string {
+    return `${Resources.applicationName} couldn't keep its data and device folders for the new version, so the update wasn't installed.`;
+  }
+
+  public static formatRestartArgumentsFile(installationId: string): string {
+    return `${ProductInfo.current.slug}-restart-${installationId}.json`;
+  }
+
+  public static formatRestartArgumentsTaken(launchArguments: readonly string[]): string {
+    return `The desktop runs on the folders of the version it updated: ${launchArguments.join(" ")}`;
+  }
+
+  public static formatRestartArgumentsNotRemoved(error: string): string {
+    return `The folders kept for the new version could not be removed after the update failed: ${error}`;
+  }
+
   public static readonly permissionBits: number = 0o7777;
   public static readonly appImagePartPattern: RegExp = /^\.(.+)\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.part$/;
   public static readonly readFlag: string = "r";
