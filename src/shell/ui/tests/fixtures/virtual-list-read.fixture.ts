@@ -29,12 +29,12 @@ export class VirtualListReadFixture {
   public async answerAsync(items?: readonly string[]): Promise<void> {
     this.isSettled = true;
     this.resolver(items ?? Array.from({ length: this.end - this.start }, (_, t) => `item ${this.start + t}`));
-    await new Promise(t => setTimeout(t));
+    await this.promise;
   }
 
   public async refuseAsync(error: unknown): Promise<void> {
     this.isSettled = true;
     this.rejecter(error);
-    await new Promise(t => setTimeout(t));
+    await this.promise.catch(() => undefined);
   }
 }

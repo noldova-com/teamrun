@@ -109,9 +109,14 @@ export class VirtualListCache<T> implements IVirtualListObserver {
     for (let index = read.start; index < read.end; index++)
       this.stale.delete(index);
     this.loading.set(page, read);
-    void new Promise<readonly T[]>(t => t(this.source.readAsync(read.start, read.end, read.controller.signal))).then(
-      t => this.receive(page, read, t),
-      (error: unknown) => this.fail(page, read, error));
+    try {
+      void this.source.readAsync(read.start, read.end, read.controller.signal).then(
+        t => this.receive(page, read, t),
+        (error: unknown) => this.fail(page, read, error));
+    }
+    catch (error) {
+      this.fail(page, read, error);
+    }
   }
 
   private receive(page: number, read: VirtualListPageRead, items: readonly T[]): void {
