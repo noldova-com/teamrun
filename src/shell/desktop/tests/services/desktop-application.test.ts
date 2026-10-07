@@ -10,19 +10,18 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import {
-  ConnectionException, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
+  ConnectionException, DataDirectory, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
   UpdateBarrierState, UpdateBarrierStatus, UpdateInProgressException
 } from "@noldova/teamrun-shell-runtime";
-import { type IIpcEvent, PathCommandException, PathCommandOutcome, UpdateException } from "@noldova/teamrun-shell-desktop";
+import { type IIpcEvent, PathCommandException, PathCommandOutcome, UnusableFolderException, UpdateException } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
@@ -1095,9 +1094,44 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public keepsAPackagedBuildsDataInThePersonsDataDirectory(): void {
+  public resolvesRelativeFoldersAgainstTheFolderItWasStartedInBeforeUsingThem(): void {
     const electron = new FakeElectron(true, true);
-    const process = new FakeDesktopProcess("linux");
+    const files = new FakeDeviceFiles();
+    const process = new FakeDesktopProcess("linux", ["/opt/teamrun/teamrun", "--data-dir=data", "--device-dir=./device"]);
+
+    const [settings] = DesktopStartFixture.start(electron, process, undefined, undefined, files);
+
+    const data = join(process.workingDirectory, "data");
+    Assert.areEqual(data, settings?.dataDirectory.root);
+    Assert.areEqual(`setPath userData ${new DataDirectory(data).profileFolder}`, electron.app.calls.find(t => t.startsWith("setPath")));
+    Assert.isTrue(files.created.length > 0 && files.created.every(([folder]) => folder.startsWith(join(process.workingDirectory, "device"))), JSON.stringify(files.created));
+  }
+
+  @TestMethod
+  @TestData("/home/person/work", "/home/person/work")
+  @TestData(null, null)
+  public resolvesRelativeFoldersOfAnAppImageAgainstTheFolderItsLauncherWasStartedIn(startFolder: string | null, expected: string | null): void {
+    const process = new FakeDesktopProcess("linux", ["/electron/electron", "--data-dir=data", "--device-dir=device"], {
+      APPIMAGE: "/home/person/Applications/TeamRun.AppImage",
+      APPDIR: "/electron",
+      ...Object.isNull(startFolder) ? {} : { OWD: startFolder }
+    });
+    const files = new FakeDeviceFiles();
+
+    const [settings] = DesktopStartFixture.start(new FakeElectron(true, true), process, undefined, undefined, files);
+
+    const folder = expected ?? process.workingDirectory;
+    Assert.areEqual(resolve(folder, "data"), settings?.dataDirectory.root);
+    Assert.isTrue(files.created.length > 0 && files.created.every(([t]) => t.startsWith(resolve(folder, "device"))), JSON.stringify(files.created));
+  }
+
+  @TestMethod
+  @TestData("--lang=en-US")
+  @TestData("--data-dir=")
+  @TestData("--data-dir= ")
+  public keepsAPackagedBuildsDataInThePersonsDataDirectory(argument: string): void {
+    const electron = new FakeElectron(true, true);
+    const process = new FakeDesktopProcess("linux", [argument]);
 
     const [settings] = DesktopStartFixture.start(electron, process);
 
@@ -2431,18 +2465,24 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async catchesAFailureBeforeItFindsItsDataDirectoryAndOffersToRestartOrQuit(): Promise<void> {
+  public async namesTheDataFolderItCannotUseOnStandardErrorAndInTheBoxAndOffersToRestartOrQuit(): Promise<void> {
     const electron = new FakeElectron();
-    const process = new FakeDesktopProcess("linux", ["--data-dir=relative/data"]);
+    const process = new FakeDesktopProcess("linux", ["/opt/teamrun/teamrun", "--data-dir=/var/locked/teamrun"]);
+    const cause = new TypeError("Failed to set path");
+    electron.app.pathFailure = cause;
     electron.dialog.answers.push(1);
 
-    const failure = Assert.throws(() => DesktopStartFixture.start(electron, process), ArgumentException);
+    const failure = Assert.throws(() => DesktopStartFixture.start(electron, process), UnusableFolderException);
     for (const listener of process.exceptionListeners)
       listener(failure);
     await electron.app.becomeReadyAsync();
     await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
 
-    Assert.isTrue(process.errors.includes(`The desktop's main process failed with an uncaught exception: ArgumentException: ${failure.message}`), process.errors);
+    const message = `TeamRun cannot use the data folder ${resolve("/var/locked/teamrun")}: TypeError: Failed to set path`;
+    Assert.areEqual(message, failure.message);
+    Assert.areEqual(cause, failure.cause);
+    Assert.isTrue(process.errors.includes(`The desktop's main process failed with an uncaught exception: UnusableFolderException: ${message}`), process.errors);
+    Assert.areEqual(JSON.stringify([`${message}\n\nThis happened while TeamRun was starting. Restart TeamRun to try again.`]), JSON.stringify(electron.dialog.boxes.map(t => t.options.detail)));
     Assert.areEqual(JSON.stringify([["Restart TeamRun", "Quit"]]), JSON.stringify(electron.dialog.boxes.map(t => t.options.buttons)));
     Assert.areEqual(JSON.stringify(["setName TeamRun", "exit 0"]), JSON.stringify(electron.app.calls));
   }

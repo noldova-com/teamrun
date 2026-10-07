@@ -34,7 +34,7 @@ export class TerminalRelaunch {
     const source = process.platform === Resources.linuxPlatform ? AppImageSource.find(process.env, process.execPath) : null;
     return Object.isNull(source)
       ? new TerminalRelaunch(process, process.execPath, process.env, process.workingDirectory)
-      : new TerminalRelaunch(process, source.file, AppImageEnvironment.restore(process.env), process.env[Resources.appImageWorkingFolderVariable] ?? process.workingDirectory);
+      : new TerminalRelaunch(process, source.file, AppImageEnvironment.restore(process.env), AppImageEnvironment.locateStartFolder(process));
   }
 
   public static forgetConsole(process: IDesktopProcess): void {
