@@ -138,6 +138,8 @@ export class TrayControllerTests {
     await linux.process.programs.answerAsync("(<true>,)\n");
     const mac = new TrayFixture("darwin");
     await mac.startAsync();
+    await DesktopStartFixture.showAsync(windows.electron, "win32", window);
+    await DesktopStartFixture.showAsync(linux.electron, "linux", DesktopStartFixture.firstWindow(linux.electron));
     window.isMinimizedNow = true;
 
     windows.tray.click();

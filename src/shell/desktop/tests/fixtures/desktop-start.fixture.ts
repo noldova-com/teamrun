@@ -115,6 +115,11 @@ export class DesktopStartFixture {
     return window;
   }
 
+  public static async showAsync(electron: FakeElectron, platform: string, window: FakeDesktopWindow): Promise<void> {
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent(platform, window.id), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.isShown);
+  }
+
   public static settings(platform: string): DesktopSettings {
     return DesktopSettings.fromModule(dirname(fileURLToPath(DesktopStartFixture.MODULE_URL)), platform);
   }
