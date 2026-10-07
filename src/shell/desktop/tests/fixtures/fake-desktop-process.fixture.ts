@@ -32,6 +32,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   });
   public readonly started: (readonly string[])[] = [];
   public readonly relaunched: { readonly command: readonly string[]; readonly environment: NodeJS.ProcessEnv; readonly workingDirectory: string }[] = [];
+  public readonly startedApart: { readonly command: readonly string[]; readonly environment: NodeJS.ProcessEnv }[] = [];
   public readonly ended: number[] = [];
   public readonly processId: number = 1000;
   public readonly programs: FakeProgramHost = new FakeProgramHost();
@@ -60,6 +61,11 @@ export class FakeDesktopProcess implements IDesktopProcess {
 
   public startDetachedAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void> {
     this.relaunched.push({ command: [executablePath, ...args], environment, workingDirectory });
+    return Object.isNull(this.relaunchFailure) ? Promise.resolve() : Promise.reject(this.relaunchFailure);
+  }
+
+  public startApartAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv): Promise<void> {
+    this.startedApart.push({ command: [executablePath, ...args], environment });
     return Object.isNull(this.relaunchFailure) ? Promise.resolve() : Promise.reject(this.relaunchFailure);
   }
 
