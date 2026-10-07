@@ -92,6 +92,18 @@ const expectNewRuntimeAsync = async (desktop: DesktopApplicationFixture, previou
   }, { timeout: 30_000 }).toBe(true);
 };
 
+const acceptHandoffFailureAsync = async (desktop: DesktopApplicationFixture, reason: string): Promise<void> => {
+  const logged = /^main: \S+ The update('s publisher check failed in \d+ ms\.$| failed: )/;
+  const expected = process.platform === "win32"
+    ? [/^main: \S+ The update's publisher check failed in \d+ ms\.$/, /^main: \S+ The update failed: The update's installer .+ is not signed by the publisher, so it was not started: /]
+    : [/^main: \S+ The update failed: /];
+  await expect.poll(() => desktop.failures.filter(t => logged.test(t)).length, { timeout: 10_000 }).toBe(expected.length);
+  const accepted = desktop.acceptFailures(logged);
+  expected.forEach((pattern, index) => expect(accepted[index]).toMatch(pattern));
+  const tail = process.platform === "win32" ? reason.slice(reason.indexOf(": its signature is not valid ")) : reason;
+  expect(accepted.at(-1)?.endsWith(tail), `${accepted.at(-1)} ends with ${tail}`).toBe(true);
+};
+
 const openAboutAsync = async (page: Page): Promise<Locator> => {
   await SettingsFixture.openPageAsync(page, "About");
   return page.getByRole("region", { name: "About TeamRun" });
@@ -152,6 +164,7 @@ test("Restart to update asks first while work runs, changes nothing when the per
     expect(DesktopApplicationFixture.isAlive(runtime ?? 0)).toBe(false);
     await expectNewRuntimeAsync(desktop, runtime);
     expect(await desktop.isVisibleAsync()).toBe(true);
+    await acceptHandoffFailureAsync(desktop, (await readUpdateAsync(window)).reason ?? "");
   });
 });
 
@@ -180,5 +193,6 @@ test("Restart to update stops TeamRun in every data directory of the installatio
     await expectNewRuntimeAsync(desktop, runtime);
     await expect(about.getByRole("button", { name: "Restart to update" })).toBeVisible();
     expect(await desktop.isVisibleAsync()).toBe(true);
+    await acceptHandoffFailureAsync(desktop, update.reason ?? "");
   });
 });
