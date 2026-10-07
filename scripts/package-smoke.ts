@@ -54,14 +54,13 @@ export default class PackageSmoke {
   private static readonly VERSION_FIELD: string = "productVersion";
   private static readonly DATA_DIRECTORY_FIELD: string = "dataDirectory";
   private static readonly STATUS_ARGUMENTS: readonly string[] = ["status", "--json"];
+  private static readonly QUIT_ARGUMENTS: readonly string[] = ["quit", "--json", "--timeout", String(PackageSmoke.QUIT_LIMIT / PackageSmoke.SECOND)];
+  private static readonly QUIT_ANSWER: string = "{\"outcome\":\"Quit\"}";
   private static readonly LOG_TAIL_LENGTH: number = 4_000;
   private static readonly SCREEN_CAPTURE: string = "screencapture";
   private static readonly SILENT_CAPTURE: string = "-x";
   private static readonly SCREENSHOT_EXTENSION: string = ".png";
   private static readonly SUMMARY_VARIABLE: string = "GITHUB_STEP_SUMMARY";
-  private static readonly CLOSE: string = "taskkill";
-  private static readonly PROCESS_OPTION: string = "/PID";
-  private static readonly QUIT_SIGNAL: NodeJS.Signals = "SIGTERM";
   private static readonly KILL_SIGNAL: NodeJS.Signals = "SIGKILL";
   private static readonly COMMAND_SHELL: string = "cmd.exe";
   private static readonly COMMAND_SHELL_OPTIONS: readonly string[] = ["/d", "/c"];
@@ -169,9 +168,9 @@ export default class PackageSmoke {
         await this.captureScreenAsync(target, folder);
       }
 
-      await this.quitAsync(target, desktop, folder);
+      await this.quitAsync(installed, data, folder);
       if (!await desktop.waitAsync(PackageSmoke.QUIT_LIMIT))
-        throw new PackagingException(`The desktop did not quit within ${PackageSmoke.QUIT_LIMIT} ms; a question on closing, such as one about work in progress, keeps it open:\n${await PackageSmoke.readTailAsync(logs)}`);
+        throw new PackagingException(`The desktop did not exit within ${PackageSmoke.QUIT_LIMIT} ms after teamrun quit said it quit:\n${await PackageSmoke.readTailAsync(logs)}`);
       if (desktop.exitCode !== 0)
         throw new PackagingException(`The desktop quit with exit code ${desktop.exitCode}:\n${await PackageSmoke.readTailAsync(logs)}`);
       this.output.write("The desktop quit.\n");
@@ -222,7 +221,7 @@ export default class PackageSmoke {
   private async checkLinkedCommandAsync(command: string, version: string, data: string, folder: string): Promise<void> {
     const link = path.join(folder, path.basename(command));
     await this.runner.requireAsync(PackageSmoke.LINK, [PackageSmoke.SYMBOLIC_OPTION, command, link], folder, PackageSmoke.COMMAND_LIMIT);
-    const status = await this.runner.captureAsync(link, PackageSmoke.formatStatusArguments(data, folder), folder, PackageSmoke.COMMAND_LIMIT, this.environment);
+    const status = await this.runner.captureAsync(link, PackageSmoke.formatArguments(PackageSmoke.STATUS_ARGUMENTS, data, folder), folder, PackageSmoke.COMMAND_LIMIT, this.environment);
     if (!status.isSuccessful)
       throw new PackagingException(`teamrun status through a link to ${command} exited with ${status.exitCode}:\n${status.text}`);
     this.checkStarted(status.output, version, data, "through a link to the app's command");
@@ -341,19 +340,23 @@ export default class PackageSmoke {
     return typeof processId === "number" ? processId : null;
   }
 
-  private queryStatusAsync(installed: InstalledPackage, data: string, folder: string): Promise<ProcessResult> {
+  private runCommandLineAsync(installed: InstalledPackage, commandArguments: readonly string[], data: string, folder: string, limit: number): Promise<ProcessResult> {
     if (installed.command !== null) {
       return this.runner.captureAsync(PackageSmoke.COMMAND_SHELL,
-        [...PackageSmoke.COMMAND_SHELL_OPTIONS, path.parse(installed.command).name, ...PackageSmoke.formatStatusArguments(data, folder)],
-        folder, PackageSmoke.COMMAND_LIMIT, this.createCommandEnvironment(installed.command));
+        [...PackageSmoke.COMMAND_SHELL_OPTIONS, path.parse(installed.command).name, ...PackageSmoke.formatArguments(commandArguments, data, folder)],
+        folder, limit, this.createCommandEnvironment(installed.command));
     }
     return this.runner.captureAsync(installed.program,
-      [path.join(installed.resources, PackageSmoke.ARCHIVE, ...TeamRunCommand.ENTRY_SEGMENTS), ...PackageSmoke.formatStatusArguments(data, folder)],
-      folder, PackageSmoke.COMMAND_LIMIT, { ...this.environment, [TeamRunCommand.RUN_AS_NODE_VARIABLE]: TeamRunCommand.RUN_AS_NODE_VALUE });
+      [path.join(installed.resources, PackageSmoke.ARCHIVE, ...TeamRunCommand.ENTRY_SEGMENTS), ...PackageSmoke.formatArguments(commandArguments, data, folder)],
+      folder, limit, { ...this.environment, [TeamRunCommand.RUN_AS_NODE_VARIABLE]: TeamRunCommand.RUN_AS_NODE_VALUE });
   }
 
-  private static formatStatusArguments(data: string, folder: string): readonly string[] {
-    return [...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DEVICE_DIRECTORY_OPTION, path.join(folder, PackageSmoke.DEVICE_FOLDER), PackageSmoke.DATA_DIRECTORY_OPTION, data];
+  private queryStatusAsync(installed: InstalledPackage, data: string, folder: string): Promise<ProcessResult> {
+    return this.runCommandLineAsync(installed, PackageSmoke.STATUS_ARGUMENTS, data, folder, PackageSmoke.COMMAND_LIMIT);
+  }
+
+  private static formatArguments(commandArguments: readonly string[], data: string, folder: string): readonly string[] {
+    return [...commandArguments, PackageSmoke.DEVICE_DIRECTORY_OPTION, path.join(folder, PackageSmoke.DEVICE_FOLDER), PackageSmoke.DATA_DIRECTORY_OPTION, data];
   }
 
   private async requireNoRuntimeAsync(installed: InstalledPackage, data: string, folder: string, moment: string): Promise<void> {
@@ -414,17 +417,10 @@ export default class PackageSmoke {
       await appendFile(summary, reason);
   }
 
-  private async quitAsync(target: PackageTarget, desktop: StartedProcess, folder: string): Promise<void> {
-    if (target.platform === PackageTarget.WINDOWS) {
-      await this.runner.requireAsync(PackageSmoke.CLOSE, [PackageSmoke.PROCESS_OPTION, String(desktop.id)], folder, PackageSmoke.COMMAND_LIMIT);
-      return;
-    }
-    if (target.platform === PackageTarget.LINUX && this.extractsAndRuns) {
-      for (const child of this.runner.listChildren(desktop.id))
-        this.runner.end(child);
-      return;
-    }
-    desktop.signal(PackageSmoke.QUIT_SIGNAL);
+  private async quitAsync(installed: InstalledPackage, data: string, folder: string): Promise<void> {
+    const quit = await this.runCommandLineAsync(installed, PackageSmoke.QUIT_ARGUMENTS, data, folder, PackageSmoke.QUIT_LIMIT + PackageSmoke.COMMAND_LIMIT);
+    if (!quit.isSuccessful || quit.output.trim() !== PackageSmoke.QUIT_ANSWER)
+      throw new PackagingException(`teamrun quit did not say ${PackageSmoke.QUIT_ANSWER}; it exited with ${quit.exitCode}:\n${quit.text}`);
   }
 }
 
