@@ -49,7 +49,7 @@ export class AppImageRestart {
   }
 
   private static restore(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-    const folder = environment[Resources.appImageFolderVariable] ?? String.empty;
+    const folder = String(environment[Resources.appImageFolderVariable]);
     return Object.fromEntries(Object.entries(environment).flatMap(([name, value]): [string, string][] => {
       const restored = Object.isUndefined(value) || Resources.appImageVariables.includes(name) ? null : AppImageRestart.unwrap(name, value, folder);
       return Object.isNull(restored) ? [] : [[name, restored]];
