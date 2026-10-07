@@ -19,6 +19,7 @@ import PackageTarget from "./package-target.ts";
 export default class PackageConfiguration {
   public static readonly COMMAND_FOLDER: string = "bin";
   public static readonly WINDOWS_COMMAND_EXTENSION: string = ".cmd";
+  public static readonly LIBRARY_EXTENSION: string = ".dll";
   private static readonly LICENSE_FILE: string = "LICENSE";
   private static readonly FONTS_FOLDER: string = "assets/fonts";
   private static readonly FONT_LICENSE_FILTER: readonly string[] = ["*.txt"];
@@ -145,7 +146,7 @@ export default class PackageConfiguration {
                 signingHashAlgorithms: [PackageConfiguration.SIGNING_HASH],
                 publisherName: product.windowsPublisher
               },
-              signExts: [WindowsAddonBuilder.ADDON_EXTENSION]
+              signExts: [WindowsAddonBuilder.ADDON_EXTENSION, PackageConfiguration.LIBRARY_EXTENSION]
             } : {})
           },
           nsis: {

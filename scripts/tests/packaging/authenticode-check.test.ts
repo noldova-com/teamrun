@@ -17,14 +17,17 @@ import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
 class AuthenticodeCheckTests {
   private static readonly PUBLISHER: string = "CN=Fixture Works, O=Fixture Works, C=US";
   private static readonly FILES: readonly string[] = ["C:\\out\\Fixture Studio-windows-x64.exe", "C:\\out\\win-unpacked\\Fixture Studio.exe"];
+  private static readonly LIBRARIES: readonly string[] = ["C:\\out\\win-unpacked\\d3dcompiler_47.dll", "C:\\out\\win-unpacked\\ffmpeg.dll"];
 
   public static register(): void {
-    test("every file's Authenticode signature is read by PowerShell 7, which requires it valid, timestamped and from every field of the publisher, and its lines are returned",
+    test("every file's Authenticode signature is read by PowerShell 7, which requires it valid, timestamped and from every field of the publisher, or from Microsoft for a library, "
+      + "and its lines are returned",
       async () => {
         const lines = "C:\\out\\Fixture Studio-windows-x64.exe: Valid, timestamped: True, publisher matches: True, signer: CN=Fixture Works, O=Fixture Works, C=US\r\n";
         const runner = new ProcessRunnerFixture([], [new ProcessResult(0, lines, "")]);
 
-        const report = await new AuthenticodeCheck(runner, "C:\\repository", { PATH: "fixture-path" }).verifyAsync(AuthenticodeCheckTests.FILES, AuthenticodeCheckTests.PUBLISHER);
+        const report = await new AuthenticodeCheck(runner, "C:\\repository", { PATH: "fixture-path" }).verifyAsync(AuthenticodeCheckTests.FILES, AuthenticodeCheckTests.LIBRARIES,
+          AuthenticodeCheckTests.PUBLISHER);
 
         const [command, directory, ...options] = runner.captured[0] ?? [];
         const script = Buffer.from(String(options.at(-1)), "base64").toString("utf16le");
@@ -33,18 +36,22 @@ class AuthenticodeCheckTests {
         assert.deepEqual(runner.captureEnvironments, [{
           PATH: "fixture-path",
           TEAMRUN_SIGNED_FILES: AuthenticodeCheckTests.FILES.join("\n"),
+          TEAMRUN_SIGNED_LIBRARIES: AuthenticodeCheckTests.LIBRARIES.join("\n"),
           TEAMRUN_WINDOWS_PUBLISHER: AuthenticodeCheckTests.PUBLISHER
         }]);
         assert.ok(script.includes("$signature = Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $file\n"));
-        assert.ok(script.includes("  if ($signature.Status -ne 'Valid' -or -not $timestamped -or -not $published) { $failed = $true }\n"));
+        assert.ok(script.includes("$libraries = @(if ($env:TEAMRUN_SIGNED_LIBRARIES) { $env:TEAMRUN_SIGNED_LIBRARIES.Split([char]10) })\n"
+          + "foreach ($file in @($env:TEAMRUN_SIGNED_FILES.Split([char]10)) + $libraries) {\n"));
+        assert.ok(script.includes("  $microsoft = $libraries -ccontains $file -and $subject -ccontains 'O=Microsoft Corporation'\n"));
+        assert.ok(script.includes("  if ($signature.Status -ne 'Valid' -or -not $timestamped -or -not ($published -or $microsoft)) { $failed = $true }\n"));
       });
 
     test("a file that fails the check fails it with every file's line", async () => {
       const lines = "C:\\out\\win-unpacked\\Fixture Studio.exe: NotSigned, timestamped: False, publisher matches: False, signer: ";
       const runner = new ProcessRunnerFixture([], [new ProcessResult(1, lines, "")]);
 
-      await assert.rejects(new AuthenticodeCheck(runner, "C:\\repository", {}).verifyAsync(AuthenticodeCheckTests.FILES, AuthenticodeCheckTests.PUBLISHER),
-        new PackagingException(`Not every file is signed by ${AuthenticodeCheckTests.PUBLISHER} with a valid, timestamped signature; pwsh exited with 1:\n${lines.trim()}`));
+      await assert.rejects(new AuthenticodeCheck(runner, "C:\\repository", {}).verifyAsync(AuthenticodeCheckTests.FILES, [], AuthenticodeCheckTests.PUBLISHER),
+        new PackagingException(`Not every program and addon is signed by ${AuthenticodeCheckTests.PUBLISHER}, and every library by it or Microsoft, with a valid, timestamped signature; pwsh exited with 1:\n${lines.trim()}`));
     });
   }
 }

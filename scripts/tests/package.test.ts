@@ -217,13 +217,14 @@ class PackageTests {
     });
 
     test("--signed takes the Azure credentials out of the environment before staging, signs a Windows package through the hook with the pinned packages and only electron-builder "
-      + "holding the credentials, then checks the installer's, the program's and the addons' signatures",
+      + "holding the credentials, then checks the installer's, the programs', the addons' and the libraries' signatures",
       { timeout: PackageTests.TIMEOUT }, async t => {
         const repository = await PackageTests.createAsync(t);
         const gallery = await PackageGalleryFixture.createAsync();
         t.after(() => gallery.disposeAsync());
         const addon = path.join("win-unpacked", "resources", "app.asar.unpacked", "node_modules", "@noldova", "teamrun-shell-runtime", "addon", "windows.node");
-        const made = ["Fixture Studio-windows-x64.exe", path.join("win-unpacked", "Fixture Studio.exe"), addon];
+        const library = path.join("win-unpacked", "ffmpeg.dll");
+        const made = ["Fixture Studio-windows-x64.exe", path.join("win-unpacked", "Fixture Studio.exe"), addon, library];
         const builder = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(0, "Every file is signed.\r\n", "")]);
         const npm = new CredentialWitnessFixture();
         const output = new TextOutputFixture();
@@ -257,7 +258,8 @@ class PackageTests {
           publisherName: "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US"
         });
         assert.deepEqual(builder.captured.map(t => [t[0], t[1]]), [["pwsh", path.join(folder, "signing")], ["pwsh", repository.directory]]);
-        assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], files.join("\n"));
+        assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], files.slice(0, 3).join("\n"));
+        assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_SIGNED_LIBRARIES"], files[3]);
         assert.equal(builder.captureEnvironments[1]?.["TEAMRUN_WINDOWS_PUBLISHER"], "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US");
         assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n  ${files[0]}\nSignatures:\nEvery file is signed.\n`);
         assert.deepEqual(JSON.parse(await readFile(path.join(folder, "package-report.json"), "utf8")), { target: "windows-x64", signed: true, checked: true });
@@ -402,9 +404,11 @@ class PackageTests {
         assert.equal(uncredentialed.text, "Signing Windows packages needs AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with noldova-signing.\n");
         assert.equal(twice.text, PackageTests.USAGE);
         assert.equal(signed.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], made.map(t => path.join(out, t)).join("\n"));
+        assert.equal(signed.captureEnvironments[1]?.["TEAMRUN_SIGNED_LIBRARIES"], "");
         assert.equal(arm64.text, `${PackageTests.STAGED}Packages made:\n  ${path.join(out, made[0] ?? "")}\nSignatures:\nSigned.\n`);
         assert.ok(unverified.text.endsWith(
-          "Not every file is signed by CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US with a valid, timestamped signature; pwsh exited with 1:\nNot signed.\n"));
+          "Not every program and addon is signed by CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US, and every library by it or Microsoft, with a valid, timestamped signature; "
+          + "pwsh exited with 1:\nNot signed.\n"));
         assert.ok(missing.text.endsWith(
           `electron-builder finished without the unpacked program ${path.join(out, "win-arm64-unpacked", "Fixture Studio.exe")}, whose signature the check reads.\n`));
       });

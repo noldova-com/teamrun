@@ -96,7 +96,7 @@ class PackageConfigurationTests {
           artifactName: "Fixture Studio-windows-arm64.${ext}",
           extraFiles: [{ from: path.join(PackageConfigurationTests.ROOT, "_build", "package", "command", "fixture-studio.cmd"), to: "bin/fixture-studio.cmd" }],
           signtoolOptions: { sign: hook, signingHashAlgorithms: ["sha256"], publisherName: "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US" },
-          signExts: [".node"]
+          signExts: [".node", ".dll"]
         }
       });
       assert.equal("forceCodeSigning" in unsigned, false);
