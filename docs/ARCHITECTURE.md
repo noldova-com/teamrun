@@ -746,6 +746,10 @@ The ownership database of section 6 is separate.
 Related writes and their durable change records commit atomically within one database.
 A change feed is not a guarantee of complete event delivery or a finished synchronization protocol.
 
+A long collection, such as a conversation's messages, stays in its owner's database and reaches the window by range.
+The owning window part supplies it to the kit's virtual list as a source that answers for items by their positions, such as items 4,000 to 4,100, and reports items added, removed or changed; it fetches them from its runtime part through its own protocol messages.
+The list asks for pages of 50 items and keeps at most 150 loaded items while it shows, with the height of every item it measured but none of their content, so neither the window nor the shell holds a whole collection, and unloading content never changes how far the list scrolls.
+
 Migrations are ordered, explicit and transactional:
 
 - Validate that a database's existing migration history is a recognized prefix before modifying it.
