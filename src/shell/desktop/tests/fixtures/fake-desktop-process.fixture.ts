@@ -23,6 +23,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly homeFolder: string;
   public readonly workingDirectory: string = path.resolve("work");
   public isDefaultApp: boolean = false;
+  public isTerminal: boolean = false;
   public readonly errorOutput: Writable = new Writable({
     write: (chunk: Buffer, _encoding, callback): void => {
       this.written += chunk.toString();
@@ -30,6 +31,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
     }
   });
   public readonly started: (readonly string[])[] = [];
+  public readonly relaunched: { readonly command: readonly string[]; readonly environment: NodeJS.ProcessEnv; readonly workingDirectory: string }[] = [];
   public readonly ended: number[] = [];
   public readonly processId: number = 1000;
   public readonly programs: FakeProgramHost = new FakeProgramHost();
@@ -37,6 +39,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly rejectionListeners: ((reason: unknown) => void)[] = [];
   public endFailure: Error | null = null;
   public startFailure: Error | null = null;
+  public relaunchFailure: Error | null = null;
 
   public constructor(platform: string, argv: readonly string[] = [], env: NodeJS.ProcessEnv = {}, homeFolder: string = "/home/person") {
     this.platform = platform;
@@ -53,6 +56,11 @@ export class FakeDesktopProcess implements IDesktopProcess {
     this.started.push([executablePath, ...args]);
     if (!Object.isNull(this.startFailure))
       onFailure(this.startFailure);
+  }
+
+  public startDetachedAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void> {
+    this.relaunched.push({ command: [executablePath, ...args], environment, workingDirectory });
+    return Object.isNull(this.relaunchFailure) ? Promise.resolve() : Promise.reject(this.relaunchFailure);
   }
 
   public endProcess(processId: number): void {

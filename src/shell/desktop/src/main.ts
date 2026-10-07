@@ -8,6 +8,7 @@
 
 import { execFile } from "node:child_process";
 import { homedir } from "node:os";
+import { isatty } from "node:tty";
 import { promisify } from "node:util";
 
 import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, ipcMain, net, screen, session, shell, utilityProcess } from "electron";
@@ -66,7 +67,9 @@ DesktopApplication.start(
     errorOutput: process.stderr,
     processId: process.pid,
     programs,
+    isTerminal: Resources.standardDescriptors.some(t => isatty(t)),
     startDetached: (path, args, onFailure) => programs.startDetached(path, args, process.env, onFailure),
+    startDetachedAsync: (path, args, environment, folder) => programs.startDetachedAsync(path, args, environment, folder),
     endProcess: t => process.kill(t, "SIGKILL"),
     onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),
     onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)
