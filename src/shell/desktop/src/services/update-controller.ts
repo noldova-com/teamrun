@@ -13,6 +13,7 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { UpdateStateKind } from "../enums/update-state-kind.js";
+import { StaleUpdateException } from "../exceptions/stale-update.exception.js";
 import { UpdateHandoffException } from "../exceptions/update-handoff.exception.js";
 import { UpdateStopException } from "../exceptions/update-stop.exception.js";
 import { UpdateException } from "../exceptions/update.exception.js";
@@ -109,7 +110,8 @@ export class UpdateController {
     }
     const ready = this.ready;
     const restartAsync = this.restartAsync;
-    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting)
+    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting || this.mustMove
+      || this.current.kind !== UpdateStateKind.Ready)
       return false;
     void this.restartReadyAsync(ready, restartAsync);
     return true;
@@ -141,11 +143,20 @@ export class UpdateController {
 
   private async restartReadyAsync(ready: UpdateReadyRecord, restartAsync: (record: UpdateReadyRecord) => Promise<void>): Promise<void> {
     this.isRestarting = true;
+    if (!Object.isNull(this.current.reason))
+      this.set(new UpdateStatus(UpdateStateKind.Ready, ready.version, null, this.current.checkedAt, null, false));
     try {
       await restartAsync(ready);
     }
     catch (error) {
-      this.set(new UpdateStatus(UpdateStateKind.Ready, ready.version, null, this.current.checkedAt, this.explain(error), false));
+      const reason = this.explain(error);
+      if (!(error instanceof StaleUpdateException)) {
+        this.set(new UpdateStatus(UpdateStateKind.Ready, ready.version, null, this.current.checkedAt, reason, false));
+        return;
+      }
+      this.ready = null;
+      this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, this.current.checkedAt, reason, this.mustMove));
+      await this.record.deleteAsync().catch((failure: unknown) => this.log(Resources.formatUpdateRecordDropped(String(failure))));
     }
     finally {
       this.isRestarting = false;

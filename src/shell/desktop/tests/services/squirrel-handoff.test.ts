@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { type INativeUpdater, type IShipItProcess, SquirrelHandoff, UpdateException, UpdateHandoffException, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+import { type INativeUpdater, type IShipItProcess, SquirrelHandoff, StaleUpdateException, UpdateException, UpdateHandoffException, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeUpdater } from "../fixtures/fake-updater.fixture.js";
@@ -126,11 +126,10 @@ export class SquirrelHandoffTests {
         onProgress(100);
         return Promise.resolve(fixture.updater.packagePath);
       };
-      fixture.shipIt.processId = null;
 
       const processId = await fixture.handoff.handOffAsync(fixture.record());
 
-      Assert.isNull(processId);
+      Assert.areEqual(5230, processId);
       Assert.areEqual(1, fixture.updater.checks);
       Assert.areEqual(1, fixture.updater.downloads);
       Assert.areEqual(1, fixture.native.checks);
@@ -141,13 +140,13 @@ export class SquirrelHandoffTests {
   public refusesAVersionTheFeedNoLongerOffersOrAZipThatChanged(): Promise<void> {
     return SquirrelHandoffFixture.runAsync(async fixture => {
       fixture.updater.check = () => Promise.resolve("1.4.0");
-      const gone = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
+      const gone = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), StaleUpdateException);
       fixture.updater.check = () => Promise.reject(new UpdateException("TeamRun couldn't reach its update feed."));
       const unreachable = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateException);
       fixture.updater.downloadedFile = fixture.updater.packagePath;
-      const changed = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record("b3RoZXI=")), UpdateHandoffException);
+      const changed = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record("b3RoZXI=")), StaleUpdateException);
       await rm(fixture.updater.packagePath);
-      const missing = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
+      const missing = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), StaleUpdateException);
 
       Assert.areEqual("The update feed no longer offers version 1.3.0.", gone.message);
       Assert.areEqual("TeamRun couldn't reach its update feed.", unreachable.message);
@@ -192,7 +191,7 @@ export class SquirrelHandoffTests {
   }
 
   @TestMethod
-  public forgetsALateStageOnceTheNextHandoffStarts(): Promise<void> {
+  public forgetsALateStageOnceTheNextHandoffStages(): Promise<void> {
     return SquirrelHandoffFixture.runAsync(async fixture => {
       fixture.updater.downloadedFile = fixture.updater.packagePath;
       fixture.native.onCheck = () => undefined;
@@ -207,6 +206,39 @@ export class SquirrelHandoffTests {
       Assert.areEqual(5230, processId);
       Assert.areEqual(1, fixture.shipIt.removals);
       Assert.areEqual(0, fixture.native.count);
+    });
+  }
+
+  @TestMethod
+  public stillRemovesTheJobOfALateStageWhenTheNextHandoffFailsBeforeStaging(): Promise<void> {
+    return SquirrelHandoffFixture.runAsync(async fixture => {
+      fixture.updater.downloadedFile = fixture.updater.packagePath;
+      fixture.native.onCheck = () => undefined;
+      const waiting = Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
+      await Condition.waitAsync(() => fixture.timers.length === 1);
+      fixture.timers[0]?.run();
+      await waiting;
+      await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record("b3RoZXI=")), StaleUpdateException);
+      const removedBeforeStage = fixture.shipIt.removals;
+
+      fixture.native.emit("update-downloaded");
+
+      Assert.areEqual(1, removedBeforeStage);
+      Assert.areEqual(2, fixture.shipIt.removals);
+      Assert.areEqual(0, fixture.native.count);
+    });
+  }
+
+  @TestMethod
+  public removesTheJobAndFailsWhenNoShipItProcessWaitsAfterTheStage(): Promise<void> {
+    return SquirrelHandoffFixture.runAsync(async fixture => {
+      fixture.updater.downloadedFile = fixture.updater.packagePath;
+      fixture.shipIt.processId = null;
+
+      const failed = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
+
+      Assert.areEqual("macOS prepared the update, but nothing is waiting to install it.", failed.message);
+      Assert.areEqual(1, fixture.shipIt.removals);
     });
   }
 

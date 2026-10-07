@@ -59,6 +59,7 @@ export class DesktopApiTests {
         "SpellChecker",
         "SpellingDictionaries",
         "SquirrelHandoff",
+        "StaleUpdateException",
         "StartedProgram",
         "StartupState",
         "StartupStateKind",

@@ -18,6 +18,10 @@ export class Resources {
     return `Another update of ${Resources.applicationName} is under way.`;
   }
 
+  public static get installerNotCopied(): string {
+    return `${Resources.applicationName} couldn't make a protected copy of the update's installer.`;
+  }
+
   public static get updateHolderNotFound(): string {
     return `${Resources.applicationName} could not find its own process in the process table.`;
   }
@@ -234,6 +238,7 @@ export class Resources {
   public static readonly updateFileElsewhere: string = "its file is not the package in the updater's cache";
   public static readonly updateChangedBeforeHandoff: string = "The downloaded update has changed since it was checked, so it wasn't installed.";
   public static readonly updateNotStaged: string = "macOS couldn't prepare the update for installing.";
+  public static readonly shipItNotFound: string = "macOS prepared the update, but nothing is waiting to install it.";
   public static readonly updateNotStagedInTime: string = "macOS didn't prepare the update for installing within 2 minutes.";
   public static readonly updateFeedRedirected: string = "The update feed redirected to an address with another protocol.";
   public static readonly updateCheckerUnknown: string = "The desktop could not identify its own process, so it cannot check for updates.";

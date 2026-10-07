@@ -7,13 +7,13 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { InstallerHandoff, UpdateHandoffException, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+import { InstallerHandoff, StaleUpdateException, UpdateHandoffException, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
 
 import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
 
@@ -25,7 +25,10 @@ class InstallerHandoffFixture {
   public readonly opened: string[] = [];
   public readonly closed: bigint[] = [];
   public readonly started: string[] = [];
+  public readonly lines: string[] = [];
   public hold: bigint | number = 7n;
+  public onOpen: (installer: string) => void = () => undefined;
+  public protect: () => Promise<void> = () => Promise.resolve();
   public start: (installer: string) => Promise<number> = () => Promise.resolve(4120);
   public readonly handoff: InstallerHandoff;
 
@@ -33,10 +36,11 @@ class InstallerHandoffFixture {
     this.folder = folder;
     this.handoff = new InstallerHandoff(join(folder, "installation"), t => {
       this.protectedFolders.push(t);
-      return Promise.resolve();
+      return this.protect();
     }, {
       openFileForReading: t => {
         this.opened.push(t);
+        this.onOpen(t);
         return this.hold;
       },
       closeHandle: t => {
@@ -45,7 +49,11 @@ class InstallerHandoffFixture {
     }, t => {
       this.started.push(t);
       return this.start(t);
-    });
+    }, t => this.lines.push(t));
+  }
+
+  public get handoffFolder(): string {
+    return join(this.folder, "installation", "handoff");
   }
 
   public get download(): string {
@@ -99,13 +107,14 @@ export class InstallerHandoffTests {
       Assert.areEqual("The update's installer couldn't be held unchanged for its start (Windows error 32).", failure.message);
       Assert.areEqual(0, fixture.started.length);
       Assert.areEqual(0, fixture.closed.length);
+      Assert.areEqual(0, (await readdir(fixture.handoffFolder)).length);
     });
   }
 
   @TestMethod
-  public letsGoOfACopyThatChangedOrThatTheStartRefuses(): Promise<void> {
+  public letsGoOfAndRemovesACopyThatChangedOrThatTheStartRefuses(): Promise<void> {
     return InstallerHandoffFixture.runAsync(async fixture => {
-      const changed = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record("b3RoZXI=")), UpdateHandoffException);
+      const changed = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record("b3RoZXI=")), StaleUpdateException);
       const startsBefore = fixture.started.length;
       const refusal = new UpdateHandoffException("The update isn't signed by the publisher.");
       fixture.start = () => Promise.reject(refusal);
@@ -115,7 +124,53 @@ export class InstallerHandoffTests {
       Assert.areEqual(0, startsBefore);
       Assert.areEqual(refusal, refused);
       Assert.areEqual(JSON.stringify(["7", "7"]), JSON.stringify(fixture.closed.map(String)));
-      Assert.areEqual(2, (await readdir(join(fixture.folder, "installation", "handoff"))).length);
+      Assert.areEqual(0, (await readdir(fixture.handoffFolder)).length);
+      Assert.areEqual(0, fixture.lines.length);
+    });
+  }
+
+  @TestMethod
+  public explainsACopyItCannotMakeOrReadAndRemovesWhatItLeft(): Promise<void> {
+    return InstallerHandoffFixture.runAsync(async fixture => {
+      const denied = new Error("EACCES: permission denied");
+      fixture.protect = () => Promise.reject(denied);
+      const unprotected = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
+      fixture.protect = () => Promise.resolve();
+      fixture.onOpen = t => rmSync(t);
+      const unread = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
+      fixture.onOpen = () => undefined;
+      await rm(fixture.download);
+      const uncopied = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
+
+      Assert.areEqual(JSON.stringify(Array(3).fill("TeamRun couldn't make a protected copy of the update's installer.")), JSON.stringify([unprotected, unread, uncopied].map(t => t.message)));
+      Assert.areEqual(denied, unprotected.cause);
+      Assert.areEqual("ENOENT", Reflect.get(Object(unread.cause), "code"));
+      Assert.areEqual("ENOENT", Reflect.get(Object(uncopied.cause), "code"));
+      Assert.areEqual(1, fixture.opened.length);
+      Assert.areEqual(JSON.stringify(["7"]), JSON.stringify(fixture.closed.map(String)));
+      Assert.areEqual(0, fixture.started.length);
+      Assert.areEqual(0, (await readdir(fixture.handoffFolder)).length);
+    });
+  }
+
+  @TestMethod
+  public logsACopyItCannotRemove(): Promise<void> {
+    return InstallerHandoffFixture.runAsync(async fixture => {
+      const removals: FailingFileCallFixture[] = [];
+      fixture.hold = 5;
+      fixture.onOpen = t => removals.push(new FailingFileCallFixture("rm", dirname(t), "EBUSY"));
+
+      try {
+        await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
+      }
+      finally {
+        for (const removal of removals)
+          removal[Symbol.dispose]();
+      }
+
+      Assert.areEqual(1, fixture.lines.length);
+      Assert.isTrue(fixture.lines[0]?.startsWith("The copy of an update's installer could not be removed, so it is removed at the next start: Error: EBUSY") === true, fixture.lines[0]);
+      Assert.areEqual(1, (await readdir(fixture.handoffFolder)).length);
     });
   }
 

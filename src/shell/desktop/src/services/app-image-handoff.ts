@@ -8,7 +8,7 @@
 
 import "@noldova/teamrun-foundation-core";
 
-import { UpdateHandoffException } from "../exceptions/update-handoff.exception.js";
+import { StaleUpdateException } from "../exceptions/stale-update.exception.js";
 import type { IUpdateHandoff } from "../interfaces/i-update-handoff.js";
 import type { UpdateReadyRecord } from "../models/update-ready-record.js";
 import { Resources } from "../resources.js";
@@ -24,7 +24,7 @@ export class AppImageHandoff implements IUpdateHandoff {
 
   public async handOffAsync(record: UpdateReadyRecord): Promise<null> {
     if (await UpdateController.hashFileAsync(record.file).catch(() => null) !== record.sha512)
-      throw new UpdateHandoffException(Resources.updateChangedBeforeHandoff);
+      throw new StaleUpdateException(Resources.updateChangedBeforeHandoff);
     await this.replacement.replaceAsync(record.file);
     return null;
   }

@@ -2059,7 +2059,7 @@ export class DesktopApplicationTests {
     const connection = new FakeRuntimeConnection();
     const lock = new FakeUpdateCheckLock();
     const electron = await DesktopApplicationTests.startWithUpdaterAsync(process, updater, files, connection, new FakeElectron(), new FakeDeviceIdentity(), lock);
-    await Condition.waitAsync(() => connection.payloads.some(t => JSON.stringify(t).includes("shell.updateChecks")));
+    await Condition.waitAsync(() => connection.payloads.some(t => JSON.stringify(t).includes("shell.updateChecks")) && files.updateReady.reads === 1);
     const window = DesktopStartFixture.firstWindow(electron);
     const trusted = DesktopStartFixture.trustedEvent("linux");
 

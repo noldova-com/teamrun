@@ -9,6 +9,7 @@
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
+import { StaleUpdateException } from "../exceptions/stale-update.exception.js";
 import { UpdateHandoffException } from "../exceptions/update-handoff.exception.js";
 import type { INativeUpdater } from "../interfaces/i-native-updater.js";
 import type { IShipItProcess } from "../interfaces/i-ship-it-process.js";
@@ -39,18 +40,20 @@ export class SquirrelHandoff implements IUpdateHandoff {
     this.log = log;
   }
 
-  public async handOffAsync(record: UpdateReadyRecord): Promise<number | null> {
-    this.forgetLateStage();
+  public async handOffAsync(record: UpdateReadyRecord): Promise<number> {
     if (this.updater.downloadedFile !== record.file) {
       if (await this.updater.checkAsync() !== record.version)
-        throw new UpdateHandoffException(Resources.formatUpdateNoLongerOffered(record.version));
+        throw new StaleUpdateException(Resources.formatUpdateNoLongerOffered(record.version));
       await this.updater.downloadAsync(() => undefined);
     }
     if (await UpdateController.hashFileAsync(record.file).catch(() => null) !== record.sha512)
-      throw new UpdateHandoffException(Resources.updateChangedBeforeHandoff);
+      throw new StaleUpdateException(Resources.updateChangedBeforeHandoff);
     try {
       await this.stageAsync();
-      return await this.shipIt.findAsync();
+      const processId = await this.shipIt.findAsync();
+      if (Object.isNull(processId))
+        throw new UpdateHandoffException(Resources.shipItNotFound);
+      return processId;
     }
     catch (error) {
       await this.removeShipItAsync();
@@ -81,6 +84,7 @@ export class SquirrelHandoff implements IUpdateHandoff {
       });
       this.native.on(Resources.squirrelStagedEvent, onStaged);
       this.native.on(Resources.errorEvent, onFailed);
+      this.forgetLateStage();
       try {
         this.native.checkForUpdates();
       }

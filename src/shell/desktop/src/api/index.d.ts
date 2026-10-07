@@ -453,9 +453,11 @@ export declare class UpdateStop {
    * @returns A promise of `true` once the handoff has run, or `false` when the person cancelled at the question about
    * work, with nothing changed.
    * @throws {UpdateStopException} Rejected with the reason when another update holds the barrier, work started
-   * meanwhile, a runtime refused or something did not save, a process or desktop did not exit in time or could not be
-   * checked, the AppImage restart could not start, or the handoff failed; the barrier it held is removed first, so every surviving runtime and desktop
-   * resumes. Once the handoff has run, the barrier stays.
+   * meanwhile, a runtime refused or something did not save, or a process or desktop did not exit in time; any other
+   * failure, as of reading the process table, starting the AppImage restart or the handoff, gives the reason that the
+   * update stopped on an unexpected error, with the failure as its cause. The barrier it held is removed first, so
+   * every surviving runtime and desktop resumes. Once the handoff has run, the barrier stays.
+   * @throws {UpdateHandoffException} Rejected as the handoff rejected it, after the same cleanup.
    * @example
    * ```ts
    * import type { UpdateStop } from "@noldova/teamrun-shell-desktop";
@@ -629,7 +631,8 @@ export interface IShipItProcess {
  * exists. It then holds the copy open with read sharing only, so it can be read and started but not written,
  * renamed or deleted, hashes it again and gives it to the installer's start, which checks its publisher and starts
  * it. The installer reads its own file after it has started, so the copy stays held until this desktop exits; a
- * failure lets it go. A later start removes the `handoff` folder, which a running installer keeps in place.
+ * failure lets it go and removes its folder. A later start removes the `handoff` folder, which a running installer
+ * keeps in place.
  */
 export declare class InstallerHandoff implements IUpdateHandoff {
   /**
@@ -639,6 +642,7 @@ export declare class InstallerHandoff implements IUpdateHandoff {
    * @param protectAsync Restricts a new folder to the current user.
    * @param files Holds a file open for reading and closes it, as `WindowsProcessApi` does.
    * @param startAsync Checks the installer's publisher and starts it, resolving to its process id.
+   * @param log Records a failed attempt's folder that cannot be removed.
    * @example
    * ```ts
    * import { SystemCommand, WindowsFolderProtector, WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -646,7 +650,7 @@ export declare class InstallerHandoff implements IUpdateHandoff {
    *
    * export function create(installationFolder: string, startAsync: (installer: string) => Promise<number>): InstallerHandoff {
    *   const protector = new WindowsFolderProtector(new SystemCommand(), process.env);
-   *   return new InstallerHandoff(installationFolder, t => protector.protectAsync(t), new WindowsProcessApi(), startAsync);
+   *   return new InstallerHandoff(installationFolder, t => protector.protectAsync(t), new WindowsProcessApi(), startAsync, console.error);
    * }
    * ```
    */
@@ -654,7 +658,8 @@ export declare class InstallerHandoff implements IUpdateHandoff {
     installationFolder: string,
     protectAsync: (folder: string) => Promise<void>,
     files: Pick<IWindowsProcessApi, "openFileForReading" | "closeHandle">,
-    startAsync: (installer: string) => Promise<number>);
+    startAsync: (installer: string) => Promise<number>,
+    log: (text: string) => void);
 
   /**
    * Removes the copies earlier handoffs left in the installation's folder.
@@ -676,9 +681,9 @@ export declare class InstallerHandoff implements IUpdateHandoff {
    *
    * @param record The ready update, whose file is the downloaded installer.
    * @returns A promise of the installer's process id.
-   * @throws {UpdateHandoffException} Rejected when the copy cannot be held, its SHA-512 no longer matches or the start
-   * refuses it, as for a publisher that isn't TeamRun's.
-   * @throws {Error} Rejected when the folder cannot be made or restricted or the installer cannot be copied.
+   * @throws {StaleUpdateException} Rejected when the copy's SHA-512 no longer matches the ready record.
+   * @throws {UpdateHandoffException} Rejected when the folder cannot be made or restricted, the installer cannot be
+   * copied, held or read, or the start refuses it, as for a publisher that isn't TeamRun's.
    * @example
    * ```ts
    * import type { InstallerHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
@@ -714,8 +719,8 @@ export declare class AppImageHandoff implements IUpdateHandoff {
    *
    * @param record The ready update.
    * @returns A promise of `null` once the AppImage is replaced.
-   * @throws {UpdateHandoffException} Rejected when the download's SHA-512 no longer matches or the AppImage cannot be
-   * replaced.
+   * @throws {StaleUpdateException} Rejected when the download's SHA-512 no longer matches the ready record.
+   * @throws {UpdateHandoffException} Rejected when the AppImage cannot be replaced.
    * @example
    * ```ts
    * import type { AppImageHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
@@ -734,8 +739,9 @@ export declare class AppImageHandoff implements IUpdateHandoff {
  * reuses the cached ZIP once it matches. It hashes the ZIP again, has Squirrel.Mac fetch it from electron-updater's
  * local feed and stage it, which checks the update's code signature, and gives the ShipIt process that installs it
  * once the desktop quits through `autoUpdater.quitAndInstall`. Only the handoff stages: once staged, any quit
- * installs. So a handoff that fails after asking Squirrel.Mac to stage removes the ShipIt job, and after the 2
- * minutes it also removes the job of a stage that finishes later, until the next handoff starts.
+ * installs. So a handoff that fails after asking Squirrel.Mac to stage, or finds no ShipIt process after the stage,
+ * removes the ShipIt job, and after the 2 minutes it also removes the job of a stage that finishes later, until the
+ * next handoff asks Squirrel.Mac to stage.
  */
 export declare class SquirrelHandoff implements IUpdateHandoff {
   /**
@@ -770,21 +776,22 @@ export declare class SquirrelHandoff implements IUpdateHandoff {
    * Stages the update and finds the process that installs it.
    *
    * @param record The ready update.
-   * @returns A promise of ShipIt's process id, or `null` when none runs.
+   * @returns A promise of ShipIt's process id.
    * @throws {UpdateException} Rejected when the check or the download again fails.
-   * @throws {UpdateHandoffException} Rejected when the feed no longer offers the version, the ZIP's SHA-512 no longer
-   * matches, or Squirrel.Mac fails to stage it or hasn't within 2 minutes.
-   * @throws {Error} Rejected with the failure of finding the ShipIt process.
+   * @throws {StaleUpdateException} Rejected when the feed no longer offers the version or the ZIP's SHA-512 no longer
+   * matches the ready record.
+   * @throws {UpdateHandoffException} Rejected when Squirrel.Mac fails to stage it or hasn't within 2 minutes, or when
+   * no ShipIt process waits after the stage or it cannot be looked up.
    * @example
    * ```ts
    * import type { SquirrelHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
    *
-   * export function stageAsync(handoff: SquirrelHandoff, record: UpdateReadyRecord): Promise<number | null> {
+   * export function stageAsync(handoff: SquirrelHandoff, record: UpdateReadyRecord): Promise<number> {
    *   return handoff.handOffAsync(record);
    * }
    * ```
    */
-  public handOffAsync(record: UpdateReadyRecord): Promise<number | null>;
+  public handOffAsync(record: UpdateReadyRecord): Promise<number>;
 }
 
 /**
@@ -5665,7 +5672,7 @@ export interface IUpdater {
   readonly packagePath: string;
 
   /**
-   * The file the last download in this process gave, or `null` before one has.
+   * The file the last download in this process gave, or `null` before one has and while a download runs.
    */
   readonly downloadedFile: string | null;
 
@@ -6002,7 +6009,7 @@ export declare class FeedUpdater implements IUpdater {
   public readonly packagePath: string;
 
   /**
-   * The file the last download in this process gave, or `null` before one has.
+   * The file the last download in this process gave, or `null` before one has and while a download runs.
    */
   public get downloadedFile(): string | null;
 
@@ -6444,9 +6451,12 @@ export declare class UpdateController {
 
   /**
    * Runs the window's action: `Check` starts a check unless one, a download or a ready update rules it out, and
-   * `Restart` starts the restart that installs the ready update unless one runs or the controller has none. A
-   * restart that fails leaves the update ready, with its reason. Once it holds the lock, a check that finds a usable ready update another desktop of the
-   * installation recorded shows it as ready instead of reaching the feed.
+   * `Restart` starts the restart that installs the ready update unless one runs, the controller has none or the
+   * application must first move to an Applications folder. A restart clears the reason an earlier one left. A
+   * restart that fails leaves the update ready, with its reason, except on a {@link StaleUpdateException}: then the
+   * controller removes the ready record and shows the update as failed, so checks run again. Once it holds the lock,
+   * a check that finds a usable ready update another desktop of the installation recorded shows it as ready instead
+   * of reaching the feed.
    *
    * @param action The action.
    * @returns Whether the action started.
@@ -6513,6 +6523,32 @@ export declare class UpdateHandoffException extends Exception {
    * import { UpdateHandoffException } from "@noldova/teamrun-shell-desktop";
    *
    * export const failure: UpdateHandoffException = new UpdateHandoffException("The AppImage could not be replaced with the update.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * The exception thrown when a ready update is no longer the one to install: the feed no longer offers its version, or
+ * its file no longer matches the ready record. Its message is the reason the updater shows.
+ */
+export declare class StaleUpdateException extends UpdateHandoffException {
+  /**
+   * The exception's name, `"StaleUpdateException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message Why the update is no longer the one to install.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { StaleUpdateException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: StaleUpdateException = new StaleUpdateException("The update feed no longer offers version 1.3.0.");
    * ```
    */
   public constructor(message: string, options?: ExceptionOptions);

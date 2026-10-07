@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { UpdateException, UpdateController, UpdateHandoffException, type UpdateReadyRecord, type UpdateStatus, UpdateStopException } from "@noldova/teamrun-shell-desktop";
+import { StaleUpdateException, UpdateException, UpdateController, UpdateHandoffException, type UpdateReadyRecord, type UpdateStatus, UpdateStopException } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeDeviceFileStore } from "../fixtures/fake-device-file-store.fixture.js";
@@ -219,7 +219,7 @@ export class UpdateControllerTests {
   }
 
   @TestMethod
-  public async refusesARestartWithoutAReadyUpdateOrARestartOrOnceStopped(): Promise<void> {
+  public async refusesARestartWithoutAReadyUpdateOrARestartOrWhileItMustMoveOrOnceStopped(): Promise<void> {
     const refused: boolean[] = [];
     await UpdateControllerFixture.runAsync(async fixture => {
       await fixture.controller.startAsync();
@@ -233,16 +233,22 @@ export class UpdateControllerTests {
     await UpdateControllerFixture.runAsync(async fixture => {
       fixture.record.kept = fixture.ready;
       await fixture.controller.startAsync();
+      refused.push(fixture.controller.act("Restart"));
+      Assert.areEqual(0, fixture.restarts.length);
+    }, true);
+    await UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = fixture.ready;
+      await fixture.controller.startAsync();
       fixture.controller.stop();
       refused.push(fixture.controller.act("Restart"));
       Assert.areEqual(0, fixture.restarts.length);
     });
 
-    Assert.areEqual(JSON.stringify([false, false, false]), JSON.stringify(refused));
+    Assert.areEqual(JSON.stringify([false, false, false, false]), JSON.stringify(refused));
   }
 
   @TestMethod
-  public keepsTheUpdateReadyWithTheReasonOfARestartThatFails(): Promise<void> {
+  public keepsTheUpdateReadyWithTheReasonOfARestartThatFailsUntilTheNextRestart(): Promise<void> {
     return UpdateControllerFixture.runAsync(async fixture => {
       fixture.record.kept = { ...fixture.ready, notified: true };
       await fixture.controller.startAsync();
@@ -251,11 +257,17 @@ export class UpdateControllerTests {
       for (const failure of [new UpdateStopException("A window could not save its work, so TeamRun keeps running."), new UpdateHandoffException("The update isn't signed by the publisher."),
         new UpdateException("TeamRun couldn't reach its update feed."), new Error("EPERM")]) {
         fixture.restart = () => Promise.reject(failure);
-        const count = fixture.published.length;
+        const count = fixture.published.length + (Object.isNull(fixture.controller.status.reason) ? 1 : 2);
         fixture.controller.act("Restart");
-        await fixture.publishedAsync(count + 1);
+        await fixture.publishedAsync(count);
         reasons.push(fixture.controller.status.reason);
       }
+      const failed = fixture.controller.status.toJson();
+      fixture.restart = () => Promise.resolve();
+      const count = fixture.published.length;
+      fixture.controller.act("Restart");
+      await fixture.publishedAsync(count + 1);
+      await Condition.waitAsync(() => fixture.controller.act("Restart"));
 
       Assert.areEqual(JSON.stringify([
         "A window could not save its work, so TeamRun keeps running.",
@@ -264,8 +276,33 @@ export class UpdateControllerTests {
         "The update stopped on an unexpected error."
       ]), JSON.stringify(reasons));
       Assert.areEqual(JSON.stringify({ kind: "Ready", version: "1.3.0", progress: null, checkedAt: null, reason: "The update stopped on an unexpected error.", mustMove: false }),
-        JSON.stringify(fixture.controller.status.toJson()));
-      Assert.areEqual(4, fixture.restarts.length);
+        JSON.stringify(failed));
+      Assert.isNull(fixture.controller.status.reason);
+      Assert.areEqual(6, fixture.restarts.length);
+      Assert.areEqual(0, fixture.record.deletes);
+    });
+  }
+
+  @TestMethod
+  public dropsAReadyUpdateThatIsNoLongerCurrentSoChecksRunAgain(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = { ...fixture.ready, notified: true };
+      fixture.record.deleteFailure = new Error("EBUSY");
+      await fixture.controller.startAsync();
+      fixture.restart = () => Promise.reject(new StaleUpdateException("The update feed no longer offers version 1.3.0."));
+
+      fixture.controller.act("Restart");
+      await Condition.waitAsync(() => fixture.lines.some(t => t.includes("EBUSY")));
+      const failed = fixture.controller.status.toJson();
+      const restarted = fixture.controller.act("Restart");
+      const checked = fixture.controller.act("Check");
+
+      Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: null, reason: "The update feed no longer offers version 1.3.0.", mustMove: false }),
+        JSON.stringify(failed));
+      Assert.isFalse(restarted);
+      Assert.isTrue(checked);
+      Assert.areEqual(1, fixture.record.deletes);
+      Assert.areEqual(1, fixture.restarts.length);
     });
   }
 

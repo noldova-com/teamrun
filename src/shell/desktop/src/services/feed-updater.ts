@@ -79,6 +79,7 @@ export class FeedUpdater implements IUpdater {
     const listener = (info: ProgressInfo): void => onProgress(Math.floor(info.percent));
     const cancellation = new CancellationToken();
     this.cancellation = cancellation;
+    this.downloaded = null;
     this.updater.on(Resources.downloadProgressEvent, listener);
     try {
       const [file] = await this.updater.downloadUpdate(cancellation);
