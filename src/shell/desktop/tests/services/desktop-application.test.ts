@@ -2601,6 +2601,20 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async readsWhetherItsTrustedWindowIsInFullScreen(): Promise<void> {
+    const electron = await DesktopStartFixture.startReadyAsync("darwin", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), new FakeDesktopProcess("darwin"));
+    const trusted = DesktopStartFixture.trustedEvent("darwin");
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    const before = electron.ipcMain.invoke("teamrun:readFullScreen", trusted);
+    window.isFullScreenNow = true;
+    const after = electron.ipcMain.invoke("teamrun:readFullScreen", trusted);
+    const untrusted = electron.ipcMain.invoke("teamrun:readFullScreen", { ...trusted, senderFrame: null });
+
+    Assert.areEqual("[false,true,null]", JSON.stringify([before, after, untrusted]));
+  }
+
+  @TestMethod
   public async pointsTheDictionaryDownloadAtItsProfilesOwnFolderAtReadyAndTakesSpellingPreferencesOnlyFromItsOwnWindow(): Promise<void> {
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);

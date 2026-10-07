@@ -64,11 +64,7 @@ export class Resources {
   public static readonly primaryButton: number = 0;
   public static readonly middleButton: number = 1;
   public static readonly escapeKey: string = "Escape";
-  public static readonly pointerMoveEvent: "pointermove" = "pointermove";
-  public static readonly pointerUpEvent: "pointerup" = "pointerup";
-  public static readonly pointerCancelEvent: "pointercancel" = "pointercancel";
   public static readonly keyDownEvent: "keydown" = "keydown";
-  public static readonly blurEvent: "blur" = "blur";
   public static readonly clickEvent: "click" = "click";
   public static readonly auxClickEvent: "auxclick" = "auxclick";
   public static readonly linkSelector: string = "a[href]";

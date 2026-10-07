@@ -59,6 +59,8 @@ describe("DesktopBridgeService", () => {
     answerQuit: (): Promise<boolean> => Promise.resolve(true),
     readTrayAvailable: (): Promise<unknown> => Promise.resolve(true),
     onTrayAvailable: (): (() => void) => () => undefined,
+    readFullScreen: (): Promise<unknown> => Promise.resolve(false),
+    onFullScreen: (): (() => void) => () => undefined,
     logModule: (): void => undefined,
     logError: (): void => undefined
   };
@@ -99,6 +101,8 @@ describe("DesktopBridgeService", () => {
     ["no answerQuit", { ...complete, answerQuit: null }],
     ["no readTrayAvailable", { ...complete, readTrayAvailable: null }],
     ["no onTrayAvailable", { ...complete, onTrayAvailable: null }],
+    ["no readFullScreen", { ...complete, readFullScreen: null }],
+    ["no onFullScreen", { ...complete, onFullScreen: null }],
     ["no logModule", { ...complete, logModule: null }],
     ["no logError", { ...complete, logError: null }]
   ];
@@ -357,6 +361,26 @@ describe("DesktopBridgeService", () => {
 
     expect(questions.map(t => t === null ? null : [t.descriptions, t.isWaiting])).toEqual([[["Indexing the project"], true], null]);
     expect([isTaken, bridge.quitAnswers, bridge.logged, bridge.errorsLogged]).toEqual([true, ["Wait"], ["clock: Ticked"], [["clock", "Error: It broke."]]]);
+  });
+
+  it("reads whether the window is in full screen, counting anything but a yes as no, and passes on each yes or no it reports", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    const service = TestBed.inject(DesktopBridgeService);
+    const reports: boolean[] = [];
+    const reads: boolean[] = [];
+
+    for (const value of [true, null])
+      reads.push(await service.readFullScreenAsync().finally(() => bridge.fullScreen = Promise.resolve(value)));
+    reads.push(await service.readFullScreenAsync());
+    const stop = service.onFullScreen(t => reports.push(t));
+    bridge.changeFullScreen(true);
+    bridge.changeFullScreen("yes");
+    bridge.changeFullScreen(false);
+    stop();
+    bridge.changeFullScreen(true);
+
+    expect(reads).toEqual([false, true, false]);
+    expect(reports).toEqual([true, false]);
   });
 
   it("reads whether the desktop can show its tray icon, counting anything but a no as yes, and passes on each yes or no it reports", async () => {

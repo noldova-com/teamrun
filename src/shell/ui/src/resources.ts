@@ -172,7 +172,6 @@ export class Resources {
     "field-padding",
     "window-row-height",
     "status-bar-height",
-    "status-bar-inset",
     "status-bar-item-height",
     "status-bar-item-gap",
     "button-height",
@@ -393,6 +392,7 @@ export class Resources {
   public static readonly topChrome: string = "top";
   public static readonly bottomChrome: string = "bottom";
   public static readonly overlayGapLook: string = "space-2";
+  public static readonly panelMarginLook: string = "panel-card-margin";
   public static readonly windowRowLook: string = "window-row-height";
   public static readonly statusBarLook: string = "status-bar-height";
   public static readonly middleButton: number = 1;
@@ -401,6 +401,8 @@ export class Resources {
   public static readonly arrowRightKey: string = "ArrowRight";
   public static readonly pointerupEvent: "pointerup" = "pointerup";
   public static readonly pointercancelEvent: "pointercancel" = "pointercancel";
+  public static readonly lostpointercaptureEvent: "lostpointercapture" = "lostpointercapture";
+  public static readonly primaryButtons: number = 1;
   public static readonly blurEvent: "blur" = "blur";
   public static readonly treeItemSelector: string = "[role=treeitem]";
   public static readonly politeAnnouncement: AriaLivePoliteness = "polite";

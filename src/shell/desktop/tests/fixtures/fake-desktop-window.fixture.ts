@@ -30,6 +30,7 @@ export class FakeDesktopWindow implements IDesktopWindow {
   public isMinimizedNow: boolean = false;
   public isFocusedNow: boolean = false;
   public isMaximizedNow: boolean = false;
+  public isFullScreenNow: boolean = false;
   public bounds: Rectangle = { x: 100, y: 80, width: 1280, height: 800 };
   public boundsReads: number = 0;
 
@@ -68,6 +69,10 @@ export class FakeDesktopWindow implements IDesktopWindow {
 
   public isMaximized(): boolean {
     return this.isMaximizedNow;
+  }
+
+  public isFullScreen(): boolean {
+    return this.isFullScreenNow;
   }
 
   public maximize(): void {

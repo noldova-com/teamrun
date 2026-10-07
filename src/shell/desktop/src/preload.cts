@@ -150,6 +150,14 @@ contextBridge.exposeInMainWorld("teamrun", {
     ipcRenderer.on("teamrun:trayAvailable", handler);
     return () => ipcRenderer.removeListener("teamrun:trayAvailable", handler);
   },
+  readFullScreen(): Promise<unknown> {
+    return ipcRenderer.invoke("teamrun:readFullScreen");
+  },
+  onFullScreen(listener: (isFullScreen: boolean) => void): () => void {
+    const handler = (_event: IpcRendererEvent, isFullScreen: boolean): void => listener(isFullScreen);
+    ipcRenderer.on("teamrun:fullScreen", handler);
+    return () => ipcRenderer.removeListener("teamrun:fullScreen", handler);
+  },
   logModule(moduleId: string, message: string): void {
     ipcRenderer.send("teamrun:moduleLog", moduleId, message);
   },

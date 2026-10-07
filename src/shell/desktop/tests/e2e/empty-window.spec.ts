@@ -41,8 +41,8 @@ test.describe("the empty window", () => {
 
     expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: [
       "actOnStartup", "actOnUpdate", "addToDictionary", "answerClose", "answerQuit", "answerUpdateSave", "appearance", "copyText", "edit", "installCommand", "keepAppearance", "keepSpelling", "logError",
-      "logModule", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent", "onFieldMenu", "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "onStartup", "onTrayAvailable", "onUpdate",
-      "onUpdateSaveRequest", "openLink", "openLogFolder", "platform", "processor", "readBuild", "readLayout", "readSpelling", "readStartup", "readTrayAvailable", "readUpdate", "replaceMisspelling", "request",
+      "logModule", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent", "onFieldMenu", "onFullScreen", "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "onStartup", "onTrayAvailable", "onUpdate",
+      "onUpdateSaveRequest", "openLink", "openLogFolder", "platform", "processor", "readBuild", "readFullScreen", "readLayout", "readSpelling", "readStartup", "readTrayAvailable", "readUpdate", "replaceMisspelling", "request",
       "setMenuBar", "writeLayout"
     ] });
   });
@@ -116,7 +116,7 @@ test.describe("the empty window", () => {
 
     expect(measured.body).toBe(expected.window);
     expect(measured.row).toEqual({ height: measured.rowLook, background: expected.titleBar, color: expected.titleBarText, borderBottom: "0px" });
-    expect(measured.bar).toEqual({ height: measured.barLook, paddingLeft: "8px", paddingRight: "8px", gap: "4px", background: expected.window, borderTop: "0px" });
+    expect(measured.bar).toEqual({ height: measured.barLook, paddingLeft: "4px", paddingRight: "4px", gap: "4px", background: expected.window, borderTop: "0px" });
     expect(measured.card).toEqual({ border: "1px", borderColor: expected.cardBorder, radius: "8px", background: expected.panel, color: expected.text });
     expect(measured.cardBounds["x"]).toBe(4);
     expect(measured.cardBounds["y"]).toBe(measured.rowBottom);
@@ -134,9 +134,9 @@ test.describe("the empty window", () => {
 
     expect(row.region).toBe("drag");
     if (process.platform === "darwin")
-      expect(row).toMatchObject({ isMac: true, left: 78, right: 0 });
+      expect(row).toMatchObject({ isMac: true, left: 78, right: 4 });
     else {
-      expect(row).toMatchObject({ isMac: false, left: 0 });
+      expect(row).toMatchObject({ isMac: false, left: 4 });
       expect(row.right).toBeGreaterThan(0);
     }
   });

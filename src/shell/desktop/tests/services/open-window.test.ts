@@ -61,6 +61,17 @@ export class OpenWindowTests {
   }
 
   @TestMethod
+  public tellsItsPageEachTimeTheWindowEntersOrLeavesFullScreen(): void {
+    const window = new FakeDesktopWindow({}, 1);
+    new OpenWindow(window, new FakeDisplayHost(), new FakeDesktopLog(), new FakeCloseGuard(), "darwin");
+
+    window.change("enter-full-screen");
+    window.change("leave-full-screen");
+
+    Assert.areEqual(JSON.stringify([["teamrun:fullScreen", true], ["teamrun:fullScreen", false]]), JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:fullScreen")));
+  }
+
+  @TestMethod
   public async staysOpenWithoutAskingItsPageToSaveWhileTheGuardKeepsIt(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const guard = new FakeCloseGuard();

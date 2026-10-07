@@ -85,7 +85,7 @@ describe("TabDragService", () => {
   }
 
   function start(tab: Tab, from: Element = element("files"), button: number = 0): void {
-    const event = new PointerEvent("pointerdown", { button, clientX: 10, clientY: 10, bubbles: true });
+    const event = new PointerEvent("pointerdown", { pointerId: 1, button, clientX: 10, clientY: 10, bubbles: true });
     from.addEventListener("pointerdown", () => drag.begin(tab, event), { once: true });
     from.dispatchEvent(event);
   }
@@ -93,13 +93,13 @@ describe("TabDragService", () => {
   function moveWithin(name: string, x: number, y: number): void {
     under = element(name);
     const bounds = under.getBoundingClientRect();
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.left + x, clientY: bounds.top + y }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: bounds.left + x, clientY: bounds.top + y }));
   }
 
   function moveOver(name: string | null, x: number = 50): void {
     under = Object.isNull(name) ? null : element(name);
     const left = Object.isNull(under) ? 0 : under.getBoundingClientRect().left;
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: left + x, clientY: 40 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: left + x, clientY: 40 }));
   }
 
   it("starts dragging past the threshold with the primary button and not from a close button or another button", () => {
@@ -112,7 +112,7 @@ describe("TabDragService", () => {
     expect(drag.dragging()).toBeNull();
 
     start(LayoutFixture.files);
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 11, clientY: 11 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: 11, clientY: 11 }));
     expect(drag.dragging()).toBeNull();
     moveOver("side");
     expect(drag.dragging()).toEqual(LayoutFixture.files);
@@ -185,7 +185,7 @@ describe("TabDragService", () => {
       moveWithin(name, x, y);
       targets.push(drag.target());
     }
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     start(LayoutFixture.plan, element("plan"));
     moveWithin("vertical", 50, 5);
 
@@ -196,7 +196,7 @@ describe("TabDragService", () => {
   it("places the tab where it is dropped and changes nothing without a target", () => {
     start(LayoutFixture.files);
     moveOver("side");
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     expect(layout.layout().sideOf(layout.layout().groupOf(LayoutFixture.files)?.id ?? -1)).toBe(DockSide.Bottom);
     expect(drag.dragging()).toBeNull();
     expect(drag.target()).toBeNull();
@@ -204,28 +204,30 @@ describe("TabDragService", () => {
     const before = layout.layout();
     start(LayoutFixture.search);
     moveOver("outside");
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     expect(layout.layout()).toBe(before);
 
     start(LayoutFixture.search);
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     expect(layout.layout()).toBe(before);
   });
 
   it("moves a tab into another group's row at the place before the tab under the pointer", () => {
     start(LayoutFixture.files);
     moveOver("changes", 10);
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
 
     expect(layout.layout().group(2)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.changes]);
   });
 
-  it("cancels on Escape, a cancelled pointer and a lost window focus, and ignores other keys", () => {
+  it("cancels on Escape, a cancelled pointer, a lost capture, a lost window focus or a move with no button pressed, and ignores other keys", () => {
     const before = layout.layout();
     const cancels: (() => void)[] = [
       () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })),
-      () => document.dispatchEvent(new PointerEvent("pointercancel")),
-      () => window.dispatchEvent(new FocusEvent("blur"))
+      () => document.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1 })),
+      () => window.dispatchEvent(new FocusEvent("blur")),
+      () => document.documentElement.dispatchEvent(new PointerEvent("lostpointercapture", { pointerId: 1 })),
+      () => document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 0 }))
     ];
     for (const cancel of cancels) {
       for (const [name, isDropBefore, hovered] of [["search", true, null], ["body", false, 1]] as const) {
@@ -235,7 +237,7 @@ describe("TabDragService", () => {
         expect([drag.dragging(), drag.isDropBefore(1, 1), drag.hoveredGroup()]).toEqual([LayoutFixture.files, isDropBefore, hovered]);
         cancel();
         expect([drag.dragging(), drag.target(), drag.isDropBefore(1, 1), drag.hoveredGroup()]).toEqual([null, null, false, null]);
-        document.dispatchEvent(new PointerEvent("pointerup"));
+        document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
         expect(layout.layout()).toBe(before);
       }
     }
@@ -263,7 +265,7 @@ describe("TabDragService", () => {
     expect(drag.target()).toEqual(new GroupDropTarget(0));
     moveOver("todo", 90);
     expect(drag.target()).toEqual(new TabDropTarget(0, 2));
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
 
     expect(layout.layout().documents.tabs).toEqual([LayoutFixture.todo, LayoutFixture.plan]);
   });
