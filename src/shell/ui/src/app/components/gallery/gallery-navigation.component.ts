@@ -29,6 +29,7 @@ import { ViewBadgeComponent } from "../view-badge/view-badge.component";
 import { VirtualListComponent } from "../virtual-list/virtual-list.component";
 import { VirtualRowDirective } from "../virtual-list/virtual-row.directive";
 import { GalleryCellComponent } from "./gallery-cell.component";
+import { GalleryFeedComponent } from "./gallery-feed.component";
 import { GalleryResources } from "./gallery-resources";
 import { GallerySpecimenComponent } from "./gallery-specimen.component";
 import { GalleryStateDirective } from "./gallery-state.directive";
@@ -36,7 +37,7 @@ import { GalleryVirtualListSource } from "./gallery-virtual-list-source";
 
 @Component({
   selector: "tr-gallery-navigation",
-  imports: [GalleryCellComponent, GallerySpecimenComponent, GalleryStateDirective, IconButtonComponent, PanelCardComponent, SashComponent, SectionHeaderComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent, VirtualListComponent,
+  imports: [GalleryCellComponent, GalleryFeedComponent, GallerySpecimenComponent, GalleryStateDirective, IconButtonComponent, PanelCardComponent, SashComponent, SectionHeaderComponent, TabComponent, ToolbarButtonComponent, ToolbarDirective, ToolbarItemDirective, TooltipDirective, TreeComponent, ViewBadgeComponent, VirtualListComponent,
     VirtualRowDirective],
   templateUrl: "./gallery-navigation.component.html",
   styleUrl: "./gallery-navigation.component.scss",

@@ -21,6 +21,12 @@ export class GalleryResources {
   public static readonly fieldMessageIdPrefix: string = "tr-gallery-field-message-";
   public static readonly virtualListLength: number = 10_000;
   public static readonly virtualListEstimate: number = 30;
+  public static readonly feedLength: number = 10_000;
+  public static readonly feedRecent: number = 100;
+  public static readonly feedHistoryDelay: number = 1500;
+  public static readonly feedReplyInterval: number = 100;
+  public static readonly feedReplyWords: number = 40;
+  public static readonly feedCodeEvery: number = 9;
   public static readonly text = {
     gallery: "Gallery",
     defaultState: "Default",
@@ -147,6 +153,12 @@ export class GalleryResources {
     virtualListItem: "Item",
     virtualListLoadingCaption: "Loading",
     virtualListRefusal: "The Gallery's source refuses every read.",
+    virtualFeed: "Virtual feed",
+    virtualFeedLabel: "Gallery conversation",
+    virtualFeedStream: "Stream a reply",
+    feedAuthors: ["Ada", "Grace", "Linus"],
+    feedReplyAuthor: "TeamRun",
+    feedWords: ["the", "build", "finished", "on", "every", "system", "and", "the", "list", "kept", "its", "place", "while", "older", "messages", "loaded", "above", "it", "so", "nothing", "in", "view", "moved"],
     sectionHeader: "Section header",
     sectionRecent: "Recent",
     sectionOlder: "Older",
@@ -239,6 +251,14 @@ export class GalleryResources {
 
   public static formatMissingPart(part: string): string {
     return `The Gallery cell has no part that matches ${part}.`;
+  }
+
+  public static formatFeedHeading(author: string, index: number): string {
+    return `${author} · message ${index + 1}`;
+  }
+
+  public static formatFeedCode(index: number): string {
+    return `const message = ${index + 1};\nconsole.log(message);`;
   }
 
   public static formatScope(themeName: string, mode: string): string {
