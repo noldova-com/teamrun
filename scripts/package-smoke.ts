@@ -55,7 +55,8 @@ export default class PackageSmoke {
   private static readonly DATA_DIRECTORY_FIELD: string = "dataDirectory";
   private static readonly STATUS_ARGUMENTS: readonly string[] = ["status", "--json"];
   private static readonly QUIT_ARGUMENTS: readonly string[] = ["quit", "--json", "--timeout", String(PackageSmoke.QUIT_LIMIT / PackageSmoke.SECOND)];
-  private static readonly QUIT_ANSWER: string = "{\"outcome\":\"Quit\"}";
+  private static readonly OUTCOME_FIELD: string = "outcome";
+  private static readonly QUIT_OUTCOME: string = "Quit";
   private static readonly LOG_TAIL_LENGTH: number = 4_000;
   private static readonly SCREEN_CAPTURE: string = "screencapture";
   private static readonly SILENT_CAPTURE: string = "-x";
@@ -419,8 +420,8 @@ export default class PackageSmoke {
 
   private async quitAsync(installed: InstalledPackage, data: string, folder: string): Promise<void> {
     const quit = await this.runCommandLineAsync(installed, PackageSmoke.QUIT_ARGUMENTS, data, folder, PackageSmoke.QUIT_LIMIT + PackageSmoke.COMMAND_LIMIT);
-    if (!quit.isSuccessful || quit.output.trim() !== PackageSmoke.QUIT_ANSWER)
-      throw new PackagingException(`teamrun quit did not say ${PackageSmoke.QUIT_ANSWER}; it exited with ${quit.exitCode}:\n${quit.text}`);
+    if (!quit.isSuccessful || PackageSmoke.readField(PackageSmoke.parse(quit.output), PackageSmoke.OUTCOME_FIELD) !== PackageSmoke.QUIT_OUTCOME)
+      throw new PackagingException(`teamrun quit did not answer the outcome ${PackageSmoke.QUIT_OUTCOME}; it exited with ${quit.exitCode}:\n${quit.text}`);
   }
 }
 

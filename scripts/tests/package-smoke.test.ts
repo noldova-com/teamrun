@@ -455,8 +455,8 @@ class PackageSmokeTests {
       assert.deepEqual(exitCodes, [1, 1, 1]);
       assert.equal(outputs[0].text, "Fixture Studio-linux-x64.AppImage --appimage-extract failed with exit code 9:\nFixture Studio-linux-x64.AppImage broke\n");
       assert.deepEqual(extract.starts, []);
-      assert.match(outputs[1].text, /\nteamrun quit did not say \{"outcome":"Quit"\}; it exited with 6:\nTeamRun stayed open: it was kept open while work was in progress\.\n$/);
-      assert.match(outputs[2].text, /\nteamrun quit did not say \{"outcome":"Quit"\}; it exited with 0:\n\{"outcome":"NoDesktop"\}\n$/);
+      assert.match(outputs[1].text, /\nteamrun quit did not answer the outcome Quit; it exited with 6:\nTeamRun stayed open: it was kept open while work was in progress\.\n$/);
+      assert.match(outputs[2].text, /\nteamrun quit did not answer the outcome Quit; it exited with 0:\n\{"outcome":"NoDesktop"\}\n$/);
       assert.deepEqual([kept.desktop.signals, alone.desktop.signals], [["SIGKILL"], ["SIGKILL"]]);
     });
 
