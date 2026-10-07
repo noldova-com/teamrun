@@ -16,8 +16,9 @@ import type { MessageBoxOptions } from "electron";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, QuitAnswered, RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey,
-  SettingValue, ShellEvents, ShellMethods, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
+  CommandRun, type Event, Failure, FailureCode, NotificationAction, NotificationBroadcast, NotificationPost, NotificationSeverity, NotificationState, NotificationsQuery, QualifiedName, QuitAnswered,
+  RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey, SettingValue, ShellEvents, ShellMethods, ShellNotifications, StopPolicy, StopRequest, WindowStateKey, WindowStateValue,
+  WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 import {
   AppImageSource,
@@ -48,6 +49,9 @@ import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { ISystemNotification } from "../interfaces/i-system-notification.js";
 import type { IUpdateHost } from "../interfaces/i-update-host.js";
+import type { IUpdateCheckLock } from "../interfaces/i-update-check-lock.js";
+import type { IUpdater } from "../interfaces/i-updater.js";
+import { UpdateStatus } from "../models/update-status.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
 import { PathCommandOutcome } from "../enums/path-command-outcome.js";
@@ -84,6 +88,7 @@ import { TrayController } from "./tray-controller.js";
 import { TrayHostWatcher } from "./tray-host-watcher.js";
 import { UpdateBarrierGate } from "./update-barrier-gate.js";
 import { UpdateBarrierWatch } from "./update-barrier-watch.js";
+import { UpdateController } from "./update-controller.js";
 import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
 
@@ -96,14 +101,6 @@ export class DesktopApplication {
     ["Paste", t => t.paste()],
     ["SelectAll", t => t.selectAll()]
   ]);
-  private static readonly UPDATES_OFF: JsonObject = {
-    [Resources.kindField]: Resources.updateOffKind,
-    [Resources.updateVersionField]: null,
-    [Resources.updateProgressField]: null,
-    [Resources.updateCheckedAtField]: null,
-    [Resources.updateReasonField]: null,
-    [Resources.updateMustMoveField]: false
-  };
   private static readonly UNOWNED_STATES: readonly StartupStateKind[] = [StartupStateKind.Connecting, StartupStateKind.PreShellData, StartupStateKind.Failed];
 
   private readonly electron: IElectron;
@@ -127,6 +124,8 @@ export class DesktopApplication {
   private readonly tray: TrayController;
   private readonly trayHosts: TrayHostWatcher;
   private readonly trayIcon: DeviceSettingFollower;
+  private readonly updates: UpdateController | null;
+  private readonly updateChecks: DeviceSettingFollower;
   private readonly spelling: SpellChecker;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
   private readonly deviceFolder: string;
@@ -157,7 +156,9 @@ export class DesktopApplication {
     icons: AppIcons,
     spelling: SpellChecker,
     installation: Installation,
-    recordDesktopAsync: () => Promise<boolean>) {
+    recordDesktopAsync: () => Promise<boolean>,
+    updater: IUpdater | null,
+    updateLock: IUpdateCheckLock) {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
@@ -206,6 +207,11 @@ export class DesktopApplication {
     this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.changeTrayHost(t));
     this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.followTrayIconSetting(t), t => this.log.write(t));
+    this.updates = Object.isNull(updater) ? null : new UpdateController(updater, createDeviceFile(installation.folder, Resources.updateReadyFile), updateLock,
+      RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
+      t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run));
+    this.updateChecks = new DeviceSettingFollower(ShellSettings.updateChecks, Resources.automaticUpdateChecks, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
+      t => this.followUpdateChecksSetting(t), t => this.log.write(t));
     this.spelling = spelling;
   }
 
@@ -217,7 +223,9 @@ export class DesktopApplication {
     readDeviceAsync: (folder: string) => Promise<string>,
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
-    recordDesktopAsync: (installation: Installation) => Promise<boolean>): void {
+    recordDesktopAsync: (installation: Installation) => Promise<boolean>,
+    createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
@@ -254,7 +262,7 @@ export class DesktopApplication {
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
-      spelling, installation, () => recordDesktopAsync(installation));
+      spelling, installation, () => recordDesktopAsync(installation), createUpdater(installation, t => log.write(t)), createUpdateLock(installation, t => log.write(t)));
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -277,6 +285,7 @@ export class DesktopApplication {
     });
     app.on(Resources.willQuitEvent, () => {
       this.watch.stop();
+      this.updates?.stop();
       this.trayHosts.stop();
       this.tray.dispose();
       this.startup.close();
@@ -332,8 +341,8 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
     this.electron.ipcMain.handle(Resources.openLinkChannel, (event, url) => Object.isNull(this.findTrusted(event)) ? false : this.openLinkAsync(url));
     this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
-    this.electron.ipcMain.handle(Resources.readUpdateChannel, event => Object.isNull(this.findTrusted(event)) ? null : DesktopApplication.UPDATES_OFF);
-    this.electron.ipcMain.handle(Resources.updateActionChannel, () => false);
+    this.electron.ipcMain.handle(Resources.readUpdateChannel, event => Object.isNull(this.findTrusted(event)) ? null : (this.updates?.status ?? UpdateStatus.off).toJson());
+    this.electron.ipcMain.handle(Resources.updateActionChannel, (event, action) => !Object.isNull(this.findTrusted(event)) && this.updates?.act(action) === true);
     this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
       if (this.hasPassedBarrier && this.windows.size === 0 && !this.isQuitting)
@@ -348,11 +357,16 @@ export class DesktopApplication {
       const trayIcon = state[Resources.trayIconStateKey];
       if (Object.isBoolean(trayIcon))
         this.trayIcon.startFrom(trayIcon);
+      const updateChecks = state[Resources.updateChecksStateKey];
+      if (Object.isString(updateChecks))
+        this.updateChecks.startFrom(updateChecks);
       this.tray.setHostAvailable(this.trayHosts.isAvailable);
       this.tray.setEnabled(this.trayIcon.value === true);
       this.trayHosts.start();
       this.open();
       this.watch.start();
+      if (!Object.isNull(this.updates))
+        void this.startUpdatesAsync(this.updates);
       void this.startup.startAsync();
     });
   }
@@ -453,8 +467,10 @@ export class DesktopApplication {
       this.notifier.reset();
     if (!isReady)
       this.quit.release();
-    if (isReady && !this.isReady)
+    if (isReady && !this.isReady) {
       void this.refreshTrayAsync();
+      void this.refreshUpdatesAsync();
+    }
     else if (!isReady)
       this.tray.clear();
     this.isReady = isReady;
@@ -579,6 +595,11 @@ export class DesktopApplication {
     void this.deviceState.rememberAsync(Resources.trayIconStateKey, value);
   }
 
+  private followUpdateChecksSetting(value: JsonValue): void {
+    this.updates?.follow(value);
+    void this.deviceState.rememberAsync(Resources.updateChecksStateKey, value);
+  }
+
   private followTrayIcon(isShown: boolean): void {
     if (!isShown && this.windows.size === 0 && !this.isQuitting && !this.keepsRunningWithoutWindows())
       this.open();
@@ -678,6 +699,7 @@ export class DesktopApplication {
     try {
       const change = SettingChange.fromJson(event.payload);
       this.trayIcon.receive(change, this.knownDevice);
+      this.updateChecks.receive(change, this.knownDevice);
       if (Object.isNull(change.key.device))
         return event.payload;
       return change.key.device === this.knownDevice ? new SettingChange(new SettingKey(change.key.name, change.key.scope), change.value, change.isSet).toJson() : undefined;
@@ -720,6 +742,45 @@ export class DesktopApplication {
       this.log.write(Resources.formatEventNotForwarded(event.name.text, String(error)));
       return undefined;
     }
+  }
+
+  private async startUpdatesAsync(updates: UpdateController): Promise<void> {
+    updates.follow(this.updateChecks.value);
+    await updates.startAsync();
+    await updates.notifyAsync();
+  }
+
+  private async refreshUpdatesAsync(): Promise<void> {
+    const updates = this.updates;
+    if (Object.isNull(updates))
+      return;
+    const device = await this.device;
+    if (!Object.isNull(device))
+      await this.updateChecks.refreshAsync(device);
+    await updates.notifyAsync();
+  }
+
+  private publishUpdate(status: UpdateStatus): void {
+    const state = status.toJson();
+    for (const open of this.windows.values())
+      if (!open.window.isDestroyed())
+        open.window.webContents.send(Resources.updateStateChannel, state);
+  }
+
+  private async postUpdateReadyAsync(version: string): Promise<boolean> {
+    const restart = new CommandRun(new QualifiedName(ShellNotifications.updateReady.owner, Resources.restartToUpdateMember), null);
+    const post = new NotificationPost(ShellNotifications.updateReady, version, Resources.formatUpdateReadyTitle(version), null, NotificationSeverity.Info, null,
+      [new NotificationAction(Resources.restartToUpdateTitle, restart)], null);
+    const failure = (await this.callAsync(ShellMethods.postNotification, post.toJson())).failure;
+    if (!Object.isUndefined(failure))
+      this.log.write(Resources.formatUpdateNotPosted(failure.message));
+    return Object.isUndefined(failure);
+  }
+
+  private static schedule(wait: number, run: () => void): () => void {
+    const timer = setTimeout(run, wait);
+    timer.unref();
+    return () => clearTimeout(timer);
   }
 
   private async refreshTrayAsync(): Promise<void> {

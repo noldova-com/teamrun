@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { readFile } from "node:fs/promises";
 import type { Writable } from "node:stream";
 
 import PackageException from "./packages/package.exception.ts";
@@ -40,7 +41,9 @@ export default class ReleaseAssets {
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
       const manifest = await RootManifest.readAsync(this.root);
-      const names = await new ReleaseFileSet(manifest.product.name).writeAsync(new PackageLayout(this.root).output, target, manifest.productVersion, new Date().toISOString());
+      const layout = new PackageLayout(this.root);
+      await ReleaseAssets.requireFeedAsync(layout.stagedProduct, manifest.product.updateFeed);
+      const names = await new ReleaseFileSet(manifest.product.name).writeAsync(layout.output, target, manifest.productVersion, new Date().toISOString());
       this.output.write(`The release files of ${target.platform} ${target.architecture} for ${manifest.productVersion}:\n${names.join("\n")}\n`);
       return 0;
     }
@@ -50,6 +53,19 @@ export default class ReleaseAssets {
       this.output.write(`${error.message}\n`);
       return 1;
     }
+  }
+
+  private static async requireFeedAsync(file: string, expected: string): Promise<void> {
+    let product: unknown;
+    try {
+      product = JSON.parse(await readFile(file, "utf8"));
+    }
+    catch (error) {
+      throw new ReleaseException(`The packaged product file ${file} could not be read as JSON, so its update feed is unknown: ${String(error)}`, { cause: error });
+    }
+    const feed = typeof product === "object" && product !== null && "updateFeed" in product ? product.updateFeed : undefined;
+    if (feed !== expected)
+      throw new ReleaseException(`The packaged product file names the update feed ${JSON.stringify(feed ?? null)}, not ${expected}, so its packages cannot be released.`);
   }
 }
 

@@ -16,6 +16,7 @@ import GalleryFile from "./angular/gallery-file.ts";
 import ModuleException from "./modules/module.exception.ts";
 import PackageException from "./packages/package.exception.ts";
 import RootManifest from "./packages/root-manifest.ts";
+import UpdateFeed from "./packages/update-feed.ts";
 import ElectronDistribution from "./packaging/electron-distribution.ts";
 import type IPackageSigning from "./packaging/interfaces/i-package-signing.ts";
 import MacSigning from "./packaging/mac-signing.ts";
@@ -35,7 +36,7 @@ import ProcessException from "./processes/process.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Package {
-  private static readonly USAGE: string = "Usage: npm run package [-- --signed]\n";
+  private static readonly USAGE: string = "Usage: npm run package [-- [--signed] [--update-feed <https URL, or http URL of localhost, ending in />]]\n";
   private static readonly SIGNED_OPTION: string = "--signed";
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly TOOL_CACHE_MANIFEST: string = "package.json";
@@ -76,15 +77,18 @@ export default class Package {
     const credentials = SigningCredentials.take(this.environment);
     const layout = new PackageLayout(this.root);
     await rm(layout.report, { force: true });
-    if (packageArguments.length > 1 || packageArguments.some(t => t !== Package.SIGNED_OPTION)) {
+    const feedIndex = packageArguments.indexOf(UpdateFeed.OPTION);
+    const updateFeed = feedIndex < 0 ? null : packageArguments[feedIndex + 1] ?? "";
+    const options = packageArguments.filter((_, i) => feedIndex < 0 || (i !== feedIndex && i !== feedIndex + 1));
+    if (options.length > 1 || options.some(t => t !== Package.SIGNED_OPTION) || (updateFeed !== null && !UpdateFeed.isValid(updateFeed))) {
       this.output.write(Package.USAGE);
       return Package.USAGE_EXIT_CODE;
     }
 
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
-      const signing = packageArguments.length === 0 ? null : this.createSigning(target, layout, credentials);
-      await this.stage.stageAsync(target, this.output);
+      const signing = options.length === 0 ? null : this.createSigning(target, layout, credentials);
+      await this.stage.stageAsync(target, this.output, updateFeed);
       await rm(layout.output, { recursive: true, force: true });
       const electron = new ElectronDistribution(this.root, layout.electron);
       await electron.copyAsync();
