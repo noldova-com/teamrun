@@ -22,8 +22,8 @@ export class QuitRelay {
   private readonly server: RuntimeServer;
   private readonly quitting: EventChannel;
   private readonly waits: Map<RequestContext, PromiseWithResolvers<QuitReport>> = new Map();
+  private readonly quittingDesktops: Set<number> = new Set();
   private desktops: ReadonlySet<number> = new Set();
-  private isQuitting: boolean = false;
 
   public constructor(server: RuntimeServer, quitting: EventChannel) {
     this.server = server;
@@ -59,13 +59,17 @@ export class QuitRelay {
   }
 
   public recordStop(connection: number): void {
-    if (this.desktops.has(connection))
-      this.isQuitting = true;
+    if (this.server.clients.some(t => t.connection === connection && t.client === ShellClients.desktop))
+      this.quittingDesktops.add(connection);
   }
 
   public check(): void {
     if (this.waits.size > 0 && !this.server.clients.some(t => this.desktops.has(t.connection)))
       this.finish(Resources.formatQuitUnanswered(ProductInfo.current.name));
+    for (const connection of this.quittingDesktops) {
+      if (!this.server.clients.some(t => t.connection === connection))
+        this.quittingDesktops.delete(connection);
+    }
   }
 
   public async endAsync(): Promise<void> {
@@ -76,7 +80,7 @@ export class QuitRelay {
   }
 
   private finish(unanswered: string): void {
-    if (!this.isQuitting) {
+    if (![...this.desktops].some(t => this.quittingDesktops.has(t))) {
       this.fail(new Failure(FailureCode.Unavailable, unanswered));
       return;
     }
@@ -92,18 +96,13 @@ export class QuitRelay {
   private cancel(context: RequestContext): void {
     this.waits.delete(context);
     if (this.waits.size === 0)
-      this.reset();
+      this.desktops = new Set();
   }
 
   private takeWaits(): PromiseWithResolvers<QuitReport>[] {
     const waits = [...this.waits.values()];
     this.waits.clear();
-    this.reset();
-    return waits;
-  }
-
-  private reset(): void {
     this.desktops = new Set();
-    this.isQuitting = false;
+    return waits;
   }
 }

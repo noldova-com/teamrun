@@ -412,6 +412,9 @@ export class Resources {
   public static readonly treeShiftDuration: number = 150;
   public static readonly treeShiftEasing: string = "ease-out";
   public static readonly treeMoveKeys: string = "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight";
+  public static readonly virtualListEstimate: number = 120;
+  public static readonly virtualListPageSize: number = 50;
+  public static readonly virtualListCapacity: number = 150;
   public static readonly configurationTableHeadingLevel: number = 3;
   public static readonly scrollOverflow: RegExp = /auto|scroll/u;
   public static readonly reducedMotionQuery: string = "(prefers-reduced-motion: reduce)";
@@ -443,6 +446,30 @@ export class Resources {
 
   public static formatTreeRowMissing(id: string): string {
     return `The tree has no row "${id}".`;
+  }
+
+  public static formatVirtualListLengthInvalid(length: number): string {
+    return `A list's length must be a whole number of 0 or more, not ${length}.`;
+  }
+
+  public static formatVirtualListEstimateInvalid(estimate: number): string {
+    return `A row's estimated height must be a number of pixels above 0, not ${estimate}.`;
+  }
+
+  public static formatVirtualListInsertInvalid(at: number, count: number, length: number): string {
+    return `${count} items can't be inserted at ${at} in a list of ${length}; the count must be a whole number of 1 or more and the place from 0 to the length.`;
+  }
+
+  public static formatVirtualListRangeInvalid(at: number, count: number, length: number): string {
+    return `${count} items from ${at} are not in a list of ${length}; the count must be a whole number of 1 or more and every item inside the list.`;
+  }
+
+  public static formatVirtualListReadMismatch(start: number, end: number, count: number): string {
+    return `A read of the ${end - start} items from ${start} to ${end - 1} answered ${count}.`;
+  }
+
+  public static formatVirtualListHeightInvalid(height: number): string {
+    return `A row's height must be a number of pixels of 0 or more, not ${height}.`;
   }
 
   public static formatBadgeCount(count: number): string {

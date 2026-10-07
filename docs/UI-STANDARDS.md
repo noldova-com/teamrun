@@ -333,7 +333,7 @@ The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
 - A menu bar follows the [menubar pattern](https://www.w3.org/WAI/ARIA/apg/patterns/menubar/).
   It is one tab stop; Left and Right move between its menus, Down, Enter and Space open one, and while one is open, Left and Right inside it, or the pointer entering another item, open the neighboring menu.
   On Windows and Linux, while no modal dialog is open, F10 or Alt pressed and released alone focuses the menu bar, or the Menu icon button when the menus are one, and Escape, once no menu is open, returns the focus to where it was.
-- The kit's virtual list marks each row it renders with its position in the whole list (`aria-posinset`) and the list's length (`aria-setsize`, or −1 while the length is unknown), and marks itself busy (`aria-busy`) while rows in view load.
+- The kit's virtual list marks each row it renders with its position in the whole list (`aria-posinset`) and the list's length (`aria-setsize`), and marks itself busy (`aria-busy`) while rows in view load.
   A row not yet loaded is blank and hidden from assistive technology (`aria-hidden`) until focus or a key reaches it; it then takes its position marking and holds the focus while it loads.
   While rows in view load, a status line says so, announced politely; a read that fails shows an error at the edge where rows are missing, announced as an alert, with a Retry button that reads them again.
   The list shows in one of two patterns:

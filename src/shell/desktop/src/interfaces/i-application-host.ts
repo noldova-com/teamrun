@@ -19,6 +19,7 @@ export interface IApplicationHost {
   setPath(name: "userData", path: string): void;
   requestSingleInstanceLock(): boolean;
   getPreferredSystemLanguages(): string[];
+  isInApplicationsFolder(): boolean;
   enableSandbox(): void;
   quit(): void;
   relaunch(): void;
