@@ -168,10 +168,10 @@ export default class ReleasePublisher {
 
   private async readTagAsync(tag: string): Promise<string | null> {
     const context = `the tag ${tag}`;
-    const reference = await this.api.readOptionalAsync(`/git/ref/tags/${tag}`);
+    const reference = await this.api.readTagAsync(tag);
     if (reference === null)
       return null;
-    const target = GitHubJson.child(GitHubJson.object(reference, context), "object", context);
+    const target = GitHubJson.child(reference, "object", context);
     if (GitHubJson.text(target, "type", context) !== ReleasePublisher.COMMIT_TYPE)
       throw new ReleaseException(`The tag ${tag} is annotated; a release's tag points straight at its commit.`);
     return GitHubJson.text(target, "sha", context);

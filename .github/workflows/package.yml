@@ -19,6 +19,10 @@ on:
         description: Whether to sign the packages of the platforms that teamrun.signedPlatforms declares, which needs the release environment's approval. Only from main.
         type: boolean
         default: false
+      update-feed:
+        description: A local update feed for a native update check, such as http://127.0.0.1:47325/, which the packages name instead of the production feed. Only a loopback HTTP URL.
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -191,6 +195,7 @@ jobs:
         timeout-minutes: 40
         env:
           SIGNED: ${{ matrix.signed }}
+          UPDATE_FEED: ${{ inputs.update-feed }}
           AZURE_TENANT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_TENANT_ID || '' }}
           AZURE_CLIENT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_ID || '' }}
           AZURE_CLIENT_SECRET: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_SECRET || '' }}
@@ -200,10 +205,21 @@ jobs:
           APPLE_API_KEY_ID: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
           APPLE_API_ISSUER: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
         run: |
+          options=()
           if [ "$SIGNED" = true ]; then
-            npm run package -- --signed
-          else
+            options+=(--signed)
+          fi
+          if [ -n "$UPDATE_FEED" ]; then
+            if ! [[ "$UPDATE_FEED" =~ ^http://(127\.0\.0\.1|localhost|\[::1\]):([0-9]{1,5})/$ ]] || [ $((10#${BASH_REMATCH[2]})) -lt 1 ] || [ $((10#${BASH_REMATCH[2]})) -gt 65535 ]; then
+              echo "::error::The update feed must be a loopback HTTP URL such as http://127.0.0.1:47325/, not $UPDATE_FEED."
+              exit 1
+            fi
+            options+=(--update-feed "$UPDATE_FEED")
+          fi
+          if [ ${#options[@]} -eq 0 ]; then
             npm run package
+          else
+            npm run package -- "${options[@]}"
           fi
 
       - name: Install, start and quit the package
