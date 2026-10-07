@@ -130,15 +130,17 @@ test.describe("virtual list", () => {
 
     await list(window, "tr-gallery-feed button.tr-button").click();
     const streaming = await viewport(feed).evaluate(async element => {
-      const distances: number[] = [];
+      const distances: (readonly number[])[] = [];
       const words: number[] = [];
       const wordsOf = (): number => (element.querySelector("[aria-posinset=\"10001\"] .tr-gallery-message-text")?.textContent ?? "").split(" ").length;
+      const shapes: string[] = [];
       while (words.at(-1) !== 40 && words.length < 1200) {
         await new Promise<number>(t => requestAnimationFrame(t));
         words.push(wordsOf());
-        const settled = words.length > 2 && words.at(-1) === words.at(-2) && words.at(-2) === words.at(-3);
+        shapes.push(`${words.at(-1)} ${element.scrollHeight} ${element.querySelectorAll("[data-tr-row]").length}`);
+        const settled = shapes.length > 2 && shapes.at(-1) === shapes.at(-2) && shapes.at(-2) === shapes.at(-3);
         if (settled)
-          distances.push(element.scrollHeight - element.clientHeight - element.scrollTop);
+          distances.push([words.length, words.at(-1) ?? 0, element.scrollHeight - element.clientHeight - element.scrollTop, element.scrollTop, element.scrollHeight]);
       }
       return { words: words.at(-1), distances };
     });
@@ -150,11 +152,27 @@ test.describe("virtual list", () => {
       const row = [...element.querySelectorAll("[role=article]")].find(t => t.getBoundingClientRect().bottom > top);
       return Number(row?.getAttribute("aria-posinset"));
     });
-    const loading = await scrollFramesAsync(feed, 150, 0, reading);
+    const trace = await viewport(feed).evaluate(async (element, place) => {
+      const records: string[] = [];
+      const row = (): Element | null => element.querySelector(`[aria-posinset="${place}"]`);
+      const rows = element.querySelector(".tr-virtual-list-rows") as HTMLElement;
+      const offset = (): number => Math.round((row()?.getBoundingClientRect().top ?? 0) - element.getBoundingClientRect().top);
+      const start = offset();
+      let changed = -1;
+      for (let frame = 0; frame < 150 && (changed < 0 || frame < changed + 4); frame++) {
+        const slots = [...element.querySelectorAll<HTMLElement>("[data-tr-row]")];
+        records.push(`${frame} st=${element.scrollTop} sh=${element.scrollHeight} off=${offset()} pt=${getComputedStyle(rows).paddingTop} first=${slots[0]?.dataset["trRow"]} n=${slots.length} hidden=${slots.filter(t => t.firstElementChild?.getAttribute("aria-hidden") === "true").length}`);
+        if (changed < 0 && Math.abs(offset() - start) > 1)
+          changed = frame;
+        await new Promise<number>(t => requestAnimationFrame(t));
+      }
+      return records.slice(Math.max(0, changed - 3));
+    }, reading);
+    const loading = { gaps: [], longFrames: null, rows: [], drift: [0] };
     await desktop.checkpointAsync("virtual-list-feed");
     await attachAsync(testInfo, window, { history: summarize(history), loading: summarize(loading) });
 
-    expect([streaming.words, Math.max(0, ...streaming.distances) <= 1, streaming.distances.length > 0, following <= 1]).toEqual([40, true, true, true]);
-    expect(Math.max(...loading.drift)).toBeLessThan(1);
+    expect([streaming.words, streaming.distances.filter(t => (t[2] ?? 0) > 1), streaming.distances.length > 0, following <= 1]).toEqual([40, [], true, true]);
+    expect([reading, trace]).toEqual([]);
   });
 });
