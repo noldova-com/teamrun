@@ -85,6 +85,7 @@ import { OpenWindow } from "./open-window.js";
 import type { PathCommand } from "./path-command.js";
 import { QuitCoordinator } from "./quit-coordinator.js";
 import { QuitFlow } from "./quit-flow.js";
+import { RestartArguments } from "./restart-arguments.js";
 import { RuntimeStartup } from "./runtime-startup.js";
 import { RuntimeWindowStateStore } from "./runtime-window-state-store.js";
 import { SenderPolicy } from "./sender-policy.js";
@@ -116,6 +117,8 @@ export class DesktopApplication {
 
   private readonly electron: IElectron;
   private readonly process: IDesktopProcess;
+  private readonly argv: readonly string[];
+  private readonly restartArguments: RestartArguments;
   private readonly settings: DesktopSettings;
   private readonly taskbar: TaskbarIdentity;
   private readonly isPackaged: boolean;
@@ -165,6 +168,8 @@ export class DesktopApplication {
   private constructor(
     electron: IElectron,
     process: IDesktopProcess,
+    argv: readonly string[],
+    restartArguments: RestartArguments,
     settings: DesktopSettings,
     taskbar: TaskbarIdentity,
     dataDirectory: DataDirectory,
@@ -185,9 +190,11 @@ export class DesktopApplication {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
-    this.deviceFolder = DesktopApplication.locateDeviceFolder(process);
+    this.deviceFolder = DesktopApplication.locateDeviceFolder(process, argv);
     this.appearanceStore = createDeviceFile(this.deviceFolder, Resources.appearanceFile);
     this.process = process;
+    this.argv = argv;
+    this.restartArguments = restartArguments;
     this.settings = settings;
     this.taskbar = taskbar;
     this.isPackaged = DesktopApplication.isPackagedBuild(electron, process);
@@ -259,15 +266,23 @@ export class DesktopApplication {
     electron.app.setName(Resources.applicationName);
     const moduleDirectory = dirname(fileURLToPath(moduleUrl));
     const isPackaged = DesktopApplication.isPackagedBuild(electron, process);
+    const program = AppImageSource.locateProgram(process.env, process.execPath);
+    const restartArguments = new RestartArguments(process.temporaryFolder, program, process.platform);
+    const kept = isPackaged ? restartArguments.take(RuntimeBuild.identity.productVersion, Date.now()) : [];
+    const handedOver = process.argv.some(t => Resources.handoverArguments.some(u => t.startsWith(u))) ? [] : kept;
+    const argv = [...process.argv, ...handedOver];
     const dataDirectory = DataDirectoryLocator.locate(
       isPackaged,
       process.env,
       process.homeFolder,
       join(moduleDirectory, ...Resources.repositoryRootSegments),
-      DesktopApplication.readFolderArgument(process, Resources.dataDirectoryArgument));
-    const userData = DesktopApplication.readFolderArgument(process, Resources.userDataArgument);
+      DesktopApplication.readFolderArgument(process, argv, Resources.dataDirectoryArgument));
+    const userData = DesktopApplication.readFolderArgument(process, argv, Resources.userDataArgument);
+    const keptProfile = DesktopApplication.readFolderArgument(process, handedOver, Resources.userDataArgument);
     if (Object.isUndefined(userData))
-      DesktopApplication.keepProfileIn(electron, dataDirectory);
+      DesktopApplication.keepProfileIn(electron, dataDirectory.root, dataDirectory.profileFolder);
+    else if (!Object.isUndefined(keptProfile))
+      DesktopApplication.keepProfileIn(electron, keptProfile, keptProfile);
     const launchSettings = new LaunchSettings(
       dataDirectory,
       process.execPath,
@@ -275,14 +290,16 @@ export class DesktopApplication {
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
     const presence = process.presence;
-    const deviceFolder = DesktopApplication.locateDeviceFolder(process);
-    const installation = new Installation(Installation.locate(deviceFolder, AppImageSource.locateProgram(process.env, process.execPath), process.platform), t => presence.isRunningAsync(t));
+    const deviceFolder = DesktopApplication.locateDeviceFolder(process, argv);
+    const installation = new Installation(Installation.locate(deviceFolder, program, process.platform), t => presence.isRunningAsync(t));
     const connector = new UpdateTargetConnector(installation.folder, t => Installation.locate(deviceFolder, t, process.platform),
       t => createLauncher(new LaunchSettings(t, launchSettings.executablePath, launchSettings.entryPath, launchSettings.environment, process.platform), installation), presence,
       Date.now, delay);
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
-    const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
+    const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
+    if (handedOver.length > 0)
+      log.write(Resources.formatRestartArgumentsTaken(handedOver));
     const profileFolder = userData ?? dataDirectory.profileFolder;
     const languages = process.platform === Resources.macPlatform
       ? []
@@ -291,7 +308,7 @@ export class DesktopApplication {
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const [setup, updatesOff] = DesktopApplication.createUpdater(createUpdater, installation, isPackaged, dataDirectory, log);
     const application = new DesktopApplication(
-      electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
+      electron, process, argv, restartArguments, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
       spelling, installation, presence, connector, () => recordDesktopAsync(installation), setup, createUpdateLock(installation, t => log.write(t)), updatesOff);
     recovery.attach(log, () => application.openLogFolderAsync(), () => application.release());
     application.run();
@@ -307,7 +324,7 @@ export class DesktopApplication {
       return;
     }
     app.enableSandbox();
-    const relaunch = TerminalRelaunch.find(this.process, this.isPackaged);
+    const relaunch = TerminalRelaunch.find(this.process, this.argv, this.isPackaged);
     if (Object.isNull(relaunch)) {
       this.listen();
       return;
@@ -809,7 +826,7 @@ export class DesktopApplication {
     const ended = Promise.withResolvers<void>();
     this.restarting = ended.promise;
     try {
-      if (await stop.runAsync(record.version, () => handoff.handOffAsync(record)))
+      if (await stop.runAsync(record.version, () => this.handOffAsync(record, handoff)))
         await this.quitAfterHandoffAsync();
     }
     finally {
@@ -818,6 +835,23 @@ export class DesktopApplication {
       if (this.isQuitHeld && !this.isExiting)
         this.electron.app.quit();
       this.isQuitHeld = false;
+    }
+  }
+
+  private async handOffAsync(record: UpdateReadyRecord, handoff: IUpdateHandoff): Promise<number | null> {
+    const folders = Resources.handoverArguments.flatMap(t => {
+      const folder = DesktopApplication.readFolderArgument(this.process, this.argv, t);
+      return Object.isUndefined(folder) ? [] : [`${t}${folder}`];
+    });
+    if (this.process.platform === Resources.linuxPlatform || folders.length === 0)
+      return handoff.handOffAsync(record);
+    await this.restartArguments.writeAsync(record.version, folders, Date.now());
+    try {
+      return await handoff.handOffAsync(record);
+    }
+    catch (error) {
+      await this.restartArguments.removeAsync().catch((failure: unknown) => this.log.write(Resources.formatRestartArgumentsNotRemoved(String(failure))));
+      throw error;
     }
   }
 
@@ -878,7 +912,7 @@ export class DesktopApplication {
   }
 
   private get launchArguments(): readonly string[] {
-    return this.process.argv.filter(t => Resources.handoverArguments.some(u => t.startsWith(u)));
+    return this.argv.filter(t => Resources.handoverArguments.some(u => t.startsWith(u)));
   }
 
   private async refreshUpdatesAsync(): Promise<void> {
@@ -1230,21 +1264,21 @@ export class DesktopApplication {
     return Object.isString(value) && Resources.moduleIdPattern.test(value);
   }
 
-  private static keepProfileIn(electron: IElectron, dataDirectory: DataDirectory): void {
+  private static keepProfileIn(electron: IElectron, folder: string, profile: string): void {
     try {
-      electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
+      electron.app.setPath(Resources.userDataPath, profile);
     }
     catch (error) {
-      throw new UnusableFolderException(Resources.formatDataFolderUnusable(dataDirectory.root, String(error)), new ExceptionOptions(error));
+      throw new UnusableFolderException(Resources.formatDataFolderUnusable(folder, String(error)), new ExceptionOptions(error));
     }
   }
 
-  private static locateDeviceFolder(process: IDesktopProcess): string {
-    return DesktopApplication.readFolderArgument(process, Resources.deviceDirectoryArgument) ?? DeviceFolder.locate(process.platform, process.env, process.homeFolder);
+  private static locateDeviceFolder(process: IDesktopProcess, argv: readonly string[]): string {
+    return DesktopApplication.readFolderArgument(process, argv, Resources.deviceDirectoryArgument) ?? DeviceFolder.locate(process.platform, process.env, process.homeFolder);
   }
 
-  private static readFolderArgument(process: IDesktopProcess, prefix: string): string | undefined {
-    const folder = process.argv.find(t => t.startsWith(prefix))?.slice(prefix.length);
+  private static readFolderArgument(process: IDesktopProcess, argv: readonly string[], prefix: string): string | undefined {
+    const folder = argv.find(t => t.startsWith(prefix))?.slice(prefix.length);
     return Object.isUndefined(folder) || String.isNullOrWhitespace(folder) || isAbsolute(folder) ? folder : resolve(AppImageEnvironment.locateStartFolder(process), folder);
   }
 }

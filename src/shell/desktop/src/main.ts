@@ -7,7 +7,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { devNull, homedir } from "node:os";
+import { devNull, homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { isatty } from "node:tty";
 import { promisify } from "node:util";
@@ -88,6 +88,7 @@ DesktopApplication.start(
     platform: process.platform,
     execPath: process.execPath,
     homeFolder: homedir(),
+    temporaryFolder: tmpdir(),
     workingDirectory: process.cwd(),
     isDefaultApp: process.defaultApp === true,
     errorOutput: process.stderr,

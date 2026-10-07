@@ -1400,6 +1400,14 @@ export interface IDesktopProcess {
   readonly homeFolder: string;
 
   /**
+   * The person's temporary folder. An update restart on Windows or macOS leaves the stopping desktop's `--data-dir=`,
+   * `--user-data-dir=` and `--device-dir=` there for the new version, which starts without arguments; a packaged
+   * desktop takes them back at start when they are for its version, at most 10 minutes old, and it was given none of
+   * its own.
+   */
+  readonly temporaryFolder: string;
+
+  /**
    * The working directory the desktop started in, against which relative path arguments resolve.
    */
   readonly workingDirectory: string;

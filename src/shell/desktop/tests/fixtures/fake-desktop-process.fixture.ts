@@ -22,6 +22,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly platform: string;
   public readonly execPath: string = "/electron/electron";
   public readonly homeFolder: string;
+  public temporaryFolder: string = path.resolve("work", "temporary");
   public readonly workingDirectory: string = path.resolve("work");
   public isDefaultApp: boolean = false;
   public isTerminal: boolean = false;
