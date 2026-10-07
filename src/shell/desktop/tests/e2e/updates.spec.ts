@@ -20,20 +20,20 @@ import ReadyUpdateFixture from "./fixtures/ready-update.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 import UpdateFeedFixture from "./fixtures/update-feed.fixture.ts";
 
-interface ReadyUpdate {
+interface IReadyUpdate {
   readonly feed: UpdateFeedFixture;
   readonly launchAsync: () => Promise<DesktopApplicationFixture>;
 }
 
-interface UpdateState {
+interface IUpdateState {
   readonly kind: string;
   readonly version: string | null;
   readonly reason: string | null;
 }
 
-interface UpdateBridge {
+interface IUpdateBridge {
   readonly teamrun: {
-    readUpdate(): Promise<UpdateState>;
+    readUpdate(): Promise<IUpdateState>;
     actOnUpdate(action: string): Promise<boolean>;
   };
 }
@@ -41,7 +41,7 @@ interface UpdateBridge {
 const VERSION = "999.0.0";
 const NOT_AN_APP_IMAGE = "This copy of TeamRun doesn't run from an AppImage, so it can't install the update.";
 
-const withReadyUpdateAsync = async (testInfo: TestInfo, run: (update: ReadyUpdate) => Promise<void>): Promise<void> => {
+const withReadyUpdateAsync = async (testInfo: TestInfo, run: (update: IReadyUpdate) => Promise<void>): Promise<void> => {
   const folder = await mkdtemp(path.join(os.tmpdir(), "teamrun-updates-"));
   const device = path.join(folder, "device");
   const cache = path.join(folder, "cache");
@@ -83,7 +83,7 @@ const withReadyUpdateAsync = async (testInfo: TestInfo, run: (update: ReadyUpdat
     expect(desktop.failures).toEqual([]);
 };
 
-const readUpdateAsync = (page: Page): Promise<UpdateState> => page.evaluate(() => (window as unknown as UpdateBridge).teamrun.readUpdate());
+const readUpdateAsync = (page: Page): Promise<IUpdateState> => page.evaluate(() => (window as unknown as IUpdateBridge).teamrun.readUpdate());
 
 const expectNewRuntimeAsync = async (desktop: DesktopApplicationFixture, previous: number | undefined): Promise<void> => {
   await expect.poll(async () => {
@@ -110,7 +110,7 @@ test("an update made ready before TeamRun started offers Restart to update at on
       await expect(about.getByRole("status")).toContainText("The update failed.");
       await expect(about.locator(".tr-about-detail")).toHaveText(NOT_AN_APP_IMAGE);
       await expect(about.getByRole("button", { name: "Restart to update" })).toHaveCount(0);
-      expect(await page.evaluate(() => (window as unknown as UpdateBridge).teamrun.actOnUpdate("Restart"))).toBe(false);
+      expect(await page.evaluate(() => (window as unknown as IUpdateBridge).teamrun.actOnUpdate("Restart"))).toBe(false);
       expect(feed.requests).not.toContain(UpdateFeedFixture.source.packageFile);
       expect(await desktop.readRuntimeProcessIdAsync()).toBe(runtime);
       expect(DesktopApplicationFixture.isAlive(runtime ?? 0)).toBe(true);
