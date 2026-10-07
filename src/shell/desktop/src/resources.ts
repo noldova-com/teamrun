@@ -355,6 +355,22 @@ export class Resources {
     return `The AppImage ${image} could not be replaced with the update and was left as it was: ${reason}`;
   }
 
+  public static readonly launchControl: string = "/bin/launchctl";
+  public static readonly launchControlList: string = "list";
+  public static readonly launchControlRemove: string = "remove";
+  public static readonly launchListSeparator: string = "\t";
+  public static formatShipItLabel(bundleIdentifier: string): string {
+    return `${bundleIdentifier}.ShipIt`;
+  }
+
+  public static formatShipItUnreadable(reason: string): string {
+    return `The installer process of the staged update could not be looked up: ${reason}`;
+  }
+
+  public static formatShipItNotRemoved(reason: string): string {
+    return `The staged update could not be withdrawn, so it may install when ${Resources.applicationName} quits: ${reason}`;
+  }
+
   public static readonly installerArguments: readonly string[] = ["--updated", "/S", "--force-run"];
   public static formatInstallerUnsigned(installer: string, reason: string): string {
     return `The update's installer ${installer} is not signed by the publisher, so it was not started: ${reason}`;

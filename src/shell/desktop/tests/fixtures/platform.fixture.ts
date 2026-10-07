@@ -17,6 +17,10 @@ export class PlatformFixture {
     return process.platform === "linux" ? () => undefined : Skip("Linux only");
   }
 
+  public static macOnly(): (value: Function) => void {
+    return process.platform === "darwin" ? () => undefined : Skip("macOS only");
+  }
+
   public static posixOnly(): (value: Function) => void {
     return process.platform === "win32" ? Skip("POSIX only") : () => undefined;
   }

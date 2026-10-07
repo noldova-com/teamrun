@@ -55,6 +55,7 @@ export class DesktopApiTests {
         "ScreenArea",
         "SenderInfo",
         "SenderPolicy",
+        "ShipItProcess",
         "SpellChecker",
         "SpellingDictionaries",
         "SquirrelHandoff",

@@ -107,6 +107,7 @@ export { InstallerHandoff } from "../services/installer-handoff.js";
 export { SquirrelHandoff } from "../services/squirrel-handoff.js";
 export { AppImageRestart } from "../services/app-image-restart.js";
 export { InstallerStart } from "../services/installer-start.js";
+export { ShipItProcess } from "../services/ship-it-process.js";
 export { UpdateWorkQuestion } from "../services/update-work-question.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";
 export { RuntimeWindowStateStore } from "../services/runtime-window-state-store.js";
