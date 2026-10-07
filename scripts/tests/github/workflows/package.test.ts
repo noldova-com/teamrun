@@ -62,6 +62,7 @@ class PackageWorkflowTests {
         PackageWorkflowTests.CREDENTIALS.map(([platform, name]) => `${signed} && matrix.platform == '${platform}' && secrets.${name} || ''`));
       assert.ok(workflow.text.includes(`      - name: Make the package\n        id: package\n        timeout-minutes: 40\n        env:\n          SIGNED: \${{ matrix.signed }}\n`
         + "          UPDATE_FEED: ${{ inputs.update-feed }}\n"
+        + "          PACKAGE_VERSION: ${{ inputs.version }}\n"
         + PackageWorkflowTests.CREDENTIALS.map(([platform, name]) => `          ${name}: \${{ ${signed} && matrix.platform == '${platform}' && secrets.${name} || '' }}\n`).join("")
         + "        run: |\n"));
       assert.ok(workflow.text.includes("        include: ${{ fromJSON(needs.plan.outputs.targets) }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 75\n    steps: &package-steps\n"));
@@ -190,6 +191,41 @@ class PackageWorkflowTests {
           "http://127.0.0.1/", "http://localhost.example:1/", "http://127.0.0.1:47325/ --signed", "http://1:47325/", "http://127x0x0x1:47325/", "http://::1:47325/",
           "http://127.0.0.1:0/", "http://127.0.0.1:00000/", "http://127.0.0.1:65536/", "http://127.0.0.1:99999/", "http://127.0.0.1:4732a/"])
           assert.deepEqual(await run("true", feed), refused(feed), feed);
+      });
+
+    test("a run by hand may give its packages a newer X.Y.Z product version, with a feed or signed, and any other version is refused before packaging", { timeout: PackageWorkflowTests.SCRIPT_TIMEOUT },
+      async t => {
+        const workflow = await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW);
+        const release = await WorkflowFileFixture.readAsync("release.yml");
+        const run = async (version: string, current: string = "0.0.1", feed: string = "", signed: string = "false")
+          : Promise<readonly [number | null, string, readonly string[]]> => {
+          const doubles = await CommandDoublesFixture.createAsync();
+          t.after(() => doubles.disposeAsync());
+          doubles.respond("npm", "pkg get version", `"${current}"\n`);
+          doubles.respond("npm", `pkg set version=${version}`, "");
+          for (const options of ["", " -- --signed", ` -- --update-feed ${feed}`, ` -- --signed --update-feed ${feed}`])
+            doubles.respond("npm", `run package${options}`, "");
+          const result = await doubles.runAsync(workflow.readStepScript("Make the package"), { SIGNED: signed, UPDATE_FEED: feed, PACKAGE_VERSION: version });
+          return [result.status, result.stdout, await doubles.readCallsAsync()];
+        };
+        const refused = (version: string, current: string = "0.0.1"): readonly [number, string, readonly string[]] =>
+          [1, `::error::The version must be X.Y.Z and newer than the root manifest's ${current}, not ${version}.\n`, ["npm pkg get version"]];
+
+        assert.ok(workflow.text.includes("      version:\n        description: A product version for a native update check, such as 0.0.2, "
+          + "which the packages carry instead of the root manifest's. Only X.Y.Z, newer than the root manifest's.\n        type: string\n        default: ''\n"));
+        assert.equal(release.text.includes("PACKAGE_VERSION: "), false);
+        assert.deepEqual(await run(""), [0, "", ["npm run package"]]);
+        assert.deepEqual(await run("0.0.2"), [0, "", ["npm pkg get version", "npm pkg set version=0.0.2", "npm run package"]]);
+        assert.deepEqual(await run("0.0.2", "0.0.1", "http://127.0.0.1:47325/", "true"),
+          [0, "", ["npm pkg get version", "npm pkg set version=0.0.2", "npm run package -- --signed --update-feed http://127.0.0.1:47325/"]]);
+        assert.deepEqual(await run("0.1.0", "0.0.9"), [0, "", ["npm pkg get version", "npm pkg set version=0.1.0", "npm run package"]]);
+        assert.deepEqual(await run("1.0.0", "0.10.10"), [0, "", ["npm pkg get version", "npm pkg set version=1.0.0", "npm run package"]]);
+        assert.deepEqual(await run("0.0.10", "0.0.09"), [0, "", ["npm pkg get version", "npm pkg set version=0.0.10", "npm run package"]]);
+        for (const version of ["0.0.1", "0.0.0", "0.0.2-beta.1", "0.0.2+build", "v0.0.2", "00.0.2", "0.0.02", "0.2", "0.0.2.1", "1000000000.0.0",
+          "0.0.2 --signed", "0.0.2; touch injected", "$(touch injected)", "0.0.2\n::error::injected"])
+          assert.deepEqual(await run(version), refused(version), version);
+        assert.deepEqual(await run("0.0.9", "0.1.0"), refused("0.0.9", "0.1.0"));
+        assert.deepEqual(await run("0.0.2", "unknown"), refused("0.0.2", "unknown"));
       });
 
     test("an installed libfuse2 is removed before the package starts, and the job fails when it is still there", { timeout: PackageWorkflowTests.SCRIPT_TIMEOUT }, async t => {
