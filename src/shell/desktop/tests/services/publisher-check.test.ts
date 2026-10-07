@@ -6,26 +6,26 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { SystemCommand } from "@noldova/teamrun-shell-runtime";
+import { type IWindowsSignature, WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
 import { PublisherCheck } from "@noldova/teamrun-shell-desktop";
 
 import { PlatformFixture } from "../fixtures/platform.fixture.js";
 
-class FakeCommand {
-  public readonly calls: { readonly file: string; readonly arguments: readonly string[]; readonly environment: NodeJS.ProcessEnv }[] = [];
-  private readonly answer: () => Promise<string>;
+class FakeSignatures {
+  public readonly files: string[] = [];
+  private readonly answer: () => Promise<IWindowsSignature>;
 
-  public constructor(answer: () => Promise<string>) {
+  public constructor(answer: () => Promise<IWindowsSignature>) {
     this.answer = answer;
   }
 
-  public runAsync(file: string, commandArguments: readonly string[], environment?: NodeJS.ProcessEnv): Promise<string> {
-    this.calls.push({ file, arguments: commandArguments, environment: environment ?? {} });
+  public verifySignatureAsync(file: string): Promise<IWindowsSignature> {
+    this.files.push(file);
     return this.answer();
   }
 }
@@ -34,29 +34,22 @@ class FakeCommand {
 export class PublisherCheckTests {
   private static readonly PUBLISHER: string = "CN=Noldova SRL, O=Noldova SRL, C=MD";
   private static readonly INSTALLER: string = "C:\\Temp\\it's\\TeamRun-windows-x64.exe";
-  private static readonly ENVIRONMENT: NodeJS.ProcessEnv = { SystemRoot: "C:\\Windows", PSModulePath: "C:\\Modules", Path: "C:\\Windows\\System32" };
 
   @TestMethod
-  public async passesASignatureOfThePublisherReadByPowerShellWithoutAShellAndRecordsHowLongItTook(): Promise<void> {
+  public async passesAValidSignatureOfThePublisherAndRecordsHowLongItTook(): Promise<void> {
     const lines: string[] = [];
     let time = 1_000;
-    const command = new FakeCommand(() => {
+    const signatures = new FakeSignatures(() => {
       time += 840;
-      return Promise.resolve(PublisherCheckTests.answer(0, "Signature verified.", PublisherCheckTests.INSTALLER, "CN=Noldova SRL, O=Noldova SRL, L=Chisinau, C=MD"));
+      return Promise.resolve({ status: 0, message: "The operation completed successfully.\r\n", subject: "CN=Noldova SRL, O=Noldova SRL, L=Chisinau, C=MD" });
     });
-    const check = new PublisherCheck(PublisherCheckTests.PUBLISHER, command, PublisherCheckTests.ENVIRONMENT, t => lines.push(t), () => time);
+    const check = new PublisherCheck(PublisherCheckTests.PUBLISHER, signatures, t => lines.push(t), () => time);
 
     const failure = await check.checkAsync(PublisherCheckTests.INSTALLER);
 
     Assert.isNull(failure);
+    Assert.areEqual(JSON.stringify([PublisherCheckTests.INSTALLER]), JSON.stringify(signatures.files));
     Assert.areEqual(JSON.stringify(["The update's publisher check passed in 840 ms."]), JSON.stringify(lines));
-    const [call] = command.calls;
-    Assert.areEqual("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", call?.file);
-    Assert.areEqual(JSON.stringify(["-NoProfile", "-NonInteractive", "-InputFormat", "None", "-EncodedCommand"]), JSON.stringify(call?.arguments.slice(0, 5)));
-    Assert.areEqual(JSON.stringify({ SystemRoot: "C:\\Windows", Path: "C:\\Windows\\System32" }), JSON.stringify(call?.environment));
-    const script = Buffer.from(call?.arguments[5] ?? "", "base64").toString("utf16le");
-    Assert.isTrue(script.includes("Get-AuthenticodeSignature -LiteralPath 'C:\\Temp\\it''s\\TeamRun-windows-x64.exe'"), script);
-    Assert.isTrue(script.includes("ConvertTo-Json -Compress"), script);
   }
 
   @TestMethod
@@ -64,27 +57,27 @@ export class PublisherCheckTests {
     const signers = ["c=MD,o=\"Noldova SRL\",cn=Noldova SRL", "CN=\"Noldova SRL\", O=Noldova SRL, C=MD", "CN=Noldova\\ SRL, O=Noldova SRL, C=MD, OU=Updates"];
 
     for (const signer of signers) {
-      const check = new PublisherCheck(PublisherCheckTests.PUBLISHER, new FakeCommand(() => Promise.resolve(PublisherCheckTests.answer(0, "", PublisherCheckTests.INSTALLER, signer))),
-        PublisherCheckTests.ENVIRONMENT, () => undefined, () => 0);
+      const check = new PublisherCheck(PublisherCheckTests.PUBLISHER, new FakeSignatures(() => Promise.resolve({ status: 0, message: "", subject: signer })), () => undefined, () => 0);
 
       Assert.isNull(await check.checkAsync(PublisherCheckTests.INSTALLER), signer);
     }
   }
 
   @TestMethod
-  public async failsInOneLineWhenTheSignatureIsInvalidOfAnotherFileOrAnothersOrThePublisherNamesNoField(): Promise<void> {
-    const cases: readonly (readonly [string, string, string])[] = [
-      [PublisherCheckTests.PUBLISHER, PublisherCheckTests.answer(2, "The file is not signed.\r\nAsk its publisher.", PublisherCheckTests.INSTALLER, ""),
-        "its signature is not valid: The file is not signed. Ask its publisher."],
-      [PublisherCheckTests.PUBLISHER, PublisherCheckTests.answer(0, "", "C:\\Temp\\other.exe", "CN=Noldova SRL, O=Noldova SRL, C=MD"), "PowerShell read the signature of C:\\Temp\\other.exe instead"],
-      [PublisherCheckTests.PUBLISHER, PublisherCheckTests.answer(0, "", "c:\\temp\\IT'S\\TeamRun-windows-x64.exe", "CN=Noldova SRL, O=Other, C=MD"),
+  public async failsInOneLineWhenTheSignatureIsInvalidHasNoReadableSignerOrIsAnothers(): Promise<void> {
+    const cases: readonly (readonly [string, IWindowsSignature, string])[] = [
+      [PublisherCheckTests.PUBLISHER, { status: 0x800B0100, message: "No signature was present\r\nin the subject.\r\n", subject: null },
+        "its signature is not valid (0x800B0100): No signature was present in the subject."],
+      [PublisherCheckTests.PUBLISHER, { status: 0x10B, message: " ", subject: "CN=Noldova SRL, O=Noldova SRL, C=MD" }, "its signature is not valid (0x0000010B)"],
+      [PublisherCheckTests.PUBLISHER, { status: 0, message: "", subject: null }, "Windows verified its signature but could not read its signer's name"],
+      [PublisherCheckTests.PUBLISHER, { status: 0, message: "", subject: "CN=Noldova SRL, O=Other, C=MD" },
         "it is signed by CN=Noldova SRL, O=Other, C=MD, not by CN=Noldova SRL, O=Noldova SRL, C=MD"],
-      ["Noldova", PublisherCheckTests.answer(0, "", PublisherCheckTests.INSTALLER, "CN=Noldova"), "it is signed by CN=Noldova, not by Noldova"]
+      ["Noldova", { status: 0, message: "", subject: "CN=Noldova" }, "it is signed by CN=Noldova, not by Noldova"]
     ];
 
-    for (const [publisher, answer, expected] of cases) {
+    for (const [publisher, signature, expected] of cases) {
       const lines: string[] = [];
-      const check = new PublisherCheck(publisher, new FakeCommand(() => Promise.resolve(answer)), PublisherCheckTests.ENVIRONMENT, t => lines.push(t), () => 0);
+      const check = new PublisherCheck(publisher, new FakeSignatures(() => Promise.resolve(signature)), t => lines.push(t), () => 0);
 
       Assert.areEqual(expected, await check.checkAsync(PublisherCheckTests.INSTALLER));
       Assert.areEqual(JSON.stringify(["The update's publisher check failed in 0 ms."]), JSON.stringify(lines));
@@ -92,53 +85,42 @@ export class PublisherCheckTests {
   }
 
   @TestMethod
-  public async failsWhenPowerShellCannotBeFoundFailsOrAnswersUnreadably(): Promise<void> {
-    const cases: readonly (readonly [NodeJS.ProcessEnv, () => Promise<string>, string])[] = [
-      [{}, () => Promise.resolve(""), "Windows did not name its system folder in SystemRoot, so PowerShell could not be found to read the signature."],
-      [{ SystemRoot: " " }, () => Promise.resolve(""), "Windows did not name its system folder in SystemRoot, so PowerShell could not be found to read the signature."],
-      [PublisherCheckTests.ENVIRONMENT, () => Promise.reject(new Error("powershell.exe failed: timed out\n  after 30 s")), "Error: powershell.exe failed: timed out after 30 s"],
-      [PublisherCheckTests.ENVIRONMENT, () => Promise.resolve("Get-AuthenticodeSignature : Access\r\nis denied."), "PowerShell answered with an unreadable signature: Get-AuthenticodeSignature : Access is denied."],
-      [PublisherCheckTests.ENVIRONMENT, () => Promise.resolve("{\"Status\":0}"), "JsonException: "]
-    ];
+  public async failsInOneLineWhenTheSignatureCannotBeRead(): Promise<void> {
+    const lines: string[] = [];
+    const check = new PublisherCheck(PublisherCheckTests.PUBLISHER, new FakeSignatures(() => Promise.reject(new Error("The runtime could not load\n  its Windows addon."))),
+      t => lines.push(t), () => 0);
 
-    for (const [environment, answer, expected] of cases) {
-      const check = new PublisherCheck(PublisherCheckTests.PUBLISHER, new FakeCommand(answer), environment, () => undefined, () => 0);
-
-      const failure = await check.checkAsync(PublisherCheckTests.INSTALLER);
-
-      Assert.isTrue(failure?.startsWith(expected) === true, `${expected} / ${failure}`);
-      Assert.isFalse(failure?.includes("\n") === true, failure ?? "");
-    }
+    Assert.areEqual("Error: The runtime could not load its Windows addon.", await check.checkAsync(PublisherCheckTests.INSTALLER));
+    Assert.areEqual(JSON.stringify(["The update's publisher check failed in 0 ms."]), JSON.stringify(lines));
   }
 
   @PlatformFixture.windowsOnly()
   @TestMethod
-  public async readsRealSignaturesWithoutAShellOrAWarningOnWindows(): Promise<void> {
+  public async readsRealSignaturesWithoutHoldingTheEventLoopOnWindows(): Promise<void> {
     const folder = await mkdtemp(path.join(tmpdir(), "tr-publisher-"));
-    const warnings: string[] = [];
-    const warn = (warning: Error): void => {
-      warnings.push(warning.message);
-    };
-    process.on("warning", warn);
     try {
-      const unsigned = path.join(folder, "TeamRun's installer.exe");
+      const unsigned = path.join(folder, "TeamRun's ünsigned installer.exe");
       await writeFile(unsigned, "MZ");
-      const check = new PublisherCheck(PublisherCheckTests.PUBLISHER, new SystemCommand(), process.env, () => undefined, Date.now);
-      const signed = path.join(process.env["SystemRoot"] ?? "C:\\Windows", "System32", "cmd.exe");
+      const lines: string[] = [];
+      const check = new PublisherCheck(PublisherCheckTests.PUBLISHER, new WindowsProcessApi(), t => lines.push(t), Date.now);
+      const order: string[] = [];
 
-      const [unsignedFailure, signedFailure] = [await check.checkAsync(unsigned), await check.checkAsync(signed)];
+      const unsignedFailure = await check.checkAsync(unsigned);
+      const checking = check.checkAsync(process.execPath).then(t => {
+        order.push("checked");
+        return t;
+      });
+      setImmediate(() => order.push("immediate"));
+      const signedFailure = await checking;
 
-      Assert.isTrue(unsignedFailure?.startsWith("its signature is not valid: ") === true, unsignedFailure ?? "");
-      Assert.isTrue(signedFailure?.startsWith("it is signed by CN=Microsoft") === true, signedFailure ?? "");
-      Assert.areEqual("[]", JSON.stringify(warnings));
+      const megabytes = Math.round((await stat(process.execPath)).size / 1_048_576);
+      console.log(`${lines[1]} (${path.basename(process.execPath)}, ${megabytes} MB)`);
+      Assert.isTrue(unsignedFailure?.startsWith("its signature is not valid (0x") === true, unsignedFailure ?? "");
+      Assert.isTrue(signedFailure?.startsWith("it is signed by CN=") === true, signedFailure ?? "");
+      Assert.areEqual(JSON.stringify(["immediate", "checked"]), JSON.stringify(order));
     }
     finally {
-      process.off("warning", warn);
       await rm(folder, { recursive: true, force: true });
     }
-  }
-
-  private static answer(status: number, message: string, file: string, subject: string): string {
-    return JSON.stringify({ Status: status, StatusMessage: message, Path: file, Subject: subject });
   }
 }

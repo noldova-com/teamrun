@@ -43,6 +43,7 @@ export type { IIdleParticipant } from "../interfaces/i-idle-participant.js";
 export type { IMethodHandler } from "../interfaces/i-method-handler.js";
 export type { IProcessStarter } from "../interfaces/i-process-starter.js";
 export type { IWindowsProcessApi } from "../interfaces/i-windows-process-api.js";
+export type { IWindowsSignature } from "../interfaces/i-windows-signature.js";
 export type { IRuntimeClientListener } from "../interfaces/i-runtime-client-listener.js";
 export type { IRuntimeDiscoveryJson } from "../interfaces/i-runtime-discovery-json.js";
 export type { IModuleDatabase } from "../interfaces/i-module-database.js";

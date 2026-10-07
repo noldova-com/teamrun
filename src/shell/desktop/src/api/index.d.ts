@@ -6530,31 +6530,29 @@ export declare class UpdateCheckLock implements IUpdateCheckLock {
 }
 
 /**
- * Checks that a Windows update carries a valid signature by the publisher. It reads the signature with Windows
- * PowerShell's `Get-AuthenticodeSignature`, started by its full path without a shell and without the caller's
- * `PSModulePath`, and passes it only when it is valid, belongs to the file and its signer's distinguished name holds
- * every field of the publisher's; any other answer, an unreadable one or a failed or timed-out PowerShell counts as
- * failed, with one line saying why.
+ * Checks that a Windows update carries a valid signature by the publisher. It reads the signature through the
+ * runtime's Windows addon, off the main thread, and passes it only when Windows verifies it and its signer's
+ * distinguished name holds every field of the publisher's; any other signature, one without a readable signer or a
+ * failed read counts as failed, with one line saying why.
  */
 export declare class PublisherCheck {
   /**
    * Creates the check.
    *
    * @param publisher The publisher's distinguished name.
-   * @param command Runs PowerShell.
-   * @param environment Supplies `SystemRoot` and the rest of PowerShell's environment.
+   * @param signatures Reads a file's signature, as {@link IWindowsProcessApi.verifySignatureAsync} does.
    * @param log Records each check, its duration and whether it passed, in one line; the reason of a failure is left to
    * the caller, so it is logged once.
    * @param now Gives the time in milliseconds.
    * @example
    * ```ts
-   * import { SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
    * import { PublisherCheck } from "@noldova/teamrun-shell-desktop";
    *
-   * export const check: PublisherCheck = new PublisherCheck("CN=Noldova, O=Noldova, C=MD", new SystemCommand(), process.env, console.log, Date.now);
+   * export const check: PublisherCheck = new PublisherCheck("CN=Noldova, O=Noldova, C=MD", new WindowsProcessApi(), console.log, Date.now);
    * ```
    */
-  public constructor(publisher: string, command: Pick<SystemCommand, "runAsync">, environment: NodeJS.ProcessEnv, log: (text: string) => void, now: () => number);
+  public constructor(publisher: string, signatures: Pick<IWindowsProcessApi, "verifySignatureAsync">, log: (text: string) => void, now: () => number);
 
   /**
    * Checks a file.
