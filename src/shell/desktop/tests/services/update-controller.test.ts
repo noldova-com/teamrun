@@ -365,14 +365,14 @@ export class UpdateControllerTests {
       fixture.fire();
       await fixture.publishedAsync(4);
       const automatic = fixture.controller.status.toJson();
-      fixture.updater.check = () => Promise.reject(new Error("unexpected"));
+      fixture.updater.check = () => Promise.reject(new Error("unexpected\r\n  in the feed"));
       fixture.controller.act("Check");
       await fixture.publishedAsync(6);
 
       Assert.areEqual(JSON.stringify({ kind: "UpToDate", version: null, progress: null, checkedAt: 31_000, reason: "TeamRun couldn't reach its update feed.", mustMove: false }), JSON.stringify(automatic));
       Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: 31_000, reason: "The update stopped on an unexpected error.", mustMove: true }),
         JSON.stringify(fixture.controller.status.toJson()));
-      Assert.areEqual(JSON.stringify(["The update failed: UpdateException: TeamRun couldn't reach its update feed.", "The update failed: Error: unexpected"]), JSON.stringify(fixture.lines));
+      Assert.areEqual(JSON.stringify(["The update failed: TeamRun couldn't reach its update feed.", "The update failed: Error: unexpected in the feed"]), JSON.stringify(fixture.lines));
     }, true);
   }
 

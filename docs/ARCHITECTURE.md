@@ -1194,6 +1194,8 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   At start the desktop hashes the file again, without the network: when the version is still newer than the installed one and the file still matches, the update shows as ready; otherwise the record is removed and the next check downloads again.
 - **Restart to update.**
   Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready; a stop or handoff that fails leaves it ready and shows why, unless the update is no longer current.
+  The failure is logged once, in one line with its reason; a publisher check logs only its duration and whether it passed.
+  The desktop's own runtime, already stopped by then, comes back by itself: the desktop is frozen for the update and reconnects once the barrier is released.
   Section 9 owns the choice the person makes while work is in progress.
   The handoff installs the way the platform does: Windows runs the installer quietly in the existing installation's scope, macOS installs through Squirrel.Mac from the ZIP, and Linux replaces the AppImage file in place, keeping its location and launchers.
   Each handoff first hashes the downloaded file again and refuses one that no longer matches the ready record.

@@ -6543,7 +6543,8 @@ export declare class PublisherCheck {
    * @param publisher The publisher's distinguished name.
    * @param command Runs PowerShell.
    * @param environment Supplies `SystemRoot` and the rest of PowerShell's environment.
-   * @param log Records each check, its duration and its result, in one line.
+   * @param log Records each check, its duration and whether it passed, in one line; the reason of a failure is left to
+   * the caller, so it is logged once.
    * @param now Gives the time in milliseconds.
    * @example
    * ```ts
@@ -6745,7 +6746,7 @@ export declare class UpdateController {
    * posted or restarted.
    * @param publish Receives each state.
    * @param postReadyAsync Posts `shell.updateReady` for a version, resolving to whether the runtime took it.
-   * @param log Records failures.
+   * @param log Records each failure in one line with its reason, without the exception's name.
    * @param now Gives the time in milliseconds.
    * @param schedule Runs a callback after a delay and gives what cancels it.
    * @param restartAsync Restarts to install a ready update: asks about work in progress, stops the installation and

@@ -326,8 +326,9 @@ export class UpdateController {
   }
 
   private explain(error: unknown): string {
-    this.log(Resources.formatUpdateFailed(String(error)));
-    return error instanceof UpdateException || error instanceof UpdateStopException || error instanceof UpdateHandoffException ? error.message : Resources.updateFailedUnexpectedly;
+    const isKnown = error instanceof UpdateException || error instanceof UpdateStopException || error instanceof UpdateHandoffException;
+    this.log(Resources.formatUpdateFailed((isKnown ? error.message : String(error)).trim().replace(Resources.lineBreaks, Resources.lineJoin)));
+    return isKnown ? error.message : Resources.updateFailedUnexpectedly;
   }
 
   private set(status: UpdateStatus): void {

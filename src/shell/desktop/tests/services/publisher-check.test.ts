@@ -87,7 +87,7 @@ export class PublisherCheckTests {
       const check = new PublisherCheck(publisher, new FakeCommand(() => Promise.resolve(answer)), PublisherCheckTests.ENVIRONMENT, t => lines.push(t), () => 0);
 
       Assert.areEqual(expected, await check.checkAsync(PublisherCheckTests.INSTALLER));
-      Assert.areEqual(JSON.stringify([`The update's publisher check failed in 0 ms: ${expected}`]), JSON.stringify(lines));
+      Assert.areEqual(JSON.stringify(["The update's publisher check failed in 0 ms."]), JSON.stringify(lines));
     }
   }
 

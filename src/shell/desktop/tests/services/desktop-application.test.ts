@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -16,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateSaved } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateReady, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException, DataDirectory, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
   RuntimeDiscovery, UpdateBarrierState, UpdateBarrierStatus, UpdateInProgressException
@@ -2183,6 +2184,43 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async getsItsRuntimeBackByItselfOnceAHandoffFailedAfterTheRuntimeStopped(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    handoff.handOff = () => Promise.reject(new UpdateHandoffException("The installer could not be started."));
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.update", Response.success("r", new UpdateReady([], []).toJson()));
+    const runtime = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000)"], { stdio: "ignore" });
+    try {
+      Assert.isDefined(runtime.pid);
+      await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async (electron, desktop, _installation, launcher) => {
+        const [own] = launcher.listeners;
+        target.onCall = () => {
+          if (target.calls.at(-1) === "shell.update")
+            own?.onEvent(new Event(ShellEvents.updating, null));
+          else if (target.calls.at(-1) === "shell.stop") {
+            runtime.kill();
+            own?.onDisconnected(null);
+          }
+        };
+        const window = DesktopStartFixture.firstWindow(electron);
+        const trusted = DesktopStartFixture.trustedEvent("linux");
+        await Condition.waitAsync(() => window.webContents.sent.some(t => t[0] === "teamrun:updateSaveRequest"));
+        electron.ipcMain.invoke("teamrun:updateSaveAnswer", trusted, window.webContents.sent.find(t => t[0] === "teamrun:updateSaveRequest")?.[1], []);
+        await Condition.waitAsync(() => launcher.calls.filter(t => t === "attach desktop IfIdle").length === 2);
+        await Condition.waitAsync(() => JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:startupState").at(-1)?.[1]) === JSON.stringify({ kind: "Ready", details: [] }));
+
+        Assert.isTrue(window.webContents.sent.some(t => t[0] === "teamrun:startupState" && Reflect.get(Object(t[1]), "kind") === "Updating"));
+        Assert.areEqual("The installer could not be started.", Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "reason"));
+        Assert.areEqual(JSON.stringify(["The update failed: The installer could not be started."]), JSON.stringify(DesktopStartFixture.readErrors(desktop, "The update failed")));
+        Assert.isFalse(electron.app.calls.includes("exit 0"));
+      }, target, true, runtime.pid);
+    }
+    finally {
+      runtime.kill();
+    }
+  }
+
+  @TestMethod
   public async explainsAndQuitsWhenMacOSCannotBeAskedToInstallTheUpdate(): Promise<void> {
     const handoff = new FakeUpdateHandoff();
     handoff.handOff = () => Promise.resolve(5230);
@@ -2870,9 +2908,10 @@ export class DesktopApplicationTests {
   private static async restartToUpdateAsync(
     platform: string,
     handoff: FakeUpdateHandoff,
-    run: (electron: FakeElectron, desktop: FakeDesktopProcess, installation: Installation) => Promise<void>,
+    run: (electron: FakeElectron, desktop: FakeDesktopProcess, installation: Installation, launcher: FakeRuntimeLauncher) => Promise<void>,
     target: FakeRuntimeConnection | null = null,
-    paints: boolean = true): Promise<void> {
+    paints: boolean = true,
+    runtimeProcessId: number = process.pid): Promise<void> {
     await DesktopApplicationTests.withReadyFileAsync(async record => {
       const folder = await mkdtemp(join(tmpdir(), "teamrun-restart-"));
       try {
@@ -2892,7 +2931,7 @@ export class DesktopApplicationTests {
           const root = join(folder, "data");
           const discovery = new DataDirectory(root).discoveryFile;
           await mkdir(dirname(discovery), { recursive: true });
-          await writeFile(discovery, JSON.stringify(new RuntimeDiscovery("127.0.0.1:52000", "capability-token", process.pid, desktop.execPath, "0.0.1", 1, "build-fingerprint").toJson()));
+          await writeFile(discovery, JSON.stringify(new RuntimeDiscovery("127.0.0.1:52000", "capability-token", runtimeProcessId, desktop.execPath, "0.0.1", 1, "build-fingerprint").toJson()));
           await installation.recordAsync(root);
           if (paints)
             DesktopApplicationTests.paint(electron, platform, DesktopStartFixture.firstWindow(electron));
@@ -2903,7 +2942,7 @@ export class DesktopApplicationTests {
         const isStarted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Restart");
 
         Assert.isTrue(isStarted as boolean);
-        await run(electron, desktop, installation);
+        await run(electron, desktop, installation, launcher);
       }
       finally {
         await rm(folder, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });

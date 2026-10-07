@@ -1059,10 +1059,8 @@ export class Resources {
     return `it is signed by ${signer}, not by ${publisher}`;
   }
 
-  public static formatPublisherCheck(milliseconds: number, failure: string | null): string {
-    return Object.isNull(failure)
-      ? `The update's publisher check passed in ${milliseconds} ms.`
-      : `The update's publisher check failed in ${milliseconds} ms: ${failure}`;
+  public static formatPublisherCheck(milliseconds: number, hasPassed: boolean): string {
+    return hasPassed ? `The update's publisher check passed in ${milliseconds} ms.` : `The update's publisher check failed in ${milliseconds} ms.`;
   }
 
   public static formatUpdateFailed(error: string): string {
