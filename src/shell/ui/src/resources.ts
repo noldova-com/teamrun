@@ -172,7 +172,6 @@ export class Resources {
     "field-padding",
     "window-row-height",
     "status-bar-height",
-    "status-bar-inset",
     "status-bar-item-height",
     "status-bar-item-gap",
     "button-height",
@@ -393,6 +392,7 @@ export class Resources {
   public static readonly topChrome: string = "top";
   public static readonly bottomChrome: string = "bottom";
   public static readonly overlayGapLook: string = "space-2";
+  public static readonly panelMarginLook: string = "panel-card-margin";
   public static readonly windowRowLook: string = "window-row-height";
   public static readonly statusBarLook: string = "status-bar-height";
   public static readonly middleButton: number = 1;

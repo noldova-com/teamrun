@@ -45,14 +45,16 @@ describe("OverlayBoundsService", () => {
       .toEqual([AppearanceFixture.measureLook("window-row-height") + service.gap, view.clientWidth - service.gap, view.clientHeight - AppearanceFixture.measureLook("status-bar-height") - service.gap, service.gap]);
   });
 
-  it("lets an overlay anchored in a chrome band come within a gap of that band's edge only", () => {
+  it("lets an overlay anchored in a chrome band come within a gap of that band's edge, and reach the panels' edges at the sides", () => {
     const service = TestBed.inject(OverlayBoundsService);
     const view = document.documentElement;
+    const margin = AppearanceFixture.measureLook("panel-card-margin");
     const fromRow = service.boundsFor(anchorIn("top"));
     const fromStatus = service.boundsFor(anchorIn("bottom"));
 
-    expect([fromRow.top, fromRow.bottom]).toEqual([service.gap, view.clientHeight - AppearanceFixture.measureLook("status-bar-height") - service.gap]);
-    expect([fromStatus.top, fromStatus.bottom]).toEqual([AppearanceFixture.measureLook("window-row-height") + service.gap, view.clientHeight - service.gap]);
+    expect([fromRow.top, fromRow.right, fromRow.bottom, fromRow.left]).toEqual([service.gap, view.clientWidth - margin, view.clientHeight - AppearanceFixture.measureLook("status-bar-height") - service.gap, margin]);
+    expect([fromStatus.top, fromStatus.right, fromStatus.bottom, fromStatus.left]).toEqual([AppearanceFixture.measureLook("window-row-height") + service.gap, view.clientWidth - margin, view.clientHeight - service.gap, margin]);
+    expect(margin).toBeLessThan(service.gap);
   });
 
   it("reads its rem-based bounds again after the text size changes", () => {

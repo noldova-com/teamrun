@@ -368,6 +368,7 @@ export class DesktopApplication {
     this.electron.ipcMain.on(Resources.keepAppearanceChannel, (event, preferences) => this.keepAppearance(event, preferences));
     this.electron.ipcMain.handle(Resources.readSpellingChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.spelling.toJson());
     this.electron.ipcMain.handle(Resources.readTrayAvailableChannel, event => Object.isNull(this.findTrusted(event)) ? null : this.trayHosts.isAvailable);
+    this.electron.ipcMain.handle(Resources.readFullScreenChannel, event => this.findTrusted(event)?.window.isFullScreen() ?? null);
     this.electron.ipcMain.on(Resources.spellingChannel, (event, isChecking, languages) => this.keepSpelling(event, isChecking, languages));
     this.electron.ipcMain.handle(Resources.replaceMisspellingChannel, (event, text) => this.replaceMisspelling(event, text));
     this.electron.ipcMain.handle(Resources.addToDictionaryChannel, (event, word) => this.addToDictionary(event, word));

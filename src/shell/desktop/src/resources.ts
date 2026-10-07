@@ -159,6 +159,8 @@ export class Resources {
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
   public static readonly readTrayAvailableChannel: string = "teamrun:readTrayAvailable";
   public static readonly trayAvailableChannel: string = "teamrun:trayAvailable";
+  public static readonly readFullScreenChannel: string = "teamrun:readFullScreen";
+  public static readonly fullScreenChannel: string = "teamrun:fullScreen";
   public static readonly quitAnswerChannel: string = "teamrun:quitAnswer";
   public static readonly moduleLogChannel: string = "teamrun:moduleLog";
   public static readonly windowErrorChannel: string = "teamrun:windowError";
@@ -506,6 +508,8 @@ export class Resources {
   public static readonly willResizeEvent: "will-resize" = "will-resize";
   public static readonly maximizeEvent: "maximize" = "maximize";
   public static readonly unmaximizeEvent: "unmaximize" = "unmaximize";
+  public static readonly enterFullScreenEvent: "enter-full-screen" = "enter-full-screen";
+  public static readonly leaveFullScreenEvent: "leave-full-screen" = "leave-full-screen";
   public static readonly boundsSaveDelay: number = 500;
   public static readonly connectingShowLimit: number = 2_000;
   public static readonly paintShowLimit: number = 10_000;
