@@ -59,7 +59,8 @@ class PackageConfigurationTests {
           { from: path.join(PackageConfigurationTests.ROOT, "LICENSE"), to: "licenses/LICENSE" },
           { from: path.join(PackageConfigurationTests.ROOT, "assets", "fonts"), to: "licenses", filter: ["*.txt"] },
           { from: path.join(PackageConfigurationTests.ROOT, "assets", "dictionaries"), to: "licenses", filter: ["*.txt"] },
-          { from: path.join(PackageConfigurationTests.STAGE, "_build", "window", "3rdpartylicenses.txt"), to: "licenses/window-third-party.txt" }
+          { from: path.join(PackageConfigurationTests.STAGE, "_build", "window", "3rdpartylicenses.txt"), to: "licenses/window-third-party.txt" },
+          { from: path.join(PackageConfigurationTests.ROOT, "_build", "package", "runtime-third-party.txt"), to: "licenses/runtime-third-party.txt" }
         ],
         publish: null,
         win: {

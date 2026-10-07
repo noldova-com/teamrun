@@ -84,7 +84,7 @@ export default class Package {
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
       const signing = packageArguments.length === 0 ? null : this.createSigning(target, layout, credentials);
-      await this.stage.stageAsync(this.output);
+      await this.stage.stageAsync(target, this.output);
       await rm(layout.output, { recursive: true, force: true });
       const electron = new ElectronDistribution(this.root, layout.electron);
       await electron.copyAsync();

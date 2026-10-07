@@ -5844,6 +5844,11 @@ export declare class ShellSettings {
   public static readonly spellCheckLanguages: QualifiedName;
 
   /**
+   * When the desktop checks for updates by itself, a device setting, `shell.updateChecks`: `Automatic`, the default, `AtStart` or `OnRequest`.
+   */
+  public static readonly updateChecks: QualifiedName;
+
+  /**
    * The shell's setting definitions, in the order Settings shows them. The tray icon's title names the place the
    * platform shows it, the notification area on Windows, the menu bar on macOS and the tray elsewhere, and it is on
    * by default except on macOS.
@@ -6707,7 +6712,8 @@ export declare class NotificationPolicy {
 
   /**
    * Checks a window's post: its kind's module is active and declares the kind, and its commands are that module's own
-   * or a dependency's. A kind of the shell's own, from `ShellNotifications`, is allowed without commands.
+   * or a dependency's. A kind of the shell's own, from `ShellNotifications`, runs only the shell's commands, and
+   * `shell.saveFailed` and `shell.saveUnfinished` run none.
    *
    * @param post The post.
    * @returns Why the post is refused, safe to show, or `null` when it is allowed.

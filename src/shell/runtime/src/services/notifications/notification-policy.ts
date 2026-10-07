@@ -7,13 +7,15 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import { type NotificationPost, ShellNotifications } from "@noldova/teamrun-shell-protocol";
+import { type CommandRun, type NotificationPost, type QualifiedName, ShellNotifications } from "@noldova/teamrun-shell-protocol";
 
 import { RegistrationException } from "../../exceptions/registration.exception.js";
 import type { ModuleDeclaration } from "../../models/module-declaration.js";
 import { Resources } from "../../resources.js";
 
 export class NotificationPolicy {
+  private static readonly COMMANDLESS_KINDS: readonly QualifiedName[] = [ShellNotifications.saveFailed, ShellNotifications.saveUnfinished];
+
   private readonly declarations: readonly ModuleDeclaration[];
   private readonly isActive: (moduleId: string) => boolean;
 
@@ -40,14 +42,21 @@ export class NotificationPolicy {
   private static findShellRefusal(post: NotificationPost): string | null {
     if (!ShellNotifications.all.some(t => t.text === post.kind.text))
       return Resources.formatShellNotificationUnknown(post.kind.text);
-    return Object.isNull(post.open) && post.actions.length === 0 ? null : Resources.formatShellNotificationCommand(post.kind.text);
+    const commands = NotificationPolicy.commandsOf(post);
+    if (NotificationPolicy.COMMANDLESS_KINDS.some(t => t.text === post.kind.text))
+      return commands.length === 0 ? null : Resources.formatShellNotificationCommand(post.kind.text);
+    const refused = commands.find(t => !t.name.isShell);
+    return Object.isUndefined(refused) ? null : Resources.formatShellNotificationModuleCommand(post.kind.text, refused.name.text);
   }
 
   private static findDeclaredRefusal(declaration: ModuleDeclaration, post: NotificationPost): string | null {
     if (!declaration.listContributions(Resources.notificationsKind).includes(post.kind.text))
       return Resources.formatNotContributed(declaration.id, Resources.notificationsKind, post.kind.text);
-    const commands = [...Object.isNull(post.open) ? [] : [post.open], ...post.actions.map(t => t.command)];
-    const refused = commands.find(t => t.name.owner !== declaration.id && !declaration.dependencies.includes(t.name.owner));
+    const refused = NotificationPolicy.commandsOf(post).find(t => t.name.owner !== declaration.id && !declaration.dependencies.includes(t.name.owner));
     return Object.isUndefined(refused) ? null : Resources.formatNotificationCommandNotAllowed(declaration.id, refused.name.text);
+  }
+
+  private static commandsOf(post: NotificationPost): readonly CommandRun[] {
+    return [...Object.isNull(post.open) ? [] : [post.open], ...post.actions.map(t => t.command)];
   }
 }

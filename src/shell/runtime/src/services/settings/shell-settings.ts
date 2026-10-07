@@ -30,6 +30,7 @@ export class ShellSettings {
   public static readonly recentCommandCount: QualifiedName = ShellSettings.named(Resources.recentCommandCountSetting);
   public static readonly spellCheck: QualifiedName = ShellSettings.named(Resources.spellCheckSetting);
   public static readonly spellCheckLanguages: QualifiedName = ShellSettings.named(Resources.spellCheckLanguagesSetting);
+  public static readonly updateChecks: QualifiedName = ShellSettings.named(Resources.updateChecksSetting);
 
   private static readonly common: readonly SettingDefinition[] = [
     ShellSettings.appearance(ShellSettings.theme, Resources.themeTitle, Resources.formatThemeDescription(ProductInfo.current.name),
@@ -73,7 +74,9 @@ export class ShellSettings {
       new SettingDefinition(ShellSettings.trayIcon, Resources.formatTrayIconTitle(product, platform), Resources.formatTrayIconDescription(product),
         SettingType.boolean(), platform !== Resources.macPlatform, SettingLocality.Device, [], Resources.notificationsPage, Resources.backgroundGroup),
       new SettingDefinition(ShellSettings.keyBindings, Resources.keyBindingsTitle, Resources.keyBindingsDescription,
-        SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup)
+        SettingType.keyBindings(), {}, SettingLocality.Shared, [], Resources.shortcutsPage, Resources.shortcutsGroup),
+      new SettingDefinition(ShellSettings.updateChecks, Resources.updateChecksTitle, Resources.updateChecksDescription,
+        ShellSettings.choiceOf(Resources.updateChecksOptions), Resources.defaultUpdateChecks, SettingLocality.Device, [], Resources.aboutPage, Resources.updatesGroup)
     ];
   }
 

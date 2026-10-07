@@ -19,9 +19,11 @@ import { Layout } from "../../../src/app/models/layout/layout";
 import { ViewRegistry } from "../../../src/app/models/layout/view-registry";
 import type { LayoutService } from "../../../src/app/services/layout.service";
 import { CommandSearchService } from "../../../src/app/services/command-search.service";
+import { SettingsPageService } from "../../../src/app/services/settings-page.service";
 import { ShellCommandsService } from "../../../src/app/services/shell-commands.service";
 import { TabStripService } from "../../../src/app/services/tab-strip.service";
 import { ToolbarService } from "../../../src/app/services/toolbar.service";
+import { UpdateService } from "../../../src/app/services/update.service";
 import { ViewDialogService } from "../../../src/app/services/view-dialog.service";
 import { DesktopBridgeFixture } from "../../fixtures/desktop-bridge.fixture";
 import { LayoutFixture } from "../../fixtures/layout.fixture";
@@ -99,7 +101,8 @@ describe("ShellCommandsService", () => {
       "shell.nextTab", "shell.previousTab", "shell.splitTabLeft", "shell.splitTabRight", "shell.splitTabUp", "shell.splitTabDown", "shell.dockTabLeft", "shell.dockTabRight",
       "shell.dockTabBottom", "shell.moveTabToGroup", "shell.moveTabToNextGroup", "shell.moveTabToPreviousGroup", "shell.focusNextGroup", "shell.focusPreviousGroup",
       "shell.toggleLeftDock", "shell.toggleRightDock", "shell.toggleBottomDock", "shell.undo", "shell.redo", "shell.cut",
-      "shell.copy", "shell.paste", "shell.selectAll", "shell.replaceMisspelling", "shell.addToDictionary", "shell.showCommands", "shell.openSettings", "shell.installCommand", "shell.openModules", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft",
+      "shell.copy", "shell.paste", "shell.selectAll", "shell.replaceMisspelling", "shell.addToDictionary", "shell.showCommands", "shell.openSettings", "shell.installCommand", "shell.checkForUpdates",
+      "shell.restartToUpdate", "shell.openModules", "shell.showInDialog", "shell.toggleToolbar", "shell.moveToolbarLeft",
       "shell.moveToolbarRight", "shell.moveToolbarUp", "shell.moveToolbarDown", "shell.hideToolbar",
       "shell.focusToolbars", "shell.resetLayout", "shell.spanBottomDock", "shell.fitBottomDockBetween", "shell.showAllTabs"
     ]);
@@ -117,6 +120,47 @@ describe("ShellCommandsService", () => {
     expect([opened.active?.key, opened.preview]).toEqual([settings.key, null]);
     expect(opened.tabs.filter(t => t.equals(settings)).length).toBe(1);
     expect(enabled("shell.openSettings")).toBe(false);
+  });
+
+  it("opens Settings at the page its arguments name, and at its last page without one", async () => {
+    const pages = TestBed.inject(SettingsPageService);
+
+    await runAsync("shell.openSettings", { page: "About" });
+    const requested = pages.requested();
+    pages.take();
+    await runAsync("shell.openSettings", {});
+
+    expect([requested, pages.requested(), layout.layout().documents.active?.key]).toEqual(["About", null, settings.key]);
+  });
+
+  it("checks for and restarts to install an update through the desktop, each offered and enabled only in its state", async () => {
+    const updates = TestBed.inject(UpdateService);
+    const names = ["shell.checkForUpdates", "shell.restartToUpdate"];
+    const offers = (): readonly string[] => names.map(t => `${command(t).isApplicable(null)}/${enabled(t)}`);
+    const update = (kind: string, version: string | null = null, mustMove: boolean = false): object => ({ kind, version, progress: null, checkedAt: null, reason: null, mustMove });
+    const seen: (readonly string[])[] = [offers()];
+    for (const state of [update("UpToDate"), update("Checking"), update("Available", "1.3.0", true), update("Downloading", "1.3.0"),
+      update("Ready", "1.3.0"), update("Failed", "1.3.0")]) {
+      bridge.publishUpdate(state);
+      seen.push(offers());
+    }
+
+    for (const name of names)
+      await runAsync(name);
+    await vi.waitFor(() => expect(bridge.updateActions.length).toBe(2));
+
+    expect(updates.state().kind).toBe("Failed");
+    expect(seen).toEqual([
+      ["false/false", "false/false"],
+      ["true/true", "false/false"],
+      ["true/false", "false/false"],
+      ["true/true", "false/false"],
+      ["true/false", "false/false"],
+      ["true/false", "true/true"],
+      ["true/true", "false/false"]
+    ]);
+    expect(bridge.updateActions).toEqual(["Check", "Restart"]);
+    expect(names.map(t => command(t).title)).toEqual(["Check for updates", "Restart to update"]);
   });
 
   it("opens Modules as one kept document, revealing the open one, and is enabled only while the document is registered", async () => {
