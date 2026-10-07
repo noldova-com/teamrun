@@ -158,7 +158,26 @@ export class QuitRelayTests {
   }
 
   @TestMethod
-  public startsAfreshOnceEveryWaitingQuitIsCancelled(): Promise<void> {
+  public answersQuitWhenTheDesktopsStopWasAcceptedBeforeTheQuitAsked(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      await fixture.startAsync();
+      const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      const [cli] = await fixture.handshakeAsync("cli", RuntimeBuild.identity);
+      await fixture.handshakeAsync("other", RuntimeBuild.identity);
+
+      const kept = await RuntimeHostFixture.callAsync(desktop, "desktop:1", ShellMethods.stop, new StopRequest(StopPolicy.IfIdle, true).toJson());
+      cli.sendMessages(new Request("cli:1", ShellMethods.quit, null));
+      await UpdateBarrierFixture.readEventAsync(desktop, ShellEvents.quitting);
+      desktop[Symbol.dispose]();
+      const answer = await RuntimeHostFixture.readAnswerAsync(cli);
+
+      Assert.areEqual("{\"keptFor\":2}", JSON.stringify(kept.payload));
+      Assert.areEqual("cli:1|{\"outcome\":\"Quit\"}", `${answer.id}|${JSON.stringify(answer.payload)}`);
+    });
+  }
+
+  @TestMethod
+  public answersQuitToALaterQuitOnceTheDesktopsStopWasAcceptedInARoundThatWasCancelled(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
       await fixture.startAsync();
       const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
@@ -176,7 +195,7 @@ export class QuitRelayTests {
       const answer = await RuntimeHostFixture.readAnswerAsync(cli);
 
       Assert.areEqual("Cancelled", cancelled.failure?.code);
-      Assert.areEqual("cli:2|Unavailable", `${answer.id}|${answer.failure?.code}`);
+      Assert.areEqual("cli:2|{\"outcome\":\"Quit\"}", `${answer.id}|${JSON.stringify(answer.payload)}`);
     });
   }
 }
