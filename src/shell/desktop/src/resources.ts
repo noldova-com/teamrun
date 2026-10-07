@@ -18,6 +18,10 @@ export class Resources {
     return `Another update of ${Resources.applicationName} is under way.`;
   }
 
+  public static get installerNotCopied(): string {
+    return `${Resources.applicationName} couldn't make a protected copy of the update's installer.`;
+  }
+
   public static get updaterNotCreated(): string {
     return `${Resources.applicationName} couldn't start checking for updates.`;
   }
@@ -206,6 +210,10 @@ export class Resources {
   public static readonly updateChecksStateKey: string = "updateChecks";
   public static readonly updateFeedTimeout: number = 30_000;
   public static readonly updateCheckAction: string = "Check";
+  public static readonly updateRestartAction: string = "Restart";
+  public static readonly handoffFolder: string = "handoff";
+  public static readonly squirrelStagedEvent: string = "update-downloaded";
+  public static readonly updateStageLimit: number = 120_000;
   public static readonly automaticUpdateChecks: string = "Automatic";
   public static readonly updateChecksAtStart: string = "AtStart";
   public static readonly onRequestUpdateChecks: string = "OnRequest";
@@ -236,6 +244,10 @@ export class Resources {
   public static readonly updateFailedUnexpectedly: string = "The update stopped on an unexpected error.";
   public static readonly updateFileChanged: string = "the downloaded file has changed or is gone";
   public static readonly updateFileElsewhere: string = "its file is not the package in the updater's cache";
+  public static readonly updateChangedBeforeHandoff: string = "The downloaded update has changed since it was checked, so it wasn't installed.";
+  public static readonly updateNotStaged: string = "macOS couldn't prepare the update for installing.";
+  public static readonly shipItNotFound: string = "macOS prepared the update, but nothing is waiting to install it.";
+  public static readonly updateNotStagedInTime: string = "macOS didn't prepare the update for installing within 2 minutes.";
   public static readonly updateFeedRedirected: string = "The update feed redirected to an address with another protocol.";
   public static readonly updateCheckerUnknown: string = "The desktop could not identify its own process, so it cannot check for updates.";
   public static readonly restartToUpdateTitle: string = "Restart to update";
@@ -900,6 +912,22 @@ export class Resources {
 
   public static get updateCheckedElsewhere(): string {
     return `Another ${Resources.applicationName} is checking for updates.`;
+  }
+
+  public static formatInstallerNotHeld(code: number): string {
+    return `The update's installer couldn't be held unchanged for its start (Windows error ${code}).`;
+  }
+
+  public static formatUpdateNoLongerOffered(version: string): string {
+    return `The update feed no longer offers version ${version}.`;
+  }
+
+  public static formatStagedUpdateKept(error: string): string {
+    return `A failed handoff left its update staged: ${error}`;
+  }
+
+  public static formatHandoffNotRemoved(error: string): string {
+    return `The copy of an update's installer could not be removed, so it is removed at the next start: ${error}`;
   }
 
   public static formatUpdateLockLeft(error: string): string {

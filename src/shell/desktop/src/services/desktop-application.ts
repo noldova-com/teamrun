@@ -72,6 +72,7 @@ import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { DeviceSettingFollower } from "./device-setting-follower.js";
 import { DeviceState } from "./device-state.js";
+import { InstallerHandoff } from "./installer-handoff.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
@@ -127,6 +128,7 @@ export class DesktopApplication {
   private readonly trayHosts: TrayHostWatcher;
   private readonly trayIcon: DeviceSettingFollower;
   private readonly updates: UpdateController | null;
+  private readonly installationFolder: string;
   private readonly updatesOff: UpdateStatus;
   private readonly updateChecks: DeviceSettingFollower;
   private readonly spelling: SpellChecker;
@@ -214,7 +216,8 @@ export class DesktopApplication {
       t => this.followTrayIconSetting(t), t => this.log.write(t));
     this.updates = Object.isNull(updater) ? null : new UpdateController(updater, createDeviceFile(installation.folder, Resources.updateReadyFile), updateLock,
       RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
-      t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run));
+      t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run), null);
+    this.installationFolder = installation.folder;
     this.updatesOff = updatesOff;
     this.updateChecks = new DeviceSettingFollower(ShellSettings.updateChecks, Resources.automaticUpdateChecks, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.followUpdateChecksSetting(t), t => this.log.write(t));
@@ -772,6 +775,7 @@ export class DesktopApplication {
   }
 
   private async startUpdatesAsync(updates: UpdateController): Promise<void> {
+    await InstallerHandoff.clearAsync(this.installationFolder, t => this.log.write(t));
     updates.follow(this.updateChecks.value);
     await updates.startAsync();
   }

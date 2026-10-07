@@ -11,6 +11,7 @@ import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import { ShellMethods, StopPolicy, StopRequest, type UpdateProcess, UpdateReady, UpdateRequest, WorkReport } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type Installation, type ProcessPresence, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
 
+import { UpdateHandoffException } from "../exceptions/update-handoff.exception.js";
 import { UpdateStopException } from "../exceptions/update-stop.exception.js";
 import type { IUpdateTarget } from "../interfaces/i-update-target.js";
 import { Resources } from "../resources.js";
@@ -86,7 +87,7 @@ export class UpdateStop {
         this.restart?.cancel();
       if (isHeld && !isHandedOff)
         await this.installation.releaseAsync();
-      throw error instanceof UpdateStopException ? error : new UpdateStopException(error instanceof Error ? error.message : String(error), new ExceptionOptions(error));
+      throw error instanceof UpdateStopException || error instanceof UpdateHandoffException ? error : new UpdateStopException(Resources.updateFailedUnexpectedly, new ExceptionOptions(error));
     }
     finally {
       for (const target of targets)

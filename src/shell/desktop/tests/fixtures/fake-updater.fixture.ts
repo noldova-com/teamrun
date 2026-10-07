@@ -12,6 +12,7 @@ export class FakeUpdater implements IUpdater {
   public static readonly FILE: string = "/cache/teamrun-updater-0123456789abcdef/pending/TeamRun-linux-x64.AppImage";
 
   public readonly packagePath: string;
+  public downloadedFile: string | null = null;
   public checks: number = 0;
   public cancels: number = 0;
   public downloads: number = 0;

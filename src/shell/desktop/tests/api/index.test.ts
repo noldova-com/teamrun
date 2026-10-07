@@ -15,6 +15,7 @@ export class DesktopApiTests {
   public exportsTheCompleteRuntimeSurface(): void {
     Assert.areEqual(
       JSON.stringify([
+        "AppImageHandoff",
         "AppImageReplacement",
         "AppImageRestart",
         "ChildProgramHost",
@@ -33,6 +34,7 @@ export class DesktopApiTests {
         "FeedProvider",
         "FeedSource",
         "FeedUpdater",
+        "InstallerHandoff",
         "InstallerStart",
         "LinkPolicy",
         "MainProcessFailureKind",
@@ -56,6 +58,8 @@ export class DesktopApiTests {
         "ShipItProcess",
         "SpellChecker",
         "SpellingDictionaries",
+        "SquirrelHandoff",
+        "StaleUpdateException",
         "StartedProgram",
         "StartupState",
         "StartupStateKind",

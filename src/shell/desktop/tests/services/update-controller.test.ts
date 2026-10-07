@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { UpdateException, UpdateController, type UpdateStatus } from "@noldova/teamrun-shell-desktop";
+import { StaleUpdateException, UpdateException, UpdateController, UpdateHandoffException, type UpdateReadyRecord, type UpdateStatus, UpdateStopException } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { FakeDeviceFileStore } from "../fixtures/fake-device-file-store.fixture.js";
@@ -39,10 +39,12 @@ class UpdateControllerFixture {
   public readonly lines: string[] = [];
   public readonly scheduled: IScheduled[] = [];
   public post: (version: string) => Promise<boolean> = () => Promise.resolve(true);
+  public readonly restarts: UpdateReadyRecord[] = [];
+  public restart: (record: UpdateReadyRecord) => Promise<void> = () => Promise.resolve();
   public time: number = 1_000;
   public readonly controller: UpdateController;
 
-  private constructor(folder: string, mustMove: boolean) {
+  private constructor(folder: string, mustMove: boolean, canRestart: boolean) {
     this.folder = folder;
     this.updater = new FakeUpdater(join(folder, "pending", "TeamRun-linux-x64.AppImage"));
     this.controller = new UpdateController(this.updater, this.record, this.lock, "1.2.0", mustMove, t => this.published.push(t), t => {
@@ -52,13 +54,16 @@ class UpdateControllerFixture {
       const entry: IScheduled = { delay, run, isCancelled: false };
       this.scheduled.push(entry);
       return () => entry.isCancelled = true;
-    });
+    }, canRestart ? t => {
+      this.restarts.push(t);
+      return this.restart(t);
+    } : null);
   }
 
-  public static async runAsync(run: (fixture: UpdateControllerFixture) => Promise<void>, mustMove: boolean = false, isDownloaded: boolean = true): Promise<void> {
+  public static async runAsync(run: (fixture: UpdateControllerFixture) => Promise<void>, mustMove: boolean = false, isDownloaded: boolean = true, canRestart: boolean = true): Promise<void> {
     const folder = await mkdtemp(join(tmpdir(), "teamrun-update-controller-"));
     try {
-      const fixture = new UpdateControllerFixture(folder, mustMove);
+      const fixture = new UpdateControllerFixture(folder, mustMove, canRestart);
       if (isDownloaded) {
         await mkdir(join(folder, "pending"));
         await writeFile(fixture.updater.packagePath, UpdateControllerFixture.CONTENT);
@@ -187,6 +192,117 @@ export class UpdateControllerTests {
       Assert.areEqual(1, fixture.updater.checks);
       Assert.areEqual(1, fixture.updater.cancels);
       Assert.areEqual(0, fixture.pending.length);
+    });
+  }
+
+  @TestMethod
+  public restartsToInstallTheReadyUpdateOneRestartAtATime(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      const first = Promise.withResolvers<void>();
+      fixture.record.kept = { ...fixture.ready, notified: true };
+      fixture.restart = () => first.promise;
+      await fixture.controller.startAsync();
+
+      const started = fixture.controller.act("Restart");
+      const during = fixture.controller.act("Restart");
+      const check = fixture.controller.act("Check");
+      first.resolve();
+      await Condition.waitAsync(() => fixture.controller.act("Restart"));
+
+      Assert.isTrue(started);
+      Assert.isFalse(during);
+      Assert.isFalse(check);
+      Assert.areEqual(JSON.stringify(["1.3.0", "1.3.0"]), JSON.stringify(fixture.restarts.map(t => t.version)));
+      Assert.areEqual(fixture.updater.packagePath, fixture.restarts[0]?.file);
+      Assert.areEqual(JSON.stringify(["Ready"]), JSON.stringify(fixture.kinds));
+    });
+  }
+
+  @TestMethod
+  public async refusesARestartWithoutAReadyUpdateOrARestartOrWhileItMustMoveOrOnceStopped(): Promise<void> {
+    const refused: boolean[] = [];
+    await UpdateControllerFixture.runAsync(async fixture => {
+      await fixture.controller.startAsync();
+      refused.push(fixture.controller.act("Restart"));
+    });
+    await UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = fixture.ready;
+      await fixture.controller.startAsync();
+      refused.push(fixture.controller.act("Restart"));
+    }, false, true, false);
+    await UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = fixture.ready;
+      await fixture.controller.startAsync();
+      refused.push(fixture.controller.act("Restart"));
+      Assert.areEqual(0, fixture.restarts.length);
+    }, true);
+    await UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = fixture.ready;
+      await fixture.controller.startAsync();
+      fixture.controller.stop();
+      refused.push(fixture.controller.act("Restart"));
+      Assert.areEqual(0, fixture.restarts.length);
+    });
+
+    Assert.areEqual(JSON.stringify([false, false, false, false]), JSON.stringify(refused));
+  }
+
+  @TestMethod
+  public keepsTheUpdateReadyWithTheReasonOfARestartThatFailsUntilTheNextRestart(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = { ...fixture.ready, notified: true };
+      await fixture.controller.startAsync();
+      const reasons: (string | null)[] = [];
+
+      for (const failure of [new UpdateStopException("A window could not save its work, so TeamRun keeps running."), new UpdateHandoffException("The update isn't signed by the publisher."),
+        new UpdateException("TeamRun couldn't reach its update feed."), new Error("EPERM")]) {
+        fixture.restart = () => Promise.reject(failure);
+        const count = fixture.published.length + (Object.isNull(fixture.controller.status.reason) ? 1 : 2);
+        fixture.controller.act("Restart");
+        await fixture.publishedAsync(count);
+        reasons.push(fixture.controller.status.reason);
+      }
+      const failed = fixture.controller.status.toJson();
+      fixture.restart = () => Promise.resolve();
+      const count = fixture.published.length;
+      fixture.controller.act("Restart");
+      await fixture.publishedAsync(count + 1);
+      await Condition.waitAsync(() => fixture.controller.act("Restart"));
+
+      Assert.areEqual(JSON.stringify([
+        "A window could not save its work, so TeamRun keeps running.",
+        "The update isn't signed by the publisher.",
+        "TeamRun couldn't reach its update feed.",
+        "The update stopped on an unexpected error."
+      ]), JSON.stringify(reasons));
+      Assert.areEqual(JSON.stringify({ kind: "Ready", version: "1.3.0", progress: null, checkedAt: null, reason: "The update stopped on an unexpected error.", mustMove: false }),
+        JSON.stringify(failed));
+      Assert.isNull(fixture.controller.status.reason);
+      Assert.areEqual(6, fixture.restarts.length);
+      Assert.areEqual(0, fixture.record.deletes);
+    });
+  }
+
+  @TestMethod
+  public dropsAReadyUpdateThatIsNoLongerCurrentSoChecksRunAgain(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = { ...fixture.ready, notified: true };
+      fixture.record.deleteFailure = new Error("EBUSY");
+      await fixture.controller.startAsync();
+      fixture.restart = () => Promise.reject(new StaleUpdateException("The update feed no longer offers version 1.3.0."));
+
+      fixture.controller.act("Restart");
+      await Condition.waitAsync(() => fixture.lines.some(t => t.includes("EBUSY")));
+      const failed = fixture.controller.status.toJson();
+      const restarted = fixture.controller.act("Restart");
+      const checked = fixture.controller.act("Check");
+
+      Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: null, reason: "The update feed no longer offers version 1.3.0.", mustMove: false }),
+        JSON.stringify(failed));
+      Assert.isFalse(restarted);
+      Assert.isTrue(checked);
+      Assert.areEqual(1, fixture.record.deletes);
+      Assert.areEqual(1, fixture.restarts.length);
     });
   }
 

@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { Failure, FailureCode, Response, UpdateProcess, UpdateReady } from "@noldova/teamrun-shell-protocol";
 import { ConnectionException, type IProcessStarter, Installation, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
-import { AppImageRestart, type IUpdateTarget, UpdateStop, UpdateStopException } from "@noldova/teamrun-shell-desktop";
+import { AppImageRestart, type IUpdateTarget, UpdateHandoffException, UpdateStop, UpdateStopException } from "@noldova/teamrun-shell-desktop";
 
 import { FakeProcessPresence } from "../fixtures/fake-process-presence.fixture.js";
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
@@ -189,13 +189,15 @@ export class UpdateStopTests {
       const first = await this.recordAsync(installation, folder, "first");
       this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
       this.rereads = true;
+      const invalid = new Error("The frame was not valid.");
       this.onAsk = () => {
-        this.connection(first).rejection = new Error("The frame was not valid.");
+        this.connection(first).rejection = invalid;
       };
 
       const failure = await this.failAsync(installation);
 
-      Assert.areEqual("The frame was not valid.", failure.message);
+      Assert.areEqual("The update stopped on an unexpected error.", failure.message);
+      Assert.areEqual(invalid, failure.cause);
       Assert.isFalse(existsSync(installation.barrierFile));
     });
   }
@@ -321,7 +323,7 @@ export class UpdateStopTests {
 
       Assert.areEqual("These processes did not exit within 10 seconds: program 7001", late.message);
       Assert.areEqual(40, waited);
-      Assert.areEqual("ps exited with code 1.", unchecked.message);
+      Assert.areEqual("The update stopped on an unexpected error.", unchecked.message);
       Assert.areEqual(unreadable, unchecked.cause);
       Assert.isFalse(existsSync(installation.barrierFile));
     });
@@ -402,11 +404,13 @@ export class UpdateStopTests {
       await once(waiting, "spawn");
       const exited = once(waiting, "exit");
 
+      const refusal = new UpdateHandoffException("The update isn't signed by the publisher.");
+
       const failure = await Assert.throwsAsync(() => this.create(installation, undefined, UpdateStopTests.createRestart(() => Promise.resolve(Number(waiting.pid))))
-        .runAsync("0.3.0", () => Promise.reject(new Error("The installer is missing."))), UpdateStopException);
+        .runAsync("0.3.0", () => Promise.reject(refusal)), UpdateHandoffException);
       await exited;
 
-      Assert.areEqual("The installer is missing.", failure.message);
+      Assert.areEqual(refusal, failure);
       Assert.isNotNull(waiting.exitCode ?? waiting.signalCode);
       Assert.isFalse(existsSync(installation.barrierFile));
     });
@@ -418,14 +422,16 @@ export class UpdateStopTests {
       using _launch = new LinuxLaunchFixture();
       await this.recordAsync(installation, folder, "first");
       let isCalled = false;
+      const missing = new Error("Bash is missing.");
 
-      const failure = await Assert.throwsAsync(() => this.create(installation, undefined, UpdateStopTests.createRestart(() => Promise.reject(new Error("Bash is missing."))))
+      const failure = await Assert.throwsAsync(() => this.create(installation, undefined, UpdateStopTests.createRestart(() => Promise.reject(missing)))
         .runAsync("0.3.0", () => {
           isCalled = true;
           return Promise.resolve(null);
         }), UpdateStopException);
 
-      Assert.areEqual("Bash is missing.", failure.message);
+      Assert.areEqual("The update stopped on an unexpected error.", failure.message);
+      Assert.areEqual(missing, failure.cause);
       Assert.isFalse(isCalled);
       Assert.isFalse(existsSync(installation.barrierFile));
     });
@@ -436,7 +442,8 @@ export class UpdateStopTests {
     return this.runAsync(async (installation, folder) => {
       await this.recordAsync(installation, folder, "first");
 
-      const failure = await Assert.throwsAsync(() => this.create(installation).runAsync("0.3.0", () => Promise.reject("The installer is missing.")), UpdateStopException);
+      const failure = await Assert.throwsAsync(() => this.create(installation)
+        .runAsync("0.3.0", () => Promise.reject(new UpdateHandoffException("The installer is missing."))), UpdateHandoffException);
 
       Assert.areEqual("The installer is missing.", failure.message);
       Assert.isFalse(existsSync(installation.barrierFile));
