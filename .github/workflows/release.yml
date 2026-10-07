@@ -211,6 +211,23 @@ jobs:
             fi
             options+=(--update-feed "$UPDATE_FEED")
           fi
+          if [ -n "$PACKAGE_VERSION" ]; then
+            current=$(npm pkg get version)
+            current=${current//\"/}
+            next=''
+            previous=''
+            if [[ "$PACKAGE_VERSION" =~ ^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$ ]]; then
+              printf -v next '%09d%09d%09d' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+            fi
+            if [[ "$current" =~ ^([0-9]{1,9})\.([0-9]{1,9})\.([0-9]{1,9})$ ]]; then
+              printf -v previous '%09d%09d%09d' $((10#${BASH_REMATCH[1]})) $((10#${BASH_REMATCH[2]})) $((10#${BASH_REMATCH[3]}))
+            fi
+            if [ -z "$next" ] || [ -z "$previous" ] || ! [[ "$next" > "$previous" ]]; then
+              echo "::error::The version must be X.Y.Z and newer than the root manifest's $current, not $PACKAGE_VERSION."
+              exit 1
+            fi
+            npm pkg set "version=$PACKAGE_VERSION"
+          fi
           if [ ${#options[@]} -eq 0 ]; then
             npm run package
           else
