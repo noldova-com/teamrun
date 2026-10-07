@@ -382,15 +382,17 @@ export class Resources {
   public static readonly ownedExitCode: number = 3;
   public static readonly updatingExitCode: number = 4;
   public static readonly programRole: string = "program";
+  public static readonly copyMountRole: string = "AppImage mount";
   public static readonly failureExitCode: number = 1;
   public static readonly launchShell: string = "/bin/bash";
   public static readonly launchDescriptors: string = "/proc/self/fd";
+  public static readonly launchDescriptorClosing: string = "for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done";
   public static readonly launchShellArguments: readonly string[] = [
     "--noprofile",
     "--norc",
     "-p",
     "-c",
-    "set -e; shopt -s failglob; for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done; exec -- \"$@\""
+    `set -e; shopt -s failglob; ${Resources.launchDescriptorClosing}; exec -- "$@"`
   ];
   public static readonly launchCopyShellArguments: readonly string[] = [
     "--noprofile",
@@ -399,7 +401,7 @@ export class Resources {
     "-c",
     [
       "shopt -s failglob",
-      "for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done",
+      Resources.launchDescriptorClosing,
       "shopt -u failglob",
       "image=$1 root=$2 mode=$3 record=$4",
       "shift 4",
@@ -952,6 +954,10 @@ export class Resources {
 
   public static formatRuntimeLogUnavailable(reason: string): string {
     return `The runtime's log could not be written, so it is no longer written to: ${reason}`;
+  }
+
+  public static formatCopyRecordUnreadable(record: string, reason: string): string {
+    return `The runtime could not read its AppImage copy record ${record} or check the mount it lists: ${reason}`;
   }
 
   public static formatCopyNotEnded(record: string, reason: string): string {

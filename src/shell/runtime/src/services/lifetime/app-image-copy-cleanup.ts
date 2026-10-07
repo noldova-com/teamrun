@@ -16,6 +16,7 @@ import "@noldova/teamrun-foundation-core";
 import { ProductInfo } from "../../models/product-info.js";
 import { Resources } from "../../resources.js";
 import type { DataDirectory } from "../data-directory/data-directory.js";
+import { ProcessCommandLine } from "../process/process-command-line.js";
 
 export class AppImageCopyCleanup {
   public static async removeAsync(directory: DataDirectory, diagnostics: Writable): Promise<void> {
@@ -41,9 +42,7 @@ export class AppImageCopyCleanup {
   }
 
   private static async endMountAsync(mounter: string, image: string): Promise<void> {
-    const separator = Resources.processArgumentSeparator;
-    const mounting = `${separator}${await AppImageCopyCleanup.readCommandLineAsync(mounter)}`;
-    if (mounting.endsWith(`${separator}${image}${separator}${Resources.appImageMountOption}${separator}`))
+    if (await ProcessCommandLine.isAppImageMountAsync(mounter, image))
       process.kill(Number(mounter), Resources.copyEndSignal);
   }
 
@@ -54,18 +53,7 @@ export class AppImageCopyCleanup {
   }
 
   private static async isHolderRunningAsync(processId: string): Promise<boolean> {
-    const commandLine = await AppImageCopyCleanup.readCommandLineAsync(processId);
+    const commandLine = await ProcessCommandLine.readAsync(processId);
     return commandLine.split(Resources.processArgumentSeparator).includes(`${ProductInfo.current.slug}${Resources.launchNameSuffix}`);
-  }
-
-  private static async readCommandLineAsync(processId: string): Promise<string> {
-    try {
-      return await readFile(path.join(Resources.processFolder, processId, Resources.commandLineFile), Resources.utf8Encoding);
-    }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === Resources.missingFileCode)
-        return String.empty;
-      throw error;
-    }
   }
 }
