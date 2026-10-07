@@ -2144,6 +2144,30 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public waitsForItsRuntimeBeforePostingAReadyUpdateFoundAtStart(): Promise<void> {
+    return DesktopApplicationTests.withReadyFileAsync(async record => {
+      const files = new FakeDeviceFiles();
+      files.updateReady.kept = record;
+      const connection = new FakeRuntimeConnection();
+      connection.answers.set("shell.postNotification", Response.success("r", null));
+      let arrive: (connection: FakeRuntimeConnection) => void = () => undefined;
+      const process = new FakeDesktopProcess("linux");
+
+      const electron = await DesktopApplicationTests.startWithUpdaterAsync(process, new FakeUpdater(String(record["file"])), files, connection, new FakeElectron(), new FakeDeviceIdentity(),
+        new FakeUpdateCheckLock(), new FakeRuntimeLauncher(new Promise(resolve => {
+          arrive = resolve;
+        })));
+      await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", DesktopStartFixture.trustedEvent("linux"))), "kind") === "Ready");
+      const errorsBeforeReady = DesktopStartFixture.readErrors(process, "The runtime refused the ready update's notification").length;
+      arrive(connection);
+      await Condition.waitAsync(() => files.updateReady.writes.length > 0);
+
+      Assert.areEqual(0, errorsBeforeReady);
+      Assert.areEqual(1, connection.calls.filter(t => t === "shell.postNotification").length);
+    });
+  }
+
+  @TestMethod
   public postsAReadyUpdateWithoutTheDevicesIdentityAndKeepsItUnpostedWhileTheRuntimeRefuses(): Promise<void> {
     return DesktopApplicationTests.withReadyFileAsync(async record => {
       const files = new FakeDeviceFiles();
