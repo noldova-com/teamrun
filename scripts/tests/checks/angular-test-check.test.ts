@@ -84,11 +84,14 @@ class AngularTestCheckTests {
       assert.equal(output.text, "Flaky, passed when run again: A retries (a.spec.ts)\n");
     });
 
-    test("the check fails when the tests fail, without listing the spec files, and names the log of their output", async () => {
-      const output = new TextOutputFixture();
+    test("the check fails when the tests end without a report, without listing the spec files, and names their exit code or signal and the log of their output", async () => {
+      const ended = new TextOutputFixture();
+      const signalled = new TextOutputFixture();
 
-      assert.equal(await new AngularTestCheck(new AngularProjectFixture(AngularTestCheckTests.run(1, null), new Error("not listed")), null).runAsync(output), false);
-      assert.equal(output.text, AngularTestCheckTests.LOG_HINT);
+      assert.equal(await new AngularTestCheck(new AngularProjectFixture(AngularTestCheckTests.run(3221225477, null), new Error("not listed")), null).runAsync(ended), false);
+      assert.equal(await new AngularTestCheck(new AngularProjectFixture(AngularTestCheckTests.run(null, null), new Error("not listed")), null).runAsync(signalled), false);
+      assert.deepEqual([ended.text, signalled.text],
+        ["The Angular tests ended with exit code 3221225477 and wrote no report.\n", "The Angular tests were ended by a signal and wrote no report.\n"].map(t => `${t}${AngularTestCheckTests.LOG_HINT}`));
     });
 
     test("the check fails and names the spec files a passing run did not run", async t => {
@@ -158,7 +161,7 @@ class AngularTestCheckTests {
       const partial = await new AngularTestCheck(new AngularProjectFixture(AngularTestCheckTests.run(0, ["a.spec.ts"]), ["a.spec.ts", "b.spec.ts"]), null).runSelectedAsync(["spec"], incomplete);
 
       assert.deepEqual([failing.isPassing, failing.selected, partial.isPassing, partial.selected], [false, 1, false, 2]);
-      assert.equal(failed.text, AngularTestCheckTests.LOG_HINT);
+      assert.equal(failed.text, `The Angular tests ended with exit code 1 and wrote no report.\n${AngularTestCheckTests.LOG_HINT}`);
       assert.equal(incomplete.text, `Angular tests have no result for these files:\n  b.spec.ts\n${AngularTestCheckTests.LOG_HINT}`);
     });
 
@@ -223,7 +226,7 @@ class AngularTestCheckTests {
     });
   }
 
-  private static run(exitCode: number, files: readonly string[] | null, retried: readonly RetriedTest[] = []): AngularTestRun {
+  private static run(exitCode: number | null, files: readonly string[] | null, retried: readonly RetriedTest[] = []): AngularTestRun {
     const result = files === null ? null : RunnerResult.parse(JSON.stringify({ passed: files.length, failed: 0, skipped: 0, unreached: 0, skips: [], files }), "report");
     return new AngularTestRun(exitCode, result, null, retried);
   }
