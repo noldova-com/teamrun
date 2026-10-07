@@ -7,7 +7,7 @@
  */
 
 import { mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
@@ -244,8 +244,8 @@ export class DesktopApplication {
       process.env,
       process.homeFolder,
       join(moduleDirectory, ...Resources.repositoryRootSegments),
-      DesktopApplication.readArgument(process.argv, Resources.dataDirectoryArgument));
-    const userData = DesktopApplication.readArgument(process.argv, Resources.userDataArgument);
+      DesktopApplication.readFolderArgument(process, Resources.dataDirectoryArgument));
+    const userData = DesktopApplication.readFolderArgument(process, Resources.userDataArgument);
     if (Object.isUndefined(userData))
       electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
     const launchSettings = new LaunchSettings(
@@ -1124,10 +1124,11 @@ export class DesktopApplication {
   }
 
   private static locateDeviceFolder(process: IDesktopProcess): string {
-    return DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument) ?? DeviceFolder.locate(process.platform, process.env, process.homeFolder);
+    return DesktopApplication.readFolderArgument(process, Resources.deviceDirectoryArgument) ?? DeviceFolder.locate(process.platform, process.env, process.homeFolder);
   }
 
-  private static readArgument(argv: readonly string[], prefix: string): string | undefined {
-    return argv.find(t => t.startsWith(prefix))?.slice(prefix.length);
+  private static readFolderArgument(process: IDesktopProcess, prefix: string): string | undefined {
+    const folder = process.argv.find(t => t.startsWith(prefix))?.slice(prefix.length);
+    return Object.isUndefined(folder) || String.isNullOrWhitespace(folder) || isAbsolute(folder) ? folder : resolve(process.workingDirectory, folder);
   }
 }
