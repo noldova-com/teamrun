@@ -14,7 +14,6 @@ export interface IApplicationHost {
   readonly dock: IDockHost | undefined;
 
   setName(name: string): void;
-  setVersion(version: string): void;
   setAppUserModelId(id: string): void;
   setDesktopName(name: string): void;
   setPath(name: "userData", path: string): void;

@@ -52,7 +52,7 @@ export class DesktopApplicationTests {
     DesktopStartFixture.start(electron, new FakeDesktopProcess("win32"));
 
     Assert.areEqual(
-      JSON.stringify(["setName TeamRun", `setVersion ${RuntimeBuild.identity.productVersion}`, `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "enableSandbox"]),
+      JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "enableSandbox"]),
       JSON.stringify(electron.app.calls.filter(t => !t.startsWith("setPath"))));
     Assert.areEqual(0, electron.windows.length);
   }
@@ -65,7 +65,7 @@ export class DesktopApplicationTests {
     await electron.app.becomeReadyAsync();
 
     Assert.areEqual(
-      JSON.stringify(["setName TeamRun", `setVersion ${RuntimeBuild.identity.productVersion}`, `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.filter(t => !t.startsWith("setPath"))));
+      JSON.stringify(["setName TeamRun", `setAppUserModelId ${DesktopStartFixture.DEVELOPMENT_APP_ID}`, "requestSingleInstanceLock", "quit"]), JSON.stringify(electron.app.calls.filter(t => !t.startsWith("setPath"))));
     Assert.areEqual(0, electron.app.count("window-all-closed"));
     Assert.areEqual(0, electron.windows.length);
   }
@@ -2081,18 +2081,6 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public labelsItselfWithTheProductVersionBeforeCreatingItsUpdater(): void {
-    const electron = new FakeElectron();
-    const seen: string[][] = [];
-    DesktopStartFixture.start(electron, new FakeDesktopProcess("linux"), new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(), [], () => Promise.resolve(true), () => {
-      seen.push([...electron.app.calls]);
-      return null;
-    });
-
-    Assert.areEqual(JSON.stringify([["setName TeamRun", `setVersion ${RuntimeBuild.identity.productVersion}`]]), JSON.stringify(seen.map(calls => calls.filter(t => t.startsWith("setName") || t.startsWith("setVersion")))));
-  }
-
-  @TestMethod
   public async startsWithItsUpdatesFailedAndTheReasonLoggedWhenItsUpdaterCannotBeCreated(): Promise<void> {
     const electron = new FakeElectron();
     const process = new FakeDesktopProcess("linux");
@@ -2406,7 +2394,7 @@ export class DesktopApplicationTests {
 
     Assert.isTrue(process.errors.includes(`The desktop's main process failed with an uncaught exception: ArgumentException: ${failure.message}`), process.errors);
     Assert.areEqual(JSON.stringify([["Restart TeamRun", "Quit"]]), JSON.stringify(electron.dialog.boxes.map(t => t.options.buttons)));
-    Assert.areEqual(JSON.stringify(["setName TeamRun", `setVersion ${RuntimeBuild.identity.productVersion}`, "exit 0"]), JSON.stringify(electron.app.calls));
+    Assert.areEqual(JSON.stringify(["setName TeamRun", "exit 0"]), JSON.stringify(electron.app.calls));
   }
 
   @TestMethod
