@@ -30,6 +30,8 @@ export class ProductInfo {
   public readonly linuxDeviceFolder: string;
   public readonly dataDirectoryVariable: string;
   public readonly icons: string;
+  public readonly windowsPublisher: string;
+  public readonly updateFeed: string | null;
   public readonly version: string;
   public readonly build: string;
 
@@ -45,6 +47,8 @@ export class ProductInfo {
     this.linuxDeviceFolder = folders.readNonBlankString(Resources.linuxField);
     this.dataDirectoryVariable = reader.readNonBlankString(Resources.dataDirectoryVariableField);
     this.icons = reader.readNonBlankString(Resources.iconsField);
+    this.windowsPublisher = reader.readNonBlankString(Resources.windowsPublisherField);
+    this.updateFeed = reader.readNullableString(Resources.updateFeedField);
     this.version = reader.readNonBlankString(Resources.versionField);
     this.build = reader.readNonBlankString(Resources.buildField);
   }

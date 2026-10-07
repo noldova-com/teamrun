@@ -11,6 +11,7 @@ import path from "node:path";
 export default class PackageLayout {
   private static readonly FOLDER_SEGMENTS: readonly string[] = ["_build", "package"];
   private static readonly STAGE_FOLDER: string = "app";
+  private static readonly STAGED_PRODUCT_SEGMENTS: readonly string[] = ["_build", "product.json"];
   private static readonly NPM_CACHE_FOLDER: string = "npm-cache";
   private static readonly ELECTRON_FOLDER: string = "electron";
   private static readonly TOOL_CACHE_FOLDER: string = "tool-cache";
@@ -31,6 +32,10 @@ export default class PackageLayout {
 
   public get stage(): string {
     return path.join(this.folder, PackageLayout.STAGE_FOLDER);
+  }
+
+  public get stagedProduct(): string {
+    return path.join(this.stage, ...PackageLayout.STAGED_PRODUCT_SEGMENTS);
   }
 
   public get npmCache(): string {

@@ -11,4 +11,5 @@ import type { JsonObject } from "@noldova/teamrun-foundation-json";
 export interface IDeviceFileStore {
   readAsync(): Promise<JsonObject | null>;
   writeAsync(value: JsonObject): Promise<void>;
+  deleteAsync(): Promise<void>;
 }

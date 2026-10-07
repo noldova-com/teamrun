@@ -33,7 +33,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class BuildTests {
   private static readonly BUILD_TIMEOUT: number = 60_000;
   private static readonly ROOT_MANIFEST: string = JSON.stringify({ teamrun: { modules: [], product: ProductIdentityFixture.json } });
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>]]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder> [--update-feed <https URL, or http URL of localhost, ending in />]]]\n";
 
   public static register(): void {
     test("a tree without packages builds nothing and succeeds", async t => {
@@ -46,7 +46,7 @@ class BuildTests {
       assert.equal(output.text, "No packages under src/; there is nothing to build.\nModules in the build: 0.\nNo Angular project under src/; there is nothing to prepare.\n");
     });
 
-    test("packages are built and installed, the build says how many, and its product file holds the product's identity, version and fingerprint", { timeout: BuildTests.BUILD_TIMEOUT }, async t => {
+    test("packages are built and installed, the build says how many, and its product file holds the product's identity, version and fingerprint, with the production update feed only in a packaged build unless it names a local one", { timeout: BuildTests.BUILD_TIMEOUT }, async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
@@ -72,11 +72,21 @@ class BuildTests {
       assert.equal(await BuildTests.create(repository.directory, output, process.env).runAsync([]), 0);
       assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--test", "--output", tested]), 0);
       assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--test", "--output", withoutNotes, "--without", "notes"]), 0);
+      const packaged = path.join(repository.directory, "_build", "variants", "packaged");
+      const local = path.join(repository.directory, "_build", "variants", "local");
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--packaged", "--output", packaged]), 0);
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--packaged", "--output", local, "--update-feed", "http://127.0.0.1:8080/"]), 0);
+      const feeds = [
+        (await readAsync(path.join(packaged, "product.json")))["updateFeed"],
+        (await readAsync(path.join(local, "product.json")))["updateFeed"]
+      ];
       const products = [
         await readAsync(path.join(repository.directory, "_build", "product.json")),
         await readAsync(path.join(tested, "product.json")),
         await readAsync(path.join(withoutNotes, "product.json"))
       ];
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--packaged"]), 0);
+      const unplaced = (await readAsync(path.join(repository.directory, "_build", "product.json")))["updateFeed"];
 
       assert.equal(
         output.text,
@@ -84,8 +94,10 @@ class BuildTests {
       assert.equal(new Set(fingerprints).size, 3);
       assert.deepEqual(products.map(t => t["build"]), fingerprints);
       assert.deepEqual(Object.keys(products[0] ?? {}), [
-        "name", "slug", "applicationId", "developmentApplicationId", "dataFolder", "deviceFolders", "dataDirectoryVariable", "icons", "version", "build"
+        "name", "slug", "applicationId", "developmentApplicationId", "dataFolder", "deviceFolders", "dataDirectoryVariable", "icons", "windowsPublisher", "updateFeed", "version", "build"
       ]);
+      assert.deepEqual([products[0]?.["windowsPublisher"], products[0]?.["updateFeed"], unplaced, ...feeds],
+        [ProductIdentityFixture.json["windowsPublisher"], null, null, "https://github.com/fixtureworks/studio/releases/latest/download/", "http://127.0.0.1:8080/"]);
       assert.equal(products[0]?.["name"], ProductIdentityFixture.json["name"]);
       assert.deepEqual(products[0]?.["deviceFolders"], ProductIdentityFixture.json["deviceFolders"]);
       assert.equal(products[0]?.["version"], "0.0.7");
@@ -199,8 +211,8 @@ class BuildTests {
       assert.equal(invalid.text, "The build lists the module notes, but src/modules/notes has no module.json.\n");
     });
 
-    test("arguments other than a test build with its exclusions or a packaged build are refused with the usage", async () => {
-      for (const buildArguments of [["foundation-core"], ["--without", "clock"], ["--output", "variant"], ["--test", "--without"], ["--test", "clock"], ["--test", "--test"], ["--test", "--output", "a", "--output", "b"], ["--packaged", "--without", "clock"], ["--packaged", "--packaged"], ["--packaged", "--output"]]) {
+    test("arguments other than a test build with its exclusions or a packaged build with at most one update feed beside its output folder are refused with the usage", async () => {
+      for (const buildArguments of [["foundation-core"], ["--without", "clock"], ["--output", "variant"], ["--test", "--without"], ["--test", "clock"], ["--test", "--test"], ["--test", "--output", "a", "--output", "b"], ["--packaged", "--without", "clock"], ["--packaged", "--packaged"], ["--packaged", "--output"], ["--update-feed", "http://a/"], ["--test", "--update-feed", "http://a/"], ["--packaged", "--update-feed", "ftp://a/"], ["--packaged", "--update-feed", "http://a"], ["--packaged", "--update-feed", "local"], ["--packaged", "--update-feed", "http://a/", "--update-feed", "http://a/"], ["--packaged", "--update-feed", "https://a/"]]) {
         const output = new TextOutputFixture();
 
         assert.equal(await BuildTests.create("unused", output, process.env).runAsync(buildArguments), 2);
