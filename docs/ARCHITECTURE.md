@@ -850,8 +850,15 @@ Before TeamRun quits, restarts for an update or stops for a newer build (section
 
 Closing the last window quits TeamRun, except on macOS and while the tray icon shows (section 8), where the window closes once it has saved and TeamRun keeps running.
 Quitting, from the last window, the tray icon, the menu, the command line or the operating system, first has every window save, then asks the runtime to stop only if idle and to keep running while another client uses it (section 6).
-On Linux and macOS the desktop quits this way on SIGTERM, and on SIGHUP when the terminal whose session it leads closes; the runtime stops on SIGINT, SIGTERM and SIGHUP alike.
-On Linux, a desktop started as a shell's job in a terminal shares its process group with its Chromium processes, so the hang-up of that terminal closing ends those processes too, and the desktop ends without saving what its windows had not saved.
+On Linux and macOS the desktop quits this way on SIGTERM and SIGHUP; the runtime stops on SIGINT, SIGTERM and SIGHUP alike.
+A packaged desktop started from a terminal on Linux or macOS, with its standard input, output or error a terminal, starts itself again in its own session with its output dropped and exits at once, before it opens a window or reaches a runtime.
+The prompt comes back, and closing the terminal leaves TeamRun running; it quits from its window, the tray icon or `teamrun quit`.
+Without that, a desktop that is a shell's job shares its process group with its Chromium processes, and the hang-up of the closing terminal ends them before the desktop can save.
+The copy gets the same arguments, environment and working folder; an AppImage starts again from its image file, without the entries the AppImage's launcher added to the environment.
+The desktop takes the single-instance lock before it decides, so a second start hands over to the running desktop as usual, and gives the lock up just before it starts the copy.
+A start that writes to the terminal, with `--enable-logging`, `--remote-debugging-port`, `--remote-debugging-pipe` or `ELECTRON_ENABLE_LOGGING`, stays in the terminal, as does a development run.
+When the copy cannot be started, the desktop keeps running in the terminal and writes why to standard error and its log; a copy that fails after it has started writes to its own desktop log.
+On Windows a desktop started from a console stays attached to it, and closing the console ends the desktop.
 The command line's `teamrun quit` reaches the desktop through the runtime: it asks with `shell.quit`, the runtime announces `shell.quitting`, and the desktop quits as above.
 A desktop that stays open answers `shell.quitAnswered` with why.
 A desktop that quits asks the runtime to stop, and the runtime counts the stop it accepts as the desktop's answer, since that stop can end the runtime at once.
@@ -1132,10 +1139,12 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
 - **Which builds read it.**
   The build decides, never a setting, a variable or an argument.
   `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
-  A build names a feed only in a packaged product file it writes to an output folder, so the development copy's `_build/product.json` never names one.
+  A build names a feed only in a product file it writes to an output folder, so the development copy's `_build/product.json` never names one.
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
   A test build, and a package made for a native update check, name instead a local feed given to the build when it is made, with `--update-feed <url>`, an HTTPS URL, or an HTTP URL of `localhost`, `127.0.0.1` or `[::1]`, ending in `/`; `release:assets` refuses a package whose product file names any feed but the production one.
   A desktop that never checks shows its updates as off.
+  The desktop gives electron-updater the product version, since it would otherwise compare the feed's version with Electron's, which a development copy reports as Electron's own.
+  A desktop whose updater can't be created shows its updates as failed and logs why, and starts as usual.
   The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
 - **Versions.**
   Only a version higher than the installed one is offered.

@@ -8,7 +8,7 @@
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -16,6 +16,7 @@ import path from "node:path";
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { ChildProgramHost, ProgramException } from "@noldova/teamrun-shell-desktop";
+import { LaunchException } from "@noldova/teamrun-shell-runtime";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { MissingBashFixture } from "../fixtures/missing-bash.fixture.js";
@@ -91,6 +92,40 @@ export class ChildProgramHostTests {
   }
 
   @TestMethod
+  public async startsADetachedProgramInTheGivenFolderAndAnswersOnceItHasStarted(): Promise<void> {
+    const folder = await mkdtemp(path.join(tmpdir(), "teamrun-relaunch-"));
+    const file = path.join(folder, "started");
+    try {
+      await new ChildProgramHost(process.platform, 5000).startDetachedAsync(process.execPath, [
+        "-e",
+        "const fs = require('node:fs'); fs.writeFileSync(`${process.argv[1]}.part`, `${process.pid}|${fs.realpathSync.native(process.cwd())}|${process.env.RELAUNCH_ANSWER}`); fs.renameSync(`${process.argv[1]}.part`, process.argv[1]);",
+        file
+      ], { ...process.env, RELAUNCH_ANSWER: "relaunched" }, folder);
+
+      await Condition.waitAsync(() => existsSync(file));
+      const [processId, ...answer] = readFileSync(file, "utf8").split("|");
+      await Condition.waitAsync(() => !ChildProgramHostTests.isRunning(Number(processId)));
+      Assert.areEqual(`${realpathSync.native(folder)}|relaunched`, answer.join("|"));
+    }
+    finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async rejectsADetachedProgramThatCannotStart(): Promise<void> {
+    let bash: Error;
+    {
+      using _bash = new MissingBashFixture();
+      bash = await Assert.throwsAsync(() => new ChildProgramHost("linux", 5000).startDetachedAsync("/opt/teamrun/teamrun", [], process.env, tmpdir()), LaunchException);
+    }
+    const missing = await Assert.throwsAsync(() => new ChildProgramHost("win32", 5000).startDetachedAsync(MISSING, [], process.env, tmpdir()), Error);
+
+    Assert.areEqual("Starting a program on Linux requires executable Bash at /bin/bash. Install Bash or restore its execute permissions.", bash.message);
+    Assert.areEqual(`spawn ${MISSING} ENOENT`, missing.message);
+  }
+
+  @TestMethod
   public async reportsADetachedProgramThatCannotStart(): Promise<void> {
     const failures: Error[] = [];
     {
@@ -156,5 +191,15 @@ export class ChildProgramHostTests {
     child.stdout?.setEncoding("utf8").on("data", (t: string) => output += t);
     await once(child, "close");
     return output.split("|").map(t => t.split(",").map(Number).sort((u, v) => u - v));
+  }
+
+  private static isRunning(processId: number): boolean {
+    try {
+      process.kill(processId, 0);
+      return true;
+    }
+    catch {
+      return false;
+    }
   }
 }
