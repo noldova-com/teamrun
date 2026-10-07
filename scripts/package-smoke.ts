@@ -43,10 +43,12 @@ export default class PackageSmoke {
   private static readonly ARCHIVE: string = "app.asar";
   private static readonly FOLDER_PREFIX: string = "tr-smoke-";
   private static readonly DATA_FOLDER: string = "data";
+  private static readonly DEVICE_FOLDER: string = "device";
   private static readonly DESKTOP_LOG: string = "desktop.log";
   private static readonly DATA_LOG_SEGMENTS: readonly string[] = ["logs", "desktop.log"];
   private static readonly DISCOVERY_SEGMENTS: readonly string[] = ["discovery", "runtime.json"];
   private static readonly DATA_DIRECTORY_OPTION: string = "--data-dir";
+  private static readonly DEVICE_DIRECTORY_OPTION: string = "--device-dir";
   private static readonly PROCESS_ID_FIELD: string = "processId";
   private static readonly BUILD_FIELD: string = "build";
   private static readonly VERSION_FIELD: string = "productVersion";
@@ -147,7 +149,8 @@ export default class PackageSmoke {
 
     const log = path.join(folder, PackageSmoke.DESKTOP_LOG);
     const logs = [log, path.join(data, ...PackageSmoke.DATA_LOG_SEGMENTS)];
-    const desktop = await this.runner.startAsync(installed.desktop, [`${PackageSmoke.DATA_DIRECTORY_OPTION}=${data}`], folder, log);
+    const desktop = await this.runner.startAsync(installed.desktop,
+      [`${PackageSmoke.DEVICE_DIRECTORY_OPTION}=${path.join(folder, PackageSmoke.DEVICE_FOLDER)}`, `${PackageSmoke.DATA_DIRECTORY_OPTION}=${data}`], folder, log);
     let runtime: number;
     let copy: readonly [string, string] | null = null;
     try {
@@ -159,6 +162,8 @@ export default class PackageSmoke {
         throw new PackagingException(`The runtime's discovery file ${path.join(data, ...PackageSmoke.DISCOVERY_SEGMENTS)} names no process.`);
       runtime = found;
       this.runtime = runtime;
+      if (target.platform === PackageTarget.LINUX)
+        copy = await this.requireCopyAsync(data);
       if (target.platform === PackageTarget.MACOS) {
         await this.checkLinkedCommandAsync(path.join(installed.resources, PackageConfiguration.COMMAND_FOLDER, manifest.product.slug), manifest.productVersion, data, folder);
         await this.captureScreenAsync(target, folder);
@@ -170,8 +175,6 @@ export default class PackageSmoke {
       if (desktop.exitCode !== 0)
         throw new PackagingException(`The desktop quit with exit code ${desktop.exitCode}:\n${await PackageSmoke.readTailAsync(logs)}`);
       this.output.write("The desktop quit.\n");
-      if (target.platform === PackageTarget.LINUX)
-        copy = await this.requireCopyAsync(data);
     }
     finally {
       if (!desktop.hasExited)
@@ -208,7 +211,8 @@ export default class PackageSmoke {
   }
 
   private async checkPowerShellAsync(command: string, version: string, data: string, folder: string): Promise<void> {
-    const line = ["&", path.parse(command).name, ...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, `'${data}';`, "exit", "$LASTEXITCODE"].join(" ");
+    const line = ["&", path.parse(command).name, ...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DEVICE_DIRECTORY_OPTION, `'${path.join(folder, PackageSmoke.DEVICE_FOLDER)}'`,
+      PackageSmoke.DATA_DIRECTORY_OPTION, `'${data}';`, "exit", "$LASTEXITCODE"].join(" ");
     const status = await this.runner.captureAsync(PackageSmoke.POWERSHELL, [...PackageSmoke.POWERSHELL_OPTIONS, line], folder, PackageSmoke.COMMAND_LIMIT, this.createCommandEnvironment(command));
     if (!status.isSuccessful)
       throw new PackagingException(`teamrun status through PowerShell exited with ${status.exitCode}:\n${status.text}`);
@@ -218,7 +222,7 @@ export default class PackageSmoke {
   private async checkLinkedCommandAsync(command: string, version: string, data: string, folder: string): Promise<void> {
     const link = path.join(folder, path.basename(command));
     await this.runner.requireAsync(PackageSmoke.LINK, [PackageSmoke.SYMBOLIC_OPTION, command, link], folder, PackageSmoke.COMMAND_LIMIT);
-    const status = await this.runner.captureAsync(link, [...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, data], folder, PackageSmoke.COMMAND_LIMIT, this.environment);
+    const status = await this.runner.captureAsync(link, PackageSmoke.formatStatusArguments(data, folder), folder, PackageSmoke.COMMAND_LIMIT, this.environment);
     if (!status.isSuccessful)
       throw new PackagingException(`teamrun status through a link to ${command} exited with ${status.exitCode}:\n${status.text}`);
     this.checkStarted(status.output, version, data, "through a link to the app's command");
@@ -236,7 +240,7 @@ export default class PackageSmoke {
     const records = (await readdir(logs)).filter(t => PackageSmoke.COPY_RECORD.test(t));
     const [name = ""] = records;
     if (records.length !== 1)
-      throw new PackagingException(`After the desktop quit, ${logs} held ${records.length} copy records of the runtime's AppImage instead of one.`);
+      throw new PackagingException(`While the desktop ran, ${logs} held ${records.length} copy records of the runtime's AppImage instead of one.`);
     const record = path.join(logs, name);
     const line = (await readFile(record, "utf8")).trim();
     if (this.extractsAndRuns) {
@@ -340,12 +344,16 @@ export default class PackageSmoke {
   private queryStatusAsync(installed: InstalledPackage, data: string, folder: string): Promise<ProcessResult> {
     if (installed.command !== null) {
       return this.runner.captureAsync(PackageSmoke.COMMAND_SHELL,
-        [...PackageSmoke.COMMAND_SHELL_OPTIONS, path.parse(installed.command).name, ...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, data],
+        [...PackageSmoke.COMMAND_SHELL_OPTIONS, path.parse(installed.command).name, ...PackageSmoke.formatStatusArguments(data, folder)],
         folder, PackageSmoke.COMMAND_LIMIT, this.createCommandEnvironment(installed.command));
     }
     return this.runner.captureAsync(installed.program,
-      [path.join(installed.resources, PackageSmoke.ARCHIVE, ...TeamRunCommand.ENTRY_SEGMENTS), ...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DATA_DIRECTORY_OPTION, data],
+      [path.join(installed.resources, PackageSmoke.ARCHIVE, ...TeamRunCommand.ENTRY_SEGMENTS), ...PackageSmoke.formatStatusArguments(data, folder)],
       folder, PackageSmoke.COMMAND_LIMIT, { ...this.environment, [TeamRunCommand.RUN_AS_NODE_VARIABLE]: TeamRunCommand.RUN_AS_NODE_VALUE });
+  }
+
+  private static formatStatusArguments(data: string, folder: string): readonly string[] {
+    return [...PackageSmoke.STATUS_ARGUMENTS, PackageSmoke.DEVICE_DIRECTORY_OPTION, path.join(folder, PackageSmoke.DEVICE_FOLDER), PackageSmoke.DATA_DIRECTORY_OPTION, data];
   }
 
   private async requireNoRuntimeAsync(installed: InstalledPackage, data: string, folder: string, moment: string): Promise<void> {
