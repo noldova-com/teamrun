@@ -18,7 +18,7 @@ import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts
 import ReadyUpdateFixture from "./fixtures/ready-update.fixture.ts";
 import UpdateFeedFixture from "./fixtures/update-feed.fixture.ts";
 
-test("an update made ready before TeamRun started offers Restart to update at once, without asking the feed again", async ({}, testInfo) => {
+test("an update made ready before TeamRun started offers Restart to update at once, without asking the feed again, or fails with the reason on a Linux copy that is no AppImage", async ({}, testInfo) => {
   const folder = await mkdtemp(path.join(os.tmpdir(), "teamrun-updates-"));
   const device = path.join(folder, "device");
   const cache = path.join(folder, "cache");
@@ -34,10 +34,19 @@ test("an update made ready before TeamRun started offers Restart to update at on
     desktop = await DesktopApplicationFixture.launchAsync(testInfo, ReadyUpdateFixture.environment(cache), {}, [], false, device);
     const page = desktop.window;
 
-    await expect(page.locator(".tr-update-item")).toHaveText(/Restart to update$/);
-    expect(feed.requests).toEqual([]);
-    expect(await page.evaluate(async () => (await (window as unknown as { teamrun: { readUpdate(): Promise<{ kind: string; version: string | null }> } }).teamrun.readUpdate())))
-      .toEqual(expect.objectContaining({ kind: "Ready", version: "999.0.0" }));
+    const readUpdateAsync = (): Promise<unknown> => page.evaluate(async () => (window as unknown as { teamrun: { readUpdate(): Promise<unknown> } }).teamrun.readUpdate());
+    if (process.platform === "linux") {
+      await expect(page.locator(".tr-update-item")).toHaveText(/Update failed$/);
+      expect(feed.requests).not.toContain(UpdateFeedFixture.source.packageFile);
+      expect(await readUpdateAsync()).toEqual(expect.objectContaining({
+        kind: "Failed", reason: "This copy of TeamRun doesn't run from an AppImage, so it can't install the update."
+      }));
+    }
+    else {
+      await expect(page.locator(".tr-update-item")).toHaveText(/Restart to update$/);
+      expect(feed.requests).toEqual([]);
+      expect(await readUpdateAsync()).toEqual(expect.objectContaining({ kind: "Ready", version: "999.0.0" }));
+    }
   }
   catch (error) {
     failure = { error };

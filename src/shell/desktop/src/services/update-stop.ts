@@ -27,6 +27,7 @@ export class UpdateStop {
   private readonly now: () => number;
   private readonly wait: (milliseconds: number) => Promise<void>;
   private readonly restart: AppImageRestart | null;
+  private readonly log: (text: string) => void;
 
   public constructor(
     installation: Installation,
@@ -37,7 +38,8 @@ export class UpdateStop {
     productVersion: string,
     now: () => number,
     wait: (milliseconds: number) => Promise<void>,
-    restart: AppImageRestart | null) {
+    restart: AppImageRestart | null,
+    log: (text: string) => void) {
     this.installation = installation;
     this.presence = presence;
     this.connectAsync = connectAsync;
@@ -47,6 +49,7 @@ export class UpdateStop {
     this.now = now;
     this.wait = wait;
     this.restart = restart;
+    this.log = log;
   }
 
   public async runAsync(version: string, handOffAsync: () => Promise<number | null>): Promise<boolean> {
@@ -86,7 +89,7 @@ export class UpdateStop {
       if (!isHandedOff)
         this.restart?.cancel();
       if (isHeld && !isHandedOff)
-        await this.installation.releaseAsync();
+        await this.installation.releaseAsync().catch((failure: unknown) => this.log(Resources.formatUpdateBarrierNotReleased(String(failure))));
       throw error instanceof UpdateStopException || error instanceof UpdateHandoffException ? error : new UpdateStopException(Resources.updateFailedUnexpectedly, new ExceptionOptions(error));
     }
     finally {
@@ -96,8 +99,17 @@ export class UpdateStop {
   }
 
   private async connectAllAsync(dataDirectories: readonly string[]): Promise<readonly IUpdateTarget[]> {
-    const targets = await Promise.all(dataDirectories.map(t => this.connectAsync(t)));
-    return targets.filter(t => !Object.isNull(t));
+    const failures: unknown[] = [];
+    const results = await Promise.all(dataDirectories.map(t => this.connectAsync(t).catch((error: unknown) => {
+      failures.push(error);
+      return null;
+    })));
+    const targets = results.filter(t => !Object.isNull(t));
+    if (failures.length === 0)
+      return targets;
+    for (const target of targets)
+      target.connection.close();
+    throw failures[0];
   }
 
   private async readWorkAsync(targets: readonly IUpdateTarget[]): Promise<readonly string[]> {

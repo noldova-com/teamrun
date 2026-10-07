@@ -13,6 +13,7 @@ import PackageException from "./packages/package.exception.ts";
 import RootManifest from "./packages/root-manifest.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
+import GitHubRelease from "./release/github-release.ts";
 import ReleaseException from "./release/release.exception.ts";
 import ReleaseRequest from "./release/release-request.ts";
 import ReleaseSigning from "./release/release-signing.ts";
@@ -25,6 +26,7 @@ export default class ReleaseCheck {
   private static readonly USAGE: string = "Usage: RELEASE_REPOSITORY=<owner/name> RELEASE_VERSION=<N.N.N> RELEASE_REVISION=<commit> npm run release:check\n";
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly MAIN: string = "main";
+  private static readonly RELEASES: string = "/releases";
   private static readonly ON_MAIN: readonly string[] = ["identical", "ahead"];
   private static readonly BUILD_RUNS: string = "/actions/workflows/build-and-test.yml/runs?event=push&branch=main&per_page=1&head_sha=";
   private static readonly SUCCESS: string = "success";
@@ -68,14 +70,15 @@ export default class ReleaseCheck {
       throw new ReleaseException(`The root manifest's version is ${manifest.productVersion}, not ${request.version.text}; raise it on main first.`);
 
     const api = new GitHubApi(request.repository, this.runner, this.root);
-    const latest = await api.readOptionalAsync("/releases/latest");
-    if (latest !== null) {
-      const latestVersion = ReleaseVersion.parseTag(GitHubJson.text(GitHubJson.object(latest, "the latest release"), "tag_name", "the latest release"), "The latest release's tag");
-      if (!request.version.isNewerThan(latestVersion))
-        throw new ReleaseException(`${request.version.text} is not newer than the latest release, ${latestVersion.text}.`);
-    }
+    const highest = (await api.readPagesAsync(ReleaseCheck.RELEASES))
+      .map((t, index) => GitHubRelease.read(t, `releases[${index}]`))
+      .filter(t => !t.isDraft)
+      .map(t => ReleaseVersion.parseTag(t.tag, `The tag of release ${t.id}`))
+      .reduce<ReleaseVersion | null>((found, t) => found === null || t.isNewerThan(found) ? t : found, null);
+    if (highest !== null && !request.version.isNewerThan(highest))
+      throw new ReleaseException(`${request.version.text} is not newer than the highest release, ${highest.text}.`);
 
-    if (await api.readOptionalAsync(`/git/ref/tags/${request.version.tag}`) !== null)
+    if (await api.readTagAsync(request.version.tag) !== null)
       throw new ReleaseException(`The tag ${request.version.tag} already exists; a published tag is never moved.`);
 
     const comparison = await api.readOptionalAsync(`/compare/${request.revision}...${ReleaseCheck.MAIN}`);

@@ -1094,7 +1094,7 @@ Each target is packaged on its own platform and processor.
   Incomplete uploads remain unpublished, and published tags and assets are not silently replaced.
 - A release carries, for each target, its packages, a checksum file `<package>.sha256` in `sha256sum`'s format, and its update information in electron-updater's format: the version; each package's name, SHA-512 in base64 and size; the package the updater downloads, again as `path` with its SHA-512; and the release date.
   After `npm run package`, `npm run release:assets` writes the checksums and the metadata beside the machine's packages, with the root manifest's version.
-- `npm run release:check` checks a requested release before anything is built: the version is the root manifest's, follows the versioning below and has no tag yet, and the revision is a full commit SHA that `main` contains and whose latest **Build and test** run on `main` passed.
+- `npm run release:check` checks a requested release before anything is built: the version is the root manifest's, follows the versioning below, is higher than the version of every published release, whatever order they were made in, and has no tag yet, and the revision is a full commit SHA that `main` contains and whose latest **Build and test** run on `main` passed.
   It names the platforms the release signs, and writes them as the step's `signed` output, separated by spaces, when `GITHUB_OUTPUT` is set.
   That run on `main` covers the tests and the full UI workflows of every target but macOS x64, which the nightly run covers; a release's own builds run each target's tests again, macOS x64's included, but not its UI workflows.
 - `npm run release:publish` publishes every target's files from one folder:
@@ -1194,6 +1194,8 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   At start the desktop hashes the file again, without the network: when the version is still newer than the installed one and the file still matches, the update shows as ready; otherwise the record is removed and the next check downloads again.
 - **Restart to update.**
   Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready; a stop or handoff that fails leaves it ready and shows why, unless the update is no longer current.
+  The failure is logged once, in one line with its reason; a publisher check logs only its duration and whether it passed.
+  The desktop's own runtime, already stopped by then, comes back by itself: the desktop is frozen for the update and reconnects once the barrier is released.
   Section 9 owns the choice the person makes while work is in progress.
   The handoff installs the way the platform does: Windows runs the installer quietly in the existing installation's scope, macOS installs through Squirrel.Mac from the ZIP, and Linux replaces the AppImage file in place, keeping its location and launchers.
   Each handoff first hashes the downloaded file again and refuses one that no longer matches the ready record.
@@ -1202,6 +1204,14 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   On Windows the desktop copies the installer into a new folder of its own under `handoff` in the installation's folder, restricted to the current user, and holds the copy open with read sharing only, from before its publisher check until the desktop exits, so the file whose publisher was checked is the file that starts and that the installer reads; a failed attempt removes its folder, and a later start removes the folder a running installer kept.
   On macOS an update restored from its record is checked and downloaded again, which reuses the cached ZIP, since electron-updater keeps no download across restarts; Squirrel.Mac then has 2 minutes to stage it, checking its code signature, and its ShipIt process installs it once the desktop quits through `autoUpdater.quitAndInstall`.
   Once staged, any quit installs the update, so only the handoff stages it, and a handoff that fails after asking Squirrel.Mac to stage, or finds no ShipIt process after the stage, removes the ShipIt job, as it does for a stage that finishes after the 2 minutes.
+  On Linux a desktop that doesn't run from an AppImage has no AppImage to replace, which is known before anything runs, so it never downloads or stops anything for an update.
+  A newer version, and a ready update from its record, show as failed with that reason, so the window never offers Restart to update.
+  Only once the handoff has succeeded does the desktop quit, without asking about work or saving again, since the update stop already did both: through `autoUpdater.quitAndInstall` on macOS, so the new version starts, and at once elsewhere.
+  On macOS the desktop first closes its windows, since `quitAndInstall` quits only once every window has closed.
+  When Squirrel.Mac reports an error instead, or the desktop hasn't quit within 10 seconds, the desktop logs why, tells the person that macOS installs the update once TeamRun quits but TeamRun can't open again by itself, and quits.
+  While the update stop and the handoff run, the desktop holds any quit, such as Quit, closing the last window or a quit from the tray, and quits as usual once the update has failed or been cancelled.
+  A handoff that fails leaves the desktop running as before, so quitting it later asks and saves as usual.
+  The standard error of the installer and of the AppImage restart's Bash goes to `logs/update-installer.log` and `logs/update-restart.log` in the data directory.
 - **macOS location.**
   A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
   Outside one, the desktop still checks but downloads and installs nothing: a newer version stays available, and About and the update item say to move TeamRun to Applications; a failed check gives its reason, then the same hint.
@@ -1227,8 +1237,10 @@ The updater and the desktop's update stop divide an update at the person's Resta
     Squirrel stages the update only inside the handoff, and ShipIt runs as the launchd job `<bundle identifier>.ShipIt` from then until it has installed.
     A staged update installs at any quit, so a handoff that fails after staging removes that job.
     A finished install leaves the job without a process, and a desktop removes such a job at start, before its updater.
-  - Linux copies the download to a file with a unique name beside the AppImage, created only when no file has that name, gives it the AppImage's permissions, flushes it to disk and renames it over the AppImage, following a link to the file it names.
+  - Linux copies the download to a file with a unique name beside the AppImage, `.<AppImage name>.<UUID>.part`, created only when no file has that name, gives it the AppImage's permissions, flushes it to disk and renames it over the AppImage, following a link to the file it names, then flushes the folder, logging a flush that fails.
     So the AppImage is always one whole version, and no process takes the handoff.
+    Before the copy it removes the copies an earlier handoff of that AppImage left, only files with that name pattern, never a folder, since the handoff creates only files; the barrier holds meanwhile, so no other handoff of it runs.
+    A copy that cannot be removed refuses the handoff with a readable reason.
     A folder that cannot be written refuses the handoff, and any failure removes the copy and leaves the AppImage as it was.
 - The update stop owns everything from the work question to the handoff: it stops every process of the installation, as [Stopping for an update](#stopping-for-an-update) describes, and then calls the handoff.
 - On Windows and macOS the platform's installer starts the new version.
@@ -1274,7 +1286,10 @@ A settled barrier is removed by first moving it aside under a unique name and de
 When the person confirms, the desktop reads and judges the barrier again, since the question may have stayed open for minutes, and removes it the same way; one that holds by then is reported as holding, and when the barrier cannot be removed, the desktop tells the person and quits.
 
 **Order.**
-The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use:
+The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use, without starting or taking over a runtime, identifying each by the process its discovery names.
+A data directory that a runtime owns but has no discovery yet has a runtime that is still starting: the update stop waits up to 15 seconds for its discovery, skips the directory if the ownership ends first, and otherwise fails the update with the reason.
+When any directory fails to connect, the update stop closes the connections it already opened.
+A barrier it cannot remove after a failure is logged, and the update keeps its own reason:
 
 1. **Work.**
    It reads `shell.work` from each runtime and, when any work is in progress, asks section 9's question in its window, listing the work by data directory.

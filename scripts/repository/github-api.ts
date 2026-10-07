@@ -17,6 +17,8 @@ export default class GitHubApi {
   private static readonly UPLOAD_TIMEOUT: number = 900_000;
   private static readonly NOT_FOUND: number = 404;
   private static readonly STATUS_PATTERN: RegExp = /\bHTTP (\d{3})\b/u;
+  private static readonly TAG_REFERENCES: string = "/git/matching-refs/tags/";
+  private static readonly TAG_PREFIX: string = "refs/tags/";
 
   private readonly repository: string;
   private readonly runner: ProcessRunner;
@@ -37,6 +39,14 @@ export default class GitHubApi {
   public async readPagesAsync(resource: string): Promise<readonly unknown[]> {
     const pages = this.parse(await this.captureAsync(["api", "--paginate", "--slurp", this.locate(resource)]), resource);
     return GitHubJson.array(pages, resource).flatMap(t => GitHubJson.array(t, resource));
+  }
+
+  public async readTagAsync(tag: string): Promise<Readonly<Record<string, unknown>> | null> {
+    const context = `the references of the tag ${tag}`;
+    const reference = `${GitHubApi.TAG_PREFIX}${tag}`;
+    return GitHubJson.array(await this.readAsync(`${GitHubApi.TAG_REFERENCES}${tag}`), context)
+      .map(t => GitHubJson.object(t, context))
+      .find(t => GitHubJson.text(t, "ref", context) === reference) ?? null;
   }
 
   public async readOptionalAsync(resource: string): Promise<unknown> {

@@ -44,10 +44,10 @@ class UpdateControllerFixture {
   public time: number = 1_000;
   public readonly controller: UpdateController;
 
-  private constructor(folder: string, mustMove: boolean, canRestart: boolean) {
+  private constructor(folder: string, mustMove: boolean, canRestart: boolean, refusal: string | null) {
     this.folder = folder;
     this.updater = new FakeUpdater(join(folder, "pending", "TeamRun-linux-x64.AppImage"));
-    this.controller = new UpdateController(this.updater, this.record, this.lock, "1.2.0", mustMove, t => this.published.push(t), t => {
+    this.controller = new UpdateController(this.updater, this.record, this.lock, "1.2.0", mustMove, refusal, t => this.published.push(t), t => {
       this.posts.push(t);
       return this.post(t);
     }, t => this.lines.push(t), () => this.time, (delay, run) => {
@@ -60,10 +60,11 @@ class UpdateControllerFixture {
     } : null);
   }
 
-  public static async runAsync(run: (fixture: UpdateControllerFixture) => Promise<void>, mustMove: boolean = false, isDownloaded: boolean = true, canRestart: boolean = true): Promise<void> {
+  public static async runAsync(run: (fixture: UpdateControllerFixture) => Promise<void>, mustMove: boolean = false, isDownloaded: boolean = true, canRestart: boolean = true,
+    refusal: string | null = null): Promise<void> {
     const folder = await mkdtemp(join(tmpdir(), "teamrun-update-controller-"));
     try {
-      const fixture = new UpdateControllerFixture(folder, mustMove, canRestart);
+      const fixture = new UpdateControllerFixture(folder, mustMove, canRestart, refusal);
       if (isDownloaded) {
         await mkdir(join(folder, "pending"));
         await writeFile(fixture.updater.packagePath, UpdateControllerFixture.CONTENT);
@@ -168,6 +169,53 @@ export class UpdateControllerTests {
       Assert.areEqual(JSON.stringify({ kind: "Available", version: "1.3.0", progress: null, checkedAt: 1_000, reason: null, mustMove: true }), JSON.stringify(fixture.controller.status.toJson()));
       Assert.areEqual(0, fixture.updater.downloads);
     }, true);
+  }
+
+  @TestMethod
+  public showsWhyANewerVersionCannotBeInstalledWithoutDownloadingIt(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      fixture.updater.check = () => Promise.resolve("1.3.0");
+      await fixture.controller.startAsync();
+
+      fixture.controller.act("Check");
+      await fixture.publishedAsync(2);
+
+      Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: 1_000, reason: "This copy can't install updates.", mustMove: false }),
+        JSON.stringify(fixture.controller.status.toJson()));
+      Assert.areEqual(0, fixture.updater.downloads);
+    }, false, true, true, "This copy can't install updates.");
+  }
+
+  @TestMethod
+  public showsAnUpdateAnotherDesktopReadiedAsFailedWithTheReasonItCannotBeInstalled(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      await fixture.controller.startAsync();
+      fixture.record.kept = fixture.ready;
+
+      fixture.controller.act("Check");
+      await fixture.publishedAsync(2);
+
+      Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: null, reason: "This copy can't install updates.", mustMove: false }),
+        JSON.stringify(fixture.controller.status.toJson()));
+      Assert.areEqual(0, fixture.updater.checks);
+    }, false, true, true, "This copy can't install updates.");
+  }
+
+  @TestMethod
+  public showsAReadyRecordItCannotInstallAsFailedWithTheReasonAndNeitherPostsNorRestartsIt(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = fixture.ready;
+      await fixture.controller.startAsync();
+      await fixture.controller.notifyAsync();
+
+      const restarted = fixture.controller.act("Restart");
+
+      Assert.isFalse(restarted);
+      Assert.areEqual(JSON.stringify([{ kind: "Failed", version: null, progress: null, checkedAt: null, reason: "This copy can't install updates.", mustMove: false }]),
+        JSON.stringify(fixture.published.map(t => t.toJson())));
+      Assert.areEqual(0, fixture.posts.length);
+      Assert.areEqual(0, fixture.restarts.length);
+    }, false, true, true, "This copy can't install updates.");
   }
 
   @TestMethod
@@ -317,14 +365,14 @@ export class UpdateControllerTests {
       fixture.fire();
       await fixture.publishedAsync(4);
       const automatic = fixture.controller.status.toJson();
-      fixture.updater.check = () => Promise.reject(new Error("unexpected"));
+      fixture.updater.check = () => Promise.reject(new Error("unexpected\r\n  in the feed"));
       fixture.controller.act("Check");
       await fixture.publishedAsync(6);
 
       Assert.areEqual(JSON.stringify({ kind: "UpToDate", version: null, progress: null, checkedAt: 31_000, reason: "TeamRun couldn't reach its update feed.", mustMove: false }), JSON.stringify(automatic));
       Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: 31_000, reason: "The update stopped on an unexpected error.", mustMove: true }),
         JSON.stringify(fixture.controller.status.toJson()));
-      Assert.areEqual(JSON.stringify(["The update failed: UpdateException: TeamRun couldn't reach its update feed.", "The update failed: Error: unexpected"]), JSON.stringify(fixture.lines));
+      Assert.areEqual(JSON.stringify(["The update failed: TeamRun couldn't reach its update feed.", "The update failed: Error: unexpected in the feed"]), JSON.stringify(fixture.lines));
     }, true);
   }
 

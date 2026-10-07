@@ -79,6 +79,7 @@ export class DesktopApiTests {
         "UpdateStatus",
         "UpdateStop",
         "UpdateStopException",
+        "UpdateTargetConnector",
         "UpdateWorkQuestion",
         "UtilityProcessStarter",
         "WindowAppearance",

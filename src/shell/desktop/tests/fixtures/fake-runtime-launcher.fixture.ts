@@ -7,7 +7,7 @@
  */
 
 import type { StopPolicy } from "@noldova/teamrun-shell-protocol";
-import type { IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
+import type { AttachOptions, IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
 import type { IRuntimeConnection, IRuntimeLauncher } from "@noldova/teamrun-shell-desktop";
 
 import { FakeRuntimeConnection } from "./fake-runtime-connection.fixture.js";
@@ -17,13 +17,18 @@ export class FakeRuntimeLauncher implements IRuntimeLauncher {
 
   public readonly calls: string[] = [];
   public readonly connections: FakeRuntimeConnection[] = [];
+  public readonly options: (AttachOptions | undefined)[] = [];
   public listener: IRuntimeClientListener | null = null;
+  public readonly listeners: IRuntimeClientListener[] = [];
+  public onAttach: () => void = () => undefined;
 
   public constructor(...outcomes: (Error | FakeRuntimeConnection | Promise<FakeRuntimeConnection>)[]) {
     this.outcomes = outcomes;
   }
 
-  public attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<IRuntimeConnection> {
+  public attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy, options?: AttachOptions): Promise<IRuntimeConnection> {
+    this.options.push(options);
+    this.onAttach();
     return this.answerAsync(`attach ${clientName} ${policy}`, listener);
   }
 
@@ -34,6 +39,7 @@ export class FakeRuntimeLauncher implements IRuntimeLauncher {
   private answerAsync(call: string, listener: IRuntimeClientListener): Promise<IRuntimeConnection> {
     this.calls.push(call);
     this.listener = listener;
+    this.listeners.push(listener);
     const outcome = this.outcomes.shift() ?? new FakeRuntimeConnection();
     if (outcome instanceof Error)
       return Promise.reject(outcome);

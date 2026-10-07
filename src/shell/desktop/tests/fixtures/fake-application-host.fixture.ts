@@ -69,9 +69,12 @@ export class FakeApplicationHost implements IApplicationHost {
   }
 
   public quit(): void {
-    const event = new FakePreventableEvent();
-    this.listeners.emit("before-quit", event);
-    this.calls.push(event.isPrevented ? "quit prevented" : "quit");
+    this.tryQuit();
+  }
+
+  public quitFully(): void {
+    if (this.tryQuit())
+      this.listeners.emit("will-quit");
   }
 
   public relaunch(): void {
@@ -103,5 +106,12 @@ export class FakeApplicationHost implements IApplicationHost {
 
   public count(event: string): number {
     return this.listeners.count(event);
+  }
+
+  private tryQuit(): boolean {
+    const event = new FakePreventableEvent();
+    this.listeners.emit("before-quit", event);
+    this.calls.push(event.isPrevented ? "quit prevented" : "quit");
+    return !event.isPrevented;
   }
 }

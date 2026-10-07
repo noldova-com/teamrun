@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -16,12 +17,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateSaved } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, Event, Failure, FailureCode, NotificationBroadcast, PreShellData, QualifiedName, RecentCommands, Response, RuntimeHandover, ShellEvents, UpdateProcess, UpdateReady, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import {
   ConnectionException, DataDirectory, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
-  UpdateBarrierState, UpdateBarrierStatus, UpdateInProgressException
+  RuntimeDiscovery, UpdateBarrierState, UpdateBarrierStatus, UpdateInProgressException
 } from "@noldova/teamrun-shell-runtime";
-import { type IIpcEvent, PathCommandException, PathCommandOutcome, UnusableFolderException, UpdateException } from "@noldova/teamrun-shell-desktop";
+import { type IIpcEvent, PathCommandException, PathCommandOutcome, UnusableFolderException, UpdateException, UpdateHandoffException } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
@@ -35,6 +36,7 @@ import { FakePathCommand } from "../fixtures/fake-path-command.fixture.js";
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
 import { FakeRuntimeLauncher } from "../fixtures/fake-runtime-launcher.fixture.js";
 import { FakeUpdateCheckLock } from "../fixtures/fake-update-check-lock.fixture.js";
+import { FakeUpdateHandoff } from "../fixtures/fake-update-handoff.fixture.js";
 import { FakeUpdater } from "../fixtures/fake-updater.fixture.js";
 import { TrayFixture } from "../fixtures/tray.fixture.js";
 
@@ -2116,22 +2118,243 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async logsALeftoverHandoffFolderItCannotRemoveBeforeStartingItsUpdates(): Promise<void> {
+  public async clearsWhatAnEarlierHandoffLeftOnceItStartsItsUpdates(): Promise<void> {
     const electron = new FakeElectron();
-    const process = new FakeDesktopProcess("linux");
-    const installations: Installation[] = [];
-    DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(), installations, () => Promise.resolve(true),
-      () => new FakeUpdater());
-    const [installation] = installations;
-    Assert.isDefined(installation);
-    const handoff = join(installation.folder, "handoff");
-    using _rm = new FailingFileCallFixture("rm", handoff, "EBUSY");
-    const left = "The copy of an update's installer could not be removed, so it is removed at the next start: Error: EBUSY: operation failed, rm '";
+    const handoff = new FakeUpdateHandoff();
+    DesktopStartFixture.start(electron, new FakeDesktopProcess("linux"), new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(), [],
+      () => Promise.resolve(true), () => new FakeUpdater(), undefined, handoff);
+    const before = handoff.clears;
 
     await DesktopStartFixture.openAsync(electron);
-    await Condition.waitAsync(() => DesktopStartFixture.readErrors(process, left).length > 0);
+    await Condition.waitAsync(() => handoff.clears > 0);
 
-    Assert.areEqual(1, DesktopStartFixture.readErrors(process, left).length);
+    Assert.areEqual(0, before);
+    Assert.areEqual(1, handoff.clears);
+  }
+
+  @TestMethod
+  @TestData("win32")
+  @TestData("linux")
+  public async quitsAtOnceWithoutAskingAgainOnceTheHandoffSucceeds(platform: string): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    await DesktopApplicationTests.restartToUpdateAsync(platform, handoff, async electron => {
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(JSON.stringify(["999.0.0"]), JSON.stringify(handoff.handedOff));
+      Assert.isFalse(electron.app.calls.includes("quit prevented"));
+      Assert.areEqual(0, electron.nativeUpdater.installs);
+    });
+  }
+
+  @TestMethod
+  public async quitsThroughSquirrelOnMacOSWithoutAskingAgainOnceTheHandoffSucceeds(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    handoff.handOff = () => Promise.resolve(5230);
+    await DesktopApplicationTests.restartToUpdateAsync("darwin", handoff, async electron => {
+      await Condition.waitAsync(() => electron.nativeUpdater.installs > 0);
+
+      Assert.areEqual(1, electron.nativeUpdater.installs);
+      Assert.isTrue(DesktopStartFixture.firstWindow(electron).isGone);
+      Assert.isTrue(electron.app.calls.includes("quit"));
+      Assert.isFalse(electron.app.calls.includes("quit prevented"));
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+    });
+  }
+
+  @TestMethod
+  @TestData("win32")
+  @TestData("linux")
+  @TestData("darwin")
+  public async stillAsksBeforeQuittingAfterAHandoffThatFailed(platform: string): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    handoff.handOff = () => Promise.reject(new UpdateHandoffException("The installer could not be started."));
+    await DesktopApplicationTests.restartToUpdateAsync(platform, handoff, async electron => {
+      const trusted = DesktopStartFixture.trustedEvent(platform);
+      await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "reason") === "The installer could not be started.");
+
+      const window = DesktopStartFixture.firstWindow(electron);
+      electron.app.quit();
+      await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
+      electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent(platform), DesktopStartFixture.closeRequests(window)[0], false);
+
+      Assert.isTrue(electron.app.calls.includes("quit prevented"));
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+      Assert.areEqual(0, electron.nativeUpdater.installs);
+    });
+  }
+
+  @TestMethod
+  public async getsItsRuntimeBackByItselfOnceAHandoffFailedAfterTheRuntimeStopped(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    handoff.handOff = () => Promise.reject(new UpdateHandoffException("The installer could not be started."));
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.update", Response.success("r", new UpdateReady([], []).toJson()));
+    const runtime = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000)"], { stdio: "ignore" });
+    try {
+      Assert.isDefined(runtime.pid);
+      await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async (electron, desktop, _installation, launcher) => {
+        const [own] = launcher.listeners;
+        target.onCall = () => {
+          if (target.calls.at(-1) === "shell.update")
+            own?.onEvent(new Event(ShellEvents.updating, null));
+          else if (target.calls.at(-1) === "shell.stop") {
+            runtime.kill();
+            own?.onDisconnected(null);
+          }
+        };
+        const window = DesktopStartFixture.firstWindow(electron);
+        const trusted = DesktopStartFixture.trustedEvent("linux");
+        await Condition.waitAsync(() => window.webContents.sent.some(t => t[0] === "teamrun:updateSaveRequest"));
+        electron.ipcMain.invoke("teamrun:updateSaveAnswer", trusted, window.webContents.sent.find(t => t[0] === "teamrun:updateSaveRequest")?.[1], []);
+        await Condition.waitAsync(() => launcher.calls.filter(t => t === "attach desktop IfIdle").length === 2);
+        await Condition.waitAsync(() => JSON.stringify(window.webContents.sent.filter(t => t[0] === "teamrun:startupState").at(-1)?.[1]) === JSON.stringify({ kind: "Ready", details: [] }));
+
+        Assert.isTrue(window.webContents.sent.some(t => t[0] === "teamrun:startupState" && Reflect.get(Object(t[1]), "kind") === "Updating"));
+        Assert.areEqual("The installer could not be started.", Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "reason"));
+        Assert.areEqual(JSON.stringify(["The update failed: The installer could not be started."]), JSON.stringify(DesktopStartFixture.readErrors(desktop, "The update failed")));
+        Assert.isFalse(electron.app.calls.includes("exit 0"));
+      }, target, true, runtime.pid);
+    }
+    finally {
+      runtime.kill();
+    }
+  }
+
+  @TestMethod
+  public async explainsAndQuitsWhenMacOSCannotBeAskedToInstallTheUpdate(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    handoff.handOff = () => Promise.resolve(5230);
+    await DesktopApplicationTests.restartToUpdateAsync("darwin", handoff, async (electron, desktop) => {
+      electron.nativeUpdater.onInstall = () => void Promise.resolve().then(() => electron.nativeUpdater.emit("error", new Error("No update available, can't quit and install")));
+      electron.dialog.failure = new Error("The dialog could not be shown.");
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(JSON.stringify([{
+        message: "macOS will install the update once TeamRun quits, but TeamRun can't open again by itself.",
+        detail: "Open TeamRun once the update has installed."
+      }]), JSON.stringify(electron.dialog.boxes.map(t => ({ message: t.options.message, detail: t.options.detail }))));
+      Assert.areEqual(1, DesktopStartFixture.readErrors(desktop,
+        "The update was handed off, but macOS could not be asked to install it and start the new version, so the desktop quits instead: Error: No update available").length);
+      Assert.isFalse(electron.app.calls.includes("quit prevented"));
+    });
+  }
+
+  @TestMethod
+  public async asksAboutWorkInTheInstallationsDataDirectoriesBeforeAnUpdateAndChangesNothingWhenCancelled(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async electron => {
+      const window = DesktopStartFixture.firstWindow(electron);
+      await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+      const answered = electron.ipcMain.invoke("teamrun:quitAnswer", DesktopStartFixture.trustedEvent("linux"), "Cancel");
+      await Condition.waitAsync(() => target.isClosed);
+
+      Assert.isTrue(answered as boolean);
+      Assert.areEqual(true, Reflect.get(Object(DesktopApplicationTests.quitQuestions(window)[0]), "isUpdate"));
+      Assert.isNull(DesktopApplicationTests.quitQuestions(window)[1]);
+      Assert.areEqual(0, handoff.handedOff.length);
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+    }, target);
+  }
+
+  @TestMethod
+  public holdsAQuitWhileItRestartsToUpdateAndQuitsAsUsualOnceTheUpdateIsCancelled(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    return DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async electron => {
+      const window = DesktopStartFixture.firstWindow(electron);
+      const trusted = DesktopStartFixture.trustedEvent("linux");
+      await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+
+      electron.app.quit();
+      const held = DesktopStartFixture.closeRequests(window).length;
+      electron.ipcMain.invoke("teamrun:quitAnswer", trusted, "Cancel");
+      await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
+      electron.ipcMain.invoke("teamrun:closeAnswer", trusted, DesktopStartFixture.closeRequests(window)[0], false);
+
+      Assert.areEqual(0, held);
+      Assert.isTrue(electron.app.calls.includes("quit prevented"));
+      Assert.isTrue(target.isClosed);
+      Assert.areEqual(0, handoff.handedOff.length);
+    }, target);
+  }
+
+  @TestMethod
+  public logsABarrierItCannotRemoveOnceARuntimeRefusesTheUpdate(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.update", Response.failure("r", new Failure(FailureCode.Internal, "The runtime is stopping.")));
+    return DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async (electron, desktop, installation) => {
+      using _rm = new FailingFileCallFixture("rm", installation.barrierFile, "EBUSY");
+
+      await Condition.waitAsync(() => DesktopStartFixture.readErrors(desktop, "The update's barrier could not be removed").length === 1);
+
+      Assert.areEqual(0, handoff.handedOff.length);
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+    }, target);
+  }
+
+  @TestMethod
+  public refusesToRestartToAnUpdateItsHandoffCannotInstallWithoutStoppingAnything(): Promise<void> {
+    return DesktopApplicationTests.withReadyFileAsync(async record => {
+      const handoff = new FakeUpdateHandoff();
+      handoff.refusal = "This copy can't install updates.";
+      const files = new FakeDeviceFiles();
+      files.updateReady.kept = record;
+      const electron = new FakeElectron();
+      DesktopStartFixture.start(electron, new FakeDesktopProcess("linux"), new FakeRuntimeLauncher(), new FakeDeviceIdentity(), files, new FakePathCommand(), [],
+        () => Promise.resolve(true), () => new FakeUpdater(String(record["file"])), undefined, handoff);
+      await DesktopStartFixture.openAsync(electron);
+      const trusted = DesktopStartFixture.trustedEvent("linux");
+      await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "kind") === "Failed");
+
+      const isStarted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Restart");
+
+      Assert.isFalse(isStarted as boolean);
+      Assert.areEqual("This copy can't install updates.", Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "reason"));
+      Assert.areEqual(0, handoff.handedOff.length);
+    });
+  }
+
+  @TestMethod
+  public async stopsWaitingForWorkAndChangesNothingWhenCancelledWhileWaiting(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async electron => {
+      const window = DesktopStartFixture.firstWindow(electron);
+      const trusted = DesktopStartFixture.trustedEvent("linux");
+      await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+      const waited = electron.ipcMain.invoke("teamrun:quitAnswer", trusted, "Wait");
+      const cancelled = electron.ipcMain.invoke("teamrun:quitAnswer", trusted, "Cancel");
+      await Condition.waitAsync(() => target.isClosed);
+
+      Assert.isTrue(waited as boolean);
+      Assert.isTrue(cancelled as boolean);
+      Assert.areEqual(1, target.calls.filter(t => t === "shell.work").length);
+      Assert.areEqual(0, handoff.handedOff.length);
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+    }, target);
+  }
+
+  @TestMethod
+  public async changesNothingWhenItsWindowClosesBeforeItCanAskAboutWork(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async electron => {
+      const window = DesktopStartFixture.firstWindow(electron);
+      const focused = window.calls.filter(t => t === "focus").length;
+      await Condition.waitAsync(() => window.calls.filter(t => t === "focus").length > focused);
+      window.destroy();
+      await Condition.waitAsync(() => target.isClosed);
+
+      Assert.areEqual(0, DesktopApplicationTests.quitQuestions(window).length);
+      Assert.areEqual(0, handoff.handedOff.length);
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+    }, target, false);
   }
 
   @TestMethod
@@ -2680,6 +2903,51 @@ export class DesktopApplicationTests {
     await DesktopStartFixture.openAsync(electron);
     await setImmediate();
     return electron;
+  }
+
+  private static async restartToUpdateAsync(
+    platform: string,
+    handoff: FakeUpdateHandoff,
+    run: (electron: FakeElectron, desktop: FakeDesktopProcess, installation: Installation, launcher: FakeRuntimeLauncher) => Promise<void>,
+    target: FakeRuntimeConnection | null = null,
+    paints: boolean = true,
+    runtimeProcessId: number = process.pid): Promise<void> {
+    await DesktopApplicationTests.withReadyFileAsync(async record => {
+      const folder = await mkdtemp(join(tmpdir(), "teamrun-restart-"));
+      try {
+        const files = new FakeDeviceFiles();
+        files.updateReady.kept = record;
+        const desktop = new FakeDesktopProcess(platform, [`--device-dir=${folder}`], { SystemRoot: process.env["SystemRoot"] });
+        desktop.processId = process.pid;
+        const electron = new FakeElectron();
+        const installations: Installation[] = [];
+        const launcher = Object.isNull(target) ? new FakeRuntimeLauncher() : new FakeRuntimeLauncher(new FakeRuntimeConnection(), target);
+        DesktopStartFixture.start(electron, desktop, launcher, new FakeDeviceIdentity(), files, new FakePathCommand(), installations, () => Promise.resolve(true),
+          () => new FakeUpdater(String(record["file"])), undefined, handoff);
+        await DesktopStartFixture.openAsync(electron);
+        const [installation] = installations;
+        Assert.isDefined(installation);
+        if (!Object.isNull(target)) {
+          const root = join(folder, "data");
+          const discovery = new DataDirectory(root).discoveryFile;
+          await mkdir(dirname(discovery), { recursive: true });
+          await writeFile(discovery, JSON.stringify(new RuntimeDiscovery("127.0.0.1:52000", "capability-token", runtimeProcessId, desktop.execPath, "0.0.1", 1, "build-fingerprint").toJson()));
+          await installation.recordAsync(root);
+          if (paints)
+            DesktopApplicationTests.paint(electron, platform, DesktopStartFixture.firstWindow(electron));
+        }
+        const trusted = DesktopStartFixture.trustedEvent(platform);
+        await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "kind") === "Ready");
+
+        const isStarted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Restart");
+
+        Assert.isTrue(isStarted as boolean);
+        await run(electron, desktop, installation, launcher);
+      }
+      finally {
+        await rm(folder, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
+      }
+    });
   }
 
   private static updateStates(window: FakeDesktopWindow): unknown[] {
