@@ -419,9 +419,15 @@ export class Resources {
   public static readonly virtualListOverscan: number = 600;
   public static readonly virtualListPrefetch: number = 400;
   public static readonly virtualListRowAttribute: string = "data-tr-row";
+  public static readonly virtualListImageTag: "img" = "img";
   public static readonly virtualListLoading: string = "Loading…";
   public static readonly virtualListFailed: string = "These items couldn't load.";
   public static readonly virtualListRetry: string = "Retry";
+  public static readonly virtualListIdPrefix: string = "tr-virtual-list-";
+  public static readonly virtualListFollowDistance: number = 120;
+  public static readonly virtualListJumpLabel: string = "Jump to latest";
+  public static readonly virtualListJumpGlyph: string = "arrow_downward";
+  public static readonly virtualListTabbableSelector: string = "a[href], area[href], button, input, select, textarea, iframe, summary, [tabindex], [contenteditable=\"true\"]";
   public static readonly configurationTableHeadingLevel: number = 3;
   public static readonly scrollOverflow: RegExp = /auto|scroll/u;
   public static readonly reducedMotionQuery: string = "(prefers-reduced-motion: reduce)";
@@ -451,8 +457,16 @@ export class Resources {
     return `The row "${id}" cannot move into "${parentId}": that parent is missing or inside the row.`;
   }
 
-  public static formatVirtualListOptionSelector(index: number): string {
-    return `[data-tr-row="${index}"] > [role=option]`;
+  public static formatVirtualListRowSelector(index: number): string {
+    return `[data-tr-row="${index}"] > .tr-virtual-list-row`;
+  }
+
+  public static formatVirtualListLabelId(id: string, index: number): string {
+    return `${id}-${index}-label`;
+  }
+
+  public static formatVirtualListDescriptionId(id: string, index: number): string {
+    return `${id}-${index}-description`;
   }
 
   public static formatTreeRowMissing(id: string): string {

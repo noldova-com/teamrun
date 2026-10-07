@@ -342,8 +342,8 @@ The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
     Up and Down move, Page Up and Page Down move by a view, Home and End go to the first and last row, and Enter or Space chooses.
     Unlike in the tree, typing does not find a row: most rows are not loaded, so the list cannot search them, and a module whose list needs that offers its own search.
   - A feed, such as a conversation, follows the [feed pattern](https://www.w3.org/WAI/ARIA/apg/patterns/feed/): each row is an article, named by an element inside it (`aria-labelledby`), such as its author and time, and optionally described by another (`aria-describedby`).
-    It is one Tab stop, which returns to the article last focused, or lands on the last article of a feed that follows its end, or on the first.
-    Page Down and Page Up, and Down and Up while the article itself has focus, move to the next and previous article; Home and End go to the first and last; Ctrl+Home and Ctrl+End move the focus to before and after the feed; Tab enters the article's own controls.
+    It is one Tab stop, which returns to the article last focused, or lands on the last article of a feed that follows its end, or else on the first loaded article in view, so entering it keeps the person's place.
+    Page Down and Page Up move to the next and previous article from anywhere in one; while the article itself has focus, Down and Up do too, and Home and End go to the first and last, so controls inside an article keep their keys; Ctrl+Home and Ctrl+End move the focus to before and after the feed; Tab enters the article's own controls.
 
   The focused row stays rendered and keeps the focus while the list scrolls, while it loads and while rows are added above it; when it is removed, the focus passes to the row after it, or before it at the end.
   Only rendered rows reach assistive technology and find-in-page, so a module whose long list needs searching offers its own search.

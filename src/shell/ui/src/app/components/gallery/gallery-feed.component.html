@@ -1,0 +1,26 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<tr-gallery-specimen [name]="text.virtualFeed" [size]="sizes.Wide">
+  <tr-gallery-cell [caption]="text.defaultState">
+    <div class="tr-gallery-feed">
+      <tr-virtual-list class="tr-gallery-feed-list" [kind]="kinds.Feed" [label]="text.virtualFeedLabel" [source]="messages">
+        <ng-template [trVirtualRow]="messages" let-message let-labelId="labelId">
+          <div class="tr-gallery-message">
+            <div class="tr-gallery-message-heading" [id]="labelId">{{ message.heading }}</div>
+            <p class="tr-gallery-message-text">{{ message.text }}</p>
+            @if (message.code; as code) {
+              <tr-code-block [language]="text.codeLanguage" [code]="code" />
+            }
+          </div>
+        </ng-template>
+      </tr-virtual-list>
+      <button type="button" tr-button [variant]="variants.Secondary" (click)="streamReply()">{{ text.virtualFeedStream }}</button>
+    </div>
+  </tr-gallery-cell>
+</tr-gallery-specimen>

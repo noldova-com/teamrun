@@ -15,8 +15,10 @@ import { VirtualListComponent } from "../../../../src/app/components/virtual-lis
 import { VirtualRowDirective } from "../../../../src/app/components/virtual-list/virtual-row.directive";
 import { ThemeMode } from "../../../../src/app/enums/theme-mode";
 import { VirtualListAlign } from "../../../../src/app/enums/virtual-list-align";
+import { VirtualListKind } from "../../../../src/app/enums/virtual-list-kind";
 import { ArrayVirtualListSource } from "../../../../src/app/models/array-virtual-list-source";
 import { DefaultTheme } from "../../../../src/app/models/default-theme";
+import { VirtualListPosition } from "../../../../src/app/models/virtual-list-position";
 import type { VirtualListSource } from "../../../../src/app/models/virtual-list-source";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import { VirtualListSourceFixture } from "../../../fixtures/virtual-list-source.fixture";
@@ -44,16 +46,40 @@ class VirtualListHostComponent {
   public readonly errors: unknown[] = [];
 }
 
+@Component({
+  imports: [VirtualListComponent, VirtualRowDirective],
+  template: `
+    <button type="button" class="before">Before</button>
+    <button type="button" class="off" disabled>Off</button>
+    <tr-virtual-list label="Messages" [kind]="kind" [source]="source()" [position]="position()" (activated)="activations.push($event.index)" (positionChange)="positions.push($event)">
+      <ng-template [trVirtualRow]="source()" [trVirtualRowDescribed]="true" let-item let-labelId="labelId" let-descriptionId="descriptionId">
+        <div class="message" [class.long]="item.startsWith('long')"><span class="label" [id]="labelId">{{ item }}</span> <span [id]="descriptionId">sent</span> <button type="button" class="reply">Reply</button>@if (item.startsWith('picture')) {<img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">}</div>
+      </ng-template>
+    </tr-virtual-list>
+    <button type="button" class="outside">Outside</button>
+  `,
+  styles: "tr-virtual-list { width: 200px; height: 300px; } .message { box-sizing: border-box; height: 26px; overflow: hidden; } .long { height: 200px; }"
+})
+class FeedHostComponent {
+  public readonly list = viewChild.required(VirtualListComponent);
+  public readonly kind: VirtualListKind = VirtualListKind.Feed;
+  public readonly source = signal<VirtualListSource<string>>(numbered(1000));
+  public readonly position = signal<VirtualListPosition | null>(null);
+  public readonly activations: number[] = [];
+  public readonly positions: VirtualListPosition[] = [];
+}
+
 describe("VirtualListComponent", () => {
-  let fixture: ComponentFixture<VirtualListHostComponent>;
+  let fixture: ComponentFixture<unknown>;
   let host: VirtualListHostComponent;
+  let feed: FeedHostComponent;
 
   async function settleAsync(): Promise<void> {
     let last = String.empty;
     for (let pass = 0; pass < 10; pass++) {
       await fixture.whenStable();
       await new Promise<void>(t => requestAnimationFrame(() => requestAnimationFrame(() => t())));
-      const shape = `${options().length} ${viewport().scrollHeight} ${viewport().scrollTop}`;
+      const shape = `${element().querySelectorAll("[data-tr-row]").length} ${viewport().scrollHeight} ${viewport().scrollTop}`;
       if (shape === last)
         return;
       last = shape;
@@ -62,9 +88,19 @@ describe("VirtualListComponent", () => {
 
   async function renderAsync(source: VirtualListSource<string> = numbered(1000), theme = DefaultTheme.theme, mode = ThemeMode.Light): Promise<void> {
     AppearanceFixture.apply(theme, mode);
-    fixture = TestBed.createComponent(VirtualListHostComponent);
-    host = fixture.componentInstance;
+    const created = TestBed.createComponent(VirtualListHostComponent);
+    fixture = created;
+    host = created.componentInstance;
     host.source.set(source);
+    await settleAsync();
+  }
+
+  async function renderFeedAsync(source: VirtualListSource<string> = numbered(1000), position: VirtualListPosition | null = null): Promise<void> {
+    const created = TestBed.createComponent(FeedHostComponent);
+    fixture = created;
+    feed = created.componentInstance;
+    feed.source.set(source);
+    feed.position.set(position);
     await settleAsync();
   }
 
@@ -92,9 +128,22 @@ describe("VirtualListComponent", () => {
   const focused = (): string | null | undefined => document.activeElement?.querySelector(".label")?.textContent;
   const focusedPlace = (): string | null | undefined => document.activeElement?.getAttribute("aria-posinset");
   const offsetOf = (label: string): number => option(label).getBoundingClientRect().top - viewport().getBoundingClientRect().top;
+  const offsetOfArticle = (label: string): number => article(label).getBoundingClientRect().top - viewport().getBoundingClientRect().top;
   const status = (): HTMLElement => element().querySelector(".tr-virtual-list-status") as HTMLElement;
   const failure = (): HTMLElement | null => element().querySelector(".tr-virtual-list-failure");
   const stops = (): string[] => options().filter(t => t.tabIndex === 0).map(t => t.getAttribute("aria-posinset") ?? String.empty);
+  const articles = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("[role=article]")];
+  const article = (label: string): HTMLElement => {
+    const found = articles().find(t => t.querySelector(".label")?.textContent === label);
+    if (Object.isUndefined(found))
+      throw new Error(`No article labelled ${label}.`);
+    return found;
+  };
+  const articleStops = (): string[] => articles().filter(t => t.tabIndex === 0).map(t => t.getAttribute("aria-posinset") ?? String.empty);
+  const jump = (): HTMLElement => element().querySelector(".tr-virtual-list-jump") as HTMLElement;
+  const isJumpShown = (): boolean => jump().classList.contains("tr-virtual-list-jump-shown");
+  const fromEnd = (): number => viewport().scrollHeight - viewport().clientHeight - viewport().scrollTop;
+  const focusedClass = (): string | undefined => document.activeElement?.className;
 
   afterEach(() => AppearanceFixture.reset());
 
@@ -282,6 +331,58 @@ describe("VirtualListComponent", () => {
     await settleAsync();
 
     expect([tops, viewport().scrollTop, focusedPlace()]).toEqual([[15_000, 14_865, 14_730, 29_700, 0], 0, null]);
+  });
+
+  it("keeps a waiting correction when a scroll event that moved nothing arrives before the next frame", async () => {
+    const source = numbered(1000);
+    await renderAsync(source);
+    await scrollAsync(3000);
+
+    source.insert(0, ["new 0", "new 1", "new 2"]);
+    viewport().dispatchEvent(new Event("scroll"));
+    await settleAsync();
+
+    expect([Math.round(offsetOf("item 100")), viewport().scrollTop]).toEqual([0, 3090]);
+  });
+
+  it("keeps a row at the height it had while its images load and decode, and lets it take its own height after", async () => {
+    const source = new ArrayVirtualListSource(["item 0", "long 1", "item 2"], t => t, 26);
+    await renderFeedAsync(source, new VirtualListPosition(0, null, 0));
+    let finish = (): void => undefined;
+    const decoded = new Promise<void>(t => {
+      finish = t;
+    });
+    const complete = vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(false);
+    const decode = vi.spyOn(HTMLImageElement.prototype, "decode").mockReturnValue(decoded);
+    const heightOf = (label: string): number => Math.round((article(label).parentElement as HTMLElement).getBoundingClientRect().height);
+
+    source.replace(1, ["picture 1"]);
+    await settleAsync();
+    const decoding = [heightOf("picture 1"), Math.round(offsetOfArticle("item 2")), decode.mock.calls.length];
+    complete.mockReturnValue(true);
+    finish();
+    await settleAsync();
+    complete.mockRestore();
+    decode.mockRestore();
+
+    expect([decoding, heightOf("picture 1"), Math.round(offsetOfArticle("item 2"))]).toEqual([[200, 226, 1], 26, 52]);
+  });
+
+  it("stops following a scroll towards the start made while a correction waits for the next frame, and tells where the person reads", async () => {
+    const source = numbered(1000);
+    await renderFeedAsync(source);
+
+    source.insert(1000, ["new 0"]);
+    viewport().scrollTop -= 300;
+    viewport().dispatchEvent(new Event("scroll"));
+    await settleAsync();
+    const top = viewport().getBoundingClientRect().top;
+    const reading = articles().find(t => t.getBoundingClientRect().bottom > top)?.querySelector(".label")?.textContent;
+    const position = feed.positions.at(-1);
+    source.insert(1001, ["new 1"]);
+    await settleAsync();
+
+    expect([isJumpShown(), fromEnd() > 250, position?.key]).toEqual([true, true, reading]);
   });
 
   it("follows a scroll made while a correction waits for the next frame", async () => {
@@ -472,6 +573,175 @@ describe("VirtualListComponent", () => {
     source.reportInserted(0, 1);
 
     expect(source.reads.every(t => t.abort.aborted)).toBe(true);
+  });
+
+  it("is a named feed of articles, each labelled and described by elements its template names, that opens at its end with its last article as the Tab stop", async () => {
+    await renderFeedAsync();
+    const last = article("item 999");
+
+    expect([listbox(), element().querySelector("[role=feed]")?.getAttribute("aria-label"), options().length]).toEqual([null, "Messages", 0]);
+    expect([document.getElementById(last.getAttribute("aria-labelledby") ?? String.empty)?.textContent, document.getElementById(last.getAttribute("aria-describedby") ?? String.empty)?.textContent]).toEqual(["item 999", "sent"]);
+    expect([last.getAttribute("aria-posinset"), last.getAttribute("aria-setsize"), last.hasAttribute("aria-selected"), Math.round(fromEnd()), articleStops(), isJumpShown()]).toEqual(["1000", "1000", false, 0, ["1000"], false]);
+  });
+
+  it("follows its end while rows are added or grow, keeping the distance it was scrolled to within the last 120px", async () => {
+    const source = numbered(1000);
+    await renderFeedAsync(source);
+
+    await scrollAsync(viewport().scrollTop - 50);
+    source.insert(1000, ["new 0", "new 1", "new 2"]);
+    await settleAsync();
+    const added = fromEnd();
+    source.replace(1002, [`${"long ".repeat(60)}new`]);
+    await settleAsync();
+
+    expect([Math.round(added), Math.round(fromEnd()), isJumpShown(), article("item 999").getAttribute("aria-setsize")]).toEqual([50, 50, false, "1003"]);
+  });
+
+  it("stops following a step towards the start beyond the last 120px, showing Jump to latest, and follows again within 120px of the end", async () => {
+    const source = numbered(1000);
+    await renderFeedAsync(source);
+
+    await scrollAsync(viewport().scrollTop - 300);
+    const reading = viewport().scrollTop;
+    source.insert(1000, ["new 0", "new 1"]);
+    await settleAsync();
+    const stopped = [Math.round(viewport().scrollTop) === Math.round(reading), isJumpShown()];
+    await scrollAsync(viewport().scrollHeight - viewport().clientHeight - 100);
+    source.insert(1002, ["new 2"]);
+    await settleAsync();
+
+    expect([stopped, Math.round(fromEnd()), isJumpShown()]).toEqual([[true, true], 100, false]);
+  });
+
+  it("follows again once its newest rows load while its view is within 120px of the end, without another scroll", async () => {
+    const source = new VirtualListSourceFixture(200, 30);
+    await renderFeedAsync(source, new VirtualListPosition(150, null, 0));
+    const opened = isJumpShown();
+
+    await scrollAsync(viewport().scrollHeight);
+    const unloaded = isJumpShown();
+    for (const read of source.reads.filter(t => !t.abort.aborted && !t.isSettled))
+      await read.answerAsync();
+    await settleAsync();
+
+    expect([opened, unloaded, isJumpShown(), articleStops()]).toEqual([true, true, false, ["200"]]);
+  });
+
+  it("follows its end when it opens at a saved position within 120px of it", async () => {
+    const source = numbered(1000);
+    await renderFeedAsync(source, new VirtualListPosition(987, null, 0));
+    const opened = Math.round(fromEnd());
+
+    source.insert(1000, ["new 0"]);
+    await settleAsync();
+
+    expect([isJumpShown(), Math.round(fromEnd()) === opened, articleStops()]).toEqual([false, true, ["1001"]]);
+  });
+
+  it("scrolls to its end, follows it and focuses the last article when Jump to latest is chosen", async () => {
+    await renderFeedAsync();
+    await scrollAsync(1000);
+
+    await userEvent.click(jump());
+    await settleAsync();
+
+    expect([Math.round(fromEnd()), isJumpShown(), document.activeElement === article("item 999")]).toEqual([0, false, true]);
+  });
+
+  it("opens at a saved position, finding its row by key once rows were added before it, or by its index when the key is gone", async () => {
+    const shifted = new ArrayVirtualListSource(["new 0", "new 1", "new 2", ...Array.from({ length: 1000 }, (_, t) => `item ${t}`)], t => t, 30);
+    await renderFeedAsync(shifted, new VirtualListPosition(497, "item 497", 10));
+    const byKey = [Math.round(offsetOfArticle("item 497")), isJumpShown(), articleStops()];
+
+    await renderFeedAsync(numbered(1000), new VirtualListPosition(300, "gone", 0));
+    const byIndex = Math.round(offsetOfArticle("item 300"));
+
+    expect([byKey, byIndex]).toEqual([[-10, true, ["501"]], 0]);
+  });
+
+  it("emits where the person reads as they scroll, with the key of the row at the top when it has loaded", async () => {
+    const source = new VirtualListSourceFixture(200, 30);
+    await renderFeedAsync(source, new VirtualListPosition(0, null, 0));
+    await source.readAt(0).answerAsync();
+    await settleAsync();
+
+    await scrollAsync(45);
+    await scrollAsync(3000);
+
+    const [first, second] = feed.positions;
+
+    expect([feed.positions.length, first?.index, first?.key, Math.round(first?.distance ?? 0), (second?.index ?? 0) > 90, second?.key]).toEqual([2, 1, "item 1", 19, true, null]);
+  });
+
+  it("keeps the first loaded row in view in place while the rows above it in view load, and emits it as where the person reads", async () => {
+    const source = new VirtualListSourceFixture(200, 30);
+    const answerAsync = async (start: number, items?: readonly string[]): Promise<void> => {
+      await source.reads.find(t => t.start === start)?.answerAsync(items);
+      await settleAsync();
+    };
+    await renderFeedAsync(source, new VirtualListPosition(150, null, 0));
+    await answerAsync(150);
+
+    await scrollAsync(viewport().scrollTop - 40);
+    const before = Math.round(offsetOfArticle("item 150"));
+    await answerAsync(100, Array.from({ length: 50 }, (_, t) => `${t === 48 ? "long" : "item"} ${100 + t}`));
+    const position = feed.positions.at(-1);
+
+    expect([before, Math.round(offsetOfArticle("item 150")), position?.index, position?.key, Math.round(position?.distance ?? 0)]).toEqual([40, 40, 150, "item 150", -40]);
+  });
+
+  it("moves between articles with Page Up and Page Down from anywhere in one, and with the arrows, Home and End on the article itself", async () => {
+    await renderFeedAsync(numbered(50));
+    feed.list().focus();
+    await settleAsync();
+    const start = focusedPlace();
+
+    await pressAsync("{PageUp}");
+    await pressAsync("{ArrowUp}");
+    const up = focusedPlace();
+    await pressAsync("{ArrowDown}");
+    const down = focusedPlace();
+    (document.activeElement?.querySelector(".reply") as HTMLElement).focus();
+    await pressAsync("{ArrowUp}{Home}{Enter}");
+    const inside = [focusedClass(), focusedPlace()];
+    await pressAsync("{PageUp}");
+    const paged = focusedPlace();
+    await pressAsync("{PageDown}{Home}");
+    const home = [focusedPlace(), isJumpShown()];
+    await pressAsync("{End}");
+
+    expect([start, up, down, inside, paged, home, focusedPlace(), isJumpShown(), feed.activations]).toEqual(["50", "48", "49", ["reply", null], "48", ["1", true], "50", false, []]);
+  });
+
+  it("moves the focus before and after the feed with Ctrl+Home and Ctrl+End, past what can't take it, and leaves other keys with a modifier", async () => {
+    await renderFeedAsync(numbered(50));
+    feed.list().focus();
+    await settleAsync();
+    const press = (key: string, init: KeyboardEventInit = {}): boolean =>
+      (document.activeElement as HTMLElement).dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }));
+
+    const ignored = [press("PageUp", { altKey: true }), press("PageUp", { metaKey: true }), press("PageUp", { shiftKey: true }), press("a", { ctrlKey: true }), focusedPlace()];
+    press("Home", { ctrlKey: true });
+    const before = focusedClass();
+    feed.list().focus();
+    await settleAsync();
+    press("End", { ctrlKey: true });
+    const after = focusedClass();
+    feed.list().focus();
+    await settleAsync();
+    (element().querySelector(".before") as HTMLElement).hidden = true;
+    press("Home", { ctrlKey: true });
+
+    expect([ignored, before, after, focusedPlace()]).toEqual([[true, true, true, true, "50"], "before", "outside", "50"]);
+  });
+
+  it("chooses nothing when an article is clicked", async () => {
+    await renderFeedAsync(numbered(5));
+
+    await userEvent.click(article("item 4"));
+
+    expect(feed.activations).toEqual([]);
   });
 
   for (const mode of AppearanceFixture.modes)

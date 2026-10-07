@@ -18,26 +18,33 @@ import "@noldova/teamrun-foundation-core";
 import { Resources } from "../../../resources";
 import { ButtonVariant } from "../../enums/button-variant";
 import { VirtualListAlign } from "../../enums/virtual-list-align";
+import { VirtualListKind } from "../../enums/virtual-list-kind";
 import type { IVirtualListObserver } from "../../interfaces/i-virtual-list-observer";
 import { VirtualListAnchor } from "../../models/virtual-list-anchor";
 import { VirtualListChoice } from "../../models/virtual-list-choice";
 import { VirtualListGap } from "../../models/virtual-list-gap";
+import { VirtualListPosition } from "../../models/virtual-list-position";
 import { VirtualListRow } from "../../models/virtual-list-row";
 import type { VirtualListSource } from "../../models/virtual-list-source";
 import { VirtualListState } from "../../models/virtual-list-state";
 import type { VirtualRange } from "../../models/virtual-range";
 import { ButtonComponent } from "../button/button.component";
 import { FieldMessageComponent } from "../field-message/field-message.component";
+import { IconButtonComponent } from "../icon-button/icon-button.component";
+import { TooltipDirective } from "../tooltip/tooltip.directive";
 import { VirtualRowDirective } from "./virtual-row.directive";
 
 @Component({
   selector: "tr-virtual-list",
-  imports: [ButtonComponent, FieldMessageComponent, NgTemplateOutlet],
+  imports: [ButtonComponent, FieldMessageComponent, IconButtonComponent, NgTemplateOutlet, TooltipDirective],
   templateUrl: "./virtual-list.component.html",
   styleUrl: "./virtual-list.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class VirtualListComponent<T> {
+  private static count: number = 0;
+
+  private readonly id: string = `${Resources.virtualListIdPrefix}${VirtualListComponent.count++}`;
   private readonly document: Document = inject(DOCUMENT);
   private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly viewport: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("viewport");
@@ -45,6 +52,7 @@ export class VirtualListComponent<T> {
   private readonly slots: Signal<readonly ElementRef<HTMLElement>[]> = viewChildren<ElementRef<HTMLElement>>("slot");
   private readonly observer: ResizeObserver = new ResizeObserver(t => this.measure(t));
   private readonly observed: Set<Element> = new Set();
+  private readonly reserved: WeakSet<HTMLElement> = new WeakSet();
   private readonly follower: IVirtualListObserver = {
     onInserted: (at, count) => this.inserted(at, count),
     onRemoved: (at, count) => this.removed(at, count),
@@ -63,13 +71,16 @@ export class VirtualListComponent<T> {
     return this.isFocused() && !Object.isNull(focus) && Object.isUndefined(cache.itemAt(focus)) && !cache.isFailed(focus);
   });
   private anchor: VirtualListAnchor = new VirtualListAnchor(0, 0);
+  private endDistance: number = 0;
   private pendingTop: number | null = null;
   private domTop: number = 0;
   private isFocusPending: boolean = false;
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly variants: typeof ButtonVariant = ButtonVariant;
+  protected readonly isFollowing: WritableSignal<boolean> = signal(false);
   protected readonly rowTemplate: Signal<VirtualRowDirective<T>> = contentChild.required<VirtualRowDirective<T>>(VirtualRowDirective);
+  protected readonly isFeed: Signal<boolean> = computed(() => this.kind() === VirtualListKind.Feed);
   protected readonly state: Signal<VirtualListState<T>> = computed(() => {
     const source = this.source();
     return untracked(() => new VirtualListState(source, t => this.failed.emit(t)));
@@ -77,9 +88,7 @@ export class VirtualListComponent<T> {
   protected readonly range: Signal<VirtualRange> = computed(() => this.rangeFor(Resources.virtualListOverscan), { equal: (a, b) => a.equals(b) });
   protected readonly stop: Signal<number | null> = computed(() => {
     const count = this.state().source.length();
-    const selected = this.selected() ?? -1;
-    const fallback = selected >= 0 && selected < count ? selected : 0;
-    return count === 0 ? null : Math.min(this.focusIndex() ?? fallback, count - 1);
+    return count === 0 ? null : Math.min(this.focusIndex() ?? this.restingStop(count), count - 1);
   });
   protected readonly rows: Signal<readonly VirtualListRow<T>[]> = computed(() => {
     const { source, ledger, cache } = this.state();
@@ -95,7 +104,7 @@ export class VirtualListComponent<T> {
       const item = cache.itemAt(index);
       const key = Object.isUndefined(item) ? undefined : source.keyOf(item);
       const top = index < range.start || index >= range.end ? ledger.offsetOf(index) : null;
-      return new VirtualListRow(index, item, key, top, ledger.heightOf(index), index === stop, index === selected);
+      return new VirtualListRow(this.id, index, item, key, top, ledger.heightOf(index), index === stop, index === selected);
     });
   });
   protected readonly gap: Signal<VirtualListGap | null> = computed(() => {
@@ -114,8 +123,11 @@ export class VirtualListComponent<T> {
 
   public readonly source = input.required<VirtualListSource<T>>();
   public readonly label = input.required<string>();
+  public readonly kind = input<VirtualListKind>(VirtualListKind.Options);
   public readonly selected = input<number | null>(null);
+  public readonly position = input<VirtualListPosition | null>(null);
   public readonly activated = output<VirtualListChoice<T>>();
+  public readonly positionChange = output<VirtualListPosition>();
   public readonly failed = output<unknown>();
 
   public constructor() {
@@ -140,6 +152,14 @@ export class VirtualListComponent<T> {
       });
     });
     effect(() => {
+      this.state().cache.revision();
+      untracked(() => {
+        this.resolve();
+        if (!this.isFollowing())
+          this.follow(this.state().ledger.total - this.viewHeight() - this.scrollTop());
+      });
+    });
+    effect(() => {
       if (this.isFailing())
         void this.announcer.announce(Resources.virtualListFailed, Resources.assertiveAnnouncement);
     });
@@ -159,19 +179,29 @@ export class VirtualListComponent<T> {
   public reveal(index: number, align: VirtualListAlign): void {
     const count = this.state().source.length();
     if (count > 0)
-      this.scrollTo(this.alignedTop(Math.min(Math.max(0, index), count - 1), align));
+      this.show(Math.min(Math.max(0, index), count - 1), align);
   }
 
   protected onScroll(): void {
-    const top = this.viewport().nativeElement.scrollTop;
+    const viewport = this.viewport().nativeElement;
+    const top = viewport.scrollTop;
     const moved = top - this.domTop;
     this.domTop = top;
     if (!Object.isNull(this.pendingTop)) {
-      this.scrollTo(this.pendingTop + moved);
+      if (moved !== 0) {
+        const target = this.pendingTop + moved;
+        this.follow(this.state().ledger.total - this.viewHeight() - target);
+        this.scrollTo(target);
+        this.tell();
+      }
       return;
     }
-    this.anchor = this.state().ledger.anchorAt(top);
+    if (Math.abs(top - this.scrollTop()) < 1)
+      return;
+    this.follow(viewport.scrollHeight - viewport.clientHeight - top);
+    this.anchor = this.anchorAt(top);
     this.scrollTop.set(top);
+    this.tell();
   }
 
   protected enter(index: number): void {
@@ -189,29 +219,70 @@ export class VirtualListComponent<T> {
   }
 
   protected press(event: KeyboardEvent, index: number): void {
+    const from = this.focusIndex() ?? index;
+    if (this.isFeed()) {
+      this.pressInFeed(event, from);
+      return;
+    }
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
       return;
-    const from = this.focusIndex() ?? index;
     if (event.key === Resources.enterKey || event.key === Resources.spaceKey) {
       event.preventDefault();
       this.choose(from);
       return;
     }
-    const to = this.targetOf(event.key, from);
+    this.go(event, this.targetOf(event.key, from));
+  }
+
+  protected choose(index: number): void {
+    const item = this.state().cache.itemAt(index);
+    if (!this.isFeed() && !Object.isUndefined(item))
+      this.activated.emit(new VirtualListChoice(index, item));
+  }
+
+  protected retry(): void {
+    this.state().cache.retry();
+  }
+
+  protected jump(): void {
+    this.endDistance = 0;
+    this.isFollowing.set(true);
+    this.scrollTo(this.targetTop());
+    this.focusIndex.set(null);
+    this.isFocusPending = true;
+  }
+
+  private pressInFeed(event: KeyboardEvent, from: number): void {
+    if (event.altKey || event.metaKey || event.shiftKey)
+      return;
+    if (event.ctrlKey) {
+      if (event.key === Resources.homeKey || event.key === Resources.endKey) {
+        event.preventDefault();
+        this.focusBeside(event.key === Resources.endKey);
+      }
+      return;
+    }
+    if (event.key === Resources.pageDownKey || event.key === Resources.pageUpKey)
+      this.go(event, event.key === Resources.pageDownKey ? from + 1 : from - 1);
+    else if (event.target === event.currentTarget)
+      this.go(event, this.targetOf(event.key, from));
+  }
+
+  private go(event: KeyboardEvent, to: number | null): void {
     if (Object.isNull(to))
       return;
     event.preventDefault();
     this.moveTo(Math.min(Math.max(0, to), this.state().source.length() - 1));
   }
 
-  protected choose(index: number): void {
-    const item = this.state().cache.itemAt(index);
-    if (!Object.isUndefined(item))
-      this.activated.emit(new VirtualListChoice(index, item));
-  }
-
-  protected retry(): void {
-    this.state().cache.retry();
+  private focusBeside(isAfter: boolean): void {
+    const list = this.list().nativeElement;
+    const tabbable = [...this.document.querySelectorAll<HTMLElement>(Resources.virtualListTabbableSelector)]
+      .filter(t => t.tabIndex >= 0 && !list.contains(t) && !t.matches(":disabled") && t.checkVisibility({ visibilityProperty: true }));
+    const target = isAfter
+      ? tabbable.find(t => (list.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
+      : tabbable.findLast(t => (list.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_PRECEDING) !== 0);
+    target?.focus();
   }
 
   private inserted(at: number, count: number): void {
@@ -235,10 +306,47 @@ export class VirtualListComponent<T> {
   }
 
   private reset(): void {
-    this.anchor = new VirtualListAnchor(0, 0);
+    const { source, ledger } = this.state();
+    const position = this.isFeed() ? this.position() : null;
+    const anchor = Object.isNull(position)
+      ? new VirtualListAnchor(0, 0)
+      : new VirtualListAnchor(Math.min(Math.max(0, position.index), Math.max(0, source.length() - 1)), position.distance, position.key);
+    this.isFollowing.set(this.isFeed() && Object.isNull(position));
+    this.endDistance = 0;
     this.focusIndex.set(null);
-    this.scrollTo(0);
+    this.scrollTo(this.isFollowing() ? this.targetTop() : ledger.topOf(anchor));
+    this.anchor = anchor;
     this.layout.update(t => t + 1);
+  }
+
+  private resolve(): void {
+    const { source, cache } = this.state();
+    if (Object.isNull(this.anchor.key) || Object.isUndefined(cache.itemAt(this.anchor.index)))
+      return;
+    const { index, distance } = this.anchor.resolve(t => cache.findIndex(item => source.keyOf(item) === t));
+    const isMoved = index !== this.anchor.index;
+    this.anchor = new VirtualListAnchor(index, distance);
+    if (isMoved)
+      this.correct();
+  }
+
+  private follow(distance: number): void {
+    if (!this.isFeed())
+      return;
+    const { source, cache } = this.state();
+    const isNear = distance <= Resources.virtualListFollowDistance;
+    if (this.isFollowing() && !isNear)
+      this.isFollowing.set(false);
+    else if (!this.isFollowing() && isNear && !Object.isUndefined(cache.itemAt(source.length() - 1)))
+      this.isFollowing.set(true);
+    if (this.isFollowing())
+      this.endDistance = Math.max(0, distance);
+  }
+
+  private tell(): void {
+    const { source, cache } = this.state();
+    const item = cache.itemAt(this.anchor.index);
+    this.positionChange.emit(new VirtualListPosition(this.anchor.index, Object.isUndefined(item) ? null : source.keyOf(item), this.anchor.distance));
   }
 
   private rangeFor(margin: number): VirtualRange {
@@ -266,6 +374,11 @@ export class VirtualListComponent<T> {
     }
   }
 
+  private targetTop(): number {
+    const { ledger } = this.state();
+    return this.isFollowing() ? Math.max(0, ledger.total - this.viewHeight() - this.endDistance) : ledger.topOf(this.anchor);
+  }
+
   private alignedTop(index: number, align: VirtualListAlign): number {
     const { ledger } = this.state();
     return Math.min(Math.max(0, this.wantedTop(index, align)), Math.max(0, ledger.total - this.viewHeight()));
@@ -285,24 +398,52 @@ export class VirtualListComponent<T> {
       case VirtualListAlign.End:
         return bottom - view;
       default:
-        return top < scrollTop ? top : Math.max(scrollTop, bottom - view);
+        return top < scrollTop ? top : Math.max(scrollTop, Math.min(top, bottom - view));
     }
   }
 
+  private show(index: number, align: VirtualListAlign): void {
+    const top = this.alignedTop(index, align);
+    this.follow(this.state().ledger.total - this.viewHeight() - top);
+    this.scrollTo(top);
+  }
+
   private moveTo(index: number): void {
-    this.scrollTo(this.alignedTop(index, VirtualListAlign.Nearest));
+    this.show(index, VirtualListAlign.Nearest);
     this.focusIndex.set(index);
     this.isFocusPending = true;
   }
 
   private scrollTo(top: number): void {
     this.pendingTop = top;
-    this.anchor = this.state().ledger.anchorAt(top);
+    this.anchor = this.anchorAt(top);
     this.scrollTop.set(top);
   }
 
+  private restingStop(count: number): number {
+    if (!this.isFeed()) {
+      const selected = this.selected() ?? -1;
+      return selected >= 0 && selected < count ? selected : 0;
+    }
+    if (this.isFollowing())
+      return count - 1;
+    this.state().cache.revision();
+    this.layout();
+    return this.anchorAt(this.scrollTop()).index;
+  }
+
+  private anchorAt(top: number): VirtualListAnchor {
+    const { ledger, cache } = this.state();
+    const anchor = ledger.anchorAt(top);
+    const end = top + this.viewHeight();
+    for (let index = anchor.index; index < ledger.count && ledger.offsetOf(index) < end; index++)
+      if (!Object.isUndefined(cache.itemAt(index)))
+        return index === anchor.index ? anchor : new VirtualListAnchor(index, top - ledger.offsetOf(index));
+    return anchor;
+  }
+
   private correct(): void {
-    this.scrollTo(this.state().ledger.topOf(this.anchor));
+    this.scrollTo(this.targetTop());
     this.layout.update(t => t + 1);
   }
 
@@ -324,7 +465,7 @@ export class VirtualListComponent<T> {
     }
     if (!isChanged)
       return;
-    const top = ledger.topOf(this.anchor);
+    const top = this.targetTop();
     viewport.scrollTop = top;
     this.domTop = viewport.scrollTop;
     this.pendingTop = top;
@@ -335,19 +476,35 @@ export class VirtualListComponent<T> {
   private settle(): void {
     const viewport = this.viewport().nativeElement;
     this.observe([viewport, ...this.slots().map(t => t.nativeElement)]);
+    this.reserve();
     if (!Object.isNull(this.pendingTop)) {
       viewport.scrollTop = this.pendingTop;
       this.domTop = viewport.scrollTop;
       this.pendingTop = null;
     }
-    const focus = this.focusIndex();
-    if (Object.isNull(focus))
+    const stop = this.stop();
+    if (Object.isNull(stop))
       return;
-    const option = viewport.querySelector<HTMLElement>(Resources.formatVirtualListOptionSelector(focus));
-    if (Object.isNull(option) || !(this.isFocusPending || this.isFocused() && !option.contains(this.document.activeElement)))
+    const row = viewport.querySelector<HTMLElement>(Resources.formatVirtualListRowSelector(stop));
+    if (Object.isNull(row) || !(this.isFocusPending || this.isFocused() && !row.contains(this.document.activeElement)))
       return;
     this.isFocusPending = false;
-    option.focus({ preventScroll: true });
+    row.focus({ preventScroll: true });
+  }
+
+  private reserve(): void {
+    const { ledger } = this.state();
+    for (const { nativeElement: slot } of this.slots()) {
+      const images = [...slot.getElementsByTagName(Resources.virtualListImageTag)].filter(t => !t.complete);
+      if (images.length === 0 || this.reserved.has(slot))
+        continue;
+      this.reserved.add(slot);
+      slot.style.minHeight = `${ledger.heightOf(Number(slot.getAttribute(Resources.virtualListRowAttribute)))}px`;
+      void Promise.allSettled(images.map(t => t.decode())).then(() => {
+        slot.style.minHeight = String.empty;
+        this.reserved.delete(slot);
+      });
+    }
   }
 
   private observe(elements: readonly Element[]): void {
