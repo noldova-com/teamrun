@@ -973,6 +973,7 @@ export class DesktopApplicationTests {
       const event = DesktopStartFixture.trustedEvent(process.platform);
       const connection = launcher.connections[0];
       await Condition.waitAsync(() => connection?.calls.includes("shell.readWindowBounds") === true);
+      connection?.answers.set("shell.writeWindowBounds", Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
 
       window.bounds = { x: 40, y: 60, width: 900, height: 640 };
       window.change("move");
@@ -993,6 +994,9 @@ export class DesktopApplicationTests {
       Assert.areEqual(
         JSON.stringify(["shell.writeWindowBounds", "shell.updateSaved"]),
         JSON.stringify(connection?.calls.filter(t => t === "shell.writeWindowBounds" || t === "shell.updateSaved")));
+      Assert.areEqual(
+        JSON.stringify(["The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds: The database is busy."]),
+        JSON.stringify(DesktopStartFixture.readErrors(desktop, "The window's bounds could not be saved")));
       Assert.areEqual(desktop.programs.starts.length, desktop.programs.stops);
     }
     finally {
