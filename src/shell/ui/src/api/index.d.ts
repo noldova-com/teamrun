@@ -4618,7 +4618,8 @@ export declare class VirtualListChoice<T> {
  * after the feed, and Tab enters an article's own controls. It is one Tab
  * stop, which returns to the article last focused, or lands on the last
  * article while it follows its end, or else on the first loaded article in
- * view, where the person reads.
+ * view, or the article at the top while none in view has loaded, where the
+ * person reads.
  *
  * While rows in view load, either kind says so in a status line, and
  * announces it while the focused row waits for its items; when a read

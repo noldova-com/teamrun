@@ -23,6 +23,10 @@ on:
         description: A local update feed for a native update check, such as http://127.0.0.1:47325/, which the packages name instead of the production feed. Only a loopback HTTP URL.
         type: string
         default: ''
+      version:
+        description: A product version for a native update check, such as 0.0.2, which the packages carry instead of the root manifest's. Only X.Y.Z, newer than the root manifest's.
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -196,6 +200,7 @@ jobs:
         env:
           SIGNED: ${{ matrix.signed }}
           UPDATE_FEED: ${{ inputs.update-feed }}
+          PACKAGE_VERSION: ${{ inputs.version }}
           AZURE_TENANT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_TENANT_ID || '' }}
           AZURE_CLIENT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_ID || '' }}
           AZURE_CLIENT_SECRET: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_SECRET || '' }}
@@ -215,6 +220,23 @@ jobs:
               exit 1
             fi
             options+=(--update-feed "$UPDATE_FEED")
+          fi
+          if [ -n "$PACKAGE_VERSION" ]; then
+            current=$(npm pkg get version)
+            current=${current//\"/}
+            next=''
+            previous=''
+            if [[ "$PACKAGE_VERSION" =~ ^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$ ]]; then
+              printf -v next '%09d%09d%09d' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}"
+            fi
+            if [[ "$current" =~ ^([0-9]{1,9})\.([0-9]{1,9})\.([0-9]{1,9})$ ]]; then
+              printf -v previous '%09d%09d%09d' $((10#${BASH_REMATCH[1]})) $((10#${BASH_REMATCH[2]})) $((10#${BASH_REMATCH[3]}))
+            fi
+            if [ -z "$next" ] || [ -z "$previous" ] || ! [[ "$next" > "$previous" ]]; then
+              echo "::error::The version must be X.Y.Z and newer than the root manifest's $current, not $PACKAGE_VERSION."
+              exit 1
+            fi
+            npm pkg set "version=$PACKAGE_VERSION"
           fi
           if [ ${#options[@]} -eq 0 ]; then
             npm run package
