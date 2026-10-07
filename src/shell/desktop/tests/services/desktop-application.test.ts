@@ -2230,18 +2230,21 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async stopsCheckingForUpdatesWhenQuitting(): Promise<void> {
-    const updater = new FakeUpdater();
-    const files = new FakeDeviceFiles();
-    const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), updater, files);
-    await Condition.waitAsync(() => files.updateReady.reads === 1);
-    await setImmediate();
+  public stopsCheckingForUpdatesWhenQuitting(): Promise<void> {
+    return DesktopApplicationTests.withReadyFileAsync(async record => {
+      const updater = new FakeUpdater(String(record["file"]));
+      const files = new FakeDeviceFiles();
+      files.updateReady.kept = record;
+      const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), updater, files);
+      const trusted = DesktopStartFixture.trustedEvent("linux");
+      await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "kind") === "Ready");
 
-    electron.app.emit("will-quit");
-    const acted = electron.ipcMain.invoke("teamrun:updateAction", DesktopStartFixture.trustedEvent("linux"), "Check");
+      electron.app.emit("will-quit");
+      const acted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Check");
 
-    Assert.isFalse(acted as boolean);
-    Assert.areEqual(0, updater.checks);
+      Assert.isFalse(acted as boolean);
+      Assert.areEqual(0, updater.checks);
+    });
   }
 
   @TestMethod
