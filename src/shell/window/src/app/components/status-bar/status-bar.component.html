@@ -15,6 +15,9 @@ LICENSE file in the root directory of this source tree.
   @for (item of bars.rightItems(); track item.name) {
     <tr-status-bar-item [item]="item" />
   }
+  @if (updates.state().showsItem) {
+    <tr-update-item />
+  }
   <tr-notifications />
   <tr-module-failures />
 </div>
