@@ -6,17 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Locator, Page } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import TabDragFixture from "./fixtures/tab-drag.fixture.ts";
 
-function dock(window: Page): Locator {
-  return window.locator("tr-dock[data-side=Left]");
-}
-
-async function widthAsync(window: Page): Promise<number> {
-  return (await dock(window).boundingBox())?.width ?? 0;
+async function edgeAsync(sash: Locator): Promise<number> {
+  return (await sash.boundingBox())?.x ?? 0;
 }
 
 test("a panel divider's drag ends when the button is released over the title bar, outside the window or where the window never sees it, and later moves resize nothing", async ({ desktop }) => {
@@ -44,18 +40,18 @@ test("a panel divider's drag ends when the button is released over the title bar
 
   for (const [name, releaseAsync] of releases) {
     const grip = await TabDragFixture.centerOfAsync(sash);
-    const before = await widthAsync(window);
+    const before = await edgeAsync(sash);
     await window.mouse.move(grip.x, grip.y);
     await window.mouse.down();
     await window.mouse.move(grip.x + 30, grip.y, { steps: 6 });
-    await expect.poll(() => widthAsync(window)).toBeGreaterThan(before + 20);
+    await expect.poll(() => edgeAsync(sash)).toBeGreaterThan(before + 20);
     await releaseAsync(grip.x + 30, grip.y);
-    const released = await widthAsync(window);
+    const released = await edgeAsync(sash);
     await window.mouse.move(away.x, away.y, { steps: 8 });
     await window.mouse.move(grip.x - 20, grip.y, { steps: 12 });
     await window.mouse.move(away.x, away.y, { steps: 12 });
     await expect(sash).not.toHaveClass(/tr-sash-active/);
-    outcomes.push(`${name}: ${Math.abs(await widthAsync(window) - released) < 1}`);
+    outcomes.push(`${name}: ${Math.abs(await edgeAsync(sash) - released) < 1}`);
   }
   await window.mouse.up();
   await session.detach();
