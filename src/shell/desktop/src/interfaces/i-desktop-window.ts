@@ -22,6 +22,7 @@ export interface IDesktopWindow {
   getNormalBounds(): Rectangle;
   setBounds(bounds: Partial<Rectangle>): void;
   isMaximized(): boolean;
+  isFullScreen(): boolean;
   maximize(): void;
   isVisible(): boolean;
   isDestroyed(): boolean;
@@ -38,6 +39,8 @@ export interface IDesktopWindow {
   on(event: "will-resize", listener: () => void): unknown;
   on(event: "maximize", listener: () => void): unknown;
   on(event: "unmaximize", listener: () => void): unknown;
+  on(event: "enter-full-screen", listener: () => void): unknown;
+  on(event: "leave-full-screen", listener: () => void): unknown;
   on(event: "unresponsive", listener: () => void): unknown;
   on(event: "responsive", listener: () => void): unknown;
   once(event: "closed", listener: () => void): unknown;

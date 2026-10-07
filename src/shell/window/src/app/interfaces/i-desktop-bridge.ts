@@ -48,6 +48,8 @@ export interface IDesktopBridge {
   answerQuit(choice: string): Promise<boolean>;
   readTrayAvailable(): Promise<unknown>;
   onTrayAvailable(listener: (isAvailable: unknown) => void): () => void;
+  readFullScreen(): Promise<unknown>;
+  onFullScreen(listener: (isFullScreen: unknown) => void): () => void;
   logModule(moduleId: string, message: string): void;
   logError(moduleId: string | null, text: string): void;
 }

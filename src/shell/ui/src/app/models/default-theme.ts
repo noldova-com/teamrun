@@ -232,7 +232,6 @@ export class DefaultTheme {
       ["window-row-height", "calc(var(--tr-icon-button-target) + 2 * var(--tr-band-gap))"],
       ["status-bar-height", "1.5rem"],
       ["status-bar-item-height", "1.25rem"],
-      ["status-bar-inset", "0.5rem"],
       ["status-bar-item-gap", "0.25rem"],
       ["button-height", "1.625rem"],
       ["button-padding", "0.5rem"],

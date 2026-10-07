@@ -231,7 +231,6 @@ export class FixtureTheme {
     ["field-padding", "0.5rem"],
     ["window-row-height", "2.5rem"],
     ["status-bar-height", "2rem"],
-    ["status-bar-inset", "0.75rem"],
     ["status-bar-item-height", "1.125rem"],
     ["status-bar-item-gap", "0.375rem"],
     ["button-height", "1.875rem"],

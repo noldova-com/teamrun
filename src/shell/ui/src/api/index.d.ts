@@ -2527,7 +2527,9 @@ export declare class OverlayBoundsService {
    * heights for them, and within the window's sides, each a gap in. An
    * origin inside the top row or the status bar, which carry
    * `data-tr-chrome`, may also cover that bar, up to a gap from the window's
-   * edge.
+   * edge, and reach the panels' outer edges at the sides, the theme's
+   * `panel-card-margin` look in, so the overlay can end where the bar's
+   * outer controls end.
    *
    * @param origin The element the overlay opens against.
    * @returns The bounds, in viewport CSS pixels, measured anew on each call.

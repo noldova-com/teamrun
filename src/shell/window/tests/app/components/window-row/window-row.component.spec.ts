@@ -159,7 +159,7 @@ describe("WindowRowComponent", () => {
     expect(row.classList.contains("tr-window-row-mac")).toBe(false);
     expect(row.getAttribute("data-tr-chrome")).toBe("top");
     expect(style.getPropertyValue("app-region")).toBe("drag");
-    expect(style.paddingLeft).toBe("0px");
+    expect(style.paddingLeft).toBe(`${AppearanceFixture.toPixels(0.25)}px`);
     expect(style.paddingRight).toBe("0px");
   });
 
@@ -201,14 +201,45 @@ describe("WindowRowComponent", () => {
     expect(bridge.changes[1]?.["titleBar"]).toBe(AppearanceFixture.readColor(FixtureTheme.theme, ThemeMode.Dark, "titleBar.activeBackground"));
   });
 
-  it("leaves the traffic lights' space free on macOS", () => {
+  it("leaves the traffic lights' space free on macOS and ends at the panels' edge on the right", () => {
     DesktopBridgeFixture.install("darwin");
     apply();
 
     const row = render();
+    const style = getComputedStyle(row);
 
     expect(row.classList.contains("tr-window-row-mac")).toBe(true);
-    expect(getComputedStyle(row).paddingLeft).toBe("78px");
+    expect([style.paddingLeft, style.paddingRight]).toEqual(["78px", `${AppearanceFixture.toPixels(0.25)}px`]);
+  });
+
+  it("starts at the panels' edge in full screen on macOS, where the traffic lights hide, and leaves their space free again after", async () => {
+    const bridge = DesktopBridgeFixture.install("darwin");
+    bridge.fullScreen = Promise.resolve(true);
+    apply();
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    await fixture.whenStable();
+    const row = fixture.nativeElement as HTMLElement;
+    const opened = getComputedStyle(row).paddingLeft;
+
+    bridge.changeFullScreen(false);
+    await fixture.whenStable();
+    const left = getComputedStyle(row).paddingLeft;
+    bridge.changeFullScreen(true);
+    await fixture.whenStable();
+
+    expect([opened, left, getComputedStyle(row).paddingLeft]).toEqual([`${AppearanceFixture.toPixels(0.25)}px`, "78px", `${AppearanceFixture.toPixels(0.25)}px`]);
+  });
+
+  it("reports a failed read of the full-screen state and keeps the traffic lights' space", async () => {
+    const bridge = DesktopBridgeFixture.install("darwin");
+    bridge.fullScreen = Promise.reject(new Error("The desktop went away."));
+    const handled: unknown[] = [];
+    TestBed.configureTestingModule({ providers: [{ provide: ErrorHandler, useValue: { handleError: (error: unknown) => handled.push(error) } }] });
+    apply();
+    const fixture = TestBed.createComponent(WindowRowComponent);
+    await fixture.whenStable();
+
+    expect([getComputedStyle(fixture.nativeElement as HTMLElement).paddingLeft, handled.map(t => String(t))]).toEqual(["78px", ["Error: The desktop went away."]]);
   });
 
   function useNotesMenus(runs: JsonValue[]): void {

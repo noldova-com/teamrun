@@ -7,7 +7,7 @@
  */
 
 import { NgTemplateOutlet } from "@angular/common";
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, signal, viewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, PendingTasks, type Signal, type WritableSignal, afterNextRender, afterRenderEffect, computed, effect, inject, signal, viewChild } from "@angular/core";
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { AppearanceService, DialogService, IconButtonComponent, MenuBarComponent, MenuBarItemComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OverlaySide, TooltipDirective } from "@noldova/teamrun-shell-ui";
@@ -35,6 +35,7 @@ import { PlaceMenuComponent } from "../place-menu/place-menu.component";
   host: {
     "data-tr-chrome": "top",
     "[class.tr-window-row-mac]": "isMac",
+    "[class.tr-window-row-full-screen]": "isFullScreen()",
     "(document:keydown)": "pressed($event)",
     "(document:keyup)": "released($event)",
     "(document:pointerdown)": "pointed()"
@@ -50,6 +51,7 @@ export class WindowRowComponent {
   private readonly settings: SettingsService = inject(SettingsService);
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly foldedValue: WritableSignal<boolean> = signal(false);
+  private readonly fullScreenValue: WritableSignal<boolean> = signal(false);
   private readonly bar: Signal<ElementRef<HTMLElement> | undefined> = viewChild("bar", { read: ElementRef });
   private readonly menuButton: Signal<ElementRef<HTMLElement> | undefined> = viewChild("menuButton", { read: ElementRef });
   private readonly start: Signal<ElementRef<HTMLElement> | undefined> = viewChild("start", { read: ElementRef });
@@ -66,6 +68,7 @@ export class WindowRowComponent {
     return active instanceof DocumentTab ? this.labels.headingOf(active) : null;
   });
   protected readonly isFolded: Signal<boolean> = this.foldedValue.asReadonly();
+  protected readonly isFullScreen: Signal<boolean> = this.fullScreenValue.asReadonly();
   protected readonly style: Signal<MenuBarStyle> = computed(() => {
     const value = this.settings.values().get(Resources.menuBarSetting);
     return value === MenuBarStyle.Button || value === MenuBarStyle.Hidden ? value : MenuBarStyle.Inline;
@@ -102,6 +105,8 @@ export class WindowRowComponent {
     if (this.isMac) {
       effect(() => this.bridge.setMenuBar(this.menuBar.tree()));
       inject(DestroyRef).onDestroy(this.bridge.onMenuCommand(t => this.menuBar.run(t)));
+      inject(DestroyRef).onDestroy(this.bridge.onFullScreen(t => this.fullScreenValue.set(t)));
+      void inject(PendingTasks).run(() => this.bridge.readFullScreenAsync().then(t => this.fullScreenValue.set(t), (error: unknown) => this.errors.handleError(error)));
     }
   }
 

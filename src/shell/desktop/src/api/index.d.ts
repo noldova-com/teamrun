@@ -3139,6 +3139,21 @@ export interface IDesktopWindow {
   isMaximized(): boolean;
 
   /**
+   * Whether the window is in full screen.
+   *
+   * @returns `true` when the window is in full screen.
+   * @example
+   * ```ts
+   * import type { IDesktopWindow } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function fillsTheScreen(window: IDesktopWindow): boolean {
+   *   return window.isFullScreen();
+   * }
+   * ```
+   */
+  isFullScreen(): boolean;
+
+  /**
    * Maximizes the window.
    *
    * @example
@@ -3342,6 +3357,24 @@ export interface IDesktopWindow {
    * @returns Electron's own return value, which the desktop does not use.
    */
   on(event: "unmaximize", listener: () => void): unknown;
+
+  /**
+   * Listens for the window entering full screen.
+   *
+   * @param event The event's name.
+   * @param listener Called each time the window has entered full screen.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
+  on(event: "enter-full-screen", listener: () => void): unknown;
+
+  /**
+   * Listens for the window leaving full screen.
+   *
+   * @param event The event's name.
+   * @param listener Called each time the window has left full screen.
+   * @returns Electron's own return value, which the desktop does not use.
+   */
+  on(event: "leave-full-screen", listener: () => void): unknown;
 
   /**
    * Listens for the window's page no longer responding.
