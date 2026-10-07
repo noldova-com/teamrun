@@ -38,7 +38,7 @@ export class ShellMethodsTests {
 
   @TestMethod
   public namesTheQuitMethods(): void {
-    Assert.areEqual("shell.quit|shell.stayedOpen", [ShellMethods.quit.text, ShellMethods.stayedOpen.text].join("|"));
+    Assert.areEqual("shell.quit|shell.quitAnswered", [ShellMethods.quit.text, ShellMethods.quitAnswered.text].join("|"));
   }
 
   @TestMethod

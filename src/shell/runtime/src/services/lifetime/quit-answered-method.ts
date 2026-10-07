@@ -7,13 +7,13 @@
  */
 
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import { StayedOpen } from "@noldova/teamrun-shell-protocol";
+import { QuitAnswered } from "@noldova/teamrun-shell-protocol";
 
 import type { IMethodHandler } from "../../interfaces/i-method-handler.js";
 import type { RequestContext } from "../../models/request-context.js";
 import type { QuitRelay } from "./quit-relay.js";
 
-export class StayedOpenMethod implements IMethodHandler {
+export class QuitAnsweredMethod implements IMethodHandler {
   private readonly relay: QuitRelay;
 
   public constructor(relay: QuitRelay) {
@@ -21,7 +21,7 @@ export class StayedOpenMethod implements IMethodHandler {
   }
 
   public handleAsync(context: RequestContext): Promise<JsonValue> {
-    this.relay.recordStayed(context.connection, StayedOpen.fromJson(context.payload));
+    this.relay.recordAnswer(context.connection, QuitAnswered.fromJson(context.payload));
     return Promise.resolve(null);
   }
 }

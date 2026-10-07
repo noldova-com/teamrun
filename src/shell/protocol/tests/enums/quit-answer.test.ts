@@ -7,12 +7,12 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { StayCause } from "@noldova/teamrun-shell-protocol";
+import { QuitAnswer } from "@noldova/teamrun-shell-protocol";
 
 @TestClass
-export class StayCauseTests {
+export class QuitAnswerTests {
   @TestMethod
-  public namesEveryCauseByItsMember(): void {
-    Assert.areEqual("Kept,SaveFailed", Object.values(StayCause).join(","));
+  public namesEveryAnswerByItsMember(): void {
+    Assert.areEqual("Stayed,SaveFailed", Object.values(QuitAnswer).join(","));
   }
 }

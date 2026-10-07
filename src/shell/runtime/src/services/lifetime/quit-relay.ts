@@ -9,7 +9,7 @@
 import { setImmediate as yieldTurn } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
-import { Failure, FailureCode, QuitReport, QuitResult, ShellClients, StayCause, type StayedOpen } from "@noldova/teamrun-shell-protocol";
+import { Failure, FailureCode, QuitAnswer, type QuitAnswered, QuitReport, QuitResult, ShellClients } from "@noldova/teamrun-shell-protocol";
 
 import { MethodFailureException } from "../../exceptions/method-failure.exception.js";
 import type { EventChannel } from "../../models/event-channel.js";
@@ -23,6 +23,7 @@ export class QuitRelay {
   private readonly quitting: EventChannel;
   private readonly waits: Map<RequestContext, PromiseWithResolvers<QuitReport>> = new Map();
   private desktops: ReadonlySet<number> = new Set();
+  private isQuitting: boolean = false;
 
   public constructor(server: RuntimeServer, quitting: EventChannel) {
     this.server = server;
@@ -43,43 +44,66 @@ export class QuitRelay {
     }
     const wait = Promise.withResolvers<QuitReport>();
     this.waits.set(context, wait);
-    context.signal.addEventListener(Resources.abortEvent, () => this.waits.delete(context), { once: true });
+    context.signal.addEventListener(Resources.abortEvent, () => this.cancel(context), { once: true });
     if (!isJoining)
       this.quitting.publish(null);
     return wait.promise;
   }
 
-  public recordStayed(connection: number, stayed: StayedOpen): void {
+  public recordAnswer(connection: number, answered: QuitAnswered): void {
     if (!this.desktops.has(connection))
       return;
-    const failure = stayed.cause === StayCause.Kept
+    this.fail(answered.answer === QuitAnswer.Stayed
       ? new Failure(FailureCode.Cancelled, Resources.formatQuitKept(ProductInfo.current.name))
-      : new Failure(FailureCode.Conflict, Resources.formatQuitSaveFailed(ProductInfo.current.name));
-    for (const wait of this.takeWaits())
-      wait.reject(new MethodFailureException(failure));
+      : new Failure(FailureCode.Conflict, Resources.formatQuitSaveFailed(ProductInfo.current.name)));
+  }
+
+  public recordStop(connection: number): void {
+    if (this.desktops.has(connection))
+      this.isQuitting = true;
   }
 
   public check(): void {
     if (this.waits.size > 0 && !this.server.clients.some(t => this.desktops.has(t.connection)))
-      this.settle();
+      this.finish(Resources.formatQuitUnanswered(ProductInfo.current.name));
   }
 
   public async endAsync(): Promise<void> {
     if (this.waits.size === 0)
       return;
-    this.settle();
+    this.finish(Resources.formatQuitInterrupted(ProductInfo.current.name));
     await yieldTurn();
   }
 
-  private settle(): void {
+  private finish(unanswered: string): void {
+    if (!this.isQuitting) {
+      this.fail(new Failure(FailureCode.Unavailable, unanswered));
+      return;
+    }
     for (const wait of this.takeWaits())
       wait.resolve(new QuitReport(QuitResult.Quit));
+  }
+
+  private fail(failure: Failure): void {
+    for (const wait of this.takeWaits())
+      wait.reject(new MethodFailureException(failure));
+  }
+
+  private cancel(context: RequestContext): void {
+    this.waits.delete(context);
+    if (this.waits.size === 0)
+      this.reset();
   }
 
   private takeWaits(): PromiseWithResolvers<QuitReport>[] {
     const waits = [...this.waits.values()];
     this.waits.clear();
-    this.desktops = new Set();
+    this.reset();
     return waits;
+  }
+
+  private reset(): void {
+    this.desktops = new Set();
+    this.isQuitting = false;
   }
 }

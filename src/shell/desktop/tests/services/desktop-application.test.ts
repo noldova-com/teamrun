@@ -273,12 +273,12 @@ export class DesktopApplicationTests {
 
     Assert.areEqual(1, DesktopStartFixture.closeRequests(window).length);
     Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(connection)));
-    Assert.isFalse(connection.calls.includes("shell.stayedOpen"));
+    Assert.isFalse(connection.calls.includes("shell.quitAnswered"));
     Assert.isFalse(window.webContents.sent.some(t => t[1] === "shell.quitting"));
   }
 
   @TestMethod
-  public async tellsTheRuntimeItStayedOpenWhenAWindowCannotSaveOrThePersonKeepsIt(): Promise<void> {
+  public async tellsTheRuntimeOnceItStayedWhenAWindowCannotSaveOrThePersonKeepsIt(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
     DesktopApplicationTests.answerStops(connection, [DesktopApplicationTests.busy()]);
@@ -290,14 +290,16 @@ export class DesktopApplicationTests {
     launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
     await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
     electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.closeRequests(window)[0], false);
-    await Condition.waitAsync(() => connection.calls.includes("shell.stayedOpen"));
+    await Condition.waitAsync(() => connection.calls.includes("shell.quitAnswered"));
     launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
     await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 2);
     await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
     electron.ipcMain.invoke("teamrun:quitAnswer", DesktopStartFixture.trustedEvent("linux"), "Cancel");
-    await Condition.waitAsync(() => connection.calls.filter(t => t === "shell.stayedOpen").length === 2);
+    await Condition.waitAsync(() => connection.calls.filter(t => t === "shell.quitAnswered").length === 2);
+    await setImmediate();
 
-    Assert.areEqual("[{\"cause\":\"SaveFailed\"},{\"cause\":\"Kept\"}]", JSON.stringify(connection.payloads.filter((_t, u) => connection.calls[u] === "shell.stayedOpen")));
+    Assert.areEqual("[{\"answer\":\"SaveFailed\"},{\"answer\":\"Stayed\"}]", JSON.stringify(connection.payloads.filter((_t, u) => connection.calls[u] === "shell.quitAnswered")));
     Assert.isFalse(window.isGone);
     Assert.isFalse(electron.app.calls.includes("quit"));
     window.destroy();

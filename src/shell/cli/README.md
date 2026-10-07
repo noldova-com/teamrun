@@ -43,7 +43,7 @@ The exit codes are stable; scripts may rely on them.
 | Code | Meaning |
 |---|---|
 | 0 | Success. |
-| 1 | The command, or the method it called, failed, a runtime could not start, or TeamRun stayed open because a window could not save when `quit` asked. |
+| 1 | The command, or the method it called, failed, a runtime could not start, or `quit` did not quit TeamRun: a window could not save, or TeamRun did not answer. |
 | 2 | The command line, or a command's arguments, are not valid. |
 | 3 | No runtime is running, and the command does not start one. |
 | 4 | Another build's runtime owns the data directory: an older one without `--take-over`, a newer one, or one with work in progress. The error names the running build and its program. |
@@ -119,11 +119,16 @@ The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how
 The [architecture](../../../docs/ARCHITECTURE.md#9-active-work-closing-and-shutdown) owns that quit.
 
 - **Outcome.**
-  It prints `TeamRun quit.` once the desktop has quit, and `TeamRun is not running.` when no desktop is connected to the runtime; both exit with code 0.
+  It prints `TeamRun quit.` once the desktop has quit, and `No desktop is running.` when no desktop is connected to the runtime; both exit with code 0.
   With `--json` it prints `{"outcome":"Quit"}` or `{"outcome":"NoDesktop"}`.
+  The desktop has quit once it asked the runtime to stop after its windows saved and, when work was in progress, after the person chose to quit, and then its connection ended or the runtime stopped.
 - **Staying open.**
   When the person keeps TeamRun open, it prints `TeamRun stayed open: it was kept open while work was in progress.` and exits with code 6, its JSON code `Cancelled`.
   When a window could not save, it prints `TeamRun stayed open: a window could not save.` and exits with code 1, its JSON code `Conflict`.
+- **No answer.**
+  When the desktop's connection ends before it quit, as when the desktop crashes, or the runtime stops for another reason first, `quit` cannot tell whether TeamRun quit.
+  It says so and exits with code 1, its JSON code `Unavailable`.
+  An update that starts meanwhile ends the wait with code 8.
 - **No runtime.**
   It never starts a runtime and exits with code 3 when none is running.
   A desktop whose runtime is not running cannot be reached, so `quit` cannot quit it.

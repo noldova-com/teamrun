@@ -7,7 +7,7 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { StayCause, WorkReport } from "@noldova/teamrun-shell-protocol";
+import { QuitAnswer, WorkReport } from "@noldova/teamrun-shell-protocol";
 import { QuitChoice, QuitCoordinator, QuitFlow } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
@@ -81,7 +81,7 @@ export class QuitFlowTests {
 
     Assert.areEqual("save,stop IfIdle,prompt,save,stop StopWork,exit", stopping.calls.join(","));
     Assert.areEqual("save,stop IfIdle,prompt", cancelling.calls.join(","));
-    Assert.areEqual(StayCause.Kept, cause);
+    Assert.areEqual(QuitAnswer.Stayed, cause);
   }
 
   @TestMethod

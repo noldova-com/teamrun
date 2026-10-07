@@ -849,9 +849,13 @@ Before TeamRun quits, restarts for an update or stops for a newer build (section
 
 Closing the last window quits TeamRun, except on macOS and while the tray icon shows (section 8), where the window closes once it has saved and TeamRun keeps running.
 Quitting, from the last window, the tray icon, the menu, the command line or the operating system, first has every window save, then asks the runtime to stop only if idle and to keep running while another client uses it (section 6).
-On Linux and macOS the desktop quits this way on SIGTERM and on SIGHUP, which a terminal it was started from sends when it closes; the runtime stops on SIGINT, SIGTERM and SIGHUP alike.
+On Linux and macOS the desktop quits this way on SIGTERM, and on SIGHUP when the terminal whose session it leads closes; the runtime stops on SIGINT, SIGTERM and SIGHUP alike.
+On Linux, a desktop started as a shell's job in a terminal shares its process group with its Chromium processes, so the hang-up of that terminal closing ends those processes too, and the desktop ends without saving what its windows had not saved.
 The command line's `teamrun quit` reaches the desktop through the runtime: it asks with `shell.quit`, the runtime announces `shell.quitting`, and the desktop quits as above.
-A desktop that stays open answers `shell.stayedOpen` with why, and the runtime answers the command line once the desktop's connection ends or the runtime begins to stop.
+A desktop that stays open answers `shell.quitAnswered` with why.
+A desktop that quits asks the runtime to stop, and the runtime counts the stop it accepts as the desktop's answer, since that stop can end the runtime at once.
+Once it has that answer, the runtime tells the command line that TeamRun quit when the desktop's connection ends or the runtime begins to stop.
+Without it, a desktop whose connection ends, or a runtime that stops for another reason, leaves the command line with `Unavailable`, since nobody can tell whether TeamRun quit.
 While the command line waits, its connection does not count as another client using the runtime, so an idle runtime stops with the desktop.
 A runtime that is kept, stops or cannot be reached lets TeamRun quit at once.
 Electron sends no `before-quit` when Windows shuts down or the person signs out, so TeamRun then ends without saving first or asking, and what the windows saved before stands.
