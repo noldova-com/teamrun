@@ -8,8 +8,8 @@
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, readFileSync } from "node:fs";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -96,11 +96,16 @@ export class ChildProgramHostTests {
     const folder = await mkdtemp(path.join(tmpdir(), "teamrun-relaunch-"));
     const file = path.join(folder, "started");
     try {
-      await new ChildProgramHost(process.platform, 5000).startDetachedAsync(process.execPath,
-        ["-e", "require('node:fs').writeFileSync(process.argv[1], `${process.cwd()}|${process.env.RELAUNCH_ANSWER}`)", file], { ...process.env, RELAUNCH_ANSWER: "relaunched" }, folder);
+      await new ChildProgramHost(process.platform, 5000).startDetachedAsync(process.execPath, [
+        "-e",
+        "const fs = require('node:fs'); fs.writeFileSync(`${process.argv[1]}.part`, `${process.pid}|${fs.realpathSync.native(process.cwd())}|${process.env.RELAUNCH_ANSWER}`); fs.renameSync(`${process.argv[1]}.part`, process.argv[1]);",
+        file
+      ], { ...process.env, RELAUNCH_ANSWER: "relaunched" }, folder);
 
-      await Condition.waitAsync(() => existsSync(file) && readFileSync(file, "utf8").length > 0);
-      Assert.areEqual(`${await realpath(folder)}|relaunched`, readFileSync(file, "utf8"));
+      await Condition.waitAsync(() => existsSync(file));
+      const [processId, ...answer] = readFileSync(file, "utf8").split("|");
+      await Condition.waitAsync(() => !ChildProgramHostTests.isRunning(Number(processId)));
+      Assert.areEqual(`${realpathSync.native(folder)}|relaunched`, answer.join("|"));
     }
     finally {
       await rm(folder, { recursive: true, force: true });
@@ -186,5 +191,15 @@ export class ChildProgramHostTests {
     child.stdout?.setEncoding("utf8").on("data", (t: string) => output += t);
     await once(child, "close");
     return output.split("|").map(t => t.split(",").map(Number).sort((u, v) => u - v));
+  }
+
+  private static isRunning(processId: number): boolean {
+    try {
+      process.kill(processId, 0);
+      return true;
+    }
+    catch {
+      return false;
+    }
   }
 }
