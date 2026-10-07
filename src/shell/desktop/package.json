@@ -24,6 +24,10 @@
         "reason": "Composes the desktop from Electron's own modules, which load only inside Electron; the desktop UI workflows run it."
       },
       {
+        "file": "services/product-app-adapter.ts",
+        "reason": "Extends electron-updater's Electron app adapter, which loads only inside Electron; the desktop UI workflows run it."
+      },
+      {
         "file": "utility-entry.ts",
         "reason": "Connects DetachedStart to Electron's parent port, which exists only inside an Electron utility process; the Windows start test runs it."
       }

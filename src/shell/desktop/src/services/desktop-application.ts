@@ -235,7 +235,6 @@ export class DesktopApplication {
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
     process.onUnhandledRejection(t => recovery.receive(t, MainProcessFailureKind.UnhandledRejection));
     electron.app.setName(Resources.applicationName);
-    electron.app.setVersion(RuntimeBuild.identity.productVersion);
     const moduleDirectory = dirname(fileURLToPath(moduleUrl));
     const isPackaged = DesktopApplication.isPackagedBuild(electron, process);
     const dataDirectory = DataDirectoryLocator.locate(
