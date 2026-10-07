@@ -9,4 +9,5 @@
 export interface IShipItProcess {
   findAsync(): Promise<number | null>;
   removeAsync(): Promise<void>;
+  removeStoppedAsync(): Promise<void>;
 }

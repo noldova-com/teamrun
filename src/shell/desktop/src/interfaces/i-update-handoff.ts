@@ -9,5 +9,7 @@
 import type { UpdateReadyRecord } from "../models/update-ready-record.js";
 
 export interface IUpdateHandoff {
+  readonly refusal: string | null;
   handOffAsync(record: UpdateReadyRecord): Promise<number | null>;
+  clearAsync(): Promise<void>;
 }

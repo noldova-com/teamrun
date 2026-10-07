@@ -30,6 +30,7 @@ export class UpdateController {
   private readonly lock: IUpdateCheckLock;
   private readonly currentVersion: string;
   private readonly mustMove: boolean;
+  private readonly refusal: string | null;
   private readonly publish: (status: UpdateStatus) => void;
   private readonly postReadyAsync: (version: string) => Promise<boolean>;
   private readonly log: (text: string) => void;
@@ -53,6 +54,7 @@ export class UpdateController {
     lock: IUpdateCheckLock,
     currentVersion: string,
     mustMove: boolean,
+    refusal: string | null,
     publish: (status: UpdateStatus) => void,
     postReadyAsync: (version: string) => Promise<boolean>,
     log: (text: string) => void,
@@ -64,6 +66,7 @@ export class UpdateController {
     this.lock = lock;
     this.currentVersion = currentVersion;
     this.mustMove = mustMove;
+    this.refusal = refusal;
     this.publish = publish;
     this.postReadyAsync = postReadyAsync;
     this.log = log;
@@ -86,10 +89,8 @@ export class UpdateController {
   public async startAsync(): Promise<void> {
     this.startedAt = this.now();
     const record = await this.readRecordAsync();
-    if (!Object.isNull(record)) {
-      this.ready = record;
-      this.set(new UpdateStatus(UpdateStateKind.Ready, record.version, null, null, null, false));
-    }
+    if (!Object.isNull(record))
+      this.adopt(record, null);
     this.arm();
   }
 
@@ -227,8 +228,7 @@ export class UpdateController {
   private async checkHeldAsync(previous: UpdateStatus, isRequested: boolean): Promise<void> {
     const found = await this.inspectRecordAsync();
     if (found instanceof UpdateReadyRecord) {
-      this.ready = found;
-      this.set(new UpdateStatus(UpdateStateKind.Ready, found.version, null, previous.checkedAt, null, false));
+      this.adopt(found, previous.checkedAt);
       return;
     }
     let version: string | null;
@@ -246,8 +246,19 @@ export class UpdateController {
       this.set(new UpdateStatus(UpdateStateKind.UpToDate, null, null, checkedAt, null, false));
     else if (this.mustMove)
       this.set(new UpdateStatus(UpdateStateKind.Available, version, null, checkedAt, null, true));
+    else if (!Object.isNull(this.refusal))
+      this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, checkedAt, this.refusal, false));
     else
       await this.downloadAsync(version, checkedAt);
+  }
+
+  private adopt(record: UpdateReadyRecord, checkedAt: number | null): void {
+    if (!Object.isNull(this.refusal)) {
+      this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, checkedAt, this.refusal, false));
+      return;
+    }
+    this.ready = record;
+    this.set(new UpdateStatus(UpdateStateKind.Ready, record.version, null, checkedAt, null, false));
   }
 
   private async downloadAsync(version: string, checkedAt: number): Promise<void> {
@@ -315,8 +326,9 @@ export class UpdateController {
   }
 
   private explain(error: unknown): string {
-    this.log(Resources.formatUpdateFailed(String(error)));
-    return error instanceof UpdateException || error instanceof UpdateStopException || error instanceof UpdateHandoffException ? error.message : Resources.updateFailedUnexpectedly;
+    const isKnown = error instanceof UpdateException || error instanceof UpdateStopException || error instanceof UpdateHandoffException;
+    this.log(Resources.formatUpdateFailed((isKnown ? error.message : String(error)).trim().replace(Resources.lineBreaks, Resources.lineJoin)));
+    return isKnown ? error.message : Resources.updateFailedUnexpectedly;
   }
 
   private set(status: UpdateStatus): void {

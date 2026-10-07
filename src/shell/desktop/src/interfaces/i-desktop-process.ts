@@ -8,6 +8,8 @@
 
 import type { Writable } from "node:stream";
 
+import type { ProcessPresence } from "@noldova/teamrun-shell-runtime";
+
 import type { IProgramHost } from "./i-program-host.js";
 
 export interface IDesktopProcess {
@@ -21,6 +23,7 @@ export interface IDesktopProcess {
   readonly errorOutput: Writable;
   readonly processId: number;
   readonly programs: IProgramHost;
+  readonly presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">;
   readonly isTerminal: boolean;
 
   startDetached(executablePath: string, args: readonly string[], onFailure: (error: Error) => void): void;

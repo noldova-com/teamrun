@@ -13,6 +13,7 @@ import path from "node:path";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { AppImageReplacement, UpdateHandoffException } from "@noldova/teamrun-shell-desktop";
 
+import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
 import { PlatformFixture } from "../fixtures/platform.fixture.js";
 import { UnwritableFolderFixture } from "../fixtures/unwritable-folder.fixture.js";
 
@@ -20,13 +21,16 @@ import { UnwritableFolderFixture } from "../fixtures/unwritable-folder.fixture.j
 export class AppImageReplacementTests {
   private static readonly OLD: string = "old version";
   private static readonly NEW: string = "new version";
+  private static readonly UNIQUE: string = "0f8e6c1a-52d4-4b7e-9a3c-6d2f1e0b9c47";
+
+  private readonly logged: string[] = [];
 
   @TestMethod
   public async replacesTheAppImageInPlaceKeepingItsPermissionsAndTheDownload(): Promise<void> {
     await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
       const before = (await stat(image)).mode;
 
-      await new AppImageReplacement(image).replaceAsync(download);
+      await this.create(image).replaceAsync(download);
 
       Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
       Assert.areEqual(before, (await stat(image)).mode);
@@ -37,12 +41,23 @@ export class AppImageReplacementTests {
 
   @TestMethod
   @PlatformFixture.posixOnly()
+  public async flushesItsFolderWithoutALogOnceTheAppImageIsReplaced(): Promise<void> {
+    await AppImageReplacementTests.runInFolderAsync(async (_folder, image, download) => {
+      await this.create(image).replaceAsync(download);
+
+      Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
+      Assert.areEqual(0, this.logged.length);
+    });
+  }
+
+  @TestMethod
+  @PlatformFixture.posixOnly()
   public async replacesTheFileALinkNamesAndKeepsTheLink(): Promise<void> {
     await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
       const link = path.join(folder, "update", "TeamRun");
       await symlink(image, link);
 
-      await new AppImageReplacement(link).replaceAsync(download);
+      await this.create(link).replaceAsync(download);
 
       Assert.isTrue((await lstat(link)).isSymbolicLink());
       Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
@@ -51,11 +66,60 @@ export class AppImageReplacementTests {
   }
 
   @TestMethod
+  public async removesOnlyTheCopiesAnEarlierReplacementOfThatAppImageLeftBehind(): Promise<void> {
+    await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
+      const kept = [
+        `.Other.AppImage.${AppImageReplacementTests.UNIQUE}.part`,
+        ".TeamRun.AppImage.unique.part",
+        `TeamRun.AppImage.${AppImageReplacementTests.UNIQUE}.part`,
+        `.TeamRun.AppImage.${AppImageReplacementTests.UNIQUE}.partial`
+      ];
+      for (const name of [`.TeamRun.AppImage.${AppImageReplacementTests.UNIQUE}.part`, ...kept])
+        await writeFile(path.join(folder, name), AppImageReplacementTests.OLD);
+      const directory = ".TeamRun.AppImage.7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f.part";
+      await mkdir(path.join(folder, directory));
+
+      await this.create(image).replaceAsync(download);
+
+      Assert.areEqual(JSON.stringify(["TeamRun.AppImage", ...kept, directory, "update"].sort()), JSON.stringify((await readdir(folder)).sort()));
+      Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
+    });
+  }
+
+  @TestMethod
+  public async logsAFolderItCannotFlushAndKeepsTheReplacement(): Promise<void> {
+    await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
+      using _open = new FailingFileCallFixture("open", folder, "EIO");
+
+      await this.create(image).replaceAsync(download);
+
+      Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
+      Assert.areEqual(JSON.stringify([`The AppImage in ${folder} was replaced, but the folder could not be flushed to disk: Error: EIO: operation failed, open '${folder}'`]),
+        JSON.stringify(this.logged));
+    });
+  }
+
+  @TestMethod
+  public async refusesWithAReadableReasonWhenAnEarlierCopyCannotBeRemoved(): Promise<void> {
+    await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
+      const leftover = path.join(folder, `.TeamRun.AppImage.${AppImageReplacementTests.UNIQUE}.part`);
+      await writeFile(leftover, AppImageReplacementTests.OLD);
+      using _rm = new FailingFileCallFixture("rm", leftover, "EACCES");
+
+      const failure = await Assert.throwsAsync(() => this.create(image).replaceAsync(download), UpdateHandoffException);
+
+      Assert.areEqual(`An unfinished copy of an earlier update in ${folder} could not be removed, so the AppImage in it was not replaced.`, failure.message);
+      Assert.isTrue(String(failure.cause).includes("EACCES"));
+      Assert.areEqual(AppImageReplacementTests.OLD, await readFile(image, "utf8"));
+    });
+  }
+
+  @TestMethod
   public async refusesWhenItsFolderCannotBeWrittenAndLeavesTheAppImage(): Promise<void> {
     await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
       using _folder = new UnwritableFolderFixture(folder);
 
-      const failure = await Assert.throwsAsync(() => new AppImageReplacement(image).replaceAsync(download), UpdateHandoffException);
+      const failure = await Assert.throwsAsync(() => this.create(image).replaceAsync(download), UpdateHandoffException);
 
       Assert.isTrue(failure.message.startsWith(`The folder ${folder} cannot be written, so the AppImage in it cannot be replaced with the update: `), failure.message);
       Assert.isTrue(failure.message.includes("EACCES"), failure.message);
@@ -69,7 +133,7 @@ export class AppImageReplacementTests {
     await AppImageReplacementTests.runInFolderAsync(async (folder, image) => {
       const missing = path.join(folder, "update", "missing.AppImage");
 
-      const failure = await Assert.throwsAsync(() => new AppImageReplacement(image).replaceAsync(missing), UpdateHandoffException);
+      const failure = await Assert.throwsAsync(() => this.create(image).replaceAsync(missing), UpdateHandoffException);
 
       Assert.isTrue(failure.message.startsWith(`The AppImage ${image} could not be replaced with the update and was left as it was: `), failure.message);
       Assert.isTrue(failure.message.includes("ENOENT"), failure.message);
@@ -83,12 +147,16 @@ export class AppImageReplacementTests {
     await AppImageReplacementTests.runInFolderAsync(async (folder, _image, download) => {
       const missing = path.join(folder, "Missing.AppImage");
 
-      const failure = await Assert.throwsAsync(() => new AppImageReplacement(missing).replaceAsync(download), UpdateHandoffException);
+      const failure = await Assert.throwsAsync(() => this.create(missing).replaceAsync(download), UpdateHandoffException);
 
       Assert.isTrue(failure.message.startsWith(`The AppImage ${missing} could not be read, so the update was not installed: `), failure.message);
       Assert.isTrue(failure.message.includes("ENOENT"), failure.message);
       Assert.areEqual(JSON.stringify(["TeamRun.AppImage", "update"]), JSON.stringify((await readdir(folder)).sort()));
     });
+  }
+
+  private create(image: string): AppImageReplacement {
+    return new AppImageReplacement(image, t => this.logged.push(t));
   }
 
   private static async runInFolderAsync(action: (folder: string, image: string, download: string) => Promise<void>): Promise<void> {

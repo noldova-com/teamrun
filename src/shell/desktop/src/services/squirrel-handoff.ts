@@ -27,6 +27,8 @@ export class SquirrelHandoff implements IUpdateHandoff {
   private readonly log: (text: string) => void;
   private lateStage: (() => void) | null = null;
 
+  public readonly refusal: string | null = null;
+
   public constructor(
     updater: IUpdater,
     native: INativeUpdater,
@@ -38,6 +40,10 @@ export class SquirrelHandoff implements IUpdateHandoff {
     this.shipIt = shipIt;
     this.schedule = schedule;
     this.log = log;
+  }
+
+  public async clearAsync(): Promise<void> {
+    await this.shipIt.removeStoppedAsync().catch((error: unknown) => this.log(Resources.formatStoppedShipItNotRemoved(String(error))));
   }
 
   public async handOffAsync(record: UpdateReadyRecord): Promise<number> {

@@ -23,6 +23,7 @@ import {
 } from "@noldova/teamrun-shell-protocol";
 import {
   AppImageSource,
+  ChildProcessStarter,
   ConnectionException,
   type DataDirectory,
   DataDirectoryLocator,
@@ -31,11 +32,10 @@ import {
   Installation,
   LaunchSettings,
   LogText,
-  ProcessPresence,
+  type ProcessPresence,
   RuntimeBuild,
   RuntimeEntry,
-  ShellSettings,
-  SystemCommand
+  ShellSettings
 } from "@noldova/teamrun-shell-runtime";
 
 import { PathCommandException } from "../exceptions/path-command.exception.js";
@@ -52,7 +52,9 @@ import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { ISystemNotification } from "../interfaces/i-system-notification.js";
 import type { IUpdateHost } from "../interfaces/i-update-host.js";
 import type { IUpdateCheckLock } from "../interfaces/i-update-check-lock.js";
-import type { IUpdater } from "../interfaces/i-updater.js";
+import type { IUpdateHandoff } from "../interfaces/i-update-handoff.js";
+import type { IUpdateSetup } from "../interfaces/i-update-setup.js";
+import type { UpdateReadyRecord } from "../models/update-ready-record.js";
 import { UpdateStatus } from "../models/update-status.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
@@ -71,11 +73,11 @@ import { WindowState } from "../models/window-state.js";
 import { Resources } from "../resources.js";
 import { AppIcons } from "./app-icons.js";
 import { AppImageEnvironment } from "./app-image-environment.js";
+import { AppImageRestart } from "./app-image-restart.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { DeviceSettingFollower } from "./device-setting-follower.js";
 import { DeviceState } from "./device-state.js";
-import { InstallerHandoff } from "./installer-handoff.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
@@ -95,6 +97,9 @@ import { TrayHostWatcher } from "./tray-host-watcher.js";
 import { UpdateBarrierGate } from "./update-barrier-gate.js";
 import { UpdateBarrierWatch } from "./update-barrier-watch.js";
 import { UpdateController } from "./update-controller.js";
+import { UpdateStop } from "./update-stop.js";
+import { UpdateTargetConnector } from "./update-target-connector.js";
+import { UpdateWorkQuestion } from "./update-work-question.js";
 import { WindowFactory } from "./window-factory.js";
 import { WindowRecovery } from "./window-recovery.js";
 
@@ -131,7 +136,10 @@ export class DesktopApplication {
   private readonly trayHosts: TrayHostWatcher;
   private readonly trayIcon: DeviceSettingFollower;
   private readonly updates: UpdateController | null;
-  private readonly installationFolder: string;
+  private readonly handoff: IUpdateHandoff | null;
+  private readonly installation: Installation;
+  private readonly presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">;
+  private readonly connector: UpdateTargetConnector;
   private readonly updatesOff: UpdateStatus;
   private readonly updateChecks: DeviceSettingFollower;
   private readonly spelling: SpellChecker;
@@ -148,8 +156,11 @@ export class DesktopApplication {
   private updatesStarted: Promise<void> = Promise.resolve();
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
+  private isRestarting: boolean = false;
+  private isQuitHeld: boolean = false;
   private runtimeQuit: Promise<void> | null = null;
   private trayCloseHint: ISystemNotification | null = null;
+  private updateQuestion: UpdateWorkQuestion | null = null;
 
   private constructor(
     electron: IElectron,
@@ -165,8 +176,10 @@ export class DesktopApplication {
     icons: AppIcons,
     spelling: SpellChecker,
     installation: Installation,
+    presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">,
+    connector: UpdateTargetConnector,
     recordDesktopAsync: () => Promise<boolean>,
-    updater: IUpdater | null,
+    setup: IUpdateSetup | null,
     updateLock: IUpdateCheckLock,
     updatesOff: UpdateStatus) {
     this.electron = electron;
@@ -217,10 +230,13 @@ export class DesktopApplication {
     this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.changeTrayHost(t));
     this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.followTrayIconSetting(t), t => this.log.write(t));
-    this.updates = Object.isNull(updater) ? null : new UpdateController(updater, createDeviceFile(installation.folder, Resources.updateReadyFile), updateLock,
-      RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
-      t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run), null);
-    this.installationFolder = installation.folder;
+    this.updates = Object.isNull(setup) ? null : new UpdateController(setup.updater, createDeviceFile(installation.folder, Resources.updateReadyFile), updateLock,
+      RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), setup.handoff.refusal, t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
+      t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run), t => this.restartToUpdateAsync(t, setup.handoff));
+    this.handoff = setup?.handoff ?? null;
+    this.installation = installation;
+    this.presence = presence;
+    this.connector = connector;
     this.updatesOff = updatesOff;
     this.updateChecks = new DeviceSettingFollower(ShellSettings.updateChecks, Resources.automaticUpdateChecks, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.followUpdateChecksSetting(t), t => this.log.write(t));
@@ -236,7 +252,7 @@ export class DesktopApplication {
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
-    createUpdater: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
+    createUpdater: (installation: Installation, isPackaged: boolean, logsFolder: string, log: (text: string) => void) => IUpdateSetup | null,
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
@@ -261,9 +277,12 @@ export class DesktopApplication {
       RuntimeEntry.entryPath,
       { ...process.env, [Resources.runAsNodeVariable]: Resources.runAsNodeValue },
       process.platform);
-    const presence = ProcessPresence.create(process.platform, new SystemCommand());
-    const installation = new Installation(
-      Installation.locate(DesktopApplication.locateDeviceFolder(process), AppImageSource.locateProgram(process.env, process.execPath), process.platform), t => presence.isRunningAsync(t));
+    const presence = process.presence;
+    const deviceFolder = DesktopApplication.locateDeviceFolder(process);
+    const installation = new Installation(Installation.locate(deviceFolder, AppImageSource.locateProgram(process.env, process.execPath), process.platform), t => presence.isRunningAsync(t));
+    const connector = new UpdateTargetConnector(installation.folder, t => Installation.locate(deviceFolder, t, process.platform),
+      t => createLauncher(new LaunchSettings(t, launchSettings.executablePath, launchSettings.entryPath, launchSettings.environment, process.platform), installation), presence,
+      Date.now, delay);
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
@@ -273,10 +292,10 @@ export class DesktopApplication {
       : SpellingDictionaries.install(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.dictionaryFolderSegments), profileFolder, t => log.write(t));
     const spelling = new SpellChecker(
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
-    const [updater, updatesOff] = DesktopApplication.createUpdater(createUpdater, installation, isPackaged, log);
+    const [setup, updatesOff] = DesktopApplication.createUpdater(createUpdater, installation, isPackaged, dataDirectory, log);
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
-      spelling, installation, () => recordDesktopAsync(installation), updater, createUpdateLock(installation, t => log.write(t)), updatesOff);
+      spelling, installation, presence, connector, () => recordDesktopAsync(installation), setup, createUpdateLock(installation, t => log.write(t)), updatesOff);
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -581,7 +600,10 @@ export class DesktopApplication {
     if (this.isExiting)
       return;
     event.preventDefault();
-    void this.quitFlow.quitAsync();
+    if (this.isRestarting)
+      this.isQuitHeld = true;
+    else
+      void this.quitFlow.quitAsync();
   }
 
   private get isQuitting(): boolean {
@@ -668,7 +690,7 @@ export class DesktopApplication {
 
   private answerQuit(event: IIpcEvent, choice: unknown): boolean {
     const open = this.findTrusted(event);
-    return !Object.isNull(open) && this.quit.answer(open, choice);
+    return !Object.isNull(open) && (this.updateQuestion?.answer(open, choice) === true || this.quit.answer(open, choice));
   }
 
   private writeModuleLog(event: IIpcEvent, moduleId: unknown, message: unknown): void {
@@ -778,9 +800,69 @@ export class DesktopApplication {
   }
 
   private async startUpdatesAsync(updates: UpdateController): Promise<void> {
-    await InstallerHandoff.clearAsync(this.installationFolder, t => this.log.write(t));
+    await this.handoff?.clearAsync();
     updates.follow(this.updateChecks.value);
     await updates.startAsync();
+  }
+
+  private async restartToUpdateAsync(record: UpdateReadyRecord, handoff: IUpdateHandoff): Promise<void> {
+    const restart = AppImageRestart.find(this.process.platform, this.process.env, this.process.execPath, this.launchArguments, new ChildProcessStarter(), this.process.processId,
+      join(this.dataDirectory.logsFolder, Resources.restartErrorFile));
+    const stop = new UpdateStop(this.installation, this.presence, t => this.connector.connectAsync(t), (work, read) => this.askUpdateWorkAsync(work, read), this.process.processId,
+      RuntimeBuild.identity.productVersion, Date.now, delay, restart, t => this.log.write(t));
+    this.isRestarting = true;
+    try {
+      if (await stop.runAsync(record.version, () => handoff.handOffAsync(record)))
+        await this.quitAfterHandoffAsync();
+    }
+    finally {
+      this.isRestarting = false;
+      if (this.isQuitHeld && !this.isExiting)
+        this.electron.app.quit();
+      this.isQuitHeld = false;
+    }
+  }
+
+  private async askUpdateWorkAsync(work: readonly string[], readWorkAsync: () => Promise<readonly string[]>): Promise<readonly string[] | null> {
+    const prompt = await this.findPromptAsync();
+    if (Object.isNull(prompt))
+      return null;
+    const question = new UpdateWorkQuestion(prompt, readWorkAsync, Resources.workWaitInterval, (t, signal) => delay(t, undefined, { signal }));
+    this.updateQuestion = question;
+    try {
+      return await question.askAsync(work);
+    }
+    finally {
+      this.updateQuestion = null;
+    }
+  }
+
+  private async quitAfterHandoffAsync(): Promise<void> {
+    this.isExiting = true;
+    if (this.process.platform === Resources.macPlatform) {
+      const failure = await this.quitAndInstallAsync();
+      if (Object.isNull(failure))
+        return;
+      this.log.write(Resources.formatUpdateRelaunchFailed(String(failure)));
+      await this.electron.dialog.showMessageBox(null, {
+        type: Resources.warningBoxType, message: Resources.updateRelaunchFailed, detail: Resources.updateRelaunchFailedDetail, buttons: [Resources.okButton], defaultId: 0, cancelId: 0,
+        noLink: true
+      }).catch(() => undefined);
+    }
+    this.electron.app.exit(Resources.quitExitCode);
+  }
+
+  private async quitAndInstallAsync(): Promise<unknown> {
+    for (const open of this.windows.values())
+      open.closeNow();
+    const failed = new Promise<unknown>(resolve => this.electron.nativeUpdater.once(Resources.errorEvent, error => resolve(error)));
+    const quitting = new Promise<unknown>(resolve => this.electron.app.on(Resources.willQuitEvent, () => resolve(null)));
+    this.electron.nativeUpdater.quitAndInstall();
+    return Promise.race([failed, quitting, delay(Resources.updateRelaunchLimit, Resources.updateNotRelaunchedInTime, { ref: false })]);
+  }
+
+  private get launchArguments(): readonly string[] {
+    return this.process.argv.filter(t => Resources.handoverArguments.some(u => t.startsWith(u)));
   }
 
   private async refreshUpdatesAsync(): Promise<void> {
@@ -1015,8 +1097,7 @@ export class DesktopApplication {
   private handOver(handover: RuntimeHandover): boolean {
     if (!this.isPackaged)
       return false;
-    this.process.startDetached(handover.executablePath, this.process.argv.filter(t => Resources.handoverArguments.some(u => t.startsWith(u))),
-      t => this.log.write(Resources.formatHandoverFailed(String(t))));
+    this.process.startDetached(handover.executablePath, this.launchArguments, t => this.log.write(Resources.formatHandoverFailed(String(t))));
     this.exit();
     return true;
   }
@@ -1111,12 +1192,13 @@ export class DesktopApplication {
   }
 
   private static createUpdater(
-    create: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
+    create: (installation: Installation, isPackaged: boolean, logsFolder: string, log: (text: string) => void) => IUpdateSetup | null,
     installation: Installation,
     isPackaged: boolean,
-    log: DesktopLog): [IUpdater | null, UpdateStatus] {
+    dataDirectory: DataDirectory,
+    log: DesktopLog): [IUpdateSetup | null, UpdateStatus] {
     try {
-      return [create(installation, isPackaged, t => log.write(t)), UpdateStatus.off];
+      return [create(installation, isPackaged, dataDirectory.logsFolder, t => log.write(t)), UpdateStatus.off];
     }
     catch (error) {
       log.write(Resources.formatUpdaterNotCreated(String(error)));

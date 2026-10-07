@@ -18,6 +18,7 @@ import { Failure, FailureCode, Response, UpdateProcess, UpdateReady } from "@nol
 import { ConnectionException, type IProcessStarter, Installation, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
 import { AppImageRestart, type IUpdateTarget, UpdateHandoffException, UpdateStop, UpdateStopException } from "@noldova/teamrun-shell-desktop";
 
+import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
 import { FakeProcessPresence } from "../fixtures/fake-process-presence.fixture.js";
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
 import { LinuxLaunchFixture } from "../fixtures/linux-launch.fixture.js";
@@ -31,6 +32,7 @@ export class UpdateStopTests {
   private readonly connections: Map<string, FakeRuntimeConnection> = new Map();
   private readonly asked: (readonly string[])[] = [];
   private readonly waits: number[] = [];
+  private readonly lines: string[] = [];
   private answer: boolean = true;
   private rereads: boolean = false;
   private isWaitedOut: boolean = false;
@@ -179,6 +181,39 @@ export class UpdateStopTests {
 
       Assert.areEqual(`Work started while TeamRun prepared to update: A reply (${first})`, failure.message);
       Assert.areEqual("shell.work|shell.update|shell.work", this.connection(first).calls.join("|"));
+      Assert.isFalse(existsSync(installation.barrierFile));
+    });
+  }
+
+  @TestMethod
+  public keepsItsReasonAndLogsABarrierItCannotRemove(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      const first = await this.recordAsync(installation, folder, "first");
+      this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
+      this.isWaitedOut = true;
+      using _rm = new FailingFileCallFixture("rm", installation.barrierFile, "EBUSY");
+
+      const failure = await this.failAsync(installation);
+
+      Assert.areEqual(`Work started while TeamRun prepared to update: A reply (${first})`, failure.message);
+      Assert.areEqual(JSON.stringify([`The update's barrier could not be removed after the update stopped: Error: EBUSY: operation failed, rm '${installation.barrierFile}'`]),
+        JSON.stringify(this.lines));
+      Assert.isTrue(existsSync(installation.barrierFile));
+    });
+  }
+
+  @TestMethod
+  public closesTheConnectionsItOpenedWhenAnotherDataDirectoryCannotBeReached(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      const first = await this.recordAsync(installation, folder, "first");
+      const second = await this.recordAsync(installation, folder, "second");
+      const unreachable = new UpdateStopException(`TeamRun couldn't reach the runtime of ${second} to stop it for the update.`);
+      this.onConnect = t => t === second ? Promise.reject(unreachable) : Promise.resolve();
+
+      const failure = await this.failAsync(installation);
+
+      Assert.areEqual(unreachable, failure);
+      Assert.isTrue(this.connection(first).isClosed);
       Assert.isFalse(existsSync(installation.barrierFile));
     });
   }
@@ -482,7 +517,8 @@ export class UpdateStopTests {
         this.time += t;
         return Promise.resolve();
       },
-      restart);
+      restart,
+      t => this.lines.push(t));
   }
 
   private target(dataDirectory: string): IUpdateTarget {

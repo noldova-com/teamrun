@@ -19,7 +19,7 @@ import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Prov
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, NotificationBroadcast, QualifiedName, QuitAnswer, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, IWindowsProcessApi, LaunchException, LaunchSettings, ProcessPresence, SystemCommand, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+import type { AttachOptions, ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, IWindowsProcessApi, LaunchException, LaunchSettings, ProcessPresence, SystemCommand, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -410,6 +410,7 @@ export declare class UpdateStop {
    * @param wait Resolves after the given number of milliseconds.
    * @param restart Starts the replaced AppImage once this desktop has exited, or `null` when the desktop does not run
    * from an AppImage.
+   * @param log Records a barrier that could not be removed after the update stopped.
    * @example
    * ```ts
    * import { setTimeout as delay } from "node:timers/promises";
@@ -421,7 +422,7 @@ export declare class UpdateStop {
    *   const restart = AppImageRestart.find(process.platform, process.env, process.execPath, process.argv.slice(1), new ChildProcessStarter(), process.pid, errorFile);
    *   return new UpdateStop(
    *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(null),
-   *     process.pid, "0.2.0", Date.now, t => delay(t), restart);
+   *     process.pid, "0.2.0", Date.now, t => delay(t), restart, console.error);
    * }
    * ```
    */
@@ -434,7 +435,8 @@ export declare class UpdateStop {
     productVersion: string,
     now: () => number,
     wait: (milliseconds: number) => Promise<void>,
-    restart: AppImageRestart | null);
+    restart: AppImageRestart | null,
+    log: (text: string) => void);
 
   /**
    * Stops the installation for an update and calls the handoff. It holds the launch barrier as `Preparing`, asks each
@@ -471,27 +473,91 @@ export declare class UpdateStop {
 }
 
 /**
+ * Connects an {@link UpdateStop} to the runtime of a data directory in the installation's record, as the client
+ * `update`. A directory without discovery that no runtime owns, or whose discovery names another program, is skipped.
+ * A directory owned without discovery has a runtime that is still starting: the connector waits up to 15 seconds for
+ * its discovery, skips the directory when the ownership ends first and fails the update when the time runs out. It
+ * attaches without starting a runtime or taking over another build's, and identifies the runtime by the process id its
+ * discovery names.
+ */
+export declare class UpdateTargetConnector {
+  /**
+   * Creates the connector.
+   *
+   * @param installationFolder The installation's folder.
+   * @param locate Gives the folder of the installation a program belongs to, as `Installation.locate` does.
+   * @param createLauncher Creates the launcher of a data directory.
+   * @param presence Identifies the runtime's process.
+   * @param now Reads the current time, in milliseconds.
+   * @param wait Resolves after the given number of milliseconds.
+   * @example
+   * ```ts
+   * import { setTimeout as delay } from "node:timers/promises";
+   *
+   * import { type IRuntimeLauncher, UpdateTargetConnector } from "@noldova/teamrun-shell-desktop";
+   * import { type DataDirectory, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function create(createLauncher: (dataDirectory: DataDirectory) => IRuntimeLauncher): UpdateTargetConnector {
+   *   return new UpdateTargetConnector("/home/person/.config/TeamRun/installations/0123456789abcdef", () => "/home/person/.config/TeamRun/installations/0123456789abcdef",
+   *     createLauncher, ProcessPresence.create("linux", new SystemCommand()), Date.now, t => delay(t));
+   * }
+   * ```
+   */
+  public constructor(
+    installationFolder: string,
+    locate: (program: string) => string,
+    createLauncher: (dataDirectory: DataDirectory) => IRuntimeLauncher,
+    presence: Pick<ProcessPresence, "stampAsync">,
+    now: () => number,
+    wait: (milliseconds: number) => Promise<void>);
+
+  /**
+   * Connects to the data directory's runtime.
+   *
+   * @param root The data directory's root.
+   * @returns A promise of the runtime, its process and the connection, or `null` when the directory is skipped or its
+   * runtime stopped before the connection.
+   * @throws {UpdateStopException} Rejected with a readable reason when the runtime cannot be reached or its process
+   * cannot be identified; the connection is then closed.
+   * @example
+   * ```ts
+   * import type { IUpdateTarget, UpdateTargetConnector } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function connectAsync(connector: UpdateTargetConnector): Promise<IUpdateTarget | null> {
+   *   return connector.connectAsync("/home/person/.teamrun");
+   * }
+   * ```
+   */
+  public connectAsync(root: string): Promise<IUpdateTarget | null>;
+}
+
+/**
  * The Linux handoff of an update: replaces the AppImage file in place with the downloaded one, keeping its location,
  * its name and its permissions, so its launchers still start it. The download is copied to a file with a unique name
  * beside the AppImage, created only when no file has that name, given the AppImage's permissions and flushed to disk,
- * and then renamed over the AppImage, so the AppImage is always either the old version or the whole new one. A link
- * to the AppImage is followed and the file it names is replaced. The download is kept, and on any failure the copy
- * is removed and the AppImage is left as it was. No process takes the handoff; {@link AppImageRestart} starts the
- * new version once the desktop has exited.
+ * and then renamed over the AppImage, so the AppImage is always either the old version or the whole new one; the
+ * folder is then flushed to disk too, and a flush that fails is logged, since the AppImage is already replaced. Before
+ * the copy, the copies an earlier replacement of that AppImage left behind are removed: only the files named
+ * `.<AppImage name>.<UUID>.part`, the name a replacement gives its copy. It runs only as the handoff, while the
+ * update's launch barrier holds, so no other replacement of the AppImage runs. A link to the AppImage is followed and
+ * the file it names is replaced. The download is kept, and on any failure the copy is removed and the AppImage is
+ * left as it was. No process takes the handoff; {@link AppImageRestart} starts the new version once the desktop has
+ * exited.
  */
 export declare class AppImageReplacement {
   /**
    * Creates the replacement of an AppImage file.
    *
    * @param image The AppImage file, or a link to it.
+   * @param log Writes a line to the desktop's log, such as a folder that could not be flushed to disk after the replacement.
    * @example
    * ```ts
    * import { AppImageReplacement } from "@noldova/teamrun-shell-desktop";
    *
-   * export const replacement: AppImageReplacement = new AppImageReplacement("/home/person/Applications/TeamRun.AppImage");
+   * export const replacement: AppImageReplacement = new AppImageReplacement("/home/person/Applications/TeamRun.AppImage", console.log);
    * ```
    */
-  public constructor(image: string);
+  public constructor(image: string, log: (text: string) => void);
 
   /**
    * Replaces the AppImage with the downloaded file.
@@ -505,7 +571,7 @@ export declare class AppImageReplacement {
    * import { AppImageReplacement } from "@noldova/teamrun-shell-desktop";
    *
    * export function handOffAsync(image: string, download: string): Promise<void> {
-   *   return new AppImageReplacement(image).replaceAsync(download);
+   *   return new AppImageReplacement(image, console.log).replaceAsync(download);
    * }
    * ```
    */
@@ -518,6 +584,22 @@ export declare class AppImageReplacement {
  * SHA-512 no longer matches the ready record.
  */
 export interface IUpdateHandoff {
+  /**
+   * Why this copy of TeamRun can never install an update, known before anything is downloaded or stopped, or
+   * `null` when it can. The update controller then shows the update as failed with this reason instead of downloading
+   * it or offering Restart to update.
+   *
+   * @example
+   * ```ts
+   * import type { IUpdateHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canInstall(handoff: IUpdateHandoff): boolean {
+   *   return handoff.refusal === null;
+   * }
+   * ```
+   */
+  readonly refusal: string | null;
+
   /**
    * Hands the update over.
    *
@@ -534,6 +616,22 @@ export interface IUpdateHandoff {
    * ```
    */
   handOffAsync(record: UpdateReadyRecord): Promise<number | null>;
+
+  /**
+   * Removes what an earlier handoff of the installation left behind. The desktop calls it at start, before its
+   * updater.
+   *
+   * @returns A promise that resolves once that is removed or the failure is logged; it never rejects.
+   * @example
+   * ```ts
+   * import type { IUpdateHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function tidyAsync(handoff: IUpdateHandoff): Promise<void> {
+   *   return handoff.clearAsync();
+   * }
+   * ```
+   */
+  clearAsync(): Promise<void>;
 }
 
 /**
@@ -572,6 +670,23 @@ export interface INativeUpdater {
   on(event: string, listener: (...values: unknown[]) => void): unknown;
 
   /**
+   * Listens for the next occurrence of an event only.
+   *
+   * @param event The event's name.
+   * @param listener Receives the event's values.
+   * @returns The updater.
+   * @example
+   * ```ts
+   * import type { INativeUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function onFailure(updater: INativeUpdater, run: (error: unknown) => void): void {
+   *   updater.once("error", run);
+   * }
+   * ```
+   */
+  once(event: string, listener: (...values: unknown[]) => void): unknown;
+
+  /**
    * Stops listening for an event.
    *
    * @param event The event's name.
@@ -587,6 +702,21 @@ export interface INativeUpdater {
    * ```
    */
   removeListener(event: string, listener: (...values: unknown[]) => void): unknown;
+
+  /**
+   * Quits the application, so the ShipIt process installs the staged update, and has it start the new version.
+   *
+   * @throws {Error} When Squirrel.Mac has no staged update to install.
+   * @example
+   * ```ts
+   * import type { INativeUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function install(updater: INativeUpdater): void {
+   *   updater.quitAndInstall();
+   * }
+   * ```
+   */
+  quitAndInstall(): void;
 }
 
 /**
@@ -623,6 +753,21 @@ export interface IShipItProcess {
    * ```
    */
   removeAsync(): Promise<void>;
+
+  /**
+   * Removes the job only when it is listed without a process, as a finished install leaves it.
+   *
+   * @returns A promise that resolves once such a job is removed, or at once when there is none.
+   * @example
+   * ```ts
+   * import type { IShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function tidyAsync(shipIt: IShipItProcess): Promise<void> {
+   *   return shipIt.removeStoppedAsync();
+   * }
+   * ```
+   */
+  removeStoppedAsync(): Promise<void>;
 }
 
 /**
@@ -635,6 +780,20 @@ export interface IShipItProcess {
  * keeps in place.
  */
 export declare class InstallerHandoff implements IUpdateHandoff {
+  /**
+   * Always `null`: whether the installer may run is known only once it is copied and its publisher checked.
+   *
+   * @example
+   * ```ts
+   * import type { InstallerHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canInstall(handoff: InstallerHandoff): boolean {
+   *   return handoff.refusal === null;
+   * }
+   * ```
+   */
+  public readonly refusal: string | null;
+
   /**
    * Creates the handoff.
    *
@@ -662,19 +821,20 @@ export declare class InstallerHandoff implements IUpdateHandoff {
     log: (text: string) => void);
 
   /**
-   * Removes the copies earlier handoffs left in the installation's folder.
+   * Removes the copies earlier handoffs left in the installation's folder, logging a copy that cannot be removed
+   * yet, such as one a running installer holds.
    *
-   * @param installationFolder The installation's folder.
-   * @param log Records a copy that cannot be removed yet, such as one a running installer holds.
    * @returns A promise that resolves once the copies are removed or the failure is logged; it never rejects.
    * @example
    * ```ts
-   * import { InstallerHandoff } from "@noldova/teamrun-shell-desktop";
+   * import type { InstallerHandoff } from "@noldova/teamrun-shell-desktop";
    *
-   * export const cleared: Promise<void> = InstallerHandoff.clearAsync("C:\\Users\\person\\AppData\\Local\\Noldova\\TeamRun\\installations\\0123456789abcdef", console.error);
+   * export function tidyAsync(handoff: InstallerHandoff): Promise<void> {
+   *   return handoff.clearAsync();
+   * }
    * ```
    */
-  public static clearAsync(installationFolder: string, log: (text: string) => void): Promise<void>;
+  public clearAsync(): Promise<void>;
 
   /**
    * Copies, holds and checks the installer, then starts it.
@@ -702,17 +862,31 @@ export declare class InstallerHandoff implements IUpdateHandoff {
  */
 export declare class AppImageHandoff implements IUpdateHandoff {
   /**
+   * Why the update cannot be installed when the desktop doesn't run from an AppImage, or `null` when it does.
+   *
+   * @example
+   * ```ts
+   * import type { AppImageHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canInstall(handoff: AppImageHandoff): boolean {
+   *   return handoff.refusal === null;
+   * }
+   * ```
+   */
+  public get refusal(): string | null;
+
+  /**
    * Creates the handoff.
    *
-   * @param replacement Replaces the AppImage with the download.
+   * @param replacement Replaces the AppImage with the download, or `null` when the desktop doesn't run from an AppImage.
    * @example
    * ```ts
    * import { AppImageHandoff, AppImageReplacement } from "@noldova/teamrun-shell-desktop";
    *
-   * export const handoff: AppImageHandoff = new AppImageHandoff(new AppImageReplacement("/home/person/Applications/TeamRun.AppImage"));
+   * export const handoff: AppImageHandoff = new AppImageHandoff(new AppImageReplacement("/home/person/Applications/TeamRun.AppImage", console.log));
    * ```
    */
-  public constructor(replacement: Pick<AppImageReplacement, "replaceAsync">);
+  public constructor(replacement: Pick<AppImageReplacement, "replaceAsync"> | null);
 
   /**
    * Checks the download and replaces the AppImage with it.
@@ -720,7 +894,8 @@ export declare class AppImageHandoff implements IUpdateHandoff {
    * @param record The ready update.
    * @returns A promise of `null` once the AppImage is replaced.
    * @throws {StaleUpdateException} Rejected when the download's SHA-512 no longer matches the ready record.
-   * @throws {UpdateHandoffException} Rejected when the AppImage cannot be replaced.
+   * @throws {UpdateHandoffException} Rejected when the desktop doesn't run from an AppImage or the AppImage cannot be
+   * replaced.
    * @example
    * ```ts
    * import type { AppImageHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
@@ -731,6 +906,21 @@ export declare class AppImageHandoff implements IUpdateHandoff {
    * ```
    */
   public handOffAsync(record: UpdateReadyRecord): Promise<null>;
+
+  /**
+   * Leaves nothing to remove, since a failed replacement removes its own copy; the next replacement removes any copy an interrupted one left.
+   *
+   * @returns A promise that resolves once that is done or the failure is logged; it never rejects.
+   * @example
+   * ```ts
+   * import type { AppImageHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function tidyAsync(handoff: AppImageHandoff): Promise<void> {
+   *   return handoff.clearAsync();
+   * }
+   * ```
+   */
+  public clearAsync(): Promise<void>;
 }
 
 /**
@@ -744,6 +934,20 @@ export declare class AppImageHandoff implements IUpdateHandoff {
  * next handoff asks Squirrel.Mac to stage.
  */
 export declare class SquirrelHandoff implements IUpdateHandoff {
+  /**
+   * Always `null`: whether macOS can stage the update is known only once Squirrel tries.
+   *
+   * @example
+   * ```ts
+   * import type { SquirrelHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canInstall(handoff: SquirrelHandoff): boolean {
+   *   return handoff.refusal === null;
+   * }
+   * ```
+   */
+  public readonly refusal: string | null;
+
   /**
    * Creates the handoff.
    *
@@ -792,6 +996,21 @@ export declare class SquirrelHandoff implements IUpdateHandoff {
    * ```
    */
   public handOffAsync(record: UpdateReadyRecord): Promise<number>;
+
+  /**
+   * Removes the ShipIt job a finished install left without a process, logging a job it cannot remove; a running ShipIt is left alone.
+   *
+   * @returns A promise that resolves once that is done or the failure is logged; it never rejects.
+   * @example
+   * ```ts
+   * import type { SquirrelHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function tidyAsync(handoff: SquirrelHandoff): Promise<void> {
+   *   return handoff.clearAsync();
+   * }
+   * ```
+   */
+  public clearAsync(): Promise<void>;
 }
 
 /**
@@ -1206,6 +1425,11 @@ export interface IDesktopProcess {
   readonly programs: IProgramHost;
 
   /**
+   * Identifies processes by process id and start time, for the launch barrier and the update stop.
+   */
+  readonly presence: Pick<ProcessPresence, "stampAsync" | "isRunningAsync">;
+
+  /**
    * Whether standard input, output or error is a terminal, as when a person starts the desktop at a shell's prompt.
    */
   readonly isTerminal: boolean;
@@ -1562,9 +1786,11 @@ export interface IRuntimeLauncher {
    * @param clientName The client's name.
    * @param listener Receives events and the disconnection.
    * @param policy What to do when an older runtime has work in progress.
+   * @param options Whether to start a runtime when none runs and whether to take over another build's runtime; both
+   * by default.
    * @returns A promise of the connection.
-   * @throws RuntimeHandoverException, PreShellDataFoundException, WorkInProgressException, LaunchException or ConnectionException
-   * as a rejection, as `RuntimeLauncher.attachAsync` does.
+   * @throws RuntimeHandoverException, PreShellDataFoundException, WorkInProgressException, LaunchException, ConnectionException
+   * or, when it may not start one, NoRuntimeException as a rejection, as `RuntimeLauncher.attachAsync` does.
    * @example
    * ```ts
    * import type { IRuntimeConnection, IRuntimeLauncher } from "@noldova/teamrun-shell-desktop";
@@ -1574,7 +1800,7 @@ export interface IRuntimeLauncher {
    * }
    * ```
    */
-  attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<IRuntimeConnection>;
+  attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy, options?: AttachOptions): Promise<IRuntimeConnection>;
 
   /**
    * Moves data from before the shell aside, then connects as {@link attachAsync} does.
@@ -3389,6 +3615,11 @@ export interface IElectron {
   readonly tray: ITrayHost;
 
   /**
+   * Electron's `autoUpdater`, Squirrel.Mac on macOS, which installs a staged update as the desktop quits.
+   */
+  readonly nativeUpdater: INativeUpdater;
+
+  /**
    * The displays, for placing a window on one that shows it.
    */
   readonly screen: IDisplayHost;
@@ -4548,11 +4779,19 @@ export declare class DesktopApplication {
    * @param recordDesktopAsync Records this desktop in its installation, as {@link DesktopRecord.recordAsync} does, while
    * the desktop checks the launch barrier, so an update waits for it to quit. A desktop it could not record is logged
    * and starts anyway.
-   * @param createUpdater Creates the updater of the installation, or gives `null` for a build that names no update feed,
-   * whose updates stay Off; it is told whether the desktop runs from a packaged build, and the updater's log is the
-   * desktop's. The {@link UpdateController} it drives keeps
-   * `update-ready.json` in the installation's folder, follows `shell.updateChecks`, pushes each state on
-   * `teamrun:updateState` and posts `shell.updateReady` once over the runtime connection.
+   * @param createUpdater Creates the updater of the installation and the handoff of its platform, given whether the
+   * desktop runs from a packaged build and the data directory's `logs` folder for the handoff's programs, or gives
+   * `null` for a build that names no update feed, whose updates stay Off; the updater's log is the desktop's. The
+   * {@link UpdateController} it drives keeps `update-ready.json` in the installation's folder, follows
+   * `shell.updateChecks`, pushes each state on `teamrun:updateState` and posts `shell.updateReady` once over the runtime
+   * connection. Before the updater starts, the handoff removes what an earlier one left. Restart to update runs an
+   * {@link UpdateStop} that connects through an {@link UpdateTargetConnector}, asks section 9's question in a window
+   * through an {@link UpdateWorkQuestion} and calls the handoff, with an {@link AppImageRestart} on Linux; a quit asked
+   * for meanwhile waits until the handoff has finished or failed. Once the handoff has succeeded, and only then, the
+   * desktop quits without asking anything again: on macOS it closes its windows and calls
+   * `nativeUpdater.quitAndInstall`, so the new version starts, and elsewhere it exits at once. When Squirrel reports an
+   * `error`, or macOS hasn't quit within 10 seconds, the desktop logs it, tells the person that macOS installs the
+   * update but TeamRun can't open again by itself, and exits.
    * @param createUpdateLock Creates the lock that lets one desktop of the installation check at a time; the lock's log
    * is the desktop's.
    * @example
@@ -4584,7 +4823,7 @@ export declare class DesktopApplication {
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
-    createUpdater: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
+    createUpdater: (installation: Installation, isPackaged: boolean, logsFolder: string, log: (text: string) => void) => IUpdateSetup | null,
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void;
 }
 
@@ -5781,6 +6020,21 @@ export interface IFeedResponse {
 }
 
 /**
+ * What a desktop updates with: its platform's updater and the handoff that installs what the updater made ready.
+ */
+export interface IUpdateSetup {
+  /**
+   * The updater, which checks, downloads and validates.
+   */
+  readonly updater: IUpdater;
+
+  /**
+   * The handoff of the desktop's platform.
+   */
+  readonly handoff: IUpdateHandoff;
+}
+
+/**
  * Checks for a newer version and downloads it.
  */
 export interface IUpdater {
@@ -6289,7 +6543,8 @@ export declare class PublisherCheck {
    * @param publisher The publisher's distinguished name.
    * @param command Runs PowerShell.
    * @param environment Supplies `SystemRoot` and the rest of PowerShell's environment.
-   * @param log Records each check, its duration and its result, in one line.
+   * @param log Records each check, its duration and whether it passed, in one line; the reason of a failure is left to
+   * the caller, so it is logged once.
    * @param now Gives the time in milliseconds.
    * @example
    * ```ts
@@ -6486,9 +6741,12 @@ export declare class UpdateController {
    * @param currentVersion The installed version.
    * @param mustMove Whether TeamRun runs on macOS outside an Applications folder, where a newer version only shows
    * as available.
+   * @param refusal Why this copy can never install an update, such as {@link IUpdateHandoff.refusal}, or `null`. A newer
+   * version, and a ready update from its record, then show as failed with this reason, so nothing is downloaded,
+   * posted or restarted.
    * @param publish Receives each state.
    * @param postReadyAsync Posts `shell.updateReady` for a version, resolving to whether the runtime took it.
-   * @param log Records failures.
+   * @param log Records each failure in one line with its reason, without the exception's name.
    * @param now Gives the time in milliseconds.
    * @param schedule Runs a callback after a delay and gives what cancels it.
    * @param restartAsync Restarts to install a ready update: asks about work in progress, stops the installation and
@@ -6498,7 +6756,7 @@ export declare class UpdateController {
    * import { DeviceFileStore, type IUpdateCheckLock, type IUpdater, UpdateController } from "@noldova/teamrun-shell-desktop";
    *
    * export function create(updater: IUpdater, lock: IUpdateCheckLock): UpdateController {
-   *   return new UpdateController(updater, new DeviceFileStore("/tmp/installation", "update-ready.json"), lock, "1.2.0", false, console.log,
+   *   return new UpdateController(updater, new DeviceFileStore("/tmp/installation", "update-ready.json"), lock, "1.2.0", false, null, console.log,
    *     () => Promise.resolve(true), console.error, Date.now, (wait, run) => {
    *       const timer = setTimeout(run, wait);
    *       return () => clearTimeout(timer);
@@ -6512,6 +6770,7 @@ export declare class UpdateController {
     lock: IUpdateCheckLock,
     currentVersion: string,
     mustMove: boolean,
+    refusal: string | null,
     publish: (status: UpdateStatus) => void,
     postReadyAsync: (version: string) => Promise<boolean>,
     log: (text: string) => void,

@@ -12,46 +12,19 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { type INativeUpdater, type IShipItProcess, SquirrelHandoff, StaleUpdateException, UpdateException, UpdateHandoffException, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+import { type IShipItProcess, SquirrelHandoff, StaleUpdateException, UpdateException, UpdateHandoffException, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
+import { FakeNativeUpdater } from "../fixtures/fake-native-updater.fixture.js";
 import { FakeUpdater } from "../fixtures/fake-updater.fixture.js";
-
-class FakeNativeUpdater implements INativeUpdater {
-  public readonly listeners: Map<string, ((...values: unknown[]) => void)[]> = new Map();
-  public checks: number = 0;
-  public onCheck: (updater: FakeNativeUpdater) => void = t => t.emit("update-downloaded");
-
-  public checkForUpdates(): void {
-    this.checks++;
-    this.onCheck(this);
-  }
-
-  public on(event: string, listener: (...values: unknown[]) => void): this {
-    this.listeners.set(event, [...this.listeners.get(event) ?? [], listener]);
-    return this;
-  }
-
-  public removeListener(event: string, listener: (...values: unknown[]) => void): this {
-    this.listeners.set(event, (this.listeners.get(event) ?? []).filter(t => t !== listener));
-    return this;
-  }
-
-  public emit(event: string, ...values: unknown[]): void {
-    for (const listener of this.listeners.get(event) ?? [])
-      listener(...values);
-  }
-
-  public get count(): number {
-    return [...this.listeners.values()].flat().length;
-  }
-}
 
 class FakeShipItProcess implements IShipItProcess {
   public processId: number | null = 5230;
   public removals: number = 0;
+  public stoppedRemovals: number = 0;
   public find: () => Promise<number | null> = () => Promise.resolve(this.processId);
   public remove: () => Promise<void> = () => Promise.resolve();
+  public removeStopped: () => Promise<void> = () => Promise.resolve();
 
   public findAsync(): Promise<number | null> {
     return this.find();
@@ -60,6 +33,11 @@ class FakeShipItProcess implements IShipItProcess {
   public removeAsync(): Promise<void> {
     this.removals++;
     return this.remove();
+  }
+
+  public removeStoppedAsync(): Promise<void> {
+    this.stoppedRemovals++;
+    return this.removeStopped();
   }
 }
 
@@ -103,6 +81,20 @@ class SquirrelHandoffFixture {
 @TestClass
 export class SquirrelHandoffTests {
   @TestMethod
+  public removesTheJobAFinishedInstallLeftAndLogsOneItCannotRemove(): Promise<void> {
+    return SquirrelHandoffFixture.runAsync(async fixture => {
+      await fixture.handoff.clearAsync();
+      fixture.shipIt.removeStopped = () => Promise.reject(new UpdateHandoffException("The jobs could not be listed."));
+      await fixture.handoff.clearAsync();
+
+      Assert.areEqual(2, fixture.shipIt.stoppedRemovals);
+      Assert.areEqual(0, fixture.shipIt.removals);
+      Assert.areEqual(JSON.stringify(["The job of an installed update could not be removed, so it is tried again at the next start: UpdateHandoffException: The jobs could not be listed."]),
+        JSON.stringify(fixture.lines));
+    });
+  }
+
+  @TestMethod
   public stagesAnUpdateDownloadedInThisProcessAndGivesItsShipItProcess(): Promise<void> {
     return SquirrelHandoffFixture.runAsync(async fixture => {
       fixture.updater.downloadedFile = fixture.updater.packagePath;
@@ -110,6 +102,7 @@ export class SquirrelHandoffTests {
       const processId = await fixture.handoff.handOffAsync(fixture.record());
 
       Assert.areEqual(5230, processId);
+      Assert.isNull(fixture.handoff.refusal);
       Assert.areEqual(0, fixture.updater.checks);
       Assert.areEqual(1, fixture.native.checks);
       Assert.areEqual(0, fixture.native.count);

@@ -38,7 +38,7 @@ export class PublisherCheck {
     catch (error) {
       failure = PublisherCheck.toLine(String(error));
     }
-    this.log(Resources.formatPublisherCheck(this.now() - started, failure));
+    this.log(Resources.formatPublisherCheck(this.now() - started, Object.isNull(failure)));
     return failure;
   }
 

@@ -10,12 +10,12 @@ import fs from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
 
 export class FailingFileCallFixture implements Disposable {
-  private readonly name: "link" | "rename" | "rm";
-  private readonly original: typeof fs.link | typeof fs.rename | typeof fs.rm;
+  private readonly name: "link" | "open" | "rename" | "rm";
+  private readonly original: typeof fs.link | typeof fs.open | typeof fs.rename | typeof fs.rm;
 
-  public constructor(name: "link" | "rename" | "rm", file: string, code: string) {
+  public constructor(name: "link" | "open" | "rename" | "rm", file: string, code: string) {
     this.name = name;
-    const original = { link: fs.link, rename: fs.rename, rm: fs.rm }[name];
+    const original = { link: fs.link, open: fs.open, rename: fs.rename, rm: fs.rm }[name];
     this.original = original;
     Reflect.set(fs, name, (...values: unknown[]): Promise<unknown> =>
       values.some(t => String(t) === file)
