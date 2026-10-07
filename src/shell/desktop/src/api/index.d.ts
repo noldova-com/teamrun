@@ -4174,7 +4174,8 @@ export declare class MainProcessRecovery {
   public attach(log: IDesktopLog, openLogFolderAsync: () => Promise<boolean>): void;
 
   /**
-   * Records a failure and, for the first one, asks the person whether to restart or quit.
+   * Records a failure and, for the first one, asks the person whether to restart or quit. The box shows the message
+   * of an {@link UnusableFolderException} before its advice.
    *
    * @param error The error or the rejection's reason, recorded with its stack.
    * @param kind How the main process failed.
@@ -5407,6 +5408,32 @@ export declare enum UpdateStateKind {
    * A check the person asked for, or a download, failed.
    */
   Failed = "Failed"
+}
+
+/**
+ * The exception thrown when the desktop cannot use the data folder it was given, whose message names the folder and
+ * the reason and is what the start-failure box shows.
+ */
+export declare class UnusableFolderException extends Exception {
+  /**
+   * The exception's name, `"UnusableFolderException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message The folder and why it cannot be used.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { UnusableFolderException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: UnusableFolderException = new UnusableFolderException("TeamRun cannot use the data folder /home/person/data: Error: Failed to set path");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
 }
 
 /**

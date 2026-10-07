@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import type { MessageBoxOptions } from "electron";
 
 import "@noldova/teamrun-foundation-core";
+import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   CommandRun, type Event, Failure, FailureCode, NotificationAction, NotificationBroadcast, NotificationPost, NotificationSeverity, NotificationState, NotificationsQuery, QualifiedName, QuitAnswered,
@@ -38,6 +39,7 @@ import {
 } from "@noldova/teamrun-shell-runtime";
 
 import { PathCommandException } from "../exceptions/path-command.exception.js";
+import { UnusableFolderException } from "../exceptions/unusable-folder.exception.js";
 import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 import type { IContextMenuParams } from "../interfaces/i-context-menu-params.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
@@ -248,7 +250,7 @@ export class DesktopApplication {
       DesktopApplication.readFolderArgument(process, Resources.dataDirectoryArgument));
     const userData = DesktopApplication.readFolderArgument(process, Resources.userDataArgument);
     if (Object.isUndefined(userData))
-      electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
+      DesktopApplication.keepProfileIn(electron, dataDirectory);
     const launchSettings = new LaunchSettings(
       dataDirectory,
       process.execPath,
@@ -1122,6 +1124,15 @@ export class DesktopApplication {
 
   private static isModuleId(value: unknown): value is string {
     return Object.isString(value) && Resources.moduleIdPattern.test(value);
+  }
+
+  private static keepProfileIn(electron: IElectron, dataDirectory: DataDirectory): void {
+    try {
+      electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
+    }
+    catch (error) {
+      throw new UnusableFolderException(Resources.formatDataFolderUnusable(dataDirectory.root, String(error)), new ExceptionOptions(error));
+    }
   }
 
   private static locateDeviceFolder(process: IDesktopProcess): string {

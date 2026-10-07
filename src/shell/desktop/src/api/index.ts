@@ -58,6 +58,7 @@ export { WindowErrorAdmission } from "../enums/window-error-admission.js";
 export { DeviceIdentityException } from "../exceptions/device-identity.exception.js";
 export { PathCommandException } from "../exceptions/path-command.exception.js";
 export { ProgramException } from "../exceptions/program.exception.js";
+export { UnusableFolderException } from "../exceptions/unusable-folder.exception.js";
 export { UpdateException } from "../exceptions/update.exception.js";
 export { UpdateHandoffException } from "../exceptions/update-handoff.exception.js";
 export { UpdateStopException } from "../exceptions/update-stop.exception.js";

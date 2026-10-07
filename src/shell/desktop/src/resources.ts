@@ -777,6 +777,14 @@ export class Resources {
     return `The notifications could not be read, so the operating system shows none until the window reads them again: ${reason}`;
   }
 
+  public static formatDataFolderUnusable(folder: string, reason: string): string {
+    return `${Resources.applicationName} cannot use the data folder ${folder}: ${reason}`;
+  }
+
+  public static formatFailureDetail(problem: string, advice: string): string {
+    return `${problem}\n\n${advice}`;
+  }
+
   public static formatDeviceUnavailable(reason: string): string {
     return `This device's identity could not be read, so window bounds are not kept: ${reason}`;
   }

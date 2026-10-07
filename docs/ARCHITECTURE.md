@@ -792,6 +792,7 @@ When a page stops responding, the desktop asks once whether to wait or reload, a
 Each episode, its outcome and the person's choice go to the desktop log.
 When the desktop's main process meets an exception it does not catch or a rejection it does not handle, its state is no longer trusted: the desktop writes the error with its stack to its log and asks once, with the operating system's message box, whether to restart TeamRun or quit, offering the log folder as well, and Electron's own error box never shows.
 It listens from its first step, so a failure before it has found its data directory goes to standard error and the box offers only restarting or quitting.
+A data folder it cannot use stops it this way, and both standard error and the box name the folder and the reason: "TeamRun cannot use the data folder", the path and the error.
 Restarting starts TeamRun again and exits; quitting exits.
 Both exit at once, without the windows' close guard or the quit question, because those run through the failed process; the runtime's work goes on, and changes the window had not yet written may be lost.
 The window reports its appearance again whenever the theme or the mode changes, and the desktop repaints the window's background and its controls, so they follow a change made while the window is open.

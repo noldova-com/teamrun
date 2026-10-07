@@ -21,7 +21,7 @@ import {
   ConnectionException, DataDirectory, DataDirectoryLocator, DeviceFolder, type Installation, PreShellDataFoundException, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeHandoverException, SystemCommand, UpdateBarrier,
   UpdateBarrierState, UpdateBarrierStatus, UpdateInProgressException
 } from "@noldova/teamrun-shell-runtime";
-import { type IIpcEvent, PathCommandException, PathCommandOutcome, UpdateException } from "@noldova/teamrun-shell-desktop";
+import { type IIpcEvent, PathCommandException, PathCommandOutcome, UnusableFolderException, UpdateException } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
@@ -2415,19 +2415,24 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async catchesAFailureBeforeItHasItsLogAndOffersToRestartOrQuit(): Promise<void> {
+  public async namesTheDataFolderItCannotUseOnStandardErrorAndInTheBoxAndOffersToRestartOrQuit(): Promise<void> {
     const electron = new FakeElectron();
-    const process = new FakeDesktopProcess("linux");
-    electron.app.pathFailure = new TypeError("Failed to set path");
+    const process = new FakeDesktopProcess("linux", ["/opt/teamrun/teamrun", "--data-dir=/var/locked/teamrun"]);
+    const cause = new TypeError("Failed to set path");
+    electron.app.pathFailure = cause;
     electron.dialog.answers.push(1);
 
-    const failure = Assert.throws(() => DesktopStartFixture.start(electron, process), TypeError);
+    const failure = Assert.throws(() => DesktopStartFixture.start(electron, process), UnusableFolderException);
     for (const listener of process.exceptionListeners)
       listener(failure);
     await electron.app.becomeReadyAsync();
     await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
 
-    Assert.isTrue(process.errors.includes(`The desktop's main process failed with an uncaught exception: TypeError: ${failure.message}`), process.errors);
+    const message = `TeamRun cannot use the data folder ${resolve("/var/locked/teamrun")}: TypeError: Failed to set path`;
+    Assert.areEqual(message, failure.message);
+    Assert.areEqual(cause, failure.cause);
+    Assert.isTrue(process.errors.includes(`The desktop's main process failed with an uncaught exception: UnusableFolderException: ${message}`), process.errors);
+    Assert.areEqual(JSON.stringify([`${message}\n\nThis happened while TeamRun was starting. Restart TeamRun to try again.`]), JSON.stringify(electron.dialog.boxes.map(t => t.options.detail)));
     Assert.areEqual(JSON.stringify([["Restart TeamRun", "Quit"]]), JSON.stringify(electron.dialog.boxes.map(t => t.options.buttons)));
     Assert.areEqual(JSON.stringify(["setName TeamRun", "exit 0"]), JSON.stringify(electron.app.calls));
   }
