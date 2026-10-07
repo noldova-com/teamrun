@@ -20,4 +20,11 @@ describe("VirtualListRow", () => {
 
     expect([row.track, row.top, row.context]).toEqual([7, 210, null]);
   });
+
+  it("tracks the Tab stop's row while it is not yet loaded as the same row wherever it moves", () => {
+    const first = new VirtualListRow<string>(7, undefined, undefined, 210, 30, true, false);
+    const moved = new VirtualListRow<string>(10, undefined, undefined, 300, 30, true, false);
+
+    expect([typeof first.track, first.track === moved.track]).toEqual(["symbol", true]);
+  });
 });

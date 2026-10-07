@@ -9,8 +9,10 @@
 import type { IVirtualRowContext } from "../interfaces/i-virtual-row-context";
 
 export class VirtualListRow<T> {
+  private static readonly stopTrack: symbol = Symbol("stop");
+
   public readonly index: number;
-  public readonly track: string | number;
+  public readonly track: string | number | symbol;
   public readonly top: number | null;
   public readonly height: number;
   public readonly isStop: boolean;
@@ -19,7 +21,7 @@ export class VirtualListRow<T> {
 
   public constructor(index: number, item: T | undefined, key: string | undefined, top: number | null, height: number, isStop: boolean, isSelected: boolean) {
     this.index = index;
-    this.track = key ?? index;
+    this.track = key ?? (isStop ? VirtualListRow.stopTrack : index);
     this.top = top;
     this.height = height;
     this.isStop = isStop;

@@ -21,6 +21,7 @@ export class GalleryResources {
   public static readonly fieldMessageIdPrefix: string = "tr-gallery-field-message-";
   public static readonly virtualListLength: number = 10_000;
   public static readonly virtualListEstimate: number = 30;
+  public static readonly virtualListSelected: number = 2;
   public static readonly text = {
     gallery: "Gallery",
     defaultState: "Default",

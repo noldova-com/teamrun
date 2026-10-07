@@ -18,7 +18,9 @@ describe("VirtualListCache", () => {
   });
 
   function createCache(source: VirtualListSourceFixture): VirtualListCache<string> {
-    return new VirtualListCache(source, t => errors.push(t));
+    const cache = new VirtualListCache(source, t => errors.push(t));
+    cache.attach();
+    return cache;
   }
 
   async function answerAllAsync(source: VirtualListSourceFixture): Promise<void> {
@@ -312,6 +314,39 @@ describe("VirtualListCache", () => {
     source.reportRemoved(11, 1);
 
     expect([moved, cache.itemAt(10), cache.itemAt(11), source.reads.length]).toEqual(["item 10", "item 9", "item 11", 2]);
+  });
+
+  it("reads the page of the row it keeps, holds that row beyond its bound and outside the request, and keeps reading that page when the request moves", async () => {
+    const source = new VirtualListSourceFixture(1000);
+    const cache = createCache(source);
+    cache.keep(510);
+
+    cache.request(0, 150);
+    cache.request(0, 150);
+    await answerAllAsync(source);
+    cache.request(300, 450);
+    await answerAllAsync(source);
+    const held = [cache.itemAt(510), cache.itemAt(511), cache.size];
+    cache.keep(null);
+    cache.request(600, 750);
+    await answerAllAsync(source);
+
+    expect(source.describeReads()).toEqual(["0-50", "50-100", "100-150", "500-550", "300-350", "350-400", "400-450", "600-650", "650-700", "700-750"]);
+    expect([held, cache.itemAt(510), cache.size]).toEqual([["item 510", undefined, 151], undefined, 150]);
+  });
+
+  it("does not read the page of a kept row beyond the end of its source, or one whose read failed", async () => {
+    const source = new VirtualListSourceFixture(100);
+    const cache = createCache(source);
+    cache.keep(400);
+    cache.request(0, 50);
+    cache.keep(80);
+    cache.request(0, 50);
+    await source.readAt(1).refuseAsync("gone");
+
+    cache.request(0, 50);
+
+    expect(source.describeReads()).toEqual(["0-50", "50-100"]);
   });
 
   it("stops its reads and no longer follows its source once disposed", () => {

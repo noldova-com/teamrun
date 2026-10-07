@@ -72,7 +72,7 @@ export class GalleryNavigationComponent {
   protected readonly listLoading: GalleryVirtualListSource = new GalleryVirtualListSource(GalleryResources.virtualListLength, GalleryResources.virtualListEstimate, () => new Promise(() => undefined));
   protected readonly listFailing: GalleryVirtualListSource = new GalleryVirtualListSource(GalleryResources.virtualListLength, GalleryResources.virtualListEstimate,
     () => Promise.reject(new VirtualListException(this.text.virtualListRefusal)));
-  protected readonly listSelected: WritableSignal<string | null> = signal(null);
+  protected readonly listSelected: WritableSignal<number | null> = signal(GalleryResources.virtualListSelected);
 
   protected moveTreeNode(move: TreeMove): void {
     this.treeNodes.update(t => move.apply(t));
