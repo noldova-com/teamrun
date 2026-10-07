@@ -1221,6 +1221,7 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
 - **macOS location.**
   A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
   Outside one, the desktop still checks but downloads and installs nothing: a newer version stays available, and About and the update item say to move TeamRun to Applications; a failed check gives its reason, then the same hint.
+  An update another copy of the installation made ready shows there as available too, and its record stays for that copy.
 - **What the person sees.**
   - **States:** up to date, checking, downloading with its progress as a whole percentage, ready and failed, and on macOS outside an Applications folder, available.
     An available, downloading or ready update names its version, and only an available or failed one says TeamRun must move to Applications, an available one always; the window refuses any other state.

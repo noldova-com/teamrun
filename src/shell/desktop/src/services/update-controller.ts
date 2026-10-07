@@ -111,7 +111,7 @@ export class UpdateController {
     }
     const ready = this.ready;
     const restartAsync = this.restartAsync;
-    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting || this.mustMove)
+    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting)
       return false;
     void this.restartReadyAsync(ready, restartAsync);
     return true;
@@ -253,6 +253,10 @@ export class UpdateController {
   }
 
   private adopt(record: UpdateReadyRecord, checkedAt: number | null): void {
+    if (this.mustMove) {
+      this.set(new UpdateStatus(UpdateStateKind.Available, record.version, null, checkedAt, null, true));
+      return;
+    }
     if (!Object.isNull(this.refusal)) {
       this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, checkedAt, this.refusal, false));
       return;

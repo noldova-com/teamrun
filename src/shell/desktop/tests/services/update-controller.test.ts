@@ -173,6 +173,24 @@ export class UpdateControllerTests {
   }
 
   @TestMethod
+  public onlyShowsAnUpdateAnotherDesktopMadeReadyAsAvailableWhenTeamRunMustMoveAndKeepsItsRecord(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      fixture.record.kept = fixture.ready;
+      await fixture.controller.startAsync();
+      const restarted = fixture.controller.act("Restart");
+      await fixture.controller.notifyAsync();
+      fixture.controller.act("Check");
+      await fixture.publishedAsync(3);
+
+      Assert.isFalse(restarted);
+      Assert.areEqual(JSON.stringify(["Available", "Checking", "Available"]), JSON.stringify(fixture.kinds));
+      Assert.areEqual(JSON.stringify({ kind: "Available", version: "1.3.0", progress: null, checkedAt: null, reason: null, mustMove: true }), JSON.stringify(fixture.controller.status.toJson()));
+      Assert.areEqual(JSON.stringify(fixture.ready), JSON.stringify(fixture.record.kept));
+      Assert.areEqual(JSON.stringify([0, 0, 0, 0]), JSON.stringify([fixture.restarts.length, fixture.posts.length, fixture.updater.checks, fixture.updater.downloads]));
+    }, true, true, true, "This copy can't install updates.");
+  }
+
+  @TestMethod
   public showsWhyANewerVersionCannotBeInstalledWithoutDownloadingIt(): Promise<void> {
     return UpdateControllerFixture.runAsync(async fixture => {
       fixture.updater.check = () => Promise.resolve("1.3.0");
