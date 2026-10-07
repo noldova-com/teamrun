@@ -36,6 +36,10 @@ export class FakeApplicationHost implements IApplicationHost {
     this.calls.push(`setName ${name}`);
   }
 
+  public setVersion(version: string): void {
+    this.calls.push(`setVersion ${version}`);
+  }
+
   public setAppUserModelId(id: string): void {
     this.calls.push(`setAppUserModelId ${id}`);
   }

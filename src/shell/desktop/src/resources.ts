@@ -18,6 +18,10 @@ export class Resources {
     return `Another update of ${Resources.applicationName} is under way.`;
   }
 
+  public static get updaterNotCreated(): string {
+    return `${Resources.applicationName} couldn't start checking for updates.`;
+  }
+
   public static get updateHolderNotFound(): string {
     return `${Resources.applicationName} could not find its own process in the process table.`;
   }
@@ -896,6 +900,10 @@ export class Resources {
 
   public static formatUpdateCheckNotReleased(error: string): string {
     return `The update check could not let go of its lock: ${error}`;
+  }
+
+  public static formatUpdaterNotCreated(error: string): string {
+    return `The updater could not be created, so this desktop doesn't check for updates: ${error}`;
   }
 
   public static formatUpdaterMessage(message: string): string {
