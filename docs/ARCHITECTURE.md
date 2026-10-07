@@ -1196,6 +1196,9 @@ The updater and the desktop's update stop divide an update at the person's Resta
   - Right before it, the download's size and SHA-512 are checked again, and on Windows the installer's signature by the publisher, so a file changed after its download is never installed.
   - Windows starts the installer quietly, without the desktop's inherited handles, and names it as the process that took the handoff.
   - macOS has Squirrel.Mac install from the ZIP and names its ShipIt process, which replaces the application once the desktop has quit.
+    Squirrel stages the update only inside the handoff, and ShipIt runs as the launchd job `<bundle identifier>.ShipIt` from then until it has installed.
+    A staged update installs at any quit, so a handoff that fails after staging removes that job.
+    A finished install leaves the job without a process, and a desktop removes such a job at start, before its updater.
   - Linux copies the download to a file with a unique name beside the AppImage, created only when no file has that name, gives it the AppImage's permissions, flushes it to disk and renames it over the AppImage, following a link to the file it names.
     So the AppImage is always one whole version, and no process takes the handoff.
     A folder that cannot be written refuses the handoff, and any failure removes the copy and leaves the AppImage as it was.
