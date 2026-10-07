@@ -7,7 +7,7 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <div #viewport class="tr-virtual-list-viewport" (scroll)="onScroll()">
-  <div class="tr-virtual-list-rows" role="listbox" [attr.aria-label]="label()" [attr.aria-busy]="gap()?.isFailed === false"
+  <div #list class="tr-virtual-list-rows" role="listbox" [attr.aria-label]="label()" [attr.aria-busy]="gap()?.isFailed === false"
     [style.padding-top.px]="range().top" [style.padding-bottom.px]="range().bottom" (focusout)="leave($event)">
     @for (row of rows(); track row.track) {
       <div #slot class="tr-virtual-list-slot" [attr.data-tr-row]="row.index" [class.tr-virtual-list-slot-outside]="row.top !== null" [style.top.px]="row.top"

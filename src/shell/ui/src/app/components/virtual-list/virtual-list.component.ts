@@ -9,7 +9,7 @@
 import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { NgTemplateOutlet } from "@angular/common";
 import {
-  ChangeDetectionStrategy, Component, DOCUMENT, DestroyRef, ElementRef, type Signal, type WritableSignal, afterEveryRender, computed, contentChild, effect, inject, input, output,
+  ChangeDetectionStrategy, Component, DOCUMENT, DestroyRef, type ElementRef, type Signal, type WritableSignal, afterEveryRender, computed, contentChild, effect, inject, input, output,
   signal, untracked, viewChild, viewChildren
 } from "@angular/core";
 
@@ -20,6 +20,7 @@ import { ButtonVariant } from "../../enums/button-variant";
 import { VirtualListAlign } from "../../enums/virtual-list-align";
 import type { IVirtualListObserver } from "../../interfaces/i-virtual-list-observer";
 import { VirtualListAnchor } from "../../models/virtual-list-anchor";
+import { VirtualListChoice } from "../../models/virtual-list-choice";
 import { VirtualListGap } from "../../models/virtual-list-gap";
 import { VirtualListRow } from "../../models/virtual-list-row";
 import type { VirtualListSource } from "../../models/virtual-list-source";
@@ -37,10 +38,10 @@ import { VirtualRowDirective } from "./virtual-row.directive";
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class VirtualListComponent<T> {
-  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly document: Document = inject(DOCUMENT);
   private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly viewport: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("viewport");
+  private readonly list: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("list");
   private readonly slots: Signal<readonly ElementRef<HTMLElement>[]> = viewChildren<ElementRef<HTMLElement>>("slot");
   private readonly observer: ResizeObserver = new ResizeObserver(t => this.measure(t));
   private readonly observed: Set<Element> = new Set();
@@ -59,7 +60,7 @@ export class VirtualListComponent<T> {
     const { cache } = this.state();
     cache.revision();
     const focus = this.focusIndex();
-    return this.isFocused() && !Object.isNull(focus) && Object.isUndefined(cache.itemAt(focus));
+    return this.isFocused() && !Object.isNull(focus) && Object.isUndefined(cache.itemAt(focus)) && !cache.isFailed(focus);
   });
   private anchor: VirtualListAnchor = new VirtualListAnchor(0, 0);
   private pendingTop: number | null = null;
@@ -76,7 +77,9 @@ export class VirtualListComponent<T> {
   protected readonly range: Signal<VirtualRange> = computed(() => this.rangeFor(Resources.virtualListOverscan), { equal: (a, b) => a.equals(b) });
   protected readonly stop: Signal<number | null> = computed(() => {
     const count = this.state().source.length();
-    return count === 0 ? null : Math.min(this.focusIndex() ?? this.selected() ?? 0, count - 1);
+    const selected = this.selected() ?? -1;
+    const fallback = selected >= 0 && selected < count ? selected : 0;
+    return count === 0 ? null : Math.min(this.focusIndex() ?? fallback, count - 1);
   });
   protected readonly rows: Signal<readonly VirtualListRow<T>[]> = computed(() => {
     const { source, ledger, cache } = this.state();
@@ -112,7 +115,7 @@ export class VirtualListComponent<T> {
   public readonly source = input.required<VirtualListSource<T>>();
   public readonly label = input.required<string>();
   public readonly selected = input<number | null>(null);
-  public readonly activated = output<number>();
+  public readonly activated = output<VirtualListChoice<T>>();
   public readonly failed = output<unknown>();
 
   public constructor() {
@@ -177,7 +180,7 @@ export class VirtualListComponent<T> {
   }
 
   protected leave(event: FocusEvent): void {
-    if (event.relatedTarget instanceof Node && this.host.contains(event.relatedTarget))
+    if (event.relatedTarget instanceof Node && this.list().nativeElement.contains(event.relatedTarget))
       return;
     const { target } = event;
     queueMicrotask(() => {
@@ -202,8 +205,9 @@ export class VirtualListComponent<T> {
   }
 
   protected choose(index: number): void {
-    if (!Object.isUndefined(this.state().cache.itemAt(index)))
-      this.activated.emit(index);
+    const item = this.state().cache.itemAt(index);
+    if (!Object.isUndefined(item))
+      this.activated.emit(new VirtualListChoice(index, item));
   }
 
   protected retry(): void {
@@ -320,9 +324,11 @@ export class VirtualListComponent<T> {
     }
     if (!isChanged)
       return;
-    viewport.scrollTop = ledger.topOf(this.anchor);
+    const top = ledger.topOf(this.anchor);
+    viewport.scrollTop = top;
     this.domTop = viewport.scrollTop;
-    this.scrollTop.set(viewport.scrollTop);
+    this.pendingTop = top;
+    this.scrollTop.set(top);
     this.layout.update(t => t + 1);
   }
 

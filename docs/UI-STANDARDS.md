@@ -335,7 +335,7 @@ The rows of a menu, list, tree or dropdown fill their column and keep 0.5rem.
   On Windows and Linux, while no modal dialog is open, F10 or Alt pressed and released alone focuses the menu bar, or the Menu icon button when the menus are one, and Escape, once no menu is open, returns the focus to where it was.
 - The kit's virtual list marks each row it renders with its position in the whole list (`aria-posinset`) and the list's length (`aria-setsize`), and marks itself busy (`aria-busy`) while rows in view load.
   A row not yet loaded is blank and hidden from assistive technology (`aria-hidden`) until focus or a key reaches it; it then takes its position marking and holds the focus while it loads.
-  While rows in view load, a status line says so, announced politely; a read that fails shows an error at the edge where rows are missing, announced as an alert, with a Retry button that reads them again.
+  While rows in view load, a status line says so, and the list announces politely that the focused row loads while it waits for its items; a read that fails shows an error at the edge where rows are missing, announced as an alert, with a Retry button that reads them again.
   The list shows in one of two patterns:
   - An options list follows the [listbox pattern](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/).
     It is one Tab stop, which returns to the row last focused, or lands on the selected row, or on the first.

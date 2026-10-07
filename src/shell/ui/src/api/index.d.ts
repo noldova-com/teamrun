@@ -4519,6 +4519,38 @@ export declare class ViewBadgeComponent {
 }
 
 /**
+ * The row a person chose in a {@link VirtualListComponent}, which its
+ * {@link VirtualListComponent.activated} emits.
+ *
+ * @typeParam T The type of the source's items.
+ */
+export declare class VirtualListChoice<T> {
+  /**
+   * The chosen row's position in the whole list, from 0.
+   */
+  public readonly index: number;
+
+  /**
+   * The chosen row's item, as the list loaded it.
+   */
+  public readonly item: T;
+
+  /**
+   * Creates a choice; the list makes one for each row a person chooses.
+   *
+   * @param index The chosen row's position in the whole list, from 0.
+   * @param item The chosen row's item.
+   * @example
+   * ```ts
+   * import { VirtualListChoice } from "@noldova/teamrun-shell-ui";
+   *
+   * export const choice: VirtualListChoice<string> = new VirtualListChoice(2, "Linus");
+   * ```
+   */
+  public constructor(index: number, item: T);
+}
+
+/**
  * The kit's list for a long collection, `tr-virtual-list`: a named listbox
  * of options that renders only the rows in and just beyond its view, so the
  * rows it renders do not grow with the list's length. It reads its items
@@ -4557,17 +4589,17 @@ export declare class VirtualListComponent<T> {
    * The position of the selected row, from 0, which is highlighted, selected
    * for assistive technology and the list's Tab stop until a row has been
    * focused, whether its item has loaded or not, or null for none; null when
-   * not bound. The owner moves it with the items it adds or removes before
-   * it.
+   * not bound. A position outside the list counts as none. The owner moves
+   * it with the items it adds or removes before it.
    */
   public readonly selected: InputSignal<number | null>;
 
   /**
-   * Emits the position of the loaded row the person chose by a click, Enter
-   * or Space; the owner usually makes it
+   * Emits the loaded row the person chose by a click, Enter or Space, with
+   * its position and its item; the owner usually makes the position
    * {@link VirtualListComponent.selected}.
    */
-  public readonly activated: OutputEmitterRef<number>;
+  public readonly activated: OutputEmitterRef<VirtualListChoice<T>>;
 
   /**
    * Emits why a read failed: what {@link VirtualListSource.readAsync}
@@ -4589,7 +4621,7 @@ export declare class VirtualListComponent<T> {
    * @Component({
    *   selector: "tr-contact-list",
    *   imports: [VirtualListComponent, VirtualRowDirective],
-   *   template: "<tr-virtual-list label=\"Contacts\" [source]=\"contacts\" [selected]=\"chosen\" (activated)=\"chosen = $event\"><ng-template [trVirtualRow]=\"contacts\" let-name>{{ name }}</ng-template></tr-virtual-list>",
+   *   template: "<tr-virtual-list label=\"Contacts\" [source]=\"contacts\" [selected]=\"chosen\" (activated)=\"chosen = $event.index\"><ng-template [trVirtualRow]=\"contacts\" let-name>{{ name }}</ng-template></tr-virtual-list>",
    *   styles: "tr-virtual-list { height: 20rem; }"
    * })
    * export class ContactListComponent {

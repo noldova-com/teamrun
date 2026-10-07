@@ -50,7 +50,7 @@ LICENSE file in the root directory of this source tree.
 
 <tr-gallery-specimen [name]="text.virtualList" [size]="sizes.Wide">
   <tr-gallery-cell [caption]="text.defaultState">
-    <tr-virtual-list class="tr-gallery-list" [label]="text.virtualListLabel" [source]="listItems" [selected]="listSelected()" (activated)="listSelected.set($event)">
+    <tr-virtual-list class="tr-gallery-list" [label]="text.virtualListLabel" [source]="listItems" [selected]="listSelected()" (activated)="listSelected.set($event.index)">
       <ng-template [trVirtualRow]="listItems" let-item>{{ item }}</ng-template>
     </tr-virtual-list>
   </tr-gallery-cell>
