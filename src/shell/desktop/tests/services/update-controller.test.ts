@@ -187,7 +187,7 @@ export class UpdateControllerTests {
   }
 
   @TestMethod
-  public showsAnUpdateAnotherDesktopReadiedWithTheReasonItCannotBeInstalled(): Promise<void> {
+  public showsAnUpdateAnotherDesktopReadiedAsFailedWithTheReasonItCannotBeInstalled(): Promise<void> {
     return UpdateControllerFixture.runAsync(async fixture => {
       await fixture.controller.startAsync();
       fixture.record.kept = fixture.ready;
@@ -195,14 +195,14 @@ export class UpdateControllerTests {
       fixture.controller.act("Check");
       await fixture.publishedAsync(2);
 
-      Assert.areEqual(JSON.stringify({ kind: "Ready", version: "1.3.0", progress: null, checkedAt: null, reason: "This copy can't install updates.", mustMove: false }),
+      Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: null, reason: "This copy can't install updates.", mustMove: false }),
         JSON.stringify(fixture.controller.status.toJson()));
       Assert.areEqual(0, fixture.updater.checks);
     }, false, true, true, "This copy can't install updates.");
   }
 
   @TestMethod
-  public showsAReadyRecordItCannotInstallWithTheReasonAndNeitherPostsNorRestartsIt(): Promise<void> {
+  public showsAReadyRecordItCannotInstallAsFailedWithTheReasonAndNeitherPostsNorRestartsIt(): Promise<void> {
     return UpdateControllerFixture.runAsync(async fixture => {
       fixture.record.kept = fixture.ready;
       await fixture.controller.startAsync();
@@ -211,7 +211,7 @@ export class UpdateControllerTests {
       const restarted = fixture.controller.act("Restart");
 
       Assert.isFalse(restarted);
-      Assert.areEqual(JSON.stringify([{ kind: "Ready", version: "1.3.0", progress: null, checkedAt: null, reason: "This copy can't install updates.", mustMove: false }]),
+      Assert.areEqual(JSON.stringify([{ kind: "Failed", version: null, progress: null, checkedAt: null, reason: "This copy can't install updates.", mustMove: false }]),
         JSON.stringify(fixture.published.map(t => t.toJson())));
       Assert.areEqual(0, fixture.posts.length);
       Assert.areEqual(0, fixture.restarts.length);

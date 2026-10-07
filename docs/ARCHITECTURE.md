@@ -1199,7 +1199,7 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   On macOS an update restored from its record is checked and downloaded again, which reuses the cached ZIP, since electron-updater keeps no download across restarts; Squirrel.Mac then has 2 minutes to stage it, checking its code signature, and its ShipIt process installs it once the desktop quits through `autoUpdater.quitAndInstall`.
   Once staged, any quit installs the update, so only the handoff stages it, and a handoff that fails after asking Squirrel.Mac to stage, or finds no ShipIt process after the stage, removes the ShipIt job, as it does for a stage that finishes after the 2 minutes.
   On Linux a desktop that doesn't run from an AppImage has no AppImage to replace, which is known before anything runs, so it never downloads or stops anything for an update.
-  A newer version shows as failed with that reason, a ready update from its record shows the reason and isn't posted, and Restart to update is refused.
+  A newer version, and a ready update from its record, show as failed with that reason, so the window never offers Restart to update.
   Only once the handoff has succeeded does the desktop quit, without asking about work or saving again, since the update stop already did both: through `autoUpdater.quitAndInstall` on macOS, so the new version starts, and at once elsewhere.
   When `quitAndInstall` throws, the desktop logs why, tells the person that macOS installs the update once TeamRun quits but TeamRun can't open again by itself, and quits.
   A handoff that fails leaves the desktop running as before, so quitting it later asks and saves as usual.

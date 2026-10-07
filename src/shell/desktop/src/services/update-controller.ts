@@ -89,10 +89,8 @@ export class UpdateController {
   public async startAsync(): Promise<void> {
     this.startedAt = this.now();
     const record = await this.readRecordAsync();
-    if (!Object.isNull(record)) {
-      this.ready = record;
-      this.set(new UpdateStatus(UpdateStateKind.Ready, record.version, null, null, this.refusal, false));
-    }
+    if (!Object.isNull(record))
+      this.adopt(record, null);
     this.arm();
   }
 
@@ -113,7 +111,7 @@ export class UpdateController {
     }
     const ready = this.ready;
     const restartAsync = this.restartAsync;
-    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting || this.mustMove || !Object.isNull(this.refusal))
+    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting || this.mustMove)
       return false;
     void this.restartReadyAsync(ready, restartAsync);
     return true;
@@ -167,7 +165,7 @@ export class UpdateController {
 
   private async notifyOnceAsync(): Promise<void> {
     const ready = this.ready;
-    if (Object.isNull(ready) || ready.isNotified || this.isStopped || !Object.isNull(this.refusal))
+    if (Object.isNull(ready) || ready.isNotified || this.isStopped)
       return;
     try {
       const stored = await this.record.readAsync();
@@ -230,8 +228,7 @@ export class UpdateController {
   private async checkHeldAsync(previous: UpdateStatus, isRequested: boolean): Promise<void> {
     const found = await this.inspectRecordAsync();
     if (found instanceof UpdateReadyRecord) {
-      this.ready = found;
-      this.set(new UpdateStatus(UpdateStateKind.Ready, found.version, null, previous.checkedAt, this.refusal, false));
+      this.adopt(found, previous.checkedAt);
       return;
     }
     let version: string | null;
@@ -253,6 +250,15 @@ export class UpdateController {
       this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, checkedAt, this.refusal, false));
     else
       await this.downloadAsync(version, checkedAt);
+  }
+
+  private adopt(record: UpdateReadyRecord, checkedAt: number | null): void {
+    if (!Object.isNull(this.refusal)) {
+      this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, checkedAt, this.refusal, false));
+      return;
+    }
+    this.ready = record;
+    this.set(new UpdateStatus(UpdateStateKind.Ready, record.version, null, checkedAt, null, false));
   }
 
   private async downloadAsync(version: string, checkedAt: number): Promise<void> {

@@ -2232,7 +2232,7 @@ export class DesktopApplicationTests {
         () => Promise.resolve(true), () => new FakeUpdater(String(record["file"])), undefined, handoff);
       await DesktopStartFixture.openAsync(electron);
       const trusted = DesktopStartFixture.trustedEvent("linux");
-      await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "kind") === "Ready");
+      await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "kind") === "Failed");
 
       const isStarted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Restart");
 

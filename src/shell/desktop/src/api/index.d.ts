@@ -576,8 +576,8 @@ export declare class AppImageReplacement {
 export interface IUpdateHandoff {
   /**
    * Why this copy of TeamRun can never install an update, known before anything is downloaded or stopped, or
-   * `null` when it can. The update controller then shows the reason instead of downloading and refuses Restart to
-   * update.
+   * `null` when it can. The update controller then shows the update as failed with this reason instead of downloading
+   * it or offering Restart to update.
    *
    * @example
    * ```ts
@@ -6708,8 +6708,8 @@ export declare class UpdateController {
    * @param mustMove Whether TeamRun runs on macOS outside an Applications folder, where a newer version only shows
    * as available.
    * @param refusal Why this copy can never install an update, such as {@link IUpdateHandoff.refusal}, or `null`. A newer
-   * version then shows as failed with this reason and isn't downloaded; a ready update shows it, isn't posted and
-   * Restart to update is refused.
+   * version, and a ready update from its record, then show as failed with this reason, so nothing is downloaded,
+   * posted or restarted.
    * @param publish Receives each state.
    * @param postReadyAsync Posts `shell.updateReady` for a version, resolving to whether the runtime took it.
    * @param log Records failures.
