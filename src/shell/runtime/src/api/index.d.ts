@@ -2645,10 +2645,11 @@ export interface IProcessStarter {
 
 /**
  * The system calls a {@link ProcessSupervisor} makes on Windows to read the
- * process table and end processes. {@link ProcessSupervisor.create} passes
- * the system's own functions, called through the runtime's Windows addon.
- * Each call returns at once, and creating an implementation loads nothing, so
- * a supervisor can be created on any platform.
+ * process table and end processes, and that the desktop makes to hold a file
+ * open for reading. {@link ProcessSupervisor.create} passes the system's own
+ * functions, called through the runtime's Windows addon, as
+ * {@link WindowsProcessApi} does. Each call returns at once, and creating an
+ * implementation loads nothing, so a supervisor can be created on any platform.
  */
 export interface IWindowsProcessApi {
   /**
@@ -2753,9 +2754,38 @@ export interface IWindowsProcessApi {
   hasExited(handle: bigint): boolean;
 
   /**
+   * Opens a file for reading, as `CreateFileW` does with `GENERIC_READ` and
+   * `FILE_SHARE_READ` only: while the handle is open, the file can be read and
+   * started but not written, renamed or deleted.
+   *
+   * @param file The file's absolute path.
+   * @returns The file's handle, which {@link IWindowsProcessApi.closeHandle} closes, or the Windows error code when it
+   * could not be opened: 2 when it doesn't exist, 32 when another handle shares no reading or holds it for writing.
+   * @throws {TypeError} When the path holds a null character.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function holdWhile<T>(api: IWindowsProcessApi, file: string, run: () => T): T | null {
+   *   const handle = api.openFileForReading(file);
+   *   if (typeof handle === "number")
+   *     return null;
+   *   try {
+   *     return run();
+   *   }
+   *   finally {
+   *     api.closeHandle(handle);
+   *   }
+   * }
+   * ```
+   */
+  openFileForReading(file: string): bigint | number;
+
+  /**
    * Closes a handle, as `CloseHandle` does.
    *
-   * @param handle A handle from {@link IWindowsProcessApi.openProcess}, which is not used again.
+   * @param handle A handle from {@link IWindowsProcessApi.openProcess} or {@link IWindowsProcessApi.openFileForReading},
+   * which is not used again.
    * @example
    * ```ts
    * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -2767,6 +2797,126 @@ export interface IWindowsProcessApi {
    * ```
    */
   closeHandle(handle: bigint): void;
+}
+
+/**
+ * The runtime's Windows addon, `native/windows-process.node`, loaded on the
+ * first call. Each method is {@link IWindowsProcessApi}'s, and each throws
+ * {@link AddonLoadException} when the addon cannot be loaded, lacks a function
+ * or returns a value of another kind, as an addon from another build does.
+ */
+export declare class WindowsProcessApi implements IWindowsProcessApi {
+  /**
+   * Lists the processes running now; see {@link IWindowsProcessApi.listProcesses}.
+   *
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function count(api: WindowsProcessApi): number {
+   *   return api.listProcesses().length;
+   * }
+   * ```
+   */
+  public listProcesses(): readonly (readonly [number, number])[];
+
+  /**
+   * Opens a process; see {@link IWindowsProcessApi.openProcess}.
+   *
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function open(api: WindowsProcessApi, processId: number): bigint | number {
+   *   return api.openProcess(processId, 0x1000);
+   * }
+   * ```
+   */
+  public openProcess(processId: number, access: number): bigint | number;
+
+  /**
+   * Reads when a process was created; see {@link IWindowsProcessApi.readCreationTime}.
+   *
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readCreated(api: WindowsProcessApi, handle: bigint): bigint | null {
+   *   return api.readCreationTime(handle);
+   * }
+   * ```
+   */
+  public readCreationTime(handle: bigint): bigint | null;
+
+  /**
+   * Reads the executable a process runs; see {@link IWindowsProcessApi.readImagePath}.
+   *
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function readExecutable(api: WindowsProcessApi, handle: bigint): string | null {
+   *   return api.readImagePath(handle);
+   * }
+   * ```
+   */
+  public readImagePath(handle: bigint): string | null;
+
+  /**
+   * Ends a process; see {@link IWindowsProcessApi.terminateProcess}.
+   *
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function end(api: WindowsProcessApi, handle: bigint): boolean {
+   *   return api.terminateProcess(handle);
+   * }
+   * ```
+   */
+  public terminateProcess(handle: bigint): boolean;
+
+  /**
+   * Checks whether a process has exited; see {@link IWindowsProcessApi.hasExited}.
+   *
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function hasEnded(api: WindowsProcessApi, handle: bigint): boolean {
+   *   return api.hasExited(handle);
+   * }
+   * ```
+   */
+  public hasExited(handle: bigint): boolean;
+
+  /**
+   * Opens a file for reading that stays unwritable while held; see {@link IWindowsProcessApi.openFileForReading}.
+   *
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function hold(api: WindowsProcessApi, file: string): bigint | number {
+   *   return api.openFileForReading(file);
+   * }
+   * ```
+   */
+  public openFileForReading(file: string): bigint | number;
+
+  /**
+   * Closes a handle; see {@link IWindowsProcessApi.closeHandle}.
+   *
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function close(api: WindowsProcessApi, handle: bigint): void {
+   *   api.closeHandle(handle);
+   * }
+   * ```
+   */
+  public closeHandle(handle: bigint): void;
 }
 
 /**

@@ -13,6 +13,8 @@ import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 
 import { UpdateStateKind } from "../enums/update-state-kind.js";
+import { UpdateHandoffException } from "../exceptions/update-handoff.exception.js";
+import { UpdateStopException } from "../exceptions/update-stop.exception.js";
 import { UpdateException } from "../exceptions/update.exception.js";
 import type { IDeviceFileStore } from "../interfaces/i-device-file-store.js";
 import type { IUpdateCheckLock } from "../interfaces/i-update-check-lock.js";
@@ -32,6 +34,7 @@ export class UpdateController {
   private readonly log: (text: string) => void;
   private readonly now: () => number;
   private readonly schedule: (delay: number, run: () => void) => () => void;
+  private readonly restartAsync: ((record: UpdateReadyRecord) => Promise<void>) | null;
   private current: UpdateStatus = new UpdateStatus(UpdateStateKind.UpToDate, null, null, null, null, false);
   private ready: UpdateReadyRecord | null = null;
   private choice: string = Resources.automaticUpdateChecks;
@@ -41,6 +44,7 @@ export class UpdateController {
   private isNotifying: boolean = false;
   private isNotifyPending: boolean = false;
   private isStopped: boolean = false;
+  private isRestarting: boolean = false;
 
   public constructor(
     updater: IUpdater,
@@ -52,7 +56,8 @@ export class UpdateController {
     postReadyAsync: (version: string) => Promise<boolean>,
     log: (text: string) => void,
     now: () => number,
-    schedule: (delay: number, run: () => void) => () => void) {
+    schedule: (delay: number, run: () => void) => () => void,
+    restartAsync: ((record: UpdateReadyRecord) => Promise<void>) | null) {
     this.updater = updater;
     this.record = record;
     this.lock = lock;
@@ -63,6 +68,7 @@ export class UpdateController {
     this.log = log;
     this.now = now;
     this.schedule = schedule;
+    this.restartAsync = restartAsync;
   }
 
   public static async hashFileAsync(file: string): Promise<string> {
@@ -95,9 +101,17 @@ export class UpdateController {
   }
 
   public act(action: unknown): boolean {
-    if (action !== Resources.updateCheckAction || this.current.isBusy || this.isStopped)
+    if (this.isStopped)
       return false;
-    void this.checkAsync(true);
+    if (action === Resources.updateCheckAction && !this.current.isBusy) {
+      void this.checkAsync(true);
+      return true;
+    }
+    const ready = this.ready;
+    const restartAsync = this.restartAsync;
+    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting)
+      return false;
+    void this.restartReadyAsync(ready, restartAsync);
     return true;
   }
 
@@ -123,6 +137,19 @@ export class UpdateController {
     this.cancelTimer?.();
     this.cancelTimer = null;
     this.updater.cancel();
+  }
+
+  private async restartReadyAsync(ready: UpdateReadyRecord, restartAsync: (record: UpdateReadyRecord) => Promise<void>): Promise<void> {
+    this.isRestarting = true;
+    try {
+      await restartAsync(ready);
+    }
+    catch (error) {
+      this.set(new UpdateStatus(UpdateStateKind.Ready, ready.version, null, this.current.checkedAt, this.explain(error), false));
+    }
+    finally {
+      this.isRestarting = false;
+    }
   }
 
   private async notifyOnceAsync(): Promise<void> {
@@ -279,7 +306,7 @@ export class UpdateController {
 
   private explain(error: unknown): string {
     this.log(Resources.formatUpdateFailed(String(error)));
-    return error instanceof UpdateException ? error.message : Resources.updateFailedUnexpectedly;
+    return error instanceof UpdateException || error instanceof UpdateStopException || error instanceof UpdateHandoffException ? error.message : Resources.updateFailedUnexpectedly;
   }
 
   private set(status: UpdateStatus): void {

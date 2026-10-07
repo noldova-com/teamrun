@@ -225,8 +225,10 @@ export class FeedUpdaterTests {
       await writeFile(updater.packagePath, "TeamRun 1.3.0");
       app.download = () => Promise.resolve([updater.packagePath]);
 
+      const before = updater.downloadedFile;
       const signed = await updater.downloadAsync(() => undefined);
       const kept = existsSync(signed);
+      const downloaded = updater.downloadedFile;
       failure = "The signature is not the publisher's.";
       const unsigned = await Assert.throwsAsync(() => updater.downloadAsync(() => undefined), UpdateException);
       const isDeleted = !existsSync(updater.packagePath);
@@ -238,6 +240,8 @@ export class FeedUpdaterTests {
       }
 
       Assert.areEqual(updater.packagePath, signed);
+      Assert.isNull(before);
+      Assert.areEqual(updater.packagePath, downloaded);
       Assert.isTrue(kept);
       Assert.areEqual("The update isn't signed by the publisher.", unsigned.message);
       Assert.isTrue(isDeleted);

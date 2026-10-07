@@ -19,7 +19,7 @@
     "coverageExclusions": [
       {
         "file": "services/process/windows-process-api.ts",
-        "reason": "Loads the Windows addon, which only a Windows build contains; the process tests run it natively there."
+        "reason": "Loads the Windows addon, which only a Windows build contains; the process and file-holding tests run it natively there."
       }
     ]
   }

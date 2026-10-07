@@ -19,7 +19,7 @@ import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Prov
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchException, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, IWindowsProcessApi, LaunchException, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -508,6 +508,283 @@ export declare class AppImageReplacement {
    * ```
    */
   public replaceAsync(download: string): Promise<void>;
+}
+
+/**
+ * Hands a ready update over to what installs it, once every process of the installation has stopped: the step
+ * `UpdateStop.runAsync` runs last. Each platform's handoff first hashes the downloaded file again and refuses one whose
+ * SHA-512 no longer matches the ready record.
+ */
+export interface IUpdateHandoff {
+  /**
+   * Hands the update over.
+   *
+   * @param record The ready update.
+   * @returns A promise of the id of the process that takes the update over, or `null` when none does.
+   * @throws {UpdateHandoffException} Rejected with the reason when the update cannot be handed over; nothing is installed.
+   * @example
+   * ```ts
+   * import type { IUpdateHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function handOffAsync(handoff: IUpdateHandoff, record: UpdateReadyRecord): Promise<number | null> {
+   *   return handoff.handOffAsync(record);
+   * }
+   * ```
+   */
+  handOffAsync(record: UpdateReadyRecord): Promise<number | null>;
+}
+
+/**
+ * The part of Electron's `autoUpdater`, Squirrel.Mac, that stages a macOS update.
+ */
+export interface INativeUpdater {
+  /**
+   * Asks Squirrel.Mac to fetch the update from the feed electron-updater set and stage it.
+   *
+   * @example
+   * ```ts
+   * import type { INativeUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stage(updater: INativeUpdater): void {
+   *   updater.checkForUpdates();
+   * }
+   * ```
+   */
+  checkForUpdates(): void;
+
+  /**
+   * Listens for an event: `update-downloaded` once the update is staged, `error` with the failure.
+   *
+   * @param event The event's name.
+   * @param listener Receives the event's values.
+   * @returns The updater.
+   * @example
+   * ```ts
+   * import type { INativeUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function onStaged(updater: INativeUpdater, run: () => void): void {
+   *   updater.on("update-downloaded", run);
+   * }
+   * ```
+   */
+  on(event: string, listener: (...values: unknown[]) => void): unknown;
+
+  /**
+   * Stops listening for an event.
+   *
+   * @param event The event's name.
+   * @param listener A listener given to {@link INativeUpdater.on}.
+   * @returns The updater.
+   * @example
+   * ```ts
+   * import type { INativeUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function offStaged(updater: INativeUpdater, run: () => void): void {
+   *   updater.removeListener("update-downloaded", run);
+   * }
+   * ```
+   */
+  removeListener(event: string, listener: (...values: unknown[]) => void): unknown;
+}
+
+/**
+ * The ShipIt process Squirrel.Mac starts, as the launchd job `<bundle id>.ShipIt`, once it has staged an update; it
+ * installs the update when the desktop quits.
+ */
+export interface IShipItProcess {
+  /**
+   * Finds the job's process.
+   *
+   * @returns A promise of its process id, or `null` when none runs.
+   * @example
+   * ```ts
+   * import type { IShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function findAsync(shipIt: IShipItProcess): Promise<number | null> {
+   *   return shipIt.findAsync();
+   * }
+   * ```
+   */
+  findAsync(): Promise<number | null>;
+
+  /**
+   * Removes the job, so quitting installs nothing.
+   *
+   * @returns A promise that resolves once the job is removed.
+   * @example
+   * ```ts
+   * import type { IShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function removeAsync(shipIt: IShipItProcess): Promise<void> {
+   *   return shipIt.removeAsync();
+   * }
+   * ```
+   */
+  removeAsync(): Promise<void>;
+}
+
+/**
+ * The Windows handoff of an update. It copies the downloaded installer into a new folder of its own under
+ * `handoff` in the installation's folder, restricted to the current user, with a copy that fails when the file
+ * exists. It then holds the copy open with read sharing only, so it can be read and started but not written,
+ * renamed or deleted, hashes it again and gives it to the installer's start, which checks its publisher and starts
+ * it. The installer reads its own file after it has started, so the copy stays held until this desktop exits; a
+ * failure lets it go. A later start removes the `handoff` folder, which a running installer keeps in place.
+ */
+export declare class InstallerHandoff implements IUpdateHandoff {
+  /**
+   * Creates the handoff.
+   *
+   * @param installationFolder The installation's folder.
+   * @param protectAsync Restricts a new folder to the current user.
+   * @param files Holds a file open for reading and closes it, as `WindowsProcessApi` does.
+   * @param startAsync Checks the installer's publisher and starts it, resolving to its process id.
+   * @example
+   * ```ts
+   * import { SystemCommand, WindowsFolderProtector, WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   * import { InstallerHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(installationFolder: string, startAsync: (installer: string) => Promise<number>): InstallerHandoff {
+   *   const protector = new WindowsFolderProtector(new SystemCommand(), process.env);
+   *   return new InstallerHandoff(installationFolder, t => protector.protectAsync(t), new WindowsProcessApi(), startAsync);
+   * }
+   * ```
+   */
+  public constructor(
+    installationFolder: string,
+    protectAsync: (folder: string) => Promise<void>,
+    files: Pick<IWindowsProcessApi, "openFileForReading" | "closeHandle">,
+    startAsync: (installer: string) => Promise<number>);
+
+  /**
+   * Removes the copies earlier handoffs left in the installation's folder.
+   *
+   * @param installationFolder The installation's folder.
+   * @param log Records a copy that cannot be removed yet, such as one a running installer holds.
+   * @returns A promise that resolves once the copies are removed or the failure is logged; it never rejects.
+   * @example
+   * ```ts
+   * import { InstallerHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const cleared: Promise<void> = InstallerHandoff.clearAsync("C:\\Users\\person\\AppData\\Local\\Noldova\\TeamRun\\installations\\0123456789abcdef", console.error);
+   * ```
+   */
+  public static clearAsync(installationFolder: string, log: (text: string) => void): Promise<void>;
+
+  /**
+   * Copies, holds and checks the installer, then starts it.
+   *
+   * @param record The ready update, whose file is the downloaded installer.
+   * @returns A promise of the installer's process id.
+   * @throws {UpdateHandoffException} Rejected when the copy cannot be held, its SHA-512 no longer matches or the start
+   * refuses it, as for a publisher that isn't TeamRun's.
+   * @throws {Error} Rejected when the folder cannot be made or restricted or the installer cannot be copied.
+   * @example
+   * ```ts
+   * import type { InstallerHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function startAsync(handoff: InstallerHandoff, record: UpdateReadyRecord): Promise<number> {
+   *   return handoff.handOffAsync(record);
+   * }
+   * ```
+   */
+  public handOffAsync(record: UpdateReadyRecord): Promise<number>;
+}
+
+/**
+ * The Linux handoff of an update: hashes the downloaded AppImage again and has {@link AppImageReplacement} put it in
+ * place of the running one. No process takes the update over; {@link AppImageRestart} starts the new version.
+ */
+export declare class AppImageHandoff implements IUpdateHandoff {
+  /**
+   * Creates the handoff.
+   *
+   * @param replacement Replaces the AppImage with the download.
+   * @example
+   * ```ts
+   * import { AppImageHandoff, AppImageReplacement } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const handoff: AppImageHandoff = new AppImageHandoff(new AppImageReplacement("/home/person/Applications/TeamRun.AppImage"));
+   * ```
+   */
+  public constructor(replacement: Pick<AppImageReplacement, "replaceAsync">);
+
+  /**
+   * Checks the download and replaces the AppImage with it.
+   *
+   * @param record The ready update.
+   * @returns A promise of `null` once the AppImage is replaced.
+   * @throws {UpdateHandoffException} Rejected when the download's SHA-512 no longer matches or the AppImage cannot be
+   * replaced.
+   * @example
+   * ```ts
+   * import type { AppImageHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function replaceAsync(handoff: AppImageHandoff, record: UpdateReadyRecord): Promise<void> {
+   *   await handoff.handOffAsync(record);
+   * }
+   * ```
+   */
+  public handOffAsync(record: UpdateReadyRecord): Promise<null>;
+}
+
+/**
+ * The macOS handoff of an update through Squirrel.Mac. When electron-updater has not downloaded the update in this
+ * process, as after a restart restored it from the ready record, it checks the feed and downloads again, which
+ * reuses the cached ZIP once it matches. It hashes the ZIP again, has Squirrel.Mac fetch it from electron-updater's
+ * local feed and stage it, which checks the update's code signature, and gives the ShipIt process that installs it
+ * once the desktop quits through `autoUpdater.quitAndInstall`. Only the handoff stages: once staged, any quit
+ * installs. So a handoff that fails after asking Squirrel.Mac to stage removes the ShipIt job, and after the 2
+ * minutes it also removes the job of a stage that finishes later, until the next handoff starts.
+ */
+export declare class SquirrelHandoff implements IUpdateHandoff {
+  /**
+   * Creates the handoff.
+   *
+   * @param updater The installation's updater.
+   * @param native Electron's `autoUpdater`.
+   * @param shipIt The ShipIt job of the staged update.
+   * @param schedule Runs a callback after a delay and gives what cancels it.
+   * @param log Records a ShipIt job that cannot be removed.
+   * @example
+   * ```ts
+   * import { autoUpdater } from "electron";
+   * import { type IShipItProcess, type IUpdater, SquirrelHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(updater: IUpdater, shipIt: IShipItProcess): SquirrelHandoff {
+   *   return new SquirrelHandoff(updater, autoUpdater, shipIt, (wait, run) => {
+   *     const timer = setTimeout(run, wait);
+   *     return () => clearTimeout(timer);
+   *   }, console.error);
+   * }
+   * ```
+   */
+  public constructor(
+    updater: IUpdater,
+    native: INativeUpdater,
+    shipIt: IShipItProcess,
+    schedule: (delay: number, run: () => void) => () => void,
+    log: (text: string) => void);
+
+  /**
+   * Stages the update and finds the process that installs it.
+   *
+   * @param record The ready update.
+   * @returns A promise of ShipIt's process id, or `null` when none runs.
+   * @throws {UpdateException} Rejected when the check or the download again fails.
+   * @throws {UpdateHandoffException} Rejected when the feed no longer offers the version, the ZIP's SHA-512 no longer
+   * matches, or Squirrel.Mac fails to stage it or hasn't within 2 minutes.
+   * @throws {Error} Rejected with the failure of finding the ShipIt process.
+   * @example
+   * ```ts
+   * import type { SquirrelHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stageAsync(handoff: SquirrelHandoff, record: UpdateReadyRecord): Promise<number | null> {
+   *   return handoff.handOffAsync(record);
+   * }
+   * ```
+   */
+  public handOffAsync(record: UpdateReadyRecord): Promise<number | null>;
 }
 
 /**
@@ -5264,6 +5541,11 @@ export interface IUpdater {
   readonly packagePath: string;
 
   /**
+   * The file the last download in this process gave, or `null` before one has.
+   */
+  readonly downloadedFile: string | null;
+
+  /**
    * Checks the feed.
    *
    * @returns A promise of the newer version, or `null` when this one is up to date; it rejects with an
@@ -5594,6 +5876,11 @@ export declare class FeedUpdater implements IUpdater {
    * The target's package in electron-updater's cache folder for the installation, the only file a download may give.
    */
   public readonly packagePath: string;
+
+  /**
+   * The file the last download in this process gave, or `null` before one has.
+   */
+  public readonly downloadedFile: string | null;
 
   /**
    * Creates the updater and sets electron-updater up.
@@ -5951,6 +6238,8 @@ export declare class UpdateController {
    * @param log Records failures.
    * @param now Gives the time in milliseconds.
    * @param schedule Runs a callback after a delay and gives what cancels it.
+   * @param restartAsync Restarts to install a ready update: asks about work in progress, stops the installation and
+   * hands the update over, resolving when the person cancels; or `null` while Restart to update is refused.
    * @example
    * ```ts
    * import { DeviceFileStore, type IUpdateCheckLock, type IUpdater, UpdateController } from "@noldova/teamrun-shell-desktop";
@@ -5960,7 +6249,7 @@ export declare class UpdateController {
    *     () => Promise.resolve(true), console.error, Date.now, (wait, run) => {
    *       const timer = setTimeout(run, wait);
    *       return () => clearTimeout(timer);
-   *     });
+   *     }, null);
    * }
    * ```
    */
@@ -5974,7 +6263,8 @@ export declare class UpdateController {
     postReadyAsync: (version: string) => Promise<boolean>,
     log: (text: string) => void,
     now: () => number,
-    schedule: (delay: number, run: () => void) => () => void);
+    schedule: (delay: number, run: () => void) => () => void,
+    restartAsync: ((record: UpdateReadyRecord) => Promise<void>) | null);
 
   /**
    * Gives a file's SHA-512.
@@ -6029,8 +6319,9 @@ export declare class UpdateController {
   public follow(choice: JsonValue): void;
 
   /**
-   * Runs the window's action: `Check` starts a check unless one, a download or a ready update rules it out. Restart to
-   * update is refused. Once it holds the lock, a check that finds a usable ready update another desktop of the
+   * Runs the window's action: `Check` starts a check unless one, a download or a ready update rules it out, and
+   * `Restart` starts the restart that installs the ready update unless one runs or the controller has none. A
+   * restart that fails leaves the update ready, with its reason. Once it holds the lock, a check that finds a usable ready update another desktop of the
    * installation recorded shows it as ready instead of reaching the feed.
    *
    * @param action The action.

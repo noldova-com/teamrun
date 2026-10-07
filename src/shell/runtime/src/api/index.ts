@@ -102,6 +102,7 @@ export { DiscoveryReader } from "../services/discovery/discovery.reader.js";
 export { FolderProtectorFactory } from "../services/discovery/folder-protector-factory.js";
 export { PosixFolderProtector } from "../services/discovery/posix-folder-protector.js";
 export { WindowsFolderProtector } from "../services/discovery/windows-folder-protector.js";
+export { WindowsProcessApi } from "../services/process/windows-process-api.js";
 export { RuntimeServer } from "../services/endpoint/runtime-server.js";
 export { DeviceFolder } from "../services/installation/device-folder.js";
 export { Installation } from "../services/installation/installation.js";

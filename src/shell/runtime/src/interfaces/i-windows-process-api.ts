@@ -13,5 +13,6 @@ export interface IWindowsProcessApi {
   readImagePath(handle: bigint): string | null;
   terminateProcess(handle: bigint): boolean;
   hasExited(handle: bigint): boolean;
+  openFileForReading(file: string): bigint | number;
   closeHandle(handle: bigint): void;
 }

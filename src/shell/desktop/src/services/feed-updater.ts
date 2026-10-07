@@ -32,6 +32,7 @@ export class FeedUpdater implements IUpdater {
   private isConfigured: boolean = false;
 
   public readonly packagePath: string;
+  public downloadedFile: string | null = null;
 
   public constructor(
     updater: IAppUpdater,
@@ -82,6 +83,7 @@ export class FeedUpdater implements IUpdater {
       if (file !== this.packagePath)
         throw new UpdateException(Resources.updateFailedUnexpectedly);
       await this.verifyPublisherAsync(file);
+      this.downloadedFile = file;
       return file;
     }
     catch (error) {

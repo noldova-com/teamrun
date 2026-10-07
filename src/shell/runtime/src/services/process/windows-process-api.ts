@@ -44,6 +44,10 @@ export class WindowsProcessApi implements IWindowsProcessApi {
     return WindowsProcessApi.expect(this.load().hasExited(handle), t => Object.isBoolean(t));
   }
 
+  public openFileForReading(file: string): bigint | number {
+    return WindowsProcessApi.expect(this.load().openFileForReading(file), t => Object.isBigInt(t) || Object.isNumber(t));
+  }
+
   public closeHandle(handle: bigint): void {
     WindowsProcessApi.expect(this.load().closeHandle(handle), t => Object.isUndefined(t));
   }
