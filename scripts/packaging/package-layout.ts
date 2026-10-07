@@ -20,6 +20,8 @@ export default class PackageLayout {
   private static readonly SIGNING_FOLDER: string = "signing";
   private static readonly CONFIGURATION_FILE: string = "electron-builder.json";
   private static readonly REPORT_FILE: string = "package-report.json";
+  private static readonly THIRD_PARTY_FOLDER: string = "third-party";
+  private static readonly THIRD_PARTY_LICENSES_FILE: string = "runtime-third-party.txt";
 
   private readonly folder: string;
 
@@ -65,5 +67,13 @@ export default class PackageLayout {
 
   public get report(): string {
     return path.join(this.folder, PackageLayout.REPORT_FILE);
+  }
+
+  public get thirdParty(): string {
+    return path.join(this.folder, PackageLayout.THIRD_PARTY_FOLDER);
+  }
+
+  public get thirdPartyLicenses(): string {
+    return path.join(this.folder, PackageLayout.THIRD_PARTY_LICENSES_FILE);
   }
 }

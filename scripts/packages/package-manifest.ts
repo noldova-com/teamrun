@@ -27,8 +27,10 @@ export default class PackageManifest {
   public readonly dependencies: readonly string[];
   public readonly coverageExclusions: string;
   public readonly windowsAddons: readonly string[];
+  public readonly externalDependencies: ReadonlyMap<string, string>;
 
-  public constructor(directory: string, name: string, dependencies: readonly string[], coverageExclusions: string = PackageManifest.NO_EXCLUSIONS, windowsAddons: readonly string[] = []) {
+  public constructor(directory: string, name: string, dependencies: readonly string[], coverageExclusions: string = PackageManifest.NO_EXCLUSIONS, windowsAddons: readonly string[] = [],
+    externalDependencies: ReadonlyMap<string, string> = new Map()) {
     const expected = PackageManifest.formatName(directory);
     if (name !== expected)
       throw new PackageException(PackageManifest.isFixtureDirectory(directory)
@@ -40,6 +42,7 @@ export default class PackageManifest {
     this.dependencies = [...dependencies].sort();
     this.coverageExclusions = coverageExclusions;
     this.windowsAddons = windowsAddons;
+    this.externalDependencies = externalDependencies;
   }
 
   public static async readAsync(root: string, directory: string): Promise<PackageManifest> {
@@ -60,6 +63,10 @@ export default class PackageManifest {
     if (typeof dependencies !== "object" || dependencies === null)
       throw new PackageException(`${file} must list its dependencies as an object.`);
     const own = Object.entries(dependencies).filter(([name]) => name.startsWith(PackageManifest.NAME_PREFIX));
+    const external = Object.entries(dependencies).filter(([name]) => !name.startsWith(PackageManifest.NAME_PREFIX));
+    const unpinned = external.filter(([, version]) => typeof version !== "string").map(([name]) => name);
+    if (unpinned.length > 0)
+      throw new PackageException(`${file} must pin ${unpinned.join(", ")} to an exact version.`);
     const unstamped = own.filter(([, version]) => version !== PackageManifest.VERSION_PLACEHOLDER).map(([name]) => name);
     if (unstamped.length > 0)
       throw new PackageException(`${file} must depend on ${unstamped.join(", ")} at version "${PackageManifest.VERSION_PLACEHOLDER}".`);
@@ -73,7 +80,8 @@ export default class PackageManifest {
     const addons: unknown = "windowsAddons" in settings ? settings.windowsAddons : [];
     if (!Array.isArray(addons) || !addons.every(t => typeof t === "string" && PackageManifest.ADDON_NAME.test(t)))
       throw new PackageException(`${file} must list its Windows addons in an array of kebab-case names.`);
-    return new PackageManifest(directory, manifest.name, own.map(([name]) => name), JSON.stringify(exclusions), addons);
+    return new PackageManifest(directory, manifest.name, own.map(([name]) => name), JSON.stringify(exclusions), addons,
+      new Map(external.map(([name, version]) => [name, String(version)])));
   }
 
   public get id(): string {
