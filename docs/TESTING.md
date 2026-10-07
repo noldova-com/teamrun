@@ -330,6 +330,7 @@ Separately authorized live checks record the actual service, tool version, obser
 Performance claims require representative workloads, recorded conditions and repeated measurements outside coverage.
 Check scaling separately; ordinary unit tests impose no machine-dependent speed thresholds.
 Missing measurements remain unknown; speed alone proves neither allocation nor retention improvements.
+A UI workflow that checks a performance budget gates only what does not depend on the machine, such as how many rows a list renders or how far content in view moves, and attaches the timings it measured, such as frame gaps and long animation frames, to its report as evidence under the rule above, never as a pass condition.
 
 ### CI levels
 
