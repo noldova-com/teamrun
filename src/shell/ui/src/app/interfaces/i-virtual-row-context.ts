@@ -10,4 +10,6 @@ export interface IVirtualRowContext<T> {
   readonly $implicit: T;
   readonly index: number;
   readonly height: number;
+  readonly labelId: string;
+  readonly descriptionId: string;
 }

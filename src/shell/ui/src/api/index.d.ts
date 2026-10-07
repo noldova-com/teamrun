@@ -262,9 +262,29 @@ export declare enum VirtualListAlign {
   /**
    * The least scrolling that shows the row: none while it is in view, its
    * top at the view's top when it is above, and its bottom at the view's
-   * bottom when it is below.
+   * bottom when it is below, or its top at the view's top when it is taller
+   * than the view.
    */
   Nearest = "Nearest"
+}
+
+/**
+ * The pattern a {@link VirtualListComponent} shows its rows in.
+ */
+export declare enum VirtualListKind {
+  /**
+   * A listbox of options with tree-row geometry, one of which can be
+   * selected and chosen; the default.
+   */
+  Options = "Options",
+
+  /**
+   * A feed of articles, such as a conversation's messages, drawn by their
+   * module. It opens at its end, or at a saved
+   * {@link VirtualListComponent.position}, and follows its end while new
+   * rows arrive.
+   */
+  Feed = "Feed"
 }
 
 /**
@@ -362,8 +382,8 @@ export interface IVirtualListObserver {
 
 /**
  * What a row of the kit's list gives the template of a
- * {@link VirtualRowDirective}: the item, its position and the height the
- * list holds for its row.
+ * {@link VirtualRowDirective}: the item, its position, the height the list
+ * holds for its row and the ids that name and describe a feed's article.
  *
  * @typeParam T The type of the source's items.
  * @example
@@ -389,9 +409,25 @@ export interface IVirtualRowContext<T> {
   /**
    * The height in CSS pixels the list holds for the row, the row's padding
    * included: its height when it was last measured, or its source's
-   * estimate until then.
+   * estimate until then. While images in the row still load and decode, the
+   * list keeps the row at least this tall, so the rows after it don't move.
    */
   readonly height: number;
+
+  /**
+   * The id the template gives the element that names the row, such as a
+   * message's author and time. In a feed the row's article is labelled by
+   * it (`aria-labelledby`), so the template must give some element this id;
+   * an options list ignores it.
+   */
+  readonly labelId: string;
+
+  /**
+   * The id the template gives the element that describes the row, when its
+   * {@link VirtualRowDirective.described} is true; a feed's article is then
+   * described by it (`aria-describedby`).
+   */
+  readonly descriptionId: string;
 }
 
 /**
@@ -4551,23 +4587,41 @@ export declare class VirtualListChoice<T> {
 }
 
 /**
- * The kit's list for a long collection, `tr-virtual-list`: a named listbox
- * of options that renders only the rows in and just beyond its view, so the
- * rows it renders do not grow with the list's length. It reads its items
- * from a {@link VirtualListSource} a few pages at a time and draws each
- * loaded one with the template a {@link VirtualRowDirective} marks; a row
- * not yet loaded is blank space at its height. Each row takes its own
- * height, which the list measures; rows measured, loaded, unloaded, added
- * or removed above the first row in view move nothing in view.
+ * The kit's list for a long collection, `tr-virtual-list`: a named list that
+ * renders only the rows in and just beyond its view, so the rows it renders
+ * do not grow with the list's length. It reads its items from a
+ * {@link VirtualListSource} a few pages at a time and draws each loaded one
+ * with the template a {@link VirtualRowDirective} marks; a row not yet
+ * loaded is blank space at its height. Each row takes its own height, which
+ * the list measures; rows measured, loaded, unloaded, added or removed above
+ * the first loaded row in view, or above the first row in view while none
+ * in view has loaded, move nothing in view, and a row keeps its height while
+ * its images load and decode.
  *
- * Its rows take the tree row's geometry, and it follows the listbox
- * keys: Up and Down move, Page Up and Page Down move by a view, Home and
- * End go to the first and last row, and Enter or Space chooses. It is one
- * Tab stop, which returns to the row last focused, or lands on the
- * selected row, or on the first. While rows in view load, it says so in a
- * status line, and announces it while the focused row waits for its items;
- * when a read fails, it says and announces that the items couldn't load and
- * offers Retry.
+ * Its {@link VirtualListComponent.kind} picks its pattern. An options list
+ * is a listbox whose rows take the tree row's geometry: Up and Down move,
+ * Page Up and Page Down move by a view, Home and End go to the first and
+ * last row, and Enter or Space chooses. It is one Tab stop, which returns to
+ * the row last focused, or lands on the selected row, or on the first.
+ *
+ * A feed is a feed of articles that its template draws whole. It opens at
+ * its end and follows it, keeping the same distance from the end as rows
+ * are added or grow, until the person scrolls towards the start beyond the
+ * last 120px; scrolling back within 120px of the end, with the newest rows
+ * loaded, follows again, and a Jump to latest button shows while it doesn't
+ * follow. Page Down and Page Up move to the next and previous article from
+ * anywhere in one; while an article itself has focus, Down and Up do too,
+ * and Home and End go to the first and last, so controls inside an article
+ * keep their keys. Ctrl+Home and Ctrl+End move the focus to before and
+ * after the feed, and Tab enters an article's own controls. It is one Tab
+ * stop, which returns to the article last focused, or lands on the last
+ * article while it follows its end, or else on the first loaded article in
+ * view, where the person reads.
+ *
+ * While rows in view load, either kind says so in a status line, and
+ * announces it while the focused row waits for its items; when a read
+ * fails, it says and announces that the items couldn't load and offers
+ * Retry.
  *
  * The module sizes the list; it scrolls inside the height it is given.
  *
@@ -4586,20 +4640,50 @@ export declare class VirtualListComponent<T> {
   public readonly label: InputSignal<string>;
 
   /**
-   * The position of the selected row, from 0, which is highlighted, selected
-   * for assistive technology and the list's Tab stop until a row has been
-   * focused, whether its item has loaded or not, or null for none; null when
-   * not bound. A position outside the list counts as none. The owner moves
-   * it with the items it adds or removes before it.
+   * The list's pattern, an options list or a feed;
+   * {@link VirtualListKind.Options} when not bound. The list takes a change
+   * at once, but a feed opens at its end or at its
+   * {@link VirtualListComponent.position} only when it starts with a
+   * source.
+   */
+  public readonly kind: InputSignal<VirtualListKind>;
+
+  /**
+   * The position of the selected row of an options list, from 0, which is
+   * highlighted, selected for assistive technology and the list's Tab stop
+   * until a row has been focused, whether its item has loaded or not, or
+   * null for none; null when not bound. A position outside the list counts
+   * as none. The owner moves it with the items it adds or removes before it.
+   * A feed ignores it.
    */
   public readonly selected: InputSignal<number | null>;
 
   /**
-   * Emits the loaded row the person chose by a click, Enter or Space, with
-   * its position and its item; the owner usually makes the position
-   * {@link VirtualListComponent.selected}.
+   * Where a feed opens, as {@link VirtualListComponent.positionChange} last
+   * gave it, or null to open at its end; null when not bound. The feed
+   * finds the row by its key among the rows it loads around the position,
+   * so rows added or removed before it since don't move the reading
+   * position, and falls back to the position's index. The list reads it
+   * when it starts with a source; an options list ignores it.
+   */
+  public readonly position: InputSignal<VirtualListPosition | null>;
+
+  /**
+   * Emits the loaded row the person chose in an options list by a click,
+   * Enter or Space, with its position and its item; the owner usually makes
+   * the position {@link VirtualListComponent.selected}. A feed never emits
+   * it.
    */
   public readonly activated: OutputEmitterRef<VirtualListChoice<T>>;
+
+  /**
+   * Emits where the person reads each time they scroll: the first loaded row
+   * in view, or the row at the top of the view while none in view has
+   * loaded, and how far into it the view starts. A feed's module keeps the last
+   * one and gives it back as {@link VirtualListComponent.position} to open
+   * there again.
+   */
+  public readonly positionChange: OutputEmitterRef<VirtualListPosition>;
 
   /**
    * Emits why a read failed: what {@link VirtualListSource.readAsync}
@@ -4633,8 +4717,10 @@ export declare class VirtualListComponent<T> {
   public constructor();
 
   /**
-   * Moves focus to the row last focused, or the selected row, or the first,
-   * and scrolls it into view; nothing happens while the list has no rows.
+   * Moves focus to the list's Tab stop, the row last focused, or else the
+   * selected row, the last article of a feed that follows its end, or the
+   * first row, and scrolls it into view; nothing happens while the list has
+   * no rows.
    *
    * @example
    * ```ts
@@ -4715,6 +4801,50 @@ export declare class VirtualListException extends Exception {
    * ```
    */
   public constructor(message: string);
+}
+
+/**
+ * Where the person reads in a {@link VirtualListComponent}: the first
+ * loaded row in view, or the row at the top of the view while none in view
+ * has loaded, by its position and its key, and how far into it the view
+ * starts. A feed emits it as the person scrolls, and opens at it again
+ * when given it as its {@link VirtualListComponent.position}.
+ */
+export declare class VirtualListPosition {
+  /**
+   * The row's position in the whole list, from 0.
+   */
+  public readonly index: number;
+
+  /**
+   * The row's key, as {@link VirtualListSource.keyOf} gives it, or null when
+   * the row wasn't loaded.
+   */
+  public readonly key: string | null;
+
+  /**
+   * How far into the row the view starts, in CSS pixels; negative when the
+   * row starts below the view's top.
+   */
+  public readonly distance: number;
+
+  /**
+   * Creates a position, usually from one the list emitted and the module
+   * stored.
+   *
+   * @param index The row's position in the whole list, from 0.
+   * @param key The row's key, or null.
+   * @param distance How far into the row the view starts, in CSS pixels.
+   * @example
+   * ```ts
+   * import { VirtualListPosition } from "@noldova/teamrun-shell-ui";
+   *
+   * export function restorePosition(saved: { index: number; key: string | null; distance: number }): VirtualListPosition {
+   *   return new VirtualListPosition(saved.index, saved.key, saved.distance);
+   * }
+   * ```
+   */
+  public constructor(index: number, key: string | null, distance: number);
 }
 
 /**
@@ -4955,8 +5085,8 @@ export declare abstract class VirtualListSource<T> {
  * Marks the `ng-template` that draws each loaded row of a
  * {@link VirtualListComponent}, as `<ng-template [trVirtualRow]="source"
  * let-item>`. Binding the list's source lets the template checker type the
- * item; the template also receives the row's `index` and `height`
- * ({@link IVirtualRowContext}).
+ * item; the template also receives the row's `index`, `height`, `labelId`
+ * and `descriptionId` ({@link IVirtualRowContext}).
  *
  * @typeParam T The type of the source's items.
  */
@@ -4970,6 +5100,13 @@ export declare class VirtualRowDirective<T> {
    * The source of the list the template belongs to, which types its item.
    */
   public readonly trVirtualRow: InputSignal<VirtualListSource<T>>;
+
+  /**
+   * Whether the template gives an element the row's `descriptionId`, as
+   * `[trVirtualRowDescribed]="true"`, so a feed's articles are described by
+   * it; false when not bound.
+   */
+  public readonly described: InputSignal<boolean>;
 
   /**
    * Tells Angular's template checker that the template's context is an
