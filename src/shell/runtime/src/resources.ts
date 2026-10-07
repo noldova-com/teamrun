@@ -156,6 +156,8 @@ export class Resources {
   public static readonly linuxField: string = "linux";
   public static readonly dataDirectoryVariableField: string = "dataDirectoryVariable";
   public static readonly iconsField: string = "icons";
+  public static readonly windowsPublisherField: string = "windowsPublisher";
+  public static readonly updateFeedField: string = "updateFeed";
   public static readonly versionField: string = "version";
   public static readonly holderField: string = "holder";
   public static readonly stateField: string = "state";

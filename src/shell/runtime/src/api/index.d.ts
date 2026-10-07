@@ -4452,6 +4452,18 @@ export declare class ProductInfo {
   public readonly icons: string;
 
   /**
+   * The distinguished name of the publisher whose signature a Windows update
+   * must carry.
+   */
+  public readonly windowsPublisher: string;
+
+  /**
+   * The URL, ending in `/`, of the update feed a packaged build reads, or
+   * `null` for a build that never checks for updates.
+   */
+  public readonly updateFeed: string | null;
+
+  /**
    * The product version.
    */
   public readonly version: string;

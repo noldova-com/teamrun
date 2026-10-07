@@ -58,10 +58,10 @@ export default class PackageStage {
     return this.layout.stage;
   }
 
-  public async stageAsync(target: PackageTarget, output: Writable): Promise<void> {
+  public async stageAsync(target: PackageTarget, output: Writable, updateFeed: string | null): Promise<void> {
     await rm(this.folder, { recursive: true, force: true });
     await rm(this.layout.npmCache, { recursive: true, force: true });
-    await this.build.buildAsync(path.join(this.folder, PackageStage.BUILD_FOLDER));
+    await this.build.buildAsync(path.join(this.folder, PackageStage.BUILD_FOLDER), updateFeed);
     output.write("The packaged window holds no Gallery.\n");
 
     const manifest = await RootManifest.readAsync(this.root);

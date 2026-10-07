@@ -50,11 +50,11 @@ class PackageStageTests {
       const stage = PackageStageTests.createStage(repository, build, gallery);
       const output = new TextOutputFixture();
 
-      await stage.stageAsync(PackageStageTests.TARGET, output);
+      await stage.stageAsync(PackageStageTests.TARGET, output, "http://127.0.0.1:8080/");
 
       const folder = path.join(repository.directory, "_build", "package", "app");
       assert.equal(stage.folder, folder);
-      assert.deepEqual(build.runs, [[process.execPath, repository.directory, path.join(repository.directory, "scripts", "build.ts"), "--packaged", "--output", path.join(folder, "_build")]]);
+      assert.deepEqual(build.runs, [[process.execPath, repository.directory, path.join(repository.directory, "scripts", "build.ts"), "--packaged", "--output", path.join(folder, "_build"), "--update-feed", "http://127.0.0.1:8080/"]]);
       assert.equal(await gallery.isPackagedAsync(), false);
       assert.deepEqual(JSON.parse(await readFile(path.join(folder, "package.json"), "utf8")), {
         name: "fixture-studio",
@@ -94,7 +94,7 @@ class PackageStageTests {
       const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery), gallery);
       await mkdir(path.join(stage.folder, "left-over"), { recursive: true });
 
-      await stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture());
+      await stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture(), null);
 
       assert.equal(existsSync(path.join(stage.folder, "left-over")), false);
       assert.equal(existsSync(path.join(stage.folder, "node_modules", "@noldova", "teamrun-modules-tasks-runtime")), false);
@@ -106,7 +106,7 @@ class PackageStageTests {
       const gallery = new GalleryFile(repository.directory);
       const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery, [], `<p>${GalleryFile.MARKERS[2]}</p>\n`), gallery);
 
-      await assert.rejects(() => stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture()),
+      await assert.rejects(() => stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture(), null),
         new ProcessException(`The window built in _build/package/app/_build/window contains ${JSON.stringify(GalleryFile.MARKERS[2])} in ${path.join("browser", "index.html")}.`));
       assert.equal(existsSync(path.join(stage.folder, "node_modules")), false);
       assert.equal(await gallery.isPackagedAsync(), false);
@@ -117,7 +117,7 @@ class PackageStageTests {
       const gallery = new GalleryFile(repository.directory);
       const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery, [2]), gallery);
 
-      await assert.rejects(() => stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture()), new PackagingException("The packaged build failed with exit code 2."));
+      await assert.rejects(() => stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture(), null), new PackagingException("The packaged build failed with exit code 2."));
       assert.equal(await gallery.isPackagedAsync(), false);
     });
 
@@ -130,7 +130,7 @@ class PackageStageTests {
       const gallery = new GalleryFile(repository.directory);
       const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery), gallery);
 
-      await assert.rejects(() => stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture()),
+      await assert.rejects(() => stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture(), null),
         new PackagingException("The stage needs @noldova/teamrun-modules-gone-runtime, which is not a package under src/."));
     });
 
@@ -162,7 +162,7 @@ class PackageStageTests {
       const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery), gallery);
       const output = new TextOutputFixture();
 
-      await stage.stageAsync(PackageStageTests.TARGET, output);
+      await stage.stageAsync(PackageStageTests.TARGET, output, null);
 
       const modules = path.join(stage.folder, "node_modules");
       assert.equal(await readFile(path.join(modules, "fixture-left", "index.js"), "utf8"), "module.exports = 'left';\n");
@@ -180,7 +180,7 @@ class PackageStageTests {
       const gallery = new GalleryFile(repository.directory);
       const stage = PackageStageTests.createStage(repository, new PackagedBuildFixture(gallery), gallery);
 
-      const error = await stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture()).then(() => null, (failure: unknown) => failure);
+      const error = await stage.stageAsync(PackageStageTests.TARGET, new TextOutputFixture(), null).then(() => null, (failure: unknown) => failure);
 
       assert.ok(error instanceof PackagingException, String(error));
       assert.match(error.message, /^Installing the packages into the stage failed with exit code \d+; it uses only the build's archives and never the registry:\n/);

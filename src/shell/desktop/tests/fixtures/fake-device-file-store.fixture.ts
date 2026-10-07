@@ -15,6 +15,8 @@ export class FakeDeviceFileStore implements IDeviceFileStore {
   public reads: number = 0;
   public readFailure?: Error;
   public writeFailure?: Error;
+  public deleteFailure?: Error;
+  public deletes: number = 0;
 
   public readAsync(): Promise<JsonObject | null> {
     this.reads++;
@@ -26,6 +28,14 @@ export class FakeDeviceFileStore implements IDeviceFileStore {
     if (!Object.isUndefined(this.writeFailure))
       return Promise.reject(this.writeFailure);
     this.kept = value;
+    return Promise.resolve();
+  }
+
+  public deleteAsync(): Promise<void> {
+    this.deletes++;
+    if (!Object.isUndefined(this.deleteFailure))
+      return Promise.reject(this.deleteFailure);
+    this.kept = null;
     return Promise.resolve();
   }
 }

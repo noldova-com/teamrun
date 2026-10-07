@@ -12,6 +12,7 @@ export class FakeDeviceFiles {
   public readonly created: (readonly [string, string])[] = [];
   public readonly appearance: FakeDeviceFileStore = new FakeDeviceFileStore();
   public readonly state: FakeDeviceFileStore = new FakeDeviceFileStore();
+  public readonly updateReady: FakeDeviceFileStore = new FakeDeviceFileStore();
 
   public create(folder: string, fileName: string): FakeDeviceFileStore {
     this.created.push([folder, fileName]);
@@ -20,6 +21,8 @@ export class FakeDeviceFiles {
         return this.appearance;
       case "device-state.json":
         return this.state;
+      case "update-ready.json":
+        return this.updateReady;
       default:
         throw new Error(`No fake device file is named ${fileName}.`);
     }

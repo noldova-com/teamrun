@@ -62,6 +62,10 @@ class ProductIdentityTests {
         [true, true, true, false, false]);
     });
 
+    test("the update feed is the latest release download of the release repository", () => {
+      assert.equal(ProductIdentity.fromManifest(ProductIdentityFixture.manifest()).updateFeed, "https://github.com/fixtureworks/studio/releases/latest/download/");
+    });
+
     test("the same device folder on several systems is one literal", () => {
       const product = ProductIdentity.fromManifest(ProductIdentityFixture.manifest({ deviceFolders: { windows: "Works/Studio", macos: "Works/Studio", linux: "works/studio" } }));
 
