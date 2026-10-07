@@ -656,6 +656,7 @@ When a runtime it started exits before it publishes discovery, the launcher read
   - When neither a mount nor an extraction works, the start fails with the reason in the start log.
   - The Bash step writes each mount's process and each extraction's folder to its copy record, `logs/copy-<UUID>.log` beside the start log, and removes the record once the copy ends.
     The launcher removes its start log once it connects, so the start log cannot keep them.
+    The runtime finds its own record by its start log's UUID and, when it prepares for an update, lists its mount's process, matched as below ([Stopping for an update](#stopping-for-an-update)).
     A runtime that owns the data directory ends any mount an earlier Bash step left running when that Bash no longer runs, and removes any extraction it left.
     It matches a mount by process id, command line and the AppImage's path, never by name alone.
     It does this once its log is open, and writes each record it cannot settle there with the reason, leaving the record; the runtime still starts.
@@ -907,6 +908,10 @@ Restarting for an update runs the same saves in every window of the installation
 - The Angular project in `src/` pins its own toolchain, including the TypeScript version Angular requires.
   The build installs it from its lockfile, separately from the packages, and the Angular CLI builds and tests the Angular parts.
   A package never imports from the Angular project's dependencies; it imports only what its own manifest declares.
+- The kit colors code with Shiki's tokenizer `@shikijs/primitive`, its JavaScript regular-expression engine `@shikijs/engine-javascript` and its grammars `@shikijs/langs`, which the Angular project pins.
+  The window loads the tokenizer with the first block it colors, and each grammar as a chunk of its own when a block first uses it; the kit's code language list names the grammars it ships.
+  None of them needs WebAssembly or `eval`, which the window's content security policy refuses.
+  The block colors its tokens through the CSS Custom Highlight API, one highlight for each kind holding static ranges, so colored code stays one text node, lays out exactly as plain code does and costs the document no range to keep up to date.
 - Development starts and the UI workflows run under the product's name and icon, never Electron's.
   `npm start` and `npm run test:ui` prepare a copy of Electron's distribution in `_build/development-app`, labelled from the product identity, and start it:
   - On Windows, the executable is named after the product and carries its version information and icon.
@@ -1235,7 +1240,10 @@ The update stop of the desktop where the person chose Restart to update coordina
    It then sets the barrier to `Closing`, and waits up to 10 more seconds for every other desktop, those step 3 listed and those the installation's `desktops` folder lists that still run, to see it, quit and be verified the same way.
 6. **Handoff.**
    It sets the barrier to `HandedOff` and calls the handoff, then records in the barrier the process the handoff names as taking over.
-   After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage.
+   After an AppImage update it first starts `/bin/bash` through a runtime launch's Bash step, which closes the descriptors it inherited.
+   That Bash waits until the desktop is no longer its parent, so neither a reused process id nor an exited desktop that is not yet reaped holds it, then starts the replaced AppImage from the root folder.
+   The AppImage starts without the old mount's `APPIMAGE`, `APPDIR`, `ARGV0` and `OWD`, and without the entries the AppImage's `AppRun` added to `PATH`, `XDG_DATA_DIRS`, `LD_LIBRARY_PATH` and `GSETTINGS_SCHEMA_DIR`.
+   A handoff that fails ends that Bash, so TeamRun does not start again when the desktop later quits.
 
 A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and once the update has ended, the barrier missing or its holder gone before the handoff, it unfreezes and reconnects.
 A desktop without a runtime connection, while it reconnects, shows a failed start or is still starting, reads the barrier every second and quits when it is `Closing` for another desktop that still runs.

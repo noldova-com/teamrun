@@ -68,7 +68,17 @@ export class FixtureTheme {
     ["teamrun.addedForeground", "#A03610"],
     ["teamrun.removedForeground", "#A03710"],
     ["teamrun.dockingPreviewBackground", "#A03810"],
-    ["teamrun.dockingPreviewBorder", "#A03910"]
+    ["teamrun.dockingPreviewBorder", "#A03910"],
+    ["teamrun.codeCommentForeground", "#A03A10"],
+    ["teamrun.codeKeywordForeground", "#A03B10"],
+    ["teamrun.codeControlForeground", "#A03C10"],
+    ["teamrun.codeStringForeground", "#A03D10"],
+    ["teamrun.codeNumberForeground", "#A03E10"],
+    ["teamrun.codeTypeForeground", "#A03F10"],
+    ["teamrun.codeFunctionForeground", "#A04010"],
+    ["teamrun.codeVariableForeground", "#A04110"],
+    ["teamrun.codeRegexForeground", "#A04210"],
+    ["teamrun.codeMetaForeground", "#A04310"]
   ]);
   private static readonly DARK: ReadonlyMap<string, string> = new Map([
     ["sideBar.background", "#2001A0"],
@@ -129,7 +139,17 @@ export class FixtureTheme {
     ["teamrun.addedForeground", "#2036A0"],
     ["teamrun.removedForeground", "#2037A0"],
     ["teamrun.dockingPreviewBackground", "#2038A0"],
-    ["teamrun.dockingPreviewBorder", "#2039A0"]
+    ["teamrun.dockingPreviewBorder", "#2039A0"],
+    ["teamrun.codeCommentForeground", "#203AA0"],
+    ["teamrun.codeKeywordForeground", "#203BA0"],
+    ["teamrun.codeControlForeground", "#203CA0"],
+    ["teamrun.codeStringForeground", "#203DA0"],
+    ["teamrun.codeNumberForeground", "#203EA0"],
+    ["teamrun.codeTypeForeground", "#203FA0"],
+    ["teamrun.codeFunctionForeground", "#2040A0"],
+    ["teamrun.codeVariableForeground", "#2041A0"],
+    ["teamrun.codeRegexForeground", "#2042A0"],
+    ["teamrun.codeMetaForeground", "#2043A0"]
   ]);
   private static readonly LOOK: ReadonlyMap<string, string> = new Map([
     ["radius-hover", "0.25rem"],
