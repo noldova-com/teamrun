@@ -2644,12 +2644,35 @@ export interface IProcessStarter {
 }
 
 /**
+ * A file's Authenticode signature as Windows verifies it.
+ */
+export interface IWindowsSignature {
+  /**
+   * The result of `WinVerifyTrust`: 0 when the signature is valid, otherwise its error code, such as `0x800B0100`
+   * when the file carries no signature.
+   */
+  readonly status: number;
+
+  /**
+   * Windows' text for the status, or an empty string when Windows has none.
+   */
+  readonly message: string;
+
+  /**
+   * The signer's distinguished name with its common name first, as `CN=…, O=…, C=…`, or `null` when the file carries no
+   * signer's certificate.
+   */
+  readonly subject: string | null;
+}
+
+/**
  * The system calls a {@link ProcessSupervisor} makes on Windows to read the
  * process table and end processes, and that the desktop makes to hold a file
- * open for reading. {@link ProcessSupervisor.create} passes the system's own
- * functions, called through the runtime's Windows addon, as
- * {@link WindowsProcessApi} does. Each call returns at once, and creating an
- * implementation loads nothing, so a supervisor can be created on any platform.
+ * open for reading and to verify its signature. {@link ProcessSupervisor.create}
+ * passes the system's own functions, called through the runtime's Windows
+ * addon, as {@link WindowsProcessApi} does. Each call but
+ * {@link IWindowsProcessApi.verifySignatureAsync} returns at once, and creating
+ * an implementation loads nothing, so a supervisor can be created on any platform.
  */
 export interface IWindowsProcessApi {
   /**
@@ -2797,6 +2820,26 @@ export interface IWindowsProcessApi {
    * ```
    */
   closeHandle(handle: bigint): void;
+
+  /**
+   * Verifies a file's Authenticode signature, as `WinVerifyTrust` does with the generic verify action, no user
+   * interface and no revocation check, and reads its signer's name, on a thread of Node's pool so the caller's
+   * thread keeps running while Windows hashes the file. The chain must still lead to a trusted root, and Windows may
+   * fetch a missing certificate of the chain.
+   *
+   * @param file The file's absolute path.
+   * @returns A promise of the signature's status, its text and its signer's name.
+   * @throws {TypeError} When the path holds a null character.
+   * @example
+   * ```ts
+   * import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function isValidAsync(api: IWindowsProcessApi, file: string): Promise<boolean> {
+   *   return (await api.verifySignatureAsync(file)).status === 0;
+   * }
+   * ```
+   */
+  verifySignatureAsync(file: string): Promise<IWindowsSignature>;
 }
 
 /**
@@ -2932,6 +2975,22 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
    * ```
    */
   public closeHandle(handle: bigint): void;
+
+  /**
+   * Verifies a file's signature; see {@link IWindowsProcessApi.verifySignatureAsync}.
+   *
+   * @param file The file's path.
+   * @returns A promise of the signature's status, its text and its signer's name.
+   * @example
+   * ```ts
+   * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+   *
+   * export async function readSignerAsync(api: WindowsProcessApi, file: string): Promise<string | null> {
+   *   return (await api.verifySignatureAsync(file)).subject;
+   * }
+   * ```
+   */
+  public verifySignatureAsync(file: string): Promise<IWindowsSignature>;
 }
 
 /**

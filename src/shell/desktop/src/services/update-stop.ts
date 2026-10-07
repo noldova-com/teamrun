@@ -89,7 +89,7 @@ export class UpdateStop {
       if (!isHandedOff)
         this.restart?.cancel();
       if (isHeld && !isHandedOff)
-        await this.installation.releaseAsync().catch((failure: unknown) => this.log(Resources.formatUpdateBarrierNotReleased(String(failure))));
+        await this.releaseAsync();
       throw error instanceof UpdateStopException || error instanceof UpdateHandoffException ? error : new UpdateStopException(Resources.updateFailedUnexpectedly, new ExceptionOptions(error));
     }
     finally {
@@ -139,6 +139,16 @@ export class UpdateStop {
   private async listOtherDesktopsAsync(processes: readonly UpdateProcess[]): Promise<readonly UpdateProcess[]> {
     const desktops = [...processes.filter(t => t.role === Resources.clientName), ...await this.installation.listDesktopsAsync()];
     return desktops.filter((t, index) => t.processId !== this.processId && desktops.findIndex(u => u.processId === t.processId) === index);
+  }
+
+  private async releaseAsync(): Promise<void> {
+    try {
+      await this.installation.releaseAsync();
+    }
+    catch {
+      await this.wait(Resources.barrierReleaseRetryDelay);
+      await this.installation.releaseAsync().catch((failure: unknown) => this.log(Resources.formatUpdateBarrierNotReleased(String(failure))));
+    }
   }
 
   private async stampSelfAsync(): Promise<UpdateProcess> {

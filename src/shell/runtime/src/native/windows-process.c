@@ -11,13 +11,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
+#include <wincrypt.h>
+#include <softpub.h>
 #include <tlhelp32.h>
 #include <wchar.h>
 #include <node_api.h>
 
+#pragma comment(lib, "crypt32.lib")
+#pragma comment(lib, "wintrust.lib")
+
 #define IMAGE_PATH_LENGTH 32768
 #define MESSAGE_LENGTH 160
 #define TERMINATED_EXIT_CODE 0xFFFFFFFF
+#define SUBJECT_FORMAT (CERT_X500_NAME_STR | CERT_NAME_STR_REVERSE_FLAG)
+
+typedef struct {
+  napi_async_work work;
+  napi_deferred deferred;
+  WCHAR *path;
+  LONG status;
+  WCHAR *message;
+  WCHAR *subject;
+} signature_check;
 
 static napi_value fail(napi_env env) {
   bool is_pending = false;
@@ -183,13 +198,10 @@ static napi_value has_exited(napi_env env, napi_callback_info info) {
   return to_boolean(env, WaitForSingleObject(handle, 0) == WAIT_OBJECT_0);
 }
 
-static napi_value open_file_for_reading(napi_env env, napi_callback_info info) {
+static WCHAR *read_path(napi_env env, napi_callback_info info) {
   napi_value value;
-  napi_value result;
   size_t length = 0;
   WCHAR *path;
-  HANDLE handle;
-  DWORD error;
   if (!read_arguments(env, info, 1, &value))
     return NULL;
   if (napi_get_value_string_utf16(env, value, NULL, 0, &length) != napi_ok) {
@@ -203,13 +215,24 @@ static napi_value open_file_for_reading(napi_env env, napi_callback_info info) {
   }
   if (napi_get_value_string_utf16(env, value, (char16_t *)path, length + 1, &length) != napi_ok) {
     free(path);
-    return fail(env);
+    fail(env);
+    return NULL;
   }
   if (wcslen(path) != length) {
     free(path);
     napi_throw_type_error(env, NULL, "The Windows process addon expects a file's path without a null character.");
     return NULL;
   }
+  return path;
+}
+
+static napi_value open_file_for_reading(napi_env env, napi_callback_info info) {
+  napi_value result;
+  HANDLE handle;
+  DWORD error;
+  WCHAR *path = read_path(env, info);
+  if (path == NULL)
+    return NULL;
   handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   error = GetLastError();
   free(path);
@@ -229,6 +252,129 @@ static napi_value close_handle(napi_env env, napi_callback_info info) {
   return NULL;
 }
 
+static WCHAR *read_signer(HANDLE state) {
+  CRYPT_PROVIDER_DATA *provider;
+  CRYPT_PROVIDER_SGNR *signer;
+  CRYPT_PROVIDER_CERT *certificate;
+  DWORD length;
+  WCHAR *subject;
+  if (state == NULL)
+    return NULL;
+  provider = WTHelperProvDataFromStateData(state);
+  signer = provider == NULL ? NULL : WTHelperGetProvSignerFromChain(provider, 0, FALSE, 0);
+  certificate = signer == NULL ? NULL : WTHelperGetProvCertFromChain(signer, 0);
+  if (certificate == NULL || certificate->pCert == NULL)
+    return NULL;
+  length = CertNameToStrW(X509_ASN_ENCODING, &certificate->pCert->pCertInfo->Subject, SUBJECT_FORMAT, NULL, 0);
+  subject = malloc(length * sizeof(WCHAR));
+  if (subject != NULL)
+    CertNameToStrW(X509_ASN_ENCODING, &certificate->pCert->pCertInfo->Subject, SUBJECT_FORMAT, subject, length);
+  return subject;
+}
+
+static void verify_signature_execute(napi_env env, void *data) {
+  signature_check *check = data;
+  GUID action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+  WINTRUST_FILE_INFO file;
+  WINTRUST_DATA trust;
+  (void)env;
+  ZeroMemory(&file, sizeof(file));
+  ZeroMemory(&trust, sizeof(trust));
+  file.cbStruct = sizeof(file);
+  file.pcwszFilePath = check->path;
+  trust.cbStruct = sizeof(trust);
+  trust.dwUIChoice = WTD_UI_NONE;
+  trust.fdwRevocationChecks = WTD_REVOKE_NONE;
+  trust.dwProvFlags = WTD_REVOCATION_CHECK_NONE;
+  trust.dwUnionChoice = WTD_CHOICE_FILE;
+  trust.pFile = &file;
+  trust.dwStateAction = WTD_STATEACTION_VERIFY;
+  check->status = WinVerifyTrust((HWND)INVALID_HANDLE_VALUE, &action, &trust);
+  check->subject = read_signer(trust.hWVTStateData);
+  trust.dwStateAction = WTD_STATEACTION_CLOSE;
+  WinVerifyTrust((HWND)INVALID_HANDLE_VALUE, &action, &trust);
+  FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, (DWORD)check->status, 0,
+    (LPWSTR)&check->message, 0, NULL);
+}
+
+static napi_value to_signature(napi_env env, const signature_check *check) {
+  napi_value signature;
+  napi_value status;
+  napi_value message;
+  napi_value subject;
+  if (napi_create_object(env, &signature) != napi_ok
+      || napi_create_uint32(env, (uint32_t)check->status, &status) != napi_ok
+      || napi_create_string_utf16(env, (const char16_t *)(check->message == NULL ? L"" : check->message), NAPI_AUTO_LENGTH, &message) != napi_ok
+      || (check->subject == NULL ? napi_get_null(env, &subject)
+        : napi_create_string_utf16(env, (const char16_t *)check->subject, NAPI_AUTO_LENGTH, &subject)) != napi_ok
+      || napi_set_named_property(env, signature, "status", status) != napi_ok
+      || napi_set_named_property(env, signature, "message", message) != napi_ok
+      || napi_set_named_property(env, signature, "subject", subject) != napi_ok)
+    return fail(env);
+  return signature;
+}
+
+static void reject(napi_env env, napi_deferred deferred) {
+  napi_value error = NULL;
+  napi_value message;
+  bool is_pending = false;
+  if (napi_is_exception_pending(env, &is_pending) == napi_ok && is_pending)
+    napi_get_and_clear_last_exception(env, &error);
+  else if (napi_create_string_utf8(env, "The Windows process addon could not read a file's signature.", NAPI_AUTO_LENGTH, &message) == napi_ok)
+    napi_create_error(env, NULL, message, &error);
+  if (error != NULL)
+    napi_reject_deferred(env, deferred, error);
+}
+
+static void free_check(signature_check *check) {
+  free(check->path);
+  free(check->subject);
+  LocalFree(check->message);
+  free(check);
+}
+
+static void verify_signature_complete(napi_env env, napi_status status, void *data) {
+  signature_check *check = data;
+  napi_value signature = status == napi_ok ? to_signature(env, check) : NULL;
+  if (signature == NULL)
+    reject(env, check->deferred);
+  else
+    napi_resolve_deferred(env, check->deferred, signature);
+  napi_delete_async_work(env, check->work);
+  free_check(check);
+}
+
+static napi_value verify_signature(napi_env env, napi_callback_info info) {
+  napi_value name;
+  napi_value promise;
+  signature_check *check;
+  WCHAR *path = read_path(env, info);
+  if (path == NULL)
+    return NULL;
+  check = calloc(1, sizeof(*check));
+  if (check == NULL) {
+    free(path);
+    napi_throw_error(env, NULL, "The Windows process addon could not allocate memory for a signature check.");
+    return NULL;
+  }
+  check->path = path;
+  if (napi_create_string_utf8(env, "verifySignatureAsync", NAPI_AUTO_LENGTH, &name) != napi_ok
+      || napi_create_promise(env, &check->deferred, &promise) != napi_ok) {
+    free_check(check);
+    return fail(env);
+  }
+  if (napi_create_async_work(env, NULL, name, verify_signature_execute, verify_signature_complete, check, &check->work) != napi_ok) {
+    reject(env, check->deferred);
+    free_check(check);
+  }
+  else if (napi_queue_async_work(env, check->work) != napi_ok) {
+    napi_delete_async_work(env, check->work);
+    reject(env, check->deferred);
+    free_check(check);
+  }
+  return promise;
+}
+
 NAPI_MODULE_INIT() {
   napi_property_descriptor functions[] = {
     { "listProcesses", NULL, list_processes, NULL, NULL, NULL, napi_enumerable, NULL },
@@ -238,7 +384,8 @@ NAPI_MODULE_INIT() {
     { "terminateProcess", NULL, terminate_process, NULL, NULL, NULL, napi_enumerable, NULL },
     { "hasExited", NULL, has_exited, NULL, NULL, NULL, napi_enumerable, NULL },
     { "openFileForReading", NULL, open_file_for_reading, NULL, NULL, NULL, napi_enumerable, NULL },
-    { "closeHandle", NULL, close_handle, NULL, NULL, NULL, napi_enumerable, NULL }
+    { "closeHandle", NULL, close_handle, NULL, NULL, NULL, napi_enumerable, NULL },
+    { "verifySignatureAsync", NULL, verify_signature, NULL, NULL, NULL, napi_enumerable, NULL }
   };
   return napi_define_properties(env, exports, sizeof(functions) / sizeof(functions[0]), functions) == napi_ok ? exports : fail(env);
 }

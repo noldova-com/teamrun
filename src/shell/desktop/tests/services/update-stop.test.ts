@@ -37,6 +37,7 @@ export class UpdateStopTests {
   private rereads: boolean = false;
   private isWaitedOut: boolean = false;
   private onAsk?: () => void;
+  private onWait?: () => void;
   private time: number = 0;
   private onConnect?: (dataDirectory: string) => Promise<void>;
 
@@ -186,7 +187,7 @@ export class UpdateStopTests {
   }
 
   @TestMethod
-  public keepsItsReasonAndLogsABarrierItCannotRemove(): Promise<void> {
+  public keepsItsReasonAndLogsABarrierItCannotRemoveEvenWhenItTriesAgain(): Promise<void> {
     return this.runAsync(async (installation, folder) => {
       const first = await this.recordAsync(installation, folder, "first");
       this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
@@ -196,9 +197,33 @@ export class UpdateStopTests {
       const failure = await this.failAsync(installation);
 
       Assert.areEqual(`Work started while TeamRun prepared to update: A reply (${first})`, failure.message);
-      Assert.areEqual(JSON.stringify([`The update's barrier could not be removed after the update stopped: Error: EBUSY: operation failed, rm '${installation.barrierFile}'`]),
-        JSON.stringify(this.lines));
+      Assert.areEqual(JSON.stringify([
+        `The update's barrier could not be removed after the update stopped, even when tried again: Error: EBUSY: operation failed, rm '${installation.barrierFile}'`
+      ]), JSON.stringify(this.lines));
+      Assert.areEqual(1000, this.waits.at(-1));
       Assert.isTrue(existsSync(installation.barrierFile));
+    });
+  }
+
+  @TestMethod
+  public removesItsBarrierWhenTheSecondTryWorks(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      const first = await this.recordAsync(installation, folder, "first");
+      this.connection(first).answers.set("shell.work", Response.success("r", { descriptions: ["A reply"], sequence: 1 }));
+      this.isWaitedOut = true;
+      const rm = new FailingFileCallFixture("rm", installation.barrierFile, "EBUSY");
+      this.onWait = () => rm[Symbol.dispose]();
+      try {
+        const failure = await this.failAsync(installation);
+
+        Assert.areEqual(`Work started while TeamRun prepared to update: A reply (${first})`, failure.message);
+        Assert.areEqual("[]", JSON.stringify(this.lines));
+        Assert.areEqual(JSON.stringify([1000]), JSON.stringify(this.waits));
+        Assert.isFalse(existsSync(installation.barrierFile));
+      }
+      finally {
+        rm[Symbol.dispose]();
+      }
     });
   }
 
@@ -514,6 +539,7 @@ export class UpdateStopTests {
       () => this.time,
       t => {
         this.waits.push(t);
+        this.onWait?.();
         this.time += t;
         return Promise.resolve();
       },

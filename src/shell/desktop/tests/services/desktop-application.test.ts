@@ -2221,6 +2221,23 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async explainsAndQuitsWhenAskingMacOSToInstallTheUpdateThrows(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    handoff.handOff = () => Promise.resolve(5230);
+    await DesktopApplicationTests.restartToUpdateAsync("darwin", handoff, async (electron, desktop) => {
+      electron.nativeUpdater.onInstall = () => {
+        throw new Error("No update available, can't quit and install");
+      };
+      electron.dialog.failure = new Error("The dialog could not be shown.");
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(1, electron.dialog.boxes.length);
+      Assert.areEqual(1, DesktopStartFixture.readErrors(desktop,
+        "The update was handed off, but macOS could not be asked to install it and start the new version, so the desktop quits instead: Error: No update available").length);
+    });
+  }
+
+  @TestMethod
   public async explainsAndQuitsWhenMacOSCannotBeAskedToInstallTheUpdate(): Promise<void> {
     const handoff = new FakeUpdateHandoff();
     handoff.handOff = () => Promise.resolve(5230);
@@ -2253,6 +2270,30 @@ export class DesktopApplicationTests {
       Assert.isTrue(answered as boolean);
       Assert.areEqual(true, Reflect.get(Object(DesktopApplicationTests.quitQuestions(window)[0]), "isUpdate"));
       Assert.isNull(DesktopApplicationTests.quitQuestions(window)[1]);
+      Assert.areEqual(0, handoff.handedOff.length);
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+    }, target);
+  }
+
+  @TestMethod
+  public holdsTheRuntimesQuitWhileItRestartsToUpdateAndAnswersItOnceTheUpdateIsCancelled(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    return DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async (electron, _desktop, _installation, launcher) => {
+      const window = DesktopStartFixture.firstWindow(electron);
+      const trusted = DesktopStartFixture.trustedEvent("linux");
+      await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+
+      launcher.listeners[0]?.onEvent(new Event(ShellEvents.quitting, null));
+      await setImmediate();
+      const held = DesktopStartFixture.closeRequests(window).length;
+      electron.ipcMain.invoke("teamrun:quitAnswer", trusted, "Cancel");
+      await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
+      electron.ipcMain.invoke("teamrun:closeAnswer", trusted, DesktopStartFixture.closeRequests(window)[0], false);
+      await Condition.waitAsync(() => launcher.connections[0]?.calls.includes("shell.quitAnswered") === true);
+
+      Assert.areEqual(0, held);
       Assert.areEqual(0, handoff.handedOff.length);
       Assert.isFalse(electron.app.calls.includes("exit 0"));
     }, target);

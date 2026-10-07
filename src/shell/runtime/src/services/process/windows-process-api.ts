@@ -14,6 +14,7 @@ import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 
 import { AddonLoadException } from "../../exceptions/addon-load.exception.js";
 import type { IWindowsProcessApi } from "../../interfaces/i-windows-process-api.js";
+import type { IWindowsSignature } from "../../interfaces/i-windows-signature.js";
 import { Resources } from "../../resources.js";
 
 export class WindowsProcessApi implements IWindowsProcessApi {
@@ -52,6 +53,10 @@ export class WindowsProcessApi implements IWindowsProcessApi {
     WindowsProcessApi.expect(this.load().closeHandle(handle), t => Object.isUndefined(t));
   }
 
+  public async verifySignatureAsync(file: string): Promise<IWindowsSignature> {
+    return WindowsProcessApi.expect(await this.load().verifySignatureAsync(file), t => WindowsProcessApi.isSignature(t));
+  }
+
   private static expect<T>(value: T, isExpected: (value: unknown) => boolean): T {
     if (!isExpected(value))
       throw new AddonLoadException(Resources.addonUnexpected);
@@ -74,6 +79,14 @@ export class WindowsProcessApi implements IWindowsProcessApi {
 
   private static isAddon(value: unknown): value is IWindowsProcessApi {
     return Object.isObject(value) && Resources.windowsAddonFunctions.every(t => Object.isFunction(Reflect.get(value, t)));
+  }
+
+  private static isSignature(value: unknown): boolean {
+    if (!Object.isObject(value))
+      return false;
+    const subject: unknown = Reflect.get(value, Resources.signatureSubjectField);
+    return Object.isNumber(Reflect.get(value, Resources.signatureStatusField)) && Object.isString(Reflect.get(value, Resources.signatureMessageField))
+      && (Object.isString(subject) || Object.isNull(subject));
   }
 
   private load(): IWindowsProcessApi {
