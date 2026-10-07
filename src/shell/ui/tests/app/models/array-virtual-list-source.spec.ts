@@ -52,4 +52,19 @@ describe("ArrayVirtualListSource", () => {
     expect(() => source.replace(2, ["x", "y"])).toThrow(VirtualListException);
     expect([source.length(), await readAllAsync(source)]).toEqual([3, ["a", "b", "c"]]);
   });
+
+  it("keeps a change it made when an observer throws, and passes the error on", async () => {
+    const source = new ArrayVirtualListSource(["a"], t => t);
+    const failure = new Error("The observer broke.");
+    source.observe({
+      onInserted: () => {
+        throw failure;
+      },
+      onRemoved: () => undefined,
+      onUpdated: () => undefined
+    });
+
+    expect(() => source.insert(1, ["b"])).toThrow(failure);
+    expect([source.length(), await readAllAsync(source)]).toEqual([2, ["a", "b"]]);
+  });
 });

@@ -748,6 +748,9 @@ export declare class ArrayVirtualListSource<T> extends VirtualListSource<T> {
    * @param items The items to add, at least one.
    * @throws VirtualListException synchronously when the position is outside
    * the list or there are no items; the source is then unchanged.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
    * @example
    * ```ts
    * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
@@ -767,6 +770,9 @@ export declare class ArrayVirtualListSource<T> extends VirtualListSource<T> {
    * @throws VirtualListException synchronously when the items are not all
    * inside the list or the count is not 1 or more; the source is then
    * unchanged.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
    * @example
    * ```ts
    * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
@@ -787,6 +793,9 @@ export declare class ArrayVirtualListSource<T> extends VirtualListSource<T> {
    * @throws VirtualListException synchronously when the replaced items are
    * not all inside the list or there are no items; the source is then
    * unchanged.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
    * @example
    * ```ts
    * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
@@ -4474,7 +4483,7 @@ export declare class VirtualListException extends Exception {
 
 /**
  * The items of a long list, which a module supplies to the kit's list by
- * position, such as items 4,000 to 4,100, while it keeps them in its own
+ * position, such as items 4,000 to 4,049, while it keeps them in its own
  * storage. The list reads only the items near its view, a few pages at a
  * time, and drops those it no longer shows; it keeps the height of every
  * item it measured but none of their content.
@@ -4543,9 +4552,10 @@ export declare abstract class VirtualListSource<T> {
    * when the person has scrolled away or the items changed; the source may
    * stop reading then, and the list ignores whatever it answers.
    * @returns A promise of exactly `end - start` items in order, which the
-   * list keeps while it shows them and does not change. A rejection shows
-   * the items as not loaded, with a way to try again; an answer with
-   * another number of items is treated as a {@link VirtualListException}.
+   * list keeps while it shows them and does not change. A rejection, or an
+   * exception the call throws, shows the items as not loaded, with a way to
+   * try again; an answer with another number of items is treated as a
+   * {@link VirtualListException}.
    * @example
    * ```ts
    * import { VirtualListSource } from "@noldova/teamrun-shell-ui";
@@ -4642,6 +4652,9 @@ export declare abstract class VirtualListSource<T> {
    * @throws VirtualListException synchronously when the position is outside
    * the list or the count is not a whole number of 1 or more; nothing
    * changes then.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
    * @example
    * ```ts
    * import type { VirtualListSource } from "@noldova/teamrun-shell-ui";
@@ -4663,6 +4676,9 @@ export declare abstract class VirtualListSource<T> {
    * @throws VirtualListException synchronously when the items were not all
    * inside the list or the count is not a whole number of 1 or more;
    * nothing changes then.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
    * @example
    * ```ts
    * import type { VirtualListSource } from "@noldova/teamrun-shell-ui";
@@ -4676,13 +4692,17 @@ export declare abstract class VirtualListSource<T> {
 
   /**
    * Reports items changed in place, such as a message that grew while it
-   * streamed: each observer is told, and the list reads them again.
+   * streamed: each observer is told, and the list reads them again, showing
+   * the items it had until the new ones arrive.
    *
    * @param at The position of the first changed item.
    * @param count How many items in a row changed, a whole number of 1 or
    * more, all of them inside the list.
    * @throws VirtualListException synchronously when the items are not all
    * inside the list or the count is not a whole number of 1 or more.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
    * @example
    * ```ts
    * import type { VirtualListSource } from "@noldova/teamrun-shell-ui";

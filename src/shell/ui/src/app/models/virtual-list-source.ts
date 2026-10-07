@@ -45,31 +45,45 @@ export abstract class VirtualListSource<T> {
   }
 
   public reportInserted(at: number, count: number): void {
-    if (!Number.isSafeInteger(at) || !Number.isSafeInteger(count) || at < 0 || at > this.length() || count < 1)
-      throw new VirtualListException(Resources.formatVirtualListInsertInvalid(at, count, this.length()));
+    this.checkInsert(at, count);
 
     this.size.update(t => t + count);
-    for (const observer of this.observers)
-      observer.onInserted(at, count);
+    this.tell(t => t.onInserted(at, count));
   }
 
   public reportRemoved(at: number, count: number): void {
     this.checkRange(at, count);
 
     this.size.update(t => t - count);
-    for (const observer of this.observers)
-      observer.onRemoved(at, count);
+    this.tell(t => t.onRemoved(at, count));
   }
 
   public reportUpdated(at: number, count: number): void {
     this.checkRange(at, count);
 
-    for (const observer of this.observers)
-      observer.onUpdated(at, count);
+    this.tell(t => t.onUpdated(at, count));
   }
 
-  private checkRange(at: number, count: number): void {
+  protected checkInsert(at: number, count: number): void {
+    if (!Number.isSafeInteger(at) || !Number.isSafeInteger(count) || at < 0 || at > this.length() || count < 1)
+      throw new VirtualListException(Resources.formatVirtualListInsertInvalid(at, count, this.length()));
+  }
+
+  protected checkRange(at: number, count: number): void {
     if (!Number.isSafeInteger(at) || !Number.isSafeInteger(count) || at < 0 || count < 1 || at + count > this.length())
       throw new VirtualListException(Resources.formatVirtualListRangeInvalid(at, count, this.length()));
+  }
+
+  private tell(change: (observer: IVirtualListObserver) => void): void {
+    const errors: unknown[] = [];
+    for (const observer of this.observers)
+      try {
+        change(observer);
+      }
+      catch (error) {
+        errors.push(error);
+      }
+    if (errors.length > 0)
+      throw errors[0];
   }
 }

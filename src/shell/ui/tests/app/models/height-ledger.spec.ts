@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { VirtualListException } from "../../../src/app/exceptions/virtual-list.exception";
 import { HeightLedger } from "../../../src/app/models/height-ledger";
 import { VirtualListAnchor } from "../../../src/app/models/virtual-list-anchor";
 import { VirtualRange } from "../../../src/app/models/virtual-range";
@@ -79,5 +80,52 @@ describe("HeightLedger", () => {
     for (let height = 121; height <= 130; height++)
       ledger.measure(99_999, height);
     expect([ledger.total, ledger.indexAt(11_999_999), ledger.indexAt(6_000_000)]).toEqual([12_000_010, 99_999, 50_000]);
+  });
+
+  it("ignores a measure of a row outside the list and refuses a height that is not a number of pixels of 0 or more", () => {
+    const ledger = new HeightLedger(3, 100);
+
+    expect([-1, 3, 1.5].map(t => ledger.measure(t, 40))).toEqual([false, false, false]);
+    expect([ledger.count, ledger.total]).toEqual([3, 300]);
+    for (const height of [Number.NaN, Number.POSITIVE_INFINITY, -1])
+      expect(() => ledger.measure(0, height)).toThrow(new VirtualListException(`A row's height must be a number of pixels of 0 or more, not ${height}.`));
+    expect([ledger.measure(0, 0), ledger.total, ledger.offsetOf(-1), ledger.offsetOf(9), ledger.heightOf(9)]).toEqual([true, 200, 0, 200, 100]);
+  });
+
+  it("agrees with a plain list of heights through any mix of measures, inserts and removals", () => {
+    const ledger = new HeightLedger(40, 30);
+    const heights = Array.from({ length: 40 }, () => 30);
+    let seed = 7;
+    const next = (limit: number): number => {
+      seed = seed * 48_271 % 2_147_483_647;
+      return seed % limit;
+    };
+    const offsetOf = (index: number): number => heights.slice(0, index).reduce((sum, t) => sum + t, 0);
+    const indexAt = (position: number): number => Math.max(0, heights.findLastIndex((_, t) => offsetOf(t) <= position));
+
+    for (let step = 0; step < 400; step++) {
+      const kind = next(3);
+      if (kind === 0 && heights.length > 0) {
+        const index = next(heights.length);
+        const height = next(90);
+        ledger.measure(index, height);
+        heights[index] = height;
+      }
+      else if (kind === 1) {
+        const at = next(heights.length + 1);
+        const count = 1 + next(5);
+        ledger.insert(at, count);
+        heights.splice(at, 0, ...Array.from({ length: count }, () => 30));
+      }
+      else if (heights.length > 0) {
+        const at = next(heights.length);
+        const count = 1 + next(Math.min(5, heights.length - at));
+        ledger.remove(at, count);
+        heights.splice(at, count);
+      }
+      const position = next(offsetOf(heights.length) + 50);
+      const index = next(heights.length + 1);
+      expect([ledger.count, ledger.total, ledger.offsetOf(index), ledger.indexAt(position)]).toEqual([heights.length, offsetOf(heights.length), offsetOf(index), indexAt(position)]);
+    }
   });
 });

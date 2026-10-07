@@ -6,18 +6,22 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { Resources } from "../../resources";
+import { VirtualListException } from "../exceptions/virtual-list.exception";
 import { VirtualListAnchor } from "./virtual-list-anchor";
 import { VirtualRange } from "./virtual-range";
 
 export class HeightLedger {
   private readonly estimate: number;
   private readonly offsets: number[] = [0];
-  private measured: (number | undefined)[];
+  private readonly measured: (number | undefined)[];
   private end: number = 0;
+  private sum: number;
 
   public constructor(count: number, estimate: number) {
     this.estimate = estimate;
     this.measured = new Array<number | undefined>(count);
+    this.sum = count * estimate;
   }
 
   public get count(): number {
@@ -25,11 +29,12 @@ export class HeightLedger {
   }
 
   public get total(): number {
-    return this.offsetOf(this.count);
+    return this.sum;
   }
 
   public offsetOf(index: number): number {
-    return this.offsets[index] ?? this.settle(index);
+    const at = Math.min(Math.max(0, index), this.count);
+    return this.offsets[at] ?? this.settle(at);
   }
 
   public heightOf(index: number): number {
@@ -37,9 +42,11 @@ export class HeightLedger {
   }
 
   public indexAt(position: number): number {
-    this.settle(this.count);
+    const last = Math.max(0, this.count - 1);
+    while (this.offsets.length <= last && this.end <= position)
+      this.settle(this.offsets.length);
     let low = 0;
-    let high = Math.max(0, this.count - 1);
+    let high = Math.min(last, this.offsets.length - 1);
     while (low < high) {
       const middle = Math.ceil((low + high) / 2);
       if (this.offsetOf(middle) <= position)
@@ -66,24 +73,32 @@ export class HeightLedger {
   }
 
   public topOf(anchor: VirtualListAnchor): number {
-    return this.offsetOf(Math.min(anchor.index, this.count)) + anchor.distance;
+    return this.offsetOf(anchor.index) + anchor.distance;
   }
 
   public measure(index: number, height: number): boolean {
-    if (this.measured[index] === height)
+    if (!Number.isFinite(height) || height < 0)
+      throw new VirtualListException(Resources.formatVirtualListHeightInvalid(height));
+    if (!Number.isInteger(index) || index < 0 || index >= this.count || this.measured[index] === height)
       return false;
+    this.sum += height - this.heightOf(index);
     this.measured[index] = height;
     this.unsettle(index);
     return true;
   }
 
   public insert(at: number, count: number): void {
-    this.measured = this.measured.slice(0, at).concat(new Array<number | undefined>(count), this.measured.slice(at));
+    const length = this.count;
+    this.measured.length = length + count;
+    this.measured.copyWithin(at + count, at, length);
+    this.measured.fill(undefined, at, at + count);
+    this.sum += count * this.estimate;
     this.unsettle(at);
   }
 
   public remove(at: number, count: number): void {
-    this.measured.splice(at, count);
+    for (const height of this.measured.splice(at, count))
+      this.sum -= height ?? this.estimate;
     this.unsettle(at);
   }
 
