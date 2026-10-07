@@ -21,8 +21,10 @@ export interface IDesktopProcess {
   readonly errorOutput: Writable;
   readonly processId: number;
   readonly programs: IProgramHost;
+  readonly isTerminal: boolean;
 
   startDetached(executablePath: string, args: readonly string[], onFailure: (error: Error) => void): void;
+  startDetachedAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void>;
   endProcess(processId: number): void;
   onUncaughtException(listener: (error: unknown) => void): void;
   onUnhandledRejection(listener: (reason: unknown) => void): void;

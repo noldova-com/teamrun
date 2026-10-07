@@ -84,6 +84,7 @@ import { SenderPolicy } from "./sender-policy.js";
 import { SpellChecker } from "./spell-checker.js";
 import { SpellingDictionaries } from "./spelling-dictionaries.js";
 import { SystemNotifier } from "./system-notifier.js";
+import { TerminalRelaunch } from "./terminal-relaunch.js";
 import { TrayController } from "./tray-controller.js";
 import { TrayHostWatcher } from "./tray-host-watcher.js";
 import { UpdateBarrierGate } from "./update-barrier-gate.js";
@@ -277,6 +278,25 @@ export class DesktopApplication {
       return;
     }
     app.enableSandbox();
+    const relaunch = TerminalRelaunch.find(this.process, this.isPackaged);
+    if (Object.isNull(relaunch)) {
+      this.listen();
+      return;
+    }
+    app.releaseSingleInstanceLock();
+    void relaunch.startAsync().then(() => app.exit(Resources.quitExitCode), (error: unknown) => this.stayInTerminal(error));
+  }
+
+  private stayInTerminal(error: unknown): void {
+    this.log.write(Resources.formatRelaunchFailed(String(error)));
+    if (this.electron.app.requestSingleInstanceLock())
+      this.listen();
+    else
+      this.electron.app.quit();
+  }
+
+  private listen(): void {
+    const app = this.electron.app;
     app.on(Resources.secondInstanceEvent, () => this.reopen());
     app.on(Resources.beforeQuitEvent, (event: IPreventableEvent) => this.beforeQuit(event));
     app.on(Resources.windowAllClosedEvent, () => {

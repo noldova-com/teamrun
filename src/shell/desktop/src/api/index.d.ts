@@ -847,6 +847,11 @@ export interface IDesktopProcess {
   readonly programs: IProgramHost;
 
   /**
+   * Whether standard input, output or error is a terminal, as when a person starts the desktop at a shell's prompt.
+   */
+  readonly isTerminal: boolean;
+
+  /**
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
@@ -863,6 +868,28 @@ export interface IDesktopProcess {
    * ```
    */
   startDetached(executablePath: string, args: readonly string[], onFailure: (error: Error) => void): void;
+
+  /**
+   * Starts another program in its own session, detached, with its standard streams ignored: the copy of itself a
+   * desktop started from a terminal starts so that closing the terminal does not end it.
+   *
+   * @param executablePath The program.
+   * @param args Its arguments.
+   * @param environment Its environment.
+   * @param workingDirectory The folder it starts in.
+   * @returns A promise that settles once the program has started.
+   * @throws Error asynchronously when the program cannot be started, with the reason the system gives, or a
+   * `LaunchException` on Linux when `/bin/bash` is not executable.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function relaunchAsync(process: IDesktopProcess): Promise<void> {
+   *   return process.startDetachedAsync(process.execPath, process.argv.slice(1), process.env, process.workingDirectory);
+   * }
+   * ```
+   */
+  startDetachedAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void>;
 
   /**
    * Ends another process at once, for a window's page that did not stop when asked.
@@ -1365,6 +1392,21 @@ export interface IApplicationHost {
    * ```
    */
   requestSingleInstanceLock(): boolean;
+
+  /**
+   * Gives up the single-instance lock, so that the copy a desktop started from a terminal starts of itself can claim
+   * it.
+   *
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function release(app: IApplicationHost): void {
+   *   app.releaseSingleInstanceLock();
+   * }
+   * ```
+   */
+  releaseSingleInstanceLock(): void;
 
   /**
    * Lists the operating system's preferred languages, most preferred first.
@@ -5123,6 +5165,31 @@ export declare class ChildProgramHost implements IProgramHost {
    * ```
    */
   public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onFailure: (error: Error) => void): void;
+
+  /**
+   * Starts a program in its own session that outlives the desktop, with its standard streams ignored, in the given
+   * folder.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param workingDirectory The folder the program starts in.
+   * @returns A promise that settles once the program has started. On Linux the program starts through Bash, so the
+   * promise settles once Bash has started and does not report the program itself missing.
+   * @throws {LaunchException} Asynchronously on Linux when `/bin/bash` is not executable or `/proc/self/fd` cannot be
+   * read.
+   * @throws Error asynchronously with the reason the system gives when the program cannot be started elsewhere.
+   * @throws {ArgumentException} Asynchronously when the program's path is empty or whitespace.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function relaunchAsync(programs: ChildProgramHost, executablePath: string): Promise<void> {
+   *   return programs.startDetachedAsync(executablePath, [], process.env, process.cwd());
+   * }
+   * ```
+   */
+  public startDetachedAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void>;
 }
 
 /**
