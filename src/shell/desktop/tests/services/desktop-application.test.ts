@@ -2186,7 +2186,7 @@ export class DesktopApplicationTests {
     await DesktopApplicationTests.restartToUpdateAsync(platform, handoff, async (electron, desktop) => {
       await Condition.waitAsync(() => electron.app.calls.includes("exit 0") || electron.nativeUpdater.installs > 0);
 
-      Assert.areEqual(JSON.stringify([{ version: "999.0.0", arguments: [`--device-dir=${desktop.temporaryFolder}`] }]),
+      Assert.areEqual(JSON.stringify([{ version: "999.0.0", arguments: [`--device-dir=${dirname(desktop.temporaryFolder)}`] }]),
         JSON.stringify(kept.map(t => ({ version: Reflect.get(Object(t), "version"), arguments: Reflect.get(Object(t), "arguments") }))));
       const written = Number(Reflect.get(Object(kept[0]), "written"));
       Assert.isTrue(written >= before && written <= Date.now(), String(written));
@@ -3113,7 +3113,7 @@ export class DesktopApplicationTests {
         files.updateReady.kept = record;
         const desktop = new FakeDesktopProcess(platform, [`--device-dir=${folder}`], { SystemRoot: process.env["SystemRoot"] });
         desktop.processId = process.pid;
-        desktop.temporaryFolder = folder;
+        desktop.temporaryFolder = join(folder, "temporary");
         const electron = new FakeElectron();
         const installations: Installation[] = [];
         const launcher = Object.isNull(target) ? new FakeRuntimeLauncher() : new FakeRuntimeLauncher(new FakeRuntimeConnection(), target);

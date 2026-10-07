@@ -23,6 +23,7 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly execPath: string = "/electron/electron";
   public readonly homeFolder: string;
   public temporaryFolder: string = path.resolve("work", "temporary");
+  public accountHomeFolder: string = path.resolve("work", "account");
   public readonly workingDirectory: string = path.resolve("work");
   public isDefaultApp: boolean = false;
   public isTerminal: boolean = false;
@@ -84,5 +85,9 @@ export class FakeDesktopProcess implements IDesktopProcess {
 
   public onUnhandledRejection(listener: (reason: unknown) => void): void {
     this.rejectionListeners.push(listener);
+  }
+
+  public readAccountHomeFolder(): string {
+    return this.accountHomeFolder;
   }
 }

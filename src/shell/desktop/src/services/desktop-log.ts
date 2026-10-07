@@ -18,6 +18,7 @@ export class DesktopLog implements IDesktopLog {
   private readonly directory: DataDirectory;
   private readonly error: Writable;
   private readonly file: LogFile;
+  private readonly kept: string[] = [];
   private isOpen: boolean = false;
   private hasOpened: boolean = false;
 
@@ -40,11 +41,26 @@ export class DesktopLog implements IDesktopLog {
     catch (failure) {
       this.write(Resources.formatDesktopLogUnavailable(String(failure)));
     }
+    for (const line of this.kept.splice(0))
+      this.append(line);
   }
 
   public write(text: string): void {
     const line = this.file.format(text);
     this.error.write(line);
+    this.append(line);
+  }
+
+  public writeKept(text: string): void {
+    const line = this.file.format(text);
+    this.error.write(line);
+    if (this.hasOpened)
+      this.append(line);
+    else
+      this.kept.push(line);
+  }
+
+  private append(line: string): void {
     if (!this.isOpen)
       return;
     try {
