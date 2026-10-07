@@ -12,6 +12,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import PackageException from "./package.exception.ts";
+import UpdateFeed from "./update-feed.ts";
 
 export default class ProductIdentity {
   public static readonly WINDOWS_ICON_FILE: string = "icon-dark.ico";
@@ -129,6 +130,10 @@ export default class ProductIdentity {
       this.dataDirectoryVariable,
       this.icons
     ])];
+  }
+
+  public get updateFeed(): string {
+    return UpdateFeed.ofRepository(this.releaseRepository);
   }
 
   public isReleaseRepository(repository: string): boolean {

@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
@@ -38,6 +38,12 @@ export class DeviceFileStore implements IDeviceFileStore {
     const write = this.writing.catch(() => undefined).then(() => this.writeNowAsync(value));
     this.writing = write;
     return write;
+  }
+
+  public deleteAsync(): Promise<void> {
+    const deletion = this.writing.catch(() => undefined).then(() => rm(this.file, { force: true }));
+    this.writing = deletion;
+    return deletion;
   }
 
   private async writeNowAsync(value: JsonObject): Promise<void> {

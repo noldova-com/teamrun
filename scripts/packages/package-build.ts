@@ -101,7 +101,7 @@ export default class PackageBuild {
       }
 
     await this.requireCurrentAsync(variant);
-    await this.product.writeAsync(await this.hashFingerprintAsync(variant), outputFolder);
+    await this.product.writeAsync(await this.hashFingerprintAsync(variant), outputFolder, variant);
     return packages;
   }
 

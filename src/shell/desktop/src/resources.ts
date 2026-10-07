@@ -181,12 +181,66 @@ export class Resources {
   public static readonly retryAction: string = "retry";
   public static readonly kindField: string = "kind";
   public static readonly detailsField: string = "details";
-  public static readonly updateOffKind: string = "Off";
   public static readonly updateVersionField: string = "version";
   public static readonly updateProgressField: string = "progress";
   public static readonly updateCheckedAtField: string = "checkedAt";
   public static readonly updateReasonField: string = "reason";
   public static readonly updateMustMoveField: string = "mustMove";
+  public static readonly updateFilesField: string = "files";
+  public static readonly updateFileField: string = "file";
+  public static readonly updateSha512Field: string = "sha512";
+  public static readonly updateNotifiedField: string = "notified";
+  public static readonly updateStateChannel: string = "teamrun:updateState";
+  public static readonly updateReadyFile: string = "update-ready.json";
+  public static readonly updateConfigFile: string = "update-config.json";
+  public static readonly updateCacheSuffix: string = "-updater-";
+  public static readonly updateCheckLockFile: string = "update-check.lock";
+  public static readonly updateChecksStateKey: string = "updateChecks";
+  public static readonly updateFeedTimeout: number = 30_000;
+  public static readonly updateCheckAction: string = "Check";
+  public static readonly automaticUpdateChecks: string = "Automatic";
+  public static readonly updateChecksAtStart: string = "AtStart";
+  public static readonly onRequestUpdateChecks: string = "OnRequest";
+  public static readonly updateCheckChoices: readonly string[] = [Resources.automaticUpdateChecks, Resources.updateChecksAtStart, Resources.onRequestUpdateChecks];
+  public static readonly firstUpdateCheckDelay: number = 30_000;
+  public static readonly updateCheckInterval: number = 3_600_000;
+  public static readonly feedSourceOption: string = "source";
+  public static readonly updateTargets: ReadonlyMap<string, readonly [string, string]> = new Map([
+    ["win32", ["windows", "exe"]],
+    ["darwin", ["macos", "zip"]],
+    ["linux", ["linux", "AppImage"]]
+  ]);
+  public static readonly updateArchitectures: readonly string[] = ["x64", "arm64"];
+  public static readonly feedSourceMissing: string = "The update feed's provider needs the feed's source in its options.";
+  public static readonly customProvider: "custom" = "custom";
+  public static readonly downloadProgressEvent: "download-progress" = "download-progress";
+  public static readonly pendingUpdateFolder: string = "pending";
+  public static readonly updaterCacheFolderField: string = "updaterCacheDirName";
+  public static readonly prereleaseSeparator: string = "-";
+  public static readonly versionSeparator: string = ".";
+  public static readonly sha512Algorithm: string = "sha512";
+  public static readonly base64Encoding: BufferEncoding = "base64";
+  public static readonly lineBreak: string = "\n";
+  public static readonly updateInfoInvalid: string = "The release's information is invalid.";
+  public static readonly updateDownloadMismatch: string = "The download doesn't match the release.";
+  public static readonly updateDownloadInterrupted: string = "The download was interrupted.";
+  public static readonly updateNotSigned: string = "The update isn't signed by the publisher.";
+  public static readonly updateFailedUnexpectedly: string = "The update stopped on an unexpected error.";
+  public static readonly updateFileChanged: string = "the downloaded file has changed or is gone";
+  public static readonly updateFileElsewhere: string = "its file is not the package in the updater's cache";
+  public static readonly updateFeedRedirected: string = "The update feed redirected to an address with another protocol.";
+  public static readonly updateCheckerUnknown: string = "The desktop could not identify its own process, so it cannot check for updates.";
+  public static readonly restartToUpdateTitle: string = "Restart to update";
+  public static readonly restartToUpdateMember: string = "restartToUpdate";
+  public static readonly updateFailureReasons: ReadonlyMap<string, string> = new Map([
+    ["ERR_UPDATER_INVALID_VERSION", Resources.updateInfoInvalid],
+    ["ERR_UPDATER_INVALID_UPDATE_INFO", Resources.updateInfoInvalid],
+    ["ERR_UPDATER_NO_FILES_PROVIDED", Resources.updateInfoInvalid],
+    ["ERR_UPDATER_NO_CHECKSUM", Resources.updateInfoInvalid],
+    ["ERR_UPDATER_ZIP_FILE_NOT_FOUND", Resources.updateInfoInvalid],
+    ["ERR_CHECKSUM_MISMATCH", Resources.updateDownloadMismatch],
+    ["ERR_UPDATER_INVALID_SIGNATURE", Resources.updateNotSigned]
+  ]);
   public static readonly dataDirectoryArgument: string = "--data-dir=";
   public static readonly userDataArgument: string = "--user-data-dir=";
   public static readonly userDataPath: "userData" = "userData";
@@ -384,6 +438,7 @@ export class Resources {
   public static readonly userCancelledCode: string = "(-128)";
   public static readonly occupiedExitCode: string = "(3)";
   public static readonly missingErrorCode: string = "ENOENT";
+  public static readonly existingErrorCode: string = "EEXIST";
   public static readonly errorCodeField: "code" = "code";
   public static readonly deniedErrorCodes: readonly string[] = ["EACCES", "EPERM"];
   public static get commandInstalled(): string {
@@ -801,6 +856,80 @@ export class Resources {
 
   public static formatMainProcessBoxFailed(error: string): string {
     return `The desktop could not ask what to do after its main process failed, so it quits: ${error}`;
+  }
+
+  public static get updateFeedUnreachable(): string {
+    return `${Resources.applicationName} couldn't reach its update feed.`;
+  }
+
+  public static formatUpdateFeedRefused(status: number): string {
+    return `The update feed answered with HTTP status ${status}.`;
+  }
+
+  public static get updateCheckedElsewhere(): string {
+    return `Another ${Resources.applicationName} is checking for updates.`;
+  }
+
+  public static formatUpdateLockLeft(error: string): string {
+    return `The update check's lock could not be removed, so it stays until this desktop checks again or quits: ${error}`;
+  }
+
+  public static formatUpdateNotDeleted(error: string): string {
+    return `The update that failed its publisher check could not be deleted: ${error}`;
+  }
+
+  public static formatUpdateCheckNotReleased(error: string): string {
+    return `The update check could not let go of its lock: ${error}`;
+  }
+
+  public static formatUpdaterMessage(message: string): string {
+    return `The updater reported: ${message}`;
+  }
+
+  public static formatPublisherCheck(milliseconds: number, failure: string | null): string {
+    return Object.isNull(failure)
+      ? `The update's publisher check passed in ${milliseconds} ms.`
+      : `The update's publisher check failed in ${milliseconds} ms: ${failure}`;
+  }
+
+  public static formatUpdateFailed(error: string): string {
+    return `The update failed: ${error}`;
+  }
+
+  public static formatUpdateInstalled(version: string): string {
+    return `version ${version} is no newer than the installed one`;
+  }
+
+  public static formatUpdateRecordDropped(reason: string): string {
+    return `The ready update's record was removed, since ${reason}.`;
+  }
+
+  public static formatUpdateNotRecorded(error: string): string {
+    return `The ready update could not be recorded, so it downloads again after a restart: ${error}`;
+  }
+
+  public static formatUpdateNotPosted(message: string): string {
+    return `The runtime refused the ready update's notification, so the desktop posts it again when the runtime is ready: ${message}`;
+  }
+
+  public static formatUpdateNotNotified(error: string): string {
+    return `The ready update's notification could not be posted or recorded: ${error}`;
+  }
+
+  public static formatUpdateReadyTitle(version: string): string {
+    return `${Resources.applicationName} ${version} is ready to install.`;
+  }
+
+  public static formatChannelFile(platform: string, architecture: string): string {
+    return `latest-${platform}-${architecture}.yml`;
+  }
+
+  public static formatPackageFile(productName: string, platform: string, architecture: string, extension: string): string {
+    return `${productName}-${platform}-${architecture}.${extension}`;
+  }
+
+  public static formatUpdateCacheFolder(slug: string, installationId: string): string {
+    return `${slug}${Resources.updateCacheSuffix}${installationId}`;
   }
 
   public static formatWindowSize(name: string, minimum: number): string {

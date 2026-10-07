@@ -28,7 +28,7 @@ export default class PackagedBuildFixture extends ProcessRunnerFixture {
   }
 
   public override async runAsync(command: string, commandArguments: readonly string[], directory: string): Promise<number | null> {
-    const output = String(commandArguments.at(-1));
+    const output = String(commandArguments[commandArguments.indexOf("--output") + 1]);
     await this.gallery.writeAsync(this.isPackaged);
     await mkdir(path.join(output, "window", "browser"), { recursive: true });
     await writeFile(path.join(output, "window", "browser", "index.html"), this.window);

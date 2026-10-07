@@ -10,6 +10,7 @@ import path from "node:path";
 
 import type AngularProject from "../angular/angular-project.ts";
 import GalleryFile from "../angular/gallery-file.ts";
+import UpdateFeed from "../packages/update-feed.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import PackagingException from "./packaging.exception.ts";
 
@@ -31,9 +32,10 @@ export default class PackagedBuild {
     this.angular = angular;
   }
 
-  public async buildAsync(folder: string): Promise<void> {
+  public async buildAsync(folder: string, updateFeed: string | null): Promise<void> {
     try {
-      const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.root, ...PackagedBuild.BUILD_SCRIPT_SEGMENTS), ...PackagedBuild.BUILD_OPTIONS, folder], this.root);
+      const feed = updateFeed === null ? [] : [UpdateFeed.OPTION, updateFeed];
+      const exitCode = await this.runner.runAsync(process.execPath, [path.join(this.root, ...PackagedBuild.BUILD_SCRIPT_SEGMENTS), ...PackagedBuild.BUILD_OPTIONS, folder, ...feed], this.root);
       if (exitCode !== 0)
         throw new PackagingException(`The packaged build failed with exit code ${exitCode}.`);
       if (!await this.gallery.isPackagedAsync())

@@ -35,7 +35,7 @@ export default class PackagedBuildCheck implements ICheck {
       return true;
 
     try {
-      await this.build.buildAsync(path.join(this.root, ...PackagedBuildCheck.OUTPUT_SEGMENTS));
+      await this.build.buildAsync(path.join(this.root, ...PackagedBuildCheck.OUTPUT_SEGMENTS), null);
       return true;
     }
     catch (error) {
