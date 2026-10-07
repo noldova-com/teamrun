@@ -1194,7 +1194,7 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   At start the desktop hashes the file again, without the network: when the version is still newer than the installed one and the file still matches, the update shows as ready; otherwise the record is removed and the next check downloads again.
 - **Restart to update.**
   Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready; a stop or handoff that fails leaves it ready and shows why, unless the update is no longer current.
-  The failure is logged once, in one line with its reason; a publisher check logs only its duration and whether it passed.
+  The failure is logged once, in one line with its reason and the message of its cause when the reason doesn't already hold it; a publisher check logs only its duration and whether it passed.
   The desktop's own runtime, already stopped by then, comes back by itself: the desktop is frozen for the update and reconnects once the barrier is released.
   Section 9 owns the choice the person makes while work is in progress.
   The handoff installs the way the platform does: Windows runs the installer quietly in the existing installation's scope, macOS installs through Squirrel.Mac from the ZIP, and Linux replaces the AppImage file in place, keeping its location and launchers.
@@ -1208,8 +1208,8 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   A newer version, and a ready update from its record, show as failed with that reason, so the window never offers Restart to update.
   Only once the handoff has succeeded does the desktop quit, without asking about work or saving again, since the update stop already did both: through `autoUpdater.quitAndInstall` on macOS, so the new version starts, and at once elsewhere.
   On macOS the desktop first closes its windows, since `quitAndInstall` quits only once every window has closed.
-  When Squirrel.Mac reports an error instead, or the desktop hasn't quit within 10 seconds, the desktop logs why, tells the person that macOS installs the update once TeamRun quits but TeamRun can't open again by itself, and quits.
-  While the update stop and the handoff run, the desktop holds any quit, such as Quit, closing the last window or a quit from the tray, and quits as usual once the update has failed or been cancelled.
+  When `quitAndInstall` throws, Squirrel.Mac reports an error instead, or the desktop hasn't quit within 10 seconds, the desktop logs why, tells the person that macOS installs the update once TeamRun quits but TeamRun can't open again by itself, and quits.
+  While the update stop and the handoff run, the desktop holds any quit, such as Quit, closing the last window, a quit from the tray or `teamrun quit`, and quits as usual once the update has failed or been cancelled, answering `teamrun quit` as it always does.
   A handoff that fails leaves the desktop running as before, so quitting it later asks and saves as usual.
   The standard error of the installer and of the AppImage restart's Bash goes to `logs/update-installer.log` and `logs/update-restart.log` in the data directory.
 - **macOS location.**
@@ -1289,7 +1289,7 @@ When the person confirms, the desktop reads and judges the barrier again, since 
 The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use, without starting or taking over a runtime, identifying each by the process its discovery names.
 A data directory that a runtime owns but has no discovery yet has a runtime that is still starting: the update stop waits up to 15 seconds for its discovery, skips the directory if the ownership ends first, and otherwise fails the update with the reason.
 When any directory fails to connect, the update stop closes the connections it already opened.
-A barrier it cannot remove after a failure is logged, and the update keeps its own reason:
+A barrier it cannot remove after a failure is tried again once a second later and logged when that fails too, and the update keeps its own reason:
 
 1. **Work.**
    It reads `shell.work` from each runtime and, when any work is in progress, asks section 9's question in its window, listing the work by data directory.

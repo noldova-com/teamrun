@@ -410,7 +410,8 @@ export declare class UpdateStop {
    * @param wait Resolves after the given number of milliseconds.
    * @param restart Starts the replaced AppImage once this desktop has exited, or `null` when the desktop does not run
    * from an AppImage.
-   * @param log Records a barrier that could not be removed after the update stopped.
+   * @param log Records a barrier that could not be removed after the update stopped, even when tried again a second
+   * later.
    * @example
    * ```ts
    * import { setTimeout as delay } from "node:timers/promises";
@@ -4783,15 +4784,15 @@ export declare class DesktopApplication {
    * desktop runs from a packaged build and the data directory's `logs` folder for the handoff's programs, or gives
    * `null` for a build that names no update feed, whose updates stay Off; the updater's log is the desktop's. The
    * {@link UpdateController} it drives keeps `update-ready.json` in the installation's folder, follows
-   * `shell.updateChecks`, pushes each state on `teamrun:updateState` and posts `shell.updateReady` once over the runtime
-   * connection. Before the updater starts, the handoff removes what an earlier one left. Restart to update runs an
-   * {@link UpdateStop} that connects through an {@link UpdateTargetConnector}, asks section 9's question in a window
+   * `shell.updateChecks`, pushes each state on `teamrun:updateState` and posts `shell.updateReady` once over the
+   * runtime connection. Before the updater starts, the handoff removes what an earlier one left. Restart to update runs
+   * an {@link UpdateStop} that connects through an {@link UpdateTargetConnector}, asks section 9's question in a window
    * through an {@link UpdateWorkQuestion} and calls the handoff, with an {@link AppImageRestart} on Linux; a quit asked
-   * for meanwhile waits until the handoff has finished or failed. Once the handoff has succeeded, and only then, the
-   * desktop quits without asking anything again: on macOS it closes its windows and calls
-   * `nativeUpdater.quitAndInstall`, so the new version starts, and elsewhere it exits at once. When Squirrel reports an
-   * `error`, or macOS hasn't quit within 10 seconds, the desktop logs it, tells the person that macOS installs the
-   * update but TeamRun can't open again by itself, and exits.
+   * for meanwhile, `teamrun quit` included, waits until the handoff has finished or failed. Once the handoff has
+   * succeeded, and only then, the desktop quits without asking anything again: on macOS it closes its windows and calls
+   * `nativeUpdater.quitAndInstall`, so the new version starts, and elsewhere it exits at once. When `quitAndInstall`
+   * throws, Squirrel reports an `error`, or macOS hasn't quit within 10 seconds, the desktop logs it, tells the person
+   * that macOS installs the update but TeamRun can't open again by itself, and exits.
    * @param createUpdateLock Creates the lock that lets one desktop of the installation check at a time; the lock's log
    * is the desktop's.
    * @example
@@ -6746,7 +6747,8 @@ export declare class UpdateController {
    * posted or restarted.
    * @param publish Receives each state.
    * @param postReadyAsync Posts `shell.updateReady` for a version, resolving to whether the runtime took it.
-   * @param log Records each failure in one line with its reason, without the exception's name.
+   * @param log Records each failure in one line with its reason, without the exception's name, and the message of its
+   * cause when the reason doesn't already hold it.
    * @param now Gives the time in milliseconds.
    * @param schedule Runs a callback after a delay and gives what cancels it.
    * @param restartAsync Restarts to install a ready update: asks about work in progress, stops the installation and

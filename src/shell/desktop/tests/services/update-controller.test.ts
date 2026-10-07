@@ -11,6 +11,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { StaleUpdateException, UpdateException, UpdateController, UpdateHandoffException, type UpdateReadyRecord, type UpdateStatus, UpdateStopException } from "@noldova/teamrun-shell-desktop";
@@ -351,6 +352,31 @@ export class UpdateControllerTests {
       Assert.isTrue(checked);
       Assert.areEqual(1, fixture.record.deletes);
       Assert.areEqual(1, fixture.restarts.length);
+    });
+  }
+
+  @TestMethod
+  public logsTheCauseOfAFailureOnceWithItsReason(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      await fixture.controller.startAsync();
+      const failures = [
+        new UpdateException("TeamRun couldn't keep its update.", new ExceptionOptions(new Error("EACCES: permission denied"))),
+        new UpdateException("TeamRun couldn't keep its update: EACCES: permission denied", new ExceptionOptions(new Error("EACCES: permission denied"))),
+        new UpdateException("TeamRun couldn't keep its update.", new ExceptionOptions("ENOSPC"))
+      ];
+
+      for (const [index, failure] of failures.entries()) {
+        fixture.updater.check = () => Promise.reject(failure);
+        fixture.controller.act("Check");
+        await Condition.waitAsync(() => fixture.lines.length === index + 1);
+      }
+
+      Assert.areEqual(JSON.stringify([
+        "The update failed: TeamRun couldn't keep its update. (EACCES: permission denied)",
+        "The update failed: TeamRun couldn't keep its update: EACCES: permission denied",
+        "The update failed: TeamRun couldn't keep its update. (ENOSPC)"
+      ]), JSON.stringify(fixture.lines));
+      Assert.areEqual("TeamRun couldn't keep its update.", fixture.controller.status.reason);
     });
   }
 
