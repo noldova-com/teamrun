@@ -204,10 +204,7 @@ export class DesktopApplication {
       hasUpdateEndedAsync: () => installation.hasEndedAsync(),
       saveAsync: () => this.saveForUpdateAsync(),
       passBarrierAsync: t => this.passBarrierAsync(() => this.gate.askAsync(t)),
-      quit: () => {
-        this.isExiting = true;
-        electron.app.exit(Resources.quitExitCode);
-      }
+      quit: () => this.exitNow()
     };
     this.startup = new RuntimeStartup(launcher, t => this.publish(t), t => this.handOver(t), Resources.workWaitInterval, t => this.forward(t), t => this.log.write(t), Date.now, (t, signal) => delay(t, undefined, { signal }), updates);
     this.watch = new UpdateBarrierWatch(updates, () => !Object.isNull(this.startup.connection), Resources.updateBarrierInterval);
@@ -296,7 +293,7 @@ export class DesktopApplication {
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
       spelling, installation, presence, connector, () => recordDesktopAsync(installation), setup, createUpdateLock(installation, t => log.write(t)), updatesOff);
-    recovery.attach(log, () => application.openLogFolderAsync());
+    recovery.attach(log, () => application.openLogFolderAsync(), () => application.release());
     application.run();
   }
 
@@ -336,10 +333,7 @@ export class DesktopApplication {
         app.quit();
     });
     app.on(Resources.willQuitEvent, () => {
-      this.watch.stop();
-      this.updates?.stop();
-      this.trayHosts.stop();
-      this.tray.dispose();
+      this.release();
       this.startup.close();
     });
     void app.whenReady().then(() => this.ready());
@@ -402,7 +396,7 @@ export class DesktopApplication {
     });
     void Promise.all([this.passBarrierAsync(() => this.gate.passAsync()), this.readAppearanceAsync(), this.recordSelfAsync(), this.deviceState.readAsync()]).then(([isClear, , , state]) => {
       if (!isClear) {
-        this.electron.app.exit(Resources.quitExitCode);
+        this.exitNow();
         return;
       }
       this.hasPassedBarrier = true;
@@ -852,7 +846,20 @@ export class DesktopApplication {
         noLink: true
       }).catch(() => undefined);
     }
+    this.exitNow();
+  }
+
+  private exitNow(): void {
+    this.isExiting = true;
+    this.release();
     this.electron.app.exit(Resources.quitExitCode);
+  }
+
+  private release(): void {
+    this.watch.stop();
+    this.updates?.stop();
+    this.trayHosts.stop();
+    this.tray.dispose();
   }
 
   private async quitAndInstallAsync(): Promise<unknown> {

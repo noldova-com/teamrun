@@ -24,6 +24,7 @@ class Failed {
   public readonly dialog: FakeDialogHost;
   public readonly recovery: MainProcessRecovery;
   public logFolders: number = 0;
+  public releaseFailure: Error | null = null;
 
   public constructor(answers: readonly number[], isAttached: boolean = true) {
     this.dialog = new FakeDialogHost(answers);
@@ -32,6 +33,10 @@ class Failed {
       this.recovery.attach(this.log, () => {
         this.logFolders++;
         return Promise.resolve(true);
+      }, () => {
+        if (!Object.isNull(this.releaseFailure))
+          throw this.releaseFailure;
+        this.app.calls.push("release");
       });
   }
 
@@ -97,7 +102,7 @@ export class MainProcessRecoveryTests {
     Assert.isTrue(failed.log.lines[0]?.startsWith("The desktop's main process failed with an uncaught exception: Error: The pipe broke.\n    at ") === true, failed.log.lines.join("\n"));
     Assert.areEqual("The person chose Restart TeamRun.", failed.log.lines[1]);
     Assert.areEqual("", failed.process.errors);
-    Assert.areEqual(JSON.stringify(["relaunch", "exit 0"]), JSON.stringify(failed.app.calls));
+    Assert.areEqual(JSON.stringify(["relaunch", "release", "exit 0"]), JSON.stringify(failed.app.calls));
   }
 
   @TestMethod
@@ -107,7 +112,7 @@ export class MainProcessRecoveryTests {
     await failed.failReadyAsync("not an error", MainProcessFailureKind.UnhandledRejection);
 
     Assert.areEqual(JSON.stringify(["The desktop's main process failed with an unhandled rejection: 'not an error'", "The person chose Quit."]), JSON.stringify(failed.log.lines));
-    Assert.areEqual(JSON.stringify(["exit 0"]), JSON.stringify(failed.app.calls));
+    Assert.areEqual(JSON.stringify(["release", "exit 0"]), JSON.stringify(failed.app.calls));
   }
 
   @TestMethod
@@ -119,7 +124,7 @@ export class MainProcessRecoveryTests {
     Assert.areEqual(3, failed.boxes.length);
     Assert.areEqual(2, failed.logFolders);
     Assert.areEqual(JSON.stringify(["The person chose Open log folder.", "The person chose Open log folder.", "The person chose Quit."]), JSON.stringify(failed.log.lines.slice(1)));
-    Assert.areEqual(JSON.stringify(["exit 0"]), JSON.stringify(failed.app.calls));
+    Assert.areEqual(JSON.stringify(["release", "exit 0"]), JSON.stringify(failed.app.calls));
   }
 
   @TestMethod
@@ -129,7 +134,7 @@ export class MainProcessRecoveryTests {
     await failed.failReadyAsync(new Error("The pipe broke."));
 
     Assert.areEqual("The person chose Quit.", failed.log.lines[1]);
-    Assert.areEqual(JSON.stringify(["exit 0"]), JSON.stringify(failed.app.calls));
+    Assert.areEqual(JSON.stringify(["release", "exit 0"]), JSON.stringify(failed.app.calls));
   }
 
   @TestMethod
@@ -146,6 +151,18 @@ export class MainProcessRecoveryTests {
   }
 
   @TestMethod
+  public async logsWhatItCouldNotStopAndQuitsAnyway(): Promise<void> {
+    const failed = new Failed([2]);
+    failed.releaseFailure = new Error("The tray could not be removed.");
+
+    await failed.failReadyAsync(new Error("The pipe broke."));
+
+    Assert.isTrue(failed.log.lines[2]?.startsWith("The desktop could not stop its watchers and helper programs before it quit: Error: The tray could not be removed.\n") === true,
+      failed.log.lines.join("\n"));
+    Assert.areEqual(JSON.stringify(["exit 0"]), JSON.stringify(failed.app.calls));
+  }
+
+  @TestMethod
   public async exitsWithAFailureWhenItCannotAsk(): Promise<void> {
     const failed = new Failed([]);
     failed.dialog.failure = new Error("No display.");
@@ -153,6 +170,6 @@ export class MainProcessRecoveryTests {
     await failed.failReadyAsync(new Error("The pipe broke."));
 
     Assert.isTrue(failed.log.lines[1]?.startsWith("The desktop could not ask what to do after its main process failed, so it quits: Error: No display.\n    at ") === true, failed.log.lines.join("\n"));
-    Assert.areEqual(JSON.stringify(["exit 1"]), JSON.stringify(failed.app.calls));
+    Assert.areEqual(JSON.stringify(["release", "exit 1"]), JSON.stringify(failed.app.calls));
   }
 }

@@ -4674,20 +4674,22 @@ export declare class MainProcessRecovery {
   public constructor(app: IApplicationHost, dialog: IDialogHost, errorOutput: Writable, redactor: DiagnosticRedactor);
 
   /**
-   * Records later failures and choices in the desktop log, and offers its folder in the box.
+   * Records later failures and choices in the desktop log, offers its folder in the box, and releases the desktop's
+   * watchers and helper programs before it exits, logging a release that fails.
    *
    * @param log The desktop log.
    * @param openLogFolderAsync Opens the log folder; its promise tells whether it opened.
+   * @param release Stops what the desktop started that would outlive it, as a quit does.
    * @example
    * ```ts
    * import type { IDesktopLog, MainProcessRecovery } from "@noldova/teamrun-shell-desktop";
    *
    * export function attach(recovery: MainProcessRecovery, log: IDesktopLog): void {
-   *   recovery.attach(log, () => Promise.resolve(true));
+   *   recovery.attach(log, () => Promise.resolve(true), () => undefined);
    * }
    * ```
    */
-  public attach(log: IDesktopLog, openLogFolderAsync: () => Promise<boolean>): void;
+  public attach(log: IDesktopLog, openLogFolderAsync: () => Promise<boolean>, release: () => void): void;
 
   /**
    * Records a failure and, for the first one, asks the person whether to restart or quit. The box shows the message
