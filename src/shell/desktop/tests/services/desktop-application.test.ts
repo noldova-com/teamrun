@@ -262,6 +262,53 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async quitsAsItsQuitDoesWhenTheRuntimeAsksAndForwardsNothingToItsWindows(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher);
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 1);
+    await Condition.waitAsync(() => electron.app.calls.includes("quit"));
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    await setImmediate();
+
+    Assert.areEqual(1, DesktopStartFixture.closeRequests(window).length);
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(connection)));
+    Assert.isFalse(connection.calls.includes("shell.quitAnswered"));
+    Assert.isFalse(window.webContents.sent.some(t => t[1] === "shell.quitting"));
+  }
+
+  @TestMethod
+  public async tellsTheRuntimeOnceItStayedWhenAWindowCannotSaveOrThePersonKeepsIt(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    DesktopApplicationTests.answerStops(connection, [DesktopApplicationTests.busy()]);
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher);
+    const window = DesktopStartFixture.firstWindow(electron);
+    DesktopApplicationTests.paint(electron, "linux", window);
+
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
+    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.closeRequests(window)[0], false);
+    await Condition.waitAsync(() => connection.calls.includes("shell.quitAnswered"));
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 2);
+    await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    electron.ipcMain.invoke("teamrun:quitAnswer", DesktopStartFixture.trustedEvent("linux"), "Cancel");
+    await Condition.waitAsync(() => connection.calls.filter(t => t === "shell.quitAnswered").length === 2);
+    await setImmediate();
+
+    Assert.areEqual("[{\"answer\":\"SaveFailed\"},{\"answer\":\"Stayed\"}]", JSON.stringify(connection.payloads.filter((_t, u) => connection.calls[u] === "shell.quitAnswered")));
+    Assert.isFalse(window.isGone);
+    Assert.isFalse(electron.app.calls.includes("quit"));
+    window.destroy();
+  }
+
+  @TestMethod
   public async savesAgainBeforeStoppingTheWorkWhenThePersonChoosesToAndStaysWhenTheyCancel(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));

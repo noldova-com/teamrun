@@ -131,6 +131,27 @@ test.describe("quitting while a module works", () => {
     await expect.poll(() => ClockWorkFixture.readAsync(desktop.dataDirectory), { timeout: ClockWorkFixture.TIMEOUT, intervals: [ClockWorkFixture.INTERVAL] }).toEqual([]);
   });
 
+  test("quits from the command line as its Quit does, which says TeamRun stayed open when the person cancels and that it quit once the work they waited for finishes", async ({ desktop }) => {
+    const window = desktop.window;
+    await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();
+    await ClockWorkFixture.beginAsync(desktop);
+    const asking = window.getByRole("dialog", { name: "Work is still running" });
+
+    const cancelled = CliFixture.runToEndAsync("quit", "--data-dir", desktop.dataDirectory);
+    await expect(asking).toBeVisible();
+    await window.keyboard.press("Escape");
+    expect(await cancelled).toEqual({ code: 6, output: "", error: "TeamRun stayed open: it was kept open while work was in progress.\n" });
+    expect(await desktop.isVisibleAsync()).toBe(true);
+
+    const quitting = CliFixture.runToEndAsync("quit", "--json", "--data-dir", desktop.dataDirectory);
+    await asking.getByRole("button", { name: "Wait, then quit" }).click();
+    const exited = waitForExitAsync(desktop);
+    await ClockWorkFixture.finishAsync(desktop.dataDirectory);
+
+    expect(await exited).toBe(0);
+    expect(await quitting).toEqual({ code: 0, output: "{\"outcome\":\"Quit\"}\n", error: "" });
+  });
+
   test("stops the work and quits when the person chooses to, and the runtime stops with it and ends the programs its modules run @smoke", async ({ desktop }) => {
     const window = desktop.window;
     await expect(window.locator("tr-tab[data-tab-key=\"document/notes.note/2\"]")).toBeVisible();

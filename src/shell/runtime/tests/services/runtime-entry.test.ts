@@ -83,14 +83,26 @@ export class RuntimeEntryTests {
       const endedWith = await Promise.race([listening.then(() => null), running]);
       Assert.isNull(endedWith, `the runtime ended before it started: ${RuntimeEntryTests.read(error)}`);
       Assert.isNotNull(await DiscoveryReader.readAsync(fixture.dataDirectory));
-      Assert.areEqual(1, signals.listenerCount("SIGTERM"));
-      Assert.areEqual(1, signals.listenerCount("SIGINT"));
+      Assert.areEqual("1,1,1", ["SIGTERM", "SIGINT", "SIGHUP"].map(t => signals.listenerCount(t)).join(","));
 
       signals.emit("SIGTERM");
 
       Assert.areEqual(0, await running);
-      Assert.areEqual(0, signals.listenerCount("SIGTERM"));
-      Assert.areEqual(0, signals.listenerCount("SIGINT"));
+      Assert.areEqual("0,0,0", ["SIGTERM", "SIGINT", "SIGHUP"].map(t => signals.listenerCount(t)).join(","));
+      Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
+    });
+  }
+
+  @TestMethod
+  public stopsOnAHangUpAsOnATerminate(): Promise<void> {
+    return RuntimeEntryTests.runAsync(async (fixture, signals, error) => {
+      const listening = RuntimeEntryTests.waitForListenerAsync(signals, "uncaughtExceptionMonitor");
+      const running = RuntimeEntry.runAsync(["--data-dir", fixture.dataDirectory.root, "--idle-grace", "60000"], process.platform, process.env, signals, error);
+      await listening;
+
+      signals.emit("SIGHUP");
+
+      Assert.areEqual(0, await running);
       Assert.isFalse(OwnershipLock.isOwned(fixture.dataDirectory));
     });
   }

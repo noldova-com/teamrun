@@ -94,7 +94,7 @@ class ModuleDeclarationTests {
     test("an id other than its folder's name, a reserved or invalid id and a blank display name or description are refused", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
-      const idRule = "must have the id \"notes\", its folder's name: lowercase kebab-case and none of shell, status, commands, run, open, help";
+      const idRule = "must have the id \"notes\", its folder's name: lowercase kebab-case and none of shell, status, commands, run, open, quit, help";
 
       for (const id of [undefined, 1, "tasks", "Notes"])
         await ModuleDeclarationTests.assertRefusedAsync(repository, JSON.stringify({ ...ModuleDeclarationTests.VALID, id }), idRule);
@@ -105,7 +105,7 @@ class ModuleDeclarationTests {
       for (const id of ["shell", "status", "commands", "run", "open", "help", "Notes"]) {
         await repository.writeAsync({ [`src/modules/${id}/module.json`]: JSON.stringify({ ...ModuleDeclarationTests.VALID, id }) });
         await assert.rejects(ModuleDeclaration.readAsync(repository.directory, `src/modules/${id}`, false),
-          new ModuleException(`src/modules/${id}/module.json must have the id "${id}", its folder's name: lowercase kebab-case and none of shell, status, commands, run, open, help.`));
+          new ModuleException(`src/modules/${id}/module.json must have the id "${id}", its folder's name: lowercase kebab-case and none of shell, status, commands, run, open, quit, help.`));
       }
     });
 

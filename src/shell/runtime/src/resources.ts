@@ -379,7 +379,7 @@ export class Resources {
   public static readonly xdgStateVariable: string = "XDG_STATE_HOME";
   public static readonly xdgStateDefault: readonly string[] = [".local", "state"];
   public static readonly idleGraceArgument: string = "--idle-grace";
-  public static readonly stopSignals: readonly NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+  public static readonly stopSignals: readonly NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];
   public static readonly usageExitCode: number = 2;
   public static readonly ownedExitCode: number = 3;
   public static readonly updatingExitCode: number = 4;
@@ -912,6 +912,22 @@ export class Resources {
 
   public static formatUpdating(productName: string): string {
     return `${productName} is preparing to install an update.`;
+  }
+
+  public static formatQuitKept(productName: string): string {
+    return `${productName} stayed open: it was kept open while work was in progress.`;
+  }
+
+  public static formatQuitSaveFailed(productName: string): string {
+    return `${productName} stayed open: a window could not save.`;
+  }
+
+  public static formatQuitUnanswered(productName: string): string {
+    return `${productName} did not say whether it quit: its desktop's connection ended before it answered.`;
+  }
+
+  public static formatQuitInterrupted(productName: string): string {
+    return `${productName} did not say whether it quit: its runtime stopped before the desktop answered.`;
   }
 
   public static formatClientNotAnswered(client: string): string {

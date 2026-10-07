@@ -16,9 +16,9 @@ import type { MessageBoxOptions } from "electron";
 import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
-  CommandRun, type Event, Failure, FailureCode, NotificationAction, NotificationBroadcast, NotificationPost, NotificationSeverity, NotificationState, NotificationsQuery, QualifiedName, RecentCommands,
-  Response, type RuntimeHandover, SettingChange, SettingKey, SettingValue, ShellEvents, ShellMethods, ShellNotifications, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite,
-  WorkReport
+  CommandRun, type Event, Failure, FailureCode, NotificationAction, NotificationBroadcast, NotificationPost, NotificationSeverity, NotificationState, NotificationsQuery, QualifiedName, QuitAnswered,
+  RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey, SettingValue, ShellEvents, ShellMethods, ShellNotifications, StopPolicy, StopRequest, WindowStateKey, WindowStateValue,
+  WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 import {
   AppImageSource,
@@ -139,6 +139,7 @@ export class DesktopApplication {
   private isReady: boolean = false;
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
+  private runtimeQuit: Promise<void> | null = null;
   private trayCloseHint: ISystemNotification | null = null;
 
   private constructor(
@@ -481,6 +482,12 @@ export class DesktopApplication {
   }
 
   private forward(event: Event): void {
+    if (event.name.text === ShellEvents.quitting.text) {
+      this.runtimeQuit ??= this.quitForRuntimeAsync().finally(() => {
+        this.runtimeQuit = null;
+      });
+      return;
+    }
     if (event.name.text === ShellEvents.work.text)
       this.receiveWork(event);
     const payload = event.name.text === ShellEvents.notifications.text ? this.readStateForDevice(event)
@@ -491,6 +498,14 @@ export class DesktopApplication {
     for (const open of this.windows.values())
       if (!open.window.isDestroyed())
         open.window.webContents.send(Resources.runtimeEventChannel, event.name.text, payload);
+  }
+
+  private async quitForRuntimeAsync(): Promise<void> {
+    if (this.isExiting)
+      return;
+    const answer = await this.quitFlow.quitAsync();
+    if (!Object.isNull(answer))
+      await this.callAsync(ShellMethods.quitAnswered, new QuitAnswered(answer).toJson());
   }
 
   private changeTrayHost(isAvailable: boolean): void {
