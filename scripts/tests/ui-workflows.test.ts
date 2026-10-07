@@ -125,13 +125,13 @@ class UiWorkflowsTests {
       const failure = new DesktopException("The development binary is supported on Windows, macOS and Linux only.");
 
       await assert.rejects(new UiWorkflows(repository.directory, runner, new TextOutputFixture(), new PreparedBinaryFixture(failure)).runAsync([]), failure);
-      assert.equal(runner.runs.length, 3);
+      assert.equal(runner.runs.length, 4);
     });
 
     test("a failed type check or UI run fails the command with its exit code", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
 
-      const typeCheck = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0, 0, 2]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
+      const typeCheck = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0, 0, 0, 2]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const unknown = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([null]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const workflows = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const killed = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, null]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
