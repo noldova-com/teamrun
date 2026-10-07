@@ -13,6 +13,8 @@ import type {
   AppDetailsOptions, BrowserWindowConstructorOptions, MenuItemConstructorOptions, MessageBoxOptions, MessageBoxReturnValue, NotificationConstructorOptions, Rectangle, RenderProcessGoneDetails,
   TitleBarOverlayOptions, WindowOpenHandlerResponse
 } from "electron";
+import { type Logger, type ProgressInfo, Provider, type ResolvedUpdateFileInfo, type UpdateInfo } from "electron-updater";
+import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Provider.js";
 
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
@@ -1213,6 +1215,21 @@ export interface IApplicationHost {
    * ```
    */
   getPreferredSystemLanguages(): string[];
+
+  /**
+   * Tells whether the application runs from an Applications folder, which only macOS has.
+   *
+   * @returns `true` when it does.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function mustMove(app: IApplicationHost): boolean {
+   *   return !app.isInApplicationsFolder();
+   * }
+   * ```
+   */
+  isInApplicationsFolder(): boolean;
 
   /**
    * Runs every renderer in the sandbox.
@@ -3941,6 +3958,10 @@ export declare class DesktopApplication {
    * @param recordDesktopAsync Records this desktop in its installation, as {@link DesktopRecord.recordAsync} does, while
    * the desktop checks the launch barrier, so an update waits for it to quit. A desktop it could not record is logged
    * and starts anyway.
+   * @param createUpdater Creates the updater of the installation, or gives `null` for a build that names no update feed,
+   * whose updates stay Off; the updater's log is the desktop's. The {@link UpdateController} it drives keeps
+   * `update-ready.json` in the installation's folder, follows `shell.updateChecks`, pushes each state on
+   * `teamrun:updateState` and posts `shell.updateReady` once over the runtime connection.
    * @example
    * ```ts
    * import { ProcessPresence, RuntimeBuild, RuntimeLauncher, SystemCommand } from "@noldova/teamrun-shell-runtime";
@@ -3955,7 +3976,8 @@ export declare class DesktopApplication {
    *     t => DeviceIdentity.readOrCreateAsync(t),
    *     (folder, fileName) => new DeviceFileStore(folder, fileName),
    *     t => PathCommand.forBundle(t, () => Promise.resolve()),
-   *     t => DesktopRecord.recordAsync(t, ProcessPresence.create(process.platform, new SystemCommand()), process.processId));
+   *     t => DesktopRecord.recordAsync(t, ProcessPresence.create(process.platform, new SystemCommand()), process.processId),
+   *     () => null);
    * }
    * ```
    */
@@ -3967,7 +3989,8 @@ export declare class DesktopApplication {
     readDeviceAsync: (folder: string) => Promise<string>,
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
-    recordDesktopAsync: (installation: Installation) => Promise<boolean>): void;
+    recordDesktopAsync: (installation: Installation) => Promise<boolean>,
+    createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null): void;
 }
 
 /**
@@ -4100,6 +4123,21 @@ export interface IDeviceFileStore {
    * ```
    */
   writeAsync(value: JsonObject): Promise<void>;
+
+  /**
+   * Removes the kept object, after any write still in progress; nothing kept is not a failure.
+   *
+   * @returns A promise that settles once it is removed.
+   * @example
+   * ```ts
+   * import type { IDeviceFileStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function forgetAsync(store: IDeviceFileStore): Promise<void> {
+   *   return store.deleteAsync();
+   * }
+   * ```
+   */
+  deleteAsync(): Promise<void>;
 }
 
 /**
@@ -4364,6 +4402,21 @@ export declare class DeviceFileStore implements IDeviceFileStore {
    * ```
    */
   public writeAsync(value: JsonObject): Promise<void>;
+
+  /**
+   * Removes the kept file, after any write still in progress; a missing file is not a failure.
+   *
+   * @returns A promise that settles once it is removed, and rejects when it could not be.
+   * @example
+   * ```ts
+   * import { DeviceFileStore } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function forgetAsync(folder: string): Promise<void> {
+   *   return new DeviceFileStore(folder, "update-ready.json").deleteAsync();
+   * }
+   * ```
+   */
+  public deleteAsync(): Promise<void>;
 }
 
 /**
@@ -4982,6 +5035,770 @@ export declare class TrayHostWatcher {
    *
    * export function close(watcher: TrayHostWatcher): void {
    *   watcher.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+}
+
+/**
+ * The update's states, which the window shows.
+ */
+export declare enum UpdateStateKind {
+  /**
+   * The build names no update feed, so it never checks.
+   */
+  Off = "Off",
+  /**
+   * No newer version was found, or no check has run yet.
+   */
+  UpToDate = "UpToDate",
+  /**
+   * A check is running.
+   */
+  Checking = "Checking",
+  /**
+   * A newer version was found on macOS outside an Applications folder, where nothing downloads.
+   */
+  Available = "Available",
+  /**
+   * A newer version is downloading.
+   */
+  Downloading = "Downloading",
+  /**
+   * A downloaded, checked version waits for Restart to update.
+   */
+  Ready = "Ready",
+  /**
+   * A check the person asked for, or a download, failed.
+   */
+  Failed = "Failed"
+}
+
+/**
+ * A failed update, whose message is the reason the window shows.
+ */
+export declare class UpdateException extends Exception {
+  /**
+   * The exception's name, `"UpdateException"`, which the class sets itself so that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message The reason, such as "The download doesn't match the release.".
+   * @param options The failure that caused it.
+   * @example
+   * ```ts
+   * import { UpdateException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: UpdateException = new UpdateException("The download was interrupted.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
+ * The response of the update feed, as `fetch` gives it.
+ */
+export interface IFeedResponse {
+  /**
+   * Whether the status is in the 200 range.
+   */
+  readonly ok: boolean;
+
+  /**
+   * The HTTP status.
+   */
+  readonly status: number;
+
+  /**
+   * The URL that answered, after any redirects.
+   */
+  readonly url: string;
+
+  /**
+   * Reads the body as text.
+   *
+   * @returns A promise of the body.
+   * @example
+   * ```ts
+   * import type { IFeedResponse } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function readAsync(response: IFeedResponse): Promise<string> {
+   *   return response.text();
+   * }
+   * ```
+   */
+  text(): Promise<string>;
+}
+
+/**
+ * Checks for a newer version and downloads it.
+ */
+export interface IUpdater {
+  /**
+   * Checks the feed.
+   *
+   * @returns A promise of the newer version, or `null` when this one is up to date; it rejects with an
+   * {@link UpdateException} that gives the reason.
+   * @example
+   * ```ts
+   * import type { IUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isUpToDateAsync(updater: IUpdater): Promise<boolean> {
+   *   return await updater.checkAsync() === null;
+   * }
+   * ```
+   */
+  checkAsync(): Promise<string | null>;
+
+  /**
+   * Downloads the version the last check found and checks it against the release.
+   *
+   * @param onProgress Receives the progress as a whole percentage.
+   * @returns A promise of the downloaded file; it rejects with an {@link UpdateException} that gives the reason.
+   * @example
+   * ```ts
+   * import type { IUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function downloadAsync(updater: IUpdater): Promise<string> {
+   *   return updater.downloadAsync(t => console.log(`${t}%`));
+   * }
+   * ```
+   */
+  downloadAsync(onProgress: (percent: number) => void): Promise<string>;
+}
+
+/**
+ * The part of electron-updater's `AppUpdater` that {@link FeedUpdater} drives.
+ */
+export interface IAppUpdater {
+  /**
+   * Whether a check downloads at once.
+   */
+  autoDownload: boolean;
+  /**
+   * Whether quitting installs a downloaded update.
+   */
+  autoInstallOnAppQuit: boolean;
+  /**
+   * Whether an older version is offered.
+   */
+  allowDowngrade: boolean;
+  /**
+   * Whether a prerelease is offered.
+   */
+  allowPrerelease: boolean;
+  /**
+   * Whether only changed blocks download.
+   */
+  disableDifferentialDownload: boolean;
+  /**
+   * Whether a web installer is refused.
+   */
+  disableWebInstaller: boolean;
+  /**
+   * Receives the updater's messages.
+   */
+  logger: Logger | null;
+  /**
+   * The file of the updater's own settings.
+   */
+  updateConfigPath: string | null;
+  /**
+   * Decides whether a found version is offered.
+   */
+  isUpdateSupported: (info: UpdateInfo) => boolean | Promise<boolean>;
+
+  /**
+   * Sets the feed's provider.
+   *
+   * @param options The custom provider and its source.
+   * @example
+   * ```ts
+   * import { FeedProvider, type FeedSource, type IAppUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function point(updater: IAppUpdater, source: FeedSource): void {
+   *   updater.setFeedURL({ provider: "custom", updateProvider: FeedProvider, source });
+   * }
+   * ```
+   */
+  setFeedURL(options: { readonly provider: "custom"; readonly updateProvider: typeof FeedProvider; readonly source: FeedSource }): void;
+
+  /**
+   * Checks the feed.
+   *
+   * @returns A promise of the result, or `null` when the updater is not active.
+   * @example
+   * ```ts
+   * import type { IAppUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function hasUpdateAsync(updater: IAppUpdater): Promise<boolean> {
+   *   return (await updater.checkForUpdates())?.isUpdateAvailable === true;
+   * }
+   * ```
+   */
+  checkForUpdates(): Promise<{ readonly isUpdateAvailable: boolean; readonly updateInfo: UpdateInfo } | null>;
+
+  /**
+   * Downloads the update the last check found.
+   *
+   * @returns A promise of the downloaded files.
+   * @example
+   * ```ts
+   * import type { IAppUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function downloadAsync(updater: IAppUpdater): Promise<string[]> {
+   *   return updater.downloadUpdate();
+   * }
+   * ```
+   */
+  downloadUpdate(): Promise<string[]>;
+
+  /**
+   * Listens to the download's progress.
+   *
+   * @param event `download-progress`.
+   * @param listener Receives the progress.
+   * @returns The updater.
+   * @example
+   * ```ts
+   * import type { IAppUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function watch(updater: IAppUpdater): void {
+   *   updater.on("download-progress", t => console.log(t.percent));
+   * }
+   * ```
+   */
+  on(event: "download-progress", listener: (info: ProgressInfo) => void): unknown;
+
+  /**
+   * Stops listening to the download's progress.
+   *
+   * @param event `download-progress`.
+   * @param listener The listener given to {@link IAppUpdater.on}.
+   * @returns The updater.
+   * @example
+   * ```ts
+   * import type { IAppUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function unwatch(updater: IAppUpdater, listener: () => void): void {
+   *   updater.removeListener("download-progress", listener);
+   * }
+   * ```
+   */
+  removeListener(event: "download-progress", listener: (info: ProgressInfo) => void): unknown;
+}
+
+/**
+ * Where the update feed is and which of its files belong to this platform and processor.
+ */
+export declare class FeedSource {
+  /**
+   * The feed's URL, ending in `/`.
+   */
+  public readonly feed: string;
+  /**
+   * The update information's file, `latest-<platform>-<arch>.yml`.
+   */
+  public readonly channelFile: string;
+  /**
+   * The package the updater downloads, `<product>-<platform>-<arch>.<ext>`.
+   */
+  public readonly packageFile: string;
+  /**
+   * Fetches a URL anonymously, following redirects.
+   */
+  public readonly fetchAsync: (url: string) => Promise<IFeedResponse>;
+
+  /**
+   * Creates the source.
+   *
+   * @param feed The feed's URL, ending in `/`.
+   * @param channelFile The update information's file.
+   * @param packageFile The package the updater downloads.
+   * @param fetchAsync Fetches a URL anonymously, following redirects.
+   * @example
+   * ```ts
+   * import { FeedSource } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const source: FeedSource = new FeedSource("http://127.0.0.1:8080/", "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", t => fetch(t));
+   * ```
+   */
+  public constructor(feed: string, channelFile: string, packageFile: string, fetchAsync: (url: string) => Promise<IFeedResponse>);
+
+  /**
+   * Creates the source of a platform and processor: Windows' installer, macOS's ZIP or Linux's AppImage, on x64 or
+   * ARM64.
+   *
+   * @param feed The product's feed, or `null` for a build that never checks.
+   * @param productName The product's name, which starts the package's name.
+   * @param platform Node's platform, such as `win32`.
+   * @param architecture Node's processor, such as `arm64`.
+   * @param fetchAsync Fetches a URL anonymously, following redirects.
+   * @returns The source, or `null` when there is no feed or the target has no packages.
+   * @example
+   * ```ts
+   * import { FeedSource } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const source: FeedSource | null = FeedSource.create("http://127.0.0.1:8080/", "TeamRun", process.platform, process.arch, t => fetch(t));
+   * ```
+   */
+  public static create(feed: string | null, productName: string, platform: string, architecture: string, fetchAsync: (url: string) => Promise<IFeedResponse>): FeedSource | null;
+}
+
+/**
+ * electron-updater's provider for TeamRun's feed: it reads the update information of the source's target and gives
+ * the package it names, resolved against the URL that answered, so the package comes from the same release.
+ */
+export declare class FeedProvider extends Provider<UpdateInfo> {
+  /**
+   * Creates the provider, as electron-updater does for a custom provider.
+   *
+   * @param options The feed's options, whose `source` is a {@link FeedSource}.
+   * @param _updater The updater, which the provider does not use.
+   * @param runtimeOptions electron-updater's runtime options.
+   * @throws {ArgumentException} When the options hold no source.
+   * @example
+   * ```ts
+   * import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Provider.js";
+   * import { FeedProvider, type FeedSource } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(source: FeedSource, runtimeOptions: ProviderRuntimeOptions): FeedProvider {
+   *   return new FeedProvider({ source }, null, runtimeOptions);
+   * }
+   * ```
+   */
+  public constructor(options: Readonly<Record<string, unknown>>, _updater: unknown, runtimeOptions: ProviderRuntimeOptions);
+
+  /**
+   * Reads the update information: its version and a package named as the source's, with a SHA-512 and a size.
+   *
+   * @returns A promise of the information; it rejects with an {@link UpdateException} when the feed cannot be
+   * reached or refuses, or the information is invalid.
+   * @example
+   * ```ts
+   * import type { FeedProvider } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function latestAsync(provider: FeedProvider): Promise<string> {
+   *   return (await provider.getLatestVersion()).version;
+   * }
+   * ```
+   */
+  public getLatestVersion(): Promise<UpdateInfo>;
+
+  /**
+   * Gives the package to download, beside the update information that was read.
+   *
+   * @param updateInfo The update information {@link FeedProvider.getLatestVersion} gave.
+   * @returns The package.
+   * @throws {UpdateException} When no information was read or it names no such package.
+   * @example
+   * ```ts
+   * import type { UpdateInfo } from "electron-updater";
+   * import type { FeedProvider } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function packageUrl(provider: FeedProvider, info: UpdateInfo): string | undefined {
+   *   return provider.resolveFiles(info)[0]?.url.href;
+   * }
+   * ```
+   */
+  public resolveFiles(updateInfo: UpdateInfo): ResolvedUpdateFileInfo[];
+}
+
+/**
+ * Drives electron-updater against TeamRun's feed: it checks without downloading, offers only a higher version without
+ * a prerelease suffix, installs nothing by itself and gives each failure its reason.
+ */
+export declare class FeedUpdater implements IUpdater {
+  /**
+   * Creates the updater and sets electron-updater up.
+   *
+   * @param updater electron-updater's updater for the platform.
+   * @param source The feed.
+   * @param configFile The file of electron-updater's own settings, which the first check writes: the publisher whose
+   * signature a Windows update must carry and the name of its cache folder.
+   * @param publisher The publisher's distinguished name.
+   * @param productSlug The product's slug, which names electron-updater's cache folder `<slug>-updater`.
+   * @param log Records the updater's warnings and errors.
+   * @example
+   * ```ts
+   * import { AppImageUpdater } from "electron-updater";
+   * import { FeedSource, FeedUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const updater: FeedUpdater = new FeedUpdater(new AppImageUpdater(), new FeedSource("http://127.0.0.1:8080/", "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", t => fetch(t)),
+   *   "/home/person/.local/state/noldova/teamrun/installations/1/update-config.json", "CN=Noldova", "teamrun", console.error);
+   * ```
+   */
+  public constructor(updater: IAppUpdater, source: FeedSource, configFile: string, publisher: string, productSlug: string, log: (text: string) => void);
+
+  /**
+   * Checks the feed; before the first check it writes electron-updater's settings and then points it at the feed, since
+   * naming the settings file drops the feed set before.
+   *
+   * @returns A promise of the newer version, or `null` when this one is up to date; it rejects with an
+   * {@link UpdateException} that gives the reason, by default that TeamRun couldn't reach its update feed.
+   * @example
+   * ```ts
+   * import type { FeedUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function checkAsync(updater: FeedUpdater): Promise<string | null> {
+   *   return updater.checkAsync();
+   * }
+   * ```
+   */
+  public checkAsync(): Promise<string | null>;
+
+  /**
+   * Downloads the version the last check found; electron-updater checks its SHA-512, and on Windows its publisher.
+   *
+   * @param onProgress Receives the progress as a whole percentage.
+   * @returns A promise of the downloaded file; it rejects with an {@link UpdateException} that gives the reason, by
+   * default that the download was interrupted.
+   * @example
+   * ```ts
+   * import type { FeedUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function downloadAsync(updater: FeedUpdater): Promise<string> {
+   *   return updater.downloadAsync(t => console.log(`${t}%`));
+   * }
+   * ```
+   */
+  public downloadAsync(onProgress: (percent: number) => void): Promise<string>;
+}
+
+/**
+ * Checks that a Windows update carries a valid signature by the publisher, with electron-updater's check; a check
+ * that warns, such as one that skips itself because PowerShell does not answer, or that fails, counts as failed.
+ */
+export declare class PublisherCheck {
+  /**
+   * Creates the check.
+   *
+   * @param publisher The publisher's distinguished name.
+   * @param verifyAsync electron-updater's signature check.
+   * @param log Records each check, its duration and its result.
+   * @param now Gives the time in milliseconds.
+   * @example
+   * ```ts
+   * import { verifySignature } from "electron-updater/out/windowsExecutableCodeSignatureVerifier.js";
+   * import { PublisherCheck } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const check: PublisherCheck = new PublisherCheck("CN=Noldova", verifySignature, console.log, Date.now);
+   * ```
+   */
+  public constructor(publisher: string, verifyAsync: (publisherNames: string[], file: string, logger: Logger) => Promise<string | null>, log: (text: string) => void, now: () => number);
+
+  /**
+   * Checks a file.
+   *
+   * @param file The downloaded installer.
+   * @returns A promise of `null` when the signature is the publisher's, otherwise of why it is not.
+   * @example
+   * ```ts
+   * import type { PublisherCheck } from "@noldova/teamrun-shell-desktop";
+   *
+   * export async function isSignedAsync(check: PublisherCheck, file: string): Promise<boolean> {
+   *   return await check.checkAsync(file) === null;
+   * }
+   * ```
+   */
+  public checkAsync(file: string): Promise<string | null>;
+}
+
+/**
+ * The update's state as the window reads it.
+ */
+export declare class UpdateStatus {
+  /**
+   * The state of a build that names no feed.
+   */
+  public static readonly off: UpdateStatus;
+
+  /**
+   * The state's kind.
+   */
+  public readonly kind: UpdateStateKind;
+  /**
+   * The version found, downloading or ready, otherwise `null`.
+   */
+  public readonly version: string | null;
+  /**
+   * The download's whole percentage, or `null`.
+   */
+  public readonly progress: number | null;
+  /**
+   * When the last check succeeded, in milliseconds since the epoch, or `null`.
+   */
+  public readonly checkedAt: number | null;
+  /**
+   * Why the last check or download failed, or `null`.
+   */
+  public readonly reason: string | null;
+  /**
+   * Whether TeamRun must move to Applications to update.
+   */
+  public readonly mustMove: boolean;
+
+  /**
+   * Creates the state.
+   *
+   * @param kind The state's kind.
+   * @param version The version, or `null`.
+   * @param progress The download's percentage, or `null`.
+   * @param checkedAt When the last check succeeded, or `null`.
+   * @param reason Why the last check or download failed, or `null`.
+   * @param mustMove Whether TeamRun must move to Applications.
+   * @example
+   * ```ts
+   * import { UpdateStateKind, UpdateStatus } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const ready: UpdateStatus = new UpdateStatus(UpdateStateKind.Ready, "1.3.0", null, null, null, false);
+   * ```
+   */
+  public constructor(kind: UpdateStateKind, version: string | null, progress: number | null, checkedAt: number | null, reason: string | null, mustMove: boolean);
+
+  /**
+   * Whether a check, a download or a ready update rules out a new check.
+   */
+  public get isBusy(): boolean;
+
+  /**
+   * Gives the state as the window reads it.
+   *
+   * @returns The state's fields.
+   * @example
+   * ```ts
+   * import { UpdateStatus } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const off: unknown = UpdateStatus.off.toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The record of a ready update in its installation's folder, `update-ready.json`.
+ */
+export declare class UpdateReadyRecord {
+  /**
+   * The ready version.
+   */
+  public readonly version: string;
+  /**
+   * The downloaded file.
+   */
+  public readonly file: string;
+  /**
+   * The file's SHA-512 in base64.
+   */
+  public readonly sha512: string;
+  /**
+   * Whether the desktop has posted `shell.updateReady` for it.
+   */
+  public readonly isNotified: boolean;
+
+  /**
+   * Creates the record.
+   *
+   * @param version The ready version.
+   * @param file The downloaded file.
+   * @param sha512 The file's SHA-512 in base64.
+   * @param isNotified Whether `shell.updateReady` was posted.
+   * @example
+   * ```ts
+   * import { UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const record: UpdateReadyRecord = new UpdateReadyRecord("1.3.0", "/tmp/TeamRun-linux-x64.AppImage", "c2hh", false);
+   * ```
+   */
+  public constructor(version: string, file: string, sha512: string, isNotified: boolean);
+
+  /**
+   * Reads a record.
+   *
+   * @param value The record's JSON.
+   * @returns The record.
+   * @throws {JsonException} When a field is missing or of the wrong type.
+   * @example
+   * ```ts
+   * import { UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const record: UpdateReadyRecord = UpdateReadyRecord.fromJson({ version: "1.3.0", file: "/tmp/a", sha512: "c2hh", notified: true });
+   * ```
+   */
+  public static fromJson(value: unknown): UpdateReadyRecord;
+
+  /**
+   * Gives the same record, marked as posted.
+   *
+   * @returns The record.
+   * @example
+   * ```ts
+   * import type { UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function post(record: UpdateReadyRecord): UpdateReadyRecord {
+   *   return record.notified();
+   * }
+   * ```
+   */
+  public notified(): UpdateReadyRecord;
+
+  /**
+   * Gives the record's JSON.
+   *
+   * @returns The record's fields.
+   * @example
+   * ```ts
+   * import type { UpdateReadyRecord } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function write(record: UpdateReadyRecord): unknown {
+   *   return record.toJson();
+   * }
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * Runs the update up to Ready: the checks `shell.updateChecks` asks for, the download, the ready record, which a
+ * restart checks again, and the one `shell.updateReady` notification of each ready version.
+ */
+export declare class UpdateController {
+  /**
+   * Creates the controller.
+   *
+   * @param updater Checks and downloads.
+   * @param record The ready record's file.
+   * @param hashAsync Gives a file's SHA-512 in base64.
+   * @param currentVersion The installed version.
+   * @param mustMove Whether TeamRun runs on macOS outside an Applications folder, where a newer version only shows
+   * as available.
+   * @param publish Receives each state.
+   * @param postReadyAsync Posts `shell.updateReady` for a version, resolving to whether the runtime took it.
+   * @param log Records failures.
+   * @param now Gives the time in milliseconds.
+   * @param schedule Runs a callback after a delay and gives what cancels it.
+   * @example
+   * ```ts
+   * import { DeviceFileStore, type IUpdater, UpdateController } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function create(updater: IUpdater): UpdateController {
+   *   return new UpdateController(updater, new DeviceFileStore("/tmp/installation", "update-ready.json"), t => UpdateController.hashFileAsync(t), "1.2.0", false, console.log,
+   *     () => Promise.resolve(true), console.error, Date.now, (wait, run) => {
+   *       const timer = setTimeout(run, wait);
+   *       return () => clearTimeout(timer);
+   *     });
+   * }
+   * ```
+   */
+  public constructor(
+    updater: IUpdater,
+    record: IDeviceFileStore,
+    hashAsync: (file: string) => Promise<string>,
+    currentVersion: string,
+    mustMove: boolean,
+    publish: (status: UpdateStatus) => void,
+    postReadyAsync: (version: string) => Promise<boolean>,
+    log: (text: string) => void,
+    now: () => number,
+    schedule: (delay: number, run: () => void) => () => void);
+
+  /**
+   * Gives a file's SHA-512.
+   *
+   * @param file The file.
+   * @returns A promise of the SHA-512 in base64; it rejects when the file cannot be read.
+   * @example
+   * ```ts
+   * import { UpdateController } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const hash: Promise<string> = UpdateController.hashFileAsync("/tmp/TeamRun-linux-x64.AppImage");
+   * ```
+   */
+  public static hashFileAsync(file: string): Promise<string>;
+
+  /**
+   * The current state.
+   */
+  public get status(): UpdateStatus;
+
+  /**
+   * Starts: a ready record whose version is newer than the installed one and whose file still has its SHA-512 shows as
+   * Ready, without the network; any other record is removed. Then the automatic checks begin: 30 seconds after the
+   * start and then every hour, once, or never, as the followed choice says.
+   *
+   * @returns A promise that settles once the record is read.
+   * @example
+   * ```ts
+   * import type { UpdateController } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function startAsync(controller: UpdateController): Promise<void> {
+   *   return controller.startAsync();
+   * }
+   * ```
+   */
+  public startAsync(): Promise<void>;
+
+  /**
+   * Follows the value of `shell.updateChecks`: `Automatic`, `AtStart` or `OnRequest`; any other value counts as
+   * `Automatic`.
+   *
+   * @param choice The setting's value.
+   * @example
+   * ```ts
+   * import type { UpdateController } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function onlyWhenAsked(controller: UpdateController): void {
+   *   controller.follow("OnRequest");
+   * }
+   * ```
+   */
+  public follow(choice: JsonValue): void;
+
+  /**
+   * Runs the window's action: `Check` starts a check unless one, a download or a ready update rules it out. Restart to
+   * update is refused.
+   *
+   * @param action The action.
+   * @returns Whether the action started.
+   * @example
+   * ```ts
+   * import type { UpdateController } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function check(controller: UpdateController): boolean {
+   *   return controller.act("Check");
+   * }
+   * ```
+   */
+  public act(action: unknown): boolean;
+
+  /**
+   * Posts `shell.updateReady` for the ready version unless it was posted before, and records that it was.
+   *
+   * @returns A promise that settles once it is posted or left for the next connection.
+   * @example
+   * ```ts
+   * import type { UpdateController } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function notifyAsync(controller: UpdateController): Promise<void> {
+   *   return controller.notifyAsync();
+   * }
+   * ```
+   */
+  public notifyAsync(): Promise<void>;
+
+  /**
+   * Stops the automatic checks and refuses new ones.
+   *
+   * @example
+   * ```ts
+   * import type { UpdateController } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function stop(controller: UpdateController): void {
+   *   controller.stop();
    * }
    * ```
    */

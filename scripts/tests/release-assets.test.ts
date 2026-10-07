@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
@@ -21,6 +21,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class ReleaseAssetsTests {
   private static readonly USAGE: string = "Usage: npm run release:assets\n";
   private static readonly OUT: string = "_build/package/out";
+  private static readonly PRODUCT: string = "_build/package/app/_build/product.json";
 
   public static register(): void {
     test("the host's packages get their checksums and update metadata, dated now and versioned from the manifest", async t => {
@@ -58,6 +59,27 @@ class ReleaseAssetsTests {
       await assert.rejects(new ReleaseAssets(repository.directory, "linux", "x64", new TextOutputFixture()).runAsync([]), (error: unknown) => error instanceof Error && "code" in error && error.code === "EISDIR");
     });
 
+    test("a packaged product file that names another update feed, none or no feed, or that cannot be read, is refused with the reason before any release file is written", async t => {
+      const repository = await ReleaseAssetsTests.createAsync(t);
+      await repository.writeAsync({ [`${ReleaseAssetsTests.OUT}/Fixture Studio-linux-x64.AppImage`]: "package\n" });
+      const texts: string[] = [];
+      for (const product of [{ updateFeed: "http://127.0.0.1:8080/" }, { updateFeed: null }, {}, "{"]) {
+        await repository.writeAsync({ [ReleaseAssetsTests.PRODUCT]: typeof product === "string" ? product : JSON.stringify(product) });
+        const output = new TextOutputFixture();
+        assert.equal(await new ReleaseAssets(repository.directory, "linux", "x64", output).runAsync([]), 1);
+        texts.push(output.text);
+      }
+      await rm(path.join(repository.directory, ReleaseAssetsTests.PRODUCT));
+      const missing = new TextOutputFixture();
+      assert.equal(await new ReleaseAssets(repository.directory, "linux", "x64", missing).runAsync([]), 1);
+
+      const refused = (feed: string): string => `The packaged product file names the update feed ${feed}, not https://github.com/fixtureworks/studio/releases/latest/download/, so its packages cannot be released.\n`;
+      assert.deepEqual(texts.slice(0, 3), [refused("\"http://127.0.0.1:8080/\""), refused("null"), refused("null")]);
+      assert.match(texts[3] ?? "", /could not be read as JSON, so its update feed is unknown: SyntaxError/u);
+      assert.match(missing.text, /could not be read as JSON, so its update feed is unknown: Error: ENOENT/u);
+      assert.deepEqual(await readdir(path.join(repository.directory, ReleaseAssetsTests.OUT)), ["Fixture Studio-linux-x64.AppImage"]);
+    });
+
     test("any argument is refused with the usage, also from the command line", async t => {
       const repository = await ReleaseAssetsTests.createAsync(t);
       const output = new TextOutputFixture();
@@ -73,7 +95,7 @@ class ReleaseAssetsTests {
   private static async createAsync(t: TestContext): Promise<RepositoryFixture> {
     const repository = await RepositoryFixture.createAsync();
     t.after(() => repository.disposeAsync());
-    await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest()) });
+    await repository.writeAsync({ "package.json": JSON.stringify(ProductIdentityFixture.manifest()), [ReleaseAssetsTests.PRODUCT]: JSON.stringify({ updateFeed: "https://github.com/fixtureworks/studio/releases/latest/download/" }) });
     return repository;
   }
 }

@@ -9,6 +9,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import type BuildVariant from "../modules/build-variant.ts";
 import RootManifest from "./root-manifest.ts";
 
 export default class BuildProduct {
@@ -21,7 +22,7 @@ export default class BuildProduct {
     this.root = root;
   }
 
-  public async writeAsync(fingerprint: string, outputFolder: string | null): Promise<void> {
+  public async writeAsync(fingerprint: string, outputFolder: string | null, variant: BuildVariant): Promise<void> {
     const manifest = await RootManifest.readAsync(this.root);
     const product = manifest.product;
     const document = {
@@ -33,6 +34,8 @@ export default class BuildProduct {
       deviceFolders: { windows: product.windowsDeviceFolder, macos: product.macosDeviceFolder, linux: product.linuxDeviceFolder },
       dataDirectoryVariable: product.dataDirectoryVariable,
       icons: product.icons,
+      windowsPublisher: product.windowsPublisher,
+      updateFeed: variant.isPackaged ? variant.updateFeed ?? product.updateFeed : null,
       version: manifest.productVersion,
       build: fingerprint
     };

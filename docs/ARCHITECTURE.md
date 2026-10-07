@@ -736,6 +736,7 @@ The ownership database of section 6 is separate.
 | The commands each device last ran from command search | The shell, in its database, the 20 newest per device |
 | The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
 | The data directories an installation's runtimes have owned, the desktops running from it, and its launch barrier | The installation's folder beside the device's identity, outside every data directory ([Stopping for an update](#stopping-for-an-update)) |
+| The installation's ready update and the updater's settings | The desktop, in `update-ready.json` and `update-config.json` in the installation's folder ([Updates](#updates)) |
 | The one-time hints the device has shown and its last tray setting | The desktop, in `device-state.json` beside the device's identity, outside the data directory; one key for each hint, such as `trayCloseHintShown`, set once the hint has shown, and `trayIcon`, the value of `shell.trayIcon` the desktop follows for the device, written each time it changes |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory; the window keeps the transient state of the shell's own tabs, such as Settings' page, under the tab's key while the tab is open, through moves, and drops it when the tab closes |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
@@ -878,7 +879,7 @@ Restarting for an update runs the same saves in every window of the installation
   A packaged build is built with `--packaged`, and the packaging step passes it itself, so nobody has to remember it.
   The build checks its built window for the Gallery's selectors and text, and for code that sets the `data-tr-state` attribute only the Gallery may set, and fails when it finds them, and `npm test` builds the packaged window and checks both its Gallery file and its bundle on every run.
 - The build keeps its identity in one generated file, `_build/product.json` in the repository the runtime is installed in, read once at start instead of compiled into packages.
-  It holds the product's identity, the product version and the fingerprint of the inputs the build was made from: the build's tools and root files, its ordered module declarations and the sources of the packages it builds, including fixture packages in a test build.
+  It holds the product's identity, the product version, the update feed and the fingerprint of the inputs the build was made from: the build's tools and root files, its ordered module declarations and the sources of the packages it builds, including fixture packages in a test build.
   The fingerprint identifies the runtime's build: the same inputs give the same build, and any change gives another.
   Because no package carries it, builds that differ only in their modules, such as the test build and its variants, share their packages and tests.
   A build with `--output <folder>` writes its own `<folder>/product.json` beside its window and declarations.
@@ -1101,6 +1102,8 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
 
 - **Feed.**
   The desktop reads `latest-<platform>-<arch>.yml` for its own platform and processor from the latest release of `teamrun.product.releaseRepository` on GitHub, then downloads the package that file names from the same release, over anonymous HTTPS.
+  The product file's `updateFeed` is the feed's URL, `https://github.com/<releaseRepository>/releases/latest/download/`, or `null`.
+  The desktop resolves the package's name against the URL the information file came from after its redirects, so the package comes from the release that answered even when a newer release appears meanwhile.
   No repository or provider credential is placed in the application or its updater, and a private repository is not made reachable that way.
   Only the latest release is offered.
   A release to any other repository is an unsigned test release ([Publication](#publication)), so it never reaches the feed.
@@ -1108,7 +1111,8 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The build decides, never a setting, a variable or an argument.
   `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
-  A test build, and a package made for a native update check, name instead a local feed given to the build when it is made; `release:assets` refuses a package whose product file names any feed but the production one.
+  A test build, and a package made for a native update check, name instead a local feed given to the build when it is made, with `--update-feed <url>`, an HTTP or HTTPS URL ending in `/`; `release:assets` refuses a package whose product file names any feed but the production one.
+  A desktop that never checks shows its updates as off.
   The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
 - **Versions.**
   Only a version higher than the installed one is offered.
@@ -1118,18 +1122,22 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The person can always run Check for updates.
   The desktop's own checks are skipped while a download runs or an update is ready.
   A failed automatic check shows only in About and the log, and the next one runs at its time; a failed check the person asked for shows as a failure.
+  A check fails when TeamRun couldn't reach its update feed, when the feed answers with an HTTP error status, which the reason names, or when the release's information is invalid.
 - **Validation.**
   Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
   After downloading, it checks the file's size and SHA-512 against it.
   On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, and no other.
-  A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher.
+  electron-updater's own check verifies it; a check that warns, such as one that skips itself because PowerShell doesn't answer in time, or that fails, counts as a failed check, and the desktop log records each check's duration and result.
+  A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher; any other error shows as the update stopping on an unexpected error.
   Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
 - **Downloading.**
-  A newer version a check finds downloads in the background at once, and only About shows its progress.
+  A newer version a check finds downloads in the background at once, and only About shows its progress, which is unknown until the first report.
   A failed download shows its reason and can be tried again.
 - **The person decides.**
   Restarting to install is the person's choice, Restart to update.
   Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed or a newer one replaces it.
+  `update-ready.json` in the installation's folder records the ready version, its downloaded file, the file's SHA-512 and whether `shell.updateReady` was posted.
+  At start the desktop hashes the file again, without the network: when the version is still newer than the installed one and the file still matches, the update shows as ready; otherwise the record is removed and the next check downloads again.
 - **Restart to update.**
   Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.
   Section 9 owns the choice the person makes while work is in progress.
@@ -1142,7 +1150,7 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
     An available, downloading or ready update names its version, and only an available or failed one says TeamRun must move to Applications, an available one always; the window refuses any other state.
   - **Status bar:** the update item shows only while an update is ready or failed, or on macOS outside an Applications folder while a newer version is available.
   - **Notifications:** the shell's notification kind `shell.updateReady` restarts to install the update.
-    The desktop posts it once per version, when that version first becomes ready, and records that it did with the ready version, so neither a restart nor another window posts it again.
+    The desktop posts it once per version over its runtime connection, when that version first becomes ready or, if no runtime took it then, once one does, and records that it did with the ready version, so neither a restart nor another window posts it again.
   - **Commands:** `shell.checkForUpdates` and `shell.restartToUpdate`, each applying only in its state, are in command search.
     Check for updates is also in Help, or on macOS in the application menu after About.
   - **About:** Settings' About page shows the version and the update's state with its action, and says why a build that cannot update doesn't.

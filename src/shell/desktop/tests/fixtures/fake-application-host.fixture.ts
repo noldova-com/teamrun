@@ -20,11 +20,16 @@ export class FakeApplicationHost implements IApplicationHost {
   public readonly calls: string[] = [];
   public readonly isPackaged: boolean;
   public systemLanguages: string[] = ["en-US"];
+  public isInApplications: boolean = true;
   public dock: FakeDockHost | undefined = undefined;
 
   public constructor(hasLock: boolean, isPackaged: boolean) {
     this.hasLock = hasLock;
     this.isPackaged = isPackaged;
+  }
+
+  public isInApplicationsFolder(): boolean {
+    return this.isInApplications;
   }
 
   public setName(name: string): void {

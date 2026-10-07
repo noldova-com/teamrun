@@ -26,6 +26,8 @@ export class ProductInfoTests {
     deviceFolders: { windows: "Fixture Works/Studio", macos: "Fixture Works/Studio Mac", linux: "fixtureworks/studio" },
     dataDirectoryVariable: "FIXTURE_STUDIO_DATA_DIR",
     icons: "assets/fixture-icons",
+    windowsPublisher: "CN=Fixture Works, O=Fixture Works, C=US",
+    updateFeed: "https://example.com/feed/",
     version: "1.2.3",
     build: "abc123"
   };
@@ -39,9 +41,12 @@ export class ProductInfoTests {
 
       Assert.areEqual(
         "Fixture Studio|fixture-studio|org.fixtureworks.studio|org.fixtureworks.studio.development|.fixtureworks/studio|Fixture Works/Studio|Fixture Works/Studio Mac|" +
-          "fixtureworks/studio|FIXTURE_STUDIO_DATA_DIR|assets/fixture-icons|1.2.3|abc123",
+          "fixtureworks/studio|FIXTURE_STUDIO_DATA_DIR|assets/fixture-icons|CN=Fixture Works, O=Fixture Works, C=US|https://example.com/feed/|1.2.3|abc123",
         [product.name, product.slug, product.applicationId, product.developmentApplicationId, product.dataFolder, product.windowsDeviceFolder,
-          product.macosDeviceFolder, product.linuxDeviceFolder, product.dataDirectoryVariable, product.icons, product.version, product.build].join("|"));
+          product.macosDeviceFolder, product.linuxDeviceFolder, product.dataDirectoryVariable, product.icons, product.windowsPublisher, product.updateFeed, product.version,
+          product.build].join("|"));
+      await writeFile(file, JSON.stringify({ ...ProductInfoTests.PRODUCT, updateFeed: null }));
+      Assert.isNull(ProductInfo.read(file).updateFeed);
     });
   }
 
@@ -65,7 +70,8 @@ export class ProductInfoTests {
         ["{", "The text is not valid JSON."],
         [JSON.stringify(withoutBuild), "build"],
         [JSON.stringify({ ...ProductInfoTests.PRODUCT, version: " " }), "version"],
-        [JSON.stringify({ ...ProductInfoTests.PRODUCT, deviceFolders: { windows: "Studio" } }), "macos"]
+        [JSON.stringify({ ...ProductInfoTests.PRODUCT, deviceFolders: { windows: "Studio" } }), "macos"],
+        [JSON.stringify(Object.fromEntries(Object.entries(ProductInfoTests.PRODUCT).filter(([key]) => key !== "updateFeed"))), "updateFeed"]
       ];
 
       Assert.isTrue(missing.message.startsWith(`The build's product file ${file} is not valid: Error: ENOENT`), missing.message);

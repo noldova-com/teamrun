@@ -19,12 +19,13 @@ import ModuleCatalog from "./modules/module-catalog.ts";
 import ModuleException from "./modules/module.exception.ts";
 import PackageBuild from "./packages/package-build.ts";
 import PackageException from "./packages/package.exception.ts";
+import UpdateFeed from "./packages/update-feed.ts";
 import ProcessRunner from "./processes/process-runner.ts";
 import ProcessException from "./processes/process.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Build {
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>]]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>] [--update-feed <http or https URL ending in />]]\n";
   private static readonly NO_PACKAGES: string = "No packages under src/; there is nothing to build.\n";
   private static readonly TEST_OPTION: string = "--test";
   private static readonly PACKAGED_OPTION: string = "--packaged";
@@ -60,15 +61,18 @@ export default class Build {
     const names = options.filter((_, i) => i % 2 === 0);
     const values = options.filter((_, i) => i % 2 === 1);
     const isWellFormed = options.length % 2 === 0
-      && names.every(t => t === Build.OUTPUT_OPTION || (isTest && t === Build.WITHOUT_OPTION))
-      && names.filter(t => t === Build.OUTPUT_OPTION).length < 2;
+      && names.every(t => t === Build.OUTPUT_OPTION || (isTest && t === Build.WITHOUT_OPTION) || (isPackaged && t === UpdateFeed.OPTION))
+      && names.filter(t => t === Build.OUTPUT_OPTION).length < 2
+      && names.filter(t => t === UpdateFeed.OPTION).length < 2
+      && values.every((t, i) => names[i] !== UpdateFeed.OPTION || UpdateFeed.isValid(t));
     if (!isWellFormed || (!isTest && !isPackaged && options.length > 0)) {
       this.output.write(Build.USAGE);
       return Build.USAGE_EXIT_CODE;
     }
 
     try {
-      const variant = new BuildVariant(isTest, values.filter((_, i) => names[i] === Build.WITHOUT_OPTION), isPackaged);
+      const feedIndex = names.indexOf(UpdateFeed.OPTION);
+      const variant = new BuildVariant(isTest, values.filter((_, i) => names[i] === Build.WITHOUT_OPTION), isPackaged, feedIndex < 0 ? null : String(values[feedIndex]));
       const outputIndex = names.indexOf(Build.OUTPUT_OPTION);
       const outputFolder = outputIndex < 0 ? null : path.resolve(String(values[outputIndex]));
       const declarations = await this.modules.listBuildAsync(variant.isTest, variant.excluded);

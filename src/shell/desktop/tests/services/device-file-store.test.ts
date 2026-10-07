@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { ArgumentException } from "@noldova/teamrun-foundation-exceptions";
-import { JsonException } from "@noldova/teamrun-foundation-json";
+import { JsonException, type JsonObject } from "@noldova/teamrun-foundation-json";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { DeviceFileStore } from "@noldova/teamrun-shell-desktop";
 
@@ -75,6 +75,36 @@ export class DeviceFileStoreTests {
       await working.writeAsync({ "shell.mode": "Light" });
 
       Assert.areEqual(JSON.stringify({ "shell.mode": "Light" }), JSON.stringify(await working.readAsync()));
+    });
+  }
+
+  @TestMethod
+  public async removesTheFileAfterTheWriteInProgressAndAcceptsAMissingOne(): Promise<void> {
+    await DeviceFileStoreTests.withFolderAsync(async folder => {
+      const store = new DeviceFileStore(folder, "update-ready.json");
+
+      await Promise.all([store.writeAsync({ version: "1.3.0" }), store.deleteAsync()]);
+      await store.deleteAsync();
+
+      Assert.isFalse(existsSync(join(folder, "update-ready.json")));
+      Assert.isNull(await store.readAsync());
+    });
+  }
+
+  @TestMethod
+  public async removesTheFileAfterAWriteItCouldNotMake(): Promise<void> {
+    await DeviceFileStoreTests.withFolderAsync(async folder => {
+      const store = new DeviceFileStore(folder, "update-ready.json");
+      const circular: JsonObject = { version: "1.3.0" };
+      Reflect.set(circular, "self", circular);
+
+      await store.writeAsync({ version: "1.2.0" });
+      const write = store.writeAsync(circular);
+      const deletion = store.deleteAsync();
+
+      await Assert.throwsAsync(() => write, TypeError);
+      await deletion;
+      Assert.isFalse(existsSync(join(folder, "update-ready.json")));
     });
   }
 

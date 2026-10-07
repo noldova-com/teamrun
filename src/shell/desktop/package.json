@@ -11,7 +11,8 @@
     "@noldova/teamrun-foundation-exceptions": "__VERSION__",
     "@noldova/teamrun-foundation-json": "__VERSION__",
     "@noldova/teamrun-shell-protocol": "__VERSION__",
-    "@noldova/teamrun-shell-runtime": "__VERSION__"
+    "@noldova/teamrun-shell-runtime": "__VERSION__",
+    "electron-updater": "6.8.9"
   },
   "peerDependencies": {
     "electron": "44.5.1"

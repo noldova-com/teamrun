@@ -15,7 +15,7 @@ import type { MenuItemConstructorOptions } from "electron";
 
 import { Assert } from "@noldova/teamrun-foundation-testing";
 import type { Installation, LaunchSettings } from "@noldova/teamrun-shell-runtime";
-import { DesktopApplication, DesktopSettings, type IIpcEvent } from "@noldova/teamrun-shell-desktop";
+import { DesktopApplication, DesktopSettings, type IIpcEvent, type IUpdater } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "./condition.fixture.js";
 import { FakeDesktopProcess } from "./fake-desktop-process.fixture.js";
@@ -43,13 +43,14 @@ export class DesktopStartFixture {
     files: FakeDeviceFiles = new FakeDeviceFiles(),
     pathCommand: FakePathCommand = new FakePathCommand(),
     installations: Installation[] = [],
-    recordDesktopAsync: (installation: Installation) => Promise<boolean> = () => Promise.resolve(true)): LaunchSettings[] {
+    recordDesktopAsync: (installation: Installation) => Promise<boolean> = () => Promise.resolve(true),
+    createUpdater: (log: (text: string) => void) => IUpdater | null = () => null): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
     DesktopApplication.start(electron, process, DesktopStartFixture.MODULE_URL, (t, installation) => {
       settings.push(t);
       installations.push(installation);
       return launcher;
-    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync);
+    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, log) => createUpdater(log));
     return settings;
   }
 

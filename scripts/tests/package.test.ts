@@ -84,7 +84,7 @@ class KeyWitnessFixture extends BuilderFixture {
 class PackageTests {
 
   private static readonly TIMEOUT: number = 120_000;
-  private static readonly USAGE: string = "Usage: npm run package [-- --signed]\n";
+  private static readonly USAGE: string = "Usage: npm run package [-- [--signed] [--update-feed <http or https URL ending in />]]\n";
   private static readonly GALLERY: readonly PinnedPackage[] = TrustedSigningModule.PACKAGES;
   private static readonly CREDENTIALS: Readonly<Record<string, string>> = {
     AZURE_TENANT_ID: "fixture-tenant",
@@ -363,7 +363,7 @@ class PackageTests {
         assert.ok(linux !== undefined && uncredentialed !== undefined && twice !== undefined && arm64 !== undefined && unverified !== undefined && missing !== undefined);
 
         const exitCodes = [
-          await runAsync("linux", "x64", new BuilderFixture([]), PackageTests.CREDENTIALS, linux),
+          await runAsync("linux", "x64", new BuilderFixture([]), PackageTests.CREDENTIALS, linux, ["--update-feed", "http://127.0.0.1:8080/", "--signed"]),
           await runAsync("win32", "x64", new BuilderFixture([]), { AZURE_TENANT_ID: "fixture-tenant" }, uncredentialed),
           await runAsync("win32", "x64", new BuilderFixture([]), PackageTests.CREDENTIALS, twice, ["--signed", "--signed"]),
           await runAsync("win32", "arm64", signed, PackageTests.CREDENTIALS, arm64),
@@ -392,17 +392,24 @@ class PackageTests {
         new RangeError("The fixture broke."));
     });
 
-    test("any argument is refused with the usage after any earlier package report is removed, and the command exits with that result", async t => {
+    test("any argument but --signed and one http or https update feed ending in a slash is refused with the usage after any earlier package report is removed, and the command exits with that result", async t => {
       const repository = await PackageTests.createAsync(t);
       const output = new TextOutputFixture();
       const builder = new BuilderFixture([]);
       await repository.writeAsync({ "_build/package/package-report.json": "{}" });
 
       const exitCode = await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, {}, output, PackageTests.GALLERY).runAsync(["--target", "linux"]);
+      const feeds = [["--update-feed"], ["--signed", "--update-feed", "ftp://a/"], ["--update-feed", "http://a"], ["--update-feed", "http://a/", "--update-feed", "http://a/"]];
+      const feedCodes: number[] = [];
+      const feedOutput = new TextOutputFixture();
+      for (const options of feeds)
+        feedCodes.push(await new Package(repository.directory, "linux", "x64", PackageTests.createStage(repository), builder, {}, feedOutput, PackageTests.GALLERY).runAsync(options));
       const command = spawnSync(process.execPath, [SourceTreeFixture.locateScript("package.ts"), "--help"], { cwd: repository.directory, encoding: "utf8", timeout: 10_000 });
 
       assert.equal(exitCode, 2);
       assert.equal(output.text, PackageTests.USAGE);
+      assert.deepEqual(feedCodes, [2, 2, 2, 2]);
+      assert.equal(feedOutput.text, PackageTests.USAGE.repeat(4));
       assert.deepEqual(await readdir(path.join(repository.directory, "_build", "package")), []);
       assert.deepEqual(builder.runs, []);
       assert.equal(command.status, 2);
