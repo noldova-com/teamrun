@@ -236,6 +236,7 @@ export class DesktopApplication {
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
+    TerminalRelaunch.forgetConsole(process);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
     process.onUnhandledRejection(t => recovery.receive(t, MainProcessFailureKind.UnhandledRejection));
     electron.app.setName(Resources.applicationName);
@@ -292,7 +293,7 @@ export class DesktopApplication {
       return;
     }
     app.releaseSingleInstanceLock();
-    void relaunch.startAsync().then(() => app.exit(Resources.quitExitCode), (error: unknown) => this.stayInTerminal(error));
+    void relaunch.startAsync(() => app.whenReady()).then(() => app.exit(Resources.quitExitCode), (error: unknown) => this.stayInTerminal(error));
   }
 
   private stayInTerminal(error: unknown): void {

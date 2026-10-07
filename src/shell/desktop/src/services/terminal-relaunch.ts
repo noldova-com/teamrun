@@ -29,14 +29,26 @@ export class TerminalRelaunch {
   public static find(process: IDesktopProcess, isPackaged: boolean): TerminalRelaunch | null {
     if (!isPackaged || !process.isTerminal || !Resources.relaunchPlatforms.includes(process.platform) || TerminalRelaunch.writesToTheTerminal(process))
       return null;
+    if (process.platform === Resources.windowsPlatform)
+      return new TerminalRelaunch(process, process.execPath, { ...process.env, [Resources.noConsoleVariable]: Resources.noConsoleValue }, process.workingDirectory);
     const source = process.platform === Resources.linuxPlatform ? AppImageSource.find(process.env, process.execPath) : null;
     return Object.isNull(source)
       ? new TerminalRelaunch(process, process.execPath, process.env, process.workingDirectory)
       : new TerminalRelaunch(process, source.file, AppImageEnvironment.restore(process.env), process.env[Resources.appImageWorkingFolderVariable] ?? process.workingDirectory);
   }
 
-  public startAsync(): Promise<void> {
-    return this.process.startDetachedAsync(this.executablePath, this.process.argv.slice(1), this.environment, this.workingDirectory);
+  public static forgetConsole(process: IDesktopProcess): void {
+    if (process.platform === Resources.windowsPlatform)
+      delete process.env[Resources.noConsoleVariable];
+  }
+
+  public async startAsync(whenReady: () => Promise<unknown>): Promise<void> {
+    if (this.process.platform !== Resources.windowsPlatform) {
+      await this.process.startDetachedAsync(this.executablePath, this.process.argv.slice(1), this.environment, this.workingDirectory);
+      return;
+    }
+    await whenReady();
+    await this.process.startApartAsync(this.executablePath, this.process.argv.slice(1), this.environment);
   }
 
   private static writesToTheTerminal(process: IDesktopProcess): boolean {
