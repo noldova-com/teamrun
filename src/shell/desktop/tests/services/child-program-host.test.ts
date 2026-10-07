@@ -87,7 +87,7 @@ export class ChildProgramHostTests {
       Assert.areEqual("handed over", readFileSync(file, "utf8"));
     }
     finally {
-      await rm(folder, { recursive: true, force: true });
+      await rm(folder, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
     }
   }
 
@@ -108,7 +108,7 @@ export class ChildProgramHostTests {
       Assert.areEqual(`${realpathSync.native(folder)}|relaunched`, answer.join("|"));
     }
     finally {
-      await rm(folder, { recursive: true, force: true });
+      await rm(folder, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });
     }
   }
 
