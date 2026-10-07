@@ -8,7 +8,7 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 
 import type { IProcessStarter } from "@noldova/teamrun-shell-runtime";
 
@@ -40,9 +40,9 @@ export class RestartParentFixture implements IProcessStarter, AsyncDisposable {
   }
 
   public static async isWaitingAsync(processId: number): Promise<boolean> {
-    const children = (await readFile(`/proc/${processId}/task/${processId}/children`, "utf8").catch(() => "")).split(" ").filter(t => t.length > 0);
-    const names = await Promise.all(children.map(t => readFile(`/proc/${t}/comm`, "utf8").catch(() => "")));
-    return names.includes("sleep\n");
+    const processes = (await readdir("/proc")).filter(t => /^\d+$/.test(t));
+    const stats = await Promise.all(processes.map(t => readFile(`/proc/${t}/stat`, "utf8").catch(() => "")));
+    return stats.some(t => t.slice(t.indexOf("(") + 1, t.lastIndexOf(")")) === "sleep" && t.slice(t.lastIndexOf(")") + 2).split(" ")[1] === String(processId));
   }
 
   public static async hasEndedAsync(processId: number): Promise<boolean> {

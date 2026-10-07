@@ -57,11 +57,12 @@ export class AppImageRestartTests {
     const starter = AppImageRestartTests.createStarter(calls, AppImageRestartTests.GONE);
     const restart = AppImageRestart.find("linux", AppImageRestartTests.ENVIRONMENT, `${AppImageRestartTests.MOUNT}/teamrun`, ["--data-dir", "/home/person/data"], starter, 4120,
       "/tmp/restart.log");
-    const unchanged = AppImageRestart.find("linux", { ...AppImageRestartTests.ENVIRONMENT, XDG_DATA_DIRS: `${AppImageRestartTests.MOUNT}/usr/share/:/usr/share` },
-      `${AppImageRestartTests.MOUNT}/teamrun`, [], starter, 4120, "/tmp/restart.log");
+    const other = AppImageRestart.find("linux", {
+      ...AppImageRestartTests.ENVIRONMENT, XDG_DATA_DIRS: `${AppImageRestartTests.MOUNT}/usr/share/:/usr/share`, LD_LIBRARY_PATH: `${AppImageRestartTests.MOUNT}/usr/lib:`
+    }, `${AppImageRestartTests.MOUNT}/teamrun`, [], starter, 4120, "/tmp/restart.log");
 
     await restart?.startAsync();
-    await unchanged?.startAsync();
+    await other?.startAsync();
 
     Assert.areEqual(2, calls.length);
     const [executable, launchArguments, environment, errorFile] = calls[0] ?? ["", [], {}, ""];
@@ -75,6 +76,7 @@ export class AppImageRestartTests {
     }), JSON.stringify(environment));
     Assert.areEqual("/tmp/restart.log", errorFile);
     Assert.areEqual(`${AppImageRestartTests.MOUNT}/usr/share/:/usr/share`, calls[1]?.[2]["XDG_DATA_DIRS"]);
+    Assert.isFalse(Object.hasOwn(calls[1]?.[2] ?? {}, "LD_LIBRARY_PATH"));
     restart?.cancel();
     restart?.cancel();
   }

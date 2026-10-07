@@ -64,7 +64,7 @@ export class AppImageRestart {
     const entries = value.split(Resources.pathListSeparator);
     const isWrapped = prepended.every((t, i) => entries[i] === `${folder}${t}`) && appended.every((t, i) => entries.at(i - appended.length) === t);
     const kept = entries.slice(prepended.length, entries.length - appended.length);
-    return !isWrapped ? value : kept.length === 0 ? null : kept.join(Resources.pathListSeparator);
+    return !isWrapped ? value : kept.every(t => t.length === 0) ? null : kept.join(Resources.pathListSeparator);
   }
 
   private static end(processId: number): void {
