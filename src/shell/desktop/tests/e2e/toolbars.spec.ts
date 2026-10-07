@@ -199,8 +199,20 @@ test.describe("toolbars", () => {
 
   test("the status bar's items stand 0.25rem below the panels and 0.25rem above the window's edge, in light and dark", async ({ desktop }) => {
     const window = desktop.window;
+    const unevenMarginOf = (): Promise<number> => window.evaluate(() => {
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const workspace = (document.querySelector("tr-workspace") as HTMLElement).getBoundingClientRect();
+      const panels = [...document.querySelectorAll("tr-tab-group")].map(t => t.getBoundingClientRect());
+      const bottom = workspace.bottom - Math.max(...panels.map(t => t.bottom));
+      const left = Math.min(...panels.map(t => t.left)) - workspace.left;
+      return Math.round((bottom - left) / rem * 1000) / 1000;
+    });
+
+    await expect.poll(() => arrangementOf(window)).toEqual([["notes.main"], ["notes.second"]]);
+    await expect(window.locator("tr-status-bar tr-status-bar-item[data-tr-item='clock.ticks']")).toBeVisible();
     for (const mode of WindowModeFixture.modes) {
       await WindowModeFixture.setAsync(window, mode);
+      await expect.poll(unevenMarginOf).toBe(0);
       const gaps = await window.evaluate(() => {
         const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
         const panels = Math.max(...[...document.querySelectorAll("tr-tab-group")].map(t => t.getBoundingClientRect().bottom));
