@@ -147,32 +147,57 @@ test.describe("virtual list", () => {
     const following = await endDistanceAsync(feed);
 
     const history = await scrollFramesAsync(feed, 200, -80, null);
-    const reading = await viewport(feed).evaluate(element => {
-      const top = element.getBoundingClientRect().top;
-      const row = [...element.querySelectorAll("[role=article]")].find(t => t.getBoundingClientRect().bottom > top);
-      return Number(row?.getAttribute("aria-posinset"));
-    });
-    const trace = await viewport(feed).evaluate(async (element, place) => {
-      const records: string[] = [];
-      const row = (): Element | null => element.querySelector(`[aria-posinset="${place}"]`);
-      const rows = element.querySelector(".tr-virtual-list-rows") as HTMLElement;
-      const offset = (): number => Math.round((row()?.getBoundingClientRect().top ?? 0) - element.getBoundingClientRect().top);
-      const start = offset();
-      let changed = -1;
-      for (let frame = 0; frame < 150 && (changed < 0 || frame < changed + 4); frame++) {
-        const slots = [...element.querySelectorAll<HTMLElement>("[data-tr-row]")];
-        records.push(`${frame} st=${element.scrollTop} sh=${element.scrollHeight} off=${offset()} pt=${getComputedStyle(rows).paddingTop} first=${slots[0]?.dataset["trRow"]} n=${slots.length} hidden=${slots.filter(t => t.firstElementChild?.getAttribute("aria-hidden") === "true").length}`);
-        if (changed < 0 && Math.abs(offset() - start) > 1)
-          changed = frame;
+    await expect(feed.locator("[role=article][aria-hidden]")).toHaveCount(0, { timeout: 10_000 });
+    const reading = await viewport(feed).evaluate(async element => {
+      const loadedInView = (): Element | null => {
+        const view = element.getBoundingClientRect();
+        return [...element.querySelectorAll("[role=article]:not([aria-hidden])")].find(t => t.childElementCount > 0 && t.getBoundingClientRect().top >= view.top && t.getBoundingClientRect().top < view.bottom) ?? null;
+      };
+      for (let jump = 0; jump < 200; jump++) {
+        element.scrollTop -= element.clientHeight / 2;
         await new Promise<number>(t => requestAnimationFrame(t));
+        await new Promise<number>(t => requestAnimationFrame(t));
+        const row = loadedInView();
+        const isWaiting = [...element.querySelectorAll("[role=article][aria-hidden]")].some(t => t.getBoundingClientRect().bottom > element.getBoundingClientRect().top);
+        if (isWaiting && row !== null)
+          return Number(row.getAttribute("aria-posinset"));
       }
-      return records.slice(Math.max(0, changed - 3));
+      return null;
+    });
+    const loading = await viewport(feed).evaluate(async (element, place) => {
+      const row = element.querySelector(`[aria-posinset="${place}"]`);
+      if (row === null)
+        return { gaps: [], longFrames: null, rows: [], drift: [Number.NaN], isLoaded: false };
+      const offsetOf = (): number => (row.isConnected ? row.getBoundingClientRect().top : Number.NaN) - element.getBoundingClientRect().top;
+      const paintedOffsetAsync = (): Promise<number> => new Promise<number>(t => {
+        const observer = new ResizeObserver(() => {
+          observer.disconnect();
+          const offset = offsetOf();
+          requestAnimationFrame(() => t(offset));
+        });
+        observer.observe(row);
+      });
+      const isWaiting = (): boolean => element.querySelector("[role=article][aria-hidden]") !== null;
+      const start = offsetOf();
+      const gaps: number[] = [];
+      const drift: number[] = [];
+      let last = performance.now();
+      let after = 0;
+      for (let frame = 0; frame < 600 && after < 10; frame++) {
+        const offset = await paintedOffsetAsync();
+        const now = performance.now();
+        gaps.push(now - last);
+        last = now;
+        drift.push(Math.abs(offset - start));
+        after = isWaiting() ? 0 : after + 1;
+      }
+      return { gaps, longFrames: null, rows: [], drift, isLoaded: !isWaiting() };
     }, reading);
-    const loading = { gaps: [], longFrames: null, rows: [], drift: [0] };
     await desktop.checkpointAsync("virtual-list-feed");
     await attachAsync(testInfo, window, { history: summarize(history), loading: summarize(loading) });
 
     expect([streaming.words, streaming.distances.filter(t => (t[2] ?? 0) > 1), streaming.distances.length > 0, following <= 1]).toEqual([40, [], true, true]);
-    expect([reading, trace]).toEqual([]);
+    expect([reading !== null, loading.isLoaded]).toEqual([true, true]);
+    expect(Math.max(...loading.drift)).toBeLessThan(1);
   });
 });
