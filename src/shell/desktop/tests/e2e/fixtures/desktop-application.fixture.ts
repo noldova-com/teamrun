@@ -23,6 +23,7 @@ import DesktopLogFixture from "./desktop-log.fixture.ts";
 import ErrorOutputClassifier from "./error-output.classifier.ts";
 import MainProcessAnswer, { type IMainProcessAnswerRecord } from "./main-process-answer.ts";
 import OffCursorPlacement from "./off-cursor-placement.ts";
+import PageBridgeFixture from "./page-bridge.fixture.ts";
 import ProcessListFixture from "./process-list.fixture.ts";
 import ProcessorLoadFixture from "./processor-load.fixture.ts";
 
@@ -434,7 +435,7 @@ export default class DesktopApplicationFixture {
   private async describeSilenceAsync(silence: IMainProcessSilence): Promise<string> {
     const processorMilliseconds = await this.readProcessorMillisecondsAsync();
     const started = Date.now();
-    const request = this.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readBuild(): Promise<unknown> }).readBuild());
+    const request = PageBridgeFixture.evaluateAsync(this.window, t => t.readBuild());
     const answer = await DesktopApplicationFixture.withinAsync(request.then(() => null, (error: unknown) => String(error)), DesktopApplicationFixture.MAIN_PROCESS_TIMEOUT);
     this.isPageUnreachable = answer === DesktopApplicationFixture.NO_ANSWER;
     const described = answer === DesktopApplicationFixture.NO_ANSWER
@@ -460,7 +461,7 @@ export default class DesktopApplicationFixture {
   }
 
   private async readSettingsAsync(): Promise<object> {
-    const request = this.window.evaluate(method => (Reflect.get(globalThis, "teamrun") as { request(name: string, payload: unknown): Promise<unknown> }).request(method, {}), DesktopApplicationFixture.SETTINGS_METHOD);
+    const request = PageBridgeFixture.evaluateAsync(this.window, (t, method) => t.request(method, {}), DesktopApplicationFixture.SETTINGS_METHOD);
     try {
       const answer = await DesktopApplicationFixture.withinAsync(request, DesktopApplicationFixture.SETTINGS_TIMEOUT);
       if (answer === DesktopApplicationFixture.NO_ANSWER)

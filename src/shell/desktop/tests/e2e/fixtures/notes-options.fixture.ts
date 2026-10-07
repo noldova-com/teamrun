@@ -8,9 +8,7 @@
 
 import type { Page } from "@playwright/test";
 
-interface IBridge {
-  request(method: string, payload: unknown): Promise<{ payload?: unknown }>;
-}
+import PageBridgeFixture from "./page-bridge.fixture.ts";
 
 export default class NotesOptionsFixture {
   public static readonly HOLD_FIRST_MARKER: string = "modules/notes/hold-first-options";
@@ -28,6 +26,6 @@ export default class NotesOptionsFixture {
   }
 
   private static requestAsync(window: Page, method: string): Promise<unknown> {
-    return window.evaluate(async name => (await (Reflect.get(globalThis, "teamrun") as IBridge).request(name, null)).payload, method);
+    return PageBridgeFixture.evaluateAsync(window, async (t, name) => (await t.request(name, null) as { payload?: unknown }).payload, method);
   }
 }

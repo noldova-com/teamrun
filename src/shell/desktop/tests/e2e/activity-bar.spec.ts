@@ -9,14 +9,14 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 import TabRowFixture from "./fixtures/tab-row.fixture.ts";
 
 const notes = "view/notes.list";
 const outline = "view/notes.outline";
 
 async function setDockStyleAsync(window: Page, name: string, value: string): Promise<void> {
-  await window.evaluate(([setting, style]) => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-    .request("shell.setSetting", { name: setting, value: style }), [name, value] as const);
+  await PageBridgeFixture.evaluateAsync(window, (t, [setting, style]) => t.request("shell.setSetting", { name: setting, value: style }), [name, value] as const);
 }
 
 function strip(window: Page): Locator {

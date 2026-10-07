@@ -10,10 +10,10 @@ import type { Locator, Page } from "@playwright/test";
 
 import CommandSearchFixture from "./fixtures/command-search.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 
 async function setMenuBarAsync(window: Page, value: string): Promise<void> {
-  await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-    .request("shell.setSetting", { name: "shell.menuBar", value }), value);
+  await PageBridgeFixture.evaluateAsync(window, (t, menuBar) => t.request("shell.setSetting", { name: "shell.menuBar", value: menuBar }), value);
 }
 
 function bar(window: Page): Locator {

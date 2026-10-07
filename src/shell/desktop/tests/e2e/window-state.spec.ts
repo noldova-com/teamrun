@@ -11,6 +11,7 @@ import type { Rectangle } from "electron";
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 
 test.use({ desktopVariant: BuildVariantFixture.noModules });
 
@@ -27,7 +28,7 @@ test.describe("window state", () => {
     return `${window}, page focused ${await desktop.window.evaluate(() => document.hasFocus())}`;
   };
   const readLayout = (desktop: DesktopApplicationFixture): Promise<unknown> =>
-    desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readLayout(): Promise<unknown> }).readLayout());
+    PageBridgeFixture.evaluateAsync(desktop.window, t => t.readLayout());
   const openings: readonly [string, (desktop: DesktopApplicationFixture) => Promise<void>][] = [
     ["quit and reopened", t => t.reopenAsync()],
     ["restarted after its runtime stopped", t => t.restartAsync()]
@@ -66,7 +67,7 @@ test.describe("window state", () => {
   test("the window's layout outlives a restart, kept through the bridge", async ({ desktop }) => {
     await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
     expect(await readLayout(desktop)).toEqual({ payload: null });
-    expect(await desktop.window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { writeLayout(layout: unknown): Promise<unknown> }).writeLayout(value), layout)).toEqual({ payload: null });
+    expect(await PageBridgeFixture.evaluateAsync(desktop.window, (t, value) => t.writeLayout(value), layout)).toEqual({ payload: null });
 
     await desktop.restartAsync();
 
