@@ -66,6 +66,7 @@ export class DesktopApiTests {
         "SystemNotifier",
         "TaskbarIdentity",
         "TrayHostWatcher",
+        "UnusableFolderException",
         "UpdateBarrierGate",
         "UpdateBarrierWatch",
         "UpdateCheckLock",
