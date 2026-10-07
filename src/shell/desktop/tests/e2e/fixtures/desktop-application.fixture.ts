@@ -103,13 +103,16 @@ export default class DesktopApplicationFixture {
   public closeMilliseconds: number | null = null;
   public readonly root: string;
   public readonly dataDirectory: string;
+  public readonly deviceDirectory: string;
 
-  private constructor(testInfo: TestInfo, root: string, environment: Readonly<Record<string, string>>, extraArguments: readonly string[], placesWindow: boolean) {
+  private constructor(
+    testInfo: TestInfo, root: string, environment: Readonly<Record<string, string>>, extraArguments: readonly string[], placesWindow: boolean, deviceDirectory: string | null) {
     this.testInfo = testInfo;
     this.extraArguments = extraArguments;
     this.viewport = placesWindow ? null : { width: DesktopApplicationFixture.VIEWPORT_WIDTH, height: DesktopApplicationFixture.VIEWPORT_HEIGHT };
     this.root = root;
     this.dataDirectory = path.join(root, DesktopApplicationFixture.DATA_FOLDER);
+    this.deviceDirectory = deviceDirectory ?? path.join(root, DesktopApplicationFixture.DEVICE_FOLDER);
     this.environment = environment;
   }
 
@@ -118,9 +121,10 @@ export default class DesktopApplicationFixture {
     environment: Readonly<Record<string, string>> = {},
     dataFiles: Readonly<Record<string, string>> = {},
     extraArguments: readonly string[] = [],
-    placesWindow: boolean = false): Promise<DesktopApplicationFixture> {
+    placesWindow: boolean = false,
+    deviceDirectory: string | null = null): Promise<DesktopApplicationFixture> {
     const root = await mkdtemp(path.join(os.tmpdir(), DesktopApplicationFixture.ROOT_PREFIX));
-    const fixture = new DesktopApplicationFixture(testInfo, root, environment, extraArguments, placesWindow);
+    const fixture = new DesktopApplicationFixture(testInfo, root, environment, extraArguments, placesWindow, deviceDirectory);
     await mkdir(fixture.dataDirectory);
     for (const [name, text] of Object.entries(dataFiles)) {
       const file = path.join(fixture.dataDirectory, name);
@@ -520,7 +524,7 @@ export default class DesktopApplicationFixture {
       args: [
         DesktopApplicationFixture.MAIN,
         `--data-dir=${this.dataDirectory}`,
-        `--device-dir=${path.join(this.root, DesktopApplicationFixture.DEVICE_FOLDER)}`,
+        `--device-dir=${this.deviceDirectory}`,
         ...DesktopApplicationFixture.LAUNCH_ARGUMENTS,
         ...this.extraArguments
       ],

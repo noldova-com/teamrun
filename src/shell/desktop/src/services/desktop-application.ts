@@ -140,6 +140,7 @@ export class DesktopApplication {
   private device: Promise<string | null> = Promise.resolve(null);
   private knownDevice: string | null = null;
   private isReady: boolean = false;
+  private updatesStarted: Promise<void> = Promise.resolve();
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
   private runtimeQuit: Promise<void> | null = null;
@@ -392,7 +393,7 @@ export class DesktopApplication {
       this.open();
       this.watch.start();
       if (!Object.isNull(this.updates))
-        void this.startUpdatesAsync(this.updates);
+        this.updatesStarted = this.startUpdatesAsync(this.updates);
       void this.startup.startAsync();
     });
   }
@@ -773,7 +774,6 @@ export class DesktopApplication {
   private async startUpdatesAsync(updates: UpdateController): Promise<void> {
     updates.follow(this.updateChecks.value);
     await updates.startAsync();
-    await updates.notifyAsync();
   }
 
   private async refreshUpdatesAsync(): Promise<void> {
@@ -783,6 +783,7 @@ export class DesktopApplication {
     const device = await this.device;
     if (!Object.isNull(device))
       await this.updateChecks.refreshAsync(device);
+    await this.updatesStarted;
     await updates.notifyAsync();
   }
 
