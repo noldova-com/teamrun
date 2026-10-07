@@ -331,7 +331,8 @@ class PackageTests {
           ["xcrun", check, "stapler", "validate", app(1)]
         ]);
         assert.deepEqual(builder.captureEnvironments.map(t => CredentialWitnessFixture.find(t)), Array.from({ length: 17 }, () => []));
-        assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n${files.map(t => `  ${t}\n`).join("")}Signatures:\n`
+        assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n${files.map(t => `  ${t}\n`).join("")}`
+          + `${files[0]}: Apple accepted notarization submission fixture-submission, and its ticket is stapled.\nSignatures:\n`
           + `${files[0]}: the disk image and its app each have a valid Developer ID Application signature, notarized and stapled.\n`
           + `${files[1]}: a valid Developer ID Application signature, notarized and stapled.\n`);
       });
@@ -342,12 +343,14 @@ class PackageTests {
         const made = ["Fixture Studio-macos-x64.dmg", "Fixture Studio-macos-x64.zip"];
         const accepted = new ProcessResult(0, "{\"id\":\"fixture-submission\",\"status\":\"Accepted\",\"message\":\"Processing complete\"}\n", "");
         const invalid = "{\"id\":\"fixture-submission\",\"status\":\"Invalid\",\"message\":\"Processing complete\"}";
+        const unidentified = "{\"status\":\"Accepted\",\"message\":\"Processing complete\"}";
         const unnotarizedBuilder = new BuilderFixture(made, [], null, [new ProcessResult(0, `${invalid}\n`, "")]);
+        const unidentifiedBuilder = new BuilderFixture(made, [], null, [new ProcessResult(0, `${unidentified}\n`, "")]);
         const unstapledBuilder = new BuilderFixture(made, [], null, [accepted, new ProcessResult(65, "", "The staple and validate action failed! Error 65.\n")]);
         const uncheckedBuilder = new BuilderFixture(made, [], null, [accepted, new ProcessResult(0, "", ""), new ProcessResult(1, "", "code object is not signed at all\n"),
           new ProcessResult(0, "", ""), new ProcessResult(3, "", "rejected\n"), new ProcessResult(65, "", "does not have a ticket stapled to it\n")]);
-        const [uncredentialed, unnotarized, unstapled, unchecked] = [1, 2, 3, 4].map(() => new TextOutputFixture());
-        assert.ok(uncredentialed !== undefined && unnotarized !== undefined && unstapled !== undefined && unchecked !== undefined);
+        const [uncredentialed, unnotarized, unstapled, unchecked, unidentifiedOutput] = [1, 2, 3, 4, 5].map(() => new TextOutputFixture());
+        assert.ok(uncredentialed !== undefined && unnotarized !== undefined && unstapled !== undefined && unchecked !== undefined && unidentifiedOutput !== undefined);
         const empty = new BuilderFixture([]);
         const runAsync = (builder: BuilderFixture, output: TextOutputFixture): Promise<number> =>
           new Package(repository.directory, "darwin", "x64", PackageTests.createStage(repository), builder, { ...PackageTests.MAC_CREDENTIALS }, output, PackageTests.GALLERY).runAsync(["--signed"]);
@@ -357,19 +360,21 @@ class PackageTests {
             uncredentialed, PackageTests.GALLERY).runAsync(["--signed"]),
           await runAsync(unnotarizedBuilder, unnotarized),
           await runAsync(unstapledBuilder, unstapled),
-          await runAsync(uncheckedBuilder, unchecked)
+          await runAsync(uncheckedBuilder, unchecked),
+          await runAsync(unidentifiedBuilder, unidentifiedOutput)
         ];
 
         const image = path.join(repository.directory, "_build", "package", "out", made[0] ?? "");
-        assert.deepEqual(exitCodes, [1, 1, 1, 1]);
+        assert.deepEqual(exitCodes, [1, 1, 1, 1, 1]);
         assert.deepEqual(empty.runs, []);
         assert.equal(uncredentialed.text, "Signing macOS packages needs MAC_CERTIFICATE_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER, "
           + "the Developer ID Application certificate and the App Store Connect key that notarizes.\n");
         assert.ok(unnotarized.text.endsWith(`Apple did not notarize the disk image ${image}:\n${invalid}\n`), unnotarized.text);
+        assert.ok(unidentifiedOutput.text.endsWith(`Apple did not notarize the disk image ${image}:\n${unidentified}\n`), unidentifiedOutput.text);
         assert.ok(unstapled.text.endsWith(`The notarization ticket could not be stapled to the disk image ${image}:\nThe staple and validate action failed! Error 65.\n`), unstapled.text);
         assert.ok(unchecked.text.endsWith(`The disk image ${image} lacks a valid signature, a Developer ID Application signature, notarization, a stapled ticket:\n`
           + "code object is not signed at all\n\nrejected\ndoes not have a ticket stapled to it\n"), unchecked.text);
-        assert.deepEqual([unnotarizedBuilder, unstapledBuilder, uncheckedBuilder].map(t => t.captured.length), [1, 2, 6]);
+        assert.deepEqual([unnotarizedBuilder, unstapledBuilder, uncheckedBuilder, unidentifiedBuilder].map(t => t.captured.length), [1, 2, 6, 1]);
         assert.ok(!unnotarized.text.includes("fixture-key-id") && !unnotarized.text.includes("fixture-issuer"), unnotarized.text);
         assert.equal(existsSync(path.join(repository.directory, "_build", "package", "signing")), false);
         assert.equal(existsSync(path.join(repository.directory, "_build", "package", "package-report.json")), false);

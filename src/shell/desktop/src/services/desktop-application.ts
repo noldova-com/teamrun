@@ -156,7 +156,7 @@ export class DesktopApplication {
   private updatesStarted: Promise<void> = Promise.resolve();
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
-  private isRestarting: boolean = false;
+  private restarting: Promise<void> | null = null;
   private isQuitHeld: boolean = false;
   private runtimeQuit: Promise<void> | null = null;
   private trayCloseHint: ISystemNotification | null = null;
@@ -544,6 +544,7 @@ export class DesktopApplication {
   }
 
   private async quitForRuntimeAsync(): Promise<void> {
+    await this.restarting;
     if (this.isExiting)
       return;
     const answer = await this.quitFlow.quitAsync();
@@ -591,7 +592,7 @@ export class DesktopApplication {
     if (this.isExiting)
       return;
     event.preventDefault();
-    if (this.isRestarting)
+    if (!Object.isNull(this.restarting))
       this.isQuitHeld = true;
     else
       void this.quitFlow.quitAsync();
@@ -801,13 +802,15 @@ export class DesktopApplication {
       join(this.dataDirectory.logsFolder, Resources.restartErrorFile));
     const stop = new UpdateStop(this.installation, this.presence, t => this.connector.connectAsync(t), (work, read) => this.askUpdateWorkAsync(work, read), this.process.processId,
       RuntimeBuild.identity.productVersion, Date.now, delay, restart, t => this.log.write(t));
-    this.isRestarting = true;
+    const ended = Promise.withResolvers<void>();
+    this.restarting = ended.promise;
     try {
       if (await stop.runAsync(record.version, () => handoff.handOffAsync(record)))
         await this.quitAfterHandoffAsync();
     }
     finally {
-      this.isRestarting = false;
+      this.restarting = null;
+      ended.resolve();
       if (this.isQuitHeld && !this.isExiting)
         this.electron.app.quit();
       this.isQuitHeld = false;
@@ -862,7 +865,12 @@ export class DesktopApplication {
       open.closeNow();
     const failed = new Promise<unknown>(resolve => this.electron.nativeUpdater.once(Resources.errorEvent, error => resolve(error)));
     const quitting = new Promise<unknown>(resolve => this.electron.app.on(Resources.willQuitEvent, () => resolve(null)));
-    this.electron.nativeUpdater.quitAndInstall();
+    try {
+      this.electron.nativeUpdater.quitAndInstall();
+    }
+    catch (error) {
+      return error;
+    }
     return Promise.race([failed, quitting, delay(Resources.updateRelaunchLimit, Resources.updateNotRelaunchedInTime, { ref: false })]);
   }
 

@@ -327,7 +327,7 @@ export class UpdateController {
 
   private explain(error: unknown): string {
     const isKnown = error instanceof UpdateException || error instanceof UpdateStopException || error instanceof UpdateHandoffException;
-    this.log(Resources.formatUpdateFailed((isKnown ? error.message : String(error)).trim().replace(Resources.lineBreaks, Resources.lineJoin)));
+    this.log(Resources.formatUpdateFailed((isKnown ? UpdateController.withCause(error) : String(error)).trim().replace(Resources.lineBreaks, Resources.lineJoin)));
     return isKnown ? error.message : Resources.updateFailedUnexpectedly;
   }
 
@@ -336,6 +336,13 @@ export class UpdateController {
       return;
     this.current = status;
     this.publish(status);
+  }
+
+  private static withCause(error: Error): string {
+    if (Object.isUndefined(error.cause))
+      return error.message;
+    const cause = error.cause instanceof Error ? error.cause.message : String(error.cause);
+    return error.message.includes(cause) ? error.message : Resources.formatFailureWithCause(error.message, cause);
   }
 
   private static isNewer(version: string, current: string): boolean {
