@@ -1400,10 +1400,8 @@ export interface IDesktopProcess {
   readonly homeFolder: string;
 
   /**
-   * The person's temporary folder. An update restart on Windows or macOS leaves the stopping desktop's `--data-dir=`,
-   * `--user-data-dir=` and `--device-dir=` there for the new version, which starts without arguments; a packaged
-   * desktop takes them back at start when they are for its version, at most 10 minutes old, and it was given none of
-   * its own.
+   * The person's temporary folder. A development build's update restart on Windows or macOS keeps its folders there,
+   * since it never takes them back.
    */
   readonly temporaryFolder: string;
 
@@ -1552,6 +1550,25 @@ export interface IDesktopProcess {
    * ```
    */
   onUnhandledRejection(listener: (reason: unknown) => void): void;
+
+  /**
+   * Reads the account's home folder as the operating system records it, ignoring the environment. An update restart
+   * of a packaged build on Windows or macOS leaves the stopping desktop's `--data-dir=`, `--user-data-dir=` and
+   * `--device-dir=` in the default device folder under it, for the new version, which starts without arguments and
+   * with the account's own environment rather than the stopping desktop's; a packaged desktop takes them back at
+   * start when they are for its version, at most 10 minutes old, and it was given none of its own.
+   *
+   * @returns The home folder.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function home(process: IDesktopProcess): string {
+   *   return process.readAccountHomeFolder();
+   * }
+   * ```
+   */
+  readAccountHomeFolder(): string;
 }
 
 /**

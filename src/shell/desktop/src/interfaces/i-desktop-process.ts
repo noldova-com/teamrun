@@ -33,4 +33,5 @@ export interface IDesktopProcess {
   endProcess(processId: number): void;
   onUncaughtException(listener: (error: unknown) => void): void;
   onUnhandledRejection(listener: (reason: unknown) => void): void;
+  readAccountHomeFolder(): string;
 }

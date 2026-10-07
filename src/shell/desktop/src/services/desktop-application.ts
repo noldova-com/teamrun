@@ -267,7 +267,7 @@ export class DesktopApplication {
     const moduleDirectory = dirname(fileURLToPath(moduleUrl));
     const isPackaged = DesktopApplication.isPackagedBuild(electron, process);
     const program = AppImageSource.locateProgram(process.env, process.execPath);
-    const restartArguments = new RestartArguments(process.temporaryFolder, program, process.platform);
+    const restartArguments = new RestartArguments(DesktopApplication.locateRestartFolder(process, isPackaged), program, process.platform);
     const kept = isPackaged ? restartArguments.take(RuntimeBuild.identity.productVersion, Date.now()) : [];
     const handedOver = process.argv.some(t => Resources.handoverArguments.some(u => t.startsWith(u))) ? [] : kept;
     const argv = [...process.argv, ...handedOver];
@@ -1275,6 +1275,10 @@ export class DesktopApplication {
     catch (error) {
       throw new UnusableFolderException(Resources.formatDataFolderUnusable(folder, String(error)), new ExceptionOptions(error));
     }
+  }
+
+  private static locateRestartFolder(process: IDesktopProcess, isPackaged: boolean): string {
+    return isPackaged && process.platform !== Resources.linuxPlatform ? DeviceFolder.locate(process.platform, {}, process.readAccountHomeFolder()) : process.temporaryFolder;
   }
 
   private static locateDeviceFolder(process: IDesktopProcess, argv: readonly string[]): string {
