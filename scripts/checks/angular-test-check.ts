@@ -60,13 +60,18 @@ export default class AngularTestCheck implements ISelectableCheck {
     }
   }
 
+  private static formatEnded(exitCode: number | null): string {
+    return exitCode === null
+      ? "The Angular tests were ended by a signal and wrote no report.\n"
+      : `The Angular tests ended with exit code ${exitCode} and wrote no report.\n`;
+  }
+
   private async checkAsync(output: Writable, include: readonly string[] = []): Promise<boolean> {
     try {
       const run = await this.project.testAsync(include, this.flaky !== null);
       await this.flaky?.addAsync(run.retried.map(t => new FlakyTest(AngularTestCheck.TOTALS_TITLE, t.file, t.name, t.failure)), output);
       if (run.result === null) {
-        if (run.isSuccessful)
-          output.write(AngularTestCheck.NO_REPORT);
+        output.write(run.isSuccessful ? AngularTestCheck.NO_REPORT : AngularTestCheck.formatEnded(run.exitCode));
         return false;
       }
       const totals = run.result.toTotals(AngularTestCheck.RUNNER, AngularTestCheck.TOTALS_TITLE, run.coverage, include.length === 0 ? await this.project.specFilesAsync() : include, null);
