@@ -971,13 +971,17 @@ export class DesktopApplicationTests {
       await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(coordinator, "0.3.0", UpdateBarrierState.Preparing, null).toJson()));
       const window = DesktopStartFixture.firstWindow(electron);
       const event = DesktopStartFixture.trustedEvent(process.platform);
+      const connection = launcher.connections[0];
+      await Condition.waitAsync(() => connection?.calls.includes("shell.readWindowBounds") === true);
+      connection?.answers.set("shell.writeWindowBounds", Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
 
+      window.bounds = { x: 40, y: 60, width: 900, height: 640 };
+      window.change("move");
       launcher.listener?.onEvent(new Event(ShellEvents.updating, null));
       await Condition.waitAsync(() => window.webContents.sent.some(t => t[0] === "teamrun:updateSaveRequest"));
       const request = window.webContents.sent.find(t => t[0] === "teamrun:updateSaveRequest");
       const untrusted = electron.ipcMain.invoke("teamrun:updateSaveAnswer", { ...event, senderFrame: null }, request?.[1], []);
       const answered = electron.ipcMain.invoke("teamrun:updateSaveAnswer", event, request?.[1], ["Notes couldn't save"]);
-      const connection = launcher.connections[0];
       await Condition.waitAsync(() => connection?.calls.includes("shell.updateSaved") === true);
       await writeFile(installation.barrierFile, JSON.stringify(new UpdateBarrier(coordinator, "0.3.0", UpdateBarrierState.Closing, null).toJson()));
       launcher.listener?.onDisconnected(null);
@@ -987,6 +991,12 @@ export class DesktopApplicationTests {
       Assert.isFalse(untrusted === true);
       Assert.isTrue(answered === true);
       Assert.areEqual(JSON.stringify(new UpdateSaved(1000, ["Notes couldn't save"]).toJson()), JSON.stringify(connection?.payloads.at(-1)));
+      Assert.areEqual(
+        JSON.stringify(["shell.writeWindowBounds", "shell.updateSaved"]),
+        JSON.stringify(connection?.calls.filter(t => t === "shell.writeWindowBounds" || t === "shell.updateSaved")));
+      Assert.areEqual(
+        JSON.stringify(["The window's bounds could not be saved: WindowStateException: The runtime refused shell.writeWindowBounds: The database is busy."]),
+        JSON.stringify(DesktopStartFixture.readErrors(desktop, "The window's bounds could not be saved")));
       Assert.areEqual(desktop.programs.starts.length, desktop.programs.stops);
     }
     finally {

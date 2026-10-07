@@ -14,11 +14,16 @@ export interface IUpdateState {
   readonly reason: string | null;
 }
 
+export interface IStartupState {
+  readonly kind: string;
+}
+
 export interface IPageBridge {
   request(method: string, payload: unknown): Promise<unknown>;
   readBuild(): Promise<unknown>;
   readLayout(): Promise<unknown>;
   writeLayout(layout: unknown): Promise<unknown>;
+  readStartup(): Promise<IStartupState | null>;
   onStartup(listener: (state: unknown) => void): () => void;
   readTrayAvailable(): Promise<unknown>;
   readUpdate(): Promise<IUpdateState>;

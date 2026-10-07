@@ -7255,7 +7255,7 @@ export declare class WindowBoundsKeeper {
   public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog, holdsPersonsMoves: boolean);
 
   /**
-   * Keeps the bounds in the store from now on, and applies the bounds it holds: the saved position when a display
+   * Keeps the bounds in the store from now on, ending a hold, and applies the store's bounds: the saved position when a display
    * shows it, otherwise the saved size centered, then maximized when it was. A window not shown yet is maximized
    * only as {@link WindowBoundsKeeper.show} shows it, since maximizing shows a hidden window without focusing it,
    * and saves count it as maximized meanwhile. When the person already moved or resized the window, those bounds
@@ -7293,8 +7293,8 @@ export declare class WindowBoundsKeeper {
 
   /**
    * Saves the window's current bounds at once, cancelling a pending save; does nothing after the window is gone, or
-   * before a store is set unless the person moved or resized the window. Bounds that could not be kept stay unsaved for
-   * {@link WindowBoundsKeeper.saveUnsavedAsync}.
+   * before a store is set unless the person moved or resized the window. While held, it only marks the bounds unsaved.
+   * Bounds that could not be kept stay unsaved for {@link WindowBoundsKeeper.saveUnsavedAsync}.
    * A save after a move or resize that finds the runtime unreachable keeps the bounds unsaved without reporting it.
    *
    * @returns A promise that settles once the bounds are kept.
@@ -7312,8 +7312,27 @@ export declare class WindowBoundsKeeper {
   public saveAsync(): Promise<void>;
 
   /**
-   * Saves the window's newest bounds when an earlier save could not keep them, for example while the runtime was
-   * unreachable; does nothing otherwise.
+   * Saves the bounds at once when a save is pending or bounds are unsaved, then holds every later save, which only marks
+   * the bounds unsaved, until {@link WindowBoundsKeeper.saveUnsavedAsync} or {@link WindowBoundsKeeper.restoreAsync}.
+   * The desktop holds its windows' bounds as it saves for an update, because the runtime refuses its writes afterwards.
+   * It holds them even when the save fails.
+   *
+   * @returns A promise that settles once the bounds are kept and held.
+   * @throws The store's failure as a rejection.
+   * @example
+   * ```ts
+   * import type { WindowBoundsKeeper } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function holdForUpdateAsync(keeper: WindowBoundsKeeper): Promise<void> {
+   *   return keeper.holdAsync();
+   * }
+   * ```
+   */
+  public holdAsync(): Promise<void>;
+
+  /**
+   * Ends a hold and saves the window's newest bounds when an earlier save could not keep them, for example while the
+   * runtime was unreachable or the bounds were held; does nothing otherwise.
    *
    * @returns A promise that settles once the bounds are kept, or at once when nothing is unsaved.
    * @throws The store's failure as a rejection.

@@ -1017,10 +1017,7 @@ export class DesktopApplication {
     if (kind === StartupStateKind.Connecting)
       return;
     if (kind === StartupStateKind.Ready && this.restored.has(open))
-      await open.bounds.saveUnsavedAsync().catch((error: unknown) => {
-        if (!(error instanceof WindowStateUnavailableException))
-          this.log.write(Resources.formatBoundsUnsaved(String(error)));
-      });
+      await open.bounds.saveUnsavedAsync().catch((error: unknown) => this.logBoundsUnsaved(error));
     else if (kind === StartupStateKind.Ready) {
       this.restored.add(open);
       const device = await this.device;
@@ -1183,8 +1180,17 @@ export class DesktopApplication {
   }
 
   private async saveForUpdateAsync(): Promise<readonly string[]> {
-    const problems = await Promise.all([...this.windows.values()].map((t, index) => t.updateSaves.requestAsync(index + 1)));
+    const problems = await Promise.all([...this.windows.values()].map(async (t, index) => {
+      const saved = await t.updateSaves.requestAsync(index + 1);
+      await t.bounds.holdAsync().catch((error: unknown) => this.logBoundsUnsaved(error));
+      return saved;
+    }));
     return problems.flat();
+  }
+
+  private logBoundsUnsaved(error: unknown): void {
+    if (!(error instanceof WindowStateUnavailableException))
+      this.log.write(Resources.formatBoundsUnsaved(String(error)));
   }
 
   private answerClose(event: IIpcEvent, requestId: unknown, isSaved: unknown): boolean {

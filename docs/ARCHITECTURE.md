@@ -1315,6 +1315,7 @@ A barrier it cannot remove after a failure is tried again once a second later an
 3. **Saves.**
    Every client told `shell.updating` answers with `shell.updateSaved`, giving its process id, and until then its requests are still handled.
    A desktop first freezes its windows under the update card ([UI standards](UI-STANDARDS.md#8-component-metrics-and-behavior)) and runs section 9's saves, and names any window and module whose save failed or did not answer.
+   It also writes each window's newest bounds, then holds later moves and resizes until the runtime is ready again, since its writes would be refused.
    The saves' own requests are all its windows still send; a save that tries to start a program fails, and so stops the update.
    The command line answers at once and exits with the code for an update in progress.
    The runtime waits at most 6 seconds for every client, then answers `shell.update` with the outcome and the process id and start time of every client, every program it holds and its AppImage copy's mount; a client that does not answer fails the update.

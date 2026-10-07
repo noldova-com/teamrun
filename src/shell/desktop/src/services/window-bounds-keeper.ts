@@ -26,6 +26,7 @@ export class WindowBoundsKeeper {
   private timer: NodeJS.Timeout | null = null;
   private hasUnsaved: boolean = false;
   private isMaximizedAtShow: boolean = false;
+  private isHeld: boolean = false;
 
   public constructor(window: IDesktopWindow, displays: IDisplayHost, saveDelay: number, log: IDesktopLog, holdsPersonsMoves: boolean) {
     this.window = window;
@@ -46,6 +47,7 @@ export class WindowBoundsKeeper {
 
   public async restoreAsync(store: IWindowStateStore): Promise<void> {
     this.store = store;
+    this.isHeld = false;
     if (this.hasUnsaved) {
       await this.saveAsync();
       return;
@@ -73,6 +75,10 @@ export class WindowBoundsKeeper {
     this.cancelSave();
     if (this.window.isDestroyed())
       return;
+    if (this.isHeld) {
+      this.hasUnsaved = true;
+      return;
+    }
     if (Object.isNull(this.store)) {
       if (this.hasUnsaved)
         throw new WindowStateUnavailableException(Resources.runtimeNotConnected);
@@ -84,7 +90,18 @@ export class WindowBoundsKeeper {
     this.hasUnsaved = false;
   }
 
+  public async holdAsync(): Promise<void> {
+    try {
+      if (!Object.isNull(this.timer) || this.hasUnsaved)
+        await this.saveAsync();
+    }
+    finally {
+      this.isHeld = true;
+    }
+  }
+
   public async saveUnsavedAsync(): Promise<void> {
+    this.isHeld = false;
     if (this.hasUnsaved)
       await this.saveAsync();
   }
