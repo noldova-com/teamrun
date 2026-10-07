@@ -10,6 +10,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import LayoutFixture from "./fixtures/layout.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 const DEFAULT_PANEL_SIZE = 13;
@@ -18,8 +19,7 @@ const POINTER_TARGET = 24;
 
 async function setSizesAsync(window: Page, size: number): Promise<void> {
   for (const name of ["shell.panelSize", "shell.messageSize", "shell.codeSize"])
-    await window.evaluate(([setting, value]) => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-      .request("shell.setSetting", { name: setting, value }), [name, size] as const);
+    await PageBridgeFixture.evaluateAsync(window, (t, [setting, value]) => t.request("shell.setSetting", { name: setting, value }), [name, size] as const);
   await expect.poll(() => window.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBeCloseTo(16 * size / DEFAULT_PANEL_SIZE, 2);
   await expect.poll(() => window.evaluate(() => ["--tr-text-message", "--tr-text-code"].map(t => getComputedStyle(document.documentElement).getPropertyValue(t)))).toEqual([`${size}px`, `${size}px`]);
 }

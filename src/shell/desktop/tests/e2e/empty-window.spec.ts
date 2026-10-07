@@ -11,6 +11,7 @@ import path from "node:path";
 
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 
 test.use({ desktopVariant: BuildVariantFixture.noModules });
 
@@ -35,11 +36,11 @@ test.describe("the empty window", () => {
       require: typeof Reflect.get(globalThis, "require"),
       process: typeof Reflect.get(globalThis, "process"),
       module: typeof Reflect.get(globalThis, "module"),
-      buffer: typeof Reflect.get(globalThis, "Buffer"),
-      bridge: Object.keys(Reflect.get(globalThis, "teamrun") as object).sort()
+      buffer: typeof Reflect.get(globalThis, "Buffer")
     }));
+    const bridge = await PageBridgeFixture.evaluateAsync(desktop.window, t => Object.keys(t).sort());
 
-    expect(globals).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: [
+    expect({ ...globals, bridge }).toEqual({ require: "undefined", process: "undefined", module: "undefined", buffer: "undefined", bridge: [
       "actOnStartup", "actOnUpdate", "addToDictionary", "answerClose", "answerQuit", "answerUpdateSave", "appearance", "copyText", "edit", "installCommand", "keepAppearance", "keepSpelling", "logError",
       "logModule", "notifyAppearance", "notifyReady", "onCloseRequest", "onEvent", "onFieldMenu", "onFullScreen", "onMenuCommand", "onNotificationOpened", "onQuitQuestion", "onStartup", "onTrayAvailable", "onUpdate",
       "onUpdateSaveRequest", "openLink", "openLogFolder", "platform", "processor", "readBuild", "readFullScreen", "readLayout", "readSpelling", "readStartup", "readTrayAvailable", "readUpdate", "replaceMisspelling", "request",

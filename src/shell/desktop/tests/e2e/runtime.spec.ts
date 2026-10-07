@@ -13,6 +13,7 @@ import path from "node:path";
 import OlderRuntimeFixture from "./fixtures/older-runtime.fixture.ts";
 import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 
 test.use({ desktopVariant: BuildVariantFixture.noModules });
 
@@ -59,7 +60,7 @@ test.describe("requests from the window", () => {
   test("the window asks the runtime for its modules and may not stop it", async ({ desktop }) => {
     await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
     const request = (method: string, payload: unknown): Promise<unknown> =>
-      desktop.window.evaluate(([name, value]) => (Reflect.get(globalThis, "teamrun") as { request(method: unknown, payload: unknown): Promise<unknown> }).request(name, value), [method, payload] as const);
+      PageBridgeFixture.evaluateAsync(desktop.window, (t, [name, value]) => t.request(name, value), [method, payload] as const);
 
     const modules = await request("shell.modules", null) as { payload: { modules: unknown[] } };
     const stop = await request("shell.stop", { policy: "IfIdle" }) as { failure: { code: string } };

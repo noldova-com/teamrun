@@ -14,6 +14,7 @@ import { RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 
 const colors = {
   light: { error: "rgb(161, 38, 13)", raised: "rgb(248, 248, 248)", cardBorder: "rgb(229, 229, 229)" },
@@ -24,7 +25,7 @@ const tab = (desktop: DesktopApplicationFixture, key: string): ReturnType<Deskto
   desktop.window.locator(`tr-tab[data-tab-key="${key}"]`);
 
 const readKeptLayoutAsync = async (desktop: DesktopApplicationFixture): Promise<string> =>
-  JSON.stringify(await desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readLayout(): Promise<unknown> }).readLayout()));
+  JSON.stringify(await PageBridgeFixture.evaluateAsync(desktop.window, t => t.readLayout()));
 
 const failClockAsync = async (desktop: DesktopApplicationFixture): Promise<void> => {
   const folder = path.join(desktop.dataDirectory, "modules", "clock");

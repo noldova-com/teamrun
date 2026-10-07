@@ -10,10 +10,11 @@ import path from "node:path";
 
 import type DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 
 test.describe("module data", () => {
   const recordAsync = async (desktop: DesktopApplicationFixture): Promise<number> => {
-    const answer = await desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> }).request("clock.record", null));
+    const answer = await PageBridgeFixture.evaluateAsync(desktop.window, t => t.request("clock.record", null));
     return (answer as { payload: { readings: number } }).payload.readings;
   };
 
