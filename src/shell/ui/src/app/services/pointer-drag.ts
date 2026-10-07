@@ -20,11 +20,12 @@ export class PointerDrag {
     this.element = element;
     this.pointerId = press.pointerId;
     const document = element.ownerDocument;
+    const isInside = (event: PointerEvent): boolean => event.clientX >= 0 && event.clientY >= 0 && event.clientX < window.innerWidth && event.clientY < window.innerHeight;
     const isOwn = (event: PointerEvent): boolean => event.pointerId === this.pointerId;
     const onMove = (event: PointerEvent): void => {
       if (!isOwn(event))
         return;
-      if ((event.buttons & Resources.primaryButtons) === 0)
+      if ((event.buttons & Resources.primaryButtons) === 0 || !isInside(event))
         cancel();
       else
         move(event);

@@ -120,16 +120,17 @@ describe("TreeDragSession", () => {
     document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 0, bubbles: true }));
     const afterUnpressedMove = await shown();
     await dragAsync("Notes", "Trash", 0.9, false);
-    pointer("pointermove", document.body, -50);
-    const outside = await shown();
-    pointer("pointerup", document.body, -50);
+    const below = root().getBoundingClientRect().bottom + 20;
+    pointer("pointermove", document.body, below);
+    const outside = (await shown()).map(t => t !== null);
+    pointer("pointerup", document.body, below);
     const afterRelease = await shown();
     const idleEscape = escape();
     pointer("pointerdown", row("Notes"), yAt("Notes", 0.5), 2);
     pointer("pointermove", row("Trash"), yAt("Trash", 0.9));
 
-    expect([other, stillDragging, escaped, afterEscape, afterBlur, afterCancel, afterLostCapture, afterUnpressedMove, outside[1], afterRelease, idleEscape, ghost(), moves()])
-      .toEqual([true, true, false, [null, null], [null, null], [null, null], [null, null], [null, null], null, [null, null], true, null, []]);
+    expect([other, stillDragging, escaped, afterEscape, afterBlur, afterCancel, afterLostCapture, afterUnpressedMove, outside, afterRelease, idleEscape, ghost(), moves()])
+      .toEqual([true, true, false, [null, null], [null, null], [null, null], [null, null], [null, null], [true, false], [null, null], true, null, []]);
   });
 
   it("ends a drag when the tree goes away, so the keys and the pointer are the page's again", async () => {

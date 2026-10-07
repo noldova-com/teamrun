@@ -30,8 +30,8 @@ describe("PointerDrag", () => {
     return drag;
   }
 
-  function pointer(type: string, pointerId: number = 1, buttons: number = 1, clientX: number = 0): void {
-    document.dispatchEvent(new PointerEvent(type, { pointerId, buttons, clientX }));
+  function pointer(type: string, pointerId: number = 1, buttons: number = 1, clientX: number = 0, clientY: number = 0): void {
+    document.dispatchEvent(new PointerEvent(type, { pointerId, buttons, clientX, clientY }));
   }
 
   function key(name: string): KeyboardEvent {
@@ -54,19 +54,24 @@ describe("PointerDrag", () => {
     pointer("pointermove", 1, 1, 5);
     pointer("pointermove", 2, 1, 6);
     pointer("pointermove", 1, 3, 7);
+    pointer("pointermove", 1, 1, innerWidth - 1, innerHeight - 1);
     pointer("pointerup", 2, 0);
     pointer("pointerup", 1, 0);
 
-    expect(calls).toEqual(["move 5", "move 7", "end"]);
+    expect(calls).toEqual(["move 5", "move 7", `move ${innerWidth - 1}`, "end"]);
   });
 
-  it("cancels on a cancelled pointer, a lost capture, a lost window focus or a move without the primary button, and ignores other pointers", () => {
+  it("cancels on a cancelled pointer, a lost capture, a lost window focus, a move without the primary button or a move outside the window, and ignores other pointers", () => {
     const endings: readonly (readonly [string, () => void])[] = [
       ["cancelled", () => pointer("pointercancel")],
       ["lost capture", () => element.dispatchEvent(new PointerEvent("lostpointercapture", { pointerId: 1 }))],
       ["blur", () => window.dispatchEvent(new FocusEvent("blur"))],
       ["no button", () => pointer("pointermove", 1, 0)],
-      ["secondary only", () => pointer("pointermove", 1, 2)]
+      ["secondary only", () => pointer("pointermove", 1, 2)],
+      ["left", () => pointer("pointermove", 1, 1, -1, 5)],
+      ["above", () => pointer("pointermove", 1, 1, 5, -1)],
+      ["right", () => pointer("pointermove", 1, 1, innerWidth, 5)],
+      ["below", () => pointer("pointermove", 1, 1, 5, innerHeight)]
     ];
     const ended: string[] = [];
 
@@ -81,7 +86,7 @@ describe("PointerDrag", () => {
       ended.push(`${name}: ${calls.join(",")}`);
     }
 
-    expect(ended).toEqual(["cancelled: cancel", "lost capture: cancel", "blur: cancel", "no button: cancel", "secondary only: cancel"]);
+    expect(ended).toEqual(["cancelled: cancel", "lost capture: cancel", "blur: cancel", "no button: cancel", "secondary only: cancel", "left: cancel", "above: cancel", "right: cancel", "below: cancel"]);
   });
 
   it("captures the pointer once the drag starts, lets Escape cancel only then, and releases the capture it holds when stopped", () => {

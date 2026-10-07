@@ -1895,10 +1895,10 @@ export declare class DragGesture {
  * Follows one pointer from its press until the drag ends, wherever the
  * pointer goes. Releasing the button ends the drag; a cancelled pointer, a
  * lost pointer capture, the window losing focus, a move with the primary
- * button no longer pressed, and Escape once the drag has started cancel it.
- * So a release over the title bar or outside the window, which the page may
- * never see, ends the drag at the next move. The kit's sash and tree and the
- * window's tab and toolbar drags all use it.
+ * button no longer pressed, a move outside the window, and Escape once the
+ * drag has started cancel it. So a release over the title bar or outside the
+ * window, which the page may never see, never leaves a drag running. The
+ * kit's sash and tree and the window's tab and toolbar drags all use it.
  */
 export declare class PointerDrag {
   /**
