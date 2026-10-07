@@ -26,6 +26,7 @@ describe("VirtualListAnchor", () => {
     expect(anchor.afterRemove(8, 5)).toEqual(new VirtualListAnchor(8, 0));
     expect(anchor.afterRemove(10, 1)).toEqual(new VirtualListAnchor(10, 0));
     expect(anchor.afterRemove(11, 3)).toBe(anchor);
+    expect(new VirtualListAnchor(10, -25).afterRemove(9, 2)).toEqual(new VirtualListAnchor(9, -25));
   });
 
   it("finds its row by its key before it falls back to its place, so a saved position survives rows added or removed before it", () => {

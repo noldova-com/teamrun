@@ -26,7 +26,7 @@ export class VirtualListAnchor {
   public afterRemove(at: number, count: number): VirtualListAnchor {
     if (at + count <= this.index)
       return new VirtualListAnchor(this.index - count, this.distance, this.key);
-    return at <= this.index ? new VirtualListAnchor(at, 0) : this;
+    return at <= this.index ? new VirtualListAnchor(at, Math.min(this.distance, 0)) : this;
   }
 
   public resolve(indexOf: (key: string) => number): VirtualListAnchor {
