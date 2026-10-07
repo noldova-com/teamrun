@@ -18,19 +18,25 @@ import ProductIdentityFixture from "./product-identity.fixture.ts";
 import type RepositoryFixture from "./repository.fixture.ts";
 
 export default class PackageArchivesFixture {
+  public static readonly SHIPPED: string = "shipped";
+  public static readonly OUTSIDE: string = "outside";
+  public static readonly THIRD_PARTY: string = "third-party";
+  public static readonly THIRD_PARTY_DEPENDENCIES: Readonly<Record<string, string>> = { "fixture-left": "1.0.0" };
+
   private static readonly PREFIX: string = "teamrun-package-archives-";
   private static readonly BETA: IFixturePackage = { directory: "src/foundation/beta", name: "@noldova/teamrun-foundation-beta", version: "0.0.7", dependencies: [], peers: {} };
+  private static readonly DESKTOP: IFixturePackage = {
+    directory: "src/shell/desktop", name: "@noldova/teamrun-shell-desktop", version: "0.0.7", dependencies: ["@noldova/teamrun-foundation-alpha"], peers: { electron: "44.5.1" }
+  };
   private static readonly PACKAGES: readonly IFixturePackage[] = [
     PackageArchivesFixture.BETA,
     { directory: "src/foundation/alpha", name: "@noldova/teamrun-foundation-alpha", version: "0.0.7", dependencies: ["@noldova/teamrun-foundation-beta"], peers: {} },
     { directory: "src/foundation/testing", name: "@noldova/teamrun-foundation-testing", version: "0.0.7", dependencies: [], peers: {} },
     { directory: "src/shell/cli", name: "@noldova/teamrun-shell-cli", version: "0.0.7", dependencies: ["@noldova/teamrun-foundation-alpha"], peers: {} },
-    { directory: "src/shell/desktop", name: "@noldova/teamrun-shell-desktop", version: "0.0.7", dependencies: ["@noldova/teamrun-foundation-alpha"], peers: { electron: "44.5.1" } },
+    PackageArchivesFixture.DESKTOP,
     { directory: "src/modules/tasks/runtime", name: "@noldova/teamrun-modules-tasks-runtime", version: "0.3.0", dependencies: ["@noldova/teamrun-foundation-beta"], peers: {} },
     { directory: "src/modules/tasks/cli", name: "@noldova/teamrun-modules-tasks-cli", version: "0.3.0", dependencies: ["@noldova/teamrun-foundation-alpha"], peers: {} }
   ];
-  private static readonly SHIPPED: string = "shipped";
-  private static readonly OUTSIDE: string = "outside";
 
   private readonly folder: string;
 
@@ -42,14 +48,17 @@ export default class PackageArchivesFixture {
     const fixture = new PackageArchivesFixture(await mkdtemp(path.join(tmpdir(), PackageArchivesFixture.PREFIX)));
     await Promise.all([
       ...PackageArchivesFixture.PACKAGES.map(t => fixture.packAsync(t, PackageArchivesFixture.SHIPPED, {})),
-      fixture.packAsync(PackageArchivesFixture.BETA, PackageArchivesFixture.OUTSIDE, { "left-pad": "1.3.0" })
+      fixture.packAsync(PackageArchivesFixture.BETA, PackageArchivesFixture.OUTSIDE, { "left-pad": "1.3.0" }),
+      fixture.packAsync(PackageArchivesFixture.DESKTOP, PackageArchivesFixture.THIRD_PARTY, PackageArchivesFixture.THIRD_PARTY_DEPENDENCIES)
     ]);
     return fixture;
   }
 
-  public async writeSourcesAsync(repository: RepositoryFixture, modules: readonly string[], hasOutsideDependency: boolean = false): Promise<void> {
+  public async writeSourcesAsync(repository: RepositoryFixture, modules: readonly string[], variant: string = PackageArchivesFixture.SHIPPED): Promise<void> {
+    const external = variant === PackageArchivesFixture.THIRD_PARTY ? PackageArchivesFixture.THIRD_PARTY_DEPENDENCIES : {};
     await repository.writeAsync({
       "package.json": JSON.stringify(ProductIdentityFixture.manifest({}, modules)),
+      "package-lock.json": JSON.stringify({ name: "fixture", lockfileVersion: 3, requires: true, packages: { "": { name: "fixture" } } }),
       "LICENSE": "Fixture license\n",
       "assets/fixture-icons/icon-dark.ico": "ico\n",
       "assets/dictionaries/dictionaries.json": "{\"dictionaries\":[]}\n",
@@ -58,13 +67,13 @@ export default class PackageArchivesFixture {
       ...Object.fromEntries(PackageArchivesFixture.PACKAGES.map(t => [`${t.directory}/package.json`, JSON.stringify({
         name: t.name,
         version: "__VERSION__",
-        dependencies: Object.fromEntries(t.dependencies.map(u => [u, "__VERSION__"]))
+        dependencies: { ...Object.fromEntries(t.dependencies.map(u => [u, "__VERSION__"])), ...(t === PackageArchivesFixture.DESKTOP ? external : {}) }
       })]))
     });
     const target = path.join(repository.directory, "_build", "archives");
     await cp(path.join(this.folder, PackageArchivesFixture.SHIPPED), target, { recursive: true });
-    if (hasOutsideDependency)
-      await cp(path.join(this.folder, PackageArchivesFixture.OUTSIDE), target, { recursive: true });
+    if (variant !== PackageArchivesFixture.SHIPPED)
+      await cp(path.join(this.folder, variant), target, { recursive: true });
   }
 
   public disposeAsync(): Promise<void> {

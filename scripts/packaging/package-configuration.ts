@@ -224,11 +224,13 @@ export default class PackageConfiguration {
   }
 
   private listLicenses(): readonly Record<string, unknown>[] {
+    const thirdParty = new PackageLayout(this.root).thirdPartyLicenses;
     return [
       { from: path.join(this.root, PackageConfiguration.LICENSE_FILE), to: `${PackageConfiguration.LICENSES_FOLDER}/${PackageConfiguration.LICENSE_FILE}` },
       { from: path.join(this.root, PackageConfiguration.FONTS_FOLDER), to: PackageConfiguration.LICENSES_FOLDER, filter: PackageConfiguration.FONT_LICENSE_FILTER },
       { from: path.join(this.root, PackageConfiguration.DICTIONARIES_FOLDER), to: PackageConfiguration.LICENSES_FOLDER, filter: PackageConfiguration.FONT_LICENSE_FILTER },
-      { from: path.join(this.stage, ...PackageConfiguration.WINDOW_LICENSES_SEGMENTS), to: `${PackageConfiguration.LICENSES_FOLDER}/${PackageConfiguration.WINDOW_LICENSES_FILE}` }
+      { from: path.join(this.stage, ...PackageConfiguration.WINDOW_LICENSES_SEGMENTS), to: `${PackageConfiguration.LICENSES_FOLDER}/${PackageConfiguration.WINDOW_LICENSES_FILE}` },
+      { from: thirdParty, to: `${PackageConfiguration.LICENSES_FOLDER}/${path.basename(thirdParty)}` }
     ];
   }
 }

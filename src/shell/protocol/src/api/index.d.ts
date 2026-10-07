@@ -1792,7 +1792,8 @@ export declare class ShellEvents {
 
 /**
  * The notification kinds the shell posts itself. They belong to no module,
- * so turning modules' notifications off never mutes them.
+ * so turning modules' notifications off never mutes them, and they run only
+ * the shell's own commands.
  */
 export declare class ShellNotifications {
   /**
@@ -1807,6 +1808,13 @@ export declare class ShellNotifications {
    * warning naming the module.
    */
   public static readonly saveUnfinished: QualifiedName;
+
+  /**
+   * `shell.updateReady`: a newer version of TeamRun is downloaded and ready
+   * to install, keyed by the version; it opens Settings' About page and
+   * offers to restart to install it.
+   */
+  public static readonly updateReady: QualifiedName;
 
   /**
    * Every kind above, in this order.

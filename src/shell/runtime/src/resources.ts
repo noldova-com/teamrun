@@ -62,6 +62,7 @@ export class Resources {
   public static readonly moduleIdPattern: RegExp = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
   public static readonly migrationIdPattern: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   public static readonly reservedModuleId: string = "shell";
+  public static readonly shellSettingsPages: readonly string[] = ["Keyboard shortcuts", "About"];
   public static readonly moduleVersionPattern: RegExp = /^(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})\.(?:0|[1-9][0-9]{0,8})$/;
   public static readonly movedFolderInfix: string = "-before-shell-";
   public static readonly timestampSeparatorPattern: RegExp = /[-:]|\.\d+/g;
@@ -233,9 +234,11 @@ export class Resources {
   public static readonly recentCommandCountSetting: string = "recentCommandCount";
   public static readonly spellCheckSetting: string = "spellCheck";
   public static readonly spellCheckLanguagesSetting: string = "spellCheckLanguages";
+  public static readonly updateChecksSetting: string = "updateChecks";
   public static readonly appearancePage: string = "Appearance";
   public static readonly notificationsPage: string = "Notifications";
   public static readonly shortcutsPage: string = "Keyboard shortcuts";
+  public static readonly aboutPage: string = "About";
   public static readonly themeGroup: string = "Theme";
   public static readonly textGroup: string = "Text";
   public static readonly layoutGroup: string = "Layout";
@@ -244,6 +247,7 @@ export class Resources {
   public static readonly notificationsGroup: string = "Notifications";
   public static readonly backgroundGroup: string = "Background";
   public static readonly shortcutsGroup: string = "Keys";
+  public static readonly updatesGroup: string = "Updates";
   public static readonly defaultThemeId: string = "shell.default";
   public static readonly defaultThemeTitle: string = "Default";
   public static readonly themeTitle: string = "Theme";
@@ -304,6 +308,10 @@ export class Resources {
   public static readonly spellCheckTitle: string = "Check spelling";
   public static readonly spellCheckDescription: string = "Underline misspelled words in the text you type and offer corrections in the text field's menu. Code is never checked.";
   public static readonly spellCheckLanguagesTitle: string = "Spelling languages";
+  public static readonly updateChecksTitle: string = "Check for updates";
+  public static readonly updateChecksDescription: string = "When this device looks for a newer version: shortly after starting and then every hour, only shortly after starting, or only when you choose Check for updates. A newer version downloads by itself; installing it waits for you.";
+  public static readonly updateChecksOptions: readonly (readonly [string, string])[] = [["Automatic", "Automatically"], ["AtStart", "Only at start"], ["OnRequest", "Only when I ask"]];
+  public static readonly defaultUpdateChecks: string = "Automatic";
   public static readonly spellCheckLanguagesDescription: string = "The languages words are checked in on this device. With none chosen, the operating system's languages that have a dictionary are used, or else the first language offered. On macOS the system chooses the languages.";
   public static readonly recentCommandCountTitle: string = "Recent commands";
   public static readonly recentCommandCountDescription: string = "How many commands you recently ran from command search are listed first. 0 lists none.";
@@ -755,6 +763,10 @@ export class Resources {
     return `The shell's notification kind ${kind} offers no command.`;
   }
 
+  public static formatShellNotificationModuleCommand(kind: string, command: string): string {
+    return `The shell's notification kind ${kind} runs only the shell's commands, not ${command}.`;
+  }
+
   public static formatNotificationNotFound(id: string): string {
     return `Notification ${id} is gone; it was dismissed or its module stopped.`;
   }
@@ -825,6 +837,10 @@ export class Resources {
 
   public static formatSettingKindReserved(moduleId: string, name: string, kind: string): string {
     return `The module ${moduleId} declares the setting ${name} of the kind ${kind}, which only the shell declares.`;
+  }
+
+  public static formatSettingPageReserved(moduleId: string, name: string, page: string): string {
+    return `The module ${moduleId} puts the setting ${name} on the page ${page}, which only the shell fills.`;
   }
 
   public static formatNotContributed(moduleId: string, kind: string, name: string): string {

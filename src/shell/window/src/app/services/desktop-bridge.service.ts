@@ -15,6 +15,7 @@ import type { ClipboardWriter } from "@noldova/teamrun-shell-ui";
 
 import type { EditAction } from "../enums/edit-action";
 import type { QuitChoice } from "../enums/quit-choice";
+import type { UpdateAction } from "../enums/update-action";
 import { DesktopBridgeException } from "../exceptions/desktop-bridge.exception";
 import { RuntimeDisconnectedException } from "../exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../exceptions/runtime-request.exception";
@@ -24,6 +25,7 @@ import { FieldMenuRequest } from "../models/field-menu-request";
 import { QuitQuestion } from "../models/quit-question";
 import { SpellingOffer } from "../models/spelling-offer";
 import { StartupState } from "../models/startup-state";
+import { UpdateState } from "../models/update-state";
 import type { WindowAppearance } from "../models/window-appearance";
 import { Resources } from "../../resources";
 
@@ -33,6 +35,10 @@ export class DesktopBridgeService implements ClipboardWriter {
 
   public get platform(): string {
     return this.bridge.platform;
+  }
+
+  public get processor(): string {
+    return this.bridge.processor;
   }
 
   public get initialAppearance(): unknown {
@@ -129,6 +135,18 @@ export class DesktopBridgeService implements ClipboardWriter {
     return this.bridge.installCommand();
   }
 
+  public async readUpdateAsync(): Promise<UpdateState> {
+    return UpdateState.fromJson(await this.bridge.readUpdate());
+  }
+
+  public onUpdate(listener: (state: UpdateState) => void): () => void {
+    return this.bridge.onUpdate(t => listener(UpdateState.fromJson(t)));
+  }
+
+  public actOnUpdateAsync(action: UpdateAction): Promise<boolean> {
+    return this.bridge.actOnUpdate(action);
+  }
+
   public keepAppearance(preferences: JsonObject): void {
     this.bridge.keepAppearance(preferences);
   }
@@ -211,6 +229,7 @@ export class DesktopBridgeService implements ClipboardWriter {
   private static isBridge(value: unknown): value is IDesktopBridge {
     return Object.isObject(value) &&
       Object.isString(Reflect.get(value, nameof<IDesktopBridge>(t => t.platform))) &&
+      Object.isString(Reflect.get(value, nameof<IDesktopBridge>(t => t.processor))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.notifyReady))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.notifyAppearance))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onCloseRequest))) &&
@@ -229,6 +248,9 @@ export class DesktopBridgeService implements ClipboardWriter {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLogFolder))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.openLink))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.installCommand))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readUpdate))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onUpdate))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.actOnUpdate))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.keepAppearance))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readSpelling))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.keepSpelling))) &&

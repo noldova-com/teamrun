@@ -75,7 +75,7 @@ test.describe("settings", () => {
 
     await expect(settingsTab(window)).toHaveCount(1);
     await expect(settingsTab(window)).toHaveAttribute("aria-selected", "true");
-    await expect(window.locator(".tr-settings-pages .tr-tree-label")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Notes", "Gallery"]);
+    await expect(window.locator(".tr-settings-pages .tr-tree-label")).toHaveText(["Appearance", "Notifications", "Keyboard shortcuts", "Clock", "Notes", "Gallery", "About"]);
     await expect(window.locator(".tr-settings-group-title")).toHaveText(["Theme", "Text", "Layout", "Command search", "Spelling"]);
     await window.getByRole("treeitem", { name: "Appearance", exact: true }).focus();
     await window.keyboard.press("ArrowDown");
@@ -113,6 +113,24 @@ test.describe("settings", () => {
       await access(path.join(desktop.dataDirectory, "desktop", "Dictionaries", "en-US-10-1.bdic"));
     }
     await desktop.checkpointAsync("settings-spelling");
+  });
+
+  test("About names the version and the platform, says updates are off in a build that names no feed, and leaves out the setting that checks for them", async ({ desktop }) => {
+    const window = desktop.window;
+    await SettingsFixture.openPageAsync(window, "About");
+    const about = window.getByRole("region", { name: "About TeamRun" });
+
+    await expect(about.locator(".tr-about-title")).toHaveText(/^TeamRun \d+\.\d+\.\d+/);
+    await expect(about.locator(".tr-about-platform")).toHaveText(/^(Windows|macOS|Linux) (x64|ARM64)$/);
+    await expect(about.getByRole("status")).toHaveText("Updates are turned off in this build.");
+    await expect(about.getByRole("button")).toHaveCount(0);
+    await expect(window.locator(".tr-settings-group-title")).toHaveCount(0);
+    await expect(window.locator(".tr-update-item")).toHaveCount(0);
+    for (const scheme of ["light", "dark"] as const) {
+      await window.emulateMedia({ colorScheme: scheme });
+      await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(scheme);
+      await desktop.checkpointAsync(`settings-about-${scheme}`);
+    }
   });
 
   test("a module's action setting opens the module's own document from its row once per press, by pointer or Enter, and stores nothing", async ({ desktop }) => {

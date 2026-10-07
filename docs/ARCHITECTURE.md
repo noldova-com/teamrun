@@ -389,7 +389,7 @@ A setting has exactly these fields, and the build refuses a file whose settings 
 | `default` | A value its type accepts |
 | `locality` | `Shared`, one value for every device that shares the data directory, or `Device`, a value per device |
 | `scopes` | The setting scopes that may override it, its module's own or a dependency's; a device setting has none |
-| `page`, `group` | Where Settings shows it |
+| `page`, `group` | Where Settings shows it; Keyboard shortcuts and About are the shell's own pages, which a module cannot use |
 
 The shell keeps the values in its database and reports every change with the event `shell.settingsChanged`, whose payload is the changed key, the value now in effect and whether a value is stored for the key, false after a reset.
 Setting a value equal to the setting's default, compared by value, is a reset when the setting would otherwise take its default, so every way of changing a setting removes the stored value and the setting follows its default from then on; a scope whose enclosing scope holds another value keeps the value it is given.
@@ -397,7 +397,7 @@ A part reads the settings of its module, its dependencies and the shell, for the
 A window reads them all with `shell.settings`, reads one key's entry, its value in effect and whether the key itself holds it, with `shell.readSetting`, and changes them with `shell.setSetting` and `shell.resetSetting`; the desktop adds its device to these requests and passes a device's change only to that device's windows.
 A stored value its setting's type no longer accepts, such as a removed choice, is kept but ignored, and reported once in the runtime's log.
 
-The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals.
+The shell shows Settings as a document of its own, `shell.settings`, which `shell.openSettings` opens or reveals, showing the page its `page` argument names when it has one.
 Its pages come from the settings' `page` and `group` fields: Appearance, Notifications and Keyboard shortcuts first, then the modules' pages in the order they first appear, and About last.
 Keyboard shortcuts lists every command with its owner and key.
 The person records a new key, removes a key, resets a command to its default or resets every shortcut, and each change writes `shell.keyBindings` whole, in one write, built on the window's previous change until the setting reports that change; when two windows change it at the same moment, the later write is kept.
@@ -414,6 +414,7 @@ A chosen language that no longer ships is dropped at the next change.
 On macOS the system chooses the languages.
 
 About shows TeamRun's name, version, platform and processor and the update's state with its action (section 10), then its Updates group, which holds Check for updates, `shell.updateChecks`, a device setting whose choices are Automatically, the default, Only at start and Only when I ask.
+A build that cannot update leaves the group out of About and of a search, since the setting does nothing there.
 
 ### Setting scopes
 
@@ -940,7 +941,7 @@ Each target is packaged on its own platform and processor.
   The packaged app mirrors the checkout's layout, so the desktop, the runtime and the command line find their files by the same relative paths as in a checkout:
   - `package.json` names the product, its version, its Linux desktop name and the desktop's entry as `main`.
   - `node_modules` holds the desktop, the command line and each module's runtime and CLI parts with their dependencies.
-    They are installed offline from the build's own archives, never from the registry, and without peer dependencies, since the program itself is the desktop's Electron.
+    They are installed offline from the build's own archives and the verified tarballs of their third-party packages, never from the registry, and without peer dependencies, since the program itself is the desktop's Electron.
   - `_build` holds the window, the module declarations and the product file of `npm run build -- --packaged`.
     The packaging checks the window again for the Gallery.
   - The identity's icons, `LICENSE` and `assets/dictionaries`.
@@ -948,6 +949,17 @@ Each target is packaged on its own platform and processor.
   The stage becomes `resources/app.asar`: the command line and the runtime load their modules from it in Node mode, and a notification's icon reaches the OS as image data, never as a path.
   Only the Windows addons are unpacked, into `resources/app.asar.unpacked`, because Windows loads a library only from a file of its own; code loads an addon by its path inside `app.asar`, and Electron reads it from the unpacked copy.
   The program's check of `app.asar` does not cover that copy, which lies in the same per-user install folder as `TeamRun.exe` and can be changed by the same user.
+- **Third-party packages.**
+  A shipped package pins a third-party runtime dependency exactly, and the root `package.json` pins the same version, so the root `package-lock.json` locks its whole tree; the Dependency pins check fails `npm test` unless the three agree.
+  Packaging takes the shipped packages' third-party dependencies, and theirs in turn, by npm's resolution in that lockfile, the nearest `node_modules` first, for the target's platform and processor: dev and peer dependencies never ship, and an optional dependency ships only where it runs.
+  An optional dependency that runs on the target but needs a required one that does not fails packaging, where npm would leave it out.
+  A required peer dependency must be Electron or a package that ships, and an alias or a bundled dependency fails packaging.
+  It downloads each tarball from the lockfile's `resolved` URL into `_build/package/third-party`, where the next run reuses it, and fails unless its SHA-512 matches the lockfile's `integrity` and its own `package.json` names the locked name and version.
+  The stage installs these tarballs beside the build's archives, so each package ships in one version, and packaging fails when the dependencies need two versions of one package.
+  Each package's `license` must be MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, BlueOak-1.0.0 or Python-2.0, or an `OR` expression with one of them, and its tarball must hold a top-level license file; anything else, such as `AND`, fails packaging and names the package.
+  A license file is named `LICENSE`, `LICENCE`, `COPYING` or `UNLICENSE`, alone, with `-<id>` or `_<id>` after it, or `LICENSE` with `<id>-` or `<id>_` before it, and has no extension or `.md`, `.txt` or `.markdown`.
+  Other files a license asks to keep, such as Apache-2.0's `NOTICE`, ship inside the package in `app.asar`, not in the licenses file.
+  A package whose tarball holds no license file ships instead the reviewed text in `assets/licenses/third-party/<name>-<version>.txt`, with a scope's `/` written as `+`, kept only for an exact version whose tarball has none and reviewed against the upstream license field; another version of it fails again.
 - **Program.**
   The program is a copy of the installed Electron's distribution without its default app and `version` file, which electron-builder also leaves out of an Electron it downloads.
   It is named and labelled from the product identity: Windows' `TeamRun.exe` with its icon and version information, the macOS bundle with the application ID, and the Linux executable named after the slug, with its desktop file named `<application ID>.desktop`.
@@ -992,7 +1004,8 @@ Each target is packaged on its own platform and processor.
   The Windows ARM64 installer's archive is compressed with 7-Zip's x86 filter.
   The ARM64 7-Zip that packages it would otherwise choose its ARM64 filter, which the installer's older extractor cannot read, so it would skip every `.exe` and `.dll` and still report success.
 - **Licenses.**
-  `resources/licenses` holds TeamRun's license, the fonts' and the spelling dictionaries' licenses and the window's third-party licenses.
+  `resources/licenses` holds TeamRun's license, the fonts' and the spelling dictionaries' licenses, the window's third-party licenses and `runtime-third-party.txt`.
+  That file names each third-party package with its license, the chosen one for an `OR` expression, and its license files; it ships, empty, when no third-party package does.
   Electron's and Chromium's licenses stay beside the program.
 - **Fuses.**
   The program's Electron fuses allow only what TeamRun uses:
@@ -1124,11 +1137,13 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The handoff installs the way the platform does: Windows runs the installer quietly in the existing installation's scope, macOS installs through Squirrel.Mac from the ZIP, and Linux replaces the AppImage file in place, keeping its location and launchers.
 - **macOS location.**
   A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
-  Outside one, the desktop still checks but downloads and installs nothing: About says to move TeamRun to Applications, and so does the update item while a newer version is available.
+  Outside one, the desktop still checks but downloads and installs nothing: a newer version stays available, and About and the update item say to move TeamRun to Applications; a failed check gives its reason, then the same hint.
 - **What the person sees.**
-  - **States:** up to date, checking, downloading with its progress, ready and failed, and on macOS outside an Applications folder, available.
+  - **States:** up to date, checking, downloading with its progress as a whole percentage, ready and failed, and on macOS outside an Applications folder, available.
+    An available, downloading or ready update names its version, and only an available or failed one says TeamRun must move to Applications, an available one always; the window refuses any other state.
   - **Status bar:** the update item shows only while an update is ready or failed, or on macOS outside an Applications folder while a newer version is available.
-  - **Notifications:** the shell's notification kind `shell.updateReady`, posted once per version when its update is ready, restarts to install it.
+  - **Notifications:** the shell's notification kind `shell.updateReady` restarts to install the update.
+    The desktop posts it once per version, when that version first becomes ready, and records that it did with the ready version, so neither a restart nor another window posts it again.
   - **Commands:** `shell.checkForUpdates` and `shell.restartToUpdate`, each applying only in its state, are in command search.
     Check for updates is also in Help, or on macOS in the application menu after About.
   - **About:** Settings' About page shows the version and the update's state with its action, and says why a build that cannot update doesn't.

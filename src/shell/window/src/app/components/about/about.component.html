@@ -1,0 +1,37 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<h2 class="tr-about-title">{{ version() }}</h2>
+<p class="tr-about-platform">{{ platform }}</p>
+<div class="tr-about-state">
+<div class="tr-about-update">
+  <p #statusLine class="tr-about-status" role="status" tabindex="-1">
+    <span>{{ status() }}@if (percent(); as percent) {<span aria-hidden="true">{{ percent }}</span>}</span>
+    @for (detail of details(); track $index) {
+      <span class="tr-about-detail">{{ detail }}</span>
+    }
+    @if (showsMoveHint()) {
+      <span>{{ resources.moveToApplications }}</span>
+    }
+  </p>
+  @switch (state().kind) {
+    @case (kinds.UpToDate) {
+      <button type="button" tr-button [variant]="secondary" (click)="check()">{{ resources.checkForUpdatesTitle }}</button>
+    }
+    @case (kinds.Ready) {
+      <button type="button" tr-button (click)="restart()">{{ resources.restartToUpdateLabel }}</button>
+    }
+    @case (kinds.Failed) {
+      <button type="button" tr-button [variant]="secondary" (click)="check()">{{ resources.tryAgain }}</button>
+    }
+  }
+</div>
+@if (state().kind === kinds.Downloading) {
+  <tr-progress class="tr-about-progress" [label]="progressLabel()" [value]="share()" />
+}
+</div>

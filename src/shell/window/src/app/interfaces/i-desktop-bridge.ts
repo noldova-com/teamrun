@@ -10,6 +10,7 @@ import type { JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 
 export interface IDesktopBridge {
   readonly platform: string;
+  readonly processor: string;
   readonly appearance: unknown;
 
   notifyReady(appearance: JsonObject): void;
@@ -30,6 +31,9 @@ export interface IDesktopBridge {
   openLogFolder(): Promise<boolean>;
   openLink(url: string): Promise<boolean>;
   installCommand(): Promise<boolean>;
+  readUpdate(): Promise<unknown>;
+  onUpdate(listener: (state: unknown) => void): () => void;
+  actOnUpdate(action: string): Promise<boolean>;
   keepAppearance(preferences: JsonObject): void;
   readSpelling(): Promise<unknown>;
   keepSpelling(isChecking: boolean, languages: readonly string[]): void;

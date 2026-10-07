@@ -7,13 +7,15 @@
  */
 
 import { NgComponentOutlet, NgTemplateOutlet } from "@angular/common";
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, PendingTasks, type Signal, type Type, type WritableSignal, afterNextRender, computed, inject, signal, viewChild } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ErrorHandler, PendingTasks, type Signal, type Type, type WritableSignal, afterNextRender, computed, effect, inject, signal,
+  untracked, viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { type SettingDefinition, SettingKind } from "@noldova/teamrun-shell-protocol";
 import { SelectComponent, SelectOption, TextFieldComponent, TreeComponent, TreeNode } from "@noldova/teamrun-shell-ui";
 
+import { UpdateStateKind } from "../../enums/update-state-kind";
 import { GalleryTokens } from "../../models/gallery-tokens";
 import { SettingsPage } from "../../models/settings/settings-page";
 import { ShortcutRow } from "../../models/settings/shortcut-row";
@@ -22,14 +24,17 @@ import { Resources } from "../../../resources";
 import { CommandService } from "../../services/command.service";
 import { DesktopBridgeService } from "../../services/desktop-bridge.service";
 import { ModuleStatusService } from "../../services/module-status.service";
+import { SettingsPageService } from "../../services/settings-page.service";
 import { SettingsService } from "../../services/settings.service";
 import { SpellingService } from "../../services/spelling.service";
+import { UpdateService } from "../../services/update.service";
+import { AboutComponent } from "../about/about.component";
 import { SettingRowComponent } from "../setting-row/setting-row.component";
 import { ShortcutsComponent } from "../shortcuts/shortcuts.component";
 
 @Component({
   selector: "tr-settings",
-  imports: [NgComponentOutlet, NgTemplateOutlet, SelectComponent, SettingRowComponent, ShortcutsComponent, TextFieldComponent, TreeComponent],
+  imports: [AboutComponent, NgComponentOutlet, NgTemplateOutlet, SelectComponent, SettingRowComponent, ShortcutsComponent, TextFieldComponent, TreeComponent],
   templateUrl: "./settings.component.html",
   styleUrl: "./settings.component.scss",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -55,6 +60,7 @@ export class SettingsComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly query: WritableSignal<string> = signal(String.empty);
   private readonly statuses: ModuleStatusService = inject(ModuleStatusService);
+  private readonly updates: UpdateService = inject(UpdateService);
 
   protected readonly gallery: Type<unknown> | null = inject(GalleryTokens.component);
   protected readonly spelling: SpellingService = inject(SpellingService);
@@ -66,10 +72,11 @@ export class SettingsComponent {
   protected readonly setFlags: Signal<ReadonlyMap<string, Signal<boolean>>> = computed(() =>
     new Map(this.settings.definitions().map(t => [t.name.text, this.settings.isSet(t.name.text)])));
   protected readonly isSearching: Signal<boolean> = computed(() => this.query().trim().length > 0);
-  protected readonly pages: Signal<readonly SettingsPage[]> = computed(() => [
-    ...SettingsPage.pagesOf(this.settings.definitions()),
-    ...Object.isNull(this.gallery) ? [] : [SettingsPage.galleryOf(Resources.galleryPage)]
-  ]);
+  private readonly offeredDefinitions: Signal<readonly SettingDefinition[]> = computed(() => this.updates.state().kind === UpdateStateKind.Off
+    ? this.settings.definitions().filter(t => t.page !== Resources.aboutPage)
+    : this.settings.definitions());
+  protected readonly pages: Signal<readonly SettingsPage[]> = computed(() =>
+    SettingsPage.pagesOf(this.offeredDefinitions(), Object.isNull(this.gallery) ? [] : [SettingsPage.galleryOf(Resources.galleryPage)]));
   private readonly currentTitle: Signal<string> = computed(() => this.pages().some(t => t.title === this.selected()) ? this.selected() : Resources.appearancePage);
   protected readonly currentPage: Signal<SettingsPage | undefined> = computed(() => this.pages().find(t => t.title === this.currentTitle()));
   protected readonly pageNodes: Signal<readonly TreeNode[]> = computed(() => this.pages().map(t => new TreeNode(t.title, t.title)));
@@ -98,6 +105,16 @@ export class SettingsComponent {
 
   public constructor() {
     const destroyRef = inject(DestroyRef);
+    const requests = inject(SettingsPageService);
+    effect(() => {
+      const page = requests.requested();
+      if (Object.isNull(page))
+        return;
+      untracked(() => {
+        requests.take();
+        this.select(page);
+      });
+    });
     destroyRef.onDestroy(this.bridge.onTrayAvailable(t => this.isTrayAvailable.set(t)));
     void inject(PendingTasks).run(() => this.bridge.readTrayAvailableAsync().then(t => this.isTrayAvailable.set(t), (error: unknown) => this.errors.handleError(error)));
     afterNextRender(() => {

@@ -19,8 +19,10 @@ import { DesktopBridgeFixture } from "../../../fixtures/desktop-bridge.fixture";
 import { WindowPartHostFixture } from "../../../fixtures/window-part-host.fixture";
 
 describe("StatusBarComponent", () => {
+  let bridge: DesktopBridgeFixture;
+
   beforeEach(() => {
-    DesktopBridgeFixture.install();
+    bridge = DesktopBridgeFixture.install();
     TestBed.configureTestingModule({ providers: [WindowPartHostFixture.provide()] });
   });
 
@@ -55,6 +57,21 @@ describe("StatusBarComponent", () => {
 
     expect(names(bar.children[0])).toEqual(["notes.count", "clock.zone"]);
     expect(names(bar.children[1])).toEqual(["clock.ticks", "notes.sync", "tr-notifications", "tr-module-failures"]);
+  });
+
+  it("holds the update item before the notifications bell only while the update has something to show", async () => {
+    const fixture = TestBed.createComponent(StatusBarComponent);
+    fixture.detectChanges();
+    const shown: (readonly string[])[] = [];
+    for (const [kind, mustMove] of [["Downloading", false], ["Ready", false], ["Failed", false], ["UpToDate", false], ["Available", true], ["Failed", true]] as const) {
+      bridge.publishUpdate({ kind, version: "1.3.0", progress: null, checkedAt: null, reason: null, mustMove });
+      await fixture.whenStable();
+      shown.push([...(fixture.nativeElement as HTMLElement).querySelectorAll(".tr-status-bar-right > *")].map(t => t.tagName.toLowerCase()));
+    }
+
+    const withItem = ["tr-update-item", "tr-notifications", "tr-module-failures"];
+    const withoutItem = ["tr-notifications", "tr-module-failures"];
+    expect(shown).toEqual([withoutItem, withItem, withItem, withoutItem, withItem, withItem]);
   });
 
   for (const mode of AppearanceFixture.modes)

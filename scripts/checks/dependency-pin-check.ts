@@ -25,6 +25,8 @@ export default class DependencyPinCheck implements ICheck {
   private static readonly OWN_VERSION: string = "__VERSION__";
   private static readonly EXACT_VERSION: RegExp = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
   private static readonly LINE_SEPARATOR: string = "\n";
+  private static readonly SHIPPED_SECTION: string = "dependencies";
+  private static readonly LOCKED_FOLDER: string = "node_modules/";
 
   private readonly root: string;
   private readonly files: RepositoryFiles;
@@ -40,8 +42,13 @@ export default class DependencyPinCheck implements ICheck {
     const files = await this.files.listAsync();
     const manifests = files.filter(t => path.posix.basename(t) === DependencyPinCheck.MANIFEST_NAME);
     const findings: string[] = [];
-    for (const manifest of manifests)
-      findings.push(...DependencyPinCheck.validate(manifest, await this.readTextAsync(manifest)));
+    const texts = new Map<string, string>();
+    for (const manifest of manifests) {
+      const text = await this.readTextAsync(manifest);
+      texts.set(manifest, text);
+      findings.push(...DependencyPinCheck.validate(manifest, text));
+    }
+    findings.push(...await this.validateRootPinsAsync(files, texts));
     const lockfiles = files.filter(t => path.posix.basename(t) === DependencyPinCheck.LOCKFILE_NAME);
     for (const lockfile of lockfiles)
       findings.push(...await this.validateConfigurationAsync(files, path.posix.join(path.posix.dirname(lockfile), DependencyPinCheck.CONFIGURATION_NAME)));
@@ -95,8 +102,50 @@ export default class DependencyPinCheck implements ICheck {
     return findings;
   }
 
+  private static parse(text: string | undefined): unknown {
+    try {
+      return text === undefined ? null : JSON.parse(text);
+    }
+    catch {
+      return null;
+    }
+  }
+
+  private static readRecord(value: unknown, field: string): Readonly<Record<string, unknown>> {
+    const entries = DependencyPinCheck.isRecord(value) ? value[field] : undefined;
+    return DependencyPinCheck.isRecord(entries) ? entries : {};
+  }
+
+  private static readShipped(file: string, text: string): readonly (readonly [string, string, string])[] {
+    const manifest = DependencyPinCheck.parse(text);
+    if (!DependencyPinCheck.isRecord(manifest) || typeof manifest["name"] !== "string" || !manifest["name"].startsWith(DependencyPinCheck.OWN_PREFIX))
+      return [];
+    return Object.entries(DependencyPinCheck.readRecord(manifest, DependencyPinCheck.SHIPPED_SECTION))
+      .filter((t): t is [string, string] => !t[0].startsWith(DependencyPinCheck.OWN_PREFIX) && typeof t[1] === "string")
+      .map(([name, version]) => [file, name, version] satisfies readonly [string, string, string]);
+  }
+
   private static isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
+  private async validateRootPinsAsync(files: readonly string[], texts: ReadonlyMap<string, string>): Promise<readonly string[]> {
+    const shipped = [...texts].filter(([file]) => file !== DependencyPinCheck.MANIFEST_NAME).flatMap(([file, text]) => DependencyPinCheck.readShipped(file, text));
+    if (shipped.length === 0)
+      return [];
+    const pins = DependencyPinCheck.readRecord(DependencyPinCheck.parse(texts.get(DependencyPinCheck.MANIFEST_NAME)), DependencyPinCheck.SHIPPED_SECTION);
+    const locked = files.includes(DependencyPinCheck.LOCKFILE_NAME)
+      ? DependencyPinCheck.readRecord(DependencyPinCheck.parse(await this.readTextAsync(DependencyPinCheck.LOCKFILE_NAME)), "packages")
+      : {};
+    return shipped.flatMap(([file, name, version]) => {
+      if (pins[name] !== version)
+        return [`${file}: dependencies ${name} is "${version}", so the root ${DependencyPinCheck.MANIFEST_NAME} must pin it to the same version in its dependencies; `
+          + "packaging ships it from the root lockfile."];
+      const entry = locked[`${DependencyPinCheck.LOCKED_FOLDER}${name}`];
+      const lockedVersion = DependencyPinCheck.isRecord(entry) ? entry["version"] : undefined;
+      return lockedVersion === version ? [] : [`${file}: dependencies ${name} is "${version}", but the root ${DependencyPinCheck.LOCKFILE_NAME} locks `
+        + `${typeof lockedVersion === "string" ? `version ${lockedVersion}` : "no version"} of it; run npm install.`];
+    });
   }
 
   private async validateConfigurationAsync(files: readonly string[], file: string): Promise<readonly string[]> {
