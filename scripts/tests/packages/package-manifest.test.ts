@@ -16,7 +16,7 @@ import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class PackageManifestTests {
   public static register(): void {
-    test("a manifest named for its path lists its own dependencies, sorted, and keeps external ones out", async t => {
+    test("a manifest named for its path lists its own dependencies, sorted, and its external ones with their pins apart", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
@@ -35,7 +35,9 @@ class PackageManifestTests {
       assert.equal(window.name, "@noldova/teamrun-modules-terminal-window");
       assert.equal(window.id, "modules-terminal-window");
       assert.deepEqual(window.dependencies, ["@noldova/teamrun-foundation-core", "@noldova/teamrun-shell-ui"]);
+      assert.deepEqual(window.externalDependencies, new Map([["@xterm/headless", "6.0.0"]]));
       assert.deepEqual(core.dependencies, []);
+      assert.deepEqual(core.externalDependencies, new Map());
     });
 
     test("a manifest passes its declared coverage exclusions on as JSON, and none when it declares none", async t => {
@@ -102,6 +104,7 @@ class PackageManifestTests {
           `{ ${name}, "version": "__VERSION__", "dependencies": { "@noldova/teamrun-foundation-core": "0.0.1", "@noldova/teamrun-foundation-json": "__VERSION__" } }`,
           "src/shell/ui/package.json must depend on @noldova/teamrun-foundation-core at version \"__VERSION__\"."
         ],
+        [`{ ${name}, "version": "__VERSION__", "dependencies": { "left-pad": "1.3.0", "is-odd": 3, "is-even": null } }`, "src/shell/ui/package.json must pin is-odd, is-even to an exact version."],
         [`{ ${name}, "version": "__VERSION__", "teamrun": null }`, "src/shell/ui/package.json must keep its TeamRun settings in an object."],
         [`{ ${name}, "version": "__VERSION__", "teamrun": { "coverageExclusions": "main.ts" } }`, "src/shell/ui/package.json must list its coverage exclusions in an array."],
         [`{ ${name}, "version": "__VERSION__", "teamrun": { "windowsAddons": "windows-process" } }`, "src/shell/ui/package.json must list its Windows addons in an array of kebab-case names."],

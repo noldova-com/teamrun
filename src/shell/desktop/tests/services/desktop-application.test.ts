@@ -1985,6 +1985,19 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async tellsOnlyItsOwnWindowThatUpdatesAreOffAndActsOnNoUpdate(): Promise<void> {
+    const electron = await DesktopStartFixture.startReadyAsync("linux");
+
+    const state = electron.ipcMain.invoke("teamrun:readUpdate", DesktopStartFixture.trustedEvent("linux"));
+    const refused = electron.ipcMain.invoke("teamrun:readUpdate", { sender: { id: 1 }, senderFrame: null });
+    const acted = electron.ipcMain.invoke("teamrun:updateAction", DesktopStartFixture.trustedEvent("linux"), "Check");
+
+    Assert.areEqual(JSON.stringify({ kind: "Off", version: null, progress: null, checkedAt: null, reason: null, mustMove: false }), JSON.stringify(state));
+    Assert.isNull(refused);
+    Assert.isFalse(acted as boolean);
+  }
+
+  @TestMethod
   public async pointsTheDictionaryDownloadAtItsProfilesOwnFolderAtReadyAndTakesSpellingPreferencesOnlyFromItsOwnWindow(): Promise<void> {
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);

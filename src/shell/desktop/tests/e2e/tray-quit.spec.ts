@@ -15,6 +15,7 @@ import CliFixture from "./fixtures/cli.fixture.ts";
 import ClockWorkFixture from "./fixtures/clock-work.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
+import OffCursorPlacement from "./fixtures/off-cursor-placement.ts";
 
 const HINT_REFUSED: RegExp = /The operating system did not show the hint that TeamRun is still running/;
 const PLAYWRIGHT_DEBUGGING: RegExp = /^--(inspect|remote-debugging-port)=/;
@@ -53,6 +54,21 @@ async function startAgainAsync(desktop: DesktopApplicationFixture): Promise<void
   expect(ended, `The second start ended with ${JSON.stringify(ended)} and wrote: ${errors}`).toEqual([0, null]);
 }
 
+async function moveOffCursorAsync(desktop: DesktopApplicationFixture): Promise<void> {
+  const state = await desktop.application.evaluate(({ BrowserWindow, screen }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return window === undefined ? null : { cursor: screen.getCursorScreenPoint(), bounds: window.getBounds(), displays: screen.getAllDisplays().map(t => t.bounds) };
+  });
+  if (state !== null)
+    await OffCursorPlacement.placeAsync(state.bounds, state.cursor, state.displays, target => desktop.application.evaluate(({ BrowserWindow }, next) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (window === undefined)
+        throw new Error("The window is gone.");
+      window.setBounds(next);
+      return window.getBounds();
+    }, target));
+}
+
 test.describe("closing and quitting beside the tray icon", () => {
   test("keeps running behind the tray icon or the macOS menu bar when the last window closes, quits there without one, and a quit ends every TeamRun process", async ({ desktop }) => {
     const started = JSON.parse(await CliFixture.runAsync("run", "clock.startProgram", "--json", "--data-dir", desktop.dataDirectory)) as { processId: number; childProcessId: number };
@@ -88,6 +104,7 @@ test.describe("closing and quitting beside the tray icon", () => {
 
     await startAgainAsync(desktop);
     await expect((await reopened).locator("tr-window")).toBeVisible();
+    await moveOffCursorAsync(desktop);
     await startAgainAsync(desktop);
 
     expect(await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);

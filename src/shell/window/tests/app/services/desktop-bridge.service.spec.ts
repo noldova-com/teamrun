@@ -11,6 +11,7 @@ import { TestBed } from "@angular/core/testing";
 import { JsonException } from "@noldova/teamrun-foundation-json";
 
 import { QuitChoice } from "../../../src/app/enums/quit-choice";
+import { UpdateAction } from "../../../src/app/enums/update-action";
 import { DesktopBridgeException } from "../../../src/app/exceptions/desktop-bridge.exception";
 import { RuntimeDisconnectedException } from "../../../src/app/exceptions/runtime-disconnected.exception";
 import { RuntimeRequestException } from "../../../src/app/exceptions/runtime-request.exception";
@@ -25,6 +26,7 @@ describe("DesktopBridgeService", () => {
 
   const complete = {
     platform: "linux",
+    processor: "x64",
     notifyReady: (): void => undefined,
     notifyAppearance: (): void => undefined,
     onCloseRequest: (): (() => void) => () => undefined,
@@ -43,6 +45,9 @@ describe("DesktopBridgeService", () => {
     openLogFolder: (): Promise<boolean> => Promise.resolve(true),
     openLink: (): Promise<boolean> => Promise.resolve(true),
     installCommand: (): Promise<boolean> => Promise.resolve(true),
+    readUpdate: (): Promise<unknown> => Promise.resolve(null),
+    onUpdate: (): (() => void) => () => undefined,
+    actOnUpdate: (): Promise<boolean> => Promise.resolve(true),
     keepAppearance: (): void => undefined,
     readSpelling: (): Promise<unknown> => Promise.resolve(null),
     keepSpelling: (): void => undefined,
@@ -61,6 +66,7 @@ describe("DesktopBridgeService", () => {
     ["nothing", undefined],
     ["a value that is not an object", "teamrun"],
     ["no platform", { ...complete, platform: 1 }],
+    ["no processor", { ...complete, processor: null }],
     ["no notifyReady", { ...complete, notifyReady: null }],
     ["no notifyAppearance", { ...complete, notifyAppearance: null }],
     ["no onCloseRequest", { ...complete, onCloseRequest: null }],
@@ -79,6 +85,9 @@ describe("DesktopBridgeService", () => {
     ["no openLogFolder", { ...complete, openLogFolder: null }],
     ["no openLink", { ...complete, openLink: null }],
     ["no installCommand", { ...complete, installCommand: null }],
+    ["no readUpdate", { ...complete, readUpdate: null }],
+    ["no onUpdate", { ...complete, onUpdate: null }],
+    ["no actOnUpdate", { ...complete, actOnUpdate: null }],
     ["no keepAppearance", { ...complete, keepAppearance: null }],
     ["no readSpelling", { ...complete, readSpelling: null }],
     ["no keepSpelling", { ...complete, keepSpelling: null }],
@@ -261,6 +270,23 @@ describe("DesktopBridgeService", () => {
 
     expect([build.productVersion, build.fingerprint, isCopied, isOpened, isLinkOpened, isRefusedLinkOpened, isInstalled]).toEqual(["1.2.3", "abc123", true, true, true, false, true]);
     expect([bridge.copied, bridge.logFolderOpens, bridge.links, bridge.commandInstalls]).toEqual([["clock: Failed"], 1, ["https://example.com/", "file:///etc/passwd"], 1]);
+  });
+
+  it("reads the update's state, follows its changes and acts on it through the desktop, and names the processor", async () => {
+    const bridge = DesktopBridgeFixture.install();
+    bridge.processor = "arm64";
+    bridge.update = { kind: "Ready", version: "1.3.0", progress: null, checkedAt: null, reason: null, mustMove: false };
+    const service = TestBed.inject(DesktopBridgeService);
+    const states: string[] = [];
+
+    const state = await service.readUpdateAsync();
+    const stop = service.onUpdate(t => states.push(t.kind));
+    bridge.publishUpdate({ kind: "Checking", version: null, progress: null, checkedAt: null, reason: null, mustMove: false });
+    stop();
+    bridge.publishUpdate({ kind: "UpToDate", version: null, progress: null, checkedAt: null, reason: null, mustMove: false });
+    const isDone = await service.actOnUpdateAsync(UpdateAction.Restart);
+
+    expect([state.kind, state.version, states, isDone, bridge.updateActions, service.processor]).toEqual(["Ready", "1.3.0", ["Checking"], true, ["Restart"], "arm64"]);
   });
 
   it("passes on the id of a notification opened from the operating system and ignores a blank one", () => {

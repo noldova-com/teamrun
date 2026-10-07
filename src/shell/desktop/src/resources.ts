@@ -122,6 +122,8 @@ export class Resources {
   public static readonly openLogFolderChannel: string = "teamrun:openLogFolder";
   public static readonly openLinkChannel: string = "teamrun:openLink";
   public static readonly installCommandChannel: string = "teamrun:installCommand";
+  public static readonly readUpdateChannel: string = "teamrun:readUpdate";
+  public static readonly updateActionChannel: string = "teamrun:updateAction";
   public static readonly notificationOpenedChannel: string = "teamrun:notificationOpened";
   public static readonly quitQuestionChannel: string = "teamrun:quitQuestion";
   public static readonly readTrayAvailableChannel: string = "teamrun:readTrayAvailable";
@@ -179,6 +181,12 @@ export class Resources {
   public static readonly retryAction: string = "retry";
   public static readonly kindField: string = "kind";
   public static readonly detailsField: string = "details";
+  public static readonly updateOffKind: string = "Off";
+  public static readonly updateVersionField: string = "version";
+  public static readonly updateProgressField: string = "progress";
+  public static readonly updateCheckedAtField: string = "checkedAt";
+  public static readonly updateReasonField: string = "reason";
+  public static readonly updateMustMoveField: string = "mustMove";
   public static readonly dataDirectoryArgument: string = "--data-dir=";
   public static readonly userDataArgument: string = "--user-data-dir=";
   public static readonly userDataPath: "userData" = "userData";

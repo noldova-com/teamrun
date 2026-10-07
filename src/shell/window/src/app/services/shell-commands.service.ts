@@ -18,6 +18,8 @@ import { DockSide } from "../enums/dock-side";
 import { EditAction } from "../enums/edit-action";
 import { PanelEdge } from "../enums/panel-edge";
 import { ToolbarMove } from "../enums/toolbar-move";
+import { UpdateAction } from "../enums/update-action";
+import { UpdateStateKind } from "../enums/update-state-kind";
 import { CommandContribution } from "../models/command-contribution";
 import { SideDropTarget } from "../models/layout/side-drop-target";
 import { SplitDropTarget } from "../models/layout/split-drop-target";
@@ -32,9 +34,11 @@ import { CommandSearchService } from "./command-search.service";
 import { DesktopBridgeService } from "./desktop-bridge.service";
 import { EditTargetService } from "./edit-target.service";
 import { LayoutService } from "./layout.service";
+import { SettingsPageService } from "./settings-page.service";
 import { TabFocusService } from "./tab-focus.service";
 import { ToolbarService } from "./toolbar.service";
 import { TabStripService } from "./tab-strip.service";
+import { UpdateService } from "./update.service";
 import { ViewDialogService } from "./view-dialog.service";
 
 @Injectable({ providedIn: "root" })
@@ -46,6 +50,8 @@ export class ShellCommandsService {
   private readonly bridge: DesktopBridgeService = inject(DesktopBridgeService);
   private readonly viewDialogs: ViewDialogService = inject(ViewDialogService);
   private readonly tabFocus: TabFocusService = inject(TabFocusService);
+  private readonly settingsPages: SettingsPageService = inject(SettingsPageService);
+  private readonly updates: UpdateService = inject(UpdateService);
   private readonly document: Document = inject(DOCUMENT);
   private readonly environment: EnvironmentInjector = inject(EnvironmentInjector);
 
@@ -97,10 +103,15 @@ export class ShellCommandsService {
     new CommandContribution(Resources.showCommandsCommand, Resources.showCommandsTitle, Resources.showCommandsGlyph, null,
       () => this.done(() => this.search.open())),
     new CommandContribution(Resources.openSettingsCommand, Resources.openSettingsTitle, Resources.settingsGlyph, null,
-      () => this.done(() => this.layout.openDocument(ShellDocuments.settingsTab)),
+      commandArguments => this.done(() => this.openSettings(commandArguments)),
       () => this.layout.registry().hasDocument(ShellDocuments.settings.name)),
     new CommandContribution(Resources.installCommandCommand, Resources.installCommandTitle, Resources.installCommandGlyph, null,
       () => this.bridge.installCommandAsync(), () => this.bridge.isMac, null, () => this.bridge.isMac),
+    new CommandContribution(Resources.checkForUpdatesCommand, Resources.checkForUpdatesTitle, Resources.checkForUpdatesGlyph, null,
+      () => this.done(() => this.updates.act(UpdateAction.Check)), () => this.updates.state().canCheck, null,
+      () => this.updates.state().kind !== UpdateStateKind.Off),
+    new CommandContribution(Resources.restartToUpdateCommand, Resources.restartToUpdateTitle, Resources.restartToUpdateGlyph, null,
+      () => this.done(() => this.updates.act(UpdateAction.Restart)), () => this.updates.state().canRestart, null, () => this.updates.state().canRestart),
     new CommandContribution(Resources.openModulesCommand, Resources.openModulesTitle, Resources.modulesGlyph, null,
       () => this.done(() => this.layout.openDocument(ShellDocuments.modulesTab)),
       () => this.layout.registry().hasDocument(ShellDocuments.modules.name)),
@@ -159,6 +170,14 @@ export class ShellCommandsService {
 
   public keys(platform: string): readonly (readonly [KeyChord, string])[] {
     return Resources.shellKeys.flatMap(([command, standard, mac]) => (platform === Resources.macPlatform ? mac : standard).map(t => [KeyChord.parse(t), command] as const));
+  }
+
+  private openSettings(commandArguments: JsonValue): void {
+    const page = Object.isNull(commandArguments) ? undefined : JsonReader.fromValue(commandArguments).readOptionalString(Resources.pageArgument);
+    if (Object.isUndefined(page))
+      this.layout.openDocument(ShellDocuments.settingsTab);
+    else
+      this.settingsPages.open(page);
   }
 
   private tabCommand(name: string, title: string, icon: string, run: (target: TabTarget) => void, isEnabled: (target: TabTarget) => boolean,
