@@ -15,6 +15,7 @@ export class DesktopApiTests {
   public exportsTheCompleteRuntimeSurface(): void {
     Assert.areEqual(
       JSON.stringify([
+        "AppImageReplacement",
         "AppImageRestart",
         "ChildProgramHost",
         "CloseCoordinator",
@@ -57,6 +58,7 @@ export class DesktopApiTests {
         "TrayHostWatcher",
         "UpdateBarrierGate",
         "UpdateBarrierWatch",
+        "UpdateHandoffException",
         "UpdateSaveCoordinator",
         "UpdateStop",
         "UpdateStopException",

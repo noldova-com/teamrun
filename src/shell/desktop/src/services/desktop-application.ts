@@ -17,7 +17,7 @@ import "@noldova/teamrun-foundation-core";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   type Event, Failure, FailureCode, NotificationBroadcast, NotificationState, NotificationsQuery, QualifiedName, RecentCommands, Response, type RuntimeHandover, SettingChange, SettingKey,
-  SettingValue, ShellEvents, ShellMethods, StayedOpen, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
+  SettingValue, ShellEvents, ShellMethods, QuitAnswered, StopPolicy, StopRequest, WindowStateKey, WindowStateValue, WindowStateWrite, WorkReport
 } from "@noldova/teamrun-shell-protocol";
 import {
   AppImageSource,
@@ -140,6 +140,7 @@ export class DesktopApplication {
   private isReady: boolean = false;
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
+  private runtimeQuit: Promise<void> | null = null;
   private trayCloseHint: ISystemNotification | null = null;
 
   private constructor(
@@ -466,7 +467,9 @@ export class DesktopApplication {
 
   private forward(event: Event): void {
     if (event.name.text === ShellEvents.quitting.text) {
-      void this.quitForRuntimeAsync();
+      this.runtimeQuit ??= this.quitForRuntimeAsync().finally(() => {
+        this.runtimeQuit = null;
+      });
       return;
     }
     if (event.name.text === ShellEvents.work.text)
@@ -484,9 +487,9 @@ export class DesktopApplication {
   private async quitForRuntimeAsync(): Promise<void> {
     if (this.isExiting)
       return;
-    const cause = await this.quitFlow.quitAsync();
-    if (!Object.isNull(cause))
-      await this.callAsync(ShellMethods.stayedOpen, new StayedOpen(cause).toJson());
+    const answer = await this.quitFlow.quitAsync();
+    if (!Object.isNull(answer))
+      await this.callAsync(ShellMethods.quitAnswered, new QuitAnswered(answer).toJson());
   }
 
   private changeTrayHost(isAvailable: boolean): void {

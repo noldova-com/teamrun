@@ -920,6 +920,14 @@ export class Resources {
     return `${productName} stayed open: a window could not save.`;
   }
 
+  public static formatQuitUnanswered(productName: string): string {
+    return `${productName} did not say whether it quit: its desktop's connection ended before it answered.`;
+  }
+
+  public static formatQuitInterrupted(productName: string): string {
+    return `${productName} did not say whether it quit: its runtime stopped before the desktop answered.`;
+  }
+
   public static formatClientNotAnswered(client: string): string {
     return `A ${client} client did not answer in time.`;
   }

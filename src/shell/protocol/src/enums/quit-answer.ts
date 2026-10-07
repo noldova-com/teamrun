@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum StayCause {
-  Kept = "Kept",
+export enum QuitAnswer {
+  Stayed = "Stayed",
   SaveFailed = "SaveFailed"
 }

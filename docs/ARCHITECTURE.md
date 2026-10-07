@@ -849,9 +849,13 @@ Before TeamRun quits, restarts for an update or stops for a newer build (section
 
 Closing the last window quits TeamRun, except on macOS and while the tray icon shows (section 8), where the window closes once it has saved and TeamRun keeps running.
 Quitting, from the last window, the tray icon, the menu, the command line or the operating system, first has every window save, then asks the runtime to stop only if idle and to keep running while another client uses it (section 6).
-On Linux and macOS the desktop quits this way on SIGTERM and on SIGHUP, which a terminal it was started from sends when it closes; the runtime stops on SIGINT, SIGTERM and SIGHUP alike.
+On Linux and macOS the desktop quits this way on SIGTERM, and on SIGHUP when the terminal whose session it leads closes; the runtime stops on SIGINT, SIGTERM and SIGHUP alike.
+On Linux, a desktop started as a shell's job in a terminal shares its process group with its Chromium processes, so the hang-up of that terminal closing ends those processes too, and the desktop ends without saving what its windows had not saved.
 The command line's `teamrun quit` reaches the desktop through the runtime: it asks with `shell.quit`, the runtime announces `shell.quitting`, and the desktop quits as above.
-A desktop that stays open answers `shell.stayedOpen` with why, and the runtime answers the command line once the desktop's connection ends or the runtime begins to stop.
+A desktop that stays open answers `shell.quitAnswered` with why.
+A desktop that quits asks the runtime to stop, and the runtime counts the stop it accepts as the desktop's answer, since that stop can end the runtime at once.
+Once it has that answer, the runtime tells the command line that TeamRun quit when the desktop's connection ends or the runtime begins to stop.
+Without it, a desktop whose connection ends, or a runtime that stops for another reason, leaves the command line with `Unavailable`, since nobody can tell whether TeamRun quit.
 While the command line waits, its connection does not count as another client using the runtime, so an idle runtime stops with the desktop.
 A runtime that is kept, stops or cannot be reached lets TeamRun quit at once.
 Electron sends no `before-quit` when Windows shuts down or the person signs out, so TeamRun then ends without saving first or asking, and what the windows saved before stands.
@@ -1169,6 +1173,13 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
 The updater and the desktop's update stop divide an update at the person's Restart to update:
 
 - The updater owns checking the feed, downloading, validating, the update's states and everything the person sees of them, and the handoff, which replaces the application files the way its platform does.
+  The handoff is the desktop's own step for each platform, never the update library's install, which would quit the desktop itself and name no process:
+  - Right before it, the download's size and SHA-512 are checked again, and on Windows the installer's signature by the publisher, so a file changed after its download is never installed.
+  - Windows starts the installer quietly, without the desktop's inherited handles, and names it as the process that took the handoff.
+  - macOS has Squirrel.Mac install from the ZIP and names its ShipIt process, which replaces the application once the desktop has quit.
+  - Linux copies the download to a file with a unique name beside the AppImage, created only when no file has that name, gives it the AppImage's permissions, flushes it to disk and renames it over the AppImage, following a link to the file it names.
+    So the AppImage is always one whole version, and no process takes the handoff.
+    A folder that cannot be written refuses the handoff, and any failure removes the copy and leaves the AppImage as it was.
 - The update stop owns everything from the work question to the handoff: it stops every process of the installation, as [Stopping for an update](#stopping-for-an-update) describes, and then calls the handoff.
 - On Windows and macOS the platform's installer starts the new version.
   After an AppImage update the update stop starts it, once the old process has exited, from outside the old AppImage and without its open descriptors, because a process holding the old version's files keeps the replaced AppImage mounted.

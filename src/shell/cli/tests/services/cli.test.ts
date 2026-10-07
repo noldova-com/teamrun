@@ -11,7 +11,7 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod, Wait } from "@noldova/teamrun-foundation-testing";
-import { type Event, ShellClients, ShellEvents, ShellMethods, StayCause, StayedOpen } from "@noldova/teamrun-shell-protocol";
+import { type Event, QuitAnswer, QuitAnswered, ShellClients, ShellEvents, ShellMethods, StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
 import { DataDirectory, DiscoveryReader, Endpoint, RuntimeBuild, RuntimeClient } from "@noldova/teamrun-shell-runtime";
 
 import { CliFixture } from "../fixtures/cli.fixture.js";
@@ -122,23 +122,27 @@ export class CliTests {
     await fixture.startHostAsync(build.declarationsFile);
 
     const noDesktop = [await fixture.runAsync(fixture.withDataDirectory(["quit"])), await fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]))];
-    const causes: (StayCause | null)[] = [StayCause.Kept, StayCause.SaveFailed, null];
+    const answers: (QuitAnswer | null)[] = [QuitAnswer.Stayed, QuitAnswer.SaveFailed, null];
     await CliTests.connectDesktopAsync(fixture, t => {
-      const cause = causes.shift() ?? null;
-      if (cause === null)
+      const answer = answers.shift() ?? null;
+      if (answer === null)
         t.close();
       else
-        void t.callAsync(ShellMethods.stayedOpen, new StayedOpen(cause).toJson());
+        void t.callAsync(ShellMethods.quitAnswered, new QuitAnswered(answer).toJson());
     });
     const kept = await fixture.runAsync(fixture.withDataDirectory(["quit"]));
     const saveFailed = await fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]));
-    const quit = [await fixture.runAsync(fixture.withDataDirectory(["quit"])), await fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]))];
+    const unanswered = await fixture.runAsync(fixture.withDataDirectory(["quit"]));
+    await CliTests.connectDesktopAsync(fixture, t => void t.callAsync(ShellMethods.stop, new StopRequest(StopPolicy.IfIdle, true).toJson()));
+    const quit = await fixture.runAsync(fixture.withDataDirectory(["quit"]));
+    const afterQuit = await fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]));
 
     Assert.areEqual(`3|No runtime is running for ${fixture.dataDirectory}.\n`, `${noRuntime.code}|${noRuntime.error}`);
-    Assert.areEqual("0|TeamRun is not running.\n|0|{\"outcome\":\"NoDesktop\"}\n", noDesktop.map(t => `${t.code}|${t.output}`).join("|"));
+    Assert.areEqual("0|No desktop is running.\n|0|{\"outcome\":\"NoDesktop\"}\n", noDesktop.map(t => `${t.code}|${t.output}`).join("|"));
     Assert.areEqual("6|TeamRun stayed open: it was kept open while work was in progress.\n", `${kept.code}|${kept.error}`);
     Assert.areEqual("1|{\"code\":\"Conflict\",\"message\":\"TeamRun stayed open: a window could not save.\"}\n", `${saveFailed.code}|${saveFailed.error}`);
-    Assert.areEqual("0|TeamRun quit.\n|0|{\"outcome\":\"NoDesktop\"}\n", quit.map(t => `${t.code}|${t.output}`).join("|"));
+    Assert.areEqual("1|TeamRun did not say whether it quit: its desktop's connection ended before it answered.\n", `${unanswered.code}|${unanswered.error}`);
+    Assert.areEqual("0|TeamRun quit.\n|3", `${quit.code}|${quit.output}|${afterQuit.code}`);
   }
 
   @TestMethod

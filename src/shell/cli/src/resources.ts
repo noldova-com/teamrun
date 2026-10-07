@@ -200,7 +200,7 @@ export class Resources {
   }
 
   public static get noDesktop(): string {
-    return `${Resources.productName} is not running.`;
+    return "No desktop is running.";
   }
 
   public static formatOpened(root: string): string {
