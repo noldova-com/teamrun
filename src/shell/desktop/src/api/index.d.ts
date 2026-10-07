@@ -18,7 +18,7 @@ import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Prov
 
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
+import type { Event, NotificationBroadcast, QualifiedName, QuitAnswer, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
 import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, IWindowsProcessApi, LaunchException, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
@@ -857,6 +857,53 @@ export declare class AppImageRestart {
 }
 
 /**
+ * The Windows handoff of an update: checks the downloaded installer's signature by the publisher again, right before
+ * starting it, so a file changed after its download is never run, then starts it quietly with the arguments of an
+ * update, `--updated /S --force-run`, so it keeps the existing installation's folder and scope and starts the new
+ * version once it has installed it. The installer starts detached, through a starter that gives it none of the
+ * desktop's inherited handles, and its process is the one that takes the handoff.
+ */
+export declare class InstallerStart {
+  /**
+   * Creates the installer's start.
+   *
+   * @param starter Starts the installer detached; the desktop's `UtilityProcessStarter`.
+   * @param verifyAsync Checks the installer's signature by the publisher, resolving `null` when it is valid and
+   * otherwise the reason it is not.
+   * @param environment The environment the installer starts with.
+   * @param errorFile The file the installer's standard error is appended to.
+   * @example
+   * ```ts
+   * import { InstallerStart } from "@noldova/teamrun-shell-desktop";
+   * import { ChildProcessStarter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function create(verifyAsync: (installer: string) => Promise<string | null>, errorFile: string): InstallerStart {
+   *   return new InstallerStart(new ChildProcessStarter(), verifyAsync, process.env, errorFile);
+   * }
+   * ```
+   */
+  public constructor(starter: IProcessStarter, verifyAsync: (installer: string) => Promise<string | null>, environment: NodeJS.ProcessEnv, errorFile: string);
+
+  /**
+   * Checks the installer's signature and starts it.
+   *
+   * @param installer The downloaded installer of the new version.
+   * @returns The installer's process id.
+   * @throws {UpdateHandoffException} Rejected with the reason when the installer is not signed by the publisher, in
+   * which case it is not started, or when it cannot be started.
+   * @example
+   * ```ts
+   * import type { InstallerStart } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function handOffAsync(start: InstallerStart, installer: string): Promise<number> {
+   *   return start.startAsync(installer);
+   * }
+   * ```
+   */
+  public startAsync(installer: string): Promise<number>;
+}
+
+/**
  * Asks the person, while TeamRun quits and the runtime has work in progress, whether to wait for the work or stop it,
  * and decides from the answer and the runtime's reports of its work. Reading the work is bounded once; when it fails or
  * times out, quitting goes ahead as it would without work. Reports carry a sequence, so a report heard before an older
@@ -1006,17 +1053,19 @@ export declare class QuitFlow implements ICloseGuard {
   /**
    * Quits TeamRun, or joins the quit already running.
    *
-   * @returns A promise that settles once TeamRun exits or stays open.
+   * @returns A promise of `null` once TeamRun exits, or of why it stayed open: `Stayed` when the person kept it open,
+   * `SaveFailed` when a window could not save.
    * @example
    * ```ts
+   * import type { QuitAnswer } from "@noldova/teamrun-shell-protocol";
    * import type { QuitFlow } from "@noldova/teamrun-shell-desktop";
    *
-   * export function quitAsync(flow: QuitFlow): Promise<void> {
+   * export function quitAsync(flow: QuitFlow): Promise<QuitAnswer | null> {
    *   return flow.quitAsync();
    * }
    * ```
    */
-  public quitAsync(): Promise<void>;
+  public quitAsync(): Promise<QuitAnswer | null>;
 }
 
 /**

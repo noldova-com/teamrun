@@ -7,7 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import { ShellMethods } from "@noldova/teamrun-shell-protocol";
+import { ShellClients, ShellMethods } from "@noldova/teamrun-shell-protocol";
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
 import { MainProcessFailureKind } from "./enums/main-process-failure-kind.js";
@@ -173,7 +173,7 @@ export class Resources {
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
   public static readonly layoutNotObject: string = "The layout must be a JSON object.";
-  public static readonly clientName: string = "desktop";
+  public static readonly clientName: string = ShellClients.desktop;
   public static readonly handoffRole: string = "handoff";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
@@ -353,6 +353,15 @@ export class Resources {
 
   public static formatAppImageNotReplaced(image: string, reason: string): string {
     return `The AppImage ${image} could not be replaced with the update and was left as it was: ${reason}`;
+  }
+
+  public static readonly installerArguments: readonly string[] = ["--updated", "/S", "--force-run"];
+  public static formatInstallerUnsigned(installer: string, reason: string): string {
+    return `The update's installer ${installer} is not signed by the publisher, so it was not started: ${reason}`;
+  }
+
+  public static formatInstallerNotStarted(installer: string, reason: string): string {
+    return `The update's installer ${installer} could not be started: ${reason}`;
   }
 
   public static readonly desktopFileSuffix: string = ".desktop";

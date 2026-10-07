@@ -241,6 +241,99 @@ export declare enum ToolbarOrientation {
 }
 
 /**
+ * What a {@link VirtualListSource} tells the objects that observe it once its
+ * items change. The kit's list observes its source itself; a module
+ * implements this only to follow a source outside a list.
+ */
+export interface IVirtualListObserver {
+  /**
+   * Called once items were added, after the source's length grew.
+   *
+   * @param at The position of the first added item; the items that were at
+   * that position or after it now sit `count` positions later.
+   * @param count How many items were added, 1 or more.
+   * @example
+   * ```ts
+   * import type { IVirtualListObserver } from "@noldova/teamrun-shell-ui";
+   *
+   * export class LengthLog implements IVirtualListObserver {
+   *   public readonly lines: string[] = [];
+   *
+   *   public onInserted(at: number, count: number): void {
+   *     this.lines.push(`${count} added at ${at}`);
+   *   }
+   *
+   *   public onRemoved(at: number, count: number): void {
+   *     this.lines.push(`${count} removed at ${at}`);
+   *   }
+   *
+   *   public onUpdated(at: number, count: number): void {
+   *     this.lines.push(`${count} changed at ${at}`);
+   *   }
+   * }
+   * ```
+   */
+  onInserted(at: number, count: number): void;
+
+  /**
+   * Called once items were removed, after the source's length shrank.
+   *
+   * @param at The position the first removed item had; the items after the
+   * removed ones now sit `count` positions earlier.
+   * @param count How many items were removed, 1 or more.
+   * @example
+   * ```ts
+   * import type { IVirtualListObserver } from "@noldova/teamrun-shell-ui";
+   *
+   * export class RemovalCounter implements IVirtualListObserver {
+   *   public removed: number = 0;
+   *
+   *   public onInserted(): void {
+   *   }
+   *
+   *   public onRemoved(_: number, count: number): void {
+   *     this.removed += count;
+   *   }
+   *
+   *   public onUpdated(): void {
+   *   }
+   * }
+   * ```
+   */
+  onRemoved(at: number, count: number): void;
+
+  /**
+   * Called once items changed in place: their positions and the length stay,
+   * and their content must be read again.
+   *
+   * @param at The position of the first changed item.
+   * @param count How many items in a row changed, 1 or more.
+   * @example
+   * ```ts
+   * import type { IVirtualListObserver } from "@noldova/teamrun-shell-ui";
+   *
+   * export class StaleMarker implements IVirtualListObserver {
+   *   public readonly stale: Set<number> = new Set();
+   *
+   *   public onInserted(): void {
+   *     this.stale.clear();
+   *   }
+   *
+   *   public onRemoved(): void {
+   *     this.stale.clear();
+   *   }
+   *
+   *   public onUpdated(at: number, count: number): void {
+   *     for (let index = at; index < at + count; index++)
+   *       this.stale.add(index);
+   *   }
+   * }
+   * ```
+   */
+  onUpdated(at: number, count: number): void;
+}
+
+/**
  * A floating pane, such as a menu, a popover, a tooltip or a dropdown, that
  * opens against an origin element and stays beside it. It places the pane on
  * the side the anchoring asks for when the pane fits there within the bounds
@@ -585,6 +678,134 @@ export declare class AppearanceService {
    * ```
    */
   public setTypography(typography: Typography): void;
+}
+
+/**
+ * A {@link VirtualListSource} over items held in memory, for short lists,
+ * demonstrations and tests. It keeps its own copy of the items and reports
+ * each change it makes to the objects that observe it.
+ *
+ * @typeParam T The type of the items.
+ */
+export declare class ArrayVirtualListSource<T> extends VirtualListSource<T> {
+  /**
+   * Creates the source with a copy of the items.
+   *
+   * @param items The items, first to last.
+   * @param keyOf Gives an item's key, which stays the same while the item
+   * exists and differs from every other item's.
+   * @param estimate The height in CSS pixels a row takes until it is
+   * measured, above 0; 120 when left out.
+   * @throws VirtualListException synchronously when the estimate is not a
+   * number above 0.
+   * @example
+   * ```ts
+   * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export const files: ArrayVirtualListSource<string> = new ArrayVirtualListSource(["README.md", "package.json"], t => t, 26);
+   * ```
+   */
+  public constructor(items: readonly T[], keyOf: (item: T) => string, estimate?: number);
+
+  /**
+   * Reads the items from one position up to another.
+   *
+   * @param start The position of the first item to read.
+   * @param end The position after the last item to read.
+   * @returns A promise of the items from `start` up to, but not including,
+   * `end`, which the list does not change.
+   * @example
+   * ```ts
+   * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export async function readFirstAsync(): Promise<readonly string[]> {
+   *   const source = new ArrayVirtualListSource(["a", "b", "c"], t => t);
+   *   return await source.readAsync(0, 2);
+   * }
+   * ```
+   */
+  public readAsync(start: number, end: number): Promise<readonly T[]>;
+
+  /**
+   * Gives an item's key through the function the source was created with.
+   *
+   * @param item One of the source's items.
+   * @returns The item's key.
+   * @example
+   * ```ts
+   * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export const key: string = new ArrayVirtualListSource([{ id: "m1", text: "Hello" }], t => t.id).keyOf({ id: "m1", text: "Hello" });
+   * ```
+   */
+  public keyOf(item: T): string;
+
+  /**
+   * Adds items at a position and reports them as inserted.
+   *
+   * @param at The position of the first new item, from 0 to the length; the
+   * items from there on move after the new ones.
+   * @param items The items to add, at least one.
+   * @throws VirtualListException synchronously when the position is outside
+   * the list or there are no items; the source is then unchanged.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
+   * @example
+   * ```ts
+   * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export function appendReply(messages: ArrayVirtualListSource<string>, reply: string): void {
+   *   messages.insert(messages.length(), [reply]);
+   * }
+   * ```
+   */
+  public insert(at: number, items: readonly T[]): void;
+
+  /**
+   * Removes items from a position and reports them as removed.
+   *
+   * @param at The position of the first item to remove.
+   * @param count How many items to remove, 1 or more, all inside the list.
+   * @throws VirtualListException synchronously when the items are not all
+   * inside the list or the count is not 1 or more; the source is then
+   * unchanged.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
+   * @example
+   * ```ts
+   * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export function dropOldest(messages: ArrayVirtualListSource<string>): void {
+   *   messages.remove(0, 1);
+   * }
+   * ```
+   */
+  public remove(at: number, count: number): void;
+
+  /**
+   * Replaces items in place and reports them as updated.
+   *
+   * @param at The position of the first item to replace.
+   * @param items The new items, at least one, which replace as many items
+   * from `at` on, all inside the list.
+   * @throws VirtualListException synchronously when the replaced items are
+   * not all inside the list or there are no items; the source is then
+   * unchanged.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
+   * @example
+   * ```ts
+   * import { ArrayVirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export function growLast(messages: ArrayVirtualListSource<string>, text: string): void {
+   *   messages.replace(messages.length() - 1, [text]);
+   * }
+   * ```
+   */
+  public replace(at: number, items: readonly T[]): void;
 }
 
 /**
@@ -4234,4 +4455,264 @@ export declare class ViewBadgeComponent {
    * null when not bound.
    */
   public readonly count: InputSignal<number | null>;
+}
+
+/**
+ * The exception a {@link VirtualListSource} throws for a length, an estimate
+ * or a change that does not fit the list, and that the kit's list reports
+ * when a source answers a read with the wrong number of items.
+ */
+export declare class VirtualListException extends Exception {
+  /**
+   * The exception's name, `"VirtualListException"`, which the class sets
+   * itself so that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message A sentence naming the values and why they don't fit.
+   * @example
+   * ```ts
+   * import { VirtualListException } from "@noldova/teamrun-shell-ui";
+   *
+   * export const refused: VirtualListException = new VirtualListException("2 items from 9 are not in a list of 10.");
+   * ```
+   */
+  public constructor(message: string);
+}
+
+/**
+ * The items of a long list, which a module supplies to the kit's list by
+ * position, such as items 4,000 to 4,049, while it keeps them in its own
+ * storage. The list reads only the items near its view, a few pages at a
+ * time, and drops those it no longer shows; it keeps the height of every
+ * item it measured but none of their content.
+ *
+ * A subclass answers {@link VirtualListSource.readAsync} and
+ * {@link VirtualListSource.keyOf}, and reports every change to its items
+ * with {@link VirtualListSource.reportInserted},
+ * {@link VirtualListSource.reportRemoved} or
+ * {@link VirtualListSource.reportUpdated} once it is made, so the list
+ * reads them again. Positions run from 0 to the length less 1 and name
+ * the same item until a change moves it.
+ *
+ * @typeParam T The type of the items.
+ */
+export declare abstract class VirtualListSource<T> {
+  /**
+   * How many items the list has, which grows and shrinks with the changes
+   * the source reports.
+   */
+  public readonly length: Signal<number>;
+
+  /**
+   * The height in CSS pixels a row takes until it is measured.
+   */
+  public readonly estimate: number;
+
+  /**
+   * Creates the source with its length.
+   *
+   * @param length How many items the list has, a whole number of 0 or more.
+   * @param estimate The height in CSS pixels a row takes until it is
+   * measured, above 0; 120 when left out.
+   * @throws VirtualListException synchronously when the length is not a
+   * whole number of 0 or more, or the estimate is not a number above 0.
+   * @example
+   * ```ts
+   * import { VirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export class LineSource extends VirtualListSource<string> {
+   *   private readonly lines: readonly string[];
+   *
+   *   public constructor(lines: readonly string[]) {
+   *     super(lines.length, 20);
+   *     this.lines = lines;
+   *   }
+   *
+   *   public readAsync(start: number, end: number): Promise<readonly string[]> {
+   *     return Promise.resolve(this.lines.slice(start, end));
+   *   }
+   *
+   *   public keyOf(item: string): string {
+   *     return item;
+   *   }
+   * }
+   * ```
+   */
+  public constructor(length: number, estimate?: number);
+
+  /**
+   * Reads the items from one position up to another. The list calls it for
+   * a page at a time and never for a range outside the list.
+   *
+   * @param start The position of the first item to read.
+   * @param end The position after the last item to read, above `start`.
+   * @param abort Aborts once the list no longer needs the items, such as
+   * when the person has scrolled away or the items changed; the source may
+   * stop reading then, and the list ignores whatever it answers.
+   * @returns A promise of exactly `end - start` items in order, which the
+   * list keeps while it shows them and does not change. A rejection, or an
+   * exception the call throws, shows the items as not loaded, with a way to
+   * try again; an answer with another number of items is treated as a
+   * {@link VirtualListException}.
+   * @example
+   * ```ts
+   * import { VirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export interface IMessageStore {
+   *   countMessages(): number;
+   *   readMessagesAsync(start: number, end: number, abort: AbortSignal): Promise<readonly string[]>;
+   * }
+   *
+   * export class MessageSource extends VirtualListSource<string> {
+   *   private readonly store: IMessageStore;
+   *
+   *   public constructor(store: IMessageStore) {
+   *     super(store.countMessages());
+   *     this.store = store;
+   *   }
+   *
+   *   public readAsync(start: number, end: number, abort: AbortSignal): Promise<readonly string[]> {
+   *     return this.store.readMessagesAsync(start, end, abort);
+   *   }
+   *
+   *   public keyOf(item: string): string {
+   *     return item;
+   *   }
+   * }
+   * ```
+   */
+  public abstract readAsync(start: number, end: number, abort: AbortSignal): Promise<readonly T[]>;
+
+  /**
+   * Gives an item's key, which stays the same while the item exists and
+   * differs from every other item's, so a row keeps its state, such as its
+   * focus, while the list moves it.
+   *
+   * @param item One of the items the source answered.
+   * @returns The item's key.
+   * @example
+   * ```ts
+   * import { VirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export class NoteSource extends VirtualListSource<{ readonly id: string; readonly text: string }> {
+   *   public readAsync(): Promise<readonly { readonly id: string; readonly text: string }[]> {
+   *     return Promise.resolve([]);
+   *   }
+   *
+   *   public keyOf(item: { readonly id: string; readonly text: string }): string {
+   *     return item.id;
+   *   }
+   * }
+   * ```
+   */
+  public abstract keyOf(item: T): string;
+
+  /**
+   * Starts telling an observer about the changes the source reports, in the
+   * order the observers started; observing twice is observing once.
+   *
+   * @param observer The observer, which the source keeps until it stops
+   * observing.
+   * @example
+   * ```ts
+   * import { ArrayVirtualListSource, type IVirtualListObserver } from "@noldova/teamrun-shell-ui";
+   *
+   * export function follow(source: ArrayVirtualListSource<string>, observer: IVirtualListObserver): void {
+   *   source.observe(observer);
+   * }
+   * ```
+   */
+  public observe(observer: IVirtualListObserver): void;
+
+  /**
+   * Stops telling an observer about changes and lets the source drop it;
+   * an observer that wasn't observing is left alone.
+   *
+   * @param observer The observer.
+   * @example
+   * ```ts
+   * import { ArrayVirtualListSource, type IVirtualListObserver } from "@noldova/teamrun-shell-ui";
+   *
+   * export function stopFollowing(source: ArrayVirtualListSource<string>, observer: IVirtualListObserver): void {
+   *   source.unobserve(observer);
+   * }
+   * ```
+   */
+  public unobserve(observer: IVirtualListObserver): void;
+
+  /**
+   * Reports items added to the source's storage: the length grows by the
+   * count, then each observer is told.
+   *
+   * @param at The position of the first added item, from 0 to the length
+   * before the change.
+   * @param count How many items were added, a whole number of 1 or more.
+   * @throws VirtualListException synchronously when the position is outside
+   * the list or the count is not a whole number of 1 or more; nothing
+   * changes then.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
+   * @example
+   * ```ts
+   * import type { VirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export function reportOlderHistory(source: VirtualListSource<string>, count: number): void {
+   *   source.reportInserted(0, count);
+   * }
+   * ```
+   */
+  public reportInserted(at: number, count: number): void;
+
+  /**
+   * Reports items removed from the source's storage: the length shrinks by
+   * the count, then each observer is told.
+   *
+   * @param at The position the first removed item had.
+   * @param count How many items were removed, a whole number of 1 or more,
+   * all of them inside the list before the change.
+   * @throws VirtualListException synchronously when the items were not all
+   * inside the list or the count is not a whole number of 1 or more;
+   * nothing changes then.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
+   * @example
+   * ```ts
+   * import type { VirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export function reportRewound(source: VirtualListSource<string>, from: number): void {
+   *   source.reportRemoved(from, source.length() - from);
+   * }
+   * ```
+   */
+  public reportRemoved(at: number, count: number): void;
+
+  /**
+   * Reports items changed in place, such as a message that grew while it
+   * streamed: each observer is told, and the list reads them again, showing
+   * the items it had until the new ones arrive.
+   *
+   * @param at The position of the first changed item.
+   * @param count How many items in a row changed, a whole number of 1 or
+   * more, all of them inside the list.
+   * @throws VirtualListException synchronously when the items are not all
+   * inside the list or the count is not a whole number of 1 or more.
+   * @throws Whatever an observer threw, synchronously, once every observer
+   * was told; the change stays made, and the error is the first observer's
+   * when several throw.
+   * @example
+   * ```ts
+   * import type { VirtualListSource } from "@noldova/teamrun-shell-ui";
+   *
+   * export function reportStreamed(source: VirtualListSource<string>): void {
+   *   source.reportUpdated(source.length() - 1, 1);
+   * }
+   * ```
+   */
+  public reportUpdated(at: number, count: number): void;
 }
