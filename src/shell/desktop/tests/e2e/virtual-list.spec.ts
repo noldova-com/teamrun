@@ -11,6 +11,8 @@ import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 
+const overscan = 600;
+
 interface IFrameRecord {
   readonly gaps: readonly number[];
   readonly longFrames: readonly number[] | null;
@@ -84,10 +86,10 @@ async function scrollFramesAsync(target: Locator, steps: number, delta: number, 
 }
 
 async function rowBoundAsync(target: Locator): Promise<number> {
-  return viewport(target).evaluate(element => {
+  return viewport(target).evaluate((element, margin) => {
     const heights = [...element.querySelectorAll("[data-tr-row]")].map(t => t.getBoundingClientRect().height).filter(t => t > 0);
-    return Math.ceil((element.clientHeight + 2 * 600) / Math.min(...heights)) + 2;
-  });
+    return Math.ceil((element.clientHeight + 2 * margin) / Math.min(...heights)) + 2;
+  }, overscan);
 }
 
 async function endDistanceAsync(target: Locator): Promise<number> {
