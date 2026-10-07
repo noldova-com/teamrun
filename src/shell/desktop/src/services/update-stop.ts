@@ -14,6 +14,7 @@ import { ConnectionException, type Installation, type ProcessPresence, UpdateBar
 import { UpdateStopException } from "../exceptions/update-stop.exception.js";
 import type { IUpdateTarget } from "../interfaces/i-update-target.js";
 import { Resources } from "../resources.js";
+import type { AppImageRestart } from "./app-image-restart.js";
 
 export class UpdateStop {
   private readonly installation: Installation;
@@ -24,6 +25,7 @@ export class UpdateStop {
   private readonly productVersion: string;
   private readonly now: () => number;
   private readonly wait: (milliseconds: number) => Promise<void>;
+  private readonly restart: AppImageRestart | null;
 
   public constructor(
     installation: Installation,
@@ -33,7 +35,8 @@ export class UpdateStop {
     processId: number,
     productVersion: string,
     now: () => number,
-    wait: (milliseconds: number) => Promise<void>) {
+    wait: (milliseconds: number) => Promise<void>,
+    restart: AppImageRestart | null) {
     this.installation = installation;
     this.presence = presence;
     this.connectAsync = connectAsync;
@@ -42,6 +45,7 @@ export class UpdateStop {
     this.productVersion = productVersion;
     this.now = now;
     this.wait = wait;
+    this.restart = restart;
   }
 
   public async runAsync(version: string, handOffAsync: () => Promise<number | null>): Promise<boolean> {
@@ -71,12 +75,15 @@ export class UpdateStop {
       await this.installation.replaceAsync(new UpdateBarrier(holder, version, UpdateBarrierState.Closing, null));
       await this.verifyAsync(await this.listOtherDesktopsAsync(processes));
       await this.installation.replaceAsync(new UpdateBarrier(holder, version, UpdateBarrierState.HandedOff, null));
+      await this.restart?.startAsync();
       const successor = await handOffAsync();
       isHandedOff = true;
       await this.recordHandoffAsync(holder, version, successor);
       return true;
     }
     catch (error) {
+      if (!isHandedOff)
+        this.restart?.cancel();
       if (isHeld && !isHandedOff)
         await this.installation.releaseAsync();
       throw error instanceof UpdateStopException ? error : new UpdateStopException(error instanceof Error ? error.message : String(error), new ExceptionOptions(error));

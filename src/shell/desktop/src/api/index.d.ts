@@ -406,17 +406,20 @@ export declare class UpdateStop {
    * @param productVersion The coordinating desktop's product version.
    * @param now Reads the current time, in milliseconds.
    * @param wait Resolves after the given number of milliseconds.
+   * @param restart Starts the replaced AppImage once this desktop has exited, or `null` when the desktop does not run
+   * from an AppImage.
    * @example
    * ```ts
    * import { setTimeout as delay } from "node:timers/promises";
    *
-   * import { UpdateStop } from "@noldova/teamrun-shell-desktop";
-   * import { type Installation, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
+   * import { AppImageRestart, UpdateStop } from "@noldova/teamrun-shell-desktop";
+   * import { ChildProcessStarter, type Installation, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
    *
-   * export function create(installation: Installation): UpdateStop {
+   * export function create(installation: Installation, errorFile: string): UpdateStop {
+   *   const restart = AppImageRestart.find(process.platform, process.env, process.execPath, process.argv.slice(1), new ChildProcessStarter(), process.pid, errorFile);
    *   return new UpdateStop(
    *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(null),
-   *     process.pid, "0.2.0", Date.now, t => delay(t));
+   *     process.pid, "0.2.0", Date.now, t => delay(t), restart);
    * }
    * ```
    */
@@ -428,7 +431,8 @@ export declare class UpdateStop {
     processId: number,
     productVersion: string,
     now: () => number,
-    wait: (milliseconds: number) => Promise<void>);
+    wait: (milliseconds: number) => Promise<void>,
+    restart: AppImageRestart | null);
 
   /**
    * Stops the installation for an update and calls the handoff. It holds the launch barrier as `Preparing`, asks each
@@ -436,7 +440,8 @@ export declare class UpdateStop {
    * update, and `shell.stop` stops the work of a runtime that still has the work they agreed to stop and otherwise
    * stops only if idle. It waits up to 10 seconds for every runtime and every process they listed except the desktops to exit,
    * sets the barrier to `Closing`, waits up to 10 more seconds for the other desktops, those the runtimes listed and
-   * those recorded in the installation that still run, then sets it to `HandedOff`. Every connection closes when it
+   * those recorded in the installation that still run, then sets it to `HandedOff`. From an AppImage, it then starts the
+   * restart before the handoff, and ends the restart when the handoff fails. Every connection closes when it
    * ends. When the handoff names the process that took over, the barrier records it, so the barrier holds while that
    * process runs; when that process cannot be found or the record cannot be written, the barrier stays without it.
    *
@@ -447,7 +452,7 @@ export declare class UpdateStop {
    * work, with nothing changed.
    * @throws {UpdateStopException} Rejected with the reason when another update holds the barrier, work started
    * meanwhile, a runtime refused or something did not save, a process or desktop did not exit in time or could not be
-   * checked, or the handoff failed; the barrier it held is removed first, so every surviving runtime and desktop
+   * checked, the AppImage restart could not start, or the handoff failed; the barrier it held is removed first, so every surviving runtime and desktop
    * resumes. Once the handoff has run, the barrier stays.
    * @example
    * ```ts
@@ -459,6 +464,75 @@ export declare class UpdateStop {
    * ```
    */
   public runAsync(version: string, handOffAsync: () => Promise<number | null>): Promise<boolean>;
+}
+
+/**
+ * Starts the replaced AppImage after an update, once this desktop has exited. A process that still holds the old
+ * version's files keeps the replaced AppImage mounted, so the new version starts from `/bin/bash`, through the runtime
+ * launch's `ProcessLaunchCommand`, which closes the descriptors it inherited above standard error, with its startup
+ * files and inherited shell options disabled. Bash waits until the desktop that started it is no longer its parent,
+ * which a reused process id or an exited desktop its own parent has not yet reaped cannot delay, then starts the
+ * AppImage file from the root folder. The environment it starts with leaves out the old mount's `APPIMAGE`, `APPDIR`,
+ * `ARGV0` and `OWD`, and removes from `PATH`, `XDG_DATA_DIRS`, `LD_LIBRARY_PATH` and `GSETTINGS_SCHEMA_DIR` the entries
+ * the AppImage's `AppRun` added around them, leaving out a variable that held nothing else.
+ */
+export declare class AppImageRestart {
+  private constructor();
+
+  /**
+   * Finds the restart of a desktop that runs from an AppImage.
+   *
+   * @param platform The desktop's platform.
+   * @param environment The desktop's environment, whose `APPIMAGE` names the AppImage file and whose `APPDIR` its mount.
+   * @param executablePath The desktop's program, which runs from inside the mount.
+   * @param launchArguments The arguments the new version starts with.
+   * @param starter Starts Bash detached, as a child of the process `processId` names.
+   * @param processId The desktop's process id; Bash waits until that process is no longer its parent.
+   * @param errorFile The file Bash's standard error is appended to; the new version's output is discarded.
+   * @returns The restart, or `null` on Windows and macOS and when the desktop does not run from an AppImage.
+   * @example
+   * ```ts
+   * import { AppImageRestart } from "@noldova/teamrun-shell-desktop";
+   * import { ChildProcessStarter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function find(errorFile: string): AppImageRestart | null {
+   *   return AppImageRestart.find(process.platform, process.env, process.execPath, process.argv.slice(1), new ChildProcessStarter(), process.pid, errorFile);
+   * }
+   * ```
+   */
+  public static find(platform: string, environment: NodeJS.ProcessEnv, executablePath: string, launchArguments: readonly string[], starter: IProcessStarter, processId: number,
+    errorFile: string): AppImageRestart | null;
+
+  /**
+   * Starts Bash, which waits for the desktop to exit and then starts the AppImage.
+   *
+   * @returns A promise that resolves once Bash has started.
+   * @throws LaunchException as a rejection when `/bin/bash` is not executable, `/proc/self/fd` cannot be read or Bash cannot be started.
+   * @example
+   * ```ts
+   * import type { AppImageRestart } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function startAsync(restart: AppImageRestart): Promise<void> {
+   *   return restart.startAsync();
+   * }
+   * ```
+   */
+  public startAsync(): Promise<void>;
+
+  /**
+   * Ends the Bash that {@link AppImageRestart.startAsync} started, so the AppImage does not start when the desktop
+   * later exits. It does nothing before a start, after a cancel, or when Bash has already ended.
+   *
+   * @example
+   * ```ts
+   * import type { AppImageRestart } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function cancel(restart: AppImageRestart): void {
+   *   restart.cancel();
+   * }
+   * ```
+   */
+  public cancel(): void;
 }
 
 /**

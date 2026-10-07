@@ -113,6 +113,7 @@ export class RuntimeHost implements IIdleParticipant {
   private readonly programsEvent: EventChannel;
   private readonly serverSettings: ServerSettings;
   private readonly installationFolder: string | null;
+  private readonly copyRecord: string | null;
   private readonly updating: EventChannel;
   private readonly updateEnded: EventChannel;
   private preparation: UpdatePreparation | null = null;
@@ -173,6 +174,9 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.work, new WorkMethod(this.work));
     this.serverSettings = options.serverSettings;
     this.installationFolder = options.installationFolder;
+    this.copyRecord = Object.isNull(options.startLogName)
+      ? null
+      : path.join(lock.dataDirectory.logsFolder, `${Resources.copyRecordPrefix}${options.startLogName.slice(Resources.startLogPrefix.length)}`);
     this.updating = this.events.declare(ShellEvents.updating);
     this.updateEnded = this.events.declare(ShellEvents.updateEnded);
     this.methods.register(ShellMethods.commands, new CommandsMethod(this.commands));
@@ -309,7 +313,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.methods.register(ShellMethods.programs, new ProgramsMethod(() => processes.status));
     const preparation = new UpdatePreparation(
       this.server, this.presence, processes, this.updating, this.updateEnded,
-      this.serverSettings.updateSaveWait, this.serverSettings.updateBarrierInterval, this.installationFolder);
+      this.serverSettings.updateSaveWait, this.serverSettings.updateBarrierInterval, this.installationFolder, this.copyRecord);
     this.preparation = preparation;
     this.methods.register(ShellMethods.update, new UpdateMethod(preparation));
     this.methods.register(ShellMethods.updateSaved, new UpdateSavedMethod(preparation));

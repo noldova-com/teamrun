@@ -812,8 +812,10 @@ export declare abstract class ClipboardWriter {
 
 /**
  * A block of code, `tr-code-block`: a header with the code's language and a
- * toolbar named Code block actions, then the code in the code text role,
- * without highlighting.
+ * toolbar named Code block actions, then the code in the code text role.
+ * Code in a language the block knows, by its name or an alias, such as
+ * `TypeScript`, `ts` or `bash`, is colored by the kind of each token in the
+ * theme's code token colors once its grammar has loaded; other code stays plain.
  *
  * Long lines scroll sideways inside the block and never widen its container,
  * until the toolbar's Word wrap button, a toggle that starts off, wraps them
