@@ -39,6 +39,7 @@ export default class MacSigning implements IPackageSigning {
     this.environment = environment;
     this.key = String(credentials["APPLE_API_KEY_P8"]);
     this.builderEnvironment = {
+      CSC_IDENTITY_AUTO_DISCOVERY: "true",
       CSC_LINK: credentials["MAC_CERTIFICATE"],
       CSC_KEY_PASSWORD: credentials["MAC_CERTIFICATE_PASSWORD"],
       APPLE_API_KEY: path.join(folder, MacSigning.KEY_FILE),
