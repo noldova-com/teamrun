@@ -428,7 +428,11 @@ export class Resources {
   }
 
   public static formatUpdateBarrierNotReleased(reason: string): string {
-    return `The update's barrier could not be removed after the update stopped: ${reason}`;
+    return `The update's barrier could not be removed after the update stopped, even when tried again: ${reason}`;
+  }
+
+  public static formatFailureWithCause(message: string, cause: string): string {
+    return `${message} (${cause})`;
   }
 
   public static formatRuntimeNotFound(dataDirectory: string): string {
@@ -612,6 +616,7 @@ export class Resources {
   public static readonly updateExitWait: number = 10000;
   public static readonly updateExitInterval: number = 250;
   public static readonly runtimeStartWait: number = 15000;
+  public static readonly barrierReleaseRetryDelay: number = 1000;
   public static readonly runtimeStartInterval: number = 250;
   public static readonly updateRelaunchLimit: number = 10000;
   public static readonly updateNotRelaunchedInTime: string = "macOS didn't quit to install the update within 10 seconds.";
