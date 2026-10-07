@@ -353,6 +353,7 @@ CI runs the tests and checks in full on every run, and the UI workflows at these
   When a request to GitHub fails, the report stops, names what it had already filed and fails the run.
 
 The Package workflow makes the packages of a target with `npm run package` and checks them with `npm run package:smoke`.
+A run by hand may name a local update feed with its `update-feed` input, a loopback HTTP URL such as `http://127.0.0.1:47325/`, for a native update check under the [architecture](ARCHITECTURE.md#10-build-installation-and-updates); its packages then name that feed instead of the production one, and any other feed is refused before packaging.
 The smoke check installs or unpacks the package, starts the desktop with a fresh data directory and device folder of its own, which every `teamrun status` it runs also uses, waits for `teamrun status` from the installed program to report the packaged build's runtime, quits the desktop with that program's `teamrun quit`, as a person would from a terminal, and requires it to say that TeamRun quit and the desktop to exit cleanly.
 On Linux it also requires that the runtime holds its own copy of the AppImage while the desktop runs, and that the copy ends with the runtime, which an idle runtime does once the desktop quits.
 The copy record is written before the runtime starts from its copy, so a runtime that answers `teamrun status` has its record already.

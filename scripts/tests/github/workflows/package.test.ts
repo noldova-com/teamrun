@@ -43,7 +43,8 @@ class PackageWorkflowTests {
 
       assert.ok(text.includes("on:\n  workflow_call:\n    inputs:\n      nightly:\n"));
       assert.ok(text.includes("        type: boolean\n        required: true\n  workflow_dispatch:\n    inputs:\n      signed:\n"));
-      assert.ok(text.includes("        type: boolean\n        default: false\n\npermissions:\n  contents: read\n\n"));
+      assert.ok(text.includes("        type: boolean\n        default: false\n      update-feed:\n"));
+      assert.ok(text.includes("        type: string\n        default: ''\n\npermissions:\n  contents: read\n\n"));
       assert.ok(text.includes("concurrency:\n  group: package-${{ inputs.nightly && 'nightly' || 'manual' }}\n  cancel-in-progress: false\n"));
       assert.equal(text.match(/^\s+\w[\w-]*: write$/gm), null);
       assert.equal(text.match(/persist-credentials: false/g)?.length, 2);
@@ -60,6 +61,7 @@ class PackageWorkflowTests {
       assert.deepEqual([...workflow.text.matchAll(/\$\{\{ ([^}]+) \}\}/g)].map(t => t[1] ?? "").filter(t => t.includes("secrets.")),
         PackageWorkflowTests.CREDENTIALS.map(([platform, name]) => `${signed} && matrix.platform == '${platform}' && secrets.${name} || ''`));
       assert.ok(workflow.text.includes(`      - name: Make the package\n        id: package\n        timeout-minutes: 40\n        env:\n          SIGNED: \${{ matrix.signed }}\n`
+        + "          UPDATE_FEED: ${{ inputs.update-feed }}\n"
         + PackageWorkflowTests.CREDENTIALS.map(([platform, name]) => `          ${name}: \${{ ${signed} && matrix.platform == '${platform}' && secrets.${name} || '' }}\n`).join("")
         + "        run: |\n"));
       assert.ok(workflow.text.includes("        include: ${{ fromJSON(needs.plan.outputs.targets) }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 75\n    steps: &package-steps\n"));
@@ -160,6 +162,34 @@ class PackageWorkflowTests {
         assert.deepEqual(await refuse("refs/heads/main"), [0, ""]);
         assert.deepEqual(await refuse("refs/heads/rr/1-signing"), [1, "::error::A signed package run starts from main, not from refs/heads/rr/1-signing.\n"]);
         assert.deepEqual(await refuse("refs/tags/v0.0.1"), [1, "::error::A signed package run starts from main, not from refs/tags/v0.0.1.\n"]);
+      });
+
+    test("a run by hand may name a loopback HTTP update feed for its packages, signed or not, and any other feed is refused before packaging", { timeout: PackageWorkflowTests.SCRIPT_TIMEOUT },
+      async t => {
+        const workflow = await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW);
+        const run = async (signed: string, feed: string): Promise<readonly [number | null, string, readonly string[]]> => {
+          const doubles = await CommandDoublesFixture.createAsync();
+          t.after(() => doubles.disposeAsync());
+          for (const options of ["", " -- --signed", ` -- --update-feed ${feed}`, ` -- --signed --update-feed ${feed}`])
+            doubles.respond("npm", `run package${options}`, "");
+          const result = await doubles.runAsync(workflow.readStepScript("Make the package"), { SIGNED: signed, UPDATE_FEED: feed });
+          return [result.status, result.stdout, await doubles.readCallsAsync()];
+        };
+        const refused = (feed: string): readonly [number, string, readonly string[]] =>
+          [1, `::error::The update feed must be a loopback HTTP URL such as http://127.0.0.1:47325/, not ${feed}.\n`, []];
+
+        assert.ok(workflow.text.includes("      update-feed:\n        description: A local update feed for a native update check, such as http://127.0.0.1:47325/, "
+          + "which the packages name instead of the production feed. Only a loopback HTTP URL.\n        type: string\n        default: ''\n"));
+        assert.deepEqual(await run("false", ""), [0, "", ["npm run package"]]);
+        assert.deepEqual(await run("true", ""), [0, "", ["npm run package -- --signed"]]);
+        assert.deepEqual(await run("true", "http://127.0.0.1:47325/"), [0, "", ["npm run package -- --signed --update-feed http://127.0.0.1:47325/"]]);
+        assert.deepEqual(await run("false", "http://localhost:8080/"), [0, "", ["npm run package -- --update-feed http://localhost:8080/"]]);
+        assert.deepEqual(await run("false", "http://[::1]:1/"), [0, "", ["npm run package -- --update-feed http://[::1]:1/"]]);
+        assert.deepEqual(await run("false", "http://127.0.0.1:65535/"), [0, "", ["npm run package -- --update-feed http://127.0.0.1:65535/"]]);
+        for (const feed of ["https://github.com/noldova-com/teamrun/releases/latest/download/", "http://127.0.0.1:47325", "http://127.0.0.2:47325/", "http://127.0.0.1:47325/feed/",
+          "http://127.0.0.1/", "http://localhost.example:1/", "http://127.0.0.1:47325/ --signed", "http://1:47325/", "http://127x0x0x1:47325/", "http://::1:47325/",
+          "http://127.0.0.1:0/", "http://127.0.0.1:00000/", "http://127.0.0.1:65536/", "http://127.0.0.1:99999/", "http://127.0.0.1:4732a/"])
+          assert.deepEqual(await run("true", feed), refused(feed), feed);
       });
 
     test("an installed libfuse2 is removed before the package starts, and the job fails when it is still there", { timeout: PackageWorkflowTests.SCRIPT_TIMEOUT }, async t => {

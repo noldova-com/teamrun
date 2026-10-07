@@ -200,10 +200,21 @@ jobs:
           APPLE_API_KEY_ID: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_KEY_ID || '' }}
           APPLE_API_ISSUER: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
         run: |
+          options=()
           if [ "$SIGNED" = true ]; then
-            npm run package -- --signed
-          else
+            options+=(--signed)
+          fi
+          if [ -n "$UPDATE_FEED" ]; then
+            if ! [[ "$UPDATE_FEED" =~ ^http://(127\.0\.0\.1|localhost|\[::1\]):([0-9]{1,5})/$ ]] || [ $((10#${BASH_REMATCH[2]})) -lt 1 ] || [ $((10#${BASH_REMATCH[2]})) -gt 65535 ]; then
+              echo "::error::The update feed must be a loopback HTTP URL such as http://127.0.0.1:47325/, not $UPDATE_FEED."
+              exit 1
+            fi
+            options+=(--update-feed "$UPDATE_FEED")
+          fi
+          if [ ${#options[@]} -eq 0 ]; then
             npm run package
+          else
+            npm run package -- "${options[@]}"
           fi
 
       - name: Install, start and quit the package
