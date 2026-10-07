@@ -698,6 +698,7 @@ The desktop cuts such text to its first 65,536 characters.
 - It refuses another build's runtime and names it, unless asked to take over; it then takes over only an older build's idle runtime, never stopping work.
   The rule that the person is never asked to find and quit another TeamRun is the desktop's.
 - It reports data from before the shell and never moves it.
+- It quits the desktop through the runtime, as section 9 describes, and never starts a runtime to do so.
 - While its installation's launch barrier holds, it starts no runtime and waits up to 30 seconds for the barrier to go, then exits with the code its document gives for an update in progress.
   A runtime that answers `Updating` counts the same way.
 - Run from a development checkout through the checkout's launcher, it uses the checkout's data directory.
@@ -848,7 +849,22 @@ The runtime lists the work with `shell.work` and announces each change with the 
 Before TeamRun quits, restarts for an update or stops for a newer build (section 6) while work is in progress, it asks the person whether to wait for the work or to stop it, and never interrupts it without that choice.
 
 Closing the last window quits TeamRun, except on macOS and while the tray icon shows (section 8), where the window closes once it has saved and TeamRun keeps running.
-Quitting, from the last window, the tray icon, the menu or the operating system, first has every window save, then asks the runtime to stop only if idle and to keep running while another client uses it (section 6).
+Quitting, from the last window, the tray icon, the menu, the command line or the operating system, first has every window save, then asks the runtime to stop only if idle and to keep running while another client uses it (section 6).
+On Linux and macOS the desktop quits this way on SIGTERM and SIGHUP; the runtime stops on SIGINT, SIGTERM and SIGHUP alike.
+A packaged desktop started from a terminal on Linux or macOS, with its standard input, output or error a terminal, starts itself again in its own session with its output dropped and exits at once, before it opens a window or reaches a runtime.
+The prompt comes back, and closing the terminal leaves TeamRun running; it quits from its window, the tray icon or `teamrun quit`.
+Without that, a desktop that is a shell's job shares its process group with its Chromium processes, and the hang-up of the closing terminal ends them before the desktop can save.
+The copy gets the same arguments, environment and working folder; an AppImage starts again from its image file, without the entries the AppImage's launcher added to the environment.
+The desktop takes the single-instance lock before it decides, so a second start hands over to the running desktop as usual, and gives the lock up just before it starts the copy.
+A start that writes to the terminal, with `--enable-logging`, `--remote-debugging-port`, `--remote-debugging-pipe` or `ELECTRON_ENABLE_LOGGING`, stays in the terminal, as does a development run.
+When the copy cannot be started, the desktop keeps running in the terminal and writes why to standard error and its log; a copy that fails after it has started writes to its own desktop log.
+On Windows a desktop started from a console stays attached to it, and closing the console ends the desktop.
+The command line's `teamrun quit` reaches the desktop through the runtime: it asks with `shell.quit`, the runtime announces `shell.quitting`, and the desktop quits as above.
+A desktop that stays open answers `shell.quitAnswered` with why.
+A desktop that quits asks the runtime to stop, and the runtime counts the stop it accepts as the desktop's answer, since that stop can end the runtime at once.
+Once it has that answer, the runtime tells the command line that TeamRun quit when the desktop's connection ends or the runtime begins to stop.
+Without it, a desktop whose connection ends, or a runtime that stops for another reason, leaves the command line with `Unavailable`, since nobody can tell whether TeamRun quit.
+While the command line waits, its connection does not count as another client using the runtime, so an idle runtime stops with the desktop.
 A runtime that is kept, stops or cannot be reached lets TeamRun quit at once.
 Electron sends no `before-quit` when Windows shuts down or the person signs out, so TeamRun then ends without saving first or asking, and what the windows saved before stands.
 When work is in progress, the desktop reads it, waiting at most two seconds; when it cannot read it in that time, TeamRun quits without asking.
@@ -1123,10 +1139,12 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
 - **Which builds read it.**
   The build decides, never a setting, a variable or an argument.
   `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
-  A build names a feed only in a packaged product file it writes to an output folder, so the development copy's `_build/product.json` never names one.
+  A build names a feed only in a product file it writes to an output folder, so the development copy's `_build/product.json` never names one.
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
   A test build, and a package made for a native update check, name instead a local feed given to the build when it is made, with `--update-feed <url>`, an HTTPS URL, or an HTTP URL of `localhost`, `127.0.0.1` or `[::1]`, ending in `/`; `release:assets` refuses a package whose product file names any feed but the production one.
   A desktop that never checks shows its updates as off.
+  The desktop gives electron-updater the product version, since it would otherwise compare the feed's version with Electron's, which a development copy reports as Electron's own.
+  A desktop whose updater can't be created shows its updates as failed and logs why, and starts as usual.
   The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
 - **Versions.**
   Only a version higher than the installed one is offered.
@@ -1187,6 +1205,9 @@ The updater and the desktop's update stop divide an update at the person's Resta
   - Right before it, the download's size and SHA-512 are checked again, and on Windows the installer's signature by the publisher, so a file changed after its download is never installed.
   - Windows starts the installer quietly, without the desktop's inherited handles, and names it as the process that took the handoff.
   - macOS has Squirrel.Mac install from the ZIP and names its ShipIt process, which replaces the application once the desktop has quit.
+    Squirrel stages the update only inside the handoff, and ShipIt runs as the launchd job `<bundle identifier>.ShipIt` from then until it has installed.
+    A staged update installs at any quit, so a handoff that fails after staging removes that job.
+    A finished install leaves the job without a process, and a desktop removes such a job at start, before its updater.
   - Linux copies the download to a file with a unique name beside the AppImage, created only when no file has that name, gives it the AppImage's permissions, flushes it to disk and renames it over the AppImage, following a link to the file it names.
     So the AppImage is always one whole version, and no process takes the handoff.
     A folder that cannot be written refuses the handoff, and any failure removes the copy and leaves the AppImage as it was.

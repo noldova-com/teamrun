@@ -10,7 +10,7 @@ import type { Writable } from "node:stream";
 
 import "@noldova/teamrun-foundation-core";
 import type { JsonValue } from "@noldova/teamrun-foundation-json";
-import type { CommandList } from "@noldova/teamrun-shell-protocol";
+import { type CommandList, type QuitReport, QuitResult } from "@noldova/teamrun-shell-protocol";
 
 import type { CliCommandResult } from "../models/cli-command-result.js";
 import type { CliFailure } from "../models/cli-failure.js";
@@ -72,6 +72,12 @@ export class CliOutput {
     if (this.isJson)
       return this.writeJson({ dataDirectory: root });
     this.writeLines([Resources.formatOpened(root)]);
+  }
+
+  public writeQuit(report: QuitReport): void {
+    if (this.isJson)
+      return this.writeJson(report.toJson());
+    this.writeLines([report.outcome === QuitResult.Quit ? Resources.quitDone : Resources.noDesktop]);
   }
 
   public writeFailure(failure: CliFailure, usage: string | null): void {

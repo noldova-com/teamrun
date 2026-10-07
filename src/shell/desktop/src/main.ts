@@ -8,6 +8,7 @@
 
 import { execFile } from "node:child_process";
 import { homedir } from "node:os";
+import { isatty } from "node:tty";
 import { promisify } from "node:util";
 
 import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, ipcMain, net, screen, session, shell, utilityProcess } from "electron";
@@ -27,6 +28,7 @@ import { DeviceFileStore } from "./services/device-file-store.js";
 import { DeviceIdentity } from "./services/device-identity.js";
 import { FeedUpdater } from "./services/feed-updater.js";
 import { PathCommand } from "./services/path-command.js";
+import { ProductAppAdapter } from "./services/product-app-adapter.js";
 import { PublisherCheck } from "./services/publisher-check.js";
 import { UpdateCheckLock } from "./services/update-check-lock.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
@@ -65,7 +67,9 @@ DesktopApplication.start(
     errorOutput: process.stderr,
     processId: process.pid,
     programs,
+    isTerminal: Resources.standardDescriptors.some(t => isatty(t)),
     startDetached: (path, args, onFailure) => programs.startDetached(path, args, process.env, onFailure),
+    startDetachedAsync: (path, args, environment, folder) => programs.startDetachedAsync(path, args, environment, folder),
     endProcess: t => process.kill(t, "SIGKILL"),
     onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),
     onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)
@@ -83,7 +87,9 @@ DesktopApplication.start(
     const source = FeedSource.create(product.updateFeed, product.name, process.platform, process.arch, t => net.fetch(t));
     if (Object.isNull(source))
       return null;
-    const updater = process.platform === Resources.windowsPlatform ? new NsisUpdater() : process.platform === Resources.macPlatform ? new MacUpdater() : new AppImageUpdater();
+    const adapter = new ProductAppAdapter();
+    const updater = process.platform === Resources.windowsPlatform ? new NsisUpdater(undefined, adapter)
+      : process.platform === Resources.macPlatform ? new MacUpdater(undefined, adapter) : new AppImageUpdater(undefined, adapter);
     const check = new PublisherCheck(product.windowsPublisher, verifySignature, log, Date.now);
     return new FeedUpdater(updater, source, installation.folder, getAppCacheDir(), product.slug, updater instanceof NsisUpdater ? t => check.checkAsync(t) : null, log);
   },

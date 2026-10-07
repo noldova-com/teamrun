@@ -35,7 +35,7 @@ export default class BuildProduct {
       dataDirectoryVariable: product.dataDirectoryVariable,
       icons: product.icons,
       windowsPublisher: product.windowsPublisher,
-      updateFeed: variant.isPackaged && outputFolder !== null ? variant.updateFeed ?? product.updateFeed : null,
+      updateFeed: outputFolder === null ? null : variant.isPackaged ? variant.updateFeed ?? product.updateFeed : variant.updateFeed,
       version: manifest.productVersion,
       build: fingerprint
     };

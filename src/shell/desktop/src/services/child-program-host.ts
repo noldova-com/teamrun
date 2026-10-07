@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { execFile, spawn } from "node:child_process";
+import { type ChildProcess, execFile, spawn } from "node:child_process";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -66,11 +66,25 @@ export class ChildProgramHost implements IProgramHost {
 
   public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onFailure: (error: Error) => void): void {
     const command = this.commandFor(file, programArguments, environment, onFailure);
-    if (Object.isNull(command))
-      return;
-    const child = spawn(command.executable, [...command.arguments], { env: environment, detached: true, stdio: "ignore" });
-    child.on(Resources.errorEvent, onFailure);
+    if (!Object.isNull(command))
+      ChildProgramHost.spawnDetached(command, environment, undefined).on(Resources.errorEvent, onFailure);
+  }
+
+  public startDetachedAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const command = this.commandFor(file, programArguments, environment, reject);
+      if (Object.isNull(command))
+        return;
+      const child = ChildProgramHost.spawnDetached(command, environment, workingDirectory);
+      child.once(Resources.spawnEvent, () => resolve());
+      child.once(Resources.errorEvent, reject);
+    });
+  }
+
+  private static spawnDetached(command: ProcessLaunchCommand, environment: NodeJS.ProcessEnv, workingDirectory: string | undefined): ChildProcess {
+    const child = spawn(command.executable, [...command.arguments], { cwd: workingDirectory, env: environment, detached: true, stdio: "ignore" });
     child.unref();
+    return child;
   }
 
   private commandFor(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onFailure: (error: LaunchException) => void): ProcessLaunchCommand | null {

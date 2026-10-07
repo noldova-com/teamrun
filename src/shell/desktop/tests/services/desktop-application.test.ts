@@ -262,6 +262,53 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async quitsAsItsQuitDoesWhenTheRuntimeAsksAndForwardsNothingToItsWindows(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher);
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 1);
+    await Condition.waitAsync(() => electron.app.calls.includes("quit"));
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    await setImmediate();
+
+    Assert.areEqual(1, DesktopStartFixture.closeRequests(window).length);
+    Assert.areEqual(JSON.stringify([DesktopApplicationTests.IF_IDLE]), JSON.stringify(DesktopApplicationTests.stops(connection)));
+    Assert.isFalse(connection.calls.includes("shell.quitAnswered"));
+    Assert.isFalse(window.webContents.sent.some(t => t[1] === "shell.quitting"));
+  }
+
+  @TestMethod
+  public async tellsTheRuntimeOnceItStayedWhenAWindowCannotSaveOrThePersonKeepsIt(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    DesktopApplicationTests.answerStops(connection, [DesktopApplicationTests.busy()]);
+    const launcher = new FakeRuntimeLauncher(connection);
+    const electron = await DesktopStartFixture.startReadyAsync("linux", launcher);
+    const window = DesktopStartFixture.firstWindow(electron);
+    DesktopApplicationTests.paint(electron, "linux", window);
+
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
+    electron.ipcMain.invoke("teamrun:closeAnswer", DesktopStartFixture.trustedEvent("linux"), DesktopStartFixture.closeRequests(window)[0], false);
+    await Condition.waitAsync(() => connection.calls.includes("shell.quitAnswered"));
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    await DesktopStartFixture.answerSaveAsync(electron, "linux", window, 2);
+    await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+    launcher.listener?.onEvent(new Event(ShellEvents.quitting, null));
+    electron.ipcMain.invoke("teamrun:quitAnswer", DesktopStartFixture.trustedEvent("linux"), "Cancel");
+    await Condition.waitAsync(() => connection.calls.filter(t => t === "shell.quitAnswered").length === 2);
+    await setImmediate();
+
+    Assert.areEqual("[{\"answer\":\"SaveFailed\"},{\"answer\":\"Stayed\"}]", JSON.stringify(connection.payloads.filter((_t, u) => connection.calls[u] === "shell.quitAnswered")));
+    Assert.isFalse(window.isGone);
+    Assert.isFalse(electron.app.calls.includes("quit"));
+    window.destroy();
+  }
+
+  @TestMethod
   public async savesAgainBeforeStoppingTheWorkWhenThePersonChoosesToAndStaysWhenTheyCancel(): Promise<void> {
     const connection = new FakeRuntimeConnection();
     connection.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
@@ -2031,6 +2078,26 @@ export class DesktopApplicationTests {
     Assert.areEqual(3, files.updateReady.reads);
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The updater reported: started").length);
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The update lock reported: started").length);
+  }
+
+  @TestMethod
+  public async startsWithItsUpdatesFailedAndTheReasonLoggedWhenItsUpdaterCannotBeCreated(): Promise<void> {
+    const electron = new FakeElectron();
+    const process = new FakeDesktopProcess("linux");
+    DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(), [], () => Promise.resolve(true), () => {
+      throw new Error("ERR_UPDATER_INVALID_VERSION: App version is not a valid semver version: \"0.0\"");
+    });
+    await DesktopStartFixture.openAsync(electron);
+    const trusted = DesktopStartFixture.trustedEvent("linux");
+
+    const state = electron.ipcMain.invoke("teamrun:readUpdate", trusted);
+    const acted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Check");
+
+    Assert.areEqual(JSON.stringify({ kind: "Failed", version: null, progress: null, checkedAt: null, reason: "TeamRun couldn't start checking for updates.", mustMove: false }), JSON.stringify(state));
+    Assert.isFalse(acted as boolean);
+    Assert.areEqual(1, electron.windows.length);
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process,
+      "The updater could not be created, so this desktop doesn't check for updates: Error: ERR_UPDATER_INVALID_VERSION: App version is not a valid semver version: \"0.0\"").length);
   }
 
   @TestMethod

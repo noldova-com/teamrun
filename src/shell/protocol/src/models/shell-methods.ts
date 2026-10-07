@@ -17,6 +17,8 @@ export class ShellMethods {
   public static readonly programs: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.programsMember);
   public static readonly update: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.updateMember);
   public static readonly updateSaved: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.updateSavedMember);
+  public static readonly quit: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.quitMember);
+  public static readonly quitAnswered: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.quitAnsweredMember);
   public static readonly commands: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.commandsMember);
   public static readonly runCommand: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.runCommandMember);
   public static readonly notifications: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.notificationsMember);

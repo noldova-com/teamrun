@@ -174,7 +174,7 @@ export declare class CliContext {
   public readonly input: Readable;
 
   /**
-   * Raises `SIGINT` when the person interrupts a running command.
+   * Raises `SIGINT` when the person interrupts a running command, and `SIGHUP` when its terminal closes.
    */
   public readonly signals: EventEmitter;
 
@@ -212,7 +212,7 @@ export declare class CliContext {
    * @param output Receives the command's output.
    * @param error Receives errors.
    * @param input Supplies arguments read from standard input.
-   * @param signals Raises `SIGINT` when the person interrupts a command.
+   * @param signals Raises `SIGINT` when the person interrupts a command, and `SIGHUP` when its terminal closes.
    * @param runtimeStarter Starts the runtime; a direct process launch by default.
    * @param desktopOpener Starts the desktop; a detached process by default.
    * @param processId The command line's process id; the running process's by default.
