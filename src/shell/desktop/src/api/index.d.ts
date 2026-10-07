@@ -4549,7 +4549,8 @@ export declare class DesktopApplication {
    * the desktop checks the launch barrier, so an update waits for it to quit. A desktop it could not record is logged
    * and starts anyway.
    * @param createUpdater Creates the updater of the installation, or gives `null` for a build that names no update feed,
-   * whose updates stay Off; the updater's log is the desktop's. The {@link UpdateController} it drives keeps
+   * whose updates stay Off; it is told whether the desktop runs from a packaged build, and the updater's log is the
+   * desktop's. The {@link UpdateController} it drives keeps
    * `update-ready.json` in the installation's folder, follows `shell.updateChecks`, pushes each state on
    * `teamrun:updateState` and posts `shell.updateReady` once over the runtime connection.
    * @param createUpdateLock Creates the lock that lets one desktop of the installation check at a time; the lock's log
@@ -4583,7 +4584,7 @@ export declare class DesktopApplication {
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
-    createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    createUpdater: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void;
 }
 

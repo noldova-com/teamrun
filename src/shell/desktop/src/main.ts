@@ -85,12 +85,12 @@ DesktopApplication.start(
     await promisify(execFile)(program, [...args]);
   }),
   t => DesktopRecord.recordAsync(t, presence, process.pid),
-  (installation, log) => {
+  (installation, isPackaged, log) => {
     const product = ProductInfo.current;
     const source = FeedSource.create(product.updateFeed, product.name, process.platform, process.arch, t => net.fetch(t));
     if (Object.isNull(source))
       return null;
-    const adapter = new ProductAppAdapter();
+    const adapter = isPackaged ? undefined : new ProductAppAdapter();
     const updater = process.platform === Resources.windowsPlatform ? new NsisUpdater(undefined, adapter)
       : process.platform === Resources.macPlatform ? new MacUpdater(undefined, adapter) : new AppImageUpdater(undefined, adapter);
     const check = new PublisherCheck(product.windowsPublisher, verifySignature, log, Date.now);
