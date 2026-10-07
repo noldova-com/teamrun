@@ -539,34 +539,15 @@ export declare class AppImageReplacement {
    * Creates the replacement of an AppImage file.
    *
    * @param image The AppImage file, or a link to it.
-   * @param syncFolderAsync Flushes a folder to disk, such as {@link AppImageReplacement.syncFolderAsync}.
-   * @param log Writes a line to the desktop's log.
+   * @param log Writes a line to the desktop's log, such as a folder that could not be flushed to disk after the replacement.
    * @example
    * ```ts
    * import { AppImageReplacement } from "@noldova/teamrun-shell-desktop";
    *
-   * export const replacement: AppImageReplacement = new AppImageReplacement("/home/person/Applications/TeamRun.AppImage",
-   *   t => AppImageReplacement.syncFolderAsync(t), console.log);
+   * export const replacement: AppImageReplacement = new AppImageReplacement("/home/person/Applications/TeamRun.AppImage", console.log);
    * ```
    */
-  public constructor(image: string, syncFolderAsync: (folder: string) => Promise<void>, log: (text: string) => void);
-
-  /**
-   * Flushes a folder's entries to disk, so a rename in it survives a power loss. Windows refuses to flush a folder.
-   *
-   * @param folder The folder.
-   * @returns A promise that resolves once the folder is flushed.
-   * @throws {Error} Rejected when the folder cannot be opened or flushed.
-   * @example
-   * ```ts
-   * import { AppImageReplacement } from "@noldova/teamrun-shell-desktop";
-   *
-   * export function flushAsync(folder: string): Promise<void> {
-   *   return AppImageReplacement.syncFolderAsync(folder);
-   * }
-   * ```
-   */
-  public static syncFolderAsync(folder: string): Promise<void>;
+  public constructor(image: string, log: (text: string) => void);
 
   /**
    * Replaces the AppImage with the downloaded file.
@@ -580,7 +561,7 @@ export declare class AppImageReplacement {
    * import { AppImageReplacement } from "@noldova/teamrun-shell-desktop";
    *
    * export function handOffAsync(image: string, download: string): Promise<void> {
-   *   return new AppImageReplacement(image, t => AppImageReplacement.syncFolderAsync(t), console.log).replaceAsync(download);
+   *   return new AppImageReplacement(image, console.log).replaceAsync(download);
    * }
    * ```
    */
@@ -593,6 +574,22 @@ export declare class AppImageReplacement {
  * SHA-512 no longer matches the ready record.
  */
 export interface IUpdateHandoff {
+  /**
+   * Why this copy of TeamRun can never install an update, known before anything is downloaded or stopped, or
+   * `null` when it can. The update controller then shows the reason instead of downloading and refuses Restart to
+   * update.
+   *
+   * @example
+   * ```ts
+   * import type { IUpdateHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canInstall(handoff: IUpdateHandoff): boolean {
+   *   return handoff.refusal === null;
+   * }
+   * ```
+   */
+  readonly refusal: string | null;
+
   /**
    * Hands the update over.
    *
@@ -757,6 +754,20 @@ export interface IShipItProcess {
  */
 export declare class InstallerHandoff implements IUpdateHandoff {
   /**
+   * Always `null`: whether the installer may run is known only once it is copied and its publisher checked.
+   *
+   * @example
+   * ```ts
+   * import type { InstallerHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canInstall(handoff: InstallerHandoff): boolean {
+   *   return handoff.refusal === null;
+   * }
+   * ```
+   */
+  public readonly refusal: string | null;
+
+  /**
    * Creates the handoff.
    *
    * @param installationFolder The installation's folder.
@@ -824,6 +835,20 @@ export declare class InstallerHandoff implements IUpdateHandoff {
  */
 export declare class AppImageHandoff implements IUpdateHandoff {
   /**
+   * Why the update cannot be installed when the desktop doesn't run from an AppImage, or `null` when it does.
+   *
+   * @example
+   * ```ts
+   * import type { AppImageHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canInstall(handoff: AppImageHandoff): boolean {
+   *   return handoff.refusal === null;
+   * }
+   * ```
+   */
+  public get refusal(): string | null;
+
+  /**
    * Creates the handoff.
    *
    * @param replacement Replaces the AppImage with the download, or `null` when the desktop doesn't run from an AppImage.
@@ -831,8 +856,7 @@ export declare class AppImageHandoff implements IUpdateHandoff {
    * ```ts
    * import { AppImageHandoff, AppImageReplacement } from "@noldova/teamrun-shell-desktop";
    *
-   * export const handoff: AppImageHandoff = new AppImageHandoff(new AppImageReplacement("/home/person/Applications/TeamRun.AppImage",
-   *   t => AppImageReplacement.syncFolderAsync(t), console.log));
+   * export const handoff: AppImageHandoff = new AppImageHandoff(new AppImageReplacement("/home/person/Applications/TeamRun.AppImage", console.log));
    * ```
    */
   public constructor(replacement: Pick<AppImageReplacement, "replaceAsync"> | null);
@@ -883,6 +907,20 @@ export declare class AppImageHandoff implements IUpdateHandoff {
  * next handoff asks Squirrel.Mac to stage.
  */
 export declare class SquirrelHandoff implements IUpdateHandoff {
+  /**
+   * Always `null`: whether macOS can stage the update is known only once Squirrel tries.
+   *
+   * @example
+   * ```ts
+   * import type { SquirrelHandoff } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function canInstall(handoff: SquirrelHandoff): boolean {
+   *   return handoff.refusal === null;
+   * }
+   * ```
+   */
+  public readonly refusal: string | null;
+
   /**
    * Creates the handoff.
    *
@@ -6619,6 +6657,9 @@ export declare class UpdateController {
    * @param currentVersion The installed version.
    * @param mustMove Whether TeamRun runs on macOS outside an Applications folder, where a newer version only shows
    * as available.
+   * @param refusal Why this copy can never install an update, such as {@link IUpdateHandoff.refusal}, or `null`. A newer
+   * version then shows as failed with this reason and isn't downloaded; a ready update shows it, isn't posted and
+   * Restart to update is refused.
    * @param publish Receives each state.
    * @param postReadyAsync Posts `shell.updateReady` for a version, resolving to whether the runtime took it.
    * @param log Records failures.
@@ -6631,7 +6672,7 @@ export declare class UpdateController {
    * import { DeviceFileStore, type IUpdateCheckLock, type IUpdater, UpdateController } from "@noldova/teamrun-shell-desktop";
    *
    * export function create(updater: IUpdater, lock: IUpdateCheckLock): UpdateController {
-   *   return new UpdateController(updater, new DeviceFileStore("/tmp/installation", "update-ready.json"), lock, "1.2.0", false, console.log,
+   *   return new UpdateController(updater, new DeviceFileStore("/tmp/installation", "update-ready.json"), lock, "1.2.0", false, null, console.log,
    *     () => Promise.resolve(true), console.error, Date.now, (wait, run) => {
    *       const timer = setTimeout(run, wait);
    *       return () => clearTimeout(timer);
@@ -6645,6 +6686,7 @@ export declare class UpdateController {
     lock: IUpdateCheckLock,
     currentVersion: string,
     mustMove: boolean,
+    refusal: string | null,
     publish: (status: UpdateStatus) => void,
     postReadyAsync: (version: string) => Promise<boolean>,
     log: (text: string) => void,

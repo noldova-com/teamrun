@@ -13,6 +13,7 @@ import path from "node:path";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { AppImageReplacement, UpdateHandoffException } from "@noldova/teamrun-shell-desktop";
 
+import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
 import { PlatformFixture } from "../fixtures/platform.fixture.js";
 import { UnwritableFolderFixture } from "../fixtures/unwritable-folder.fixture.js";
 
@@ -22,19 +23,12 @@ export class AppImageReplacementTests {
   private static readonly NEW: string = "new version";
   private static readonly UNIQUE: string = "0f8e6c1a-52d4-4b7e-9a3c-6d2f1e0b9c47";
 
-  private readonly synced: string[] = [];
   private readonly logged: string[] = [];
-  private syncFolderAsync: (folder: string) => Promise<void> = t => AppImageReplacement.syncFolderAsync(t);
 
   @TestMethod
   public async replacesTheAppImageInPlaceKeepingItsPermissionsAndTheDownload(): Promise<void> {
     await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
       const before = (await stat(image)).mode;
-      const seen: string[] = [];
-      this.syncFolderAsync = async t => {
-        seen.push(await readFile(image, "utf8"));
-        this.synced.push(t);
-      };
 
       await this.create(image).replaceAsync(download);
 
@@ -42,8 +36,16 @@ export class AppImageReplacementTests {
       Assert.areEqual(before, (await stat(image)).mode);
       Assert.areEqual(AppImageReplacementTests.NEW, await readFile(download, "utf8"));
       Assert.areEqual(JSON.stringify(["TeamRun.AppImage", "update"]), JSON.stringify((await readdir(folder)).sort()));
-      Assert.areEqual(JSON.stringify([folder]), JSON.stringify(this.synced));
-      Assert.areEqual(JSON.stringify([AppImageReplacementTests.NEW]), JSON.stringify(seen));
+    });
+  }
+
+  @TestMethod
+  @PlatformFixture.posixOnly()
+  public async flushesItsFolderWithoutALogOnceTheAppImageIsReplaced(): Promise<void> {
+    await AppImageReplacementTests.runInFolderAsync(async (_folder, image, download) => {
+      await this.create(image).replaceAsync(download);
+
+      Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
       Assert.areEqual(0, this.logged.length);
     });
   }
@@ -85,12 +87,12 @@ export class AppImageReplacementTests {
   @TestMethod
   public async logsAFolderItCannotFlushAndKeepsTheReplacement(): Promise<void> {
     await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
-      this.syncFolderAsync = () => Promise.reject(new Error("EIO: i/o error, fsync"));
+      using _open = new FailingFileCallFixture("open", folder, "EIO");
 
       await this.create(image).replaceAsync(download);
 
       Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
-      Assert.areEqual(JSON.stringify([`The AppImage in ${folder} was replaced, but the folder could not be flushed to disk: Error: EIO: i/o error, fsync`]),
+      Assert.areEqual(JSON.stringify([`The AppImage in ${folder} was replaced, but the folder could not be flushed to disk: Error: EIO: operation failed, open '${folder}'`]),
         JSON.stringify(this.logged));
     });
   }
@@ -120,7 +122,6 @@ export class AppImageReplacementTests {
       Assert.isTrue(failure.message.includes("ENOENT"), failure.message);
       Assert.areEqual(AppImageReplacementTests.OLD, await readFile(image, "utf8"));
       Assert.areEqual(JSON.stringify(["TeamRun.AppImage", "update"]), JSON.stringify((await readdir(folder)).sort()));
-      Assert.areEqual(0, this.synced.length);
     });
   }
 
@@ -137,37 +138,8 @@ export class AppImageReplacementTests {
     });
   }
 
-  @TestMethod
-  @PlatformFixture.posixOnly()
-  public async flushesAFolder(): Promise<void> {
-    await AppImageReplacementTests.runInFolderAsync(async folder => {
-      await AppImageReplacement.syncFolderAsync(folder);
-
-      Assert.areEqual(JSON.stringify(["TeamRun.AppImage", "update"]), JSON.stringify((await readdir(folder)).sort()));
-    });
-  }
-
-  @TestMethod
-  @PlatformFixture.windowsOnly()
-  public async cannotFlushAFolderOnWindows(): Promise<void> {
-    await AppImageReplacementTests.runInFolderAsync(async folder => {
-      const failure = await Assert.throwsAsync(() => AppImageReplacement.syncFolderAsync(folder), Error);
-
-      Assert.isTrue(failure.message.includes("EPERM"), failure.message);
-    });
-  }
-
-  @TestMethod
-  public async failsToFlushAFolderThatIsGone(): Promise<void> {
-    await AppImageReplacementTests.runInFolderAsync(async folder => {
-      const failure = await Assert.throwsAsync(() => AppImageReplacement.syncFolderAsync(path.join(folder, "missing")), Error);
-
-      Assert.isTrue(failure.message.includes("ENOENT"), failure.message);
-    });
-  }
-
   private create(image: string): AppImageReplacement {
-    return new AppImageReplacement(image, t => this.syncFolderAsync(t), t => this.logged.push(t));
+    return new AppImageReplacement(image, t => this.logged.push(t));
   }
 
   private static async runInFolderAsync(action: (folder: string, image: string, download: string) => Promise<void>): Promise<void> {

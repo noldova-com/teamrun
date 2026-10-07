@@ -11,6 +11,7 @@ import type { IUpdateHandoff, UpdateReadyRecord } from "@noldova/teamrun-shell-d
 export class FakeUpdateHandoff implements IUpdateHandoff {
   public readonly handedOff: string[] = [];
   public clears: number = 0;
+  public refusal: string | null = null;
   public handOff: (record: UpdateReadyRecord) => Promise<number | null> = () => Promise.resolve(null);
   public onClear: () => void = () => undefined;
 

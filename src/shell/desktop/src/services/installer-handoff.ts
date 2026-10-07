@@ -29,6 +29,8 @@ export class InstallerHandoff implements IUpdateHandoff {
   private readonly startAsync: (installer: string) => Promise<number>;
   private readonly log: (text: string) => void;
 
+  public readonly refusal: string | null = null;
+
   public constructor(
     installationFolder: string,
     protectAsync: (folder: string) => Promise<void>,

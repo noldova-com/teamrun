@@ -30,6 +30,7 @@ export class AppImageHandoffTests {
       const processId = await handoff.handOffAsync(new UpdateReadyRecord("1.3.0", download, AppImageHandoffTests.HASH, true));
 
       Assert.isNull(processId);
+      Assert.isNull(handoff.refusal);
       Assert.areEqual(JSON.stringify([download]), JSON.stringify(replaced));
     });
   }
@@ -61,6 +62,7 @@ export class AppImageHandoffTests {
       await handoff.clearAsync();
 
       Assert.areEqual("This copy of TeamRun doesn't run from an AppImage, so it can't install the update.", failure.message);
+      Assert.areEqual(failure.message, handoff.refusal);
     });
   }
 

@@ -87,6 +87,7 @@ export class InstallerHandoffTests {
       const copy = String(fixture.started[0]);
 
       Assert.areEqual(4120, processId);
+      Assert.isNull(fixture.handoff.refusal);
       Assert.areEqual(join(fixture.folder, "installation", "handoff"), dirname(dirname(copy)));
       Assert.areEqual("TeamRun-windows-x64.exe", copy.slice(dirname(copy).length + 1));
       Assert.areEqual(InstallerHandoffFixture.CONTENT, await readFile(copy, "utf8"));

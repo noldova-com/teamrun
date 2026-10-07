@@ -23,6 +23,10 @@ export class AppImageHandoff implements IUpdateHandoff {
     this.replacement = replacement;
   }
 
+  public get refusal(): string | null {
+    return Object.isNull(this.replacement) ? Resources.notAnAppImage : null;
+  }
+
   public async handOffAsync(record: UpdateReadyRecord): Promise<null> {
     if (Object.isNull(this.replacement))
       throw new UpdateHandoffException(Resources.notAnAppImage);

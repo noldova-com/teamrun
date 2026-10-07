@@ -27,6 +27,8 @@ export class SquirrelHandoff implements IUpdateHandoff {
   private readonly log: (text: string) => void;
   private lateStage: (() => void) | null = null;
 
+  public readonly refusal: string | null = null;
+
   public constructor(
     updater: IUpdater,
     native: INativeUpdater,

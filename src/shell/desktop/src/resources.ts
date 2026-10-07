@@ -378,7 +378,7 @@ export class Resources {
   }
 
   public static readonly permissionBits: number = 0o7777;
-  public static readonly appImagePartPattern: RegExp = /^\.(.+)\.([^.]+)\.part$/;
+  public static readonly appImagePartPattern: RegExp = /^\.(.+)\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.part$/;
   public static readonly readFlag: string = "r";
 
   public static formatAppImagePart(name: string, unique: string): string {

@@ -30,6 +30,7 @@ export class UpdateController {
   private readonly lock: IUpdateCheckLock;
   private readonly currentVersion: string;
   private readonly mustMove: boolean;
+  private readonly refusal: string | null;
   private readonly publish: (status: UpdateStatus) => void;
   private readonly postReadyAsync: (version: string) => Promise<boolean>;
   private readonly log: (text: string) => void;
@@ -53,6 +54,7 @@ export class UpdateController {
     lock: IUpdateCheckLock,
     currentVersion: string,
     mustMove: boolean,
+    refusal: string | null,
     publish: (status: UpdateStatus) => void,
     postReadyAsync: (version: string) => Promise<boolean>,
     log: (text: string) => void,
@@ -64,6 +66,7 @@ export class UpdateController {
     this.lock = lock;
     this.currentVersion = currentVersion;
     this.mustMove = mustMove;
+    this.refusal = refusal;
     this.publish = publish;
     this.postReadyAsync = postReadyAsync;
     this.log = log;
@@ -88,7 +91,7 @@ export class UpdateController {
     const record = await this.readRecordAsync();
     if (!Object.isNull(record)) {
       this.ready = record;
-      this.set(new UpdateStatus(UpdateStateKind.Ready, record.version, null, null, null, false));
+      this.set(new UpdateStatus(UpdateStateKind.Ready, record.version, null, null, this.refusal, false));
     }
     this.arm();
   }
@@ -110,7 +113,7 @@ export class UpdateController {
     }
     const ready = this.ready;
     const restartAsync = this.restartAsync;
-    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting || this.mustMove)
+    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting || this.mustMove || !Object.isNull(this.refusal))
       return false;
     void this.restartReadyAsync(ready, restartAsync);
     return true;
@@ -164,7 +167,7 @@ export class UpdateController {
 
   private async notifyOnceAsync(): Promise<void> {
     const ready = this.ready;
-    if (Object.isNull(ready) || ready.isNotified || this.isStopped)
+    if (Object.isNull(ready) || ready.isNotified || this.isStopped || !Object.isNull(this.refusal))
       return;
     try {
       const stored = await this.record.readAsync();
@@ -228,7 +231,7 @@ export class UpdateController {
     const found = await this.inspectRecordAsync();
     if (found instanceof UpdateReadyRecord) {
       this.ready = found;
-      this.set(new UpdateStatus(UpdateStateKind.Ready, found.version, null, previous.checkedAt, null, false));
+      this.set(new UpdateStatus(UpdateStateKind.Ready, found.version, null, previous.checkedAt, this.refusal, false));
       return;
     }
     let version: string | null;
@@ -246,6 +249,8 @@ export class UpdateController {
       this.set(new UpdateStatus(UpdateStateKind.UpToDate, null, null, checkedAt, null, false));
     else if (this.mustMove)
       this.set(new UpdateStatus(UpdateStateKind.Available, version, null, checkedAt, null, true));
+    else if (!Object.isNull(this.refusal))
+      this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, checkedAt, this.refusal, false));
     else
       await this.downloadAsync(version, checkedAt);
   }

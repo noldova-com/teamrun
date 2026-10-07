@@ -102,6 +102,7 @@ export class SquirrelHandoffTests {
       const processId = await fixture.handoff.handOffAsync(fixture.record());
 
       Assert.areEqual(5230, processId);
+      Assert.isNull(fixture.handoff.refusal);
       Assert.areEqual(0, fixture.updater.checks);
       Assert.areEqual(1, fixture.native.checks);
       Assert.areEqual(0, fixture.native.count);

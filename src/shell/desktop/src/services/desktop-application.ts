@@ -225,7 +225,7 @@ export class DesktopApplication {
     this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.followTrayIconSetting(t), t => this.log.write(t));
     this.updates = Object.isNull(setup) ? null : new UpdateController(setup.updater, createDeviceFile(installation.folder, Resources.updateReadyFile), updateLock,
-      RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
+      RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), setup.handoff.refusal, t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
       t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run), t => this.restartToUpdateAsync(t, setup.handoff));
     this.handoff = setup?.handoff ?? null;
     this.installation = installation;
@@ -799,7 +799,7 @@ export class DesktopApplication {
     const restart = AppImageRestart.find(this.process.platform, this.process.env, this.process.execPath, this.launchArguments, new ChildProcessStarter(), this.process.processId,
       join(this.dataDirectory.logsFolder, Resources.restartErrorFile));
     const stop = new UpdateStop(this.installation, this.presence, t => this.connector.connectAsync(t), (work, read) => this.askUpdateWorkAsync(work, read), this.process.processId,
-      RuntimeBuild.identity.productVersion, Date.now, t => delay(t), restart);
+      RuntimeBuild.identity.productVersion, Date.now, delay, restart);
     if (await stop.runAsync(record.version, () => handoff.handOffAsync(record)))
       await this.quitAfterHandoffAsync();
   }

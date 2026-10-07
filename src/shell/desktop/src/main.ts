@@ -60,7 +60,7 @@ function createHandoff(installation: Installation, updater: IUpdater, verifyAsyn
       return () => clearTimeout(timer);
     }, log);
   const image = AppImageSource.find(process.env, process.execPath);
-  return new AppImageHandoff(Object.isNull(image) ? null : new AppImageReplacement(image.file, t => AppImageReplacement.syncFolderAsync(t), log));
+  return new AppImageHandoff(Object.isNull(image) ? null : new AppImageReplacement(image.file, log));
 }
 
 DesktopApplication.start(
