@@ -46,7 +46,7 @@ export class DesktopStartFixture {
     pathCommand: FakePathCommand = new FakePathCommand(),
     installations: Installation[] = [],
     recordDesktopAsync: (installation: Installation) => Promise<boolean> = () => Promise.resolve(true),
-    createUpdater: (log: (text: string) => void) => IUpdater | null = () => null,
+    createUpdater: (log: (text: string) => void, isPackaged: boolean) => IUpdater | null = () => null,
     createUpdateLock: (log: (text: string) => void) => IUpdateCheckLock = () => new FakeUpdateCheckLock(),
     handoff: FakeUpdateHandoff = new FakeUpdateHandoff()): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
@@ -54,8 +54,8 @@ export class DesktopStartFixture {
       settings.push(t);
       installations.push(installation);
       return launcher;
-    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, _logs, log) => {
-      const updater = createUpdater(log);
+    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, isPackaged, _logs, log) => {
+      const updater = createUpdater(log, isPackaged);
       return Object.isNull(updater) ? null : { updater, handoff };
     }, (_, log) => createUpdateLock(log));
     return settings;

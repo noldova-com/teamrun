@@ -2320,6 +2320,23 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public tellsItsUpdaterWhetherItRunsFromAPackagedBuild(): void {
+    const told: boolean[] = [];
+    const builds: readonly (readonly [boolean, boolean])[] = [[true, false], [false, false], [true, true]];
+    for (const [isPackaged, isDefaultApp] of builds) {
+      const process = new FakeDesktopProcess("linux");
+      process.isDefaultApp = isDefaultApp;
+      DesktopStartFixture.start(new FakeElectron(true, isPackaged), process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(), [],
+        () => Promise.resolve(true), (_, packaged) => {
+          told.push(packaged);
+          return null;
+        });
+    }
+
+    Assert.areEqual(JSON.stringify([true, false, false]), JSON.stringify(told));
+  }
+
+  @TestMethod
   public async startsWithItsUpdatesFailedAndTheReasonLoggedWhenItsUpdaterCannotBeCreated(): Promise<void> {
     const electron = new FakeElectron();
     const process = new FakeDesktopProcess("linux");

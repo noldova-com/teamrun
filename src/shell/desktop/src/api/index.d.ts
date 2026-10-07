@@ -4779,17 +4779,19 @@ export declare class DesktopApplication {
    * @param recordDesktopAsync Records this desktop in its installation, as {@link DesktopRecord.recordAsync} does, while
    * the desktop checks the launch barrier, so an update waits for it to quit. A desktop it could not record is logged
    * and starts anyway.
-   * @param createUpdater Creates the updater of the installation and the handoff of its platform, given the data
-   * directory's `logs` folder for the handoff's programs, or gives `null` for a build that names no update feed, whose
-   * updates stay Off; the updater's log is the desktop's. The {@link UpdateController} it drives keeps
-   * `update-ready.json` in the installation's folder, follows `shell.updateChecks`, pushes each state on
-   * `teamrun:updateState` and posts `shell.updateReady` once over the runtime connection. Before the updater starts,
-   * the handoff removes what an earlier one left. Restart to update runs an {@link UpdateStop} that connects through an
-   * {@link UpdateTargetConnector}, asks section 9's question in a window through an {@link UpdateWorkQuestion} and
-   * calls the handoff, with an {@link AppImageRestart} on Linux. Once the handoff has succeeded, and only then, the
-   * desktop quits without asking anything again: through `nativeUpdater.quitAndInstall` on macOS, so the new version
-   * starts, or at once elsewhere. When `quitAndInstall` throws, the desktop logs it, tells the person that macOS
-   * installs the update but TeamRun can't open again by itself, and quits.
+   * @param createUpdater Creates the updater of the installation and the handoff of its platform, given whether the
+   * desktop runs from a packaged build and the data directory's `logs` folder for the handoff's programs, or gives
+   * `null` for a build that names no update feed, whose updates stay Off; the updater's log is the desktop's. The
+   * {@link UpdateController} it drives keeps `update-ready.json` in the installation's folder, follows
+   * `shell.updateChecks`, pushes each state on `teamrun:updateState` and posts `shell.updateReady` once over the runtime
+   * connection. Before the updater starts, the handoff removes what an earlier one left. Restart to update runs an
+   * {@link UpdateStop} that connects through an {@link UpdateTargetConnector}, asks section 9's question in a window
+   * through an {@link UpdateWorkQuestion} and calls the handoff, with an {@link AppImageRestart} on Linux; a quit asked
+   * for meanwhile waits until the handoff has finished or failed. Once the handoff has succeeded, and only then, the
+   * desktop quits without asking anything again: on macOS it closes its windows and calls
+   * `nativeUpdater.quitAndInstall`, so the new version starts, and elsewhere it exits at once. When Squirrel reports an
+   * `error`, or macOS hasn't quit within 10 seconds, the desktop logs it, tells the person that macOS installs the
+   * update but TeamRun can't open again by itself, and exits.
    * @param createUpdateLock Creates the lock that lets one desktop of the installation check at a time; the lock's log
    * is the desktop's.
    * @example
@@ -4821,7 +4823,7 @@ export declare class DesktopApplication {
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
-    createUpdater: (installation: Installation, logsFolder: string, log: (text: string) => void) => IUpdateSetup | null,
+    createUpdater: (installation: Installation, isPackaged: boolean, logsFolder: string, log: (text: string) => void) => IUpdateSetup | null,
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void;
 }
 
