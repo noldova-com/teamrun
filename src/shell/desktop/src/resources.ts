@@ -395,6 +395,10 @@ export class Resources {
     return `The folder ${folder} cannot be written, so the AppImage in it cannot be replaced with the update: ${reason}`;
   }
 
+  public static formatAppImageLeftoverNotRemoved(folder: string): string {
+    return `An unfinished copy of an earlier update in ${folder} could not be removed, so the AppImage in it was not replaced.`;
+  }
+
   public static formatAppImageNotReplaced(image: string, reason: string): string {
     return `The AppImage ${image} could not be replaced with the update and was left as it was: ${reason}`;
   }
@@ -417,6 +421,14 @@ export class Resources {
 
   public static formatRuntimeNotReached(dataDirectory: string): string {
     return `${Resources.applicationName} couldn't reach the runtime of ${dataDirectory} to stop it for the update.`;
+  }
+
+  public static formatRuntimeStillStarting(dataDirectory: string): string {
+    return `The runtime of ${dataDirectory} was still starting, so it couldn't be stopped for the update.`;
+  }
+
+  public static formatUpdateBarrierNotReleased(reason: string): string {
+    return `The update's barrier could not be removed after the update stopped: ${reason}`;
   }
 
   public static formatRuntimeNotFound(dataDirectory: string): string {
@@ -599,6 +611,10 @@ export class Resources {
   public static readonly updatePrepareTimeout: number = 15000;
   public static readonly updateExitWait: number = 10000;
   public static readonly updateExitInterval: number = 250;
+  public static readonly runtimeStartWait: number = 15000;
+  public static readonly runtimeStartInterval: number = 250;
+  public static readonly updateRelaunchLimit: number = 10000;
+  public static readonly updateNotRelaunchedInTime: string = "macOS didn't quit to install the update within 10 seconds.";
   public static readonly workSeparator: string = "; ";
   public static readonly workQueryTimeout: number = 2000;
   public static readonly programTimeout: number = 5000;

@@ -40,7 +40,12 @@ export class FakeElectron implements IElectron {
 
   public constructor(hasLock: boolean = true, isPackaged: boolean = false) {
     this.app = new FakeApplicationHost(hasLock, isPackaged);
-    this.nativeUpdater.onInstall = () => this.app.quit();
+    this.nativeUpdater.onInstall = () => {
+      for (const window of this.windows)
+        window.close();
+      if (this.windows.every(t => t.isDestroyed()))
+        this.app.quitFully();
+    };
   }
 
   public createWindow(options: BrowserWindowConstructorOptions): FakeDesktopWindow {

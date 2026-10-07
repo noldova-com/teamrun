@@ -410,6 +410,7 @@ export declare class UpdateStop {
    * @param wait Resolves after the given number of milliseconds.
    * @param restart Starts the replaced AppImage once this desktop has exited, or `null` when the desktop does not run
    * from an AppImage.
+   * @param log Records a barrier that could not be removed after the update stopped.
    * @example
    * ```ts
    * import { setTimeout as delay } from "node:timers/promises";
@@ -421,7 +422,7 @@ export declare class UpdateStop {
    *   const restart = AppImageRestart.find(process.platform, process.env, process.execPath, process.argv.slice(1), new ChildProcessStarter(), process.pid, errorFile);
    *   return new UpdateStop(
    *     installation, ProcessPresence.create(process.platform, new SystemCommand()), () => Promise.resolve(null), () => Promise.resolve(null),
-   *     process.pid, "0.2.0", Date.now, t => delay(t), restart);
+   *     process.pid, "0.2.0", Date.now, t => delay(t), restart, console.error);
    * }
    * ```
    */
@@ -434,7 +435,8 @@ export declare class UpdateStop {
     productVersion: string,
     now: () => number,
     wait: (milliseconds: number) => Promise<void>,
-    restart: AppImageRestart | null);
+    restart: AppImageRestart | null,
+    log: (text: string) => void);
 
   /**
    * Stops the installation for an update and calls the handoff. It holds the launch barrier as `Preparing`, asks each
@@ -473,8 +475,10 @@ export declare class UpdateStop {
 /**
  * Connects an {@link UpdateStop} to the runtime of a data directory in the installation's record, as the client
  * `update`. A directory without discovery that no runtime owns, or whose discovery names another program, is skipped.
- * It attaches without starting a runtime or taking over another build's, so a directory owned without discovery gets
- * the launcher's time to publish it, and identifies the runtime by the process id its discovery names.
+ * A directory owned without discovery has a runtime that is still starting: the connector waits up to 15 seconds for
+ * its discovery, skips the directory when the ownership ends first and fails the update when the time runs out. It
+ * attaches without starting a runtime or taking over another build's, and identifies the runtime by the process id its
+ * discovery names.
  */
 export declare class UpdateTargetConnector {
   /**
@@ -484,14 +488,18 @@ export declare class UpdateTargetConnector {
    * @param locate Gives the folder of the installation a program belongs to, as `Installation.locate` does.
    * @param createLauncher Creates the launcher of a data directory.
    * @param presence Identifies the runtime's process.
+   * @param now Reads the current time, in milliseconds.
+   * @param wait Resolves after the given number of milliseconds.
    * @example
    * ```ts
+   * import { setTimeout as delay } from "node:timers/promises";
+   *
    * import { type IRuntimeLauncher, UpdateTargetConnector } from "@noldova/teamrun-shell-desktop";
    * import { type DataDirectory, ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
    *
    * export function create(createLauncher: (dataDirectory: DataDirectory) => IRuntimeLauncher): UpdateTargetConnector {
    *   return new UpdateTargetConnector("/home/person/.config/TeamRun/installations/0123456789abcdef", () => "/home/person/.config/TeamRun/installations/0123456789abcdef",
-   *     createLauncher, ProcessPresence.create("linux", new SystemCommand()));
+   *     createLauncher, ProcessPresence.create("linux", new SystemCommand()), Date.now, t => delay(t));
    * }
    * ```
    */
@@ -499,7 +507,9 @@ export declare class UpdateTargetConnector {
     installationFolder: string,
     locate: (program: string) => string,
     createLauncher: (dataDirectory: DataDirectory) => IRuntimeLauncher,
-    presence: Pick<ProcessPresence, "stampAsync">);
+    presence: Pick<ProcessPresence, "stampAsync">,
+    now: () => number,
+    wait: (milliseconds: number) => Promise<void>);
 
   /**
    * Connects to the data directory's runtime.
@@ -658,6 +668,23 @@ export interface INativeUpdater {
    * ```
    */
   on(event: string, listener: (...values: unknown[]) => void): unknown;
+
+  /**
+   * Listens for the next occurrence of an event only.
+   *
+   * @param event The event's name.
+   * @param listener Receives the event's values.
+   * @returns The updater.
+   * @example
+   * ```ts
+   * import type { INativeUpdater } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function onFailure(updater: INativeUpdater, run: (error: unknown) => void): void {
+   *   updater.once("error", run);
+   * }
+   * ```
+   */
+  once(event: string, listener: (...values: unknown[]) => void): unknown;
 
   /**
    * Stops listening for an event.

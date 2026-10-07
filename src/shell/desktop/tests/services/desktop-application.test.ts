@@ -25,6 +25,7 @@ import { type IIpcEvent, PathCommandException, PathCommandOutcome, UnusableFolde
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
+import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDeviceFiles } from "../fixtures/fake-device-files.fixture.js";
@@ -2152,6 +2153,7 @@ export class DesktopApplicationTests {
       await Condition.waitAsync(() => electron.nativeUpdater.installs > 0);
 
       Assert.areEqual(1, electron.nativeUpdater.installs);
+      Assert.isTrue(DesktopStartFixture.firstWindow(electron).isGone);
       Assert.isTrue(electron.app.calls.includes("quit"));
       Assert.isFalse(electron.app.calls.includes("quit prevented"));
       Assert.isFalse(electron.app.calls.includes("exit 0"));
@@ -2185,9 +2187,7 @@ export class DesktopApplicationTests {
     const handoff = new FakeUpdateHandoff();
     handoff.handOff = () => Promise.resolve(5230);
     await DesktopApplicationTests.restartToUpdateAsync("darwin", handoff, async (electron, desktop) => {
-      electron.nativeUpdater.onInstall = () => {
-        throw new Error("No update available, can't quit and install");
-      };
+      electron.nativeUpdater.onInstall = () => void Promise.resolve().then(() => electron.nativeUpdater.emit("error", new Error("No update available, can't quit and install")));
       electron.dialog.failure = new Error("The dialog could not be shown.");
       await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
 
@@ -2215,6 +2215,44 @@ export class DesktopApplicationTests {
       Assert.isTrue(answered as boolean);
       Assert.areEqual(true, Reflect.get(Object(DesktopApplicationTests.quitQuestions(window)[0]), "isUpdate"));
       Assert.isNull(DesktopApplicationTests.quitQuestions(window)[1]);
+      Assert.areEqual(0, handoff.handedOff.length);
+      Assert.isFalse(electron.app.calls.includes("exit 0"));
+    }, target);
+  }
+
+  @TestMethod
+  public holdsAQuitWhileItRestartsToUpdateAndQuitsAsUsualOnceTheUpdateIsCancelled(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
+    return DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async electron => {
+      const window = DesktopStartFixture.firstWindow(electron);
+      const trusted = DesktopStartFixture.trustedEvent("linux");
+      await Condition.waitAsync(() => DesktopApplicationTests.quitQuestions(window).length === 1);
+
+      electron.app.quit();
+      const held = DesktopStartFixture.closeRequests(window).length;
+      electron.ipcMain.invoke("teamrun:quitAnswer", trusted, "Cancel");
+      await Condition.waitAsync(() => DesktopStartFixture.closeRequests(window).length === 1);
+      electron.ipcMain.invoke("teamrun:closeAnswer", trusted, DesktopStartFixture.closeRequests(window)[0], false);
+
+      Assert.areEqual(0, held);
+      Assert.isTrue(electron.app.calls.includes("quit prevented"));
+      Assert.isTrue(target.isClosed);
+      Assert.areEqual(0, handoff.handedOff.length);
+    }, target);
+  }
+
+  @TestMethod
+  public logsABarrierItCannotRemoveOnceARuntimeRefusesTheUpdate(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    const target = new FakeRuntimeConnection();
+    target.answers.set("shell.update", Response.failure("r", new Failure(FailureCode.Internal, "The runtime is stopping.")));
+    return DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async (electron, desktop, installation) => {
+      using _rm = new FailingFileCallFixture("rm", installation.barrierFile, "EBUSY");
+
+      await Condition.waitAsync(() => DesktopStartFixture.readErrors(desktop, "The update's barrier could not be removed").length === 1);
+
       Assert.areEqual(0, handoff.handedOff.length);
       Assert.isFalse(electron.app.calls.includes("exit 0"));
     }, target);
@@ -2815,7 +2853,7 @@ export class DesktopApplicationTests {
   private static async restartToUpdateAsync(
     platform: string,
     handoff: FakeUpdateHandoff,
-    run: (electron: FakeElectron, desktop: FakeDesktopProcess) => Promise<void>,
+    run: (electron: FakeElectron, desktop: FakeDesktopProcess, installation: Installation) => Promise<void>,
     target: FakeRuntimeConnection | null = null,
     paints: boolean = true): Promise<void> {
     await DesktopApplicationTests.withReadyFileAsync(async record => {
@@ -2848,7 +2886,7 @@ export class DesktopApplicationTests {
         const isStarted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Restart");
 
         Assert.isTrue(isStarted as boolean);
-        await run(electron, desktop);
+        await run(electron, desktop, installation);
       }
       finally {
         await rm(folder, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 });

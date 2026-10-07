@@ -156,6 +156,8 @@ export class DesktopApplication {
   private updatesStarted: Promise<void> = Promise.resolve();
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
+  private isRestarting: boolean = false;
+  private isQuitHeld: boolean = false;
   private runtimeQuit: Promise<void> | null = null;
   private trayCloseHint: ISystemNotification | null = null;
   private updateQuestion: UpdateWorkQuestion | null = null;
@@ -279,7 +281,8 @@ export class DesktopApplication {
     const deviceFolder = DesktopApplication.locateDeviceFolder(process);
     const installation = new Installation(Installation.locate(deviceFolder, AppImageSource.locateProgram(process.env, process.execPath), process.platform), t => presence.isRunningAsync(t));
     const connector = new UpdateTargetConnector(installation.folder, t => Installation.locate(deviceFolder, t, process.platform),
-      t => createLauncher(new LaunchSettings(t, launchSettings.executablePath, launchSettings.entryPath, launchSettings.environment, process.platform), installation), presence);
+      t => createLauncher(new LaunchSettings(t, launchSettings.executablePath, launchSettings.entryPath, launchSettings.environment, process.platform), installation), presence,
+      Date.now, delay);
     const icons = new AppIcons(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.iconFolderSegments), process.platform);
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), process.argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
@@ -597,7 +600,10 @@ export class DesktopApplication {
     if (this.isExiting)
       return;
     event.preventDefault();
-    void this.quitFlow.quitAsync();
+    if (this.isRestarting)
+      this.isQuitHeld = true;
+    else
+      void this.quitFlow.quitAsync();
   }
 
   private get isQuitting(): boolean {
@@ -803,9 +809,18 @@ export class DesktopApplication {
     const restart = AppImageRestart.find(this.process.platform, this.process.env, this.process.execPath, this.launchArguments, new ChildProcessStarter(), this.process.processId,
       join(this.dataDirectory.logsFolder, Resources.restartErrorFile));
     const stop = new UpdateStop(this.installation, this.presence, t => this.connector.connectAsync(t), (work, read) => this.askUpdateWorkAsync(work, read), this.process.processId,
-      RuntimeBuild.identity.productVersion, Date.now, delay, restart);
-    if (await stop.runAsync(record.version, () => handoff.handOffAsync(record)))
-      await this.quitAfterHandoffAsync();
+      RuntimeBuild.identity.productVersion, Date.now, delay, restart, t => this.log.write(t));
+    this.isRestarting = true;
+    try {
+      if (await stop.runAsync(record.version, () => handoff.handOffAsync(record)))
+        await this.quitAfterHandoffAsync();
+    }
+    finally {
+      this.isRestarting = false;
+      if (this.isQuitHeld && !this.isExiting)
+        this.electron.app.quit();
+      this.isQuitHeld = false;
+    }
   }
 
   private async askUpdateWorkAsync(work: readonly string[], readWorkAsync: () => Promise<readonly string[]>): Promise<readonly string[] | null> {
@@ -824,19 +839,26 @@ export class DesktopApplication {
 
   private async quitAfterHandoffAsync(): Promise<void> {
     this.isExiting = true;
-    if (this.process.platform === Resources.macPlatform)
-      try {
-        this.electron.nativeUpdater.quitAndInstall();
+    if (this.process.platform === Resources.macPlatform) {
+      const failure = await this.quitAndInstallAsync();
+      if (Object.isNull(failure))
         return;
-      }
-      catch (error) {
-        this.log.write(Resources.formatUpdateRelaunchFailed(String(error)));
-        await this.electron.dialog.showMessageBox(null, {
-          type: Resources.warningBoxType, message: Resources.updateRelaunchFailed, detail: Resources.updateRelaunchFailedDetail, buttons: [Resources.okButton], defaultId: 0, cancelId: 0,
-          noLink: true
-        }).catch(() => undefined);
-      }
+      this.log.write(Resources.formatUpdateRelaunchFailed(String(failure)));
+      await this.electron.dialog.showMessageBox(null, {
+        type: Resources.warningBoxType, message: Resources.updateRelaunchFailed, detail: Resources.updateRelaunchFailedDetail, buttons: [Resources.okButton], defaultId: 0, cancelId: 0,
+        noLink: true
+      }).catch(() => undefined);
+    }
     this.electron.app.exit(Resources.quitExitCode);
+  }
+
+  private async quitAndInstallAsync(): Promise<unknown> {
+    for (const open of this.windows.values())
+      open.closeNow();
+    const failed = new Promise<unknown>(resolve => this.electron.nativeUpdater.once(Resources.errorEvent, error => resolve(error)));
+    const quitting = new Promise<unknown>(resolve => this.electron.app.on(Resources.willQuitEvent, () => resolve(null)));
+    this.electron.nativeUpdater.quitAndInstall();
+    return Promise.race([failed, quitting, delay(Resources.updateRelaunchLimit, Resources.updateNotRelaunchedInTime, { ref: false })]);
   }
 
   private get launchArguments(): readonly string[] {

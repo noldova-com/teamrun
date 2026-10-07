@@ -25,6 +25,14 @@ export class FakeNativeUpdater implements INativeUpdater {
     return this;
   }
 
+  public once(event: string, listener: (...values: unknown[]) => void): this {
+    const once = (...values: unknown[]): void => {
+      this.removeListener(event, once);
+      listener(...values);
+    };
+    return this.on(event, once);
+  }
+
   public removeListener(event: string, listener: (...values: unknown[]) => void): this {
     this.listeners.set(event, (this.listeners.get(event) ?? []).filter(t => t !== listener));
     return this;

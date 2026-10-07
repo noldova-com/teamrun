@@ -76,10 +76,12 @@ export class AppImageReplacementTests {
       ];
       for (const name of [`.TeamRun.AppImage.${AppImageReplacementTests.UNIQUE}.part`, ...kept])
         await writeFile(path.join(folder, name), AppImageReplacementTests.OLD);
+      const directory = ".TeamRun.AppImage.7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e5f.part";
+      await mkdir(path.join(folder, directory));
 
       await this.create(image).replaceAsync(download);
 
-      Assert.areEqual(JSON.stringify(["TeamRun.AppImage", ...kept, "update"].sort()), JSON.stringify((await readdir(folder)).sort()));
+      Assert.areEqual(JSON.stringify(["TeamRun.AppImage", ...kept, directory, "update"].sort()), JSON.stringify((await readdir(folder)).sort()));
       Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
     });
   }
@@ -94,6 +96,21 @@ export class AppImageReplacementTests {
       Assert.areEqual(AppImageReplacementTests.NEW, await readFile(image, "utf8"));
       Assert.areEqual(JSON.stringify([`The AppImage in ${folder} was replaced, but the folder could not be flushed to disk: Error: EIO: operation failed, open '${folder}'`]),
         JSON.stringify(this.logged));
+    });
+  }
+
+  @TestMethod
+  public async refusesWithAReadableReasonWhenAnEarlierCopyCannotBeRemoved(): Promise<void> {
+    await AppImageReplacementTests.runInFolderAsync(async (folder, image, download) => {
+      const leftover = path.join(folder, `.TeamRun.AppImage.${AppImageReplacementTests.UNIQUE}.part`);
+      await writeFile(leftover, AppImageReplacementTests.OLD);
+      using _rm = new FailingFileCallFixture("rm", leftover, "EACCES");
+
+      const failure = await Assert.throwsAsync(() => this.create(image).replaceAsync(download), UpdateHandoffException);
+
+      Assert.areEqual(`An unfinished copy of an earlier update in ${folder} could not be removed, so the AppImage in it was not replaced.`, failure.message);
+      Assert.isTrue(String(failure.cause).includes("EACCES"));
+      Assert.areEqual(AppImageReplacementTests.OLD, await readFile(image, "utf8"));
     });
   }
 

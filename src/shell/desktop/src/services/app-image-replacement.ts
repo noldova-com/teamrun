@@ -52,12 +52,7 @@ export class AppImageReplacement {
 
   private static async syncFolderAsync(folder: string): Promise<void> {
     const handle = await open(folder, Resources.readFlag);
-    try {
-      await handle.sync();
-    }
-    finally {
-      await handle.close();
-    }
+    return handle.sync().finally(() => handle.close());
   }
 
   private static async inspectAsync(file: string): Promise<[string, number]> {
@@ -71,8 +66,8 @@ export class AppImageReplacement {
   }
 
   private static async createAsync(part: string, folder: string, name: string, mode: number): Promise<FileHandle> {
+    await AppImageReplacement.removeLeftoversAsync(folder, name);
     try {
-      await AppImageReplacement.removeLeftoversAsync(folder, name);
       return await open(part, Resources.createOnlyFlag, mode);
     }
     catch (error) {
@@ -81,8 +76,13 @@ export class AppImageReplacement {
   }
 
   private static async removeLeftoversAsync(folder: string, name: string): Promise<void> {
-    const leftovers = (await readdir(folder)).filter(t => Resources.appImagePartPattern.exec(t)?.[1] === name);
-    for (const leftover of leftovers)
-      await rm(path.join(folder, leftover), { force: true });
+    try {
+      const leftovers = (await readdir(folder, { withFileTypes: true })).filter(t => !t.isDirectory() && Resources.appImagePartPattern.exec(t.name)?.[1] === name);
+      for (const leftover of leftovers)
+        await rm(path.join(folder, leftover.name), { force: true });
+    }
+    catch (error) {
+      throw new UpdateHandoffException(Resources.formatAppImageLeftoverNotRemoved(folder), new ExceptionOptions(error));
+    }
   }
 }

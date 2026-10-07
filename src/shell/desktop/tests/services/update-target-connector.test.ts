@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { Event, ShellEvents, UpdateProcess } from "@noldova/teamrun-shell-protocol";
-import { DataDirectory, LaunchException, NoRuntimeException, RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
+import { DataDirectory, LaunchException, NoRuntimeException, OwnershipLock, RuntimeDiscovery } from "@noldova/teamrun-shell-runtime";
 import { UpdateStopException, UpdateTargetConnector } from "@noldova/teamrun-shell-desktop";
 
 import { FakeProcessPresence } from "../fixtures/fake-process-presence.fixture.js";
@@ -27,7 +27,10 @@ export class UpdateTargetConnectorTests {
 
   private readonly presence: FakeProcessPresence = new FakeProcessPresence();
   private readonly launched: string[] = [];
+  private readonly waits: number[] = [];
   private launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher();
+  private time: number = 0;
+  private onWait: () => Promise<void> = () => Promise.resolve();
 
   @TestMethod
   public skipsADirectoryThatNoRuntimeOwns(): Promise<void> {
@@ -71,6 +74,51 @@ export class UpdateTargetConnectorTests {
       this.launcher.listener?.onEvent(new Event(ShellEvents.work, { descriptions: [], sequence: 1 }));
       this.launcher.listener?.onDisconnected(null);
       Assert.isFalse(connection.isClosed);
+    });
+  }
+
+  @TestMethod
+  public waitsForTheRuntimeOfAnOwnedDirectoryToPublishItselfAndConnects(): Promise<void> {
+    return this.runAsync(async root => {
+      using _lock = OwnershipLock.acquire(new DataDirectory(root));
+      const connection = new FakeRuntimeConnection();
+      this.launcher = new FakeRuntimeLauncher(connection);
+      this.onWait = () => UpdateTargetConnectorTests.publishAsync(root, UpdateTargetConnectorTests.PROGRAM);
+
+      const target = await this.create().connectAsync(root);
+
+      Assert.areEqual(connection, target?.connection);
+      Assert.areEqual(JSON.stringify([250]), JSON.stringify(this.waits));
+    });
+  }
+
+  @TestMethod
+  public skipsAnOwnedDirectoryWhoseRuntimeEndsBeforeItPublishesItself(): Promise<void> {
+    return this.runAsync(async root => {
+      const lock = OwnershipLock.acquire(new DataDirectory(root));
+      this.onWait = () => {
+        lock[Symbol.dispose]();
+        return Promise.resolve();
+      };
+
+      const target = await this.create().connectAsync(root);
+
+      Assert.isNull(target);
+      Assert.areEqual(JSON.stringify([250]), JSON.stringify(this.waits));
+      Assert.areEqual(0, this.launched.length);
+    });
+  }
+
+  @TestMethod
+  public failsWhenTheRuntimeOfAnOwnedDirectoryIsStillStartingAfterFifteenSeconds(): Promise<void> {
+    return this.runAsync(async root => {
+      using _lock = OwnershipLock.acquire(new DataDirectory(root));
+
+      const failure = await Assert.throwsAsync(() => this.create().connectAsync(root), UpdateStopException);
+
+      Assert.areEqual(`The runtime of ${root} was still starting, so it couldn't be stopped for the update.`, failure.message);
+      Assert.areEqual(15_000, this.waits.reduce((total, t) => total + t, 0));
+      Assert.areEqual(0, this.launched.length);
     });
   }
 
@@ -141,7 +189,11 @@ export class UpdateTargetConnectorTests {
       t => t === UpdateTargetConnectorTests.PROGRAM ? UpdateTargetConnectorTests.INSTALLATION : "/home/person/.config/TeamRun/installations/fedcba9876543210", t => {
         this.launched.push(t.root);
         return this.launcher;
-      }, this.presence);
+      }, this.presence, () => this.time, async t => {
+        this.waits.push(t);
+        this.time += t;
+        await this.onWait();
+      });
   }
 
   private static async publishAsync(root: string, program: string): Promise<void> {
