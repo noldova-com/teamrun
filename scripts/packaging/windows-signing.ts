@@ -55,8 +55,8 @@ export default class WindowsSigning implements IPackageSigning {
     return this.module.prepareAsync(this.packages);
   }
 
-  public finishAsync(): Promise<void> {
-    return Promise.resolve();
+  public finishAsync(): Promise<string> {
+    return Promise.resolve("");
   }
 
   public async verifyAsync(packages: readonly string[], product: ProductIdentity): Promise<string> {

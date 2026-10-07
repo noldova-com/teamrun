@@ -137,7 +137,7 @@ export default class Package {
       throw new PackagingException(`electron-builder finished without making ${missing.join(", ")}.`);
     this.output.write(`Packages made:\n${files.map(t => `  ${t}\n`).join("")}`);
     if (signing !== null) {
-      await signing.finishAsync(files);
+      this.output.write(await signing.finishAsync(files));
       this.output.write(`Signatures:\n${await signing.verifyAsync(files, manifest.product)}\n`);
     }
     await new PackageReport(target.id, signing !== null, signing !== null).writeAsync(layout.report);
