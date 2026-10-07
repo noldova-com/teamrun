@@ -6866,7 +6866,7 @@ export declare class RuntimeEntry {
    * @param entryArguments The entry arguments, as {@link RuntimeOptions.parse} reads them.
    * @param platform The platform, as in `process.platform`.
    * @param environment The environment.
-   * @param signals Emits `SIGINT` and `SIGTERM`, which stop the runtime.
+   * @param signals Emits `SIGINT`, `SIGTERM` and `SIGHUP`, which stop the runtime.
    * @param error Receives usage and failure messages.
    * @returns A promise of the exit code: 0 after a stop, 1 when the runtime failed to start, 2 for invalid arguments and 3 when another runtime owns the directory.
    * @example

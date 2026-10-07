@@ -13,9 +13,10 @@ It shares the runtime and the data directory with the desktop.
 |---|---|
 | `teamrun status` | Reports the runtime's build, the data directory, the modules and where each stands, and the work in progress. Never starts a runtime. |
 | `teamrun commands` | Lists the runtime's commands, with each one's name, title and module. The window's commands are not reachable from the command line. |
-| `teamrun run <command> [<json> \| --args-file <path> \| -]` | Runs one of the runtime's commands and prints its result; a command that is not enabled now is refused. Its arguments are JSON, given inline, read from a file, or read from standard input with `-`. Pressing Ctrl+C cancels the command. |
-| `teamrun <module> <command> [<argument>...] [--<option> [<value>]...]` | Runs one of a module's commands, as [module commands](#7-module-commands) describe. Pressing Ctrl+C cancels the command. |
+| `teamrun run <command> [<json> \| --args-file <path> \| -]` | Runs one of the runtime's commands and prints its result; a command that is not enabled now is refused. Its arguments are JSON, given inline, read from a file, or read from standard input with `-`. Pressing Ctrl+C, or closing the terminal, cancels the command. |
+| `teamrun <module> <command> [<argument>...] [--<option> [<value>]...]` | Runs one of a module's commands, as [module commands](#7-module-commands) describe. Pressing Ctrl+C, or closing the terminal, cancels the command. |
 | `teamrun open` | Starts TeamRun with the same data directory, or brings its window forward when it already runs. |
+| `teamrun quit` | Quits the TeamRun that runs with the same data directory, as its Quit TeamRun does, and waits for the outcome, as [quitting](#8-quitting) describes. Never starts a runtime. |
 | `teamrun help [<module> [<command>]]` | Prints the usage: the command line's own commands and every module's commands, a module's commands, or one command's arguments, options and examples. Never starts a runtime. |
 
 `commands`, `run` and module commands start a runtime when none is running.
@@ -30,7 +31,7 @@ The runtime then stays up under its idle policy, so later calls attach to it.
 | `--json` | Prints exactly one JSON value on standard output, and each error as a line of `{"code","message","details"}` on standard error. |
 | `--no-start` | `commands`, `run` and module commands fail with exit code 3 instead of starting a runtime. |
 | `--take-over` | `commands`, `run` and module commands take over another build's runtime when this build is newer and that runtime is idle. |
-| `--timeout <seconds>` | How long `run`'s command or a module command may take, in whole seconds from 1 to 3600. |
+| `--timeout <seconds>` | How long `run`'s command, `quit` or a module command may take, in whole seconds from 1 to 3600. |
 | `--help` | Prints the help of the command it follows, as `teamrun help` does, and runs nothing. |
 
 The command line never asks a question; it reports and exits.
@@ -42,12 +43,12 @@ The exit codes are stable; scripts may rely on them.
 | Code | Meaning |
 |---|---|
 | 0 | Success. |
-| 1 | The command, or the method it called, failed, or a runtime could not start. |
+| 1 | The command, or the method it called, failed, a runtime could not start, or TeamRun stayed open because a window could not save when `quit` asked. |
 | 2 | The command line, or a command's arguments, are not valid. |
 | 3 | No runtime is running, and the command does not start one. |
 | 4 | Another build's runtime owns the data directory: an older one without `--take-over`, a newer one, or one with work in progress. The error names the running build and its program. |
 | 5 | The data directory cannot be used: it holds data from before the shell, another program's runtime owns it, or it is not a writable folder. Data from before the shell is reported and never moved. |
-| 6 | The command timed out or was cancelled. |
+| 6 | The command timed out or was cancelled, or TeamRun stayed open because the person kept it open when `quit` asked. |
 | 7 | The command's module is not active: it failed or is blocked in the runtime, or its command-line part failed to start in this command line. The error names the module, its cause and, for a blocked module, the dependency that blocks it. |
 | 8 | TeamRun is installing an update: the update was still under way after 30 seconds, or one that was handed to the installer may not have finished. Run the command again once TeamRun has restarted, or open TeamRun to settle an update that did not finish. |
 | 9 | A module command succeeded and printed its result, but a command-line part failed to stop; the error names why. Its work is done, so running it again repeats it. |
@@ -80,7 +81,7 @@ A module adds its commands under its id, as `teamrun <module> <command>`, where 
 The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how a module declares them.
 
 - **Reserved words.**
-  A module's id is never one of the command line's own commands: `status`, `commands`, `run`, `open` and `help`.
+  A module's id is never one of the command line's own commands: `status`, `commands`, `run`, `open`, `quit` and `help`.
   The build refuses a module whose id is one of them, and a module command's option named like one of the command line's own options, `--args-file` included.
   The build reads both lists from the command line's source, so a new command or option of the command line's own refuses a module that already uses its name.
 - **Reading the call.**
@@ -98,7 +99,7 @@ The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how
   Every part that started is stopped afterwards in reverse order, even when one fails to stop.
   A part still starting then is stopped once its start settles, whenever that is, so it may stop while the others do; the command line ends once it has written its result, so a part whose start settles later is never stopped, and the process ends even while that start holds a timer, socket or child process.
   A part that fails to stop is reported on standard error after the command's result or error, and makes a command that succeeded exit with code 9.
-  Stopping the parts is not bounded by `--timeout`: the command line waits for each part to stop, and an interruption while it waits ends the command line at once, with the exit code the system gives an interrupted program, 130 in a Linux or macOS shell and `0xC000013A` on Windows.
+  Stopping the parts is not bounded by `--timeout`: the command line waits for each part to stop, and an interruption while it waits ends the command line at once, with the exit code the system gives an interrupted program, 130 in a Linux or macOS shell, 129 when its terminal closed, and `0xC000013A` on Windows.
   A part reaches only the methods of its own module and of the modules it declares as dependencies, not of their dependencies.
   `teamrun run` exits with code 7 too for a runtime command whose module is not active.
 - **Output.**
@@ -111,3 +112,24 @@ The [architecture](../../../docs/ARCHITECTURE.md#command-line-commands) owns how
   `teamrun help <module> <command>` and `teamrun <module> <command> --help` print the command's usage, description, arguments, options with their types and defaults, and examples.
   With `--json`, help prints `{"help"}` with the same text.
   Help reads only the build's declarations, so it never starts or reaches a runtime and lists every module of the build, active or not.
+
+## 8. Quitting
+
+`teamrun quit` asks the runtime of the data directory to quit its desktop, which quits as its Quit TeamRun does: every window saves, and when work is in progress, a window asks the person whether to wait for it or stop it.
+The [architecture](../../../docs/ARCHITECTURE.md#9-active-work-closing-and-shutdown) owns that quit.
+
+- **Outcome.**
+  It prints `TeamRun quit.` once the desktop has quit, and `TeamRun is not running.` when no desktop is connected to the runtime; both exit with code 0.
+  With `--json` it prints `{"outcome":"Quit"}` or `{"outcome":"NoDesktop"}`.
+- **Staying open.**
+  When the person keeps TeamRun open, it prints `TeamRun stayed open: it was kept open while work was in progress.` and exits with code 6, its JSON code `Cancelled`.
+  When a window could not save, it prints `TeamRun stayed open: a window could not save.` and exits with code 1, its JSON code `Conflict`.
+- **No runtime.**
+  It never starts a runtime and exits with code 3 when none is running.
+  A desktop whose runtime is not running cannot be reached, so `quit` cannot quit it.
+- **Waiting.**
+  `--timeout`, Ctrl+C and closing the terminal stop the wait with code 6; a question the window already shows stays for the person to answer.
+  Without `--timeout`, it waits as long as the runtime allows a request, 10 minutes.
+  A second `quit` while one waits joins it and gets the same outcome.
+- **The runtime.**
+  While `quit` waits, its connection does not keep the runtime running, so an idle runtime stops with the desktop as it does after Quit TeamRun.

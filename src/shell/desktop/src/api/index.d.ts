@@ -16,7 +16,7 @@ import type {
 
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
+import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StayCause, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
 import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchException, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
@@ -611,17 +611,19 @@ export declare class QuitFlow implements ICloseGuard {
   /**
    * Quits TeamRun, or joins the quit already running.
    *
-   * @returns A promise that settles once TeamRun exits or stays open.
+   * @returns A promise of `null` once TeamRun exits, or of why it stayed open: `Kept` when the person kept it open,
+   * `SaveFailed` when a window could not save.
    * @example
    * ```ts
+   * import type { StayCause } from "@noldova/teamrun-shell-protocol";
    * import type { QuitFlow } from "@noldova/teamrun-shell-desktop";
    *
-   * export function quitAsync(flow: QuitFlow): Promise<void> {
+   * export function quitAsync(flow: QuitFlow): Promise<StayCause | null> {
    *   return flow.quitAsync();
    * }
    * ```
    */
-  public quitAsync(): Promise<void>;
+  public quitAsync(): Promise<StayCause | null>;
 }
 
 /**

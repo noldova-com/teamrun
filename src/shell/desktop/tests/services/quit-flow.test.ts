@@ -7,7 +7,7 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { WorkReport } from "@noldova/teamrun-shell-protocol";
+import { StayCause, WorkReport } from "@noldova/teamrun-shell-protocol";
 import { QuitChoice, QuitCoordinator, QuitFlow } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "../fixtures/condition.fixture.js";
@@ -38,8 +38,9 @@ export class QuitFlowTests {
   public async exitsWithoutAskingOnceTheWindowsHaveSavedWhenTheRuntimeStopsOrIsKept(): Promise<void> {
     const host = new FakeQuitHost();
 
-    await QuitFlowTests.create(host, new WorkReport(["Indexing"], 1)).quitAsync();
+    const stayed = await QuitFlowTests.create(host, new WorkReport(["Indexing"], 1)).quitAsync();
 
+    Assert.isNull(stayed);
     Assert.areEqual("save,stop IfIdle,exit", host.calls.join(","));
   }
 
@@ -51,9 +52,9 @@ export class QuitFlowTests {
     second.busy.push(true);
     second.saves.push(true, false);
 
-    await QuitFlowTests.create(first, null).quitAsync();
-    await QuitFlowTests.create(second, null).quitAsync();
+    const causes = [await QuitFlowTests.create(first, null).quitAsync(), await QuitFlowTests.create(second, null).quitAsync()];
 
+    Assert.areEqual("SaveFailed,SaveFailed", causes.join(","));
     Assert.areEqual("save", first.calls.join(","));
     Assert.areEqual("save,stop IfIdle,prompt,save", second.calls.join(","));
   }
@@ -76,10 +77,11 @@ export class QuitFlowTests {
     const cancelled = new QuitFlow(cancelling, asker).quitAsync();
     await Condition.waitAsync(() => prompt.shown.length === 3);
     asker.answer(prompt, QuitChoice.Cancel);
-    await cancelled;
+    const cause = await cancelled;
 
     Assert.areEqual("save,stop IfIdle,prompt,save,stop StopWork,exit", stopping.calls.join(","));
     Assert.areEqual("save,stop IfIdle,prompt", cancelling.calls.join(","));
+    Assert.areEqual(StayCause.Kept, cause);
   }
 
   @TestMethod

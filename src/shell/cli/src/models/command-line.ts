@@ -18,6 +18,7 @@ export class CommandLine {
   private static readonly VALUE_OPTIONS: readonly string[] = CommandLineNames.valueOptions.map(t => `${Resources.flagPrefix}${t}`);
   private static readonly SWITCHES: readonly string[] = CommandLineNames.switches.map(t => `${Resources.flagPrefix}${t}`);
   private static readonly ATTACHING: readonly CliCommand[] = [CliCommand.Commands, CliCommand.Run];
+  private static readonly WAITING: readonly CliCommand[] = [CliCommand.Run, CliCommand.Quit];
 
   public readonly command: CliCommand;
   public readonly dataDirectory: string | null;
@@ -105,9 +106,10 @@ export class CommandLine {
     for (const option of [Resources.noStartFlag, Resources.takeOverFlag])
       if (options.has(option) && !CommandLine.ATTACHING.includes(command))
         throw new UsageException(Resources.formatOptionNotForCommand(option, name));
-    for (const option of [Resources.timeoutFlag, Resources.argumentsFileFlag])
-      if (options.has(option) && command !== CliCommand.Run)
-        throw new UsageException(Resources.formatOptionNotForCommand(option, name));
+    if (options.has(Resources.timeoutFlag) && !CommandLine.WAITING.includes(command))
+      throw new UsageException(Resources.formatOptionNotForCommand(Resources.timeoutFlag, name));
+    if (options.has(Resources.argumentsFileFlag) && command !== CliCommand.Run)
+      throw new UsageException(Resources.formatOptionNotForCommand(Resources.argumentsFileFlag, name));
 
     const [commandName, argumentsValue, unexpected] = command === CliCommand.Run ? rest : [undefined, undefined, rest[0]];
     if (!Object.isUndefined(unexpected))

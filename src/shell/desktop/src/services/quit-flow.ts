@@ -7,7 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import { StopPolicy } from "@noldova/teamrun-shell-protocol";
+import { StayCause, StopPolicy } from "@noldova/teamrun-shell-protocol";
 
 import { QuitOutcome } from "../enums/quit-outcome.js";
 import type { ICloseGuard } from "../interfaces/i-close-guard.js";
@@ -18,7 +18,7 @@ import type { QuitCoordinator } from "./quit-coordinator.js";
 export class QuitFlow implements ICloseGuard {
   private readonly host: IQuitHost;
   private readonly asker: QuitCoordinator;
-  private quitting: Promise<void> | null = null;
+  private quitting: Promise<StayCause | null> | null = null;
 
   public constructor(host: IQuitHost, asker: QuitCoordinator) {
     this.host = host;
@@ -44,23 +44,26 @@ export class QuitFlow implements ICloseGuard {
     return false;
   }
 
-  public quitAsync(): Promise<void> {
+  public quitAsync(): Promise<StayCause | null> {
     this.quitting ??= this.runAsync().finally(() => {
       this.quitting = null;
     });
     return this.quitting;
   }
 
-  private async runAsync(): Promise<void> {
+  private async runAsync(): Promise<StayCause | null> {
     if (!await this.host.saveAllAsync())
-      return;
+      return StayCause.SaveFailed;
     if (await this.host.stopAsync(StopPolicy.IfIdle)) {
       const prompt = await this.host.findPromptAsync();
       const outcome = Object.isNull(prompt) ? QuitOutcome.Quit : await this.asker.askAsync(prompt);
-      if (outcome === QuitOutcome.Stay || !await this.host.saveAllAsync())
-        return;
+      if (outcome === QuitOutcome.Stay)
+        return StayCause.Kept;
+      if (!await this.host.saveAllAsync())
+        return StayCause.SaveFailed;
       await this.host.stopAsync(outcome === QuitOutcome.StopWork ? StopPolicy.StopWork : StopPolicy.IfIdle);
     }
     this.host.exit();
+    return null;
   }
 }

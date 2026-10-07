@@ -196,6 +196,36 @@ export declare enum StopPolicy {
 }
 
 /**
+ * How a `shell.quit` ended when the desktop did not stay open.
+ */
+export declare enum QuitResult {
+  /**
+   * The desktop saved and quit, as its Quit TeamRun does.
+   */
+  Quit = "Quit",
+
+  /**
+   * No desktop was connected to the runtime, so nothing quit.
+   */
+  NoDesktop = "NoDesktop"
+}
+
+/**
+ * Why a desktop asked to quit by `shell.quitting` stayed open.
+ */
+export declare enum StayCause {
+  /**
+   * The person kept TeamRun open when it asked about the work in progress.
+   */
+  Kept = "Kept",
+
+  /**
+   * A window part's save failed, so TeamRun stayed open.
+   */
+  SaveFailed = "SaveFailed"
+}
+
+/**
  * The kind of value a setting holds.
  */
 export declare enum SettingKind {
@@ -805,6 +835,121 @@ export declare class KeptRuntime {
    * import { KeptRuntime } from "@noldova/teamrun-shell-protocol";
    *
    * export const json: JsonObject = new KeptRuntime(1).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The answer to a `shell.quit` whose desktop did not stay open.
+ */
+export declare class QuitReport {
+  /**
+   * Whether the desktop quit or none was connected.
+   */
+  public readonly outcome: QuitResult;
+
+  /**
+   * Creates the answer.
+   *
+   * @param outcome Whether the desktop quit or none was connected.
+   *
+   * @example
+   * ```ts
+   * import { QuitReport, QuitResult } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const report: QuitReport = new QuitReport(QuitResult.Quit);
+   * ```
+   */
+  public constructor(outcome: QuitResult);
+
+  /**
+   * Reads an answer from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The answer.
+   * @throws JsonException synchronously when `outcome` is missing or not a
+   * `QuitResult`, or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { QuitReport } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const report: QuitReport = QuitReport.fromJson({ outcome: "NoDesktop" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): QuitReport;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `outcome` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { QuitReport, QuitResult } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new QuitReport(QuitResult.Quit).toJson();
+   * ```
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `shell.stayedOpen`: a desktop asked to quit by
+ * `shell.quitting` stayed open.
+ */
+export declare class StayedOpen {
+  /**
+   * Why the desktop stayed open.
+   */
+  public readonly cause: StayCause;
+
+  /**
+   * Creates the payload.
+   *
+   * @param cause Why the desktop stayed open.
+   *
+   * @example
+   * ```ts
+   * import { StayCause, StayedOpen } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const stayed: StayedOpen = new StayedOpen(StayCause.Kept);
+   * ```
+   */
+  public constructor(cause: StayCause);
+
+  /**
+   * Reads a payload from its wire form.
+   *
+   * @param value The untrusted value.
+   * @param path The path a failure reports; `$` by default.
+   * @returns The payload.
+   * @throws JsonException synchronously when `cause` is missing or not a
+   * `StayCause`, or another field is present; its path names the field.
+   *
+   * @example
+   * ```ts
+   * import { StayedOpen } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const stayed: StayedOpen = StayedOpen.fromJson({ cause: "SaveFailed" });
+   * ```
+   */
+  public static fromJson(value: unknown, path?: string): StayedOpen;
+
+  /**
+   * Returns the wire form.
+   *
+   * @returns The `cause` field.
+   *
+   * @example
+   * ```ts
+   * import type { JsonObject } from "@noldova/teamrun-foundation-json";
+   * import { StayCause, StayedOpen } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const json: JsonObject = new StayedOpen(StayCause.Kept).toJson();
    * ```
    */
   public toJson(): JsonObject;
@@ -1770,6 +1915,15 @@ export declare class ShellEvents {
   public static readonly updateEnded: QualifiedName;
 
   /**
+   * `shell.quitting`: a client asked the runtime with `shell.quit` to quit
+   * its desktops. A desktop quits as its Quit TeamRun does: its windows
+   * save, and it asks the person when work is in progress. A desktop that
+   * stays open answers with `shell.stayedOpen`; one that quits answers
+   * nothing and ends its connection. It has no payload.
+   */
+  public static readonly quitting: QualifiedName;
+
+  /**
    * `shell.commandsChanged`: a runtime command was registered or withdrawn,
    * or its enabled or checked state changed; its payload is the whole
    * `CommandList`, with a sequence greater than any list before it.
@@ -1788,6 +1942,28 @@ export declare class ShellEvents {
    * `RecentCommands`.
    */
   public static readonly recentCommandsChanged: QualifiedName;
+}
+
+/**
+ * The client names the shell's own clients give in their handshake.
+ */
+export declare class ShellClients {
+  /**
+   * `desktop`: the desktop, which `shell.quit` asks to quit.
+   */
+  public static readonly desktop: string;
+
+  /**
+   * `cli`: the command line.
+   *
+   * @example
+   * ```ts
+   * import { ShellClients } from "@noldova/teamrun-shell-protocol";
+   *
+   * export const isCommandLine: boolean = ShellClients.commandLine === "cli";
+   * ```
+   */
+  public static readonly commandLine: string;
 }
 
 /**
@@ -1878,6 +2054,25 @@ export declare class ShellMethods {
    * is an `UpdateSaved`.
    */
   public static readonly updateSaved: QualifiedName;
+
+  /**
+   * `shell.quit`: asks the runtime to quit the desktops connected to it, as
+   * their Quit TeamRun does. The runtime announces `shell.quitting` and
+   * answers with a `QuitReport` once every desktop's connection has ended or
+   * the runtime begins to stop, or at once with `NoDesktop` when no desktop
+   * is connected. A desktop that stays open fails the call: with `Cancelled`
+   * when the person kept TeamRun open, with `Conflict` when a save failed.
+   * A call made while another waits joins it. While the call waits, its
+   * client is not counted as sharing the runtime when a desktop asks it to
+   * stop. It takes no payload.
+   */
+  public static readonly quit: QualifiedName;
+
+  /**
+   * `shell.stayedOpen`: a desktop's answer to `shell.quitting` when it
+   * stayed open; its payload is a `StayedOpen`.
+   */
+  public static readonly stayedOpen: QualifiedName;
 
   /**
    * `shell.commands`: asks the runtime for the commands its active modules'

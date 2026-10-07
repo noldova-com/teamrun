@@ -6,12 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum CliCommand {
-  Status = "Status",
-  Commands = "Commands",
-  Run = "Run",
-  Open = "Open",
-  Quit = "Quit",
-  Help = "Help",
-  Module = "Module"
+export enum StayCause {
+  Kept = "Kept",
+  SaveFailed = "SaveFailed"
 }

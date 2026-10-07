@@ -49,6 +49,7 @@ export class Resources {
   public static readonly locationField: string = "location";
   public static readonly stateField: string = "state";
   public static readonly causeField: string = "cause";
+  public static readonly outcomeField: string = "outcome";
   public static readonly displayNameField: string = "displayName";
   public static readonly versionField: string = "version";
   public static readonly dependenciesField: string = "dependencies";
@@ -189,6 +190,11 @@ export class Resources {
   public static readonly updateSavedMember: string = "updateSaved";
   public static readonly updatingMember: string = "updating";
   public static readonly updateEndedMember: string = "updateEnded";
+  public static readonly quitMember: string = "quit";
+  public static readonly quittingMember: string = "quitting";
+  public static readonly stayedOpenMember: string = "stayedOpen";
+  public static readonly desktopClient: string = "desktop";
+  public static readonly commandLineClient: string = "cli";
   public static readonly readWindowBoundsMember: string = "readWindowBounds";
   public static readonly writeWindowBoundsMember: string = "writeWindowBounds";
   public static readonly readWindowLayoutMember: string = "readWindowLayout";

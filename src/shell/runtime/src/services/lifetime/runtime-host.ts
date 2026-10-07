@@ -84,6 +84,9 @@ import { AppImageCopyCleanup } from "./app-image-copy-cleanup.js";
 import { IdleMonitor } from "./idle-monitor.js";
 import { MoveAsideMethod } from "./move-aside-method.js";
 import { RuntimeLog } from "./runtime-log.js";
+import { QuitMethod } from "./quit-method.js";
+import { QuitRelay } from "./quit-relay.js";
+import { StayedOpenMethod } from "./stayed-open-method.js";
 import { StopMethod } from "./stop-method.js";
 import { UpdateMethod } from "./update-method.js";
 import { UpdatePreparation } from "./update-preparation.js";
@@ -113,6 +116,7 @@ export class RuntimeHost implements IIdleParticipant {
   private readonly updating: EventChannel;
   private readonly updateEnded: EventChannel;
   private preparation: UpdatePreparation | null = null;
+  private readonly quit: QuitRelay;
 
   public readonly identity: BuildIdentity;
   public readonly work: WorkTracker;
@@ -146,7 +150,7 @@ export class RuntimeHost implements IIdleParticipant {
       new RuntimeHandover(this.identity, AppImageSource.locateProgram(environment, process.execPath)),
       this.methods,
       options.serverSettings,
-      () => this.idle.check(),
+      () => this.clientsChanged(),
       log.diagnostics);
     this.events = new EventRegistry(this.server);
     this.publisher = new DiscoveryPublisher(lock, FolderProtectorFactory.create(platform, new SystemCommand(), environment));
@@ -161,7 +165,10 @@ export class RuntimeHost implements IIdleParticipant {
     this.modules = new ModuleHost(
       declarations, lock.dataDirectory, this.methods, this.events, this.commands, this.notifications, new PackageRuntimePartLoader(), log.diagnostics,
       this.work, new DiagnosticRedactor(homedir()));
-    this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.server.countOtherClients(t), t => this.requestStop(t)));
+    this.quit = new QuitRelay(this.server, this.events.declare(ShellEvents.quitting));
+    this.methods.register(ShellMethods.stop, new StopMethod(this.work, t => this.server.countOtherClients(t) - this.quit.countWaiting(t), t => this.requestStop(t)));
+    this.methods.register(ShellMethods.quit, new QuitMethod(this.quit));
+    this.methods.register(ShellMethods.stayedOpen, new StayedOpenMethod(this.quit));
     this.methods.register(ShellMethods.modules, new ModulesMethod(this.modules));
     this.methods.register(ShellMethods.work, new WorkMethod(this.work));
     this.serverSettings = options.serverSettings;
@@ -229,6 +236,11 @@ export class RuntimeHost implements IIdleParticipant {
 
   public waitForStopAsync(): Promise<string> {
     return this.stopped.promise;
+  }
+
+  private clientsChanged(): void {
+    this.idle.check();
+    this.quit.check();
   }
 
   private workChanged(): void {
@@ -351,6 +363,7 @@ export class RuntimeHost implements IIdleParticipant {
     this.preparation?.[Symbol.dispose]();
     this.work.cancelAll();
     try {
+      await this.quit.endAsync();
       await this.server.closeAsync();
       try {
         await this.modules.deactivateAsync();
