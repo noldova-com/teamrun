@@ -299,7 +299,7 @@ export class DesktopApplication {
     const taskbar = TaskbarIdentity.create(isPackaged, process.execPath, icons.window, fileURLToPath(moduleUrl), argv, process.workingDirectory);
     const log = new DesktopLog(dataDirectory, process.errorOutput, redactor);
     if (handedOver.length > 0)
-      log.write(Resources.formatRestartArgumentsTaken(handedOver));
+      log.writeKept(Resources.formatRestartArgumentsTaken(handedOver));
     const profileFolder = userData ?? dataDirectory.profileFolder;
     const languages = process.platform === Resources.macPlatform
       ? []

@@ -681,7 +681,7 @@ The desktop writes every launch or connection failure to standard error and, onc
 
 The desktop keeps its own diagnostics in `logs/desktop.log`, with the same redaction, timestamps and size limit, and mirrors every line to its standard error.
 Its single-instance lock allows one desktop per data directory, so the desktop alone owns the file.
-It starts the file once a runtime owns the data directory, keeping the previous start's file as `logs/desktop.previous.log`; until then, and while the directory is not usable (not yet located, holding data from before the shell, or not writable), its records go to standard error only.
+It starts the file once a runtime owns the data directory, keeping the previous start's file as `logs/desktop.previous.log`; until then, and while the directory is not usable (not yet located, holding data from before the shell, or not writable), its records go to standard error only, except the folders a restarted version took, which the file also takes first once it starts, since a version that macOS or the installer started has no standard error anyone reads.
 Logging never stops the desktop from starting.
 The window sends each error it does not handle to the desktop once, including an error that stops its bootstrap, even when that error reaches it more than once; the desktop checks and redacts it and writes it to this file as a window error, under the module's id when a window part failed to load or activate.
 The desktop writes at most ten errors a minute from each window, then one notice that it left out the rest of that minute's errors; reloading the page does not start a new minute.

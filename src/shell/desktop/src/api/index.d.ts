@@ -7208,6 +7208,23 @@ export declare class DesktopLog implements IDesktopLog {
    * ```
    */
   public write(text: string): void;
+
+  /**
+   * Records a line as {@link DesktopLog.write} does, and when the file hasn't started yet, keeps it for the file, which
+   * then takes it first, such as the folders a restarted version took before its data directory was known. A file
+   * that never starts never takes it.
+   *
+   * @param text What happened.
+   * @example
+   * ```ts
+   * import type { DesktopLog } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function record(log: DesktopLog): void {
+   *   log.writeKept("The desktop runs on the folders of the version it updated: --data-dir=/data");
+   * }
+   * ```
+   */
+  public writeKept(text: string): void;
 }
 
 /**
