@@ -50,6 +50,25 @@ export class Resources {
     return `Open ${Resources.applicationName} again once the update has finished.`;
   }
 
+  public static get updateRelaunchFailed(): string {
+    return `macOS will install the update once ${Resources.applicationName} quits, but ${Resources.applicationName} can't open again by itself.`;
+  }
+
+  public static get updateRelaunchFailedDetail(): string {
+    return `Open ${Resources.applicationName} once the update has installed.`;
+  }
+
+  public static get notAnAppImage(): string {
+    return `This copy of ${Resources.applicationName} doesn't run from an AppImage, so it can't install the update.`;
+  }
+
+  public static readonly restartErrorFile: string = "update-restart.log";
+  public static readonly installerErrorFile: string = "update-installer.log";
+
+  public static formatUpdateRelaunchFailed(reason: string): string {
+    return `The update was handed off, but macOS could not be asked to install it and start the new version, so the desktop quits instead: ${reason}`;
+  }
+
   public static get updateUnfinished(): string {
     return `An update of ${Resources.applicationName} may still be installing, or it did not finish.`;
   }
@@ -187,6 +206,8 @@ export class Resources {
   public static readonly layoutNotObject: string = "The layout must be a JSON object.";
   public static readonly clientName: string = ShellClients.desktop;
   public static readonly handoffRole: string = "handoff";
+  public static readonly runtimeRole: string = "runtime";
+  public static readonly updateClientName: string = "update";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
   public static readonly waitAction: string = "wait";
@@ -357,6 +378,9 @@ export class Resources {
   }
 
   public static readonly permissionBits: number = 0o7777;
+  public static readonly appImagePartPattern: RegExp = /^\.(.+)\.([^.]+)\.part$/;
+  public static readonly readFlag: string = "r";
+
   public static formatAppImagePart(name: string, unique: string): string {
     return `.${name}.${unique}.part`;
   }
@@ -373,6 +397,10 @@ export class Resources {
     return `The AppImage ${image} could not be replaced with the update and was left as it was: ${reason}`;
   }
 
+  public static formatAppImageFolderNotSynced(folder: string, reason: string): string {
+    return `The AppImage in ${folder} was replaced, but the folder could not be flushed to disk: ${reason}`;
+  }
+
   public static readonly launchControl: string = "/bin/launchctl";
   public static readonly launchControlList: string = "list";
   public static readonly launchControlRemove: string = "remove";
@@ -383,6 +411,18 @@ export class Resources {
 
   public static formatShipItUnreadable(reason: string): string {
     return `The installer process of the staged update could not be looked up: ${reason}`;
+  }
+
+  public static formatRuntimeNotReached(dataDirectory: string): string {
+    return `${Resources.applicationName} couldn't reach the runtime of ${dataDirectory} to stop it for the update.`;
+  }
+
+  public static formatRuntimeNotFound(dataDirectory: string): string {
+    return `The runtime of ${dataDirectory} could not be identified, so it can't be verified to stop for the update.`;
+  }
+
+  public static formatStoppedShipItNotRemoved(reason: string): string {
+    return `The job of an installed update could not be removed, so it is tried again at the next start: ${reason}`;
   }
 
   public static formatShipItNotRemoved(reason: string): string {

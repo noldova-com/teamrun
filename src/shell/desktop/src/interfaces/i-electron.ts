@@ -15,6 +15,7 @@ import type { IDialogHost } from "./i-dialog-host.js";
 import type { IDisplayHost } from "./i-display-host.js";
 import type { IIpcHost } from "./i-ipc-host.js";
 import type { IMenuHost } from "./i-menu-host.js";
+import type { INativeUpdater } from "./i-native-updater.js";
 import type { INotificationHost } from "./i-notification-host.js";
 import type { ISessionHost } from "./i-session-host.js";
 import type { IShellHost } from "./i-shell-host.js";
@@ -31,6 +32,7 @@ export interface IElectron {
   readonly dialog: IDialogHost;
   readonly notifications: INotificationHost;
   readonly tray: ITrayHost;
+  readonly nativeUpdater: INativeUpdater;
 
   createWindow(options: BrowserWindowConstructorOptions): IDesktopWindow;
 }

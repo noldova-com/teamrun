@@ -10,4 +10,5 @@ import type { UpdateReadyRecord } from "../models/update-ready-record.js";
 
 export interface IUpdateHandoff {
   handOffAsync(record: UpdateReadyRecord): Promise<number | null>;
+  clearAsync(): Promise<void>;
 }

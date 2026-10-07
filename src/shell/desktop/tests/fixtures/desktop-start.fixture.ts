@@ -26,6 +26,7 @@ import { FakeElectron } from "./fake-electron.fixture.js";
 import { FakePathCommand } from "./fake-path-command.fixture.js";
 import { FakeRuntimeLauncher } from "./fake-runtime-launcher.fixture.js";
 import { FakeUpdateCheckLock } from "./fake-update-check-lock.fixture.js";
+import { FakeUpdateHandoff } from "./fake-update-handoff.fixture.js";
 
 export class DesktopStartFixture {
   public static readonly MODULE_URL: string = pathToFileURL("/teamrun/node_modules/@noldova/teamrun-shell-desktop/main.js").href;
@@ -46,13 +47,17 @@ export class DesktopStartFixture {
     installations: Installation[] = [],
     recordDesktopAsync: (installation: Installation) => Promise<boolean> = () => Promise.resolve(true),
     createUpdater: (log: (text: string) => void) => IUpdater | null = () => null,
-    createUpdateLock: (log: (text: string) => void) => IUpdateCheckLock = () => new FakeUpdateCheckLock()): LaunchSettings[] {
+    createUpdateLock: (log: (text: string) => void) => IUpdateCheckLock = () => new FakeUpdateCheckLock(),
+    handoff: FakeUpdateHandoff = new FakeUpdateHandoff()): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
     DesktopApplication.start(electron, process, DesktopStartFixture.MODULE_URL, (t, installation) => {
       settings.push(t);
       installations.push(installation);
       return launcher;
-    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, log) => createUpdater(log), (_, log) => createUpdateLock(log));
+    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, _logs, log) => {
+      const updater = createUpdater(log);
+      return Object.isNull(updater) ? null : { updater, handoff };
+    }, (_, log) => createUpdateLock(log));
     return settings;
   }
 

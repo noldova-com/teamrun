@@ -177,24 +177,22 @@ export class InstallerHandoffTests {
   @TestMethod
   public removesTheCopiesEarlierHandoffsLeftAndLogsOnesItCannotRemove(): Promise<void> {
     return InstallerHandoffFixture.runAsync(async fixture => {
-      const installation = join(fixture.folder, "installation");
-      const handoff = join(installation, "handoff");
+      const handoff = fixture.handoffFolder;
       await mkdir(join(handoff, "0123"), { recursive: true });
       await writeFile(join(handoff, "0123", "TeamRun-windows-x64.exe"), InstallerHandoffFixture.CONTENT);
-      const lines: string[] = [];
 
       {
         using _rm = new FailingFileCallFixture("rm", handoff, "EBUSY");
-        await InstallerHandoff.clearAsync(installation, t => lines.push(t));
+        await fixture.handoff.clearAsync();
       }
       const isKept = existsSync(handoff);
-      await InstallerHandoff.clearAsync(installation, t => lines.push(t));
-      await InstallerHandoff.clearAsync(installation, t => lines.push(t));
+      await fixture.handoff.clearAsync();
+      await fixture.handoff.clearAsync();
 
       Assert.isTrue(isKept);
       Assert.isFalse(existsSync(handoff));
-      Assert.areEqual(1, lines.length);
-      Assert.isTrue(lines[0]?.startsWith("The copy of an update's installer could not be removed, so it is removed at the next start: Error: EBUSY") === true, lines[0]);
+      Assert.areEqual(1, fixture.lines.length);
+      Assert.isTrue(fixture.lines[0]?.startsWith("The copy of an update's installer could not be removed, so it is removed at the next start: Error: EBUSY") === true, fixture.lines[0]);
     });
   }
 }

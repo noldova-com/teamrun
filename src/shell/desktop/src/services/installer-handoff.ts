@@ -42,9 +42,8 @@ export class InstallerHandoff implements IUpdateHandoff {
     this.log = log;
   }
 
-  public static async clearAsync(installationFolder: string, log: (text: string) => void): Promise<void> {
-    await rm(join(installationFolder, Resources.handoffFolder), { recursive: true, force: true })
-      .catch((error: unknown) => log(Resources.formatHandoffNotRemoved(String(error))));
+  public async clearAsync(): Promise<void> {
+    await rm(this.folder, { recursive: true, force: true }).catch((error: unknown) => this.log(Resources.formatHandoffNotRemoved(String(error))));
   }
 
   public async handOffAsync(record: UpdateReadyRecord): Promise<number> {

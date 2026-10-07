@@ -52,6 +52,18 @@ export class AppImageHandoffTests {
     });
   }
 
+  @TestMethod
+  public async refusesWhenTheDesktopDoesNotRunFromAnAppImageAndLeavesNothingToClear(): Promise<void> {
+    await AppImageHandoffTests.withDownloadAsync(async download => {
+      const handoff = new AppImageHandoff(null);
+
+      const failure = await Assert.throwsAsync(() => handoff.handOffAsync(new UpdateReadyRecord("1.3.0", download, AppImageHandoffTests.HASH, true)), UpdateHandoffException);
+      await handoff.clearAsync();
+
+      Assert.areEqual("This copy of TeamRun doesn't run from an AppImage, so it can't install the update.", failure.message);
+    });
+  }
+
   private static async withDownloadAsync(run: (download: string) => Promise<void>): Promise<void> {
     const folder = await mkdtemp(join(tmpdir(), "teamrun-app-image-handoff-"));
     try {

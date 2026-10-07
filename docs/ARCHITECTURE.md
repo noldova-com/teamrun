@@ -1189,6 +1189,11 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   On Windows the desktop copies the installer into a new folder of its own under `handoff` in the installation's folder, restricted to the current user, and holds the copy open with read sharing only, from before its publisher check until the desktop exits, so the file whose publisher was checked is the file that starts and that the installer reads; a failed attempt removes its folder, and a later start removes the folder a running installer kept.
   On macOS an update restored from its record is checked and downloaded again, which reuses the cached ZIP, since electron-updater keeps no download across restarts; Squirrel.Mac then has 2 minutes to stage it, checking its code signature, and its ShipIt process installs it once the desktop quits through `autoUpdater.quitAndInstall`.
   Once staged, any quit installs the update, so only the handoff stages it, and a handoff that fails after asking Squirrel.Mac to stage, or finds no ShipIt process after the stage, removes the ShipIt job, as it does for a stage that finishes after the 2 minutes.
+  On Linux a desktop that doesn't run from an AppImage refuses the handoff, since it has no AppImage to replace.
+  Only once the handoff has succeeded does the desktop quit, without asking about work or saving again, since the update stop already did both: through `autoUpdater.quitAndInstall` on macOS, so the new version starts, and at once elsewhere.
+  When `quitAndInstall` throws, the desktop logs why, tells the person that macOS installs the update once TeamRun quits but TeamRun can't open again by itself, and quits.
+  A handoff that fails leaves the desktop running as before, so quitting it later asks and saves as usual.
+  The standard error of the installer and of the AppImage restart's Bash goes to `logs/update-installer.log` and `logs/update-restart.log` in the data directory.
 - **macOS location.**
   A macOS application must run from an Applications folder, because a copy macOS runs from a temporary read-only location cannot be replaced.
   Outside one, the desktop still checks but downloads and installs nothing: a newer version stays available, and About and the update item say to move TeamRun to Applications; a failed check gives its reason, then the same hint.
@@ -1214,8 +1219,9 @@ The updater and the desktop's update stop divide an update at the person's Resta
     Squirrel stages the update only inside the handoff, and ShipIt runs as the launchd job `<bundle identifier>.ShipIt` from then until it has installed.
     A staged update installs at any quit, so a handoff that fails after staging removes that job.
     A finished install leaves the job without a process, and a desktop removes such a job at start, before its updater.
-  - Linux copies the download to a file with a unique name beside the AppImage, created only when no file has that name, gives it the AppImage's permissions, flushes it to disk and renames it over the AppImage, following a link to the file it names.
+  - Linux copies the download to a file with a unique name beside the AppImage, `.<AppImage name>.<UUID>.part`, created only when no file has that name, gives it the AppImage's permissions, flushes it to disk and renames it over the AppImage, following a link to the file it names, then flushes the folder, logging a flush that fails.
     So the AppImage is always one whole version, and no process takes the handoff.
+    Before the copy it removes the copies an earlier handoff of that AppImage left, only files with that name pattern; the barrier holds meanwhile, so no other handoff of it runs.
     A folder that cannot be written refuses the handoff, and any failure removes the copy and leaves the AppImage as it was.
 - The update stop owns everything from the work question to the handoff: it stops every process of the installation, as [Stopping for an update](#stopping-for-an-update) describes, and then calls the handoff.
 - On Windows and macOS the platform's installer starts the new version.
@@ -1261,7 +1267,7 @@ A settled barrier is removed by first moving it aside under a unique name and de
 When the person confirms, the desktop reads and judges the barrier again, since the question may have stayed open for minutes, and removes it the same way; one that holds by then is reported as holding, and when the barrier cannot be removed, the desktop tells the person and quits.
 
 **Order.**
-The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use:
+The update stop of the desktop where the person chose Restart to update coordinates, and connects as the client `update` to the runtime of every data directory in the record that is in use, without starting or taking over a runtime, identifying each by the process its discovery names:
 
 1. **Work.**
    It reads `shell.work` from each runtime and, when any work is in progress, asks section 9's question in its window, listing the work by data directory.

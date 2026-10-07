@@ -10,4 +10,5 @@ export interface INativeUpdater {
   checkForUpdates(): void;
   on(event: string, listener: (...values: unknown[]) => void): unknown;
   removeListener(event: string, listener: (...values: unknown[]) => void): unknown;
+  quitAndInstall(): void;
 }

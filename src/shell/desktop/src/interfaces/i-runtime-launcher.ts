@@ -7,11 +7,11 @@
  */
 
 import type { StopPolicy } from "@noldova/teamrun-shell-protocol";
-import type { IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
+import type { AttachOptions, IRuntimeClientListener } from "@noldova/teamrun-shell-runtime";
 
 import type { IRuntimeConnection } from "./i-runtime-connection.js";
 
 export interface IRuntimeLauncher {
-  attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<IRuntimeConnection>;
+  attachAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy, options?: AttachOptions): Promise<IRuntimeConnection>;
   moveAsideAsync(clientName: string, listener: IRuntimeClientListener, policy?: StopPolicy): Promise<IRuntimeConnection>;
 }

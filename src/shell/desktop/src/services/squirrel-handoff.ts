@@ -40,6 +40,10 @@ export class SquirrelHandoff implements IUpdateHandoff {
     this.log = log;
   }
 
+  public async clearAsync(): Promise<void> {
+    await this.shipIt.removeStoppedAsync().catch((error: unknown) => this.log(Resources.formatStoppedShipItNotRemoved(String(error))));
+  }
+
   public async handOffAsync(record: UpdateReadyRecord): Promise<number> {
     if (this.updater.downloadedFile !== record.file) {
       if (await this.updater.checkAsync() !== record.version)

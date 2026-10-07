@@ -17,6 +17,7 @@ import { FakeDialogHost } from "./fake-dialog-host.fixture.js";
 import { FakeDisplayHost } from "./fake-display-host.fixture.js";
 import { FakeIpcHost } from "./fake-ipc-host.fixture.js";
 import { FakeMenuHost } from "./fake-menu-host.fixture.js";
+import { FakeNativeUpdater } from "./fake-native-updater.fixture.js";
 import { FakeNotificationHost } from "./fake-notification-host.fixture.js";
 import { FakeSession } from "./fake-session.fixture.js";
 import { FakeShellHost } from "./fake-shell-host.fixture.js";
@@ -34,10 +35,12 @@ export class FakeElectron implements IElectron {
   public readonly dialog: FakeDialogHost = new FakeDialogHost();
   public readonly notifications: FakeNotificationHost = new FakeNotificationHost();
   public readonly tray: FakeTrayHost = new FakeTrayHost();
+  public readonly nativeUpdater: FakeNativeUpdater = new FakeNativeUpdater();
   public readonly windows: FakeDesktopWindow[] = [];
 
   public constructor(hasLock: boolean = true, isPackaged: boolean = false) {
     this.app = new FakeApplicationHost(hasLock, isPackaged);
+    this.nativeUpdater.onInstall = () => this.app.quit();
   }
 
   public createWindow(options: BrowserWindowConstructorOptions): FakeDesktopWindow {

@@ -8,7 +8,7 @@
 
 import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { type FileHandle, open, realpath, rename, rm, stat } from "node:fs/promises";
+import { type FileHandle, open, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 
@@ -20,16 +20,31 @@ import { Resources } from "../resources.js";
 
 export class AppImageReplacement {
   private readonly image: string;
+  private readonly syncFolderAsync: (folder: string) => Promise<void>;
+  private readonly log: (text: string) => void;
 
-  public constructor(image: string) {
+  public constructor(image: string, syncFolderAsync: (folder: string) => Promise<void>, log: (text: string) => void) {
     this.image = image;
+    this.syncFolderAsync = syncFolderAsync;
+    this.log = log;
+  }
+
+  public static async syncFolderAsync(folder: string): Promise<void> {
+    const handle = await open(folder, Resources.readFlag);
+    try {
+      await handle.sync();
+    }
+    finally {
+      await handle.close();
+    }
   }
 
   public async replaceAsync(download: string): Promise<void> {
     const [image, mode] = await AppImageReplacement.inspectAsync(this.image);
     const folder = path.dirname(image);
-    const part = path.join(folder, Resources.formatAppImagePart(path.basename(image), randomUUID()));
-    const handle = await AppImageReplacement.createAsync(part, folder, mode);
+    const name = path.basename(image);
+    const part = path.join(folder, Resources.formatAppImagePart(name, randomUUID()));
+    const handle = await AppImageReplacement.createAsync(part, folder, name, mode);
     try {
       try {
         await handle.chmod(mode);
@@ -44,6 +59,7 @@ export class AppImageReplacement {
       await rm(part, { force: true });
       throw new UpdateHandoffException(Resources.formatAppImageNotReplaced(image, String(error)), new ExceptionOptions(error));
     }
+    await this.syncFolderAsync(folder).catch((error: unknown) => this.log(Resources.formatAppImageFolderNotSynced(folder, String(error))));
   }
 
   private static async inspectAsync(file: string): Promise<[string, number]> {
@@ -56,12 +72,22 @@ export class AppImageReplacement {
     }
   }
 
-  private static async createAsync(part: string, folder: string, mode: number): Promise<FileHandle> {
+  private static async createAsync(part: string, folder: string, name: string, mode: number): Promise<FileHandle> {
     try {
+      await AppImageReplacement.removeLeftoversAsync(folder, name);
       return await open(part, Resources.createOnlyFlag, mode);
     }
     catch (error) {
       throw new UpdateHandoffException(Resources.formatAppImageFolderUnwritable(folder, String(error)), new ExceptionOptions(error));
     }
+  }
+
+  private static async removeLeftoversAsync(folder: string, name: string): Promise<void> {
+    const leftovers = (await readdir(folder)).filter(t => {
+      const match = Resources.appImagePartPattern.exec(t);
+      return match?.[1] === name && Resources.uuidPattern.test(match[2] ?? "");
+    });
+    for (const leftover of leftovers)
+      await rm(path.join(folder, leftover), { force: true });
   }
 }

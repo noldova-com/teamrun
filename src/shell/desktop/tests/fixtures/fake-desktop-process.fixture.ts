@@ -9,6 +9,7 @@
 import path from "node:path";
 import { Writable } from "node:stream";
 
+import { ProcessPresence, SystemCommand } from "@noldova/teamrun-shell-runtime";
 import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
 
 import { FakeProgramHost } from "./fake-program-host.fixture.js";
@@ -33,8 +34,9 @@ export class FakeDesktopProcess implements IDesktopProcess {
   public readonly started: (readonly string[])[] = [];
   public readonly relaunched: { readonly command: readonly string[]; readonly environment: NodeJS.ProcessEnv; readonly workingDirectory: string }[] = [];
   public readonly ended: number[] = [];
-  public readonly processId: number = 1000;
+  public processId: number = 1000;
   public readonly programs: FakeProgramHost = new FakeProgramHost();
+  public readonly presence: ProcessPresence = ProcessPresence.create(process.platform, new SystemCommand());
   public readonly exceptionListeners: ((error: unknown) => void)[] = [];
   public readonly rejectionListeners: ((reason: unknown) => void)[] = [];
   public endFailure: Error | null = null;
