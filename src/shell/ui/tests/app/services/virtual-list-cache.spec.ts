@@ -207,7 +207,7 @@ describe("VirtualListCache", () => {
     expect(source.describeReads()).toEqual(["0-50", "50-100", "100-150 aborted"]);
   });
 
-  it("goes on reading a page that ends before an insert or a remove", async () => {
+  it("goes on reading a page that ends before an insert or a remove, and reads the stopped page again once it arrives", async () => {
     const source = new VirtualListSourceFixture(200);
     const cache = createCache(source);
     cache.request(0, 100);
@@ -216,7 +216,7 @@ describe("VirtualListCache", () => {
     source.reportRemoved(150, 1);
     await source.readAt(0).answerAsync();
 
-    expect([source.describeReads(), cache.itemAt(49)]).toEqual([["0-50", "50-100 aborted"], "item 49"]);
+    expect([source.describeReads(), cache.itemAt(49)]).toEqual([["0-50", "50-100 aborted", "50-100"], "item 49"]);
   });
 
   it("moves a changed item it holds outside the request with the items inserted before it, and forgets it once it is removed", async () => {
