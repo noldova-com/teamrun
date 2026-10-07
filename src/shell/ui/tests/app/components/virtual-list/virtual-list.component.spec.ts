@@ -333,6 +333,18 @@ describe("VirtualListComponent", () => {
     expect([tops, viewport().scrollTop, focusedPlace()]).toEqual([[15_000, 14_865, 14_730, 29_700, 0], 0, null]);
   });
 
+  it("keeps a waiting correction when a scroll event that moved nothing arrives before the next frame", async () => {
+    const source = numbered(1000);
+    await renderAsync(source);
+    await scrollAsync(3000);
+
+    source.insert(0, ["new 0", "new 1", "new 2"]);
+    viewport().dispatchEvent(new Event("scroll"));
+    await settleAsync();
+
+    expect([Math.round(offsetOf("item 100")), viewport().scrollTop]).toEqual([0, 3090]);
+  });
+
   it("follows a scroll made while a correction waits for the next frame", async () => {
     const source = numbered(1000);
     await renderAsync(source);
