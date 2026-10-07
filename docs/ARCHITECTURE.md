@@ -1068,7 +1068,12 @@ Each target is packaged on its own platform and processor.
   - electron-builder imports the certificate into a temporary keychain and finds its identity there; an unsigned build never looks for a signing identity on the machine.
   - electron-builder signs the app and its helpers with the hardened runtime and `assets/macos/entitlements.plist`, which allows only the JIT that V8 needs, then notarizes the app and staples the ticket.
     A signed package keeps its signature after the fuses are flipped, so it is not signed ad hoc again.
-  - Afterwards packaging opens the disk image and expands the archive, and checks each app: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl` must accept it as notarized; and `stapler` must find its ticket.
+  - electron-builder then signs the disk image with the same certificate.
+    Packaging submits the signed disk image to Apple's notary service with `notarytool` and the same key, waits up to an hour for it to be accepted, and staples the ticket to it, so the first opening of a downloaded disk image needs no network check either.
+    The key's ID and issuer reach `notarytool` as arguments, never in its environment, and no failure message repeats them.
+    Release update information and checksums are computed from the final, stapled files.
+  - Afterwards packaging checks the disk image itself: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl --assess --type open --context context:primary-signature` must accept it as notarized; and `stapler` must find its ticket.
+    It then opens the disk image and expands the archive, and checks each app the same way, with `codesign --deep` and `spctl --assess --type execute`.
 
 ### Publication
 
