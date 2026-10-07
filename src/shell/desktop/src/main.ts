@@ -31,6 +31,14 @@ import { PublisherCheck } from "./services/publisher-check.js";
 import { UpdateCheckLock } from "./services/update-check-lock.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
 
+declare global {
+  namespace Electron {
+    interface App {
+      setVersion(version: string): void;
+    }
+  }
+}
+
 const starter = process.platform === Resources.windowsPlatform ? new UtilityProcessStarter(utilityProcess) : new ChildProcessStarter();
 const programs = new ChildProgramHost(process.platform, Resources.programTimeout);
 const presence = ProcessPresence.create(process.platform, new SystemCommand());

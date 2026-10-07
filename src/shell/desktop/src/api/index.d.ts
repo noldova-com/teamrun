@@ -1380,6 +1380,21 @@ export interface IApplicationHost {
   setName(name: string): void;
 
   /**
+   * Sets the version the application reports, which the updater compares with the feed's.
+   *
+   * @param version The version.
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function label(app: IApplicationHost): void {
+   *   app.setVersion("1.3.0");
+   * }
+   * ```
+   */
+  setVersion(version: string): void;
+
+  /**
    * Sets the application user model id that Windows groups the application's windows and notifications by.
    *
    * @param id The id.

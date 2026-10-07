@@ -56,6 +56,7 @@ import type { IWindowContents } from "../interfaces/i-window-contents.js";
 import { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
 import { PathCommandOutcome } from "../enums/path-command-outcome.js";
 import { StartupStateKind } from "../enums/startup-state-kind.js";
+import { UpdateStateKind } from "../enums/update-state-kind.js";
 import { WindowErrorAdmission } from "../enums/window-error-admission.js";
 import { DesktopSettings } from "../models/desktop-settings.js";
 import { MenuBar } from "../models/menu-bar.js";
@@ -125,6 +126,7 @@ export class DesktopApplication {
   private readonly trayHosts: TrayHostWatcher;
   private readonly trayIcon: DeviceSettingFollower;
   private readonly updates: UpdateController | null;
+  private readonly updatesOff: UpdateStatus;
   private readonly updateChecks: DeviceSettingFollower;
   private readonly spelling: SpellChecker;
   private readonly readDeviceAsync: (folder: string) => Promise<string>;
@@ -158,7 +160,8 @@ export class DesktopApplication {
     installation: Installation,
     recordDesktopAsync: () => Promise<boolean>,
     updater: IUpdater | null,
-    updateLock: IUpdateCheckLock) {
+    updateLock: IUpdateCheckLock,
+    updatesOff: UpdateStatus) {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
@@ -210,6 +213,7 @@ export class DesktopApplication {
     this.updates = Object.isNull(updater) ? null : new UpdateController(updater, createDeviceFile(installation.folder, Resources.updateReadyFile), updateLock,
       RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
       t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run));
+    this.updatesOff = updatesOff;
     this.updateChecks = new DeviceSettingFollower(ShellSettings.updateChecks, Resources.automaticUpdateChecks, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.followUpdateChecksSetting(t), t => this.log.write(t));
     this.spelling = spelling;
@@ -231,6 +235,7 @@ export class DesktopApplication {
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
     process.onUnhandledRejection(t => recovery.receive(t, MainProcessFailureKind.UnhandledRejection));
     electron.app.setName(Resources.applicationName);
+    electron.app.setVersion(RuntimeBuild.identity.productVersion);
     const moduleDirectory = dirname(fileURLToPath(moduleUrl));
     const isPackaged = DesktopApplication.isPackagedBuild(electron, process);
     const dataDirectory = DataDirectoryLocator.locate(
@@ -260,9 +265,10 @@ export class DesktopApplication {
       : SpellingDictionaries.install(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.dictionaryFolderSegments), profileFolder, t => log.write(t));
     const spelling = new SpellChecker(
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
+    const [updater, updatesOff] = DesktopApplication.createUpdater(createUpdater, installation, log);
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
-      spelling, installation, () => recordDesktopAsync(installation), createUpdater(installation, t => log.write(t)), createUpdateLock(installation, t => log.write(t)));
+      spelling, installation, () => recordDesktopAsync(installation), updater, createUpdateLock(installation, t => log.write(t)), updatesOff);
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -341,7 +347,7 @@ export class DesktopApplication {
     this.electron.ipcMain.handle(Resources.openLogFolderChannel, event => Object.isNull(this.findTrusted(event)) ? false : this.openLogFolderAsync());
     this.electron.ipcMain.handle(Resources.openLinkChannel, (event, url) => Object.isNull(this.findTrusted(event)) ? false : this.openLinkAsync(url));
     this.electron.ipcMain.handle(Resources.installCommandChannel, event => this.installCommandAsync(event));
-    this.electron.ipcMain.handle(Resources.readUpdateChannel, event => Object.isNull(this.findTrusted(event)) ? null : (this.updates?.status ?? UpdateStatus.off).toJson());
+    this.electron.ipcMain.handle(Resources.readUpdateChannel, event => Object.isNull(this.findTrusted(event)) ? null : (this.updates?.status ?? this.updatesOff).toJson());
     this.electron.ipcMain.handle(Resources.updateActionChannel, (event, action) => !Object.isNull(this.findTrusted(event)) && this.updates?.act(action) === true);
     this.electron.ipcMain.handle(Resources.editChannel, (event, action) => this.edit(event, action));
     this.electron.app.on(Resources.activateEvent, () => {
@@ -1073,6 +1079,19 @@ export class DesktopApplication {
     }
     catch {
       return undefined;
+    }
+  }
+
+  private static createUpdater(
+    create: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    installation: Installation,
+    log: DesktopLog): [IUpdater | null, UpdateStatus] {
+    try {
+      return [create(installation, t => log.write(t)), UpdateStatus.off];
+    }
+    catch (error) {
+      log.write(Resources.formatUpdaterNotCreated(String(error)));
+      return [null, new UpdateStatus(UpdateStateKind.Failed, null, null, null, Resources.updaterNotCreated, false)];
     }
   }
 
