@@ -22,61 +22,66 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class ReleaseCheckTests {
   private static readonly REVISION: string = "0123456789abcdef0123456789abcdef01234567";
   private static readonly COMPARE: string = `/compare/${ReleaseCheckTests.REVISION}...main`;
-  private static readonly TAG: string = "/git/ref/tags/v0.0.7";
+  private static readonly TAG: string = "/git/matching-refs/tags/v0.0.7";
+  private static readonly RELEASES: string = "/releases";
   private static readonly RUNS: string = `/actions/workflows/build-and-test.yml/runs?event=push&branch=main&per_page=1&head_sha=${ReleaseCheckTests.REVISION}`;
   private static readonly PASSED: Readonly<Record<string, unknown>> = { workflow_runs: [{ status: "completed", conclusion: "success" }] };
   private static readonly NOT_FOUND: string = "gh: Not Found (HTTP 404)";
   private static readonly USAGE: string = "Usage: RELEASE_REPOSITORY=<owner/name> RELEASE_VERSION=<N.N.N> RELEASE_REVISION=<commit> npm run release:check\n";
 
   public static register(): void {
-    test("a version that matches the manifest and is newer than the latest release, on a revision main contains, passes", async t => {
+    test("a version that matches the manifest and is newer than every published release, whatever order they were made in, on a revision main contains, passes, "
+      + "also with no release or only drafts", async t => {
       const repository = await ReleaseCheckTests.createAsync(t);
       const github = new GitHubApiFixture();
       const first = new GitHubApiFixture();
+      const drafted = new GitHubApiFixture();
       const output = new TextOutputFixture();
-      github.answer("/releases/latest", { tag_name: "v0.0.6" });
-      github.answer(ReleaseCheckTests.COMPARE, { status: "ahead" });
-      github.answer(ReleaseCheckTests.RUNS, ReleaseCheckTests.PASSED);
-      github.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
-      first.fail("/releases/latest", ReleaseCheckTests.NOT_FOUND);
-      first.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
-      first.answer(ReleaseCheckTests.COMPARE, { status: "identical" });
-      first.answer(ReleaseCheckTests.RUNS, ReleaseCheckTests.PASSED);
+      github.answer(ReleaseCheckTests.RELEASES, [ReleaseCheckTests.release(4, "v0.0.5"), ReleaseCheckTests.release(3, "v0.0.9", true), ReleaseCheckTests.release(2, "v0.0.6"),
+        ReleaseCheckTests.release(1, "v0.0.4")]);
+      github.answer(ReleaseCheckTests.TAG, [{ ref: "refs/tags/v0.0.70", object: { sha: ReleaseCheckTests.REVISION, type: "commit" } }]);
+      first.answer(ReleaseCheckTests.RELEASES, []);
+      drafted.answer(ReleaseCheckTests.RELEASES, [ReleaseCheckTests.release(1, "v0.0.7", true)]);
+      for (const fixture of [github, first, drafted]) {
+        fixture.answer(ReleaseCheckTests.COMPARE, { status: fixture === github ? "ahead" : "identical" });
+        fixture.answer(ReleaseCheckTests.RUNS, ReleaseCheckTests.PASSED);
+      }
+      first.answer(ReleaseCheckTests.TAG, []);
+      drafted.answer(ReleaseCheckTests.TAG, []);
 
       const outputs = path.join(repository.directory, "outputs");
 
       const exitCodes = [await ReleaseCheckTests.checkAsync(repository, github, output, "0.0.7", { GITHUB_OUTPUT: outputs }),
-        await ReleaseCheckTests.checkAsync(repository, first, new TextOutputFixture())];
+        await ReleaseCheckTests.checkAsync(repository, first, new TextOutputFixture()), await ReleaseCheckTests.checkAsync(repository, drafted, new TextOutputFixture())];
 
-      assert.deepEqual(exitCodes, [0, 0]);
+      assert.deepEqual(exitCodes, [0, 0, 0]);
       assert.equal(output.text, `v0.0.7 of noldova-com/teamrun from ${ReleaseCheckTests.REVISION}: the version is new, the revision is on main and its Build and test run there passed. `
         + "Signed platforms: none.\n");
       assert.equal(await readFile(outputs, "utf8"), "signed=\n");
-      assert.deepEqual(github.requests, ["GET /releases/latest", `GET ${ReleaseCheckTests.TAG}`, `GET ${ReleaseCheckTests.COMPARE}`, `GET ${ReleaseCheckTests.RUNS}`]);
+      assert.deepEqual(github.requests, [`GET ${ReleaseCheckTests.RELEASES}`, `GET ${ReleaseCheckTests.TAG}`, `GET ${ReleaseCheckTests.COMPARE}`, `GET ${ReleaseCheckTests.RUNS}`]);
     });
 
     test("another version than the manifest's, one that is not newer or already tagged, a revision off main or unknown, or a malformed request fails with the reason", async t => {
       const repository = await ReleaseCheckTests.createAsync(t);
-      const tag = { ref: "refs/tags/v0.0.7", object: { sha: ReleaseCheckTests.REVISION, type: "commit" } };
-      const cases: readonly (readonly [string, Readonly<Record<string, unknown>>, unknown, unknown, string])[] = [
-        ["0.0.8", {}, null, null, "The root manifest's version is 0.0.7, not 0.0.8; raise it on main first.\n"],
-        ["0.0.7", { tag_name: "v0.0.7" }, null, null, "0.0.7 is not newer than the latest release, 0.0.7.\n"],
-        ["0.0.7", { tag_name: "release-7" }, null, null, "The latest release's tag must be a tag such as v0.0.2, not \"release-7\".\n"],
-        ["0.0.7", { tag_name: "v0.0.6" }, tag, null, "The tag v0.0.7 already exists; a published tag is never moved.\n"],
-        ["0.0.7", { tag_name: "v0.0.6" }, null, { status: "diverged" }, `${ReleaseCheckTests.REVISION} is not on main; main is diverged compared with it.\n`],
-        ["0.0.7", { tag_name: "v0.0.6" }, null, { status: "behind" }, `${ReleaseCheckTests.REVISION} is not on main; main is behind compared with it.\n`],
-        ["0.0.7", { tag_name: "v0.0.6" }, null, null, `${ReleaseCheckTests.REVISION} is not a commit of noldova-com/teamrun.\n`],
-        ["0.0.7-rc", {}, null, null, "RELEASE_VERSION must be a plain version such as 0.0.2, not \"0.0.7-rc\".\n"]
+      const tag = [{ ref: "refs/tags/v0.0.7", object: { sha: ReleaseCheckTests.REVISION, type: "commit" } }];
+      const older = [ReleaseCheckTests.release(2, "v0.0.6")];
+      const cases: readonly (readonly [string, readonly unknown[], unknown, unknown, string])[] = [
+        ["0.0.8", [], [], null, "The root manifest's version is 0.0.7, not 0.0.8; raise it on main first.\n"],
+        ["0.0.7", [ReleaseCheckTests.release(2, "v0.0.7")], [], null, "0.0.7 is not newer than the highest release, 0.0.7.\n"],
+        ["0.0.7", [ReleaseCheckTests.release(2, "v0.0.6"), ReleaseCheckTests.release(1, "v0.0.8")], [], null, "0.0.7 is not newer than the highest release, 0.0.8.\n"],
+        ["0.0.7", [ReleaseCheckTests.release(2, "release-7")], [], null, "The tag of release 2 must be a tag such as v0.0.2, not \"release-7\".\n"],
+        ["0.0.7", older, tag, null, "The tag v0.0.7 already exists; a published tag is never moved.\n"],
+        ["0.0.7", older, [], { status: "diverged" }, `${ReleaseCheckTests.REVISION} is not on main; main is diverged compared with it.\n`],
+        ["0.0.7", older, [], { status: "behind" }, `${ReleaseCheckTests.REVISION} is not on main; main is behind compared with it.\n`],
+        ["0.0.7", older, [], null, `${ReleaseCheckTests.REVISION} is not a commit of noldova-com/teamrun.\n`],
+        ["0.0.7-rc", [], [], null, "RELEASE_VERSION must be a plain version such as 0.0.2, not \"0.0.7-rc\".\n"]
       ];
 
-      for (const [version, latest, reference, comparison, reason] of cases) {
+      for (const [version, releases, reference, comparison, reason] of cases) {
         const github = new GitHubApiFixture();
         const output = new TextOutputFixture();
-        github.answer("/releases/latest", latest);
-        if (reference === null)
-          github.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
-        else
-          github.answer(ReleaseCheckTests.TAG, reference);
+        github.answer(ReleaseCheckTests.RELEASES, releases);
+        github.answer(ReleaseCheckTests.TAG, reference);
         if (comparison === null)
           github.fail(ReleaseCheckTests.COMPARE, ReleaseCheckTests.NOT_FOUND);
         else
@@ -101,8 +106,8 @@ class ReleaseCheckTests {
       for (const [runs, reason] of cases) {
         const github = new GitHubApiFixture();
         const output = new TextOutputFixture();
-        github.fail("/releases/latest", ReleaseCheckTests.NOT_FOUND);
-        github.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
+        github.answer(ReleaseCheckTests.RELEASES, []);
+        github.answer(ReleaseCheckTests.TAG, []);
         github.answer(ReleaseCheckTests.COMPARE, { status: "ahead" });
         github.answer(ReleaseCheckTests.RUNS, { workflow_runs: runs });
 
@@ -119,8 +124,8 @@ class ReleaseCheckTests {
       const github = new GitHubApiFixture();
       const output = new TextOutputFixture();
       const outputs = path.join(repository.directory, "outputs");
-      github.fail("/releases/latest", ReleaseCheckTests.NOT_FOUND);
-      github.fail(ReleaseCheckTests.TAG, ReleaseCheckTests.NOT_FOUND);
+      github.answer(ReleaseCheckTests.RELEASES, []);
+      github.answer(ReleaseCheckTests.TAG, []);
       github.answer(ReleaseCheckTests.COMPARE, { status: "identical" });
       github.answer(ReleaseCheckTests.RUNS, ReleaseCheckTests.PASSED);
 
@@ -155,11 +160,11 @@ class ReleaseCheckTests {
       const repository = await ReleaseCheckTests.createAsync(t);
       const failing = new GitHubApiFixture();
       const output = new TextOutputFixture();
-      failing.fail("/releases/latest", "gh: Server Error (HTTP 500)");
+      failing.fail(ReleaseCheckTests.RELEASES, "gh: Server Error (HTTP 500)");
 
       assert.equal(await ReleaseCheckTests.checkAsync(repository, failing, output), 1);
-      assert.equal(output.text, "\"gh api repos/noldova-com/teamrun/releases/latest\" failed with exit code 1: gh: Server Error (HTTP 500)\n");
-      await assert.rejects(ReleaseCheckTests.checkAsync(repository, new GitHubApiFixture(), new TextOutputFixture()), new Error("No answer recorded for /releases/latest."));
+      assert.equal(output.text, "\"gh api --paginate --slurp repos/noldova-com/teamrun/releases\" failed with exit code 1: gh: Server Error (HTTP 500)\n");
+      await assert.rejects(ReleaseCheckTests.checkAsync(repository, new GitHubApiFixture(), new TextOutputFixture()), new Error("No answer recorded for /releases."));
     });
 
     test("any argument is refused with the usage, also from the command line", async t => {
@@ -172,6 +177,10 @@ class ReleaseCheckTests {
       assert.equal(output.text, ReleaseCheckTests.USAGE);
       assert.deepEqual([command.status, command.stdout], [2, ReleaseCheckTests.USAGE]);
     });
+  }
+
+  private static release(id: number, tag: string, isDraft: boolean = false): Readonly<Record<string, unknown>> {
+    return { id, tag_name: tag, target_commitish: "main", draft: isDraft, assets: [] };
   }
 
   private static async createAsync(t: TestContext): Promise<RepositoryFixture> {
