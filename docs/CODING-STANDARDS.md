@@ -151,7 +151,7 @@ Each folder has its own TypeScript configuration at its root, and `resources.ts`
 The Package layout check enforces this for every package except the test fixture packages, which section 13 owns.
 
 A package's Windows addons are C sources in its `src/native/`, one file per addon named in kebab-case, such as `windows-process.c`, and its manifest lists their names under `teamrun.windowsAddons`.
-An addon includes only `node_api.h`, the C standard headers and the system's headers, uses no C++ and no other library, and gives every function except its registration internal linkage.
+An addon includes only `node_api.h`, the C standard headers and the system's headers, uses no C++, links only Windows' own libraries, which its source names with `#pragma comment(lib, …)`, and gives every function except its registration internal linkage.
 It exposes only what one interface declares; a single class implements that interface by loading the addon on its first call, and tests drive the interface through a fake.
 The [architecture](ARCHITECTURE.md#build-inputs) owns how addons are built, shipped and loaded.
 

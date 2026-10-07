@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IWindowsProcessApi } from "@noldova/teamrun-shell-runtime";
+import type { IWindowsProcessApi, IWindowsSignature } from "@noldova/teamrun-shell-runtime";
 
 export class WindowsProcessApiFixture implements IWindowsProcessApi {
   public static readonly QUERY: number = 0x1000;
@@ -99,6 +99,10 @@ export class WindowsProcessApiFixture implements IWindowsProcessApi {
   public closeHandle(handle: bigint): void {
     this.find(handle);
     this.handles.delete(handle);
+  }
+
+  public verifySignatureAsync(): Promise<IWindowsSignature> {
+    return Promise.reject(new Error("The process fixture reads no signatures."));
   }
 
   private static isRunning(processId: number): boolean {

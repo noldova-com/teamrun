@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { IWindowsSignature } from "./i-windows-signature.js";
+
 export interface IWindowsProcessApi {
   listProcesses(): readonly (readonly [number, number])[];
   openProcess(processId: number, access: number): bigint | number;
@@ -15,4 +17,5 @@ export interface IWindowsProcessApi {
   hasExited(handle: bigint): boolean;
   openFileForReading(file: string): bigint | number;
   closeHandle(handle: bigint): void;
+  verifySignatureAsync(file: string): Promise<IWindowsSignature>;
 }

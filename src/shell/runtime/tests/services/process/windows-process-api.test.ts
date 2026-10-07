@@ -62,4 +62,23 @@ export class WindowsProcessApiTests {
     Assert.areEqual(2, missing);
     Assert.throws(() => api.openFileForReading(`${join(folder.path, "gone.exe")}\0.txt`), TypeError);
   }
+
+  @TestMethod
+  @PlatformFixture.windowsOnly()
+  public async readsTheSignerOfASignedProgramAndWhyAnUnsignedFileIsNotValidOnWindows(): Promise<void> {
+    await using folder = await TemporaryFolderFixture.createAsync();
+    const unsigned = join(folder.path, "TeamRun's ünsigned installer.exe");
+    await writeFile(unsigned, "MZ");
+    const api = new WindowsProcessApi();
+
+    const signed = await api.verifySignatureAsync(process.execPath);
+    const notSigned = await api.verifySignatureAsync(unsigned);
+
+    Assert.areEqual(0, signed.status, signed.message);
+    Assert.isTrue(signed.subject?.startsWith("CN=") === true, String(signed.subject));
+    Assert.areNotEqual(0, notSigned.status);
+    Assert.isTrue(notSigned.message.trim().length > 0, notSigned.message);
+    Assert.isNull(notSigned.subject);
+    await Assert.throwsAsync(() => api.verifySignatureAsync(`${unsigned}\0.txt`), TypeError);
+  }
 }

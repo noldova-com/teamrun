@@ -1019,18 +1019,8 @@ export class Resources {
     return `The updater reported: ${message}`;
   }
 
-  public static readonly systemRootVariable: string = "SystemRoot";
-  public static readonly systemRootMissing: string = "Windows did not name its system folder in SystemRoot, so PowerShell could not be found to read the signature.";
-  public static readonly moduleSearchPathVariable: string = "psmodulepath";
-  public static readonly singleQuote: string = "'";
-  public static readonly utf16Encoding: BufferEncoding = "utf16le";
-  public static readonly powerShellSegments: readonly string[] = ["System32", "WindowsPowerShell", "v1.0", "powershell.exe"];
-  public static readonly powerShellArguments: readonly string[] = ["-NoProfile", "-NonInteractive", "-InputFormat", "None", "-EncodedCommand"];
-  public static readonly signatureStatusField: string = "Status";
-  public static readonly signatureMessageField: string = "StatusMessage";
-  public static readonly signaturePathField: string = "Path";
-  public static readonly signatureSubjectField: string = "Subject";
   public static readonly validSignatureStatus: number = 0;
+  public static readonly signerUnreadable: string = "Windows verified its signature but could not read its signer's name";
   public static readonly nameEscape: string = "\\";
   public static readonly nameQuote: string = "\"";
   public static readonly nameSeparator: string = ",";
@@ -1038,26 +1028,9 @@ export class Resources {
   public static readonly lineBreaks: RegExp = /\s*[\r\n]+\s*/g;
   public static readonly lineJoin: string = " ";
 
-  public static formatSignatureScript(quotedFile: string): string {
-    return [
-      "$ErrorActionPreference = 'Stop'",
-      "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
-      `$signature = Get-AuthenticodeSignature -LiteralPath '${quotedFile}'`,
-      "[pscustomobject]@{ Status = [int]$signature.Status; StatusMessage = [string]$signature.StatusMessage; Path = [string]$signature.Path; " +
-        "Subject = [string]$signature.SignerCertificate.Subject } | ConvertTo-Json -Compress"
-    ].join("; ");
-  }
-
-  public static formatSignatureUnreadable(output: string): string {
-    return `PowerShell answered with an unreadable signature: ${output}`;
-  }
-
-  public static formatSignatureInvalid(message: string): string {
-    return `its signature is not valid: ${message}`;
-  }
-
-  public static formatSignatureOfAnotherFile(file: string): string {
-    return `PowerShell read the signature of ${file} instead`;
+  public static formatSignatureInvalid(status: number, message: string): string {
+    const code = `0x${status.toString(16).toUpperCase().padStart(8, "0")}`;
+    return message.length > 0 ? `its signature is not valid (${code}): ${message}` : `its signature is not valid (${code})`;
   }
 
   public static formatSignedByAnother(signer: string, publisher: string): string {

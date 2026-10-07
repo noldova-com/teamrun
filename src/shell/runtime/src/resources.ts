@@ -619,7 +619,10 @@ export class Resources {
   public static readonly windowsEndAccess: number = 0x1000 | 0x0001 | 0x100000;
   public static readonly windowsGoneError: number = 87;
   public static readonly windowsAddonPath: string = "../../native/windows-process.node";
-  public static readonly windowsAddonFunctions: readonly string[] = ["listProcesses", "openProcess", "readCreationTime", "readImagePath", "terminateProcess", "hasExited", "openFileForReading", "closeHandle"];
+  public static readonly windowsAddonFunctions: readonly string[] = ["listProcesses", "openProcess", "readCreationTime", "readImagePath", "terminateProcess", "hasExited", "openFileForReading", "closeHandle", "verifySignatureAsync"];
+  public static readonly signatureStatusField: string = "status";
+  public static readonly signatureMessageField: string = "message";
+  public static readonly signatureSubjectField: string = "subject";
   public static readonly addonLoadFailed: string = "The runtime could not load its Windows addon, native/windows-process.node.";
   public static readonly addonIncomplete: string = "The runtime's Windows addon, native/windows-process.node, lacks functions this runtime calls; it comes from another build.";
   public static readonly addonUnexpected: string = "The runtime's Windows addon, native/windows-process.node, returned a value this runtime does not expect; it comes from another build.";
