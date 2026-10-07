@@ -19,6 +19,13 @@ test.describe("window state", () => {
   const layout = { version: 1, probe: "window-state" };
   const readBounds = (desktop: DesktopApplicationFixture): Promise<Rectangle | undefined> =>
     desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getNormalBounds());
+  const readFocus = async (desktop: DesktopApplicationFixture): Promise<string> => {
+    const window = await desktop.application.evaluate(({ BrowserWindow }) => {
+      const shown = BrowserWindow.getAllWindows()[0];
+      return `maximized ${shown?.isMaximized()}, focused ${shown?.isFocused()}`;
+    });
+    return `${window}, page focused ${await desktop.window.evaluate(() => document.hasFocus())}`;
+  };
   const readLayout = (desktop: DesktopApplicationFixture): Promise<unknown> =>
     desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { readLayout(): Promise<unknown> }).readLayout());
   const openings: readonly [string, (desktop: DesktopApplicationFixture) => Promise<void>][] = [
@@ -40,6 +47,20 @@ test.describe("window state", () => {
         await expect.poll(() => desktop.isVisibleAsync()).toBe(true);
         await expect.poll(() => readBounds(desktop)).toEqual(moved);
       });
+
+    test("TeamRun quit and reopened with its window maximized opens it maximized and focused, so it takes keys without a click @smoke", async ({ desktop }) => {
+      test.skip(process.platform === "linux", "The Linux workflows' display has no window manager to maximize a window.");
+      await expect(desktop.window.locator("tr-empty-window")).toBeVisible();
+      const first = await readFocus(desktop);
+      await desktop.application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.maximize());
+      await expect.poll(() => readFocus(desktop)).toMatch(/^maximized true,/);
+
+      await desktop.reopenAsync();
+
+      await expect.poll(() => desktop.isVisibleAsync()).toBe(true);
+      await expect.poll(async () => [first, await readFocus(desktop)])
+        .toEqual(["maximized false, focused true, page focused true", "maximized true, focused true, page focused true"]);
+    });
   });
 
   test("the window's layout outlives a restart, kept through the bridge", async ({ desktop }) => {

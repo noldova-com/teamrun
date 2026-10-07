@@ -115,7 +115,7 @@ export class OpenWindow implements IQuitPrompt {
 
   private showWhenReady(): void {
     if (this.isPainted && this.isSettled && !this.window.isDestroyed() && !this.window.isVisible())
-      this.window.show();
+      this.bounds.show();
   }
 
   public show(question: QuitQuestion | null): boolean {

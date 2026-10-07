@@ -1284,6 +1284,19 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async maximizesAWindowSavedMaximizedAsItShowsItSoItOpensFocused(): Promise<void> {
+    const connection = new FakeRuntimeConnection();
+    connection.states.set(`writeWindowBounds:${FakeDeviceIdentity.ID}:main`, { x: 200, y: 100, width: 1000, height: 700, maximized: true });
+    const electron = await DesktopStartFixture.startReadyAsync("darwin", new FakeRuntimeLauncher(connection));
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    electron.ipcMain.send("teamrun:ready", DesktopStartFixture.trustedEvent("darwin"), DesktopStartFixture.APPEARANCE);
+    await Condition.waitAsync(() => window.calls.includes("show"));
+
+    Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "maximize", "show"]), JSON.stringify(window.calls));
+  }
+
+  @TestMethod
   public async restoresTheSavedBoundsTheNextTimeTheRuntimeIsReadyWhenTheConnectionEndsDuringTheRead(): Promise<void> {
     const first = new FakeRuntimeConnection();
     first.deferred.set("shell.readWindowBounds", () => {

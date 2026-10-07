@@ -157,13 +157,31 @@ export class WindowBoundsKeeperTests {
   }
 
   @TestMethod
-  public async restoresSavedBoundsThatADisplayShows(): Promise<void> {
+  public async restoresSavedBoundsThatADisplayShowsAndMaximizesAShownWindowAtOnce(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
+    window.isShown = true;
     const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
 
     await keeper.restoreAsync(new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: true }));
 
     Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "maximize"]), JSON.stringify(window.calls));
+  }
+
+  @TestMethod
+  public async maximizesAHiddenWindowOnlyAsItShowsItAndSavesItAsMaximizedMeanwhile(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore({ x: 200, y: 100, width: 1000, height: 700, maximized: true });
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 5, new FakeDesktopLog(), true);
+
+    await keeper.restoreAsync(store);
+    const whileHidden = [...window.calls];
+    await keeper.saveAsync();
+    keeper.show();
+    keeper.show();
+
+    Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}"]), JSON.stringify(whileHidden));
+    Assert.areEqual(JSON.stringify([{ x: 200, y: 100, width: 1000, height: 700, maximized: true }]), JSON.stringify(store.writes));
+    Assert.areEqual(JSON.stringify(["setBounds {\"x\":200,\"y\":100,\"width\":1000,\"height\":700}", "maximize", "show", "show"]), JSON.stringify(window.calls));
   }
 
   @TestMethod
@@ -173,6 +191,7 @@ export class WindowBoundsKeeperTests {
     displays.workAreas = [{ x: 0, y: 25, width: 1024, height: 743 }];
     displays.primaryWorkArea = { x: 0, y: 25, width: 1024, height: 743 };
     const keeper = new WindowBoundsKeeper(window, displays, 5, new FakeDesktopLog(), false);
+    window.isShown = true;
 
     await keeper.restoreAsync(new MemoryStore({ x: 0, y: 25, width: 1280, height: 800, maximized: true }));
     await keeper.restoreAsync(new MemoryStore({ x: null, y: null, width: 1280, height: 800, maximized: false }));
