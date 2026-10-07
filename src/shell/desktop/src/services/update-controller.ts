@@ -110,8 +110,7 @@ export class UpdateController {
     }
     const ready = this.ready;
     const restartAsync = this.restartAsync;
-    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting || this.mustMove
-      || this.current.kind !== UpdateStateKind.Ready)
+    if (action !== Resources.updateRestartAction || Object.isNull(ready) || Object.isNull(restartAsync) || this.isRestarting || this.mustMove)
       return false;
     void this.restartReadyAsync(ready, restartAsync);
     return true;

@@ -442,7 +442,8 @@ export class UpdateStopTests {
     return this.runAsync(async (installation, folder) => {
       await this.recordAsync(installation, folder, "first");
 
-      const failure = await Assert.throwsAsync(() => this.create(installation).runAsync("0.3.0", () => Promise.reject("The installer is missing.")), UpdateStopException);
+      const failure = await Assert.throwsAsync(() => this.create(installation)
+        .runAsync("0.3.0", () => Promise.reject(new UpdateHandoffException("The installer is missing."))), UpdateHandoffException);
 
       Assert.areEqual("The installer is missing.", failure.message);
       Assert.isFalse(existsSync(installation.barrierFile));
