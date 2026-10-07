@@ -33,6 +33,7 @@ export class DesktopApiTests {
         "FeedProvider",
         "FeedSource",
         "FeedUpdater",
+        "InstallerStart",
         "LinkPolicy",
         "MainProcessFailureKind",
         "MainProcessRecovery",

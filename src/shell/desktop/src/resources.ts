@@ -348,6 +348,15 @@ export class Resources {
     return `The AppImage ${image} could not be replaced with the update and was left as it was: ${reason}`;
   }
 
+  public static readonly installerArguments: readonly string[] = ["--updated", "/S", "--force-run"];
+  public static formatInstallerUnsigned(installer: string, reason: string): string {
+    return `The update's installer ${installer} is not signed by the publisher, so it was not started: ${reason}`;
+  }
+
+  public static formatInstallerNotStarted(installer: string, reason: string): string {
+    return `The update's installer ${installer} could not be started: ${reason}`;
+  }
+
   public static readonly desktopFileSuffix: string = ".desktop";
   public static get iconFolderSegments(): readonly string[] {
     return ProductInfo.current.icons.split(Resources.folderSeparator);
