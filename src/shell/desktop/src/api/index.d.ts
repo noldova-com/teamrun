@@ -467,6 +467,48 @@ export declare class UpdateStop {
 }
 
 /**
+ * The Linux handoff of an update: replaces the AppImage file in place with the downloaded one, keeping its location,
+ * its name and its permissions, so its launchers still start it. The download is copied to a file with a unique name
+ * beside the AppImage, created only when no file has that name, given the AppImage's permissions and flushed to disk,
+ * and then renamed over the AppImage, so the AppImage is always either the old version or the whole new one. A link
+ * to the AppImage is followed and the file it names is replaced. The download is kept, and on any failure the copy
+ * is removed and the AppImage is left as it was. No process takes the handoff; {@link AppImageRestart} starts the
+ * new version once the desktop has exited.
+ */
+export declare class AppImageReplacement {
+  /**
+   * Creates the replacement of an AppImage file.
+   *
+   * @param image The AppImage file, or a link to it.
+   * @example
+   * ```ts
+   * import { AppImageReplacement } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const replacement: AppImageReplacement = new AppImageReplacement("/home/person/Applications/TeamRun.AppImage");
+   * ```
+   */
+  public constructor(image: string);
+
+  /**
+   * Replaces the AppImage with the downloaded file.
+   *
+   * @param download The downloaded and validated AppImage of the new version.
+   * @returns A promise that resolves once the AppImage has been replaced.
+   * @throws {UpdateHandoffException} Rejected with the reason when the AppImage cannot be read, its folder cannot be
+   * written, or the download cannot be copied or put in its place; the AppImage is then left as it was.
+   * @example
+   * ```ts
+   * import { AppImageReplacement } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function handOffAsync(image: string, download: string): Promise<void> {
+   *   return new AppImageReplacement(image).replaceAsync(download);
+   * }
+   * ```
+   */
+  public replaceAsync(download: string): Promise<void>;
+}
+
+/**
  * Starts the replaced AppImage after an update, once this desktop has exited. A process that still holds the old
  * version's files keeps the replaced AppImage mounted, so the new version starts from `/bin/bash`, through the runtime
  * launch's `ProcessLaunchCommand`, which closes the descriptors it inherited above standard error, with its startup
@@ -5062,6 +5104,31 @@ export declare class TrayHostWatcher {
    * ```
    */
   public stop(): void;
+}
+
+/**
+ * The exception thrown when an update's handoff cannot install it; its message is the reason the updater shows.
+ */
+export declare class UpdateHandoffException extends Exception {
+  /**
+   * The exception's name, `"UpdateHandoffException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message Why the handoff failed.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { UpdateHandoffException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: UpdateHandoffException = new UpdateHandoffException("The AppImage could not be replaced with the update.");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
 }
 
 /**

@@ -277,6 +277,23 @@ export class Resources {
     return `${ProductInfo.current.slug}-restart`;
   }
 
+  public static readonly permissionBits: number = 0o7777;
+  public static formatAppImagePart(name: string, unique: string): string {
+    return `.${name}.${unique}.part`;
+  }
+
+  public static formatAppImageUnreadable(image: string, reason: string): string {
+    return `The AppImage ${image} could not be read, so the update was not installed: ${reason}`;
+  }
+
+  public static formatAppImageFolderUnwritable(folder: string, reason: string): string {
+    return `The folder ${folder} cannot be written, so the AppImage in it cannot be replaced with the update: ${reason}`;
+  }
+
+  public static formatAppImageNotReplaced(image: string, reason: string): string {
+    return `The AppImage ${image} could not be replaced with the update and was left as it was: ${reason}`;
+  }
+
   public static readonly desktopFileSuffix: string = ".desktop";
   public static get iconFolderSegments(): readonly string[] {
     return ProductInfo.current.icons.split(Resources.folderSeparator);
