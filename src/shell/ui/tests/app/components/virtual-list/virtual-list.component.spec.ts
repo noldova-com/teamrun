@@ -53,7 +53,7 @@ class VirtualListHostComponent {
     <button type="button" class="off" disabled>Off</button>
     <tr-virtual-list label="Messages" [kind]="kind" [source]="source()" [position]="position()" (activated)="activations.push($event.index)" (positionChange)="positions.push($event)">
       <ng-template [trVirtualRow]="source()" [trVirtualRowDescribed]="true" let-item let-labelId="labelId" let-descriptionId="descriptionId">
-        <div class="message" [class.long]="item.startsWith('long')"><span class="label" [id]="labelId">{{ item }}</span> <span [id]="descriptionId">sent</span> <button type="button" class="reply">Reply</button></div>
+        <div class="message" [class.long]="item.startsWith('long')"><span class="label" [id]="labelId">{{ item }}</span> <span [id]="descriptionId">sent</span> <button type="button" class="reply">Reply</button>@if (item.startsWith('picture')) {<img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">}</div>
       </ng-template>
     </tr-virtual-list>
     <button type="button" class="outside">Outside</button>
@@ -343,6 +343,29 @@ describe("VirtualListComponent", () => {
     await settleAsync();
 
     expect([Math.round(offsetOf("item 100")), viewport().scrollTop]).toEqual([0, 3090]);
+  });
+
+  it("keeps a row at the height it had while its images load and decode, and lets it take its own height after", async () => {
+    const source = new ArrayVirtualListSource(["item 0", "long 1", "item 2"], t => t, 26);
+    await renderFeedAsync(source, new VirtualListPosition(0, null, 0));
+    let finish = (): void => undefined;
+    const decoded = new Promise<void>(t => {
+      finish = t;
+    });
+    const complete = vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(false);
+    const decode = vi.spyOn(HTMLImageElement.prototype, "decode").mockReturnValue(decoded);
+    const heightOf = (label: string): number => Math.round((article(label).parentElement as HTMLElement).getBoundingClientRect().height);
+
+    source.replace(1, ["picture 1"]);
+    await settleAsync();
+    const decoding = [heightOf("picture 1"), Math.round(offsetOfArticle("item 2")), decode.mock.calls.length];
+    complete.mockReturnValue(true);
+    finish();
+    await settleAsync();
+    complete.mockRestore();
+    decode.mockRestore();
+
+    expect([decoding, heightOf("picture 1"), Math.round(offsetOfArticle("item 2"))]).toEqual([[200, 226, 1], 26, 52]);
   });
 
   it("follows a scroll made while a correction waits for the next frame", async () => {

@@ -52,6 +52,7 @@ export class VirtualListComponent<T> {
   private readonly slots: Signal<readonly ElementRef<HTMLElement>[]> = viewChildren<ElementRef<HTMLElement>>("slot");
   private readonly observer: ResizeObserver = new ResizeObserver(t => this.measure(t));
   private readonly observed: Set<Element> = new Set();
+  private readonly reserved: WeakSet<HTMLElement> = new WeakSet();
   private readonly follower: IVirtualListObserver = {
     onInserted: (at, count) => this.inserted(at, count),
     onRemoved: (at, count) => this.removed(at, count),
@@ -448,6 +449,7 @@ export class VirtualListComponent<T> {
   private settle(): void {
     const viewport = this.viewport().nativeElement;
     this.observe([viewport, ...this.slots().map(t => t.nativeElement)]);
+    this.reserve();
     if (!Object.isNull(this.pendingTop)) {
       viewport.scrollTop = this.pendingTop;
       this.domTop = viewport.scrollTop;
@@ -461,6 +463,21 @@ export class VirtualListComponent<T> {
       return;
     this.isFocusPending = false;
     row.focus({ preventScroll: true });
+  }
+
+  private reserve(): void {
+    const { ledger } = this.state();
+    for (const { nativeElement: slot } of this.slots()) {
+      const images = [...slot.querySelectorAll<HTMLImageElement>(Resources.virtualListImageSelector)].filter(t => !t.complete);
+      if (images.length === 0 || this.reserved.has(slot))
+        continue;
+      this.reserved.add(slot);
+      slot.style.minHeight = `${ledger.heightOf(Number(slot.getAttribute(Resources.virtualListRowAttribute)))}px`;
+      void Promise.allSettled(images.map(t => t.decode())).then(() => {
+        slot.style.minHeight = String.empty;
+        this.reserved.delete(slot);
+      });
+    }
   }
 
   private observe(elements: readonly Element[]): void {

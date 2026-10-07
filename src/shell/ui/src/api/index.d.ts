@@ -409,7 +409,8 @@ export interface IVirtualRowContext<T> {
   /**
    * The height in CSS pixels the list holds for the row, the row's padding
    * included: its height when it was last measured, or its source's
-   * estimate until then.
+   * estimate until then. While images in the row still load and decode, the
+   * list keeps the row at least this tall, so the rows after it don't move.
    */
   readonly height: number;
 
@@ -4593,7 +4594,8 @@ export declare class VirtualListChoice<T> {
  * with the template a {@link VirtualRowDirective} marks; a row not yet
  * loaded is blank space at its height. Each row takes its own height, which
  * the list measures; rows measured, loaded, unloaded, added or removed above
- * the first row in view move nothing in view.
+ * the first row in view move nothing in view, and a row keeps its height
+ * while its images load and decode.
  *
  * Its {@link VirtualListComponent.kind} picks its pattern. An options list
  * is a listbox whose rows take the tree row's geometry: Up and Down move,
