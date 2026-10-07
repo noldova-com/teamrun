@@ -1132,7 +1132,7 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
 - **Which builds read it.**
   The build decides, never a setting, a variable or an argument.
   `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
-  A build names a feed only in a packaged product file it writes to an output folder, so the development copy's `_build/product.json` never names one.
+  A build names a feed only in a product file it writes to an output folder, so the development copy's `_build/product.json` never names one.
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
   A test build, and a package made for a native update check, name instead a local feed given to the build when it is made, with `--update-feed <url>`, an HTTPS URL, or an HTTP URL of `localhost`, `127.0.0.1` or `[::1]`, ending in `/`; `release:assets` refuses a package whose product file names any feed but the production one.
   A desktop that never checks shows its updates as off.
