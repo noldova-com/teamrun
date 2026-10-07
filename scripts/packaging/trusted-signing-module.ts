@@ -11,6 +11,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type ProcessRunner from "../processes/process-runner.ts";
+import PackageConfiguration from "./package-configuration.ts";
 import PackagingException from "./packaging.exception.ts";
 import PinnedPackage from "./pinned-package.ts";
 
@@ -54,13 +55,18 @@ export default class TrustedSigningModule {
     `$module = Microsoft.PowerShell.Core\\Get-Module -Name ${TrustedSigningModule.NAME}`,
     `if ($module.Version -ne [version]'${TrustedSigningModule.VERSION}') { throw "${TrustedSigningModule.NAME} $($module.Version) loaded instead of ${TrustedSigningModule.VERSION}." }`
   ].join(TrustedSigningModule.LINE_SEPARATOR);
-  private static readonly SIGN_SCRIPT: string = [
-    "$ErrorActionPreference = 'Stop'",
-    `if ((Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $env:${TrustedSigningModule.FILE_VARIABLE}).Status -eq 'Valid') { exit 0 }`,
+  private static readonly STOP_LINE: string = "$ErrorActionPreference = 'Stop'";
+  private static readonly SIGN_LINES: readonly string[] = [
     TrustedSigningModule.IMPORT_LINE,
     `${TrustedSigningModule.NAME}\\Invoke-TrustedSigning -Endpoint '${TrustedSigningModule.ENDPOINT}' -CodeSigningAccountName '${TrustedSigningModule.ACCOUNT_NAME}' `
       + `-CertificateProfileName '${TrustedSigningModule.CERTIFICATE_PROFILE}' -FileDigest '${TrustedSigningModule.DIGEST}' `
       + `-TimestampRfc3161 '${TrustedSigningModule.TIMESTAMP_SERVER}' -TimestampDigest '${TrustedSigningModule.DIGEST}' -Files $env:${TrustedSigningModule.FILE_VARIABLE}`
+  ];
+  private static readonly SIGN_SCRIPT: string = [TrustedSigningModule.STOP_LINE, ...TrustedSigningModule.SIGN_LINES].join(TrustedSigningModule.LINE_SEPARATOR);
+  private static readonly LIBRARY_SIGN_SCRIPT: string = [
+    TrustedSigningModule.STOP_LINE,
+    `if ((Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $env:${TrustedSigningModule.FILE_VARIABLE}).Status -eq 'Valid') { exit 0 }`,
+    ...TrustedSigningModule.SIGN_LINES
   ].join(TrustedSigningModule.LINE_SEPARATOR);
 
   public static readonly PACKAGES: readonly PinnedPackage[] = [
@@ -126,7 +132,8 @@ export default class TrustedSigningModule {
   public async signAsync(file: string): Promise<void> {
     if (file.includes(TrustedSigningModule.FILE_SEPARATOR))
       throw new PackagingException(`${TrustedSigningModule.NAME} takes a comma-separated list of files, so it cannot sign ${file}.`);
-    await this.runAsync(TrustedSigningModule.SIGN_SCRIPT, {
+    const script = path.extname(file) === PackageConfiguration.LIBRARY_EXTENSION ? TrustedSigningModule.LIBRARY_SIGN_SCRIPT : TrustedSigningModule.SIGN_SCRIPT;
+    await this.runAsync(script, {
       [TrustedSigningModule.FILE_VARIABLE]: path.resolve(file),
       [TrustedSigningModule.TOOLS_VARIABLE]: path.join(this.folder, TrustedSigningModule.TOOLS_FOLDER)
     }, path.dirname(path.resolve(file)), `signing ${file} with`);
