@@ -10,7 +10,7 @@ import { setImmediate } from "node:timers/promises";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { DiagnosticRedactor } from "@noldova/teamrun-shell-runtime";
-import { MainProcessFailureKind, MainProcessRecovery } from "@noldova/teamrun-shell-desktop";
+import { MainProcessFailureKind, MainProcessRecovery, UnusableFolderException } from "@noldova/teamrun-shell-desktop";
 
 import { FakeApplicationHost } from "../fixtures/fake-application-host.fixture.js";
 import { FakeDesktopLog } from "../fixtures/fake-desktop-log.fixture.js";
@@ -71,6 +71,20 @@ export class MainProcessRecoveryTests {
     Assert.isTrue(failed.process.errors.includes("\n    at "), "the record keeps the error's stack");
     Assert.areEqual(0, failed.log.lines.length);
     Assert.areEqual(JSON.stringify(["relaunch", "exit 0"]), JSON.stringify(failed.app.calls));
+  }
+
+  @TestMethod
+  public async showsTheFolderItCannotUseBeforeTheAdviceInTheBox(): Promise<void> {
+    const early = new Failed([1], false);
+    const attached = new Failed([2]);
+    const failure = new UnusableFolderException("TeamRun cannot use the data folder /var/locked/teamrun: Error: Failed to set path");
+
+    await early.failReadyAsync(failure);
+    await attached.failReadyAsync(failure);
+
+    Assert.areEqual(JSON.stringify([MainProcessRecoveryTests.EARLY_BOX.replace("| This happened", `| ${failure.message}\n\nThis happened`)]), JSON.stringify(early.boxes));
+    Assert.areEqual(JSON.stringify([MainProcessRecoveryTests.BOX.replace("| Work running", `| ${failure.message}\n\nWork running`)]), JSON.stringify(attached.boxes));
+    Assert.isTrue(early.process.errors.includes(`The desktop's main process failed with an uncaught exception: UnusableFolderException: ${failure.message}`), early.process.errors);
   }
 
   @TestMethod

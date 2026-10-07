@@ -510,6 +510,7 @@ The [command line's document](../src/shell/cli/README.md#7-module-commands) owns
   An owner without discovery is starting or stopping, so the new runtime keeps trying to take over for up to five seconds and leaves as soon as that owner publishes discovery.
 - The device folder keeps what belongs to the device rather than to a data directory: its identity, its last appearance preferences and each installation's record and launch barrier.
   It is in the operating system's local application data by default; `--device-dir` names another for the desktop and the command line, as `--data-dir` names a data directory, and test runs give one of their own.
+  Both, and the desktop's `--user-data-dir`, take a relative folder from the folder the program was started in, which for an AppImage is the one its launcher records in `OWD`, as the relaunch from a terminal uses.
 - The launcher gives the runtime it starts its installation's folder.
   Once it owns the directory and before it publishes discovery, the runtime adds the directory to its installation's record and checks the launch barrier, releasing ownership and exiting while the barrier holds, so a runtime whose launcher found no barrier cannot slip into an update that began meanwhile ([Stopping for an update](#stopping-for-an-update)).
 - Discovery metadata is published atomically and identifies the endpoint, the owner process and the program it runs from, the product and protocol versions and the runtime's build.
@@ -791,6 +792,7 @@ When a page stops responding, the desktop asks once whether to wait or reload, a
 Each episode, its outcome and the person's choice go to the desktop log.
 When the desktop's main process meets an exception it does not catch or a rejection it does not handle, its state is no longer trusted: the desktop writes the error with its stack to its log and asks once, with the operating system's message box, whether to restart TeamRun or quit, offering the log folder as well, and Electron's own error box never shows.
 It listens from its first step, so a failure before it has found its data directory goes to standard error and the box offers only restarting or quitting.
+A data folder it cannot use stops it this way, and both standard error and the box name the folder and the reason: "TeamRun cannot use the data folder", the path and the error.
 Restarting starts TeamRun again and exits; quitting exits.
 Both exit at once, without the windows' close guard or the quit question, because those run through the failed process; the runtime's work goes on, and changes the window had not yet written may be lost.
 The window reports its appearance again whenever the theme or the mode changes, and the desktop repaints the window's background and its controls, so they follow a change made while the window is open.

@@ -27,13 +27,13 @@ export class VirtualListCache<T> implements IVirtualListObserver {
   private wantedStart: number = 0;
   private wantedEnd: number = 0;
   private updates: number = 0;
+  private kept: number | null = null;
 
   public readonly revision: Signal<number> = this.changes.asReadonly();
 
   public constructor(source: VirtualListSource<T>, report: (error: unknown) => void) {
     this.source = source;
     this.report = report;
-    source.observe(this);
   }
 
   public get size(): number {
@@ -48,6 +48,21 @@ export class VirtualListCache<T> implements IVirtualListObserver {
     return this.failed.has(Math.floor(index / Resources.virtualListPageSize));
   }
 
+  public findIndex(test: (item: T) => boolean): number {
+    for (const [index, item] of this.items)
+      if (test(item))
+        return index;
+    return -1;
+  }
+
+  public attach(): void {
+    this.source.observe(this);
+  }
+
+  public keep(index: number | null): void {
+    this.kept = index;
+  }
+
   public request(start: number, end: number): void {
     const length = this.source.length();
     const from = Math.min(Math.max(0, start), length);
@@ -57,19 +72,24 @@ export class VirtualListCache<T> implements IVirtualListObserver {
     this.wantedEnd = excess > 0 ? this.wantedStart + Resources.virtualListCapacity : to;
     const first = Math.floor(this.wantedStart / Resources.virtualListPageSize);
     const last = Math.ceil(this.wantedEnd / Resources.virtualListPageSize);
+    const kept = this.kept;
+    const keptPage = Object.isNull(kept) ? -1 : Math.floor(kept / Resources.virtualListPageSize);
     for (const [page, read] of this.loading)
-      if (page < first || page >= last) {
+      if ((page < first || page >= last) && page !== keptPage) {
         read.controller.abort();
         this.loading.delete(page);
       }
     for (let page = first; page < last; page++)
       if (!this.loading.has(page) && !this.failed.has(page) && this.needsRead(page))
         this.load(page);
+    if (!Object.isNull(kept) && kept < length && !this.items.has(kept) && !this.loading.has(keptPage) && !this.failed.has(keptPage))
+      this.load(keptPage);
     this.evict();
   }
 
   public retry(): void {
     this.failed.clear();
+    this.changes.update(t => t + 1);
     this.request(this.wantedStart, this.wantedEnd);
   }
 
@@ -156,7 +176,7 @@ export class VirtualListCache<T> implements IVirtualListObserver {
     const excess = this.items.size - Resources.virtualListCapacity;
     if (excess <= 0)
       return;
-    const outside = [...this.items.keys()].filter(t => t < this.wantedStart || t >= this.wantedEnd);
+    const outside = [...this.items.keys()].filter(t => t !== this.kept && (t < this.wantedStart || t >= this.wantedEnd));
     outside.sort((a, b) => this.distanceOf(b) - this.distanceOf(a));
     for (const index of outside.slice(0, excess)) {
       this.items.delete(index);

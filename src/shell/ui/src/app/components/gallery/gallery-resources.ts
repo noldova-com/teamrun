@@ -19,6 +19,9 @@ export class GalleryResources {
   public static readonly focusedSelect: string = ".tr-select-button";
   public static readonly dialogTitleIdPrefix: string = "tr-gallery-dialog-";
   public static readonly fieldMessageIdPrefix: string = "tr-gallery-field-message-";
+  public static readonly virtualListLength: number = 10_000;
+  public static readonly virtualListEstimate: number = 30;
+  public static readonly virtualListSelected: number = 2;
   public static readonly text = {
     gallery: "Gallery",
     defaultState: "Default",
@@ -140,6 +143,11 @@ export class GalleryResources {
     treeReadme: "Readme",
     treeNotes: "Notes",
     treeLong: "A file name that is far too long to fit the width of its tree",
+    virtualList: "Virtual list",
+    virtualListLabel: "Gallery items",
+    virtualListItem: "Item",
+    virtualListLoadingCaption: "Loading",
+    virtualListRefusal: "The Gallery's source refuses every read.",
     sectionHeader: "Section header",
     sectionRecent: "Recent",
     sectionOlder: "Older",

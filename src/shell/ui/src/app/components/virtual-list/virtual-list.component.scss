@@ -1,0 +1,92 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@use "forced-colors" as *;
+@use "selected-surface" as *;
+@use "states";
+
+:host {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  min-height: 0;
+}
+
+.tr-virtual-list-viewport {
+  grid-area: 1 / 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+}
+
+.tr-virtual-list-rows {
+  position: relative;
+}
+
+.tr-virtual-list-slot {
+  box-sizing: border-box;
+  padding-block-end: var(--tr-space-1);
+}
+
+.tr-virtual-list-slot-outside {
+  position: absolute;
+  inset-inline: 0;
+}
+
+.tr-virtual-list-option {
+  display: flex;
+  align-items: center;
+  gap: var(--tr-space-2);
+  box-sizing: border-box;
+  min-height: var(--tr-tree-row-height);
+  padding-inline: var(--tr-space-2);
+  border-radius: var(--tr-radius-small);
+  color: var(--tr-text);
+  overflow-wrap: anywhere;
+}
+
+.tr-virtual-list-option#{states.$hover} {
+  background-color: var(--tr-hover);
+
+  @include forced-hover;
+}
+
+.tr-virtual-list-option-selected,
+.tr-virtual-list-option-selected#{states.$hover} {
+  @include selected-surface;
+}
+
+.tr-virtual-list-status,
+.tr-virtual-list-failure {
+  z-index: 1;
+  grid-area: 1 / 1;
+  align-self: start;
+  background-color: var(--tr-panel);
+}
+
+.tr-virtual-list-edge-end {
+  align-self: end;
+}
+
+.tr-virtual-list-status-shown {
+  padding: var(--tr-space-2);
+  color: var(--tr-text-muted);
+}
+
+.tr-virtual-list-failure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tr-space-2);
+  padding: var(--tr-space-2);
+
+  tr-field-message {
+    flex: 1 1 0;
+    margin-top: 0;
+  }
+}

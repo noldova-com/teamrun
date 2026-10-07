@@ -15,6 +15,7 @@ import "@noldova/teamrun-foundation-core";
 import { type DiagnosticRedactor, LogText } from "@noldova/teamrun-shell-runtime";
 
 import type { MainProcessFailureKind } from "../enums/main-process-failure-kind.js";
+import { UnusableFolderException } from "../exceptions/unusable-folder.exception.js";
 import type { IApplicationHost } from "../interfaces/i-application-host.js";
 import type { IDesktopLog } from "../interfaces/i-desktop-log.js";
 import type { IDialogHost } from "../interfaces/i-dialog-host.js";
@@ -46,7 +47,7 @@ export class MainProcessRecovery {
     if (this.hasFailed)
       return;
     this.hasFailed = true;
-    this.askAsync().catch((failure: unknown) => {
+    this.askAsync(error).catch((failure: unknown) => {
       try {
         this.record(Resources.formatMainProcessBoxFailed(MainProcessRecovery.describe(failure)));
       }
@@ -56,16 +57,17 @@ export class MainProcessRecovery {
     });
   }
 
-  private async askAsync(): Promise<void> {
+  private async askAsync(error: unknown): Promise<void> {
     await this.app.whenReady();
     const openLogFolderAsync = this.openLogFolderAsync;
     const buttons = Object.isNull(openLogFolderAsync)
       ? [Resources.restartButton, Resources.quitButton]
       : [Resources.restartButton, Resources.openLogFolderButton, Resources.quitButton];
+    const advice = Object.isNull(openLogFolderAsync) ? Resources.mainProcessFailedBeforeStartDetail : Resources.mainProcessFailedDetail;
     const options: MessageBoxOptions = {
       type: Resources.warningBoxType,
       message: Resources.mainProcessFailed,
-      detail: Object.isNull(openLogFolderAsync) ? Resources.mainProcessFailedBeforeStartDetail : Resources.mainProcessFailedDetail,
+      detail: error instanceof UnusableFolderException ? Resources.formatFailureDetail(error.message, advice) : advice,
       buttons,
       defaultId: 0,
       cancelId: buttons.length - 1,
