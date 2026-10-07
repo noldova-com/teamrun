@@ -62,7 +62,7 @@ export class HeightLedger {
       return VirtualRange.empty;
     const start = this.indexAt(Math.max(0, scrollTop - margin));
     const end = Math.min(this.count, this.indexAt(scrollTop + viewport + margin) + 1);
-    return new VirtualRange(start, end, this.offsetOf(start), this.total - this.offsetOf(end));
+    return new VirtualRange(start, end, this.offsetOf(start), Math.max(0, this.total - this.offsetOf(end)));
   }
 
   public anchorAt(scrollTop: number): VirtualListAnchor {

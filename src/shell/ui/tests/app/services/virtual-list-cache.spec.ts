@@ -173,6 +173,76 @@ describe("VirtualListCache", () => {
     expect(source.describeReads()).toEqual(["0-50", "0-50"]);
   });
 
+  it("reads an updated page again when its refresh is stopped by a request that leaves it", async () => {
+    const source = new VirtualListSourceFixture(200);
+    const cache = createCache(source);
+    cache.request(0, 100);
+    await answerAllAsync(source);
+
+    source.reportUpdated(60, 1);
+    cache.request(0, 50);
+    cache.request(0, 100);
+
+    expect(source.describeReads()).toEqual(["0-50", "50-100", "50-100 aborted", "50-100"]);
+  });
+
+  it("reads an updated page again when its refresh is stopped by a removal inside the page", async () => {
+    const source = new VirtualListSourceFixture(200);
+    const cache = createCache(source);
+    cache.request(0, 100);
+    await answerAllAsync(source);
+
+    source.reportUpdated(60, 1);
+    source.reportRemoved(80, 1);
+    cache.request(0, 99);
+
+    expect(source.describeReads()).toEqual(["0-50", "50-100", "50-100 aborted", "50-100"]);
+  });
+
+  it("reads an updated page again on a retry when its refresh failed", async () => {
+    const source = new VirtualListSourceFixture(200);
+    const cache = createCache(source);
+    cache.request(0, 100);
+    await answerAllAsync(source);
+
+    source.reportUpdated(60, 1);
+    await source.readAt(2).refuseAsync(new Error("The store went away."));
+    const failed = cache.isFailed(60);
+    cache.retry();
+
+    expect([failed, source.describeReads()]).toEqual([true, ["0-50", "50-100", "50-100", "50-100"]]);
+  });
+
+  it("forgets a failure of the last page once items are added after it", async () => {
+    const source = new VirtualListSourceFixture(70);
+    const cache = createCache(source);
+    cache.request(0, 70);
+    await source.readAt(0).answerAsync();
+    await source.readAt(1).refuseAsync(new Error("The store went away."));
+    const failed = cache.isFailed(60);
+
+    source.reportInserted(70, 5);
+
+    expect([failed, cache.isFailed(60)]).toEqual([true, false]);
+  });
+
+  it("moves the items it was asked for with the items inserted or removed before them", async () => {
+    const source = new VirtualListSourceFixture(300);
+    const cache = createCache(source);
+    cache.request(100, 150);
+    await source.readAt(0).answerAsync();
+
+    source.reportInserted(250, 1);
+    source.reportInserted(0, 50);
+    source.reportUpdated(160, 1);
+    await source.readAt(1).answerAsync();
+    source.reportRemoved(300, 1);
+    source.reportRemoved(0, 60);
+    source.reportUpdated(100, 1);
+
+    expect(source.describeReads()).toEqual(["100-150", "150-200", "100-150"]);
+  });
+
   it("goes on reading an earlier page while one item streams updates", async () => {
     const source = new VirtualListSourceFixture(100);
     const cache = createCache(source);
@@ -216,7 +286,7 @@ describe("VirtualListCache", () => {
     source.reportRemoved(150, 1);
     await source.readAt(0).answerAsync();
 
-    expect([source.describeReads(), cache.itemAt(49)]).toEqual([["0-50", "50-100 aborted", "50-100"], "item 49"]);
+    expect([source.describeReads(), cache.itemAt(49)]).toEqual([["0-50", "50-100 aborted", "50-100", "100-150"], "item 49"]);
   });
 
   it("moves a changed item it holds outside the request with the items inserted before it, and forgets it once it is removed", async () => {

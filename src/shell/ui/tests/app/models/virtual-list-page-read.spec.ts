@@ -9,11 +9,11 @@
 import { VirtualListPageRead } from "../../../src/app/models/virtual-list-page-read";
 
 describe("VirtualListPageRead", () => {
-  it("keeps the positions it reads and a controller of its own that can abort it", () => {
-    const read = new VirtualListPageRead(50, 100);
-    const other = new VirtualListPageRead(0, 50);
+  it("keeps the positions it reads, the last update before it started and a controller of its own that can abort it", () => {
+    const read = new VirtualListPageRead(50, 100, 7);
+    const other = new VirtualListPageRead(0, 50, 0);
     read.controller.abort();
 
-    expect([read.start, read.end, read.controller.signal.aborted, other.controller.signal.aborted]).toEqual([50, 100, true, false]);
+    expect([read.start, read.end, read.lastUpdate, read.controller.signal.aborted, other.controller.signal.aborted]).toEqual([50, 100, 7, true, false]);
   });
 });
