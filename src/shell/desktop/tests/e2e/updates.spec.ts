@@ -97,7 +97,7 @@ const openAboutAsync = async (page: Page): Promise<Locator> => {
   return page.getByRole("region", { name: "About TeamRun" });
 };
 
-test("an update made ready before TeamRun started offers Restart to update at once, without asking the feed again, on a Mac copy outside Applications only asks the person to move it, or on a Linux copy that is no AppImage fails with the reason, offers no restart, stops nothing and downloads nothing", async ({}, testInfo) => {
+test("an update made ready before TeamRun started offers Restart to update at once, without asking the feed again, on a Mac copy outside Applications only asks the person to move it, or on a Linux copy that is no AppImage fails with the reason, offers no restart, stops nothing and downloads nothing @smoke", async ({}, testInfo) => {
   await withReadyUpdateAsync(testInfo, async ({ feed, launchAsync }) => {
     const desktop = await launchAsync();
     const page = desktop.window;
