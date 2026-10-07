@@ -197,6 +197,17 @@ export class DesktopBridgeService implements ClipboardWriter {
     });
   }
 
+  public async readFullScreenAsync(): Promise<boolean> {
+    return await this.bridge.readFullScreen() === true;
+  }
+
+  public onFullScreen(listener: (isFullScreen: boolean) => void): () => void {
+    return this.bridge.onFullScreen(t => {
+      if (Object.isBoolean(t))
+        listener(t);
+    });
+  }
+
   public logModule(moduleId: string, message: string): void {
     this.bridge.logModule(moduleId, message);
   }
@@ -262,6 +273,8 @@ export class DesktopBridgeService implements ClipboardWriter {
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.answerQuit))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readTrayAvailable))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onTrayAvailable))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.readFullScreen))) &&
+      Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.onFullScreen))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logModule))) &&
       Object.isFunction(Reflect.get(value, nameof<IDesktopBridge>(t => t.logError)));
   }

@@ -23,6 +23,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   private readonly fieldMenuListeners: Set<(request: unknown) => void> = new Set();
   private readonly updateSaveListeners: Set<(requestId: string) => void> = new Set();
   private readonly trayListeners: Set<(isAvailable: unknown) => void> = new Set();
+  private readonly fullScreenListeners: Set<(isFullScreen: unknown) => void> = new Set();
 
   public platform: string;
   public processor: string = "x64";
@@ -41,6 +42,7 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public readonly actions: string[] = [];
   public startup: unknown = { kind: "Ready", details: [] };
   public trayAvailable: Promise<unknown> = Promise.resolve(true);
+  public fullScreen: Promise<unknown> = Promise.resolve(false);
   public layout: unknown = null;
   public readonly requests: [string, JsonValue][] = [];
   public answer: unknown = { payload: null };
@@ -283,6 +285,20 @@ export class DesktopBridgeFixture implements IDesktopBridge {
   public changeTrayAvailable(isAvailable: unknown): void {
     for (const listener of this.trayListeners)
       listener(isAvailable);
+  }
+
+  public readFullScreen(): Promise<unknown> {
+    return this.fullScreen;
+  }
+
+  public onFullScreen(listener: (isFullScreen: unknown) => void): () => void {
+    this.fullScreenListeners.add(listener);
+    return () => this.fullScreenListeners.delete(listener);
+  }
+
+  public changeFullScreen(isFullScreen: unknown): void {
+    for (const listener of this.fullScreenListeners)
+      listener(isFullScreen);
   }
 
   public logModule(moduleId: string, message: string): void {

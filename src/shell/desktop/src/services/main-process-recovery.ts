@@ -28,6 +28,7 @@ export class MainProcessRecovery {
   private readonly redactor: DiagnosticRedactor;
   private log: IDesktopLog | null = null;
   private openLogFolderAsync: (() => Promise<boolean>) | null = null;
+  private release: (() => void) | null = null;
   private hasFailed: boolean = false;
 
   public constructor(app: IApplicationHost, dialog: IDialogHost, errorOutput: Writable, redactor: DiagnosticRedactor) {
@@ -37,9 +38,10 @@ export class MainProcessRecovery {
     this.redactor = redactor;
   }
 
-  public attach(log: IDesktopLog, openLogFolderAsync: () => Promise<boolean>): void {
+  public attach(log: IDesktopLog, openLogFolderAsync: () => Promise<boolean>, release: () => void): void {
     this.log = log;
     this.openLogFolderAsync = openLogFolderAsync;
+    this.release = release;
   }
 
   public receive(error: unknown, kind: MainProcessFailureKind): void {
@@ -52,7 +54,7 @@ export class MainProcessRecovery {
         this.record(Resources.formatMainProcessBoxFailed(MainProcessRecovery.describe(failure)));
       }
       finally {
-        this.app.exit(Resources.failureExitCode);
+        this.exit(Resources.failureExitCode);
       }
     });
   }
@@ -82,9 +84,19 @@ export class MainProcessRecovery {
       }
       if (choice === Resources.restartButton)
         this.app.relaunch();
-      this.app.exit(Resources.quitExitCode);
+      this.exit(Resources.quitExitCode);
       return;
     }
+  }
+
+  private exit(code: number): void {
+    try {
+      this.release?.();
+    }
+    catch (failure) {
+      this.record(Resources.formatMainProcessNotReleased(MainProcessRecovery.describe(failure)));
+    }
+    this.app.exit(code);
   }
 
   private record(text: string): void {

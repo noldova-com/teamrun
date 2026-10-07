@@ -26,7 +26,8 @@ export class OverlayBoundsService {
     const edge = origin.closest(Resources.chromeSelector)?.getAttribute(Resources.chromeAttribute);
     const top = edge === Resources.topChrome ? gap : this.measure(Resources.windowRowLook) + gap;
     const bottom = view.clientHeight - (edge === Resources.bottomChrome ? gap : this.measure(Resources.statusBarLook) + gap);
-    return new OverlayBounds(top, view.clientWidth - gap, bottom, gap);
+    const side = Object.isNullOrUndefined(edge) ? gap : this.measure(Resources.panelMarginLook);
+    return new OverlayBounds(top, view.clientWidth - side, bottom, side);
   }
 
   private measure(look: string): number {

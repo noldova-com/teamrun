@@ -955,7 +955,8 @@ export class DesktopApplicationTests {
       const launcher = new FakeRuntimeLauncher();
       const installations: Installation[] = [];
       const environment = { SystemRoot: process.env["SystemRoot"] };
-      DesktopStartFixture.start(electron, new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment), launcher, undefined, undefined, undefined, installations);
+      const desktop = new FakeDesktopProcess(process.platform, [`--device-dir=${folder}`], environment);
+      DesktopStartFixture.start(electron, desktop, launcher, undefined, undefined, undefined, installations);
       await electron.app.becomeReadyAsync();
       await Condition.waitAsync(() => launcher.connections.length === 1);
       const [installation] = installations;
@@ -982,6 +983,7 @@ export class DesktopApplicationTests {
       Assert.isFalse(untrusted === true);
       Assert.isTrue(answered === true);
       Assert.areEqual(JSON.stringify(new UpdateSaved(1000, ["Notes couldn't save"]).toJson()), JSON.stringify(connection?.payloads.at(-1)));
+      Assert.areEqual(desktop.programs.starts.length, desktop.programs.stops);
     }
     finally {
       await rm(folder, { recursive: true, force: true });
@@ -2160,6 +2162,18 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async stopsItsTrayHostMonitorAndTrayBeforeItExitsAfterTheHandoff(): Promise<void> {
+    const handoff = new FakeUpdateHandoff();
+    await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async (electron, desktop) => {
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(1, desktop.programs.starts.length);
+      Assert.areEqual(1, desktop.programs.stops);
+      Assert.isUndefined(electron.tray.shown);
+    });
+  }
+
+  @TestMethod
   public async quitsThroughSquirrelOnMacOSWithoutAskingAgainOnceTheHandoffSucceeds(): Promise<void> {
     const handoff = new FakeUpdateHandoff();
     handoff.handOff = () => Promise.resolve(5230);
@@ -2600,6 +2614,20 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
+  public async readsWhetherItsTrustedWindowIsInFullScreen(): Promise<void> {
+    const electron = await DesktopStartFixture.startReadyAsync("darwin", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), new FakeDesktopProcess("darwin"));
+    const trusted = DesktopStartFixture.trustedEvent("darwin");
+    const window = DesktopStartFixture.firstWindow(electron);
+
+    const before = electron.ipcMain.invoke("teamrun:readFullScreen", trusted);
+    window.isFullScreenNow = true;
+    const after = electron.ipcMain.invoke("teamrun:readFullScreen", trusted);
+    const untrusted = electron.ipcMain.invoke("teamrun:readFullScreen", { ...trusted, senderFrame: null });
+
+    Assert.areEqual("[false,true,null]", JSON.stringify([before, after, untrusted]));
+  }
+
+  @TestMethod
   public async pointsTheDictionaryDownloadAtItsProfilesOwnFolderAtReadyAndTakesSpellingPreferencesOnlyFromItsOwnWindow(): Promise<void> {
     const process = new FakeDesktopProcess("linux");
     const electron = await DesktopStartFixture.startReadyAsync("linux", new FakeRuntimeLauncher(), new FakeElectron(), new FakeDeviceIdentity(), process);
@@ -2752,6 +2780,28 @@ export class DesktopApplicationTests {
       Assert.isTrue(process.errors.includes("desktop-application.test"), "the log keeps the error's stack");
       Assert.areEqual(JSON.stringify([null, null]), JSON.stringify(electron.dialog.boxes.map(t => t.windowId)));
       Assert.areEqual(JSON.stringify([join(data, "logs")]), JSON.stringify(electron.shell.opened));
+    }
+    finally {
+      await rm(data, { recursive: true, force: true });
+    }
+  }
+
+  @TestMethod
+  public async stopsItsTrayHostMonitorWhenItQuitsAfterAMainProcessFailure(): Promise<void> {
+    const data = await mkdtemp(join(tmpdir(), "teamrun-desktop-"));
+    try {
+      const electron = new FakeElectron();
+      const process = new FakeDesktopProcess("linux", [`--data-dir=${data}`]);
+      electron.dialog.answers.push(2);
+      DesktopStartFixture.start(electron, process);
+      await electron.app.becomeReadyAsync();
+      await Condition.waitAsync(() => process.programs.starts.length === 1);
+
+      for (const listener of process.exceptionListeners)
+        listener(new Error("The pipe broke."));
+      await Condition.waitAsync(() => electron.app.calls.includes("exit 0"));
+
+      Assert.areEqual(1, process.programs.stops);
     }
     finally {
       await rm(data, { recursive: true, force: true });

@@ -77,10 +77,18 @@ describe("SashComponent", () => {
     fixture.detectChanges();
   }
 
-  function pointer(type: string, button: number, clientX: number, clientY: number): PointerEvent {
-    const event = new PointerEvent(type, { button, clientX, clientY, pointerId: 7, cancelable: true });
+  function pointer(type: string, button: number, clientX: number, clientY: number, buttons: number = 1): PointerEvent {
+    const event = new PointerEvent(type, { button, buttons, clientX, clientY, pointerId: 7, bubbles: true, cancelable: true });
     sash().dispatchEvent(event);
     return event;
+  }
+
+  function holdCapture(): { readonly capture: ReturnType<typeof vi.spyOn>; readonly release: ReturnType<typeof vi.spyOn> } {
+    const held = new Set<number>();
+    const capture = vi.spyOn(sash(), "setPointerCapture").mockImplementation(t => void held.add(t));
+    const release = vi.spyOn(sash(), "releasePointerCapture").mockImplementation(t => void held.delete(t));
+    vi.spyOn(sash(), "hasPointerCapture").mockImplementation(t => held.has(t));
+    return { capture, release };
   }
 
   function key(name: string): KeyboardEvent {
@@ -126,8 +134,7 @@ describe("SashComponent", () => {
   });
 
   it("follows a primary-button drag along its axis and reports only real movement", () => {
-    const capture = vi.spyOn(sash(), "setPointerCapture").mockImplementation(() => undefined);
-    const release = vi.spyOn(sash(), "releasePointerCapture").mockImplementation(() => undefined);
+    const { capture, release } = holdCapture();
 
     pointer("pointermove", 0, 120, 10);
     pointer("pointerup", 0, 120, 10);
@@ -152,14 +159,49 @@ describe("SashComponent", () => {
 
   it("follows a horizontal sash's vertical drag and ends on cancel", () => {
     update(() => host.orientation.set(SashOrientation.Horizontal));
-    vi.spyOn(sash(), "setPointerCapture").mockImplementation(() => undefined);
-    const release = vi.spyOn(sash(), "releasePointerCapture").mockImplementation(() => undefined);
+    const { release } = holdCapture();
 
     pointer("pointerdown", 0, 10, 50);
     pointer("pointermove", 0, 90, 44);
     pointer("pointercancel", 0, 90, 44);
 
     expect(host.deltas).toEqual([-6]);
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("ends its drag on a lost capture, a lost window focus, a move with no button pressed or Escape, after which moves resize nothing", () => {
+    const { release } = holdCapture();
+    const endings: readonly (readonly [string, () => void])[] = [
+      ["lost capture", () => sash().dispatchEvent(new PointerEvent("lostpointercapture", { pointerId: 7 }))],
+      ["blur", () => window.dispatchEvent(new FocusEvent("blur"))],
+      ["no button", () => pointer("pointermove", 0, 130, 10, 0)],
+      ["Escape", () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }))]
+    ];
+    const ended: string[] = [];
+
+    for (const [name, end] of endings) {
+      host.deltas.splice(0);
+      pointer("pointerdown", 0, 100, 10);
+      pointer("pointermove", 0, 110, 10);
+      end();
+      pointer("pointermove", 0, 140, 10);
+      pointer("pointermove", 0, 150, 10, 0);
+      fixture.detectChanges();
+      ended.push(`${name}: ${host.deltas.join(",")} ${sash().classList.contains("tr-sash-active")}`);
+    }
+
+    expect(ended).toEqual(["lost capture: 10 false", "blur: 10 false", "no button: 10 false", "Escape: 10 false"]);
+    expect(release).toHaveBeenCalledTimes(4);
+  });
+
+  it("stops following the pointer when it is destroyed mid-drag", () => {
+    const { release } = holdCapture();
+
+    pointer("pointerdown", 0, 100, 10);
+    update(() => host.shown.set(false));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 7, buttons: 1, clientX: 140, clientY: 10 }));
+
+    expect(host.deltas).toEqual([]);
     expect(release).toHaveBeenCalledOnce();
   });
 
@@ -185,8 +227,7 @@ describe("SashComponent", () => {
 
   it("shows its bar at once while dragging, keeps it when the pointer leaves and hides it when the drag ends", () => {
     vi.useFakeTimers();
-    vi.spyOn(sash(), "setPointerCapture").mockImplementation(() => undefined);
-    vi.spyOn(sash(), "releasePointerCapture").mockImplementation(() => undefined);
+    holdCapture();
 
     sash().dispatchEvent(new PointerEvent("pointerenter"));
     pointer("pointerdown", 0, 100, 10);

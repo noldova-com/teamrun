@@ -225,7 +225,7 @@ describe("TabGroupComponent", () => {
     update();
     expect(layout.layout().documents.tabs).toEqual([LayoutFixture.plan]);
 
-    tab(1, 1).dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true }));
+    tab(1, 1).dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, button: 0, bubbles: true }));
     expect(begin).toHaveBeenCalledWith(LayoutFixture.search, expect.any(PointerEvent));
   });
 
@@ -263,22 +263,22 @@ describe("TabGroupComponent", () => {
     await renderAsync();
     let under: Element | null = null;
     vi.spyOn(document, "elementFromPoint").mockImplementation(() => under);
-    tab(1, 0).dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 0, clientY: 0, bubbles: true }));
+    tab(1, 0).dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, button: 0, clientX: 0, clientY: 0, bubbles: true }));
     under = tab(0, 1);
     const bounds = under.getBoundingClientRect();
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.left + 1, clientY: bounds.top + 1 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: bounds.left + 1, clientY: bounds.top + 1 }));
     update();
 
     expect(tab(0, 1).classList.contains("tr-drop-line-before")).toBe(true);
     expect(tab(1, 0).classList.contains("tr-tab-dragged")).toBe(true);
 
     under = group(0).querySelector(".tr-tab-group-end");
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.right + 40, clientY: bounds.top + 1 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: bounds.right + 40, clientY: bounds.top + 1 }));
     update();
     expect(group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-drop-line-before")).toBe(true);
 
     under = group(0).querySelector(".tr-tab-group-menu");
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: bounds.right + 60, clientY: bounds.top + 1 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: bounds.right + 60, clientY: bounds.top + 1 }));
     update();
     expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-drop-line-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-drop-line-before")])
       .toEqual([true, false]);
@@ -293,8 +293,8 @@ describe("TabGroupComponent", () => {
     await fixture.whenStable();
     update();
     vi.spyOn(document, "elementFromPoint").mockReturnValue(group(0).querySelector(".tr-tab-group-actions"));
-    tab(0, 0).dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 0, clientY: 0, bubbles: true }));
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 40, clientY: 40 }));
+    tab(0, 0).dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, button: 0, clientX: 0, clientY: 0, bubbles: true }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: 40, clientY: 40 }));
     update();
 
     expect([group(0).querySelector(".tr-tab-group-end")?.classList.contains("tr-drop-line-before"), group(0).querySelector(".tr-tab-group-actions")?.classList.contains("tr-drop-line-before")])
@@ -333,7 +333,7 @@ describe("TabGroupComponent", () => {
     expect([body?.getAttribute("role"), body?.getAttribute("aria-labelledby")]).toEqual(["region", title?.id]);
     expect([group(corner).querySelector(".tr-tab-group-menu"), group(corner).querySelector(".tr-tab-group-hide")].every(t => !Object.isNull(t))).toBe(true);
     expect(group(layout.layout().dock(DockSide.Right).root?.cornerGroup.id ?? -1).querySelector("[role=tablist]")).not.toBeNull();
-    title?.dispatchEvent(new PointerEvent("pointerdown", { button: 0 }));
+    title?.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, button: 0 }));
     expect(begin).not.toHaveBeenCalled();
 
     layout.place(LayoutFixture.search, new TabDropTarget(corner, 1));
@@ -358,13 +358,13 @@ describe("TabGroupComponent", () => {
     const drag = TestBed.inject(TabDragService);
     const corner = layout.layout().dock(DockSide.Left).root?.cornerGroup.id ?? -1;
     vi.spyOn(document, "elementFromPoint").mockReturnValue(group(corner).querySelector(".tr-tab-group-title"));
-    drag.begin(LayoutFixture.search, new PointerEvent("pointerdown", { button: 0, clientX: 0, clientY: 0 }));
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 40, clientY: 40 }));
+    drag.begin(LayoutFixture.search, new PointerEvent("pointerdown", { pointerId: 1, button: 0, clientX: 0, clientY: 0 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: 40, clientY: 40 }));
     update();
 
     expect(group(corner).querySelector(".tr-tab-group-header .tr-tab-group-actions")?.classList.contains("tr-drop-line-before")).toBe(true);
     expect(drag.hoveredGroup()).toBeNull();
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     expect(layout.layout().group(corner)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.search]);
   });
 

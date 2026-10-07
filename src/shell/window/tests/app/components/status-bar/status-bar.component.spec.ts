@@ -86,8 +86,8 @@ describe("StatusBarComponent", () => {
         expect(style.backgroundColor).toBe(AppearanceFixture.readColor(theme, mode, "sideBar.background"));
         expect(style.color).toBe(AppearanceFixture.readColor(theme, mode, "foreground"));
         AppearanceFixture.expectLook(style.minHeight, theme, "status-bar-height", "min-height");
-        AppearanceFixture.expectLook(style.paddingLeft, theme, "status-bar-inset", "padding-left");
-        AppearanceFixture.expectLook(style.paddingRight, theme, "status-bar-inset", "padding-right");
+        AppearanceFixture.expectLook(style.paddingLeft, theme, "panel-card-margin", "padding-left");
+        AppearanceFixture.expectLook(style.paddingRight, theme, "panel-card-margin", "padding-right");
         AppearanceFixture.expectLook(side.columnGap, theme, "status-bar-item-gap", "column-gap");
       });
 });

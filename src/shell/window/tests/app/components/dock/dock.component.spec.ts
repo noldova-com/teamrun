@@ -187,18 +187,18 @@ describe("DockComponent", () => {
       return { clientX: bounds.left + bounds.width / 2, clientY: bounds.top + bounds.height * fraction };
     };
 
-    icon("view/files.search").dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true, ...pointAt(icon("view/files.search"), 0.5) }));
-    document.dispatchEvent(new PointerEvent("pointermove", pointAt(icon("view/files.tree"), 0.9)));
+    icon("view/files.search").dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, button: 0, bubbles: true, ...pointAt(icon("view/files.search"), 0.5) }));
+    document.dispatchEvent(new PointerEvent("pointermove", { ...pointAt(icon("view/files.tree"), 0.9), pointerId: 1, buttons: 1 }));
     fixture.detectChanges();
     const marked = ["tr-drop-line-before", "tr-drop-line-vertical", "tr-dock-strip-dragged"].map(t => icon("view/files.search").classList.contains(t));
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     fixture.detectChanges();
 
     expect(targets).toEqual([[`${treeGroup}:0`, `${treeGroup}:1`, "vertical"], [`${treeGroup}:1`, `${searchGroup}:1`, "vertical"]]);
     expect(marked).toEqual([true, true, true]);
     expect(layout.layout().group(treeGroup)?.tabs).toEqual([LayoutFixture.files, LayoutFixture.search]);
-    icon("view/files.tree").dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true, ...pointAt(icon("view/files.tree"), 0.5) }));
-    document.dispatchEvent(new PointerEvent("pointermove", pointAt(icon("view/files.search"), 0.9)));
+    icon("view/files.tree").dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, button: 0, bubbles: true, ...pointAt(icon("view/files.tree"), 0.5) }));
+    document.dispatchEvent(new PointerEvent("pointermove", { ...pointAt(icon("view/files.search"), 0.9), pointerId: 1, buttons: 1 }));
     fixture.detectChanges();
     expect(icon("view/files.search").classList.contains("tr-drop-line-after")).toBe(true);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));

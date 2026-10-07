@@ -828,6 +828,8 @@ The desktop reads the setting for its device once the runtime is ready, follows 
 On Linux the icon shows only while a StatusNotifierItem host is registered: the desktop asks the session bus through `/usr/bin/gdbus` whether `org.kde.StatusNotifierWatcher` reports `IsStatusNotifierHostRegistered`, and keeps `gdbus monitor` on that name to ask again when its owner changes or a host registers or leaves.
 A missing `gdbus`, no watcher or a failed answer means no host; when the monitor ends, the desktop asks once and starts it again after a wait that begins at a second and doubles up to a minute.
 The desktop starts `gdbus` the way it [launches the runtime](#launching-the-runtime), through Bash that closes inherited descriptors, so it never holds Chromium's channels to the desktop's own processes and they end with the desktop.
+The monitor would outlive the desktop, so every way the desktop ends stops it, with its other watchers and its tray: a quit, an exit after an update's handoff or for another desktop's update, and an exit after a main-process failure.
+An exit leaves the runtime connection to end with the process, after its windows have closed and saved their bounds through it, as a quit closes it only once its windows have closed.
 Windows and macOS always have a place for the icon.
 When the operating system cannot show the icon, the desktop logs it once and shows none.
 

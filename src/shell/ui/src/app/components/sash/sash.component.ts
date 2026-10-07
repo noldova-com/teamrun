@@ -11,6 +11,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, type Signal
 import "@noldova/teamrun-foundation-core";
 
 import { SashOrientation } from "../../enums/sash-orientation";
+import { PointerDrag } from "../../services/pointer-drag";
 import { Resources } from "../../../resources";
 
 @Component({
@@ -31,9 +32,6 @@ import { Resources } from "../../../resources";
     "(pointerenter)": "onPointerEnter()",
     "(pointerleave)": "onPointerLeave()",
     "(pointerdown)": "onPointerDown($event)",
-    "(pointermove)": "onPointerMove($event)",
-    "(pointerup)": "onPointerEnd($event)",
-    "(pointercancel)": "onPointerEnd($event)",
     "(keydown)": "onKeyDown($event)"
   }
 })
@@ -43,6 +41,7 @@ export class SashComponent {
   private readonly isDragging: WritableSignal<boolean> = signal(false);
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPosition: number = 0;
+  private drag: PointerDrag | null = null;
 
   protected readonly isVertical: Signal<boolean> = computed(() => this.orientation() === SashOrientation.Vertical);
   protected readonly ariaOrientation: Signal<string> = computed(() => this.isVertical() ? Resources.verticalOrientation : Resources.horizontalOrientation);
@@ -57,7 +56,10 @@ export class SashComponent {
   public readonly resize = output<number>();
 
   public constructor() {
-    inject(DestroyRef).onDestroy(() => this.clearHoverTimer());
+    inject(DestroyRef).onDestroy(() => {
+      this.clearHoverTimer();
+      this.endDrag();
+    });
   }
 
   protected onPointerEnter(): void {
@@ -74,26 +76,11 @@ export class SashComponent {
     if (event.button !== Resources.primaryButton)
       return;
     event.preventDefault();
-    this.host.setPointerCapture(event.pointerId);
+    this.endDrag();
     this.lastPosition = this.readPosition(event);
+    this.drag = new PointerDrag(this.host, event, t => this.follow(t), () => this.endDrag(), () => this.endDrag());
+    this.drag.start();
     this.isDragging.set(true);
-  }
-
-  protected onPointerMove(event: PointerEvent): void {
-    if (!this.isDragging())
-      return;
-    const position = this.readPosition(event);
-    const delta = position - this.lastPosition;
-    this.lastPosition = position;
-    if (delta !== 0)
-      this.resize.emit(delta);
-  }
-
-  protected onPointerEnd(event: PointerEvent): void {
-    if (!this.isDragging())
-      return;
-    this.host.releasePointerCapture(event.pointerId);
-    this.isDragging.set(false);
   }
 
   protected onKeyDown(event: KeyboardEvent): void {
@@ -105,6 +92,20 @@ export class SashComponent {
     else
       return;
     event.preventDefault();
+  }
+
+  private follow(event: PointerEvent): void {
+    const position = this.readPosition(event);
+    const delta = position - this.lastPosition;
+    this.lastPosition = position;
+    if (delta !== 0)
+      this.resize.emit(delta);
+  }
+
+  private endDrag(): void {
+    this.drag?.stop();
+    this.drag = null;
+    this.isDragging.set(false);
   }
 
   private readPosition(event: PointerEvent): number {

@@ -45,6 +45,8 @@ export class OpenWindow implements IQuitPrompt {
     this.coordinator = new CloseCoordinator(t => this.sendRequest(Resources.closeRequestChannel, t), Resources.closeAnswerTimeout);
     this.updateSaves = new UpdateSaveCoordinator(t => this.sendRequest(Resources.updateSaveRequestChannel, t), Resources.closeAnswerTimeout);
     this.bounds = new WindowBoundsKeeper(window, displays, Resources.boundsSaveDelay, log, platform === Resources.windowsPlatform);
+    window.on(Resources.enterFullScreenEvent, () => window.webContents.send(Resources.fullScreenChannel, true));
+    window.on(Resources.leaveFullScreenEvent, () => window.webContents.send(Resources.fullScreenChannel, false));
     window.on(Resources.closeEvent, event => {
       if (this.canClose)
         return;
