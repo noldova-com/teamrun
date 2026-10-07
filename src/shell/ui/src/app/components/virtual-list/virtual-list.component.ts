@@ -58,7 +58,10 @@ export class VirtualListComponent<T> {
   protected readonly resources: typeof Resources = Resources;
   protected readonly variants: typeof ButtonVariant = ButtonVariant;
   protected readonly rowTemplate: Signal<VirtualRowDirective<T>> = contentChild.required<VirtualRowDirective<T>>(VirtualRowDirective);
-  protected readonly state: Signal<VirtualListState<T>> = computed(() => new VirtualListState(this.source(), t => this.failed.emit(t)));
+  protected readonly state: Signal<VirtualListState<T>> = computed(() => {
+    const source = this.source();
+    return untracked(() => new VirtualListState(source, t => this.failed.emit(t)));
+  });
   protected readonly range: Signal<VirtualRange> = computed(() => this.rangeFor(Resources.virtualListOverscan), { equal: (a, b) => a.equals(b) });
   protected readonly stop: Signal<number | null> = computed(() => {
     const { source, cache } = this.state();
@@ -71,6 +74,7 @@ export class VirtualListComponent<T> {
   protected readonly rows: Signal<readonly VirtualListRow<T>[]> = computed(() => {
     const { source, ledger, cache } = this.state();
     cache.revision();
+    this.layout();
     const range = this.range();
     const stop = this.stop();
     const selected = this.selected();
