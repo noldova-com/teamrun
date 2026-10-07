@@ -97,6 +97,7 @@ export { QuitCoordinator } from "../services/quit-coordinator.js";
 export { QuitFlow } from "../services/quit-flow.js";
 export { UpdateController } from "../services/update-controller.js";
 export { UpdateStop } from "../services/update-stop.js";
+export { AppImageRestart } from "../services/app-image-restart.js";
 export { UpdateWorkQuestion } from "../services/update-work-question.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";
 export { RuntimeWindowStateStore } from "../services/runtime-window-state-store.js";

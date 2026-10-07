@@ -448,10 +448,13 @@ test.describe("gallery", () => {
     }
   });
 
-  test("a code block's Word wrap is pressed by keyboard and wraps its lines, its long line never widens the Settings document, its text keeps equal space over and under it and its end padding when scrolled to the end, and Copy puts its code on the system clipboard, in light and in dark", async ({ desktop }) => {
+  test("a code block is colored under the window's content security policy, its Word wrap is pressed by keyboard and wraps its lines, its long line never widens the Settings document, its text keeps equal space over and under it and its end padding when scrolled to the end, and Copy puts its code on the system clipboard, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
     const content = window.locator(".tr-settings-content");
     await SettingsFixture.openGalleryAsync(window);
+    const policy = await window.locator("meta[http-equiv=\"Content-Security-Policy\"]").getAttribute("content");
+    expect(policy).toContain("script-src 'self';");
+    expect(policy).not.toContain("unsafe-eval");
 
     for (const mode of ["Light", "Dark"] as const) {
       const block = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Code block\"] tr-gallery-cell[aria-label=\"Default\"] tr-code-block");
@@ -472,6 +475,7 @@ test.describe("gallery", () => {
       });
       await block.scrollIntoViewIfNeeded();
 
+      await expect.poll(() => block.evaluate((t: HTMLElement) => [...CSS.highlights.values()].flatMap(u => [...u]).filter(u => t.contains(u.startContainer)).length)).toBeGreaterThan(0);
       await expect(block.getByRole("toolbar", { name: "Code block actions" }).getByRole("button")).toHaveText(["wrap_text", "content_copy"]);
       await expect(wrap).toHaveAttribute("aria-pressed", "false");
       expect(await overflowAsync(body)).toBeGreaterThan(0);
