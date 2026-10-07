@@ -7,10 +7,17 @@
  */
 
 import "@noldova/teamrun-foundation-core";
+import { AppImageSource } from "@noldova/teamrun-shell-runtime";
 
+import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
 import { Resources } from "../resources.js";
 
 export class AppImageEnvironment {
+  public static locateStartFolder(process: IDesktopProcess): string {
+    const isAppImage = process.platform === Resources.linuxPlatform && !Object.isNull(AppImageSource.find(process.env, process.execPath));
+    return isAppImage ? process.env[Resources.appImageWorkingFolderVariable] ?? process.workingDirectory : process.workingDirectory;
+  }
+
   public static restore(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     const folder = String(environment[Resources.appImageFolderVariable]);
     return Object.fromEntries(Object.entries(environment).flatMap(([name, value]): [string, string][] => {

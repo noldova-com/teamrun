@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -1104,6 +1104,24 @@ export class DesktopApplicationTests {
     Assert.areEqual(data, settings?.dataDirectory.root);
     Assert.areEqual(`setPath userData ${new DataDirectory(data).profileFolder}`, electron.app.calls.find(t => t.startsWith("setPath")));
     Assert.isTrue(files.created.length > 0 && files.created.every(([folder]) => folder.startsWith(join(process.workingDirectory, "device"))), JSON.stringify(files.created));
+  }
+
+  @TestMethod
+  @TestData("/home/person/work", "/home/person/work")
+  @TestData(null, null)
+  public resolvesRelativeFoldersOfAnAppImageAgainstTheFolderItsLauncherWasStartedIn(startFolder: string | null, expected: string | null): void {
+    const process = new FakeDesktopProcess("linux", ["/electron/electron", "--data-dir=data", "--device-dir=device"], {
+      APPIMAGE: "/home/person/Applications/TeamRun.AppImage",
+      APPDIR: "/electron",
+      ...Object.isNull(startFolder) ? {} : { OWD: startFolder }
+    });
+    const files = new FakeDeviceFiles();
+
+    const [settings] = DesktopStartFixture.start(new FakeElectron(true, true), process, undefined, undefined, files);
+
+    const folder = expected ?? process.workingDirectory;
+    Assert.areEqual(resolve(folder, "data"), settings?.dataDirectory.root);
+    Assert.isTrue(files.created.length > 0 && files.created.every(([t]) => t.startsWith(resolve(folder, "device"))), JSON.stringify(files.created));
   }
 
   @TestMethod

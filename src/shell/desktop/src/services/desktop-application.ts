@@ -68,6 +68,7 @@ import { WindowAppearance } from "../models/window-appearance.js";
 import { WindowState } from "../models/window-state.js";
 import { Resources } from "../resources.js";
 import { AppIcons } from "./app-icons.js";
+import { AppImageEnvironment } from "./app-image-environment.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { DeviceSettingFollower } from "./device-setting-follower.js";
@@ -1129,6 +1130,6 @@ export class DesktopApplication {
 
   private static readFolderArgument(process: IDesktopProcess, prefix: string): string | undefined {
     const folder = process.argv.find(t => t.startsWith(prefix))?.slice(prefix.length);
-    return Object.isUndefined(folder) || String.isNullOrWhitespace(folder) || isAbsolute(folder) ? folder : resolve(process.workingDirectory, folder);
+    return Object.isUndefined(folder) || String.isNullOrWhitespace(folder) || isAbsolute(folder) ? folder : resolve(AppImageEnvironment.locateStartFolder(process), folder);
   }
 }
