@@ -22,6 +22,7 @@ export class FakeApplicationHost implements IApplicationHost {
   public systemLanguages: string[] = ["en-US"];
   public isInApplications: boolean = true;
   public dock: FakeDockHost | undefined = undefined;
+  public pathFailure: Error | null = null;
 
   public constructor(hasLock: boolean, isPackaged: boolean) {
     this.hasLock = hasLock;
@@ -45,6 +46,8 @@ export class FakeApplicationHost implements IApplicationHost {
   }
 
   public setPath(name: string, path: string): void {
+    if (!Object.isNull(this.pathFailure))
+      throw this.pathFailure;
     this.calls.push(`setPath ${name} ${path}`);
   }
 

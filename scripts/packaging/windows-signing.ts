@@ -15,6 +15,7 @@ import WindowsAddonBuilder from "../packages/windows-addon-builder.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import AuthenticodeCheck from "./authenticode-check.ts";
 import type IPackageSigning from "./interfaces/i-package-signing.ts";
+import PackageConfiguration from "./package-configuration.ts";
 import type PackageTarget from "./package-target.ts";
 import PackagingException from "./packaging.exception.ts";
 import type PinnedPackage from "./pinned-package.ts";
@@ -26,7 +27,6 @@ export default class WindowsSigning implements IPackageSigning {
   private static readonly FOLDER_PREFIX: string = "win";
   private static readonly UNPACKED_FOLDER_SUFFIX: string = "unpacked";
   private static readonly X64: string = "x64";
-  private static readonly RESOURCES_SEGMENTS: readonly string[] = ["resources", "app.asar.unpacked"];
   private static readonly PROGRAM_EXTENSION: string = ".exe";
 
   private readonly runner: ProcessRunner;
@@ -65,14 +65,13 @@ export default class WindowsSigning implements IPackageSigning {
     const program = path.join(this.output, folder, `${product.name}${WindowsSigning.PROGRAM_EXTENSION}`);
     if (!existsSync(program))
       throw new PackagingException(`electron-builder finished without the unpacked program ${program}, whose signature the check reads.`);
-    const resources = path.join(this.output, folder, ...WindowsSigning.RESOURCES_SEGMENTS);
-    const addons = existsSync(resources)
-      ? (await readdir(resources, { recursive: true, withFileTypes: true }))
-        .filter(t => t.isFile() && path.extname(t.name) === WindowsAddonBuilder.ADDON_EXTENSION)
-        .map(t => path.join(t.parentPath, t.name))
-        .sort()
-      : [];
-    return new AuthenticodeCheck(this.runner, this.root, this.environment).verifyAsync([...packages, program, ...addons], product.windowsPublisher);
+    const unpacked = (await readdir(path.join(this.output, folder), { recursive: true, withFileTypes: true }))
+      .filter(t => t.isFile())
+      .map(t => path.join(t.parentPath, t.name))
+      .sort();
+    const own = unpacked.filter(t => [WindowsSigning.PROGRAM_EXTENSION, WindowsAddonBuilder.ADDON_EXTENSION].includes(path.extname(t)));
+    const libraries = unpacked.filter(t => path.extname(t) === PackageConfiguration.LIBRARY_EXTENSION);
+    return new AuthenticodeCheck(this.runner, this.root, this.environment).verifyAsync([...packages, ...own], libraries, product.windowsPublisher);
   }
 
   public disposeAsync(): Promise<void> {

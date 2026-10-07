@@ -105,15 +105,18 @@ class TrustedSigningModuleTests {
       assert.deepEqual(await readdir(folder), []);
     });
 
-    test("a file is signed by the prepared module and its pinned tools with SHA-256 digests and an RFC 3161 timestamp, named through the environment, and a failure names the file",
+    test("a file is signed by the prepared module and its pinned tools with SHA-256 digests and an RFC 3161 timestamp, named through the environment, and a failure names the file; "
+      + "only a library that already carries a valid signature keeps it",
       async t => {
         const [repository] = await TrustedSigningModuleTests.createAsync(t);
         const folder = path.join(repository.directory, "signing");
         const file = path.join(repository.directory, "out", "Fixture Studio.exe");
-        const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "", ""), new ProcessResult(5, "", "Invoke-TrustedSigning broke")]);
+        const library = path.join(repository.directory, "out", "ffmpeg.dll");
+        const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "", ""), new ProcessResult(0, "", ""), new ProcessResult(5, "", "Invoke-TrustedSigning broke")]);
         const signing = TrustedSigningModule.fromEnvironment(runner, { ...TrustedSigningModuleTests.CREDENTIALS, LocalAppData: "fixture-local", TEAMRUN_SIGNING_FOLDER: folder });
 
         await signing.signAsync(file);
+        await signing.signAsync(library);
         await assert.rejects(signing.signAsync(file), new PackagingException(`pwsh failed signing ${file} with the TrustedSigning module with exit code 5:\nInvoke-TrustedSigning broke`));
 
         const script = Buffer.from(String(runner.captured[0]?.at(-1)), "base64").toString("utf16le");
@@ -124,6 +127,12 @@ class TrustedSigningModuleTests {
           TEAMRUN_SIGNING_FILE: file,
           LOCALAPPDATA: path.join(folder, "tools")
         });
+        const libraryScript = Buffer.from(String(runner.captured[1]?.at(-1)), "base64").toString("utf16le");
+        assert.ok(script.startsWith("$ErrorActionPreference = 'Stop'\nMicrosoft.PowerShell.Core\\Import-Module "), script);
+        assert.equal(runner.captureEnvironments[1]?.["TEAMRUN_SIGNING_FILE"], library);
+        assert.equal(libraryScript, "$ErrorActionPreference = 'Stop'\n"
+          + "if ((Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $env:TEAMRUN_SIGNING_FILE).Status -eq 'Valid') { exit 0 }\n"
+          + script.slice("$ErrorActionPreference = 'Stop'\n".length));
         assert.ok(script.includes("TrustedSigning\\Invoke-TrustedSigning -Endpoint 'https://wus3.codesigning.azure.net/' -CodeSigningAccountName 'noldova-signing' "
           + "-CertificateProfileName 'TeamRun' -FileDigest 'SHA256' -TimestampRfc3161 'http://timestamp.acs.microsoft.com' -TimestampDigest 'SHA256' -Files $env:TEAMRUN_SIGNING_FILE"));
       });

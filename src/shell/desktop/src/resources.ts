@@ -789,6 +789,14 @@ export class Resources {
     return `The notifications could not be read, so the operating system shows none until the window reads them again: ${reason}`;
   }
 
+  public static formatDataFolderUnusable(folder: string, reason: string): string {
+    return `${Resources.applicationName} cannot use the data folder ${folder}: ${reason}`;
+  }
+
+  public static formatFailureDetail(problem: string, advice: string): string {
+    return `${problem}\n\n${advice}`;
+  }
+
   public static formatDeviceUnavailable(reason: string): string {
     return `This device's identity could not be read, so window bounds are not kept: ${reason}`;
   }
@@ -948,6 +956,51 @@ export class Resources {
 
   public static formatUpdaterMessage(message: string): string {
     return `The updater reported: ${message}`;
+  }
+
+  public static readonly systemRootVariable: string = "SystemRoot";
+  public static readonly systemRootMissing: string = "Windows did not name its system folder in SystemRoot, so PowerShell could not be found to read the signature.";
+  public static readonly moduleSearchPathVariable: string = "psmodulepath";
+  public static readonly singleQuote: string = "'";
+  public static readonly utf16Encoding: BufferEncoding = "utf16le";
+  public static readonly powerShellSegments: readonly string[] = ["System32", "WindowsPowerShell", "v1.0", "powershell.exe"];
+  public static readonly powerShellArguments: readonly string[] = ["-NoProfile", "-NonInteractive", "-InputFormat", "None", "-EncodedCommand"];
+  public static readonly signatureStatusField: string = "Status";
+  public static readonly signatureMessageField: string = "StatusMessage";
+  public static readonly signaturePathField: string = "Path";
+  public static readonly signatureSubjectField: string = "Subject";
+  public static readonly validSignatureStatus: number = 0;
+  public static readonly nameEscape: string = "\\";
+  public static readonly nameQuote: string = "\"";
+  public static readonly nameSeparator: string = ",";
+  public static readonly nameAssignment: string = "=";
+  public static readonly lineBreaks: RegExp = /\s*[\r\n]+\s*/g;
+  public static readonly lineJoin: string = " ";
+
+  public static formatSignatureScript(quotedFile: string): string {
+    return [
+      "$ErrorActionPreference = 'Stop'",
+      "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+      `$signature = Get-AuthenticodeSignature -LiteralPath '${quotedFile}'`,
+      "[pscustomobject]@{ Status = [int]$signature.Status; StatusMessage = [string]$signature.StatusMessage; Path = [string]$signature.Path; " +
+        "Subject = [string]$signature.SignerCertificate.Subject } | ConvertTo-Json -Compress"
+    ].join("; ");
+  }
+
+  public static formatSignatureUnreadable(output: string): string {
+    return `PowerShell answered with an unreadable signature: ${output}`;
+  }
+
+  public static formatSignatureInvalid(message: string): string {
+    return `its signature is not valid: ${message}`;
+  }
+
+  public static formatSignatureOfAnotherFile(file: string): string {
+    return `PowerShell read the signature of ${file} instead`;
+  }
+
+  public static formatSignedByAnother(signer: string, publisher: string): string {
+    return `it is signed by ${signer}, not by ${publisher}`;
   }
 
   public static formatPublisherCheck(milliseconds: number, failure: string | null): string {

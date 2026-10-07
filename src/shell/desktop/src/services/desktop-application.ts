@@ -7,13 +7,14 @@
  */
 
 import { mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 import type { MessageBoxOptions } from "electron";
 
 import "@noldova/teamrun-foundation-core";
+import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/teamrun-foundation-json";
 import {
   CommandRun, type Event, Failure, FailureCode, NotificationAction, NotificationBroadcast, NotificationPost, NotificationSeverity, NotificationState, NotificationsQuery, QualifiedName, QuitAnswered,
@@ -38,6 +39,7 @@ import {
 } from "@noldova/teamrun-shell-runtime";
 
 import { PathCommandException } from "../exceptions/path-command.exception.js";
+import { UnusableFolderException } from "../exceptions/unusable-folder.exception.js";
 import { WindowStateUnavailableException } from "../exceptions/window-state-unavailable.exception.js";
 import type { IContextMenuParams } from "../interfaces/i-context-menu-params.js";
 import type { IDesktopProcess } from "../interfaces/i-desktop-process.js";
@@ -68,6 +70,7 @@ import { WindowAppearance } from "../models/window-appearance.js";
 import { WindowState } from "../models/window-state.js";
 import { Resources } from "../resources.js";
 import { AppIcons } from "./app-icons.js";
+import { AppImageEnvironment } from "./app-image-environment.js";
 import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { DeviceSettingFollower } from "./device-setting-follower.js";
@@ -233,7 +236,7 @@ export class DesktopApplication {
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
-    createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    createUpdater: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
@@ -248,10 +251,10 @@ export class DesktopApplication {
       process.env,
       process.homeFolder,
       join(moduleDirectory, ...Resources.repositoryRootSegments),
-      DesktopApplication.readArgument(process.argv, Resources.dataDirectoryArgument));
-    const userData = DesktopApplication.readArgument(process.argv, Resources.userDataArgument);
+      DesktopApplication.readFolderArgument(process, Resources.dataDirectoryArgument));
+    const userData = DesktopApplication.readFolderArgument(process, Resources.userDataArgument);
     if (Object.isUndefined(userData))
-      electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
+      DesktopApplication.keepProfileIn(electron, dataDirectory);
     const launchSettings = new LaunchSettings(
       dataDirectory,
       process.execPath,
@@ -270,7 +273,7 @@ export class DesktopApplication {
       : SpellingDictionaries.install(join(moduleDirectory, ...Resources.repositoryRootSegments, ...Resources.dictionaryFolderSegments), profileFolder, t => log.write(t));
     const spelling = new SpellChecker(
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
-    const [updater, updatesOff] = DesktopApplication.createUpdater(createUpdater, installation, log);
+    const [updater, updatesOff] = DesktopApplication.createUpdater(createUpdater, installation, isPackaged, log);
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
       spelling, installation, () => recordDesktopAsync(installation), updater, createUpdateLock(installation, t => log.write(t)), updatesOff);
@@ -1108,11 +1111,12 @@ export class DesktopApplication {
   }
 
   private static createUpdater(
-    create: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    create: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
     installation: Installation,
+    isPackaged: boolean,
     log: DesktopLog): [IUpdater | null, UpdateStatus] {
     try {
-      return [create(installation, t => log.write(t)), UpdateStatus.off];
+      return [create(installation, isPackaged, t => log.write(t)), UpdateStatus.off];
     }
     catch (error) {
       log.write(Resources.formatUpdaterNotCreated(String(error)));
@@ -1128,11 +1132,21 @@ export class DesktopApplication {
     return Object.isString(value) && Resources.moduleIdPattern.test(value);
   }
 
-  private static locateDeviceFolder(process: IDesktopProcess): string {
-    return DesktopApplication.readArgument(process.argv, Resources.deviceDirectoryArgument) ?? DeviceFolder.locate(process.platform, process.env, process.homeFolder);
+  private static keepProfileIn(electron: IElectron, dataDirectory: DataDirectory): void {
+    try {
+      electron.app.setPath(Resources.userDataPath, dataDirectory.profileFolder);
+    }
+    catch (error) {
+      throw new UnusableFolderException(Resources.formatDataFolderUnusable(dataDirectory.root, String(error)), new ExceptionOptions(error));
+    }
   }
 
-  private static readArgument(argv: readonly string[], prefix: string): string | undefined {
-    return argv.find(t => t.startsWith(prefix))?.slice(prefix.length);
+  private static locateDeviceFolder(process: IDesktopProcess): string {
+    return DesktopApplication.readFolderArgument(process, Resources.deviceDirectoryArgument) ?? DeviceFolder.locate(process.platform, process.env, process.homeFolder);
+  }
+
+  private static readFolderArgument(process: IDesktopProcess, prefix: string): string | undefined {
+    const folder = process.argv.find(t => t.startsWith(prefix))?.slice(prefix.length);
+    return Object.isUndefined(folder) || String.isNullOrWhitespace(folder) || isAbsolute(folder) ? folder : resolve(AppImageEnvironment.locateStartFolder(process), folder);
   }
 }

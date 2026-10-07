@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
@@ -50,16 +51,20 @@ describe("GalleryFeedComponent", () => {
     expect([element().querySelector("tr-code-block") !== null, articles().length < 40, Math.round(viewport().scrollHeight - viewport().clientHeight - viewport().scrollTop)]).toEqual([true, true, 0]);
   });
 
-  it("streams a reply word by word at its end, which the feed follows", async () => {
+  it("streams a reply word by word at its end, which the feed follows, and announces it politely once complete", async () => {
     await renderAsync();
+    const announce = vi.spyOn(TestBed.inject(LiveAnnouncer), "announce");
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
 
     await userEvent.click(stream());
-    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(3900);
+    const streaming = announce.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(100);
     await settleAsync();
     const text = last().querySelector(".tr-gallery-message-text")?.textContent ?? String.empty;
 
     expect([last().getAttribute("aria-setsize"), text.split(" ").length, vi.getTimerCount(), Math.round(viewport().scrollHeight - viewport().clientHeight - viewport().scrollTop)]).toEqual(["10001", 40, 0, 0]);
+    expect([streaming, announce.mock.calls]).toEqual([0, [[`Assistant · message 10001: ${text}`, "polite"]]]);
   });
 
   it("stops a reply that is still streaming once it is destroyed", async () => {

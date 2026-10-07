@@ -88,10 +88,7 @@ export class VirtualListComponent<T> {
   protected readonly range: Signal<VirtualRange> = computed(() => this.rangeFor(Resources.virtualListOverscan), { equal: (a, b) => a.equals(b) });
   protected readonly stop: Signal<number | null> = computed(() => {
     const count = this.state().source.length();
-    const selected = this.isFeed() ? -1 : this.selected() ?? -1;
-    const chosen = selected >= 0 && selected < count ? selected : 0;
-    const fallback = this.isFeed() && this.isFollowing() ? count - 1 : chosen;
-    return count === 0 ? null : Math.min(this.focusIndex() ?? fallback, count - 1);
+    return count === 0 ? null : Math.min(this.focusIndex() ?? this.restingStop(count), count - 1);
   });
   protected readonly rows: Signal<readonly VirtualListRow<T>[]> = computed(() => {
     const { source, ledger, cache } = this.state();
@@ -156,7 +153,11 @@ export class VirtualListComponent<T> {
     });
     effect(() => {
       this.state().cache.revision();
-      untracked(() => this.resolve());
+      untracked(() => {
+        this.resolve();
+        if (!this.isFollowing())
+          this.follow(this.state().ledger.total - this.viewHeight() - this.scrollTop());
+      });
     });
     effect(() => {
       if (this.isFailing())
@@ -187,8 +188,12 @@ export class VirtualListComponent<T> {
     const moved = top - this.domTop;
     this.domTop = top;
     if (!Object.isNull(this.pendingTop)) {
-      if (moved !== 0)
-        this.scrollTo(this.pendingTop + moved);
+      if (moved !== 0) {
+        const target = this.pendingTop + moved;
+        this.follow(this.state().ledger.total - this.viewHeight() - target);
+        this.scrollTo(target);
+        this.tell();
+      }
       return;
     }
     if (Math.abs(top - this.scrollTop()) < 1)
@@ -415,6 +420,18 @@ export class VirtualListComponent<T> {
     this.scrollTop.set(top);
   }
 
+  private restingStop(count: number): number {
+    if (!this.isFeed()) {
+      const selected = this.selected() ?? -1;
+      return selected >= 0 && selected < count ? selected : 0;
+    }
+    if (this.isFollowing())
+      return count - 1;
+    this.state().cache.revision();
+    this.layout();
+    return this.anchorAt(this.scrollTop()).index;
+  }
+
   private anchorAt(top: number): VirtualListAnchor {
     const { ledger, cache } = this.state();
     const anchor = ledger.anchorAt(top);
@@ -478,7 +495,7 @@ export class VirtualListComponent<T> {
   private reserve(): void {
     const { ledger } = this.state();
     for (const { nativeElement: slot } of this.slots()) {
-      const images = [...slot.querySelectorAll<HTMLImageElement>(Resources.virtualListImageSelector)].filter(t => !t.complete);
+      const images = [...slot.getElementsByTagName(Resources.virtualListImageTag)].filter(t => !t.complete);
       if (images.length === 0 || this.reserved.has(slot))
         continue;
       this.reserved.add(slot);

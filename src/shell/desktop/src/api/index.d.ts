@@ -4458,7 +4458,8 @@ export declare class MainProcessRecovery {
   public attach(log: IDesktopLog, openLogFolderAsync: () => Promise<boolean>): void;
 
   /**
-   * Records a failure and, for the first one, asks the person whether to restart or quit.
+   * Records a failure and, for the first one, asks the person whether to restart or quit. The box shows the message
+   * of an {@link UnusableFolderException} before its advice.
    *
    * @param error The error or the rejection's reason, recorded with its stack.
    * @param kind How the main process failed.
@@ -4548,7 +4549,8 @@ export declare class DesktopApplication {
    * the desktop checks the launch barrier, so an update waits for it to quit. A desktop it could not record is logged
    * and starts anyway.
    * @param createUpdater Creates the updater of the installation, or gives `null` for a build that names no update feed,
-   * whose updates stay Off; the updater's log is the desktop's. The {@link UpdateController} it drives keeps
+   * whose updates stay Off; it is told whether the desktop runs from a packaged build, and the updater's log is the
+   * desktop's. The {@link UpdateController} it drives keeps
    * `update-ready.json` in the installation's folder, follows `shell.updateChecks`, pushes each state on
    * `teamrun:updateState` and posts `shell.updateReady` once over the runtime connection.
    * @param createUpdateLock Creates the lock that lets one desktop of the installation check at a time; the lock's log
@@ -4582,7 +4584,7 @@ export declare class DesktopApplication {
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
-    createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    createUpdater: (installation: Installation, isPackaged: boolean, log: (text: string) => void) => IUpdater | null,
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void;
 }
 
@@ -5694,6 +5696,32 @@ export declare enum UpdateStateKind {
 }
 
 /**
+ * The exception thrown when the desktop cannot use the data folder it was given, whose message names the folder and
+ * the reason and is what the start-failure box shows.
+ */
+export declare class UnusableFolderException extends Exception {
+  /**
+   * The exception's name, `"UnusableFolderException"`, which the class sets itself so
+   * that a minified build keeps it.
+   */
+  public override readonly name: string;
+
+  /**
+   * Creates the exception.
+   *
+   * @param message The folder and why it cannot be used.
+   * @param options The underlying error, if any.
+   * @example
+   * ```ts
+   * import { UnusableFolderException } from "@noldova/teamrun-shell-desktop";
+   *
+   * export const failure: UnusableFolderException = new UnusableFolderException("TeamRun cannot use the data folder /home/person/data: Error: Failed to set path");
+   * ```
+   */
+  public constructor(message: string, options?: ExceptionOptions);
+}
+
+/**
  * A failed update, whose message is the reason the window shows.
  */
 export declare class UpdateException extends Exception {
@@ -6248,26 +6276,30 @@ export declare class UpdateCheckLock implements IUpdateCheckLock {
 }
 
 /**
- * Checks that a Windows update carries a valid signature by the publisher, with electron-updater's check; a check
- * that warns, such as one that skips itself because PowerShell does not answer, or that fails, counts as failed.
+ * Checks that a Windows update carries a valid signature by the publisher. It reads the signature with Windows
+ * PowerShell's `Get-AuthenticodeSignature`, started by its full path without a shell and without the caller's
+ * `PSModulePath`, and passes it only when it is valid, belongs to the file and its signer's distinguished name holds
+ * every field of the publisher's; any other answer, an unreadable one or a failed or timed-out PowerShell counts as
+ * failed, with one line saying why.
  */
 export declare class PublisherCheck {
   /**
    * Creates the check.
    *
    * @param publisher The publisher's distinguished name.
-   * @param verifyAsync electron-updater's signature check.
-   * @param log Records each check, its duration and its result.
+   * @param command Runs PowerShell.
+   * @param environment Supplies `SystemRoot` and the rest of PowerShell's environment.
+   * @param log Records each check, its duration and its result, in one line.
    * @param now Gives the time in milliseconds.
    * @example
    * ```ts
-   * import { verifySignature } from "electron-updater/out/windowsExecutableCodeSignatureVerifier.js";
+   * import { SystemCommand } from "@noldova/teamrun-shell-runtime";
    * import { PublisherCheck } from "@noldova/teamrun-shell-desktop";
    *
-   * export const check: PublisherCheck = new PublisherCheck("CN=Noldova", verifySignature, console.log, Date.now);
+   * export const check: PublisherCheck = new PublisherCheck("CN=Noldova, O=Noldova, C=MD", new SystemCommand(), process.env, console.log, Date.now);
    * ```
    */
-  public constructor(publisher: string, verifyAsync: (publisherNames: string[], file: string, logger: Logger) => Promise<string | null>, log: (text: string) => void, now: () => number);
+  public constructor(publisher: string, command: Pick<SystemCommand, "runAsync">, environment: NodeJS.ProcessEnv, log: (text: string) => void, now: () => number);
 
   /**
    * Checks a file.

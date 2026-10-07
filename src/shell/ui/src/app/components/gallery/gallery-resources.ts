@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { AriaLivePoliteness } from "@angular/cdk/a11y";
+
 import "@noldova/teamrun-foundation-core";
 
 export class GalleryResources {
@@ -27,6 +29,7 @@ export class GalleryResources {
   public static readonly feedHistoryDelay: number = 1500;
   public static readonly feedReplyInterval: number = 100;
   public static readonly feedReplyWords: number = 40;
+  public static readonly feedReplyPoliteness: AriaLivePoliteness = "polite";
   public static readonly feedCodeEvery: number = 9;
   public static readonly text = {
     gallery: "Gallery",
@@ -256,6 +259,10 @@ export class GalleryResources {
 
   public static formatFeedHeading(author: string, index: number): string {
     return `${author} · message ${index + 1}`;
+  }
+
+  public static formatFeedReply(heading: string, text: string): string {
+    return `${heading}: ${text}`;
   }
 
   public static formatFeedCode(index: number): string {
