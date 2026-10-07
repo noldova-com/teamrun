@@ -2232,7 +2232,10 @@ export class DesktopApplicationTests {
   @TestMethod
   public async stopsCheckingForUpdatesWhenQuitting(): Promise<void> {
     const updater = new FakeUpdater();
-    const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), updater);
+    const files = new FakeDeviceFiles();
+    const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), updater, files);
+    await Condition.waitAsync(() => files.updateReady.reads === 1);
+    await setImmediate();
 
     electron.app.emit("will-quit");
     const acted = electron.ipcMain.invoke("teamrun:updateAction", DesktopStartFixture.trustedEvent("linux"), "Check");
