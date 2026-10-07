@@ -7,12 +7,17 @@
  */
 
 import { LiveAnnouncer } from "@angular/cdk/a11y";
-import { ChangeDetectionStrategy, Component, DestroyRef, ErrorHandler, type Signal, ViewEncapsulation, type WritableSignal, computed, inject, input, model, signal } from "@angular/core";
+import { ChangeDetectionStrategy, Component, DOCUMENT, DestroyRef, ElementRef, ErrorHandler, type ResourceRef, type Signal, ViewEncapsulation, type WritableSignal,
+  afterRenderEffect, computed, effect, inject, input, model, resource, signal, viewChild } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
 
 import { CopyState } from "../../enums/copy-state";
+import { CodeLanguage } from "../../models/code-language";
+import type { CodeToken } from "../../models/code-token";
 import { ClipboardWriter } from "../../services/clipboard-writer";
+import { CodeHighlighter } from "../../services/code-highlighter";
+import { CodeHighlights } from "../../services/code-highlights";
 import { Resources } from "../../../resources";
 import { IconButtonComponent } from "../icon-button/icon-button.component";
 import { ToolbarItemDirective } from "../toolbar/toolbar-item.directive";
@@ -35,6 +40,10 @@ export class CodeBlockComponent {
   private readonly clipboard: ClipboardWriter = inject(ClipboardWriter);
   private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly errors: ErrorHandler = inject(ErrorHandler);
+  private readonly highlighter: CodeHighlighter = inject(CodeHighlighter);
+  private readonly highlights: CodeHighlights = inject(CodeHighlights);
+  private readonly text: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("text");
+  private readonly codeText: Text = inject(DOCUMENT).createTextNode(String.empty);
   private readonly copyState: WritableSignal<CopyState> = signal(CopyState.Ready);
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -47,8 +56,30 @@ export class CodeBlockComponent {
   public readonly language = input<string | null>(null);
   public readonly wrapped = model<boolean>(false);
 
+  protected readonly tokens: ResourceRef<readonly CodeToken[] | undefined> = resource({
+    params: () => {
+      const language = CodeLanguage.named(this.language());
+      return Object.isNull(language) ? undefined : { code: this.code(), language };
+    },
+    loader: ({ params, abortSignal }) => this.highlighter.tokensAsync(params.code, params.language, abortSignal)
+  });
+
   public constructor() {
     inject(DestroyRef).onDestroy(() => this.clearCopyTimer());
+    effect(() => {
+      const error = this.tokens.error();
+      if (!Object.isUndefined(error))
+        this.errors.handleError(error);
+    });
+    afterRenderEffect(onCleanup => {
+      const element = this.text().nativeElement;
+      if (this.codeText.parentNode !== element)
+        element.append(this.codeText);
+      if (this.codeText.data !== this.code())
+        this.codeText.data = this.code();
+      if (this.tokens.hasValue())
+        onCleanup(this.highlights.add(this.codeText, this.tokens.value()));
+    });
   }
 
   protected toggleWrap(): void {
