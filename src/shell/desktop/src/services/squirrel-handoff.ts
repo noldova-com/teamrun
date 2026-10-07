@@ -97,6 +97,6 @@ export class SquirrelHandoff implements IUpdateHandoff {
   }
 
   private async removeShipItAsync(): Promise<void> {
-    await this.shipIt.removeAsync().catch((error: unknown) => this.log(Resources.formatShipItNotRemoved(String(error))));
+    await this.shipIt.removeAsync().catch((error: unknown) => this.log(Resources.formatStagedUpdateKept(String(error))));
   }
 }

@@ -901,8 +901,8 @@ export class Resources {
     return `The update feed no longer offers version ${version}.`;
   }
 
-  public static formatShipItNotRemoved(error: string): string {
-    return `The staged update's ShipIt job could not be removed, so quitting may still install it: ${error}`;
+  public static formatStagedUpdateKept(error: string): string {
+    return `A failed handoff left its update staged: ${error}`;
   }
 
   public static formatHandoffNotRemoved(error: string): string {

@@ -222,7 +222,7 @@ export class SquirrelHandoffTests {
 
       Assert.areEqual(lookup, failed);
       Assert.areEqual(1, fixture.shipIt.removals);
-      Assert.areEqual(JSON.stringify(["The staged update's ShipIt job could not be removed, so quitting may still install it: Error: Boot-out failed: 5: Input/output error"]),
+      Assert.areEqual(JSON.stringify(["A failed handoff left its update staged: Error: Boot-out failed: 5: Input/output error"]),
         JSON.stringify(fixture.lines));
     });
   }
