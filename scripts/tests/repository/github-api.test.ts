@@ -100,6 +100,20 @@ class GitHubApiTests {
       assert.deepEqual(await api.readOptionalAsync("/compare/a...main"), { status: "ahead" });
     });
 
+    test("a tag is read from the references that start with its name, taking only the one that names it exactly, and is missing when none does", async () => {
+      const runner = new ProcessRunnerFixture([], [
+        new ProcessResult(0, JSON.stringify([{ ref: "refs/tags/v0.0.10", object: { sha: "b" } }, { ref: "refs/tags/v0.0.1", object: { sha: "a" } }]), ""),
+        new ProcessResult(0, JSON.stringify([{ ref: "refs/tags/v0.0.10", object: { sha: "b" } }]), ""),
+        new ProcessResult(0, "[]", "")
+      ]);
+      const api = new GitHubApi(GitHubApiTests.REPOSITORY, runner, "work");
+
+      assert.deepEqual(await api.readTagAsync("v0.0.1"), { ref: "refs/tags/v0.0.1", object: { sha: "a" } });
+      assert.equal(await api.readTagAsync("v0.0.1"), null);
+      assert.equal(await api.readTagAsync("v0.0.1"), null);
+      assert.equal(runner.captured[0]?.at(-1), "repos/noldova-com/teamrun/git/matching-refs/tags/v0.0.1");
+    });
+
     test("a failed command and an answer that is not JSON are refused with the cause", async () => {
       const failing = new ProcessRunnerFixture([], [new ProcessResult(1, "", "HTTP 403: Resource not accessible\n")]);
       const text = new ProcessRunnerFixture([], [new ProcessResult(0, "<html>", ""), new ProcessResult(0, "<html>", "")]);
