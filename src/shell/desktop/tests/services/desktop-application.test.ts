@@ -2040,7 +2040,7 @@ export class DesktopApplicationTests {
       const connection = new FakeRuntimeConnection();
       connection.answers.set("shell.postNotification", Response.success("r", null));
 
-      const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), new FakeUpdater(String(record.file)), files, connection);
+      const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), new FakeUpdater(String(record["file"])), files, connection);
       await Condition.waitAsync(() => files.updateReady.writes.length > 0 && connection.calls.includes("shell.readSetting"));
 
       Assert.areEqual(JSON.stringify([{
@@ -2068,7 +2068,7 @@ export class DesktopApplicationTests {
       const process = new FakeDesktopProcess("linux");
       const refused = "The runtime refused the ready update's notification, so the desktop posts it again when the runtime is ready: The database is busy.";
 
-      await DesktopApplicationTests.startWithUpdaterAsync(process, new FakeUpdater(String(record.file)), files, connection, new FakeElectron(), device);
+      await DesktopApplicationTests.startWithUpdaterAsync(process, new FakeUpdater(String(record["file"])), files, connection, new FakeElectron(), device);
       await Condition.waitAsync(() => DesktopStartFixture.readErrors(process, refused).length > 0);
 
       Assert.areEqual(0, files.updateReady.writes.length);
