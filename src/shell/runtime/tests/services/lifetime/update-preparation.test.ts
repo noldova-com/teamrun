@@ -9,6 +9,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
@@ -24,6 +25,9 @@ import { WindowsProcessApiFixture } from "../../fixtures/windows-process-api.fix
 
 @TestClass
 export class UpdatePreparationTests {
+  private static readonly UNIQUE: string = "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e";
+  private static readonly OTHER_UNIQUE: string = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+
   @TestMethod
   public reportsAClientThatDoesNotAnswerInTime(): Promise<void> {
     return RuntimeHostFixture.runAsync(async fixture => {
@@ -46,6 +50,53 @@ export class UpdatePreparationTests {
       Assert.areEqual(FailureCode.Updating, late.failure?.code);
       Assert.areEqual(FailureCode.Updating, updater.failure?.code);
     });
+  }
+
+  @TestMethod
+  public listsTheMountOfTheAppImageCopyItsStartLogNamesAmongItsProcesses(): Promise<void> {
+    return RuntimeHostFixture.runAsync(async fixture => {
+      await using folder = await TemporaryFolderFixture.createAsync();
+      const installation = UpdateBarrierFixture.open(folder.path);
+      await fixture.startAsync(30_000, undefined, undefined, process.env, new ServerSettings(undefined, undefined, undefined, undefined, 5_000, 1_000), installation.folder, undefined,
+        `start-${UpdatePreparationTests.UNIQUE}.log`);
+      await writeFile(path.join(fixture.dataDirectory.logsFolder, `copy-${UpdatePreparationTests.OTHER_UNIQUE}.log`), `teamrun-copy mount 1 ${process.ppid} /home/person/Other.AppImage\n`);
+      await writeFile(path.join(fixture.dataDirectory.logsFolder, `copy-${UpdatePreparationTests.UNIQUE}.log`),
+        `teamrun-copy extraction 1 /tmp/teamrun-runtime-AbC123\nteamrun-copy mount 1 ${process.pid} /home/person/TeamRun.AppImage\n`);
+      const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+      await UpdateBarrierFixture.holdAsync(installation);
+
+      desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
+      const [responses] = await RuntimeHostFixture.readMessagesAsync(desktop, 2);
+      const ready = UpdateReady.fromJson(responses.get("desktop:1")?.payload);
+
+      Assert.isTrue(ready.isReady);
+      Assert.areEqual(JSON.stringify([[process.pid, "AppImage mount"]]), JSON.stringify(ready.processes.map(t => [t.processId, t.role])));
+    });
+  }
+
+  @TestMethod
+  public async listsNoMountWithoutACopyRecordAndReportsARecordItCannotRead(): Promise<void> {
+    for (const isUnreadable of [false, true])
+      await RuntimeHostFixture.runAsync(async fixture => {
+        await using folder = await TemporaryFolderFixture.createAsync();
+        const installation = UpdateBarrierFixture.open(folder.path);
+        await fixture.startAsync(30_000, undefined, undefined, process.env, new ServerSettings(undefined, undefined, undefined, undefined, 5_000, 1_000), installation.folder, undefined,
+          `start-${UpdatePreparationTests.UNIQUE}.log`);
+        const record = path.join(fixture.dataDirectory.logsFolder, `copy-${UpdatePreparationTests.UNIQUE}.log`);
+        if (isUnreadable)
+          await mkdir(record);
+        const [desktop] = await fixture.handshakeAsync("desktop", RuntimeBuild.identity);
+        await UpdateBarrierFixture.holdAsync(installation);
+
+        desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
+        const [responses] = await RuntimeHostFixture.readMessagesAsync(desktop, 2);
+        const ready = UpdateReady.fromJson(responses.get("desktop:1")?.payload);
+
+        Assert.areEqual(0, ready.processes.length);
+        Assert.areEqual(isUnreadable ? 1 : 0, ready.problems.length);
+        if (isUnreadable)
+          Assert.isTrue(ready.problems.join("|").startsWith(`The runtime could not read its AppImage copy record ${record}, so its mount cannot be checked: Error: EISDIR`), ready.problems.join("|"));
+      });
   }
 
   @TestMethod

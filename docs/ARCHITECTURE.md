@@ -655,6 +655,7 @@ When a runtime it started exits before it publishes discovery, the launcher read
   - When neither a mount nor an extraction works, the start fails with the reason in the start log.
   - The Bash step writes each mount's process and each extraction's folder to its copy record, `logs/copy-<UUID>.log` beside the start log, and removes the record once the copy ends.
     The launcher removes its start log once it connects, so the start log cannot keep them.
+    The runtime finds its own record by its start log's UUID and lists its mount's process when it prepares for an update ([Stopping for an update](#stopping-for-an-update)).
     A runtime that owns the data directory ends any mount an earlier Bash step left running when that Bash no longer runs, and removes any extraction it left.
     It matches a mount by process id, command line and the AppImage's path, never by name alone.
     It does this once its log is open, and writes each record it cannot settle there with the reason, leaving the record; the runtime still starts.
@@ -1208,7 +1209,8 @@ The update stop of the desktop where the person chose Restart to update coordina
    It then sets the barrier to `Closing`, and waits up to 10 more seconds for every other desktop, those step 3 listed and those the installation's `desktops` folder lists that still run, to see it, quit and be verified the same way.
 6. **Handoff.**
    It sets the barrier to `HandedOff` and calls the handoff, then records in the barrier the process the handoff names as taking over.
-   After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage.
+   After an AppImage update it first starts `/bin/bash`, detached as a runtime launch is, to wait for its own process to exit and then start the replaced AppImage from the root folder, without the old mount's `APPIMAGE`, `APPDIR`, `ARGV0` and `OWD`.
+   A handoff that fails ends that Bash, so TeamRun does not start again when the desktop later quits.
 
 A desktop frozen for an update reads the barrier while its runtime is gone: `Closing` quits it, and once the update has ended, the barrier missing or its holder gone before the handoff, it unfreezes and reconnects.
 A desktop without a runtime connection, while it reconnects, shows a failed start or is still starting, reads the barrier every second and quits when it is `Closing` for another desktop that still runs.

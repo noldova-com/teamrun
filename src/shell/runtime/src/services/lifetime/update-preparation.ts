@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { readFile } from "node:fs/promises";
+
 import "@noldova/teamrun-foundation-core";
 import { Failure, FailureCode, type UpdateProcess, UpdateReady, type UpdateRequest, type UpdateSaved } from "@noldova/teamrun-shell-protocol";
 
@@ -28,6 +30,7 @@ export class UpdatePreparation implements Disposable {
   private readonly saveWait: number;
   private readonly barrierInterval: number;
   private readonly installationFolder: string | null;
+  private readonly copyRecord: string | null;
   private answers: Map<number, UpdateSaved> | null = null;
   private answered: (() => void) | null = null;
   private expected: readonly ConnectedClient[] = [];
@@ -42,7 +45,8 @@ export class UpdatePreparation implements Disposable {
     ended: EventChannel,
     saveWait: number,
     barrierInterval: number,
-    installationFolder: string | null) {
+    installationFolder: string | null,
+    copyRecord: string | null) {
     this.server = server;
     this.presence = presence;
     this.processes = processes;
@@ -51,6 +55,7 @@ export class UpdatePreparation implements Disposable {
     this.saveWait = saveWait;
     this.barrierInterval = barrierInterval;
     this.installationFolder = installationFolder;
+    this.copyRecord = copyRecord;
   }
 
   public async prepareAsync(connection: number, request: UpdateRequest): Promise<UpdateReady> {
@@ -104,8 +109,24 @@ export class UpdatePreparation implements Disposable {
       const saved = answers.get(t.connection);
       return Object.isUndefined(saved) ? [] : [[saved.processId, t.client]];
     });
-    const processes: UpdateProcess[] = [...await this.presence.stampAsync(clients), ...this.processes.updateProcesses];
+    const mounts = await this.readCopyMountsAsync().catch((error: unknown) => {
+      problems.push(Resources.formatCopyRecordUnreadable(String(this.copyRecord), String(error)));
+      return [];
+    });
+    const processes: UpdateProcess[] = [...await this.presence.stampAsync([...clients, ...mounts]), ...this.processes.updateProcesses];
     return new UpdateReady(problems, processes);
+  }
+
+  private async readCopyMountsAsync(): Promise<readonly (readonly [number, string])[]> {
+    if (Object.isNull(this.copyRecord))
+      return [];
+    const text = await readFile(this.copyRecord, Resources.utf8Encoding).catch((error: unknown) => {
+      if (error instanceof Error && "code" in error && error.code === Resources.missingFileCode)
+        return String.empty;
+      throw error;
+    });
+    return text.split(Resources.lineSeparator).map(t => Resources.copyMountRecord.exec(t)).filter(t => !Object.isNull(t))
+      .map(([, , mounter = String.empty]) => [Number(mounter), Resources.copyMountRole]);
   }
 
   private watchBarrier(installation: Installation): void {

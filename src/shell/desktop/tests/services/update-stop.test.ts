@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,8 +15,8 @@ import { join } from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { Failure, FailureCode, Response, UpdateProcess, UpdateReady } from "@noldova/teamrun-shell-protocol";
-import { ConnectionException, Installation, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
-import { type IUpdateTarget, UpdateStop, UpdateStopException } from "@noldova/teamrun-shell-desktop";
+import { ConnectionException, type IProcessStarter, Installation, UpdateBarrier, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
+import { AppImageRestart, type IUpdateTarget, UpdateStop, UpdateStopException } from "@noldova/teamrun-shell-desktop";
 
 import { FakeProcessPresence } from "../fixtures/fake-process-presence.fixture.js";
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
@@ -370,6 +372,62 @@ export class UpdateStopTests {
   }
 
   @TestMethod
+  public startsTheAppImageRestartOnceHandedOffAndBeforeTheHandoff(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      await this.recordAsync(installation, folder, "first");
+      const steps: string[] = [];
+      const restart = UpdateStopTests.createRestart(async () => {
+        steps.push(`restart ${String(JSON.parse(await readFile(installation.barrierFile, "utf8")).state)}`);
+        return 0x3fffffff;
+      });
+
+      const isHandedOff = await this.create(installation, undefined, restart).runAsync("0.3.0", () => {
+        steps.push("handoff");
+        return Promise.resolve(null);
+      });
+
+      Assert.isTrue(isHandedOff);
+      Assert.areEqual("restart HandedOff|handoff", steps.join("|"));
+    });
+  }
+
+  @TestMethod
+  public endsTheAppImageRestartWhenTheHandoffFails(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      await this.recordAsync(installation, folder, "first");
+      const waiting = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000)"], { stdio: "ignore" });
+      await once(waiting, "spawn");
+      const exited = once(waiting, "exit");
+
+      const failure = await Assert.throwsAsync(() => this.create(installation, undefined, UpdateStopTests.createRestart(() => Promise.resolve(Number(waiting.pid))))
+        .runAsync("0.3.0", () => Promise.reject(new Error("The installer is missing."))), UpdateStopException);
+      await exited;
+
+      Assert.areEqual("The installer is missing.", failure.message);
+      Assert.isNotNull(waiting.exitCode ?? waiting.signalCode);
+      Assert.isFalse(existsSync(installation.barrierFile));
+    });
+  }
+
+  @TestMethod
+  public failsWithoutHandingOffWhenTheAppImageRestartCannotStart(): Promise<void> {
+    return this.runAsync(async (installation, folder) => {
+      await this.recordAsync(installation, folder, "first");
+      let isCalled = false;
+
+      const failure = await Assert.throwsAsync(() => this.create(installation, undefined, UpdateStopTests.createRestart(() => Promise.reject(new Error("Bash is missing."))))
+        .runAsync("0.3.0", () => {
+          isCalled = true;
+          return Promise.resolve(null);
+        }), UpdateStopException);
+
+      Assert.areEqual("Bash is missing.", failure.message);
+      Assert.isFalse(isCalled);
+      Assert.isFalse(existsSync(installation.barrierFile));
+    });
+  }
+
+  @TestMethod
   public removesTheBarrierWhenTheHandoffFails(): Promise<void> {
     return this.runAsync(async (installation, folder) => {
       await this.recordAsync(installation, folder, "first");
@@ -381,7 +439,13 @@ export class UpdateStopTests {
     });
   }
 
-  private create(installation: Installation, isUnused: (dataDirectory: string) => boolean = () => false): UpdateStop {
+  private static createRestart(startAsync: () => Promise<number>): AppImageRestart | null {
+    const starter: IProcessStarter = { startAsync };
+    return AppImageRestart.find("linux", { APPIMAGE: "/home/person/TeamRun.AppImage", APPDIR: "/tmp/.mount_TeamRuX" }, "/tmp/.mount_TeamRuX/teamrun", [], starter, UpdateStopTests.SELF,
+      "/tmp/restart.log");
+  }
+
+  private create(installation: Installation, isUnused: (dataDirectory: string) => boolean = () => false, restart: AppImageRestart | null = null): UpdateStop {
     return new UpdateStop(
       installation,
       this.presence,
@@ -406,7 +470,8 @@ export class UpdateStopTests {
         this.waits.push(t);
         this.time += t;
         return Promise.resolve();
-      });
+      },
+      restart);
   }
 
   private target(dataDirectory: string): IUpdateTarget {

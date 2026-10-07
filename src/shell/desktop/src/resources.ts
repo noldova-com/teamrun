@@ -234,6 +234,29 @@ export class Resources {
   public static readonly queryPrefix: string = "?";
   public static readonly macPlatform: string = "darwin";
   public static readonly linuxPlatform: string = "linux";
+  public static readonly appImageVariables: readonly string[] = ["APPIMAGE", "APPDIR", "ARGV0", "OWD"];
+  public static readonly restartShell: string = "/bin/bash";
+  public static readonly restartShellArguments: readonly string[] = [
+    "--noprofile",
+    "--norc",
+    "-p",
+    "-c",
+    [
+      "shopt -s failglob",
+      "for descriptor in /proc/self/fd/*; do descriptor=${descriptor##*/}; if (( descriptor > 2 )); then exec {descriptor}>&-; fi; done",
+      "shopt -u failglob",
+      "holder=$1 image=$2",
+      "shift 2",
+      "while kill -0 \"$holder\" 2> /dev/null; do sleep 0.1; done",
+      "cd / || exit 1",
+      "if [[ ! -x $image ]]; then echo \"$image cannot be started after the update.\" >&2; exit 1; fi",
+      "exec -- \"$image\" \"$@\" < /dev/null > /dev/null 2>&1"
+    ].join("\n")
+  ];
+  public static get restartName(): string {
+    return `${ProductInfo.current.slug}-restart`;
+  }
+
   public static readonly desktopFileSuffix: string = ".desktop";
   public static get iconFolderSegments(): readonly string[] {
     return ProductInfo.current.icons.split(Resources.folderSeparator);
