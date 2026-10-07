@@ -60,6 +60,7 @@ export { PanelSurface } from "../app/enums/panel-surface";
 export { SashOrientation } from "../app/enums/sash-orientation";
 export { ThemeMode } from "../app/enums/theme-mode";
 export { ToolbarOrientation } from "../app/enums/toolbar-orientation";
+export { VirtualListAlign } from "../app/enums/virtual-list-align";
 export { VirtualListKind } from "../app/enums/virtual-list-kind";
 export { ThemeException } from "../app/exceptions/theme.exception";
 export { TreeMoveException } from "../app/exceptions/tree-move.exception";

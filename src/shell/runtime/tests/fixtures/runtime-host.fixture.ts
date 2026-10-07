@@ -118,6 +118,14 @@ export class RuntimeHostFixture implements AsyncDisposable {
     return [responses, events];
   }
 
+  public static async readAnswerAsync(connection: RawConnectionFixture): Promise<Response> {
+    for (;;) {
+      const message = new WireDecoder().decode(await connection.readTextAsync());
+      if (message instanceof Response)
+        return message;
+    }
+  }
+
   public static async readResponsesAsync(connection: RawConnectionFixture, count: number): Promise<Map<string, Response>> {
     const responses = new Map<string, Response>();
     for (let index = 0; index < count; index++) {

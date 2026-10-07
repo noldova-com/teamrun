@@ -41,8 +41,8 @@ describe("GalleryNavigationComponent", () => {
     const [items, loading, failing] = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>("tr-gallery-navigation tr-virtual-list")];
     const options = [...(items as HTMLElement).querySelectorAll("[role=option]")];
 
-    expect([options[0]?.textContent, options[0]?.getAttribute("aria-setsize"), options.length < 60]).toEqual(["Item 1", "10000", true]);
-    expect(loading?.querySelector("[role=status]")?.textContent?.trim()).toBe("Loading…");
+    expect([options[0]?.textContent, options[0]?.getAttribute("aria-setsize"), options.length < 60, options[2]?.getAttribute("aria-selected")]).toEqual(["Item 1", "10000", true, "true"]);
+    expect([loading?.querySelector(".tr-virtual-list-status")?.textContent?.trim(), loading?.querySelector("[role=listbox]")?.getAttribute("aria-label")]).toEqual(["Loading…", "Gallery items"]);
     expect(failing?.querySelector(".tr-virtual-list-failure button")?.textContent).toBe("Retry");
   });
 });

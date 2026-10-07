@@ -7,7 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import { ShellMethods } from "@noldova/teamrun-shell-protocol";
+import { ShellClients, ShellMethods } from "@noldova/teamrun-shell-protocol";
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
 import { MainProcessFailureKind } from "./enums/main-process-failure-kind.js";
@@ -16,6 +16,10 @@ export class Resources {
   public static readonly folderSeparator: string = "/";
   public static get updateUnderWay(): string {
     return `Another update of ${Resources.applicationName} is under way.`;
+  }
+
+  public static get updaterNotCreated(): string {
+    return `${Resources.applicationName} couldn't start checking for updates.`;
   }
 
   public static get updateHolderNotFound(): string {
@@ -67,6 +71,10 @@ export class Resources {
 
   public static formatBarrierNotCleared(message: string): string {
     return `The launch barrier of an unfinished update could not be removed: ${message}`;
+  }
+
+  public static formatRelaunchFailed(reason: string): string {
+    return `${Resources.applicationName} could not start itself apart from the terminal, so it runs in the terminal and quits when the terminal closes: ${reason}`;
   }
 
   public static formatHandoverFailed(reason: string): string {
@@ -173,7 +181,7 @@ export class Resources {
   public static readonly methodNotText: string = "The method must be a qualified name such as notes.open.";
   public static readonly payloadNotJson: string = "The payload must be a JSON value.";
   public static readonly layoutNotObject: string = "The layout must be a JSON object.";
-  public static readonly clientName: string = "desktop";
+  public static readonly clientName: string = ShellClients.desktop;
   public static readonly handoffRole: string = "handoff";
   public static readonly moveAsideAction: string = "moveAside";
   public static readonly stopWorkAction: string = "stopWork";
@@ -296,8 +304,13 @@ export class Resources {
   public static readonly queryPrefix: string = "?";
   public static readonly macPlatform: string = "darwin";
   public static readonly linuxPlatform: string = "linux";
+  public static readonly relaunchPlatforms: readonly string[] = [Resources.linuxPlatform, Resources.macPlatform];
   public static readonly appImageVariables: readonly string[] = ["APPIMAGE", "APPDIR", "ARGV0", "OWD"];
   public static readonly appImageFolderVariable: string = "APPDIR";
+  public static readonly appImageWorkingFolderVariable: string = "OWD";
+  public static readonly standardDescriptors: readonly number[] = [0, 1, 2];
+  public static readonly enableLoggingVariable: string = "ELECTRON_ENABLE_LOGGING";
+  public static readonly terminalArguments: readonly string[] = ["--enable-logging", "--remote-debugging-port", "--remote-debugging-pipe"];
   public static readonly appRunPathVariables: readonly (readonly [string, readonly string[], readonly string[]])[] = [
     ["PATH", [String.empty, "/usr/sbin"], []],
     ["XDG_DATA_DIRS", ["/usr/share/"], ["/usr/share/gnome", "/usr/local/share/", "/usr/share/"]],
@@ -348,6 +361,31 @@ export class Resources {
     return `The AppImage ${image} could not be replaced with the update and was left as it was: ${reason}`;
   }
 
+  public static readonly launchControl: string = "/bin/launchctl";
+  public static readonly launchControlList: string = "list";
+  public static readonly launchControlRemove: string = "remove";
+  public static readonly launchListSeparator: string = "\t";
+  public static formatShipItLabel(bundleIdentifier: string): string {
+    return `${bundleIdentifier}.ShipIt`;
+  }
+
+  public static formatShipItUnreadable(reason: string): string {
+    return `The installer process of the staged update could not be looked up: ${reason}`;
+  }
+
+  public static formatShipItNotRemoved(reason: string): string {
+    return `The staged update could not be withdrawn, so it may install when ${Resources.applicationName} quits: ${reason}`;
+  }
+
+  public static readonly installerArguments: readonly string[] = ["--updated", "/S", "--force-run"];
+  public static formatInstallerUnsigned(installer: string, reason: string): string {
+    return `The update's installer ${installer} is not signed by the publisher, so it was not started: ${reason}`;
+  }
+
+  public static formatInstallerNotStarted(installer: string, reason: string): string {
+    return `The update's installer ${installer} could not be started: ${reason}`;
+  }
+
   public static readonly desktopFileSuffix: string = ".desktop";
   public static get iconFolderSegments(): readonly string[] {
     return ProductInfo.current.icons.split(Resources.folderSeparator);
@@ -386,6 +424,7 @@ export class Resources {
   public static readonly failedEvent: "failed" = "failed";
   public static readonly dataEvent: "data" = "data";
   public static readonly errorEvent: "error" = "error";
+  public static readonly spawnEvent: "spawn" = "spawn";
   public static readonly secondInstanceEvent: "second-instance" = "second-instance";
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
@@ -871,6 +910,10 @@ export class Resources {
 
   public static formatUpdateCheckNotReleased(error: string): string {
     return `The update check could not let go of its lock: ${error}`;
+  }
+
+  public static formatUpdaterNotCreated(error: string): string {
+    return `The updater could not be created, so this desktop doesn't check for updates: ${error}`;
   }
 
   public static formatUpdaterMessage(message: string): string {

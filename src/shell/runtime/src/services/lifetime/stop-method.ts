@@ -18,11 +18,13 @@ import type { WorkTracker } from "../work/work-tracker.js";
 export class StopMethod implements IMethodHandler {
   private readonly work: WorkTracker;
   private readonly countOthers: (context: RequestContext) => number;
+  private readonly accept: (context: RequestContext) => void;
   private readonly stop: (reason: string) => void;
 
-  public constructor(work: WorkTracker, countOthers: (context: RequestContext) => number, stop: (reason: string) => void) {
+  public constructor(work: WorkTracker, countOthers: (context: RequestContext) => number, accept: (context: RequestContext) => void, stop: (reason: string) => void) {
     this.work = work;
     this.countOthers = countOthers;
+    this.accept = accept;
     this.stop = stop;
   }
 
@@ -30,12 +32,15 @@ export class StopMethod implements IMethodHandler {
     const request = StopRequest.fromJson(context.payload);
     if (request.keepsWhileShared) {
       const others = this.countOthers(context);
-      if (others > 0)
+      if (others > 0) {
+        this.accept(context);
         return Promise.resolve(new KeptRuntime(others).toJson());
+      }
     }
     if (request.policy === StopPolicy.IfIdle && !this.work.isEmpty)
       return Promise.reject(new MethodFailureException(new Failure(FailureCode.Conflict, Resources.workInProgress, new RunningWork(this.work.descriptions).toJson())));
 
+    this.accept(context);
     this.work.cancelAll();
     setImmediate(() => this.stop(Resources.stoppedByRequest));
     return Promise.resolve(null);

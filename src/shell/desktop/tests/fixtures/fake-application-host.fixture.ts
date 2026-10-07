@@ -14,11 +14,11 @@ import { ListenerRegistry } from "./listener-registry.fixture.js";
 
 export class FakeApplicationHost implements IApplicationHost {
   private readonly listeners: ListenerRegistry = new ListenerRegistry();
-  private readonly hasLock: boolean;
   private readonly readiness: PromiseWithResolvers<void> = Promise.withResolvers<void>();
 
   public readonly calls: string[] = [];
   public readonly isPackaged: boolean;
+  public hasLock: boolean;
   public systemLanguages: string[] = ["en-US"];
   public isInApplications: boolean = true;
   public dock: FakeDockHost | undefined = undefined;
@@ -51,6 +51,10 @@ export class FakeApplicationHost implements IApplicationHost {
   public requestSingleInstanceLock(): boolean {
     this.calls.push("requestSingleInstanceLock");
     return this.hasLock;
+  }
+
+  public releaseSingleInstanceLock(): void {
+    this.calls.push("releaseSingleInstanceLock");
   }
 
   public getPreferredSystemLanguages(): string[] {

@@ -11,7 +11,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { BuildIdentity, ShellMethods, UpdateReady, UpdateRequest } from "@noldova/teamrun-shell-protocol";
+import { BuildIdentity, ShellClients, ShellEvents, ShellMethods, UpdateReady, UpdateRequest } from "@noldova/teamrun-shell-protocol";
 import {
   DataDirectory, Installation, LaunchSettings, ProcessPresence, RuntimeBuild, RuntimeEntry, RuntimeLauncher, SystemCommand, UpdateBarrier, UpdateBarrierState
 } from "@noldova/teamrun-shell-runtime";
@@ -46,6 +46,7 @@ export class CliFailureTests {
 
     const fromNewer = await fixture.runAsync(fixture.withDataDirectory(["commands", "--json"]), newer);
     const fromOlder = await fixture.runAsync(fixture.withDataDirectory(["status", "--json"]), older);
+    const quitFromOlder = await fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]), older);
     const work = host.work.begin("Indexing the project");
     const busy = await fixture.runAsync(fixture.withDataDirectory(["commands", "--take-over", "--json"]), newer);
     work[Symbol.dispose]();
@@ -57,6 +58,7 @@ export class CliFailureTests {
     Assert.areEqual(RuntimeBuild.identity.fingerprint, refusal.details.identity.fingerprint);
     Assert.areEqual(4, fromOlder.code);
     Assert.areEqual("BuildMismatch", JSON.parse(fromOlder.error).code);
+    Assert.areEqual("4|BuildMismatch", `${quitFromOlder.code}|${JSON.parse(quitFromOlder.error).code}`);
     Assert.areEqual(4, busy.code);
     Assert.areEqual(JSON.stringify({ descriptions: ["Indexing the project"] }), JSON.stringify(JSON.parse(busy.error).details));
     Assert.areEqual(0, takenOver.code, takenOver.error);
@@ -235,6 +237,32 @@ export class CliFailureTests {
     Assert.areEqual("Updating", JSON.parse(answered.error).code);
     Assert.areEqual(8, refused.code);
     Assert.areEqual(JSON.stringify({ code: "Updating", message: "TeamRun is preparing to install an update." }), refused.error.trim());
+  }
+
+  @TestMethod
+  public async reportsTheUpdateToAQuitThatWaitsWhenTheRuntimePreparesForOne(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0");
+    const installation = Installation.locate(fixture.deviceFolder, process.execPath, process.platform);
+    await fixture.startHostAsync(build.declarationsFile, installation);
+    await CliFailureTests.holdBarrierAsync(installation);
+    const settings = new LaunchSettings(new DataDirectory(fixture.dataDirectory), process.execPath, RuntimeEntry.entryPath, fixture.environment, process.platform);
+    const asked = Promise.withResolvers<void>();
+    const desktop = await new RuntimeLauncher(settings, RuntimeBuild.identity, new Installation(installation, () => Promise.resolve(false))).attachAsync(ShellClients.desktop, {
+      onEvent: t => {
+        if (t.name.equals(ShellEvents.quitting))
+          asked.resolve();
+      },
+      onDisconnected: () => undefined
+    });
+
+    const quitting = fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]));
+    await asked.promise;
+    await desktop.callAsync(ShellMethods.update, new UpdateRequest(installation).toJson());
+    const answered = await quitting;
+    desktop.close();
+
+    Assert.areEqual("8|Updating", `${answered.code}|${JSON.parse(answered.error).code}`);
   }
 
   private static async holdBarrierAsync(folder: string): Promise<void> {

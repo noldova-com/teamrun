@@ -241,6 +241,34 @@ export declare enum ToolbarOrientation {
 }
 
 /**
+ * Where {@link VirtualListComponent.reveal} puts a row in the list's view.
+ */
+export declare enum VirtualListAlign {
+  /**
+   * The row's top at the view's top.
+   */
+  Start = "Start",
+
+  /**
+   * The row's middle at the view's middle.
+   */
+  Center = "Center",
+
+  /**
+   * The row's bottom at the view's bottom.
+   */
+  End = "End",
+
+  /**
+   * The least scrolling that shows the row: none while it is in view, its
+   * top at the view's top when it is above, and its bottom at the view's
+   * bottom when it is below, or its top at the view's top when it is taller
+   * than the view.
+   */
+  Nearest = "Nearest"
+}
+
+/**
  * The pattern a {@link VirtualListComponent} shows its rows in.
  */
 export declare enum VirtualListKind {
@@ -354,8 +382,8 @@ export interface IVirtualListObserver {
 
 /**
  * What a row of the kit's list gives the template of a
- * {@link VirtualRowDirective}: the item, its position, the height its row
- * had and the ids that name and describe a feed's article.
+ * {@link VirtualRowDirective}: the item, its position, the height the list
+ * holds for its row and the ids that name and describe a feed's article.
  *
  * @typeParam T The type of the source's items.
  * @example
@@ -379,9 +407,9 @@ export interface IVirtualRowContext<T> {
   readonly index: number;
 
   /**
-   * The height in CSS pixels the row had when it was last measured, or its
-   * source's estimate until then. A row whose content, such as an image,
-   * is still decoding keeps this height, so the rows after it don't move.
+   * The height in CSS pixels the list holds for the row, the row's padding
+   * included: its height when it was last measured, or its source's
+   * estimate until then.
    */
   readonly height: number;
 
@@ -4555,6 +4583,11 @@ export declare class ViewBadgeComponent {
  * which returns to the article last focused, or lands on the last article
  * while it follows its end, or on the first.
  *
+ * While rows in view load, either kind says so in a status line, and
+ * announces it while the focused row waits for its items; when a read
+ * fails, it says and announces that the items couldn't load and offers
+ * Retry.
+ *
  * The module sizes the list; it scrolls inside the height it is given.
  *
  * @typeParam T The type of the source's items.
@@ -4579,12 +4612,13 @@ export declare class VirtualListComponent<T> {
   public readonly kind: InputSignal<VirtualListKind>;
 
   /**
-   * The key, as {@link VirtualListSource.keyOf} gives it, of the selected
-   * item of an options list, which is highlighted, selected for assistive
-   * technology and the list's Tab stop until a row has been focused, or null
-   * for none; null when not bound. A feed ignores it.
+   * The position of the selected row of an options list, from 0, which is
+   * highlighted, selected for assistive technology and the list's Tab stop
+   * until a row has been focused, whether its item has loaded or not, or
+   * null for none; null when not bound. The owner moves it with the items it
+   * adds or removes before it. A feed ignores it.
    */
-  public readonly selected: InputSignal<string | null>;
+  public readonly selected: InputSignal<number | null>;
 
   /**
    * Where a feed opens, as {@link VirtualListComponent.positionChange} last
@@ -4597,11 +4631,11 @@ export declare class VirtualListComponent<T> {
   public readonly position: InputSignal<VirtualListPosition | null>;
 
   /**
-   * Emits the loaded item the person chose in an options list by a click,
-   * Enter or Space; the owner usually makes its key
+   * Emits the position of the loaded row the person chose in an options
+   * list by a click, Enter or Space; the owner usually makes it
    * {@link VirtualListComponent.selected}. A feed never emits it.
    */
-  public readonly activated: OutputEmitterRef<T>;
+  public readonly activated: OutputEmitterRef<number>;
 
   /**
    * Emits where the person reads each time they scroll: the row at the top
@@ -4613,9 +4647,9 @@ export declare class VirtualListComponent<T> {
 
   /**
    * Emits why a read failed: what {@link VirtualListSource.readAsync}
-   * rejected with, or a {@link VirtualListException} when it answered with
-   * the wrong number of items. The list itself tells the person and offers
-   * Retry; the owner may log it.
+   * threw or rejected with, or a {@link VirtualListException} when it
+   * answered with the wrong number of items. The list itself tells the
+   * person and offers Retry; the owner may log it.
    */
   public readonly failed: OutputEmitterRef<unknown>;
 
@@ -4636,7 +4670,7 @@ export declare class VirtualListComponent<T> {
    * })
    * export class ContactListComponent {
    *   protected readonly contacts: ArrayVirtualListSource<string> = new ArrayVirtualListSource(["Ada", "Grace", "Linus"], t => t, 30);
-   *   protected chosen: string | null = null;
+   *   protected chosen: number | null = null;
    * }
    * ```
    */
@@ -4670,6 +4704,37 @@ export declare class VirtualListComponent<T> {
    * ```
    */
   public focus(): void;
+
+  /**
+   * Scrolls the list so the row at a position shows where the alignment
+   * puts it, as far as the list can scroll, without moving focus; a
+   * position beyond either end reveals the row at that end, and nothing
+   * happens while the list has no rows.
+   *
+   * @param index The row's position, from 0.
+   * @param align Where in the view the row goes.
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ArrayVirtualListSource, VirtualListAlign, VirtualListComponent, VirtualRowDirective } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-history",
+   *   imports: [VirtualListComponent, VirtualRowDirective],
+   *   template: "<tr-virtual-list label=\"History\" [source]=\"entries\"><ng-template [trVirtualRow]=\"entries\" let-entry>{{ entry }}</ng-template></tr-virtual-list><button type=\"button\" (click)=\"showLatest()\">Latest</button>"
+   * })
+   * export class HistoryComponent {
+   *   private readonly list: Signal<VirtualListComponent<string>> = viewChild.required<VirtualListComponent<string>>(VirtualListComponent);
+   *
+   *   protected readonly entries: ArrayVirtualListSource<string> = new ArrayVirtualListSource(["Opened", "Edited", "Saved"], t => t);
+   *
+   *   protected showLatest(): void {
+   *     this.list().reveal(this.entries.length() - 1, VirtualListAlign.End);
+   *   }
+   * }
+   * ```
+   */
+  public reveal(index: number, align: VirtualListAlign): void;
 }
 
 /**
@@ -5013,7 +5078,9 @@ export declare class VirtualRowDirective<T> {
    * ```ts
    * import { VirtualRowDirective } from "@noldova/teamrun-shell-ui";
    *
-   * export const isRowContext: boolean = VirtualRowDirective.ngTemplateContextGuard({} as VirtualRowDirective<string>, { $implicit: "Ada", index: 0, height: 30, labelId: "contact-0", descriptionId: "contact-0-detail" });
+   * export function isRowContext(directive: VirtualRowDirective<string>, context: unknown): boolean {
+   *   return VirtualRowDirective.ngTemplateContextGuard(directive, context);
+   * }
    * ```
    */
   public static ngTemplateContextGuard<T>(_: VirtualRowDirective<T>, _context: unknown): _context is IVirtualRowContext<T>;

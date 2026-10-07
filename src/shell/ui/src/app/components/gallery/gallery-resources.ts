@@ -21,6 +21,7 @@ export class GalleryResources {
   public static readonly fieldMessageIdPrefix: string = "tr-gallery-field-message-";
   public static readonly virtualListLength: number = 10_000;
   public static readonly virtualListEstimate: number = 30;
+  public static readonly virtualListSelected: number = 2;
   public static readonly feedLength: number = 10_000;
   public static readonly feedRecent: number = 100;
   public static readonly feedHistoryDelay: number = 1500;
@@ -157,7 +158,7 @@ export class GalleryResources {
     virtualFeedLabel: "Gallery conversation",
     virtualFeedStream: "Stream a reply",
     feedAuthors: ["Ada", "Grace", "Linus"],
-    feedReplyAuthor: "TeamRun",
+    feedReplyAuthor: "Assistant",
     feedWords: ["the", "build", "finished", "on", "every", "system", "and", "the", "list", "kept", "its", "place", "while", "older", "messages", "loaded", "above", "it", "so", "nothing", "in", "view", "moved"],
     sectionHeader: "Section header",
     sectionRecent: "Recent",

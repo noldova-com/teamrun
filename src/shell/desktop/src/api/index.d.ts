@@ -18,8 +18,8 @@ import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Prov
 
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
-import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchException, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+import type { Event, NotificationBroadcast, QualifiedName, QuitAnswer, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchException, LaunchSettings, ProcessPresence, SystemCommand, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -580,6 +580,128 @@ export declare class AppImageRestart {
 }
 
 /**
+ * The Windows handoff of an update: checks the downloaded installer's signature by the publisher again, right before
+ * starting it, so a file changed after its download is never run, then starts it quietly with the arguments of an
+ * update, `--updated /S --force-run`, so it keeps the existing installation's folder and scope and starts the new
+ * version once it has installed it. The installer starts detached, through a starter that gives it none of the
+ * desktop's inherited handles, and its process is the one that takes the handoff.
+ */
+export declare class InstallerStart {
+  /**
+   * Creates the installer's start.
+   *
+   * @param starter Starts the installer detached; the desktop's `UtilityProcessStarter`.
+   * @param verifyAsync Checks the installer's signature by the publisher, resolving `null` when it is valid and
+   * otherwise the reason it is not.
+   * @param environment The environment the installer starts with.
+   * @param errorFile The file the installer's standard error is appended to.
+   * @example
+   * ```ts
+   * import { InstallerStart } from "@noldova/teamrun-shell-desktop";
+   * import { ChildProcessStarter } from "@noldova/teamrun-shell-runtime";
+   *
+   * export function create(verifyAsync: (installer: string) => Promise<string | null>, errorFile: string): InstallerStart {
+   *   return new InstallerStart(new ChildProcessStarter(), verifyAsync, process.env, errorFile);
+   * }
+   * ```
+   */
+  public constructor(starter: IProcessStarter, verifyAsync: (installer: string) => Promise<string | null>, environment: NodeJS.ProcessEnv, errorFile: string);
+
+  /**
+   * Checks the installer's signature and starts it.
+   *
+   * @param installer The downloaded installer of the new version.
+   * @returns The installer's process id.
+   * @throws {UpdateHandoffException} Rejected with the reason when the installer is not signed by the publisher, in
+   * which case it is not started, or when it cannot be started.
+   * @example
+   * ```ts
+   * import type { InstallerStart } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function handOffAsync(start: InstallerStart, installer: string): Promise<number> {
+   *   return start.startAsync(installer);
+   * }
+   * ```
+   */
+  public startAsync(installer: string): Promise<number>;
+}
+
+/**
+ * The process that installs a macOS update: Squirrel.Mac's ShipIt, which runs as the launchd job
+ * `<bundle identifier>.ShipIt` in the person's session from the moment Squirrel has staged the update, keeps its
+ * process id until it has installed it, and installs it once the desktop has quit. Read from `launchctl list`. A
+ * staged update installs at any quit, so a handoff that fails after staging removes the job.
+ */
+export declare class ShipItProcess {
+  /**
+   * Creates the lookup of the ShipIt job of an application.
+   *
+   * @param bundleIdentifier The application's bundle identifier, which names the job.
+   * @param command Runs `/bin/launchctl`.
+   * @example
+   * ```ts
+   * import { ShipItProcess } from "@noldova/teamrun-shell-desktop";
+   * import { SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const shipIt: ShipItProcess = new ShipItProcess("com.noldova.teamrun", new SystemCommand());
+   * ```
+   */
+  public constructor(bundleIdentifier: string, command: Pick<SystemCommand, "runAsync">);
+
+  /**
+   * Finds the ShipIt process, once Squirrel has staged the update.
+   *
+   * @returns The process id of the running ShipIt job, or `null` when the job is not listed or not running.
+   * @throws {UpdateHandoffException} Rejected with the reason when the jobs cannot be listed.
+   * @example
+   * ```ts
+   * import type { ShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function findAsync(shipIt: ShipItProcess): Promise<number | null> {
+   *   return shipIt.findAsync();
+   * }
+   * ```
+   */
+  public findAsync(): Promise<number | null>;
+
+  /**
+   * Removes the ShipIt job, which ends a ShipIt that is still waiting, so the staged update does not install when
+   * the desktop quits. It does nothing when the job is not listed.
+   *
+   * @returns A promise that resolves once the job is removed.
+   * @throws {UpdateHandoffException} Rejected with the reason when the jobs cannot be listed or the job cannot be
+   * removed.
+   * @example
+   * ```ts
+   * import type { ShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function withdrawAsync(shipIt: ShipItProcess): Promise<void> {
+   *   return shipIt.removeAsync();
+   * }
+   * ```
+   */
+  public removeAsync(): Promise<void>;
+
+  /**
+   * Removes the ShipIt job only when it is listed without a process: the job a finished install leaves behind. A
+   * desktop calls it at start, before its updater, and a running ShipIt is left alone.
+   *
+   * @returns A promise that resolves once a stopped job is removed, or at once when there is none.
+   * @throws {UpdateHandoffException} Rejected with the reason when the jobs cannot be listed or the job cannot be
+   * removed.
+   * @example
+   * ```ts
+   * import type { ShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function tidyAsync(shipIt: ShipItProcess): Promise<void> {
+   *   return shipIt.removeStoppedAsync();
+   * }
+   * ```
+   */
+  public removeStoppedAsync(): Promise<void>;
+}
+
+/**
  * Asks the person, while TeamRun quits and the runtime has work in progress, whether to wait for the work or stop it,
  * and decides from the answer and the runtime's reports of its work. Reading the work is bounded once; when it fails or
  * times out, quitting goes ahead as it would without work. Reports carry a sequence, so a report heard before an older
@@ -729,17 +851,19 @@ export declare class QuitFlow implements ICloseGuard {
   /**
    * Quits TeamRun, or joins the quit already running.
    *
-   * @returns A promise that settles once TeamRun exits or stays open.
+   * @returns A promise of `null` once TeamRun exits, or of why it stayed open: `Stayed` when the person kept it open,
+   * `SaveFailed` when a window could not save.
    * @example
    * ```ts
+   * import type { QuitAnswer } from "@noldova/teamrun-shell-protocol";
    * import type { QuitFlow } from "@noldova/teamrun-shell-desktop";
    *
-   * export function quitAsync(flow: QuitFlow): Promise<void> {
+   * export function quitAsync(flow: QuitFlow): Promise<QuitAnswer | null> {
    *   return flow.quitAsync();
    * }
    * ```
    */
-  public quitAsync(): Promise<void>;
+  public quitAsync(): Promise<QuitAnswer | null>;
 }
 
 /**
@@ -798,6 +922,11 @@ export interface IDesktopProcess {
   readonly programs: IProgramHost;
 
   /**
+   * Whether standard input, output or error is a terminal, as when a person starts the desktop at a shell's prompt.
+   */
+  readonly isTerminal: boolean;
+
+  /**
    * Starts another program, detached, for the hand-over to a newer build.
    *
    * @param executablePath The program.
@@ -814,6 +943,28 @@ export interface IDesktopProcess {
    * ```
    */
   startDetached(executablePath: string, args: readonly string[], onFailure: (error: Error) => void): void;
+
+  /**
+   * Starts another program in its own session, detached, with its standard streams ignored: the copy of itself a
+   * desktop started from a terminal starts so that closing the terminal does not end it.
+   *
+   * @param executablePath The program.
+   * @param args Its arguments.
+   * @param environment Its environment.
+   * @param workingDirectory The folder it starts in.
+   * @returns A promise that settles once the program has started.
+   * @throws Error asynchronously when the program cannot be started, with the reason the system gives, or a
+   * `LaunchException` on Linux when `/bin/bash` is not executable.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function relaunchAsync(process: IDesktopProcess): Promise<void> {
+   *   return process.startDetachedAsync(process.execPath, process.argv.slice(1), process.env, process.workingDirectory);
+   * }
+   * ```
+   */
+  startDetachedAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void>;
 
   /**
    * Ends another process at once, for a window's page that did not stop when asked.
@@ -1316,6 +1467,21 @@ export interface IApplicationHost {
    * ```
    */
   requestSingleInstanceLock(): boolean;
+
+  /**
+   * Gives up the single-instance lock, so that the copy a desktop started from a terminal starts of itself can claim
+   * it.
+   *
+   * @example
+   * ```ts
+   * import type { IApplicationHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function release(app: IApplicationHost): void {
+   *   app.releaseSingleInstanceLock();
+   * }
+   * ```
+   */
+  releaseSingleInstanceLock(): void;
 
   /**
    * Lists the operating system's preferred languages, most preferred first.
@@ -5074,6 +5240,31 @@ export declare class ChildProgramHost implements IProgramHost {
    * ```
    */
   public startDetached(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, onFailure: (error: Error) => void): void;
+
+  /**
+   * Starts a program in its own session that outlives the desktop, with its standard streams ignored, in the given
+   * folder.
+   *
+   * @param file The program, by its full path.
+   * @param programArguments The program's arguments.
+   * @param environment The program's environment.
+   * @param workingDirectory The folder the program starts in.
+   * @returns A promise that settles once the program has started. On Linux the program starts through Bash, so the
+   * promise settles once Bash has started and does not report the program itself missing.
+   * @throws {LaunchException} Asynchronously on Linux when `/bin/bash` is not executable or `/proc/self/fd` cannot be
+   * read.
+   * @throws Error asynchronously with the reason the system gives when the program cannot be started elsewhere.
+   * @throws {ArgumentException} Asynchronously when the program's path is empty or whitespace.
+   * @example
+   * ```ts
+   * import type { ChildProgramHost } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function relaunchAsync(programs: ChildProgramHost, executablePath: string): Promise<void> {
+   *   return programs.startDetachedAsync(executablePath, [], process.env, process.cwd());
+   * }
+   * ```
+   */
+  public startDetachedAsync(file: string, programArguments: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void>;
 }
 
 /**

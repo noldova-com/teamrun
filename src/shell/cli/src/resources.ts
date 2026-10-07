@@ -7,6 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
+import { ShellClients } from "@noldova/teamrun-shell-protocol";
 import { ProductInfo } from "@noldova/teamrun-shell-runtime";
 
 import { CliCommand } from "./enums/cli-command.js";
@@ -25,7 +26,7 @@ export class Resources {
     return `${Resources.productSlug.toUpperCase()}_CHECKOUT`;
   }
 
-  public static readonly clientName: string = "cli";
+  public static readonly clientName: string = ShellClients.commandLine;
   public static readonly runAsNodeVariable: string = "ELECTRON_RUN_AS_NODE";
   public static readonly runAsNodeValue: string = "1";
   public static get desktopMainSegments(): readonly string[] {
@@ -33,7 +34,7 @@ export class Resources {
   }
 
   public static readonly utf8Encoding: BufferEncoding = "utf8";
-  public static readonly interruptSignal: string = "SIGINT";
+  public static readonly interruptSignals: readonly string[] = ["SIGINT", "SIGHUP"];
   public static readonly millisecondsPerSecond: number = 1_000;
   public static readonly minimumTimeoutSeconds: number = 1;
   public static readonly wholeSecondsPattern: RegExp = /^\d+$/;
@@ -88,6 +89,7 @@ export class Resources {
       "  run <command> [<json> | --args-file <path> | -]",
       "                                           Runs a runtime command with its arguments, printing its result.",
       `  open                                     Starts ${Resources.productName} or brings its window forward.`,
+      `  quit                                     Quits the running ${Resources.productName} as its Quit does. Never starts a runtime.`,
       "  help [<module> [<command>]]              Prints this help, a module's commands or one command's help.",
       "  <module> <command> [<argument>...]       Runs a module's command with its arguments and options.",
       String.empty,
@@ -97,7 +99,7 @@ export class Resources {
       "  --json              Prints one JSON value on standard output, and errors as JSON on standard error.",
       "  --no-start          Fails instead of starting a runtime when none is running (commands, run, module commands).",
       "  --take-over         Asks another build's idle runtime to stop and takes its place (commands, run, module commands).",
-      "  --timeout <seconds> How long a command may run (run, module commands).",
+      "  --timeout <seconds> How long a command may run (run, quit, module commands).",
       "  --help              Prints the help of the command it follows.",
       String.empty,
       "Exit codes: 0 success, 1 the command failed, 2 usage, 3 no runtime running, 4 another build's runtime,",
@@ -191,6 +193,14 @@ export class Resources {
 
   public static formatWork(work: string): string {
     return `Work in progress: ${work}`;
+  }
+
+  public static get quitDone(): string {
+    return `${Resources.productName} quit.`;
+  }
+
+  public static get noDesktop(): string {
+    return "No desktop is running.";
   }
 
   public static formatOpened(root: string): string {

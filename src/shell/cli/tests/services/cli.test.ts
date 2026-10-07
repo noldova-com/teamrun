@@ -11,6 +11,8 @@ import path from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod, Wait } from "@noldova/teamrun-foundation-testing";
+import { type Event, QuitAnswer, QuitAnswered, ShellClients, ShellEvents, ShellMethods, StopPolicy, StopRequest } from "@noldova/teamrun-shell-protocol";
+import { DataDirectory, DiscoveryReader, Endpoint, RuntimeBuild, RuntimeClient } from "@noldova/teamrun-shell-runtime";
 
 import { CliFixture } from "../fixtures/cli.fixture.js";
 import { ProbeBuildFixture } from "../fixtures/probe-build.fixture.js";
@@ -113,6 +115,64 @@ export class CliTests {
   }
 
   @TestMethod
+  public async quitsTheRunningDesktopAndSaysWhatHappened(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0");
+    const noRuntime = await fixture.runAsync(fixture.withDataDirectory(["quit"]));
+    await fixture.startHostAsync(build.declarationsFile);
+
+    const noDesktop = [await fixture.runAsync(fixture.withDataDirectory(["quit"])), await fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]))];
+    const answers: (QuitAnswer | null)[] = [QuitAnswer.Stayed, QuitAnswer.SaveFailed, null];
+    await CliTests.connectDesktopAsync(fixture, t => {
+      const answer = answers.shift() ?? null;
+      if (answer === null)
+        t.close();
+      else
+        void t.callAsync(ShellMethods.quitAnswered, new QuitAnswered(answer).toJson());
+    });
+    const kept = await fixture.runAsync(fixture.withDataDirectory(["quit"]));
+    const saveFailed = await fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]));
+    const unanswered = await fixture.runAsync(fixture.withDataDirectory(["quit"]));
+    await CliTests.connectDesktopAsync(fixture, t => void t.callAsync(ShellMethods.stop, new StopRequest(StopPolicy.IfIdle, true).toJson()));
+    const quit = await fixture.runAsync(fixture.withDataDirectory(["quit"]));
+    const afterQuit = await fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]));
+
+    Assert.areEqual(`3|No runtime is running for ${fixture.dataDirectory}.\n`, `${noRuntime.code}|${noRuntime.error}`);
+    Assert.areEqual("0|No desktop is running.\n|0|{\"outcome\":\"NoDesktop\"}\n", noDesktop.map(t => `${t.code}|${t.output}`).join("|"));
+    Assert.areEqual("6|TeamRun stayed open: it was kept open while work was in progress.\n", `${kept.code}|${kept.error}`);
+    Assert.areEqual("1|{\"code\":\"Conflict\",\"message\":\"TeamRun stayed open: a window could not save.\"}\n", `${saveFailed.code}|${saveFailed.error}`);
+    Assert.areEqual("1|TeamRun did not say whether it quit: its desktop's connection ended before it answered.\n", `${unanswered.code}|${unanswered.error}`);
+    Assert.areEqual("0|TeamRun quit.\n|3", `${quit.code}|${quit.output}|${afterQuit.code}`);
+  }
+
+  @TestMethod
+  public async stopsWaitingForAQuitAtItsTimeoutAHangUpOrAnInterruptionAndRefusesOtherOptions(): Promise<void> {
+    await using fixture = await CliFixture.createAsync();
+    await using build = await ProbeBuildFixture.createAsync("1.0.0");
+    await fixture.startHostAsync(build.declarationsFile);
+    let asked = 0;
+    const desktop = await CliTests.connectDesktopAsync(fixture, () => asked++);
+
+    const timedOut = await fixture.runAsync(fixture.withDataDirectory(["quit", "--timeout", "1", "--json"]));
+    const hungUp = fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]));
+    await Wait.untilAsync(() => Promise.resolve(asked === 2), 15_000);
+    fixture.signals.emit("SIGHUP");
+    const afterHangUp = await hungUp;
+    const interrupted = fixture.runAsync(fixture.withDataDirectory(["quit", "--json"]));
+    await Wait.untilAsync(() => Promise.resolve(asked === 3), 15_000);
+    fixture.signals.emit("SIGINT");
+    const stopped = [afterHangUp, await interrupted];
+    const refused = [await fixture.runAsync(fixture.withDataDirectory(["quit", "--no-start"])), await fixture.runAsync(fixture.withDataDirectory(["quit", "--args-file", "x.json"]))];
+    desktop.close();
+
+    Assert.areEqual("6|DeadlineExceeded", `${timedOut.code}|${(JSON.parse(timedOut.error) as { code: string }).code}`);
+    Assert.areEqual("6|Cancelled,6|Cancelled", stopped.map(t => `${t.code}|${(JSON.parse(t.error) as { code: string }).code}`).join(","));
+    Assert.areEqual("0,0", ["SIGHUP", "SIGINT"].map(t => fixture.signals.listenerCount(t)).join(","));
+    Assert.areEqual("2,2", refused.map(t => t.code).join(","));
+    Assert.areEqual(3, asked);
+  }
+
+  @TestMethod
   public async stopsAModuleCommandAtItsTimeoutOrAnInterruptionAndThenItsParts(): Promise<void> {
     await using fixture = await CliFixture.createAsync();
     await using build = await ProbeBuildFixture.createAsync("1.0.0", true);
@@ -161,5 +221,19 @@ export class CliTests {
     Assert.isTrue(["", "activate stalled\n"].includes(afterTimeout), afterTimeout);
     Assert.areEqual(0, fixture.signals.listenerCount("SIGINT"));
     Assert.areEqual("activate stalled\n", await build.readPartsLogAsync());
+  }
+
+  private static async connectDesktopAsync(fixture: CliFixture, onQuitting: (client: RuntimeClient) => void): Promise<RuntimeClient> {
+    const discovery = await DiscoveryReader.readAsync(new DataDirectory(fixture.dataDirectory));
+    const connected = Promise.withResolvers<RuntimeClient>();
+    const client = await RuntimeClient.connectAsync(Endpoint.parse(String(discovery?.endpoint)), String(discovery?.token), RuntimeBuild.identity, ShellClients.desktop, {
+      onEvent: (event: Event) => {
+        if (event.name.equals(ShellEvents.quitting))
+          void connected.promise.then(onQuitting);
+      },
+      onDisconnected: () => undefined
+    });
+    connected.resolve(client);
+    return client;
   }
 }

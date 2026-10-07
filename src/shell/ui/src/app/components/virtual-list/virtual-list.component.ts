@@ -6,9 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { NgTemplateOutlet } from "@angular/common";
 import {
-  ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, ElementRef, type Signal, type WritableSignal, afterEveryRender, computed, contentChild, effect, inject, input, output,
+  ChangeDetectionStrategy, Component, DOCUMENT, DestroyRef, ElementRef, type Signal, type WritableSignal, afterEveryRender, computed, contentChild, effect, inject, input, output,
   signal, untracked, viewChild, viewChildren
 } from "@angular/core";
 
@@ -16,6 +17,7 @@ import "@noldova/teamrun-foundation-core";
 
 import { Resources } from "../../../resources";
 import { ButtonVariant } from "../../enums/button-variant";
+import { VirtualListAlign } from "../../enums/virtual-list-align";
 import { VirtualListKind } from "../../enums/virtual-list-kind";
 import type { IVirtualListObserver } from "../../interfaces/i-virtual-list-observer";
 import { VirtualListAnchor } from "../../models/virtual-list-anchor";
@@ -43,7 +45,8 @@ export class VirtualListComponent<T> {
 
   private readonly id: string = `${Resources.virtualListIdPrefix}${VirtualListComponent.count++}`;
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  private readonly changeDetector: ChangeDetectorRef = inject(ChangeDetectorRef);
+  private readonly document: Document = inject(DOCUMENT);
+  private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly viewport: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("viewport");
   private readonly list: Signal<ElementRef<HTMLElement>> = viewChild.required<ElementRef<HTMLElement>>("list");
   private readonly slots: Signal<readonly ElementRef<HTMLElement>[]> = viewChildren<ElementRef<HTMLElement>>("slot");
@@ -58,11 +61,19 @@ export class VirtualListComponent<T> {
   private readonly scrollTop: WritableSignal<number> = signal(0);
   private readonly viewHeight: WritableSignal<number> = signal(0);
   private readonly focusIndex: WritableSignal<number | null> = signal(null);
+  private readonly isFocused: WritableSignal<boolean> = signal(false);
+  private readonly isFailing: Signal<boolean> = computed(() => this.gap()?.isFailed === true);
+  private readonly isFocusWaiting: Signal<boolean> = computed(() => {
+    const { cache } = this.state();
+    cache.revision();
+    const focus = this.focusIndex();
+    return this.isFocused() && !Object.isNull(focus) && Object.isUndefined(cache.itemAt(focus));
+  });
   private anchor: VirtualListAnchor = new VirtualListAnchor(0, 0);
   private endDistance: number = 0;
   private pendingTop: number | null = null;
+  private domTop: number = 0;
   private isFocusPending: boolean = false;
-  private hasFocus: boolean = false;
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly variants: typeof ButtonVariant = ButtonVariant;
@@ -75,12 +86,9 @@ export class VirtualListComponent<T> {
   });
   protected readonly range: Signal<VirtualRange> = computed(() => this.rangeFor(Resources.virtualListOverscan), { equal: (a, b) => a.equals(b) });
   protected readonly stop: Signal<number | null> = computed(() => {
-    const { source, cache } = this.state();
-    cache.revision();
-    const count = source.length();
-    const selected = this.selected();
-    const found = Object.isNull(selected) ? -1 : cache.findIndex(t => source.keyOf(t) === selected);
-    const fallback = this.isFeed() && this.isFollowing() ? count - 1 : Math.max(0, found);
+    const count = this.state().source.length();
+    const selected = this.isFeed() ? null : this.selected();
+    const fallback = this.isFeed() && this.isFollowing() ? count - 1 : selected ?? 0;
     return count === 0 ? null : Math.min(this.focusIndex() ?? fallback, count - 1);
   });
   protected readonly rows: Signal<readonly VirtualListRow<T>[]> = computed(() => {
@@ -97,7 +105,7 @@ export class VirtualListComponent<T> {
       const item = cache.itemAt(index);
       const key = Object.isUndefined(item) ? undefined : source.keyOf(item);
       const top = index < range.start || index >= range.end ? ledger.offsetOf(index) : null;
-      return new VirtualListRow(this.id, index, item, key, top, ledger.heightOf(index), index === stop, !Object.isUndefined(key) && key === selected);
+      return new VirtualListRow(this.id, index, item, key, top, ledger.heightOf(index), index === stop, index === selected);
     });
   });
   protected readonly gap: Signal<VirtualListGap | null> = computed(() => {
@@ -117,9 +125,9 @@ export class VirtualListComponent<T> {
   public readonly source = input.required<VirtualListSource<T>>();
   public readonly label = input.required<string>();
   public readonly kind = input<VirtualListKind>(VirtualListKind.Options);
-  public readonly selected = input<string | null>(null);
+  public readonly selected = input<number | null>(null);
   public readonly position = input<VirtualListPosition | null>(null);
-  public readonly activated = output<T>();
+  public readonly activated = output<number>();
   public readonly positionChange = output<VirtualListPosition>();
   public readonly failed = output<unknown>();
 
@@ -127,6 +135,7 @@ export class VirtualListComponent<T> {
     inject(DestroyRef).onDestroy(() => this.observer.disconnect());
     effect(onCleanup => {
       const state = this.state();
+      state.cache.attach();
       state.source.observe(this.follower);
       untracked(() => this.reset());
       onCleanup(() => {
@@ -136,11 +145,24 @@ export class VirtualListComponent<T> {
     });
     effect(() => {
       const wanted = this.rangeFor(Resources.virtualListOverscan + Resources.virtualListPrefetch);
-      untracked(() => this.state().cache.request(wanted.start, wanted.end));
+      const focus = this.focusIndex();
+      untracked(() => {
+        const { cache } = this.state();
+        cache.keep(focus);
+        cache.request(wanted.start, wanted.end);
+      });
     });
     effect(() => {
       this.state().cache.revision();
       untracked(() => this.resolve());
+    });
+    effect(() => {
+      if (this.isFailing())
+        void this.announcer.announce(Resources.virtualListFailed, Resources.assertiveAnnouncement);
+    });
+    effect(() => {
+      if (this.isFocusWaiting())
+        void this.announcer.announce(Resources.virtualListLoading, Resources.politeAnnouncement);
     });
     afterEveryRender({ write: () => this.settle() });
   }
@@ -151,10 +173,23 @@ export class VirtualListComponent<T> {
       this.moveTo(stop);
   }
 
+  public reveal(index: number, align: VirtualListAlign): void {
+    const count = this.state().source.length();
+    if (count > 0)
+      this.show(Math.min(Math.max(0, index), count - 1), align);
+  }
+
   protected onScroll(): void {
     const viewport = this.viewport().nativeElement;
     const top = viewport.scrollTop;
-    if (!Object.isNull(this.pendingTop) || Math.abs(top - this.scrollTop()) < 1)
+    const moved = top - this.domTop;
+    this.domTop = top;
+    if (!Object.isNull(this.pendingTop)) {
+      if (moved !== 0)
+        this.scrollTo(this.pendingTop + moved);
+      return;
+    }
+    if (Math.abs(top - this.scrollTop()) < 1)
       return;
     this.follow(viewport.scrollHeight - viewport.clientHeight - top);
     this.anchor = this.state().ledger.anchorAt(top);
@@ -162,28 +197,28 @@ export class VirtualListComponent<T> {
     this.tell();
   }
 
-  protected enter(event: FocusEvent): void {
-    this.focusIndex.set(VirtualListComponent.indexOf(event));
-    this.hasFocus = true;
+  protected enter(index: number): void {
+    this.focusIndex.set(index);
+    this.isFocused.set(true);
   }
 
   protected leave(event: FocusEvent): void {
-    if (this.host.contains(event.relatedTarget as Node | null))
+    if (event.relatedTarget instanceof Node && this.host.contains(event.relatedTarget))
       return;
-    const target = event.target as Element;
+    const { target } = event;
     queueMicrotask(() => {
-      this.hasFocus = !target.isConnected;
+      this.isFocused.set(target instanceof Node && !target.isConnected);
     });
   }
 
-  protected press(event: KeyboardEvent): void {
+  protected press(event: KeyboardEvent, index: number): void {
+    const from = this.focusIndex() ?? index;
     if (this.isFeed()) {
-      this.pressInFeed(event);
+      this.pressInFeed(event, from);
       return;
     }
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
       return;
-    const from = this.focusIndex() ?? VirtualListComponent.indexOf(event);
     if (event.key === Resources.enterKey || event.key === Resources.spaceKey) {
       event.preventDefault();
       this.choose(from);
@@ -193,9 +228,8 @@ export class VirtualListComponent<T> {
   }
 
   protected choose(index: number): void {
-    const item = this.state().cache.itemAt(index);
-    if (!this.isFeed() && !Object.isUndefined(item))
-      this.activated.emit(item);
+    if (!this.isFeed() && !Object.isUndefined(this.state().cache.itemAt(index)))
+      this.activated.emit(index);
   }
 
   protected retry(): void {
@@ -210,11 +244,7 @@ export class VirtualListComponent<T> {
     this.isFocusPending = true;
   }
 
-  private static indexOf(event: Event): number {
-    return Number(((event.target as Element).closest(Resources.virtualListRowSelector) as HTMLElement).dataset[Resources.virtualListRowKey]);
-  }
-
-  private pressInFeed(event: KeyboardEvent): void {
+  private pressInFeed(event: KeyboardEvent, from: number): void {
     if (event.altKey || event.metaKey || event.shiftKey)
       return;
     if (event.ctrlKey) {
@@ -224,10 +254,9 @@ export class VirtualListComponent<T> {
       }
       return;
     }
-    const from = this.focusIndex() ?? VirtualListComponent.indexOf(event);
     if (event.key === Resources.pageDownKey || event.key === Resources.pageUpKey)
       this.go(event, event.key === Resources.pageDownKey ? from + 1 : from - 1);
-    else if ((event.target as Element).classList.contains(Resources.virtualListRowClass))
+    else if (event.target === event.currentTarget)
       this.go(event, this.targetOf(event.key, from));
   }
 
@@ -240,7 +269,7 @@ export class VirtualListComponent<T> {
 
   private focusBeside(isAfter: boolean): void {
     const list = this.list().nativeElement;
-    const tabbable = [...document.querySelectorAll<HTMLElement>(Resources.virtualListTabbableSelector)]
+    const tabbable = [...this.document.querySelectorAll<HTMLElement>(Resources.virtualListTabbableSelector)]
       .filter(t => t.tabIndex >= 0 && !list.contains(t) && !t.matches(":disabled") && t.checkVisibility({ visibilityProperty: true }));
     const target = isAfter
       ? tabbable.find(t => (list.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
@@ -342,19 +371,39 @@ export class VirtualListComponent<T> {
     return this.isFollowing() ? Math.max(0, ledger.total - this.viewHeight() - this.endDistance) : ledger.topOf(this.anchor);
   }
 
-  private moveTo(index: number): void {
+  private alignedTop(index: number, align: VirtualListAlign): number {
+    const { ledger } = this.state();
+    return Math.min(Math.max(0, this.wantedTop(index, align)), Math.max(0, ledger.total - this.viewHeight()));
+  }
+
+  private wantedTop(index: number, align: VirtualListAlign): number {
     const { ledger } = this.state();
     const top = ledger.offsetOf(index);
     const bottom = top + ledger.heightOf(index);
+    const view = this.viewHeight();
     const scrollTop = this.scrollTop();
-    const target = top < scrollTop ? top : bottom > scrollTop + this.viewHeight() ? Math.min(top, bottom - this.viewHeight()) : null;
-    if (!Object.isNull(target)) {
-      this.follow(ledger.total - this.viewHeight() - target);
-      this.scrollTo(target);
+    switch (align) {
+      case VirtualListAlign.Start:
+        return top;
+      case VirtualListAlign.Center:
+        return (top + bottom - view) / 2;
+      case VirtualListAlign.End:
+        return bottom - view;
+      default:
+        return top < scrollTop ? top : Math.max(scrollTop, Math.min(top, bottom - view));
     }
+  }
+
+  private show(index: number, align: VirtualListAlign): void {
+    const top = this.alignedTop(index, align);
+    this.follow(this.state().ledger.total - this.viewHeight() - top);
+    this.scrollTo(top);
+  }
+
+  private moveTo(index: number): void {
+    this.show(index, VirtualListAlign.Nearest);
     this.focusIndex.set(index);
     this.isFocusPending = true;
-    this.changeDetector.markForCheck();
   }
 
   private scrollTo(top: number): void {
@@ -371,7 +420,8 @@ export class VirtualListComponent<T> {
   private measure(entries: readonly ResizeObserverEntry[]): void {
     const { ledger, cache } = this.state();
     const viewport = this.viewport().nativeElement;
-    const range = this.range();
+    if (viewport.getClientRects().length === 0)
+      return;
     let isChanged = false;
     for (const { target } of entries) {
       if (target === viewport) {
@@ -379,14 +429,15 @@ export class VirtualListComponent<T> {
         isChanged = true;
         continue;
       }
-      const index = Number((target as HTMLElement).dataset[Resources.virtualListRowKey]);
-      if (index >= range.start && index < range.end && !Object.isUndefined(cache.itemAt(index)))
+      const index = Number(target.getAttribute(Resources.virtualListRowAttribute));
+      if (!Object.isUndefined(cache.itemAt(index)))
         isChanged = ledger.measure(index, target.getBoundingClientRect().height) || isChanged;
     }
     if (!isChanged)
       return;
     const top = this.targetTop();
     viewport.scrollTop = top;
+    this.domTop = viewport.scrollTop;
     this.pendingTop = top;
     this.scrollTop.set(top);
     this.layout.update(t => t + 1);
@@ -397,13 +448,17 @@ export class VirtualListComponent<T> {
     this.observe([viewport, ...this.slots().map(t => t.nativeElement)]);
     if (!Object.isNull(this.pendingTop)) {
       viewport.scrollTop = this.pendingTop;
+      this.domTop = viewport.scrollTop;
       this.pendingTop = null;
     }
     const stop = this.stop();
-    if (Object.isNull(stop) || !(this.isFocusPending || this.hasFocus && !this.host.contains(document.activeElement)))
+    if (Object.isNull(stop))
+      return;
+    const row = viewport.querySelector<HTMLElement>(Resources.formatVirtualListRowSelector(stop));
+    if (Object.isNull(row) || !(this.isFocusPending || this.isFocused() && !row.contains(this.document.activeElement)))
       return;
     this.isFocusPending = false;
-    (viewport.querySelector(Resources.formatVirtualListRowSelector(stop)) as HTMLElement).focus({ preventScroll: true });
+    row.focus({ preventScroll: true });
   }
 
   private observe(elements: readonly Element[]): void {

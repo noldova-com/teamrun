@@ -11,12 +11,14 @@ export class CommandLineNames {
   public static readonly commands: string = "commands";
   public static readonly run: string = "run";
   public static readonly open: string = "open";
+  public static readonly quit: string = "quit";
   public static readonly help: string = "help";
   public static readonly ownCommands: readonly string[] = [
     CommandLineNames.status,
     CommandLineNames.commands,
     CommandLineNames.run,
     CommandLineNames.open,
+    CommandLineNames.quit,
     CommandLineNames.help
   ];
 

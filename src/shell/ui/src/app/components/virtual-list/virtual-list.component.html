@@ -8,7 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 <div #viewport class="tr-virtual-list-viewport" (scroll)="onScroll()">
   <div #list class="tr-virtual-list-rows" [attr.role]="isFeed() ? 'feed' : 'listbox'" [attr.aria-label]="label()" [attr.aria-busy]="gap()?.isFailed === false"
-    [style.padding-top.px]="range().top" [style.padding-bottom.px]="range().bottom" (keydown)="press($event)" (focusin)="enter($event)" (focusout)="leave($event)">
+    [style.padding-top.px]="range().top" [style.padding-bottom.px]="range().bottom" (focusout)="leave($event)">
     @for (row of rows(); track row.track) {
       <div #slot class="tr-virtual-list-slot" [attr.data-tr-row]="row.index" [class.tr-virtual-list-slot-outside]="row.top !== null" [style.top.px]="row.top"
         [style.height.px]="row.context ? null : row.height">
@@ -16,7 +16,8 @@ LICENSE file in the root directory of this source tree.
           [attr.role]="isFeed() ? 'article' : 'option'" [attr.aria-selected]="isFeed() ? null : row.isSelected"
           [attr.aria-labelledby]="isFeed() && row.context ? row.labelId : null" [attr.aria-describedby]="isFeed() && row.context && rowTemplate().described() ? row.descriptionId : null"
           [attr.aria-posinset]="row.index + 1" [attr.aria-setsize]="state().source.length()" [attr.aria-hidden]="row.context || row.isStop ? null : true"
-          [attr.tabindex]="row.isStop ? 0 : row.context ? -1 : null" (click)="choose(row.index)">
+          [attr.tabindex]="row.isStop ? 0 : row.context ? -1 : null" (focusin)="enter(row.index)" (keydown)="press($event, row.index)"
+          (click)="choose(row.index)">
           @if (row.context; as context) {
             <ng-container *ngTemplateOutlet="rowTemplate().template; context: context" />
           }
@@ -25,7 +26,7 @@ LICENSE file in the root directory of this source tree.
     }
   </div>
 </div>
-<div class="tr-virtual-list-status" role="status" [class.tr-virtual-list-edge-end]="gap()?.isAtStart === false" [class.tr-virtual-list-status-shown]="gap()?.isFailed === false">
+<div class="tr-virtual-list-status" [class.tr-virtual-list-edge-end]="gap()?.isAtStart === false" [class.tr-virtual-list-status-shown]="gap()?.isFailed === false">
   @if (gap()?.isFailed === false) {
     {{ resources.virtualListLoading }}
   }

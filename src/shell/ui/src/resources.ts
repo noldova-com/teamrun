@@ -404,6 +404,7 @@ export class Resources {
   public static readonly blurEvent: "blur" = "blur";
   public static readonly treeItemSelector: string = "[role=treeitem]";
   public static readonly politeAnnouncement: AriaLivePoliteness = "polite";
+  public static readonly assertiveAnnouncement: AriaLivePoliteness = "assertive";
   public static readonly treeHoverOpenDelay: number = 500;
   public static readonly treeGhostOffset: number = 12;
   public static readonly treeScrollStep: number = 8;
@@ -417,9 +418,7 @@ export class Resources {
   public static readonly virtualListCapacity: number = 150;
   public static readonly virtualListOverscan: number = 600;
   public static readonly virtualListPrefetch: number = 400;
-  public static readonly virtualListRowSelector: string = "[data-tr-row]";
-  public static readonly virtualListRowKey: string = "trRow";
-  public static readonly virtualListRowClass: string = "tr-virtual-list-row";
+  public static readonly virtualListRowAttribute: string = "data-tr-row";
   public static readonly virtualListLoading: string = "Loading…";
   public static readonly virtualListFailed: string = "These items couldn't load.";
   public static readonly virtualListRetry: string = "Retry";

@@ -57,6 +57,6 @@ describe("GalleryFeedSource", () => {
     source.extendReply(index, "build");
     const [reply] = await source.readAsync(index, index + 1);
 
-    expect([index, source.length(), empty, reply?.heading, reply?.text, reply?.code, changes]).toEqual([10, 11, "", "TeamRun · message 11", "the build", null, ["inserted 10 1", "updated 10 1", "updated 10 1"]]);
+    expect([index, source.length(), empty, reply?.heading, reply?.text, reply?.code, changes]).toEqual([10, 11, "", "Assistant · message 11", "the build", null, ["inserted 10 1", "updated 10 1", "updated 10 1"]]);
   });
 });
