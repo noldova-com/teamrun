@@ -6275,26 +6275,30 @@ export declare class UpdateCheckLock implements IUpdateCheckLock {
 }
 
 /**
- * Checks that a Windows update carries a valid signature by the publisher, with electron-updater's check; a check
- * that warns, such as one that skips itself because PowerShell does not answer, or that fails, counts as failed.
+ * Checks that a Windows update carries a valid signature by the publisher. It reads the signature with Windows
+ * PowerShell's `Get-AuthenticodeSignature`, started by its full path without a shell and without the caller's
+ * `PSModulePath`, and passes it only when it is valid, belongs to the file and its signer's distinguished name holds
+ * every field of the publisher's; any other answer, an unreadable one or a failed or timed-out PowerShell counts as
+ * failed, with one line saying why.
  */
 export declare class PublisherCheck {
   /**
    * Creates the check.
    *
    * @param publisher The publisher's distinguished name.
-   * @param verifyAsync electron-updater's signature check.
-   * @param log Records each check, its duration and its result.
+   * @param command Runs PowerShell.
+   * @param environment Supplies `SystemRoot` and the rest of PowerShell's environment.
+   * @param log Records each check, its duration and its result, in one line.
    * @param now Gives the time in milliseconds.
    * @example
    * ```ts
-   * import { verifySignature } from "electron-updater/out/windowsExecutableCodeSignatureVerifier.js";
+   * import { SystemCommand } from "@noldova/teamrun-shell-runtime";
    * import { PublisherCheck } from "@noldova/teamrun-shell-desktop";
    *
-   * export const check: PublisherCheck = new PublisherCheck("CN=Noldova", verifySignature, console.log, Date.now);
+   * export const check: PublisherCheck = new PublisherCheck("CN=Noldova, O=Noldova, C=MD", new SystemCommand(), process.env, console.log, Date.now);
    * ```
    */
-  public constructor(publisher: string, verifyAsync: (publisherNames: string[], file: string, logger: Logger) => Promise<string | null>, log: (text: string) => void, now: () => number);
+  public constructor(publisher: string, command: Pick<SystemCommand, "runAsync">, environment: NodeJS.ProcessEnv, log: (text: string) => void, now: () => number);
 
   /**
    * Checks a file.

@@ -14,7 +14,6 @@ import { promisify } from "node:util";
 import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, ipcMain, net, screen, session, shell, utilityProcess } from "electron";
 import { AppImageUpdater, MacUpdater, NsisUpdater } from "electron-updater";
 import { getAppCacheDir } from "electron-updater/out/AppAdapter.js";
-import { verifySignature } from "electron-updater/out/windowsExecutableCodeSignatureVerifier.js";
 
 import "@noldova/teamrun-foundation-core";
 import { ChildProcessStarter, ProcessPresence, ProductInfo, RuntimeBuild, RuntimeLauncher, SystemCommand } from "@noldova/teamrun-shell-runtime";
@@ -93,7 +92,7 @@ DesktopApplication.start(
     const adapter = new ProductAppAdapter();
     const updater = process.platform === Resources.windowsPlatform ? new NsisUpdater(undefined, adapter)
       : process.platform === Resources.macPlatform ? new MacUpdater(undefined, adapter) : new AppImageUpdater(undefined, adapter);
-    const check = new PublisherCheck(product.windowsPublisher, verifySignature, log, Date.now);
+    const check = new PublisherCheck(product.windowsPublisher, new SystemCommand(), process.env, log, Date.now);
     return new FeedUpdater(updater, source, installation.folder, getAppCacheDir(), product.slug, updater instanceof NsisUpdater ? t => check.checkAsync(t) : null, log);
   },
   (installation, log) => new UpdateCheckLock(installation.folder, async () => (await presence.stampAsync([[process.pid, Resources.clientName]]))[0] ?? null, t => presence.isRunningAsync(t), log));
