@@ -245,7 +245,7 @@ export class Resources {
   public static readonly appImageVariables: readonly string[] = ["APPIMAGE", "APPDIR", "ARGV0", "OWD"];
   public static readonly appImageFolderVariable: string = "APPDIR";
   public static readonly appRunPathVariables: readonly (readonly [string, readonly string[], readonly string[]])[] = [
-    ["PATH", ["", "/usr/sbin"], []],
+    ["PATH", [String.empty, "/usr/sbin"], []],
     ["XDG_DATA_DIRS", ["/usr/share/"], ["/usr/share/gnome", "/usr/local/share/", "/usr/share/"]],
     ["LD_LIBRARY_PATH", ["/usr/lib"], []],
     ["GSETTINGS_SCHEMA_DIR", ["/usr/share/glib-2.0/schemas"], []]

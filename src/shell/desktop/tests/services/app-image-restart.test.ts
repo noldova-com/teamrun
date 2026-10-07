@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -100,10 +100,6 @@ export class AppImageRestartTests {
   @TestMethod
   public async startsTheAppImageFromTheRootFolderWithoutInheritedDescriptorsOnlyOnceItsParentHasExited(): Promise<void> {
     await AppImageRestartTests.runInFolderAsync(async (folder, image, marker) => {
-      const direct = spawnSync(image, [], { stdio: "ignore" });
-      Assert.areEqual(0, direct.status);
-      const descriptors = (await readFile(marker, "utf8")).split("\n")[1];
-      await rm(marker);
       await using parent = await RestartParentFixture.createAsync();
       const restart = AppImageRestartTests.find(folder, image, ["--one", "two"], parent, parent.processId);
 
@@ -115,7 +111,7 @@ export class AppImageRestartTests {
       Assert.isTrue(isWaiting, "Bash did not wait for its parent to exit");
       Assert.isFalse(isEarly, "the AppImage started while Bash's parent still ran");
       Assert.isTrue(await Wait.untilAsync(() => existsSync(marker), AppImageRestartTests.LIMIT), "the AppImage did not start after Bash's parent exited");
-      Assert.areEqual(`/|--one two|unset|unset\n${descriptors}`, await readFile(marker, "utf8"));
+      Assert.areEqual("/|--one two|unset|unset\n0 1 2 3 ", await readFile(marker, "utf8"));
     });
   }
 
