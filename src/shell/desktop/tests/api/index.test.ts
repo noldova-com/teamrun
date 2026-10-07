@@ -30,6 +30,7 @@ export class DesktopApiTests {
         "DeviceIdentity",
         "DeviceIdentityException",
         "DeviceState",
+        "InstallerStart",
         "LinkPolicy",
         "MainProcessFailureKind",
         "MainProcessRecovery",
