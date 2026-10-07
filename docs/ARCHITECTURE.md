@@ -1174,7 +1174,9 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
   After downloading, it checks the file's size and SHA-512 against it.
   On Windows the installer must also carry a valid signature by TeamRun's publisher, the `windowsPublisher` of `teamrun.product`, and no other.
-  The desktop runs electron-updater's signature check itself on every download, with the publisher from the application's product file and never from a file the person can change; a check that warns, such as one that skips itself because PowerShell doesn't answer in time, or that fails, counts as a failed check, and the desktop log records each check's duration and result.
+  The desktop runs its own signature check on every download, with the publisher from the application's product file and never from a file the person can change.
+  It reads the signature with Windows PowerShell's `Get-AuthenticodeSignature`, started by its full path without a shell and without the caller's `PSModulePath`, and passes only a valid signature of that file whose signer's distinguished name holds every field of the publisher's.
+  Any other answer, an unreadable one, or a PowerShell that fails or doesn't answer in time counts as a failed check, and the desktop log records each check's duration and result in one line.
   A file that fails is deleted, or the log says why it could not be, and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher; any other error shows as the update stopping on an unexpected error.
   The update stop's handoff checks the publisher again right before it starts the installer.
   Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
