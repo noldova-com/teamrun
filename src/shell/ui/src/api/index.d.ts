@@ -4609,12 +4609,14 @@ export declare class VirtualListChoice<T> {
  * are added or grow, until the person scrolls towards the start beyond the
  * last 120px; scrolling back within 120px of the end, with the newest rows
  * loaded, follows again, and a Jump to latest button shows while it doesn't
- * follow. Page Down and Page Up, and Down and Up while an article itself has
- * focus, move to the next and previous article; Home and End go to the
- * first and last; Ctrl+Home and Ctrl+End move the focus to before and after
- * the feed, and Tab enters an article's own controls. It is one Tab stop,
- * which returns to the article last focused, or lands on the last article
- * while it follows its end, or on the first.
+ * follow. Page Down and Page Up move to the next and previous article from
+ * anywhere in one; while an article itself has focus, Down and Up do too,
+ * and Home and End go to the first and last, so controls inside an article
+ * keep their keys. Ctrl+Home and Ctrl+End move the focus to before and
+ * after the feed, and Tab enters an article's own controls. It is one Tab
+ * stop, which returns to the article last focused, or lands on the last
+ * article while it follows its end, or else on the first loaded article in
+ * view, where the person reads.
  *
  * While rows in view load, either kind says so in a status line, and
  * announces it while the focused row waits for its items; when a read
@@ -4639,8 +4641,10 @@ export declare class VirtualListComponent<T> {
 
   /**
    * The list's pattern, an options list or a feed;
-   * {@link VirtualListKind.Options} when not bound. The list reads it when
-   * it starts with a source.
+   * {@link VirtualListKind.Options} when not bound. The list takes a change
+   * at once, but a feed opens at its end or at its
+   * {@link VirtualListComponent.position} only when it starts with a
+   * source.
    */
   public readonly kind: InputSignal<VirtualListKind>;
 

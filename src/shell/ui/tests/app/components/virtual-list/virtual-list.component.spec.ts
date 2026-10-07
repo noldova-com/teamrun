@@ -368,6 +368,23 @@ describe("VirtualListComponent", () => {
     expect([decoding, heightOf("picture 1"), Math.round(offsetOfArticle("item 2"))]).toEqual([[200, 226, 1], 26, 52]);
   });
 
+  it("stops following a scroll towards the start made while a correction waits for the next frame, and tells where the person reads", async () => {
+    const source = numbered(1000);
+    await renderFeedAsync(source);
+
+    source.insert(1000, ["new 0"]);
+    viewport().scrollTop -= 300;
+    viewport().dispatchEvent(new Event("scroll"));
+    await settleAsync();
+    const top = viewport().getBoundingClientRect().top;
+    const reading = articles().find(t => t.getBoundingClientRect().bottom > top)?.querySelector(".label")?.textContent;
+    const position = feed.positions.at(-1);
+    source.insert(1001, ["new 1"]);
+    await settleAsync();
+
+    expect([isJumpShown(), fromEnd() > 250, position?.key]).toEqual([true, true, reading]);
+  });
+
   it("follows a scroll made while a correction waits for the next frame", async () => {
     const source = numbered(1000);
     await renderAsync(source);
@@ -597,7 +614,7 @@ describe("VirtualListComponent", () => {
     expect([stopped, Math.round(fromEnd()), isJumpShown()]).toEqual([[true, true], 100, false]);
   });
 
-  it("follows again only once its newest rows have loaded", async () => {
+  it("follows again once its newest rows load while its view is within 120px of the end, without another scroll", async () => {
     const source = new VirtualListSourceFixture(200, 30);
     await renderFeedAsync(source, new VirtualListPosition(150, null, 0));
     const opened = isJumpShown();
@@ -607,9 +624,19 @@ describe("VirtualListComponent", () => {
     for (const read of source.reads.filter(t => !t.abort.aborted && !t.isSettled))
       await read.answerAsync();
     await settleAsync();
-    await scrollAsync(viewport().scrollTop - 10);
 
-    expect([opened, unloaded, isJumpShown()]).toEqual([true, true, false]);
+    expect([opened, unloaded, isJumpShown(), articleStops()]).toEqual([true, true, false, ["200"]]);
+  });
+
+  it("follows its end when it opens at a saved position within 120px of it", async () => {
+    const source = numbered(1000);
+    await renderFeedAsync(source, new VirtualListPosition(987, null, 0));
+    const opened = Math.round(fromEnd());
+
+    source.insert(1000, ["new 0"]);
+    await settleAsync();
+
+    expect([isJumpShown(), Math.round(fromEnd()) === opened, articleStops()]).toEqual([false, true, ["1001"]]);
   });
 
   it("scrolls to its end, follows it and focuses the last article when Jump to latest is chosen", async () => {
@@ -630,7 +657,7 @@ describe("VirtualListComponent", () => {
     await renderFeedAsync(numbered(1000), new VirtualListPosition(300, "gone", 0));
     const byIndex = Math.round(offsetOfArticle("item 300"));
 
-    expect([byKey, byIndex]).toEqual([[-10, true, ["1"]], 0]);
+    expect([byKey, byIndex]).toEqual([[-10, true, ["501"]], 0]);
   });
 
   it("emits where the person reads as they scroll, with the key of the row at the top when it has loaded", async () => {

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { LiveAnnouncer } from "@angular/cdk/a11y";
 import { ChangeDetectionStrategy, Component, DestroyRef, inject } from "@angular/core";
 
 import { ButtonVariant } from "../../enums/button-variant";
@@ -28,6 +29,7 @@ import { GallerySpecimenComponent } from "./gallery-specimen.component";
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GalleryFeedComponent {
+  private readonly announcer: LiveAnnouncer = inject(LiveAnnouncer);
   private readonly timers: Set<ReturnType<typeof setInterval>> = new Set();
 
   protected readonly text: typeof GalleryResources.text = GalleryResources.text;
@@ -48,12 +50,13 @@ export class GalleryFeedComponent {
     const { feedWords } = this.text;
     let step = 0;
     const timer = setInterval(() => {
-      this.messages.extendReply(index, String(feedWords[step % feedWords.length]));
+      const reply = this.messages.extendReply(index, String(feedWords[step % feedWords.length]));
       step++;
       if (step < GalleryResources.feedReplyWords)
         return;
       clearInterval(timer);
       this.timers.delete(timer);
+      void this.announcer.announce(GalleryResources.formatFeedReply(reply.heading, reply.text), GalleryResources.feedReplyPoliteness);
     }, GalleryResources.feedReplyInterval);
     this.timers.add(timer);
   }

@@ -39,10 +39,12 @@ export class GalleryFeedSource extends VirtualListSource<GalleryMessage> {
     return index;
   }
 
-  public extendReply(index: number, word: string): void {
+  public extendReply(index: number, word: string): GalleryMessage {
     const reply = this.messageAt(index);
-    this.replies.set(index, reply.withText(reply.text === String.empty ? word : `${reply.text} ${word}`));
+    const extended = reply.withText(reply.text === String.empty ? word : `${reply.text} ${word}`);
+    this.replies.set(index, extended);
     this.reportUpdated(index, 1);
+    return extended;
   }
 
   private static generate(index: number): GalleryMessage {

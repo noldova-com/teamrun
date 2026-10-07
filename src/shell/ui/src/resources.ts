@@ -419,7 +419,7 @@ export class Resources {
   public static readonly virtualListOverscan: number = 600;
   public static readonly virtualListPrefetch: number = 400;
   public static readonly virtualListRowAttribute: string = "data-tr-row";
-  public static readonly virtualListImageSelector: string = "img";
+  public static readonly virtualListImageTag: "img" = "img";
   public static readonly virtualListLoading: string = "Loading…";
   public static readonly virtualListFailed: string = "These items couldn't load.";
   public static readonly virtualListRetry: string = "Retry";
