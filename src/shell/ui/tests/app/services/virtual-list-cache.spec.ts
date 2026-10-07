@@ -144,7 +144,6 @@ describe("VirtualListCache", () => {
     source.readError = thrown;
 
     expect(() => cache.request(0, 50)).not.toThrow();
-    await Promise.resolve();
     source.readError = null;
     const failed = [cache.isFailed(0), errors];
     cache.retry();
@@ -216,6 +215,18 @@ describe("VirtualListCache", () => {
     expect([later, earlier]).toEqual([[true, true, revision + 1], [false, undefined, "item 0", "item 49", undefined]]);
     expect([cache.itemAt(9), cache.itemAt(10), cache.itemAt(44), cache.itemAt(45)]).toEqual(["item 9", "item 15", "item 49", undefined]);
     expect(source.describeReads()).toEqual(["0-50", "50-100", "100-150 aborted"]);
+  });
+
+  it("goes on reading a page that ends before an insert or a remove", async () => {
+    const source = new VirtualListSourceFixture(200);
+    const cache = createCache(source);
+    cache.request(0, 100);
+
+    source.reportInserted(60, 1);
+    source.reportRemoved(150, 1);
+    await source.readAt(0).answerAsync();
+
+    expect([source.describeReads(), cache.itemAt(49)]).toEqual([["0-50", "50-100 aborted"], "item 49"]);
   });
 
   it("moves a changed item it holds outside the request with the items inserted before it, and forgets it once it is removed", async () => {
