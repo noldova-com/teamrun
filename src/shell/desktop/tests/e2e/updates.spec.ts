@@ -78,6 +78,7 @@ const expectNewRuntimeAsync = async (desktop: DesktopApplicationFixture, previou
     const current = await desktop.readRuntimeProcessIdAsync();
     return current !== undefined && current !== previous && DesktopApplicationFixture.isAlive(current);
   }, { timeout: 30_000 }).toBe(true);
+  await expect.poll(async () => (await PageBridgeFixture.evaluateAsync(desktop.window, t => t.readStartup()))?.kind, { timeout: 30_000 }).toBe("Ready");
 };
 
 const acceptHandoffFailureAsync = async (desktop: DesktopApplicationFixture, reason: string): Promise<void> => {
