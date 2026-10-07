@@ -264,7 +264,7 @@ class PackageTests {
       });
 
     test("--signed signs and notarizes a macOS package with the certificate and the App Store Connect key that only electron-builder receives, the key in a private file "
-      + "that is removed afterwards, then checks the app in the disk image and in the archive", { timeout: PackageTests.TIMEOUT }, async t => {
+      + "that is removed afterwards, notarizes and staples the disk image, then checks the disk image and the app in it and in the archive", { timeout: PackageTests.TIMEOUT }, async t => {
         const repository = await PackageTests.createAsync(t);
         const made = ["Fixture Studio-macos-arm64.dmg", "Fixture Studio-macos-arm64.zip"];
         const succeeded = new ProcessResult(0, "", "");
@@ -274,7 +274,8 @@ class PackageTests {
           new ProcessResult(0, "accepted\nsource=Notarized Developer ID\n", ""),
           new ProcessResult(0, "The validate action worked!\n", "")
         ];
-        const builder = new KeyWitnessFixture(made, [], null, [succeeded, ...checks, succeeded, succeeded, ...checks]);
+        const accepted = new ProcessResult(0, "{\"id\":\"fixture-submission\",\"status\":\"Accepted\",\"message\":\"Processing complete\"}\n", "");
+        const builder = new KeyWitnessFixture(made, [], null, [accepted, succeeded, ...checks, succeeded, ...checks, succeeded, succeeded, ...checks]);
         const output = new TextOutputFixture();
         const environment: NodeJS.ProcessEnv = { ...PackageTests.CREDENTIALS, ...PackageTests.MAC_CREDENTIALS, HOME: "fixture-home" };
 
@@ -286,7 +287,10 @@ class PackageTests {
         const check = path.join(signing, "check");
         const files = made.map(t => path.join(folder, "out", t));
         const app = (index: number): string => path.join(check, String(index), "Fixture Studio.app");
-        const configuration = JSON.parse(await readFile(path.join(folder, "electron-builder.json"), "utf8")) as { readonly mac: Readonly<Record<string, unknown>> };
+        const configuration = JSON.parse(await readFile(path.join(folder, "electron-builder.json"), "utf8")) as {
+          readonly mac: Readonly<Record<string, unknown>>;
+          readonly dmg: Readonly<Record<string, unknown>>;
+        };
         assert.equal(exitCode, 0, output.text);
         assert.deepEqual(environment, { HOME: "fixture-home" });
         assert.deepEqual(builder.environments, [{
@@ -303,7 +307,15 @@ class PackageTests {
         assert.equal(existsSync(signing), false);
         assert.deepEqual(JSON.parse(await readFile(path.join(folder, "package-report.json"), "utf8")), { target: "macos-arm64", signed: true, checked: true });
         assert.equal(configuration.mac["notarize"], true);
+        assert.deepEqual(configuration.dmg, { sign: true });
         assert.deepEqual(builder.captured, [
+          ["xcrun", signing, "notarytool", "submit", files[0] ?? "", "--key", path.join(signing, "notarization-key.p8"), "--key-id", "fixture-key-id", "--issuer", "fixture-issuer",
+            "--wait", "--timeout", "1h", "--output-format", "json"],
+          ["xcrun", signing, "stapler", "staple", files[0] ?? ""],
+          ["codesign", check, "--verify", "--strict", "--verbose=2", files[0] ?? ""],
+          ["codesign", check, "--display", "--verbose=2", files[0] ?? ""],
+          ["spctl", check, "--assess", "--type", "open", "--context", "context:primary-signature", "--verbose=2", files[0] ?? ""],
+          ["xcrun", check, "stapler", "validate", files[0] ?? ""],
           ["hdiutil", check, "attach", "-readonly", "-nobrowse", "-noautoopen", "-mountpoint", path.join(check, "0"), files[0] ?? ""],
           ["codesign", check, "--verify", "--deep", "--strict", "--verbose=2", app(0)],
           ["codesign", check, "--display", "--verbose=2", app(0)],
@@ -316,34 +328,47 @@ class PackageTests {
           ["spctl", check, "--assess", "--type", "execute", "--verbose=2", app(1)],
           ["xcrun", check, "stapler", "validate", app(1)]
         ]);
-        assert.deepEqual(builder.captureEnvironments.map(t => CredentialWitnessFixture.find(t)), Array.from({ length: 11 }, () => []));
+        assert.deepEqual(builder.captureEnvironments.map(t => CredentialWitnessFixture.find(t)), Array.from({ length: 17 }, () => []));
         assert.equal(output.text, `${PackageTests.STAGED}Packages made:\n${files.map(t => `  ${t}\n`).join("")}Signatures:\n`
-          + files.map(t => `${t}: a valid Developer ID Application signature, notarized and stapled.\n`).join(""));
+          + `${files[0]}: the disk image and its app each have a valid Developer ID Application signature, notarized and stapled.\n`
+          + `${files[1]}: a valid Developer ID Application signature, notarized and stapled.\n`);
       });
 
     test("--signed is refused for macOS without every certificate and key credential before anything is staged, and a failed check still removes the key",
       { timeout: PackageTests.TIMEOUT }, async t => {
         const repository = await PackageTests.createAsync(t);
         const made = ["Fixture Studio-macos-x64.dmg", "Fixture Studio-macos-x64.zip"];
-        const builder = new BuilderFixture(made, [], null, [new ProcessResult(1, "hdiutil: attach failed\n", "")]);
-        const uncredentialed = new TextOutputFixture();
-        const unchecked = new TextOutputFixture();
+        const accepted = new ProcessResult(0, "{\"id\":\"fixture-submission\",\"status\":\"Accepted\",\"message\":\"Processing complete\"}\n", "");
+        const invalid = "{\"id\":\"fixture-submission\",\"status\":\"Invalid\",\"message\":\"Processing complete\"}";
+        const unnotarizedBuilder = new BuilderFixture(made, [], null, [new ProcessResult(0, `${invalid}\n`, "")]);
+        const unstapledBuilder = new BuilderFixture(made, [], null, [accepted, new ProcessResult(65, "", "The staple and validate action failed! Error 65.\n")]);
+        const uncheckedBuilder = new BuilderFixture(made, [], null, [accepted, new ProcessResult(0, "", ""), new ProcessResult(1, "", "code object is not signed at all\n"),
+          new ProcessResult(0, "", ""), new ProcessResult(3, "", "rejected\n"), new ProcessResult(65, "", "does not have a ticket stapled to it\n")]);
+        const [uncredentialed, unnotarized, unstapled, unchecked] = [1, 2, 3, 4].map(() => new TextOutputFixture());
+        assert.ok(uncredentialed !== undefined && unnotarized !== undefined && unstapled !== undefined && unchecked !== undefined);
         const empty = new BuilderFixture([]);
+        const runAsync = (builder: BuilderFixture, output: TextOutputFixture): Promise<number> =>
+          new Package(repository.directory, "darwin", "x64", PackageTests.createStage(repository), builder, { ...PackageTests.MAC_CREDENTIALS }, output, PackageTests.GALLERY).runAsync(["--signed"]);
 
         const exitCodes = [
           await new Package(repository.directory, "darwin", "x64", PackageTests.createStage(repository), empty, { MAC_CERTIFICATE: "fixture-certificate", APPLE_API_KEY_ID: "" },
             uncredentialed, PackageTests.GALLERY).runAsync(["--signed"]),
-          await new Package(repository.directory, "darwin", "x64", PackageTests.createStage(repository), builder, { ...PackageTests.MAC_CREDENTIALS }, unchecked, PackageTests.GALLERY)
-            .runAsync(["--signed"])
+          await runAsync(unnotarizedBuilder, unnotarized),
+          await runAsync(unstapledBuilder, unstapled),
+          await runAsync(uncheckedBuilder, unchecked)
         ];
 
-        const out = path.join(repository.directory, "_build", "package", "out");
-        assert.deepEqual(exitCodes, [1, 1]);
+        const image = path.join(repository.directory, "_build", "package", "out", made[0] ?? "");
+        assert.deepEqual(exitCodes, [1, 1, 1, 1]);
         assert.deepEqual(empty.runs, []);
         assert.equal(uncredentialed.text, "Signing macOS packages needs MAC_CERTIFICATE_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID, APPLE_API_ISSUER, "
           + "the Developer ID Application certificate and the App Store Connect key that notarizes.\n");
-        assert.ok(unchecked.text.endsWith(`hdiutil attach -readonly -nobrowse -noautoopen -mountpoint ${path.join(repository.directory, "_build", "package", "signing", "check", "0")} `
-          + `${path.join(out, made[0] ?? "")} failed with exit code 1:\nhdiutil: attach failed\n`), unchecked.text);
+        assert.ok(unnotarized.text.endsWith(`Apple did not notarize the disk image ${image}:\n${invalid}\n`), unnotarized.text);
+        assert.ok(unstapled.text.endsWith(`The notarization ticket could not be stapled to the disk image ${image}:\nThe staple and validate action failed! Error 65.\n`), unstapled.text);
+        assert.ok(unchecked.text.endsWith(`The disk image ${image} lacks a valid signature, a Developer ID Application signature, notarization, a stapled ticket:\n`
+          + "code object is not signed at all\n\nrejected\ndoes not have a ticket stapled to it\n"), unchecked.text);
+        assert.deepEqual([unnotarizedBuilder, unstapledBuilder, uncheckedBuilder].map(t => t.captured.length), [1, 2, 6]);
+        assert.ok(!unnotarized.text.includes("fixture-key-id") && !unnotarized.text.includes("fixture-issuer"), unnotarized.text);
         assert.equal(existsSync(path.join(repository.directory, "_build", "package", "signing")), false);
         assert.equal(existsSync(path.join(repository.directory, "_build", "package", "package-report.json")), false);
       });
