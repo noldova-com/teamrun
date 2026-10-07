@@ -70,7 +70,17 @@ export class DefaultTheme {
       ["notifications.background", "#FFFFFF"],
       ["notifications.border", "#E5E5E5"],
       ["errorForeground", "#A1260D"],
-      ["teamrun.addedForeground", "#3F6212"]
+      ["teamrun.addedForeground", "#3F6212"],
+      ["teamrun.codeCommentForeground", "#008000"],
+      ["teamrun.codeKeywordForeground", "#0000FF"],
+      ["teamrun.codeControlForeground", "#AF00DB"],
+      ["teamrun.codeStringForeground", "#A31515"],
+      ["teamrun.codeNumberForeground", "#098154"],
+      ["teamrun.codeTypeForeground", "#247A93"],
+      ["teamrun.codeFunctionForeground", "#795E26"],
+      ["teamrun.codeVariableForeground", "#001080"],
+      ["teamrun.codeRegexForeground", "#811F3F"],
+      ["teamrun.codeMetaForeground", "#800000"]
     ]),
     new Map([
       ["sideBar.background", "#181818"],
@@ -129,7 +139,17 @@ export class DefaultTheme {
       ["notifications.background", "#1F1F1F"],
       ["notifications.border", "#454545"],
       ["errorForeground", "#F48771"],
-      ["teamrun.addedForeground", "#B5CEA8"]
+      ["teamrun.addedForeground", "#B5CEA8"],
+      ["teamrun.codeCommentForeground", "#6A9955"],
+      ["teamrun.codeKeywordForeground", "#569CD6"],
+      ["teamrun.codeControlForeground", "#C586C0"],
+      ["teamrun.codeStringForeground", "#CE9178"],
+      ["teamrun.codeNumberForeground", "#B5CEA8"],
+      ["teamrun.codeTypeForeground", "#4EC9B0"],
+      ["teamrun.codeFunctionForeground", "#DCDCAA"],
+      ["teamrun.codeVariableForeground", "#9CDCFE"],
+      ["teamrun.codeRegexForeground", "#D16969"],
+      ["teamrun.codeMetaForeground", "#D7BA7D"]
     ]),
     new Map([
       ["radius-hover", "0.1875rem"],

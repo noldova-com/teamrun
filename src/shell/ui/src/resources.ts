@@ -11,6 +11,7 @@ import type { AriaLivePoliteness, FocusOrigin } from "@angular/cdk/a11y";
 
 import "@noldova/teamrun-foundation-core";
 
+import { CodeTokenKind } from "./app/enums/code-token-kind";
 import { CopyState } from "./app/enums/copy-state";
 import { DockingDirection } from "./app/enums/docking-direction";
 import { OverlayAlignment } from "./app/enums/overlay-alignment";
@@ -25,6 +26,16 @@ export class Resources {
     new ColorToken("--tr-raised", "teamrun.raisedBackground", "editorWidget.background"),
     new ColorToken("--tr-code", "teamrun.codeBackground", "sideBar.background"),
     new ColorToken("--tr-code-header", "teamrun.codeHeaderBackground", "editorWidget.background"),
+    new ColorToken("--tr-code-comment", "teamrun.codeCommentForeground"),
+    new ColorToken("--tr-code-keyword", "teamrun.codeKeywordForeground"),
+    new ColorToken("--tr-code-control", "teamrun.codeControlForeground"),
+    new ColorToken("--tr-code-string", "teamrun.codeStringForeground"),
+    new ColorToken("--tr-code-number", "teamrun.codeNumberForeground"),
+    new ColorToken("--tr-code-type", "teamrun.codeTypeForeground"),
+    new ColorToken("--tr-code-function", "teamrun.codeFunctionForeground"),
+    new ColorToken("--tr-code-variable", "teamrun.codeVariableForeground"),
+    new ColorToken("--tr-code-regex", "teamrun.codeRegexForeground"),
+    new ColorToken("--tr-code-meta", "teamrun.codeMetaForeground"),
     new ColorToken("--tr-text", "foreground"),
     new ColorToken("--tr-text-muted", "teamrun.mutedForeground", "descriptionForeground"),
     new ColorToken("--tr-icon-color", "icon.foreground", "foreground"),
@@ -341,6 +352,26 @@ export class Resources {
     [CopyState.Failed]: "Couldn't copy"
   };
   public static readonly copyFeedbackDuration: number = 2000;
+  public static readonly codeThemeName: string = "teamrun";
+  public static readonly codePlainMarker: string = "plain";
+  public static readonly codeLengthLimit: number = 100_000;
+  public static readonly codeLineLengthLimit: number = 2000;
+  public static readonly codeLoadFailureHold: number = 10_000;
+  public static readonly codeHighlightPrefix: string = "tr-code-";
+  public static readonly codePlainScopes: readonly string[] = ["keyword.operator", "punctuation"];
+  public static readonly codeTokenScopes: Readonly<Record<CodeTokenKind, readonly string[]>> = {
+    [CodeTokenKind.Comment]: ["comment", "punctuation.definition.comment"],
+    [CodeTokenKind.Keyword]: ["keyword", "storage", "constant.language", "variable.language", "keyword.operator.new", "keyword.operator.expression", "keyword.operator.word",
+      "keyword.operator.wordlike", "keyword.operator.logical.python"],
+    [CodeTokenKind.Control]: ["keyword.control"],
+    [CodeTokenKind.String]: ["string", "punctuation.definition.string", "markup.deleted"],
+    [CodeTokenKind.Number]: ["constant.numeric", "keyword.other.unit", "markup.inserted"],
+    [CodeTokenKind.Type]: ["entity.name.type", "entity.name.class", "entity.name.namespace", "entity.other.inherited-class", "support.type", "support.class"],
+    [CodeTokenKind.Function]: ["entity.name.function", "support.function"],
+    [CodeTokenKind.Variable]: ["variable", "meta.object-literal.key", "support.variable", "support.type.property-name", "entity.other.attribute-name"],
+    [CodeTokenKind.Regex]: ["string.regexp"],
+    [CodeTokenKind.Meta]: ["meta.preprocessor", "punctuation.decorator", "entity.name.tag", "markup.heading", "entity.name.section", "meta.diff.header", "meta.diff.range"]
+  };
   public static readonly selectGlyph: string = "expand_more";
   public static readonly selectListSelector: string = ".tr-select-list";
   public static readonly menuItemRole: string = "menuitem";

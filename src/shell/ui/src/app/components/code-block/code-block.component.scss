@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@use "forced-colors" as *;
+
 .tr-code-block {
   display: flex;
   flex-direction: column;
@@ -65,6 +67,61 @@
 @container scroll-state(scrollable: inline) {
   .tr-code-block-body > code {
     padding-bottom: max(0px, var(--tr-space-2) - var(--tr-scrollbar-size));
+  }
+}
+
+.tr-code-block-body > code::highlight(tr-code-comment) {
+  color: var(--tr-code-comment);
+}
+
+.tr-code-block-body > code::highlight(tr-code-keyword) {
+  color: var(--tr-code-keyword);
+}
+
+.tr-code-block-body > code::highlight(tr-code-control) {
+  color: var(--tr-code-control);
+}
+
+.tr-code-block-body > code::highlight(tr-code-string) {
+  color: var(--tr-code-string);
+}
+
+.tr-code-block-body > code::highlight(tr-code-number) {
+  color: var(--tr-code-number);
+}
+
+.tr-code-block-body > code::highlight(tr-code-type) {
+  color: var(--tr-code-type);
+}
+
+.tr-code-block-body > code::highlight(tr-code-function) {
+  color: var(--tr-code-function);
+}
+
+.tr-code-block-body > code::highlight(tr-code-variable) {
+  color: var(--tr-code-variable);
+}
+
+.tr-code-block-body > code::highlight(tr-code-regex) {
+  color: var(--tr-code-regex);
+}
+
+.tr-code-block-body > code::highlight(tr-code-meta) {
+  color: var(--tr-code-meta);
+}
+
+@include forced-colors {
+  .tr-code-block-body > code::highlight(tr-code-comment),
+  .tr-code-block-body > code::highlight(tr-code-keyword),
+  .tr-code-block-body > code::highlight(tr-code-control),
+  .tr-code-block-body > code::highlight(tr-code-string),
+  .tr-code-block-body > code::highlight(tr-code-number),
+  .tr-code-block-body > code::highlight(tr-code-type),
+  .tr-code-block-body > code::highlight(tr-code-function),
+  .tr-code-block-body > code::highlight(tr-code-variable),
+  .tr-code-block-body > code::highlight(tr-code-regex),
+  .tr-code-block-body > code::highlight(tr-code-meta) {
+    color: CanvasText;
   }
 }
 
