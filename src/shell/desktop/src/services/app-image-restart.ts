@@ -7,7 +7,7 @@
  */
 
 import "@noldova/teamrun-foundation-core";
-import { AppImageSource, type IProcessStarter } from "@noldova/teamrun-shell-runtime";
+import { AppImageSource, type IProcessStarter, ProcessLaunchCommand } from "@noldova/teamrun-shell-runtime";
 
 import { Resources } from "../resources.js";
 
@@ -24,7 +24,7 @@ export class AppImageRestart {
     this.starter = starter;
     this.image = image;
     this.launchArguments = [...launchArguments];
-    this.environment = Object.fromEntries(Object.entries(environment).filter(([name]) => !Resources.appImageVariables.includes(name)));
+    this.environment = AppImageRestart.restore(environment);
     this.processId = processId;
     this.errorFile = errorFile;
   }
@@ -36,8 +36,9 @@ export class AppImageRestart {
   }
 
   public async startAsync(): Promise<void> {
-    this.started = await this.starter.startAsync(Resources.restartShell, [...Resources.restartShellArguments, Resources.restartName, String(this.processId), this.image, ...this.launchArguments],
-      this.environment, this.errorFile);
+    const command = new ProcessLaunchCommand(Resources.linuxPlatform, Resources.restartShell,
+      [...Resources.restartShellArguments, Resources.restartName, String(this.processId), this.image, ...this.launchArguments], this.environment, null);
+    this.started = await this.starter.startAsync(command.executable, command.arguments, this.environment, this.errorFile);
   }
 
   public cancel(): void {
@@ -45,6 +46,25 @@ export class AppImageRestart {
     this.started = null;
     if (!Object.isNull(started))
       AppImageRestart.end(started);
+  }
+
+  private static restore(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    const folder = environment[Resources.appImageFolderVariable] ?? String.empty;
+    return Object.fromEntries(Object.entries(environment).flatMap(([name, value]): [string, string][] => {
+      const restored = Object.isUndefined(value) || Resources.appImageVariables.includes(name) ? null : AppImageRestart.unwrap(name, value, folder);
+      return Object.isNull(restored) ? [] : [[name, restored]];
+    }));
+  }
+
+  private static unwrap(name: string, value: string, folder: string): string | null {
+    const wrapping = Resources.appRunPathVariables.find(([variable]) => variable === name);
+    if (Object.isUndefined(wrapping))
+      return value;
+    const [, prepended, appended] = wrapping;
+    const entries = value.split(Resources.pathListSeparator);
+    const isWrapped = prepended.every((t, i) => entries[i] === `${folder}${t}`) && appended.every((t, i) => entries.at(i - appended.length) === t);
+    const kept = entries.slice(prepended.length, entries.length - appended.length);
+    return !isWrapped ? value : kept.length === 0 ? null : kept.join(Resources.pathListSeparator);
   }
 
   private static end(processId: number): void {

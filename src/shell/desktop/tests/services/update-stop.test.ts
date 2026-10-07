@@ -20,6 +20,7 @@ import { AppImageRestart, type IUpdateTarget, UpdateStop, UpdateStopException } 
 
 import { FakeProcessPresence } from "../fixtures/fake-process-presence.fixture.js";
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
+import { LinuxLaunchFixture } from "../fixtures/linux-launch.fixture.js";
 
 @TestClass
 export class UpdateStopTests {
@@ -374,6 +375,7 @@ export class UpdateStopTests {
   @TestMethod
   public startsTheAppImageRestartOnceHandedOffAndBeforeTheHandoff(): Promise<void> {
     return this.runAsync(async (installation, folder) => {
+      using _launch = new LinuxLaunchFixture();
       await this.recordAsync(installation, folder, "first");
       const steps: string[] = [];
       const restart = UpdateStopTests.createRestart(async () => {
@@ -394,6 +396,7 @@ export class UpdateStopTests {
   @TestMethod
   public endsTheAppImageRestartWhenTheHandoffFails(): Promise<void> {
     return this.runAsync(async (installation, folder) => {
+      using _launch = new LinuxLaunchFixture();
       await this.recordAsync(installation, folder, "first");
       const waiting = spawn(process.execPath, ["-e", "setInterval(() => undefined, 1000)"], { stdio: "ignore" });
       await once(waiting, "spawn");
@@ -412,6 +415,7 @@ export class UpdateStopTests {
   @TestMethod
   public failsWithoutHandingOffWhenTheAppImageRestartCannotStart(): Promise<void> {
     return this.runAsync(async (installation, folder) => {
+      using _launch = new LinuxLaunchFixture();
       await this.recordAsync(installation, folder, "first");
       let isCalled = false;
 

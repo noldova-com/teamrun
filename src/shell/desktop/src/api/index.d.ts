@@ -468,10 +468,13 @@ export declare class UpdateStop {
 
 /**
  * Starts the replaced AppImage after an update, once this desktop has exited. A process that still holds the old
- * version's files keeps the replaced AppImage mounted, so the new version starts from `/bin/bash`, detached as a runtime
- * launch is, with its startup files and inherited shell options disabled. Bash closes the descriptors it inherited
- * above standard error, waits for the desktop's process to exit, then starts the AppImage file from the root folder,
- * without the old mount's `APPIMAGE`, `APPDIR`, `ARGV0` and `OWD`.
+ * version's files keeps the replaced AppImage mounted, so the new version starts from `/bin/bash`, through the runtime
+ * launch's `ProcessLaunchCommand`, which closes the descriptors it inherited above standard error, with its startup
+ * files and inherited shell options disabled. Bash waits until the desktop that started it is no longer its parent,
+ * which a reused process id or an exited desktop its own parent has not yet reaped cannot delay, then starts the
+ * AppImage file from the root folder. The environment it starts with leaves out the old mount's `APPIMAGE`, `APPDIR`,
+ * `ARGV0` and `OWD`, and removes from `PATH`, `XDG_DATA_DIRS`, `LD_LIBRARY_PATH` and `GSETTINGS_SCHEMA_DIR` the entries
+ * the AppImage's `AppRun` added around them, leaving out a variable that held nothing else.
  */
 export declare class AppImageRestart {
   private constructor();
@@ -483,8 +486,8 @@ export declare class AppImageRestart {
    * @param environment The desktop's environment, whose `APPIMAGE` names the AppImage file and whose `APPDIR` its mount.
    * @param executablePath The desktop's program, which runs from inside the mount.
    * @param launchArguments The arguments the new version starts with.
-   * @param starter Starts Bash detached.
-   * @param processId The desktop's process id, whose exit Bash waits for.
+   * @param starter Starts Bash detached, as a child of the process `processId` names.
+   * @param processId The desktop's process id; Bash waits until that process is no longer its parent.
    * @param errorFile The file Bash's standard error is appended to; the new version's output is discarded.
    * @returns The restart, or `null` on Windows and macOS and when the desktop does not run from an AppImage.
    * @example
@@ -504,7 +507,7 @@ export declare class AppImageRestart {
    * Starts Bash, which waits for the desktop to exit and then starts the AppImage.
    *
    * @returns A promise that resolves once Bash has started.
-   * @throws LaunchException as a rejection when Bash cannot be started.
+   * @throws LaunchException as a rejection when `/bin/bash` is not executable, `/proc/self/fd` cannot be read or Bash cannot be started.
    * @example
    * ```ts
    * import type { AppImageRestart } from "@noldova/teamrun-shell-desktop";

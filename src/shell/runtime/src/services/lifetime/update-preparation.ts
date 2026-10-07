@@ -19,6 +19,7 @@ import { Resources } from "../../resources.js";
 import type { RuntimeServer } from "../endpoint/runtime-server.js";
 import { Installation } from "../installation/installation.js";
 import type { ProcessPresence } from "../installation/process-presence.js";
+import { ProcessCommandLine } from "../process/process-command-line.js";
 import type { ProcessSupervisor } from "../process/process-supervisor.js";
 
 export class UpdatePreparation implements Disposable {
@@ -125,8 +126,10 @@ export class UpdatePreparation implements Disposable {
         return String.empty;
       throw error;
     });
-    return text.split(Resources.lineSeparator).map(t => Resources.copyMountRecord.exec(t)).filter(t => !Object.isNull(t))
-      .map(([, , mounter = String.empty]) => [Number(mounter), Resources.copyMountRole]);
+    const mounts = text.split(Resources.lineSeparator).map(t => Resources.copyMountRecord.exec(t)).filter(t => !Object.isNull(t));
+    const listed = await Promise.all(mounts.map(async ([, , mounter = String.empty, image = String.empty]): Promise<(readonly [number, string])[]> =>
+      await ProcessCommandLine.isAppImageMountAsync(mounter, image) ? [[Number(mounter), Resources.copyMountRole]] : []));
+    return listed.flat();
   }
 
   private watchBarrier(installation: Installation): void {
