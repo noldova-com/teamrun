@@ -44,7 +44,7 @@ export class VirtualListComponent<T> {
   private readonly follower: IVirtualListObserver = {
     onInserted: (at, count) => this.inserted(at, count),
     onRemoved: (at, count) => this.removed(at, count),
-    onUpdated: () => this.layout.update(t => t + 1)
+    onUpdated: () => undefined
   };
   private readonly layout: WritableSignal<number> = signal(0);
   private readonly scrollTop: WritableSignal<number> = signal(0);
