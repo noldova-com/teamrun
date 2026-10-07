@@ -762,6 +762,12 @@ The window explains the refusal and offers to move that data aside.
 At the person's request, the runtime moves everything in the data directory that is not one of its own entries into a new folder beside it, named `<data directory>-before-shell-<time>`, deletes nothing, and carries on with an empty data directory.
 Until then, a window's connection accepts only that request and `shell.stop`, so a runtime holding such data can always be stopped, and stopping it closes its files as any stop does.
 
+### Long collections
+
+A long collection, such as a conversation's messages, stays in its owner's database and reaches the window by range.
+The owning window part supplies it to the kit's virtual list as a source that answers for items by their positions, such as items 4,000 to 4,049, and reports items added, removed or changed; it fetches them from its runtime part through its own protocol messages.
+The list asks for pages of 50 items and keeps at most 150 loaded items while it shows, with the height of every item it measured but none of their content, so neither the window nor the shell holds a whole collection, and unloading content never changes how far the list scrolls.
+
 ## 8. Window
 
 The window presents confirmed state and keeps only transient state locally.
@@ -1036,6 +1042,7 @@ Each target is packaged on its own platform and processor.
   It needs `MAC_CERTIFICATE` (the certificate and its private key as a base64 PKCS #12), `MAC_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8` (the key's text), `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`, and checks them before anything is built.
   Packaging takes them out of its environment as it starts, together with the Windows credentials; only electron-builder receives them.
   - The key is written to a file in `_build/package/signing` that only its owner can read, and that folder is removed once packaging ends, whether it succeeded or not.
+  - electron-builder imports the certificate into a temporary keychain and finds its identity there; an unsigned build never looks for a signing identity on the machine.
   - electron-builder signs the app and its helpers with the hardened runtime and `assets/macos/entitlements.plist`, which allows only the JIT that V8 needs, then notarizes the app and staples the ticket.
     A signed package keeps its signature after the fuses are flipped, so it is not signed ad hoc again.
   - Afterwards packaging opens the disk image and expands the archive, and checks each app: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl` must accept it as notarized; and `stapler` must find its ticket.
