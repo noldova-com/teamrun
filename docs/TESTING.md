@@ -353,8 +353,9 @@ CI runs the tests and checks in full on every run, and the UI workflows at these
   When a request to GitHub fails, the report stops, names what it had already filed and fails the run.
 
 The Package workflow makes the packages of a target with `npm run package` and checks them with `npm run package:smoke`.
-The smoke check installs or unpacks the package, starts the desktop with a fresh data directory and device folder of its own, which every `teamrun status` it runs also uses, waits for `teamrun status` from the installed program to report the packaged build's runtime, quits the desktop and requires it to exit cleanly.
+The smoke check installs or unpacks the package, starts the desktop with a fresh data directory and device folder of its own, which every `teamrun status` it runs also uses, waits for `teamrun status` from the installed program to report the packaged build's runtime, quits the desktop with that program's `teamrun quit`, as a person would from a terminal, and requires it to say that TeamRun quit and the desktop to exit cleanly.
 On Linux it also requires that the runtime holds its own copy of the AppImage while the desktop runs, and that the copy ends with the runtime, which an idle runtime does once the desktop quits.
+The copy record is written before the runtime starts from its copy, so a runtime that answers `teamrun status` has its record already.
 The Linux job runs the check twice: with the AppImage mounted, and with `APPIMAGE_EXTRACT_AND_RUN=1`, where the copy is an extraction.
 It reports how long the install took, and a Windows installer that does not finish in time fails with the files it had installed by then.
 The Windows installer runs with Windows PowerShell's own module folder first in `PSModulePath`, so the Windows PowerShell it starts to check for a running TeamRun finds its cmdlets before searching other modules; the hosted Windows ARM64 runner lists its large set of preinstalled modules first, and each of those checks then took more than a minute.
