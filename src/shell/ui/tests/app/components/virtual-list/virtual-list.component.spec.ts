@@ -51,7 +51,7 @@ class VirtualListHostComponent {
   template: `
     <button type="button" class="before">Before</button>
     <button type="button" class="off" disabled>Off</button>
-    <tr-virtual-list label="Messages" [kind]="kind" [source]="source()" [position]="position()" (activated)="activations.push($event.index)" (positionChange)="positions.push($event)">
+    <tr-virtual-list label="Messages" [kind]="kind()" [source]="source()" [position]="position()" (activated)="activations.push($event.index)" (positionChange)="positions.push($event)">
       <ng-template [trVirtualRow]="source()" [trVirtualRowDescribed]="true" let-item let-labelId="labelId" let-descriptionId="descriptionId">
         <div class="message" [class.long]="item.startsWith('long')"><span class="label" [id]="labelId">{{ item }}</span> <span [id]="descriptionId">sent</span> <button type="button" class="reply">Reply</button>@if (item.startsWith('picture')) {<img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">}</div>
       </ng-template>
@@ -62,7 +62,7 @@ class VirtualListHostComponent {
 })
 class FeedHostComponent {
   public readonly list = viewChild.required(VirtualListComponent);
-  public readonly kind: VirtualListKind = VirtualListKind.Feed;
+  public readonly kind = signal<VirtualListKind>(VirtualListKind.Feed);
   public readonly source = signal<VirtualListSource<string>>(numbered(1000));
   public readonly position = signal<VirtualListPosition | null>(null);
   public readonly activations: number[] = [];
@@ -626,6 +626,36 @@ describe("VirtualListComponent", () => {
     await settleAsync();
 
     expect([opened, unloaded, isJumpShown(), articleStops()]).toEqual([true, true, false, ["200"]]);
+  });
+
+  it("stops following its end once its kind changes to an options list", async () => {
+    const source = numbered(1000);
+    await renderFeedAsync(source);
+    feed.kind.set(VirtualListKind.Options);
+    await settleAsync();
+
+    await scrollAsync(1000);
+    const reading = Math.round(viewport().scrollTop);
+    source.insert(1000, ["new 0"]);
+    await settleAsync();
+
+    expect(Math.round(viewport().scrollTop)).toBe(reading);
+  });
+
+  it("keeps the place of the first loaded row in view when that row is removed, and never scrolls above the start", async () => {
+    const source = new VirtualListSourceFixture(200, 30);
+    await renderFeedAsync(source, new VirtualListPosition(48, null, 0));
+    await source.reads.find(t => t.start === 50)?.answerAsync();
+    await settleAsync();
+    await scrollAsync(1445);
+
+    source.reportRemoved(50, 1);
+    await settleAsync();
+    const shifted = Math.round(offsetOfArticle("item 51"));
+    source.reportRemoved(0, 50);
+    await settleAsync();
+
+    expect([shifted, Math.round(offsetOfArticle("item 51")), viewport().scrollTop]).toEqual([55, 0, 0]);
   });
 
   it("follows its end when it opens at a saved position within 120px of it", async () => {

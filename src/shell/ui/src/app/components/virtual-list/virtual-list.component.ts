@@ -376,7 +376,7 @@ export class VirtualListComponent<T> {
 
   private targetTop(): number {
     const { ledger } = this.state();
-    return this.isFollowing() ? Math.max(0, ledger.total - this.viewHeight() - this.endDistance) : ledger.topOf(this.anchor);
+    return Math.max(0, this.isFeed() && this.isFollowing() ? ledger.total - this.viewHeight() - this.endDistance : ledger.topOf(this.anchor));
   }
 
   private alignedTop(index: number, align: VirtualListAlign): number {
