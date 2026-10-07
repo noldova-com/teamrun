@@ -25,6 +25,7 @@ export default class MacSigning implements IPackageSigning {
   private static readonly NOTARIZATION_WAIT: string = "1h";
   private static readonly STAPLE_LIMIT: number = 300_000;
   private static readonly ACCEPTED: RegExp = /"status"\s*:\s*"Accepted"/;
+  private static readonly SUBMISSION: RegExp = /"id"\s*:\s*"([^"]+)"/;
   private static readonly PRIVATE_FOLDER_MODE: number = 0o700;
   private static readonly PRIVATE_FILE_MODE: number = 0o600;
 
@@ -63,18 +64,22 @@ export default class MacSigning implements IPackageSigning {
     await writeFile(path.join(this.folder, MacSigning.KEY_FILE), this.key, { mode: MacSigning.PRIVATE_FILE_MODE });
   }
 
-  public async finishAsync(packages: readonly string[]): Promise<void> {
+  public async finishAsync(packages: readonly string[]): Promise<string> {
+    const lines: string[] = [];
     for (const image of packages.filter(t => path.extname(t) === MacSigning.DISK_IMAGE_EXTENSION)) {
       const submitted = await this.runner.captureAsync("xcrun", [
         "notarytool", "submit", image, "--key", path.join(this.folder, MacSigning.KEY_FILE), "--key-id", this.keyId, "--issuer", this.issuer,
         "--wait", "--timeout", MacSigning.NOTARIZATION_WAIT, "--output-format", "json"
       ], this.folder, MacSigning.NOTARIZATION_LIMIT, this.environment);
-      if (!submitted.isSuccessful || !MacSigning.ACCEPTED.test(submitted.text))
+      const submission = MacSigning.SUBMISSION.exec(submitted.text)?.[1];
+      if (!submitted.isSuccessful || !MacSigning.ACCEPTED.test(submitted.text) || submission === undefined)
         throw new PackagingException(`Apple did not notarize the disk image ${image}:\n${submitted.text}`);
       const stapled = await this.runner.captureAsync("xcrun", ["stapler", "staple", image], this.folder, MacSigning.STAPLE_LIMIT, this.environment);
       if (!stapled.isSuccessful)
         throw new PackagingException(`The notarization ticket could not be stapled to the disk image ${image}:\n${stapled.text}`);
+      lines.push(`${image}: Apple accepted notarization submission ${submission}, and its ticket is stapled.\n`);
     }
+    return lines.join("");
   }
 
   public verifyAsync(packages: readonly string[], product: ProductIdentity): Promise<string> {

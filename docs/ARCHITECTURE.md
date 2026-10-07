@@ -1073,6 +1073,7 @@ Each target is packaged on its own platform and processor.
     A signed package keeps its signature after the fuses are flipped, so it is not signed ad hoc again.
   - electron-builder then signs the disk image with the same certificate.
     Packaging submits the signed disk image to Apple's notary service with `notarytool` and the same key, waits up to an hour for it to be accepted, and staples the ticket to it, so the first opening of a downloaded disk image needs no network check either.
+    Its output names Apple's submission, whose log `notarytool log` reads with the same key.
     The key's ID and issuer reach `notarytool` as arguments, never in its environment, and no failure message repeats them.
     Release update information and checksums are computed from the final, stapled files.
   - Afterwards packaging checks the disk image itself: `codesign` must find a valid, strict signature from a Developer ID Application certificate; `spctl --assess --type open --context context:primary-signature` must accept it as notarized; and `stapler` must find its ticket.
