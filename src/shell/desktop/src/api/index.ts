@@ -101,6 +101,7 @@ export { UpdateStop } from "../services/update-stop.js";
 export { AppImageReplacement } from "../services/app-image-replacement.js";
 export { AppImageRestart } from "../services/app-image-restart.js";
 export { InstallerStart } from "../services/installer-start.js";
+export { ShipItProcess } from "../services/ship-it-process.js";
 export { UpdateWorkQuestion } from "../services/update-work-question.js";
 export { RuntimeStartup } from "../services/runtime-startup.js";
 export { RuntimeWindowStateStore } from "../services/runtime-window-state-store.js";

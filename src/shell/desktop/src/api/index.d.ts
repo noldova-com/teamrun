@@ -19,7 +19,7 @@ import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Prov
 import { type ArgumentException, Exception, type ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { JsonException, JsonObject, JsonValue } from "@noldova/teamrun-foundation-json";
 import type { Event, NotificationBroadcast, QualifiedName, Response, RuntimeHandover, StopPolicy, UpdateProcess, WindowStateKey, WorkReport } from "@noldova/teamrun-shell-protocol";
-import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchException, LaunchSettings, ProcessPresence, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
+import type { ConnectionException, DataDirectory, DiagnosticRedactor, Installation, IProcessStarter, IRuntimeClientListener, LaunchException, LaunchSettings, ProcessPresence, SystemCommand, UpdateBarrier, UpdateBarrierStatus } from "@noldova/teamrun-shell-runtime";
 
 /**
  * Where starting or attaching to the runtime stands, as the window shows it.
@@ -624,6 +624,81 @@ export declare class InstallerStart {
    * ```
    */
   public startAsync(installer: string): Promise<number>;
+}
+
+/**
+ * The process that installs a macOS update: Squirrel.Mac's ShipIt, which runs as the launchd job
+ * `<bundle identifier>.ShipIt` in the person's session from the moment Squirrel has staged the update, keeps its
+ * process id until it has installed it, and installs it once the desktop has quit. Read from `launchctl list`. A
+ * staged update installs at any quit, so a handoff that fails after staging removes the job.
+ */
+export declare class ShipItProcess {
+  /**
+   * Creates the lookup of the ShipIt job of an application.
+   *
+   * @param bundleIdentifier The application's bundle identifier, which names the job.
+   * @param command Runs `/bin/launchctl`.
+   * @example
+   * ```ts
+   * import { ShipItProcess } from "@noldova/teamrun-shell-desktop";
+   * import { SystemCommand } from "@noldova/teamrun-shell-runtime";
+   *
+   * export const shipIt: ShipItProcess = new ShipItProcess("com.noldova.teamrun", new SystemCommand());
+   * ```
+   */
+  public constructor(bundleIdentifier: string, command: Pick<SystemCommand, "runAsync">);
+
+  /**
+   * Finds the ShipIt process, once Squirrel has staged the update.
+   *
+   * @returns The process id of the running ShipIt job, or `null` when the job is not listed or not running.
+   * @throws {UpdateHandoffException} Rejected with the reason when the jobs cannot be listed.
+   * @example
+   * ```ts
+   * import type { ShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function findAsync(shipIt: ShipItProcess): Promise<number | null> {
+   *   return shipIt.findAsync();
+   * }
+   * ```
+   */
+  public findAsync(): Promise<number | null>;
+
+  /**
+   * Removes the ShipIt job, which ends a ShipIt that is still waiting, so the staged update does not install when
+   * the desktop quits. It does nothing when the job is not listed.
+   *
+   * @returns A promise that resolves once the job is removed.
+   * @throws {UpdateHandoffException} Rejected with the reason when the jobs cannot be listed or the job cannot be
+   * removed.
+   * @example
+   * ```ts
+   * import type { ShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function withdrawAsync(shipIt: ShipItProcess): Promise<void> {
+   *   return shipIt.removeAsync();
+   * }
+   * ```
+   */
+  public removeAsync(): Promise<void>;
+
+  /**
+   * Removes the ShipIt job only when it is listed without a process: the job a finished install leaves behind. A
+   * desktop calls it at start, before its updater, and a running ShipIt is left alone.
+   *
+   * @returns A promise that resolves once a stopped job is removed, or at once when there is none.
+   * @throws {UpdateHandoffException} Rejected with the reason when the jobs cannot be listed or the job cannot be
+   * removed.
+   * @example
+   * ```ts
+   * import type { ShipItProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function tidyAsync(shipIt: ShipItProcess): Promise<void> {
+   *   return shipIt.removeStoppedAsync();
+   * }
+   * ```
+   */
+  public removeStoppedAsync(): Promise<void>;
 }
 
 /**
