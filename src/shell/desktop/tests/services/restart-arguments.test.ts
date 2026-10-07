@@ -6,13 +6,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir, userInfo } from "node:os";
+import { basename, dirname, join } from "node:path";
+import { promisify } from "node:util";
 
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/teamrun-foundation-testing";
-import { Installation, ProductInfo, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
+import { DeviceFolder, Installation, ProductInfo, RuntimeBuild } from "@noldova/teamrun-shell-runtime";
 
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
@@ -27,6 +29,7 @@ class Restarted {
   public readonly data: string;
   public readonly profile: string;
   public readonly device: string;
+  public readonly isPackaged: boolean;
   public readonly process: FakeDesktopProcess;
   public readonly electron: FakeElectron;
   public readonly installations: Installation[] = [];
@@ -36,13 +39,19 @@ class Restarted {
     this.data = join(folder, "data");
     this.profile = join(folder, "profile");
     this.device = join(folder, "device");
-    this.process = new FakeDesktopProcess(platform, ["/electron/electron", "--updated", ...argv]);
-    this.process.temporaryFolder = folder;
+    this.isPackaged = isPackaged;
+    this.process = new FakeDesktopProcess(platform, ["/electron/electron", "--updated", ...argv], { LOCALAPPDATA: join(folder, "local") }, join(folder, "home"));
+    this.process.temporaryFolder = join(folder, "temporary");
+    this.process.accountHomeFolder = join(folder, "account");
     this.electron = new FakeElectron(true, isPackaged);
   }
 
   public get file(): string {
-    return join(this.folder, `${ProductInfo.current.slug}-restart-${basename(Installation.locate(this.folder, this.process.execPath, this.process.platform))}.json`);
+    return this.isPackaged ? this.fileIn(DeviceFolder.locate(this.process.platform, {}, this.process.accountHomeFolder)) : this.temporaryFile;
+  }
+
+  public get temporaryFile(): string {
+    return this.fileIn(this.process.temporaryFolder);
   }
 
   public get kept(): readonly string[] {
@@ -53,14 +62,19 @@ class Restarted {
     return DesktopStartFixture.readErrors(this.process, "The desktop runs on the folders of the version it updated: ");
   }
 
-  public writeAsync(value: unknown): Promise<void> {
-    return writeFile(this.file, Object.isString(value) ? value : JSON.stringify(value));
+  public async writeAsync(value: unknown, file: string = this.file): Promise<void> {
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, Object.isString(value) ? value : JSON.stringify(value));
   }
 
   public start(): string | undefined {
     const [settings] = DesktopStartFixture.start(this.electron, this.process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(),
       this.installations);
     return settings?.dataDirectory.root;
+  }
+
+  private fileIn(folder: string): string {
+    return join(folder, `${ProductInfo.current.slug}-restart-${basename(Installation.locate(folder, this.process.execPath, this.process.platform))}.json`);
   }
 }
 
@@ -136,6 +150,33 @@ export class RestartArgumentsTests {
       Assert.areEqual(join(restarted.process.workingDirectory, "given"), root);
       Assert.areEqual(0, restarted.taken.length);
       Assert.isFalse(existsSync(restarted.file));
+    });
+  }
+
+  @TestMethod
+  @TestData("win32")
+  @TestData("darwin")
+  public async leavesFoldersKeptInItsTemporaryFolderAloneSinceTheNewVersionGetsTheAccountsOwn(platform: string): Promise<void> {
+    await RestartArgumentsTests.withRestartAsync(platform, [], true, async restarted => {
+      await restarted.writeAsync({ version: RuntimeBuild.identity.productVersion, arguments: restarted.kept, written: Date.now() }, restarted.temporaryFile);
+
+      const root = restarted.start();
+
+      Assert.areNotEqual(restarted.data, root);
+      Assert.areEqual(0, restarted.taken.length);
+      Assert.isTrue(existsSync(restarted.temporaryFile));
+    });
+  }
+
+  @TestMethod
+  public async readsTheSameAccountHomeFolderWhateverTheEnvironmentNamesAsHomeOrTemporaryFolder(): Promise<void> {
+    await RestartArgumentsTests.withRestartAsync(process.platform, [], true, async restarted => {
+      const elsewhere = Object.fromEntries(["HOME", "USERPROFILE", "LOCALAPPDATA", "TMPDIR", "TEMP", "TMP"].map(t => [t, restarted.folder]));
+
+      const { stdout } = await promisify(execFile)(process.execPath, ["-e", "process.stdout.write(require(\"node:os\").userInfo().homedir)"], { env: { ...process.env, ...elsewhere } });
+
+      Assert.areEqual(userInfo().homedir, stdout);
+      Assert.areNotEqual(restarted.folder, stdout);
     });
   }
 

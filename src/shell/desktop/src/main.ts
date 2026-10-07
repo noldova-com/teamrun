@@ -7,7 +7,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { devNull, homedir, tmpdir } from "node:os";
+import { devNull, homedir, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import { isatty } from "node:tty";
 import { promisify } from "node:util";
@@ -103,7 +103,8 @@ DesktopApplication.start(
     },
     endProcess: t => process.kill(t, "SIGKILL"),
     onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),
-    onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)
+    onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t),
+    readAccountHomeFolder: () => userInfo().homedir
   },
   import.meta.url,
   (settings, installation) => new RuntimeLauncher(settings, RuntimeBuild.identity, installation, starter),

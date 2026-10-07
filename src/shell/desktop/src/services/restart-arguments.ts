@@ -7,8 +7,8 @@
  */
 
 import { readFileSync, rmSync } from "node:fs";
-import { rm, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -21,12 +21,13 @@ import { Resources } from "../resources.js";
 export class RestartArguments {
   private readonly file: string;
 
-  public constructor(temporaryFolder: string, programPath: string, platform: string) {
-    this.file = join(temporaryFolder, Resources.formatRestartArgumentsFile(basename(Installation.locate(temporaryFolder, programPath, platform))));
+  public constructor(folder: string, programPath: string, platform: string) {
+    this.file = join(folder, Resources.formatRestartArgumentsFile(basename(Installation.locate(folder, programPath, platform))));
   }
 
   public async writeAsync(version: string, launchArguments: readonly string[], written: number): Promise<void> {
     try {
+      await mkdir(dirname(this.file), { recursive: true });
       await writeFile(this.file, JSON.stringify({
         [Resources.restartVersionField]: version,
         [Resources.restartArgumentsField]: launchArguments,

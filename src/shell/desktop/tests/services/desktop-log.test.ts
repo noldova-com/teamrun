@@ -39,6 +39,25 @@ export class DesktopLogTests {
   }
 
   @TestMethod
+  public async putsALineKeptBeforeTheFileOpensInTheFileFirstAndAnyLaterKeptLineAtOnce(): Promise<void> {
+    await DesktopLogTests.runAsync(async (folder, directory) => {
+      const process = new FakeDesktopProcess("linux");
+      const log = new DesktopLog(directory, process.errorOutput, new DiagnosticRedactor(folder), () => DesktopLogTests.MOMENT);
+
+      log.writeKept("Kept for the file.");
+      log.write("Before the file.");
+      log.open();
+      log.write("In the file.");
+      log.writeKept("Kept again.");
+      log.open();
+
+      const lines = ["Kept for the file.", "Before the file.", "In the file.", "Kept again."].map(t => `2026-10-02T23:40:01.250Z ${t}\n`);
+      Assert.areEqual(lines.join(""), process.errors);
+      Assert.areEqual([lines[0], lines[2], lines[3]].join(""), await readFile(directory.desktopLog, "utf8"));
+    });
+  }
+
+  @TestMethod
   public async keepsExactlyOnePreviousLogAndStartsOnlyOncePerDesktop(): Promise<void> {
     await DesktopLogTests.runAsync(async (folder, directory) => {
       for (const start of ["first", "second", "third"]) {
@@ -82,12 +101,13 @@ export class DesktopLogTests {
       const missingLog = new DesktopLog(missing, missingProcess.errorOutput, new DiagnosticRedactor(folder));
       const blockedLog = new DesktopLog(blocked, blockedProcess.errorOutput, new DiagnosticRedactor(folder));
 
+      missingLog.writeKept("Kept for a file that never starts.");
       missingLog.open();
       blockedLog.open();
       missingLog.write("Still recorded.");
 
       Assert.isFalse(existsSync(missing.root));
-      Assert.areEqual(2, missingProcess.errors.split("\n").length - 1);
+      Assert.areEqual(3, missingProcess.errors.split("\n").length - 1);
       Assert.isTrue(missingProcess.errors.includes(" The desktop's log could not be written, so its records go to standard error only: Error: "));
       Assert.isTrue(missingProcess.errors.endsWith(" Still recorded.\n"));
       Assert.isTrue(blockedProcess.errors.includes(" The desktop's log could not be written, so its records go to standard error only: Error: "));
