@@ -962,6 +962,10 @@ export class Resources {
     return `The desktop's main process failed with ${kind === MainProcessFailureKind.UnhandledRejection ? "an unhandled rejection" : "an uncaught exception"}: ${error}`;
   }
 
+  public static formatMainProcessNotReleased(error: string): string {
+    return `The desktop could not stop its watchers and helper programs before it quit: ${error}`;
+  }
+
   public static formatMainProcessBoxFailed(error: string): string {
     return `The desktop could not ask what to do after its main process failed, so it quits: ${error}`;
   }
