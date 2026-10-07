@@ -429,6 +429,7 @@ export class Resources {
   public static readonly userCancelledCode: string = "(-128)";
   public static readonly occupiedExitCode: string = "(3)";
   public static readonly missingErrorCode: string = "ENOENT";
+  public static readonly existingErrorCode: string = "EEXIST";
   public static readonly errorCodeField: "code" = "code";
   public static readonly deniedErrorCodes: readonly string[] = ["EACCES", "EPERM"];
   public static get commandInstalled(): string {
@@ -858,6 +859,14 @@ export class Resources {
 
   public static get updateCheckedElsewhere(): string {
     return `Another ${Resources.applicationName} is checking for updates.`;
+  }
+
+  public static formatUpdateLockLeft(error: string): string {
+    return `The update check's lock could not be removed, so it stays until this desktop checks again or quits: ${error}`;
+  }
+
+  public static formatUpdateNotDeleted(error: string): string {
+    return `The update that failed its publisher check could not be deleted: ${error}`;
   }
 
   public static formatUpdateCheckNotReleased(error: string): string {

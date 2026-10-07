@@ -25,7 +25,7 @@ import ProcessException from "./processes/process.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Build {
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>] [--update-feed <https URL, or http URL of localhost, ending in />]]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder> [--update-feed <https URL, or http URL of localhost, ending in />]]]\n";
   private static readonly NO_PACKAGES: string = "No packages under src/; there is nothing to build.\n";
   private static readonly TEST_OPTION: string = "--test";
   private static readonly PACKAGED_OPTION: string = "--packaged";
@@ -64,7 +64,8 @@ export default class Build {
       && names.every(t => t === Build.OUTPUT_OPTION || (isTest && t === Build.WITHOUT_OPTION) || (isPackaged && t === UpdateFeed.OPTION))
       && names.filter(t => t === Build.OUTPUT_OPTION).length < 2
       && names.filter(t => t === UpdateFeed.OPTION).length < 2
-      && values.every((t, i) => names[i] !== UpdateFeed.OPTION || UpdateFeed.isValid(t));
+      && values.every((t, i) => names[i] !== UpdateFeed.OPTION || UpdateFeed.isValid(t))
+      && (!names.includes(UpdateFeed.OPTION) || names.includes(Build.OUTPUT_OPTION));
     if (!isWellFormed || (!isTest && !isPackaged && options.length > 0)) {
       this.output.write(Build.USAGE);
       return Build.USAGE_EXIT_CODE;

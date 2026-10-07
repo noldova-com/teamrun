@@ -16,12 +16,13 @@ import type { CancellationToken } from "electron-updater";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { FeedProvider, FeedSource, FeedUpdater, type IFeedResponse, UpdateException } from "@noldova/teamrun-shell-desktop";
 
+import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
 import { FakeAppUpdater } from "../fixtures/fake-app-updater.fixture.js";
 
 @TestClass
 export class FeedUpdaterTests {
   private static readonly SOURCE: FeedSource = new FeedSource("http://127.0.0.1:8080/", "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage",
-    (): Promise<IFeedResponse> => Promise.reject(new Error("offline")), 30_000);
+    (): Promise<IFeedResponse> => Promise.reject(new Error("offline")));
   private static readonly INSTALLATION: string = join("/devices", "installations", "0123456789abcdef");
   private static readonly PACKAGE: string = join("/cache", "teamrun-updater-0123456789abcdef", "pending", "TeamRun-linux-x64.AppImage");
 
@@ -210,15 +211,16 @@ export class FeedUpdaterTests {
   }
 
   @TestMethod
-  public checksThePublisherOfEachDownloadAndDeletesOneThatFails(): Promise<void> {
+  public checksThePublisherOfEachDownloadAndDeletesOneThatFailsOrLogsWhyItCannot(): Promise<void> {
     return FeedUpdaterTests.withFolderAsync(async folder => {
       const app = new FakeAppUpdater();
       const checked: string[] = [];
+      const lines: string[] = [];
       let failure: string | null = null;
       const updater = new FeedUpdater(app, FeedUpdaterTests.SOURCE, FeedUpdaterTests.INSTALLATION, folder, "teamrun", t => {
         checked.push(t);
         return Promise.resolve(failure);
-      }, () => undefined);
+      }, t => lines.push(t));
       await mkdir(join(updater.packagePath, ".."), { recursive: true });
       await writeFile(updater.packagePath, "TeamRun 1.3.0");
       app.download = () => Promise.resolve([updater.packagePath]);
@@ -227,12 +229,23 @@ export class FeedUpdaterTests {
       const kept = existsSync(signed);
       failure = "The signature is not the publisher's.";
       const unsigned = await Assert.throwsAsync(() => updater.downloadAsync(() => undefined), UpdateException);
+      const isDeleted = !existsSync(updater.packagePath);
+      await writeFile(updater.packagePath, "TeamRun 1.3.0");
+      let stuck: UpdateException;
+      {
+        using _rm = new FailingFileCallFixture("rm", updater.packagePath, "EBUSY");
+        stuck = await Assert.throwsAsync(() => updater.downloadAsync(() => undefined), UpdateException);
+      }
 
       Assert.areEqual(updater.packagePath, signed);
       Assert.isTrue(kept);
       Assert.areEqual("The update isn't signed by the publisher.", unsigned.message);
-      Assert.isFalse(existsSync(updater.packagePath));
-      Assert.areEqual(JSON.stringify([updater.packagePath, updater.packagePath]), JSON.stringify(checked));
+      Assert.isTrue(isDeleted);
+      Assert.areEqual("The update isn't signed by the publisher.", stuck.message);
+      Assert.isTrue(existsSync(updater.packagePath));
+      Assert.areEqual(1, lines.length);
+      Assert.isTrue(lines[0]?.startsWith("The update that failed its publisher check could not be deleted: Error: EBUSY") === true, lines[0]);
+      Assert.areEqual(JSON.stringify([updater.packagePath, updater.packagePath, updater.packagePath]), JSON.stringify(checked));
     });
   }
 

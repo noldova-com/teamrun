@@ -2028,8 +2028,9 @@ export class DesktopApplicationTests {
     Assert.areEqual(JSON.stringify(["Checking", "UpToDate"]), JSON.stringify(DesktopApplicationTests.updateStates(window)));
     Assert.areEqual("UpToDate", Reflect.get(Object(state), "kind"));
     Assert.areEqual(1, files.created.filter(t => t[1] === "update-ready.json").length);
-    Assert.areEqual(1, files.updateReady.reads);
+    Assert.areEqual(3, files.updateReady.reads);
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The updater reported: started").length);
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The update lock reported: started").length);
   }
 
   @TestMethod
@@ -2498,7 +2499,10 @@ export class DesktopApplicationTests {
     DesktopStartFixture.start(electron, process, launcher, device, files, new FakePathCommand(), [], () => Promise.resolve(true), log => {
       log("The updater reported: started");
       return updater;
-    }, lock);
+    }, log => {
+      log("The update lock reported: started");
+      return lock;
+    });
     await DesktopStartFixture.openAsync(electron);
     await setImmediate();
     return electron;

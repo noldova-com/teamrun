@@ -33,7 +33,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class BuildTests {
   private static readonly BUILD_TIMEOUT: number = 60_000;
   private static readonly ROOT_MANIFEST: string = JSON.stringify({ teamrun: { modules: [], product: ProductIdentityFixture.json } });
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>] [--update-feed <https URL, or http URL of localhost, ending in />]]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder> [--update-feed <https URL, or http URL of localhost, ending in />]]]\n";
 
   public static register(): void {
     test("a tree without packages builds nothing and succeeds", async t => {
@@ -211,8 +211,8 @@ class BuildTests {
       assert.equal(invalid.text, "The build lists the module notes, but src/modules/notes has no module.json.\n");
     });
 
-    test("arguments other than a test build with its exclusions or a packaged build with at most one http or https update feed ending in a slash are refused with the usage", async () => {
-      for (const buildArguments of [["foundation-core"], ["--without", "clock"], ["--output", "variant"], ["--test", "--without"], ["--test", "clock"], ["--test", "--test"], ["--test", "--output", "a", "--output", "b"], ["--packaged", "--without", "clock"], ["--packaged", "--packaged"], ["--packaged", "--output"], ["--update-feed", "http://a/"], ["--test", "--update-feed", "http://a/"], ["--packaged", "--update-feed", "ftp://a/"], ["--packaged", "--update-feed", "http://a"], ["--packaged", "--update-feed", "local"], ["--packaged", "--update-feed", "http://a/", "--update-feed", "http://a/"]]) {
+    test("arguments other than a test build with its exclusions or a packaged build with at most one update feed beside its output folder are refused with the usage", async () => {
+      for (const buildArguments of [["foundation-core"], ["--without", "clock"], ["--output", "variant"], ["--test", "--without"], ["--test", "clock"], ["--test", "--test"], ["--test", "--output", "a", "--output", "b"], ["--packaged", "--without", "clock"], ["--packaged", "--packaged"], ["--packaged", "--output"], ["--update-feed", "http://a/"], ["--test", "--update-feed", "http://a/"], ["--packaged", "--update-feed", "ftp://a/"], ["--packaged", "--update-feed", "http://a"], ["--packaged", "--update-feed", "local"], ["--packaged", "--update-feed", "http://a/", "--update-feed", "http://a/"], ["--packaged", "--update-feed", "https://a/"]]) {
         const output = new TextOutputFixture();
 
         assert.equal(await BuildTests.create("unused", output, process.env).runAsync(buildArguments), 2);

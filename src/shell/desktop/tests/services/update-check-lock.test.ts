@@ -15,16 +15,19 @@ import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testi
 import { UpdateCheckLock, UpdateException } from "@noldova/teamrun-shell-desktop";
 import { UpdateProcess } from "@noldova/teamrun-shell-protocol";
 
+import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
+
 @TestClass
 export class UpdateCheckLockTests {
   private static readonly SELF: UpdateProcess = new UpdateProcess(4120, 1500, 1501, "desktop");
   private static readonly OTHER: UpdateProcess = new UpdateProcess(5230, 1600, 1601, "desktop");
+  private static readonly IGNORE: (text: string) => void = () => undefined;
 
   @TestMethod
   public holdsTheLockUntilItLetsGoAndLeavesNoTemporaryFile(): Promise<void> {
     return UpdateCheckLockTests.withFolderAsync(async folder => {
       const file = join(folder, "installation", "update-check.lock");
-      const lock = new UpdateCheckLock(join(folder, "installation"), () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(true));
+      const lock = new UpdateCheckLock(join(folder, "installation"), () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(true), UpdateCheckLockTests.IGNORE);
 
       const isHeld = await lock.tryAcquireAsync();
       const text = await readFile(file, "utf8");
@@ -47,7 +50,7 @@ export class UpdateCheckLockTests {
       const lock = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), t => {
         asked.push(t.processId);
         return Promise.resolve(true);
-      });
+      }, UpdateCheckLockTests.IGNORE);
 
       const isHeld = await lock.tryAcquireAsync();
       await lock.releaseAsync();
@@ -64,7 +67,7 @@ export class UpdateCheckLockTests {
       await UpdateCheckLockTests.withFolderAsync(async folder => {
         const file = join(folder, "update-check.lock");
         await writeFile(file, text);
-        const lock = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(false));
+        const lock = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(false), UpdateCheckLockTests.IGNORE);
 
         const isHeld = await lock.tryAcquireAsync();
 
@@ -83,11 +86,11 @@ export class UpdateCheckLockTests {
       const replacing = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), async () => {
         await writeFile(file, newer);
         return false;
-      });
+      }, UpdateCheckLockTests.IGNORE);
       const removing = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), async () => {
         await rm(file);
         return false;
-      });
+      }, UpdateCheckLockTests.IGNORE);
 
       const isReplacedHeld = await replacing.tryAcquireAsync();
       const kept = await readFile(file, "utf8");
@@ -105,7 +108,7 @@ export class UpdateCheckLockTests {
     return UpdateCheckLockTests.withFolderAsync(async folder => {
       const file = join(folder, "update-check.lock");
       await mkdir(file);
-      const lock = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(false));
+      const lock = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(false), UpdateCheckLockTests.IGNORE);
 
       Assert.isFalse(await lock.tryAcquireAsync());
       Assert.isTrue(existsSync(file));
@@ -117,7 +120,7 @@ export class UpdateCheckLockTests {
     return UpdateCheckLockTests.withFolderAsync(async folder => {
       const file = join(folder, "update-check.lock");
       const other = JSON.stringify(UpdateCheckLockTests.OTHER.toJson());
-      const lock = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(true));
+      const lock = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(true), UpdateCheckLockTests.IGNORE);
 
       await lock.tryAcquireAsync();
       await writeFile(file, other);
@@ -135,9 +138,66 @@ export class UpdateCheckLockTests {
   }
 
   @TestMethod
+  public logsALockItCouldNotRemoveAndTakesItBackAtTheNextCheck(): Promise<void> {
+    return UpdateCheckLockTests.withFolderAsync(async folder => {
+      const file = join(folder, "update-check.lock");
+      const logged: string[] = [];
+      let stamps = 0;
+      const lock = new UpdateCheckLock(folder, () => {
+        stamps++;
+        return Promise.resolve(UpdateCheckLockTests.SELF);
+      }, () => Promise.resolve(true), t => logged.push(t));
+
+      await lock.tryAcquireAsync();
+      {
+        using _rename = new FailingFileCallFixture("rename", file, "EPERM");
+        await lock.releaseAsync();
+      }
+      const left = await readFile(file, "utf8");
+      const isHeldAgain = await lock.tryAcquireAsync();
+      await lock.releaseAsync();
+
+      Assert.areEqual(JSON.stringify(UpdateCheckLockTests.SELF.toJson()), left);
+      Assert.isTrue(isHeldAgain);
+      Assert.areEqual(1, stamps);
+      Assert.areEqual(1, logged.length);
+      Assert.isTrue(logged[0]?.startsWith("The update check's lock could not be removed, so it stays until this desktop checks again or quits: Error: EPERM") === true, logged[0]);
+      Assert.areEqual(0, (await readdir(folder)).length);
+    });
+  }
+
+  @TestMethod
+  public passesOnAFailureToCreateOrClaimTheLockOtherThanFindingOrMissingIt(): Promise<void> {
+    return UpdateCheckLockTests.withFolderAsync(async folder => {
+      const file = join(folder, "update-check.lock");
+      const other = JSON.stringify(UpdateCheckLockTests.OTHER.toJson());
+      const lock = new UpdateCheckLock(folder, () => Promise.resolve(UpdateCheckLockTests.SELF), () => Promise.resolve(false), UpdateCheckLockTests.IGNORE);
+
+      let linkFailure: unknown = null;
+      {
+        using _link = new FailingFileCallFixture("link", file, "EPERM");
+        await lock.tryAcquireAsync().catch((error: unknown) => { linkFailure = error; });
+      }
+      const isCreated = existsSync(file);
+      await writeFile(file, other);
+      let renameFailure: unknown = null;
+      {
+        using _rename = new FailingFileCallFixture("rename", file, "EACCES");
+        await lock.tryAcquireAsync().catch((error: unknown) => { renameFailure = error; });
+      }
+
+      Assert.areEqual("EPERM", Reflect.get(Object(linkFailure), "code"));
+      Assert.isFalse(isCreated);
+      Assert.areEqual("EACCES", Reflect.get(Object(renameFailure), "code"));
+      Assert.areEqual(other, await readFile(file, "utf8"));
+      Assert.areEqual(1, (await readdir(folder)).length);
+    });
+  }
+
+  @TestMethod
   public refusesToCheckWhenItCannotIdentifyItsOwnProcess(): Promise<void> {
     return UpdateCheckLockTests.withFolderAsync(async folder => {
-      const lock = new UpdateCheckLock(folder, () => Promise.resolve(null), () => Promise.resolve(false));
+      const lock = new UpdateCheckLock(folder, () => Promise.resolve(null), () => Promise.resolve(false), UpdateCheckLockTests.IGNORE);
 
       const failure = await Assert.throwsAsync(() => lock.tryAcquireAsync(), UpdateException);
 

@@ -46,13 +46,13 @@ export class DesktopStartFixture {
     installations: Installation[] = [],
     recordDesktopAsync: (installation: Installation) => Promise<boolean> = () => Promise.resolve(true),
     createUpdater: (log: (text: string) => void) => IUpdater | null = () => null,
-    updateLock: IUpdateCheckLock = new FakeUpdateCheckLock()): LaunchSettings[] {
+    createUpdateLock: (log: (text: string) => void) => IUpdateCheckLock = () => new FakeUpdateCheckLock()): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
     DesktopApplication.start(electron, process, DesktopStartFixture.MODULE_URL, (t, installation) => {
       settings.push(t);
       installations.push(installation);
       return launcher;
-    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, log) => createUpdater(log), () => updateLock);
+    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, log) => createUpdater(log), (_, log) => createUpdateLock(log));
     return settings;
   }
 

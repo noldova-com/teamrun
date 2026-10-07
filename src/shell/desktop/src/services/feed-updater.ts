@@ -27,6 +27,7 @@ export class FeedUpdater implements IUpdater {
   private readonly configFile: string;
   private readonly configuration: string;
   private readonly verifyAsync: ((file: string) => Promise<string | null>) | null;
+  private readonly log: (text: string) => void;
   private cancellation: CancellationToken | null = null;
   private isConfigured: boolean = false;
 
@@ -46,6 +47,7 @@ export class FeedUpdater implements IUpdater {
     this.configFile = join(installationFolder, Resources.updateConfigFile);
     this.configuration = JSON.stringify({ [Resources.updaterCacheFolderField]: cacheFolder });
     this.verifyAsync = verifyAsync;
+    this.log = log;
     this.packagePath = join(cacheRoot, cacheFolder, Resources.pendingUpdateFolder, source.packageFile);
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
@@ -98,7 +100,7 @@ export class FeedUpdater implements IUpdater {
   private async verifyPublisherAsync(file: string): Promise<void> {
     if (Object.isNull(this.verifyAsync) || Object.isNull(await this.verifyAsync(file)))
       return;
-    await rm(file, { force: true });
+    await rm(file, { force: true }).catch((error: unknown) => this.log(Resources.formatUpdateNotDeleted(String(error))));
     throw new UpdateException(Resources.updateNotSigned);
   }
 

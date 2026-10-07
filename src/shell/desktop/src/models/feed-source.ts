@@ -16,14 +16,12 @@ export class FeedSource {
   public readonly channelFile: string;
   public readonly packageFile: string;
   public readonly fetchAsync: (url: string, signal: AbortSignal) => Promise<IFeedResponse>;
-  public readonly timeout: number;
 
-  public constructor(feed: string, channelFile: string, packageFile: string, fetchAsync: (url: string, signal: AbortSignal) => Promise<IFeedResponse>, timeout: number) {
+  public constructor(feed: string, channelFile: string, packageFile: string, fetchAsync: (url: string, signal: AbortSignal) => Promise<IFeedResponse>) {
     this.feed = feed;
     this.channelFile = channelFile;
     this.packageFile = packageFile;
     this.fetchAsync = fetchAsync;
-    this.timeout = timeout;
   }
 
   public static create(feed: string | null, productName: string, platform: string, architecture: string, fetchAsync: (url: string, signal: AbortSignal) => Promise<IFeedResponse>): FeedSource | null {
@@ -31,6 +29,6 @@ export class FeedSource {
     if (Object.isNull(feed) || Object.isUndefined(target) || !Resources.updateArchitectures.includes(architecture))
       return null;
     const [name, extension] = target;
-    return new FeedSource(feed, Resources.formatChannelFile(name, architecture), Resources.formatPackageFile(productName, name, architecture, extension), fetchAsync, Resources.updateFeedTimeout);
+    return new FeedSource(feed, Resources.formatChannelFile(name, architecture), Resources.formatPackageFile(productName, name, architecture, extension), fetchAsync);
   }
 }

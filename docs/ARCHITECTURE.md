@@ -1137,7 +1137,9 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The person can always run Check for updates.
   The desktop's own checks are skipped while a download runs or an update is ready.
   One desktop of an installation checks at a time: a check and its download hold `update-check.lock` in the installation's folder, which names the desktop's process, and a lock whose process is gone is taken over.
+  A lock that cannot be removed is logged and left behind, and the desktop it names takes it back at its next check.
   Another desktop's check is skipped meanwhile, and one the person asked for says another TeamRun is checking.
+  Once it holds the lock, a desktop that finds a usable ready update another desktop recorded shows it as ready instead of checking.
   A failed automatic check shows only in About and the log, and the next one runs at its time; a failed check the person asked for shows as a failure.
   A check fails when TeamRun couldn't reach its update feed, when the feed answers with an HTTP error status, which the reason names, when it redirects to another protocol, or when the release's information is invalid; any other error shows as the update stopping on an unexpected error.
 - **Validation.**
@@ -1145,7 +1147,7 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   After downloading, it checks the file's size and SHA-512 against it.
   On Windows the installer must also carry a valid signature by TeamRun's publisher, the `windowsPublisher` of `teamrun.product`, and no other.
   The desktop runs electron-updater's signature check itself on every download, with the publisher from the application's product file and never from a file the person can change; a check that warns, such as one that skips itself because PowerShell doesn't answer in time, or that fails, counts as a failed check, and the desktop log records each check's duration and result.
-  A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher; any other error shows as the update stopping on an unexpected error.
+  A file that fails is deleted, or the log says why it could not be, and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher; any other error shows as the update stopping on an unexpected error.
   The update stop's handoff checks the publisher again right before it starts the installer.
   Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
 - **Downloading.**
@@ -1157,6 +1159,7 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed; while it is ready, the desktop doesn't check for a newer one.
   electron-updater keeps the download in its cache folder for the installation, `<slug>-updater-<installation id>` in the user's cache folder, which `update-config.json` in the installation's folder names, so two installations never share a download.
   `update-ready.json` in the installation's folder records the ready version, its downloaded file, the file's SHA-512 and whether `shell.updateReady` was posted; a record whose file is not the package in that cache folder's `pending` folder is removed.
+  A download electron-updater reports at any other path fails as unexpected and is left to electron-updater, which owns its cache, since the desktop deletes no file outside that `pending` folder.
   At start the desktop hashes the file again, without the network: when the version is still newer than the installed one and the file still matches, the update shows as ready; otherwise the record is removed and the next check downloads again.
 - **Restart to update.**
   Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.

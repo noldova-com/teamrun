@@ -4078,7 +4078,8 @@ export declare class DesktopApplication {
    * whose updates stay Off; the updater's log is the desktop's. The {@link UpdateController} it drives keeps
    * `update-ready.json` in the installation's folder, follows `shell.updateChecks`, pushes each state on
    * `teamrun:updateState` and posts `shell.updateReady` once over the runtime connection.
-   * @param createUpdateLock Creates the lock that lets one desktop of the installation check at a time.
+   * @param createUpdateLock Creates the lock that lets one desktop of the installation check at a time; the lock's log
+   * is the desktop's.
    * @example
    * ```ts
    * import { ProcessPresence, RuntimeBuild, RuntimeLauncher, SystemCommand } from "@noldova/teamrun-shell-runtime";
@@ -4095,7 +4096,7 @@ export declare class DesktopApplication {
    *     t => PathCommand.forBundle(t, () => Promise.resolve()),
    *     t => DesktopRecord.recordAsync(t, ProcessPresence.create(process.platform, new SystemCommand()), process.processId),
    *     () => null,
-   *     t => new UpdateCheckLock(t.folder, () => Promise.resolve(null), () => Promise.resolve(false)));
+   *     (t, log) => new UpdateCheckLock(t.folder, () => Promise.resolve(null), () => Promise.resolve(false), log));
    * }
    * ```
    */
@@ -4109,7 +4110,7 @@ export declare class DesktopApplication {
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
     createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null,
-    createUpdateLock: (installation: Installation) => IUpdateCheckLock): void;
+    createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void;
 }
 
 /**
@@ -5487,10 +5488,6 @@ export declare class FeedSource {
    * Fetches a URL anonymously, following redirects, until the signal aborts.
    */
   public readonly fetchAsync: (url: string, signal: AbortSignal) => Promise<IFeedResponse>;
-  /**
-   * How long the feed has to answer with the whole information file, in milliseconds.
-   */
-  public readonly timeout: number;
 
   /**
    * Creates the source.
@@ -5498,16 +5495,16 @@ export declare class FeedSource {
    * @param feed The feed's URL, ending in `/`.
    * @param channelFile The update information's file.
    * @param packageFile The package the updater downloads.
-   * @param fetchAsync Fetches a URL anonymously, following redirects, until the signal aborts.
-   * @param timeout How long the feed has to answer, in milliseconds.
+   * @param fetchAsync Fetches a URL anonymously, following redirects, until the signal aborts; the signal aborts when the
+   * feed hasn't answered with the whole information file within 30 seconds.
    * @example
    * ```ts
    * import { FeedSource } from "@noldova/teamrun-shell-desktop";
    *
-   * export const source: FeedSource = new FeedSource("http://127.0.0.1:8080/", "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", (url, signal) => fetch(url, { signal }), 30_000);
+   * export const source: FeedSource = new FeedSource("http://127.0.0.1:8080/", "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", (url, signal) => fetch(url, { signal }));
    * ```
    */
-  public constructor(feed: string, channelFile: string, packageFile: string, fetchAsync: (url: string, signal: AbortSignal) => Promise<IFeedResponse>, timeout: number);
+  public constructor(feed: string, channelFile: string, packageFile: string, fetchAsync: (url: string, signal: AbortSignal) => Promise<IFeedResponse>);
 
   /**
    * Creates the source of a platform and processor: Windows' installer, macOS's ZIP or Linux's AppImage, on x64 or
@@ -5609,14 +5606,15 @@ export declare class FeedUpdater implements IUpdater {
    * @param productSlug The product's slug.
    * @param verifyAsync Checks a downloaded file's publisher, resolving to `null` when it is the product's publisher and
    * otherwise to why not, or `null` on a platform whose updates carry no publisher to check.
-   * @param log Records the updater's warnings and errors.
+   * @param log Records the updater's warnings and errors, and a download that failed its publisher check but could not be
+   * deleted.
    * @example
    * ```ts
    * import { AppImageUpdater } from "electron-updater";
    * import { FeedSource, FeedUpdater } from "@noldova/teamrun-shell-desktop";
    *
    * export const updater: FeedUpdater = new FeedUpdater(new AppImageUpdater(),
-   *   new FeedSource("http://127.0.0.1:8080/", "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", (url, signal) => fetch(url, { signal }), 30_000),
+   *   new FeedSource("http://127.0.0.1:8080/", "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", (url, signal) => fetch(url, { signal })),
    *   "/home/person/.local/state/noldova/teamrun/installations/0123456789abcdef", "/home/person/.cache", "teamrun", null, console.error);
    * ```
    */
@@ -5693,23 +5691,26 @@ export declare class UpdateCheckLock implements IUpdateCheckLock {
    * @param folder The installation's folder.
    * @param stampAsync Gives this desktop's process, or `null` when it cannot be found.
    * @param isRunningAsync Whether a holder's process still runs.
+   * @param log Records a lock that could not be removed.
    * @example
    * ```ts
    * import type { Installation, ProcessPresence } from "@noldova/teamrun-shell-runtime";
    * import { UpdateCheckLock } from "@noldova/teamrun-shell-desktop";
    *
    * export function create(installation: Installation, presence: ProcessPresence): UpdateCheckLock {
-   *   return new UpdateCheckLock(installation.folder, async () => (await presence.stampAsync([[process.pid, "desktop"]]))[0] ?? null, t => presence.isRunningAsync(t));
+   *   return new UpdateCheckLock(installation.folder, async () => (await presence.stampAsync([[process.pid, "desktop"]]))[0] ?? null, t => presence.isRunningAsync(t), console.error);
    * }
    * ```
    */
-  public constructor(folder: string, stampAsync: () => Promise<UpdateProcess | null>, isRunningAsync: (holder: UpdateProcess) => Promise<boolean>);
+  public constructor(folder: string, stampAsync: () => Promise<UpdateProcess | null>, isRunningAsync: (holder: UpdateProcess) => Promise<boolean>, log: (text: string) => void);
 
   /**
-   * Takes the lock unless a running desktop holds it.
+   * Takes the lock unless another running desktop holds it; a lock that still names this desktop's process, left
+   * behind by a release that failed, is taken back.
    *
    * @returns A promise of whether this desktop now holds the lock.
    * @throws {UpdateException} Rejected when this desktop's process cannot be found.
+   * @throws {Error} Rejected when the lock can neither be created nor found, or a stale one cannot be claimed.
    * @example
    * ```ts
    * import type { UpdateCheckLock } from "@noldova/teamrun-shell-desktop";
@@ -5722,9 +5723,10 @@ export declare class UpdateCheckLock implements IUpdateCheckLock {
   public tryAcquireAsync(): Promise<boolean>;
 
   /**
-   * Lets go of the lock this desktop holds; a lock another desktop has taken over since is left in place.
+   * Lets go of the lock this desktop holds; a lock another desktop has taken over since is left in place, and a lock
+   * that cannot be removed is logged and left behind.
    *
-   * @returns A promise that settles once the lock is let go.
+   * @returns A promise that settles once the lock is let go; it never rejects.
    * @example
    * ```ts
    * import type { UpdateCheckLock } from "@noldova/teamrun-shell-desktop";
@@ -6028,7 +6030,8 @@ export declare class UpdateController {
 
   /**
    * Runs the window's action: `Check` starts a check unless one, a download or a ready update rules it out. Restart to
-   * update is refused.
+   * update is refused. Once it holds the lock, a check that finds a usable ready update another desktop of the
+   * installation recorded shows it as ready instead of reaching the feed.
    *
    * @param action The action.
    * @returns Whether the action started.
@@ -6060,8 +6063,8 @@ export declare class UpdateController {
   public notifyAsync(): Promise<void>;
 
   /**
-   * Stops the automatic checks, refuses new ones and cancels the download in progress; what a running check or
-   * download gives afterwards is dropped.
+   * Stops the automatic checks, refuses new ones and cancels the download in progress; nothing is published afterwards,
+   * a check that was taking the lock reaches no feed, and what a running check or download gives is dropped.
    *
    * @example
    * ```ts

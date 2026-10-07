@@ -118,7 +118,7 @@ export class UpdateControllerTests {
       Assert.areEqual(2, fixture.lock.acquires);
       Assert.areEqual(JSON.stringify(["Checking", "UpToDate", "Checking", "UpToDate"]), JSON.stringify(fixture.kinds));
       Assert.areEqual(fixture.time, fixture.controller.status.checkedAt);
-      Assert.areEqual(1, fixture.record.reads);
+      Assert.areEqual(3, fixture.record.reads);
     });
   }
 
@@ -263,6 +263,7 @@ export class UpdateControllerTests {
       await fixture.controller.startAsync();
 
       fixture.controller.act("Check");
+      await Condition.waitAsync(() => fixture.updater.checks === 1);
       fixture.controller.stop();
       check.resolve("1.3.0");
       await Condition.waitAsync(() => fixture.lock.releases === 1);
@@ -270,6 +271,78 @@ export class UpdateControllerTests {
       Assert.areEqual(0, fixture.updater.downloads);
       Assert.areEqual(JSON.stringify(["Checking"]), JSON.stringify(fixture.kinds));
       Assert.areEqual(1, fixture.updater.cancels);
+    });
+  }
+
+  @TestMethod
+  public checksNothingWhenStoppedWhileTakingTheLock(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      const acquire = Promise.withResolvers<boolean>();
+      fixture.lock.acquire = () => acquire.promise;
+      await fixture.controller.startAsync();
+
+      fixture.controller.act("Check");
+      fixture.controller.stop();
+      acquire.resolve(true);
+      await Condition.waitAsync(() => fixture.lock.releases === 1);
+
+      Assert.areEqual(0, fixture.updater.checks);
+      Assert.areEqual(1, fixture.record.reads);
+      Assert.areEqual(JSON.stringify(["Checking"]), JSON.stringify(fixture.kinds));
+    });
+  }
+
+  @TestMethod
+  public async publishesNothingForALockOrCheckThatFailsOnceStopped(): Promise<void> {
+    const cases: [(fixture: UpdateControllerFixture, failure: Promise<boolean>) => void, number, number][] = [
+      [(fixture, failure) => fixture.lock.acquire = () => failure.then(() => Promise.reject(new Error("EACCES"))), 0, 1],
+      [(fixture, failure) => fixture.lock.acquire = () => failure.then(() => false), 0, 0],
+      [(fixture, failure) => fixture.updater.check = () => failure.then(() => Promise.reject(new UpdateException("TeamRun couldn't reach its update feed."))), 1, 1]
+    ];
+
+    for (const [arrange, checks, lines] of cases)
+      await UpdateControllerFixture.runAsync(async fixture => {
+        const failure = Promise.withResolvers<boolean>();
+        arrange(fixture, failure.promise);
+        await fixture.controller.startAsync();
+
+        fixture.controller.act("Check");
+        await Condition.waitAsync(() => fixture.lock.acquires === 1 && fixture.updater.checks === checks);
+        fixture.controller.stop();
+        failure.resolve(true);
+        await Condition.waitAsync(() => fixture.lines.length === lines);
+        await new Promise(resolve => setImmediate(resolve));
+
+        Assert.areEqual(JSON.stringify(["Checking"]), JSON.stringify(fixture.kinds));
+        Assert.areEqual("Checking", fixture.controller.status.kind);
+        Assert.areEqual(checks, fixture.lock.releases);
+      });
+  }
+
+  @TestMethod
+  public adoptsAReadyUpdateAnotherDesktopRecordedInsteadOfCheckingAndKeepsARecordItCannotUse(): Promise<void> {
+    return UpdateControllerFixture.runAsync(async fixture => {
+      await fixture.controller.startAsync();
+      fixture.record.kept = { ...fixture.ready, version: "1.2.0" };
+
+      fixture.controller.act("Check");
+      await fixture.publishedAsync(2);
+      await Condition.waitAsync(() => fixture.lock.releases === 1);
+      const kept = fixture.record.kept;
+      fixture.record.kept = { ...fixture.ready, notified: true };
+      fixture.controller.act("Check");
+      await fixture.publishedAsync(4);
+      await fixture.controller.notifyAsync();
+
+      Assert.areEqual(JSON.stringify({ ...fixture.ready, version: "1.2.0" }), JSON.stringify(kept));
+      Assert.areEqual(1, fixture.updater.checks);
+      Assert.areEqual(0, fixture.record.deletes);
+      Assert.areEqual(JSON.stringify(["Checking", "UpToDate", "Checking", "Ready"]), JSON.stringify(fixture.kinds));
+      Assert.areEqual(JSON.stringify({ kind: "Ready", version: "1.3.0", progress: null, checkedAt: 1_000, reason: null, mustMove: false }), JSON.stringify(fixture.controller.status.toJson()));
+      Assert.areEqual(0, fixture.updater.downloads);
+      Assert.areEqual(0, fixture.posts.length);
+      Assert.areEqual(0, fixture.lines.length);
+      Assert.areEqual(2, fixture.lock.releases);
     });
   }
 

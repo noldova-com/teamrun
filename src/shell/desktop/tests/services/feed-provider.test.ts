@@ -56,7 +56,7 @@ export class FeedProviderTests {
   @TestMethod
   public async saysTheFeedIsUnreachableWhenTheFetchFails(): Promise<void> {
     const cause = new Error("net::ERR_NAME_NOT_RESOLVED");
-    const source = new FeedSource(FeedProviderTests.FEED, "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", () => Promise.reject(cause), 30_000);
+    const source = new FeedSource(FeedProviderTests.FEED, "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", () => Promise.reject(cause));
     const provider = new FeedProvider({ source }, null, FeedProviderTests.OPTIONS);
 
     const failure = await Assert.throwsAsync(() => provider.getLatestVersion(), UpdateException);
@@ -67,18 +67,20 @@ export class FeedProviderTests {
 
   @TestMethod
   public async givesUpOnAFeedThatDoesNotAnswerInTime(): Promise<void> {
-    const signals: AbortSignal[] = [];
+    const signals: unknown[] = [];
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
     const source = new FeedSource(FeedProviderTests.FEED, "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", (_, signal) => {
       signals.push(signal);
-      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted", { cause: signal.reason }))));
-    }, 20);
+      return Promise.reject(timeout);
+    });
     const provider = new FeedProvider({ source }, null, FeedProviderTests.OPTIONS);
 
     const failure = await Assert.throwsAsync(() => provider.getLatestVersion(), UpdateException);
 
     Assert.areEqual("TeamRun couldn't reach its update feed.", failure.message);
-    Assert.isTrue(signals[0]?.aborted === true);
-    Assert.areEqual(signals[0]?.reason, Reflect.get(Object(failure.cause), "cause"));
+    Assert.areEqual(timeout, failure.cause);
+    Assert.isTrue(signals[0] instanceof AbortSignal);
+    Assert.isTrue(signals[0] instanceof AbortSignal && !signals[0].aborted);
   }
 
   @TestMethod
@@ -151,7 +153,7 @@ export class FeedProviderTests {
     const source = new FeedSource(FeedProviderTests.FEED, "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", url => {
       requested.push(url);
       return Promise.resolve(response);
-    }, 30_000);
+    });
     await run(new FeedProvider({ source }, null, FeedProviderTests.OPTIONS), requested);
   }
 }

@@ -224,7 +224,7 @@ export class DesktopApplication {
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
     createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null,
-    createUpdateLock: (installation: Installation) => IUpdateCheckLock): void {
+    createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
@@ -261,7 +261,7 @@ export class DesktopApplication {
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
-      spelling, installation, () => recordDesktopAsync(installation), createUpdater(installation, t => log.write(t)), createUpdateLock(installation));
+      spelling, installation, () => recordDesktopAsync(installation), createUpdater(installation, t => log.write(t)), createUpdateLock(installation, t => log.write(t)));
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }

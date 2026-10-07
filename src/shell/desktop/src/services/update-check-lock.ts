@@ -22,24 +22,26 @@ export class UpdateCheckLock implements IUpdateCheckLock {
   private readonly file: string;
   private readonly stampAsync: () => Promise<UpdateProcess | null>;
   private readonly isRunningAsync: (holder: UpdateProcess) => Promise<boolean>;
+  private readonly log: (text: string) => void;
+  private holder: string | null = null;
   private held: string | null = null;
 
-  public constructor(folder: string, stampAsync: () => Promise<UpdateProcess | null>, isRunningAsync: (holder: UpdateProcess) => Promise<boolean>) {
+  public constructor(folder: string, stampAsync: () => Promise<UpdateProcess | null>, isRunningAsync: (holder: UpdateProcess) => Promise<boolean>, log: (text: string) => void) {
     this.folder = folder;
     this.file = join(folder, Resources.updateCheckLockFile);
     this.stampAsync = stampAsync;
     this.isRunningAsync = isRunningAsync;
+    this.log = log;
   }
 
   public async tryAcquireAsync(): Promise<boolean> {
-    const holder = await this.stampAsync();
-    if (Object.isNull(holder))
-      throw new UpdateException(Resources.updateCheckerUnknown);
-    const text = JSON.stringify(holder.toJson());
+    const text = await this.identifyAsync();
     await mkdir(this.folder, { recursive: true });
     if (await this.createAsync(text))
       return this.hold(text);
     const current = await readFile(this.file, Resources.textEncoding).catch(() => null);
+    if (current === text)
+      return this.hold(text);
     if (Object.isNull(current) || await this.isHeldAsync(current) || !await this.removeAsync(current))
       return false;
     return await this.createAsync(text) && this.hold(text);
@@ -48,8 +50,24 @@ export class UpdateCheckLock implements IUpdateCheckLock {
   public async releaseAsync(): Promise<void> {
     const held = this.held;
     this.held = null;
-    if (!Object.isNull(held))
+    if (Object.isNull(held))
+      return;
+    try {
       await this.removeAsync(held);
+    }
+    catch (error) {
+      this.log(Resources.formatUpdateLockLeft(String(error)));
+    }
+  }
+
+  private async identifyAsync(): Promise<string> {
+    if (Object.isNull(this.holder)) {
+      const holder = await this.stampAsync();
+      if (Object.isNull(holder))
+        throw new UpdateException(Resources.updateCheckerUnknown);
+      this.holder = JSON.stringify(holder.toJson());
+    }
+    return this.holder;
   }
 
   private hold(text: string): boolean {
@@ -65,15 +83,30 @@ export class UpdateCheckLock implements IUpdateCheckLock {
   private async createAsync(text: string): Promise<boolean> {
     const temporary = this.temporaryName();
     await writeFile(temporary, text);
-    const isCreated = await link(temporary, this.file).then(() => true, () => false);
-    await rm(temporary, { force: true });
-    return isCreated;
+    try {
+      await link(temporary, this.file);
+      return true;
+    }
+    catch (error) {
+      if (!UpdateCheckLock.hasCode(error, Resources.existingErrorCode))
+        throw error;
+      return false;
+    }
+    finally {
+      await rm(temporary, { force: true });
+    }
   }
 
   private async removeAsync(text: string): Promise<boolean> {
     const claimed = this.temporaryName();
-    if (!await rename(this.file, claimed).then(() => true, () => false))
+    try {
+      await rename(this.file, claimed);
+    }
+    catch (error) {
+      if (!UpdateCheckLock.hasCode(error, Resources.missingErrorCode))
+        throw error;
       return false;
+    }
     const isJudged = await readFile(claimed, Resources.textEncoding) === text;
     await (isJudged ? rm(claimed, { force: true }) : rename(claimed, this.file));
     return isJudged;
@@ -81,6 +114,10 @@ export class UpdateCheckLock implements IUpdateCheckLock {
 
   private temporaryName(): string {
     return `${this.file}.${randomUUID()}${Resources.temporarySuffix}`;
+  }
+
+  private static hasCode(error: unknown, code: string): boolean {
+    return Object.isObject(error) && Reflect.get(error, Resources.errorCodeField) === code;
   }
 
   private static parse(text: string): UpdateProcess | null {

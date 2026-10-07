@@ -179,7 +179,8 @@ export class UpdateController {
       return;
     }
     try {
-      await this.checkHeldAsync(previous, isRequested);
+      if (!this.isStopped)
+        await this.checkHeldAsync(previous, isRequested);
     }
     finally {
       await this.lock.releaseAsync().catch((error: unknown) => this.log(Resources.formatUpdateCheckNotReleased(String(error))));
@@ -187,6 +188,12 @@ export class UpdateController {
   }
 
   private async checkHeldAsync(previous: UpdateStatus, isRequested: boolean): Promise<void> {
+    const found = await this.inspectRecordAsync();
+    if (found instanceof UpdateReadyRecord) {
+      this.ready = found;
+      this.set(new UpdateStatus(UpdateStateKind.Ready, found.version, null, previous.checkedAt, null, false));
+      return;
+    }
     let version: string | null;
     try {
       version = await this.updater.checkAsync();
@@ -236,27 +243,31 @@ export class UpdateController {
   }
 
   private async readRecordAsync(): Promise<UpdateReadyRecord | null> {
-    let reason: string;
+    const found = await this.inspectRecordAsync();
+    if (!Object.isString(found))
+      return found;
+    this.log(Resources.formatUpdateRecordDropped(found));
+    await this.record.deleteAsync().catch((error: unknown) => this.log(Resources.formatUpdateRecordDropped(String(error))));
+    return null;
+  }
+
+  private async inspectRecordAsync(): Promise<UpdateReadyRecord | string | null> {
     try {
       const json = await this.record.readAsync();
       if (Object.isNull(json))
         return null;
       const record = UpdateReadyRecord.fromJson(json);
       if (!UpdateController.isNewer(record.version, this.currentVersion))
-        reason = Resources.formatUpdateInstalled(record.version);
-      else if (record.file !== this.updater.packagePath)
-        reason = Resources.updateFileElsewhere;
-      else if (await UpdateController.hashFileAsync(record.file).catch(() => null) !== record.sha512)
-        reason = Resources.updateFileChanged;
-      else
-        return record;
+        return Resources.formatUpdateInstalled(record.version);
+      if (record.file !== this.updater.packagePath)
+        return Resources.updateFileElsewhere;
+      if (await UpdateController.hashFileAsync(record.file).catch(() => null) !== record.sha512)
+        return Resources.updateFileChanged;
+      return record;
     }
     catch (error) {
-      reason = String(error);
+      return String(error);
     }
-    this.log(Resources.formatUpdateRecordDropped(reason));
-    await this.record.deleteAsync().catch((error: unknown) => this.log(Resources.formatUpdateRecordDropped(String(error))));
-    return null;
   }
 
   private fail(previous: UpdateStatus, isRequested: boolean, error: unknown): void {
@@ -272,6 +283,8 @@ export class UpdateController {
   }
 
   private set(status: UpdateStatus): void {
+    if (this.isStopped)
+      return;
     this.current = status;
     this.publish(status);
   }

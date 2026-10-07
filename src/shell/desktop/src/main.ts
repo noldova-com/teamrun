@@ -87,4 +87,4 @@ DesktopApplication.start(
     const check = new PublisherCheck(product.windowsPublisher, verifySignature, log, Date.now);
     return new FeedUpdater(updater, source, installation.folder, getAppCacheDir(), product.slug, updater instanceof NsisUpdater ? t => check.checkAsync(t) : null, log);
   },
-  installation => new UpdateCheckLock(installation.folder, async () => (await presence.stampAsync([[process.pid, Resources.clientName]]))[0] ?? null, t => presence.isRunningAsync(t)));
+  (installation, log) => new UpdateCheckLock(installation.folder, async () => (await presence.stampAsync([[process.pid, Resources.clientName]]))[0] ?? null, t => presence.isRunningAsync(t), log));

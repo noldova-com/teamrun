@@ -32,7 +32,7 @@ export class FeedProvider extends Provider<UpdateInfo> {
 
   public async getLatestVersion(): Promise<UpdateInfo> {
     const requested = new URL(this.source.channelFile, this.source.feed);
-    const signal = AbortSignal.timeout(this.source.timeout);
+    const signal = AbortSignal.timeout(Resources.updateFeedTimeout);
     const response = await FeedProvider.reach(this.source.fetchAsync(requested.href, signal));
     if (!response.ok)
       throw new UpdateException(Resources.formatUpdateFeedRefused(response.status));
