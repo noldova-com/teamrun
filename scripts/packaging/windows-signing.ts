@@ -55,6 +55,10 @@ export default class WindowsSigning implements IPackageSigning {
     return this.module.prepareAsync(this.packages);
   }
 
+  public finishAsync(): Promise<void> {
+    return Promise.resolve();
+  }
+
   public async verifyAsync(packages: readonly string[], product: ProductIdentity): Promise<string> {
     const folder = [WindowsSigning.FOLDER_PREFIX, ...(this.target.architecture === WindowsSigning.X64 ? [] : [this.target.architecture]), WindowsSigning.UNPACKED_FOLDER_SUFFIX]
       .join("-");
