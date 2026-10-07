@@ -1164,6 +1164,13 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
 The updater and the desktop's update stop divide an update at the person's Restart to update:
 
 - The updater owns checking the feed, downloading, validating, the update's states and everything the person sees of them, and the handoff, which replaces the application files the way its platform does.
+  The handoff is the desktop's own step for each platform, never the update library's install, which would quit the desktop itself and name no process:
+  - Right before it, the download's size and SHA-512 are checked again, and on Windows the installer's signature by the publisher, so a file changed after its download is never installed.
+  - Windows starts the installer quietly, without the desktop's inherited handles, and names it as the process that took the handoff.
+  - macOS has Squirrel.Mac install from the ZIP and names its ShipIt process, which replaces the application once the desktop has quit.
+  - Linux copies the download to a file with a unique name beside the AppImage, created only when no file has that name, gives it the AppImage's permissions, flushes it to disk and renames it over the AppImage, following a link to the file it names.
+    So the AppImage is always one whole version, and no process takes the handoff.
+    A folder that cannot be written refuses the handoff, and any failure removes the copy and leaves the AppImage as it was.
 - The update stop owns everything from the work question to the handoff: it stops every process of the installation, as [Stopping for an update](#stopping-for-an-update) describes, and then calls the handoff.
 - On Windows and macOS the platform's installer starts the new version.
   After an AppImage update the update stop starts it, once the old process has exited, from outside the old AppImage and without its open descriptors, because a process holding the old version's files keeps the replaced AppImage mounted.

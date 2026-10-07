@@ -41,6 +41,14 @@ describe("HeightLedger", () => {
     expect(new HeightLedger(0, 100).rangeFor(0, 500, 600)).toBe(VirtualRange.empty);
   });
 
+  it("gives no negative space below the rows when fractional heights add up differently in the total and the offsets", () => {
+    const ledger = new HeightLedger(2, 1);
+    ledger.measure(0, 0.2);
+    ledger.measure(1, 0.1);
+
+    expect([ledger.offsetOf(2) > ledger.total, ledger.rangeFor(0, 100, 0).bottom]).toEqual([true, 0]);
+  });
+
   it("anchors to the row under a position and finds that place again after rows above it change, are inserted or removed", () => {
     const ledger = new HeightLedger(10, 100);
     const anchor = ledger.anchorAt(250);

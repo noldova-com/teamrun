@@ -9,10 +9,12 @@
 export class VirtualListPageRead {
   public readonly start: number;
   public readonly end: number;
+  public readonly lastUpdate: number;
   public readonly controller: AbortController = new AbortController();
 
-  public constructor(start: number, end: number) {
+  public constructor(start: number, end: number, lastUpdate: number) {
     this.start = start;
     this.end = end;
+    this.lastUpdate = lastUpdate;
   }
 }

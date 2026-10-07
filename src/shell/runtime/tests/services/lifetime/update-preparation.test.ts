@@ -8,12 +8,12 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import "@noldova/teamrun-foundation-core";
-import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
+import { Assert, TestClass, TestMethod, Wait } from "@noldova/teamrun-foundation-testing";
 import { FailureCode, Request, ShellEvents, ShellMethods, UpdateReady, UpdateRequest, UpdateSaved } from "@noldova/teamrun-shell-protocol";
 import { ProcessPresence, RuntimeBuild, ServerSettings, UpdateBarrierState } from "@noldova/teamrun-shell-runtime";
 
@@ -21,6 +21,7 @@ import { CommandLinePatchFixture } from "../../fixtures/command-line-patch.fixtu
 import { RuntimeHostFixture } from "../../fixtures/runtime-host.fixture.js";
 import { SystemCommandFixture } from "../../fixtures/system-command.fixture.js";
 import { TemporaryFolderFixture } from "../../fixtures/temporary-folder.fixture.js";
+import { UnreadableFileFixture } from "../../fixtures/unreadable-file.fixture.js";
 import { UpdateBarrierFixture } from "../../fixtures/update-barrier.fixture.js";
 import { WindowsProcessApiFixture } from "../../fixtures/windows-process-api.fixture.js";
 
@@ -202,12 +203,10 @@ export class UpdatePreparationTests {
 
       desktop.sendMessages(new Request("desktop:1", ShellMethods.update, new UpdateRequest(installation.folder).toJson()));
       const [responses] = await RuntimeHostFixture.readMessagesAsync(desktop, 2);
-      await rm(installation.barrierFile);
-      await mkdir(installation.barrierFile);
-      await delay(200);
-      const [, unreadable] = await fixture.handshakeAsync("unreadable", RuntimeBuild.identity);
-      await rm(installation.barrierFile, { recursive: true });
-      await writeFile(installation.barrierFile, "{\"holder\":");
+      const [isRead, [, unreadable]] = await UpdatePreparationTests.readWhileUnreadableAsync(installation.barrierFile,
+        () => fixture.handshakeAsync("unreadable", RuntimeBuild.identity));
+      await writeFile(`${installation.barrierFile}.part`, "{\"holder\":");
+      await rename(`${installation.barrierFile}.part`, installation.barrierFile);
       await delay(200);
       const [, unparsable] = await fixture.handshakeAsync("unparsable", RuntimeBuild.identity);
       await rm(installation.barrierFile);
@@ -215,9 +214,16 @@ export class UpdatePreparationTests {
       const [, late] = await fixture.handshakeAsync("late", RuntimeBuild.identity);
 
       Assert.isTrue(UpdateReady.fromJson(responses.get("desktop:1")?.payload).isReady);
+      Assert.isTrue(isRead, "the runtime did not read the unreadable barrier");
       Assert.areEqual(FailureCode.Updating, unreadable.failure?.code);
       Assert.areEqual(FailureCode.Updating, unparsable.failure?.code);
       Assert.isFalse(late.hasFailed);
     });
+  }
+
+  private static async readWhileUnreadableAsync<T>(file: string, readAsync: () => Promise<T>): Promise<[boolean, T]> {
+    using barrier = new UnreadableFileFixture(file);
+    const isRead = await Wait.untilAsync(() => barrier.refused > 0, 5_000, 20);
+    return [isRead, await readAsync()];
   }
 }
