@@ -332,7 +332,10 @@ export class DesktopApplication {
       if (!this.keepsRunningWithoutWindows())
         app.quit();
     });
-    app.on(Resources.willQuitEvent, () => this.release());
+    app.on(Resources.willQuitEvent, () => {
+      this.release();
+      this.startup.close();
+    });
     void app.whenReady().then(() => this.ready());
   }
 
@@ -857,7 +860,6 @@ export class DesktopApplication {
     this.updates?.stop();
     this.trayHosts.stop();
     this.tray.dispose();
-    this.startup.close();
   }
 
   private async quitAndInstallAsync(): Promise<unknown> {
