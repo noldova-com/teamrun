@@ -88,11 +88,11 @@ class RequireLinkedIssueTests {
       }
     });
 
-    test("the check reads the pull request with read-only permissions and runs for every change to its description and every merge group", async () => {
+    test("the check reads the pull request with read-only permissions and runs for every change to its description and every merge group, and no run cancels another", async () => {
       const text = (await WorkflowFileFixture.readAsync("require-linked-issue.yml")).text;
       assert.ok(text.includes("  pull_request:\n    branches: [main]\n    types: [opened, edited, synchronize, reopened, ready_for_review]\n  merge_group:\n    types: [checks_requested]\n"));
       assert.ok(text.includes("permissions:\n  issues: read\n  pull-requests: read\n"));
-      assert.ok(text.includes("  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}\n"));
+      assert.doesNotMatch(text, /concurrency|cancel-in-progress/);
       assert.ok(text.includes("          PR_NUMBER: ${{ github.event.pull_request.number }}\n          QUEUE_BRANCH: ${{ github.event.merge_group.head_ref }}\n"));
       assert.doesNotMatch(text, /: write|actions\/checkout/);
       assert.ok(text.includes("    name: Require linked issue\n"));
