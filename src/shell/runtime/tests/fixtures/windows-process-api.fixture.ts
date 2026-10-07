@@ -89,6 +89,13 @@ export class WindowsProcessApiFixture implements IWindowsProcessApi {
     return !WindowsProcessApiFixture.isRunning(this.find(handle));
   }
 
+  public openFileForReading(file: string): bigint | number {
+    this.opened.push(file);
+    const handle = this.nextHandle++;
+    this.handles.set(handle, [0, 0]);
+    return handle;
+  }
+
   public closeHandle(handle: bigint): void {
     this.find(handle);
     this.handles.delete(handle);

@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <windows.h>
 #include <tlhelp32.h>
+#include <wchar.h>
 #include <node_api.h>
 
 #define IMAGE_PATH_LENGTH 32768
@@ -52,7 +53,7 @@ static bool read_handle(napi_env env, napi_callback_info info, HANDLE *handle) {
   if (!read_arguments(env, info, 1, &value))
     return false;
   if (napi_get_value_bigint_uint64(env, value, &number, &is_lossless) != napi_ok || !is_lossless || number == 0) {
-    napi_throw_type_error(env, NULL, "The Windows process addon expects a handle from openProcess.");
+    napi_throw_type_error(env, NULL, "The Windows process addon expects a handle from openProcess or openFileForReading.");
     return false;
   }
   *handle = (HANDLE)(uintptr_t)number;
@@ -182,6 +183,45 @@ static napi_value has_exited(napi_env env, napi_callback_info info) {
   return to_boolean(env, WaitForSingleObject(handle, 0) == WAIT_OBJECT_0);
 }
 
+static napi_value open_file_for_reading(napi_env env, napi_callback_info info) {
+  napi_value value;
+  napi_value result;
+  size_t length = 0;
+  WCHAR *path;
+  HANDLE handle;
+  DWORD error;
+  if (!read_arguments(env, info, 1, &value))
+    return NULL;
+  if (napi_get_value_string_utf16(env, value, NULL, 0, &length) != napi_ok) {
+    napi_throw_type_error(env, NULL, "The Windows process addon expects a file's path as a string.");
+    return NULL;
+  }
+  path = malloc((length + 1) * sizeof(WCHAR));
+  if (path == NULL) {
+    napi_throw_error(env, NULL, "The Windows process addon could not allocate memory for a file's path.");
+    return NULL;
+  }
+  if (napi_get_value_string_utf16(env, value, (char16_t *)path, length + 1, &length) != napi_ok) {
+    free(path);
+    return fail(env);
+  }
+  if (wcslen(path) != length) {
+    free(path);
+    napi_throw_type_error(env, NULL, "The Windows process addon expects a file's path without a null character.");
+    return NULL;
+  }
+  handle = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  error = GetLastError();
+  free(path);
+  if (handle == INVALID_HANDLE_VALUE)
+    return napi_create_uint32(env, error, &result) == napi_ok ? result : fail(env);
+  if (napi_create_bigint_uint64(env, (uint64_t)(uintptr_t)handle, &result) != napi_ok) {
+    CloseHandle(handle);
+    return fail(env);
+  }
+  return result;
+}
+
 static napi_value close_handle(napi_env env, napi_callback_info info) {
   HANDLE handle;
   if (read_handle(env, info, &handle))
@@ -197,6 +237,7 @@ NAPI_MODULE_INIT() {
     { "readImagePath", NULL, read_image_path, NULL, NULL, NULL, napi_enumerable, NULL },
     { "terminateProcess", NULL, terminate_process, NULL, NULL, NULL, napi_enumerable, NULL },
     { "hasExited", NULL, has_exited, NULL, NULL, NULL, napi_enumerable, NULL },
+    { "openFileForReading", NULL, open_file_for_reading, NULL, NULL, NULL, napi_enumerable, NULL },
     { "closeHandle", NULL, close_handle, NULL, NULL, NULL, napi_enumerable, NULL }
   };
   return napi_define_properties(env, exports, sizeof(functions) / sizeof(functions[0]), functions) == napi_ok ? exports : fail(env);

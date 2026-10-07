@@ -118,6 +118,7 @@ export class RuntimeApiTests {
       "Installation",
       "ProcessPresence",
       "WindowsFolderProtector",
+      "WindowsProcessApi",
       "WorkInProgressException",
       "WorkItem",
       "WorkTracker"

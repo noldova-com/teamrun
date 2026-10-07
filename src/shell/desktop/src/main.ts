@@ -7,7 +7,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { homedir } from "node:os";
+import { devNull, homedir } from "node:os";
 import { isatty } from "node:tty";
 import { promisify } from "node:util";
 
@@ -33,7 +33,7 @@ import { PublisherCheck } from "./services/publisher-check.js";
 import { UpdateCheckLock } from "./services/update-check-lock.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
 
-const starter = process.platform === Resources.windowsPlatform ? new UtilityProcessStarter(utilityProcess) : new ChildProcessStarter();
+const starter = process.platform === Resources.windowsPlatform ? new UtilityProcessStarter(utilityProcess, process.env) : new ChildProcessStarter();
 const programs = new ChildProgramHost(process.platform, Resources.programTimeout);
 const presence = ProcessPresence.create(process.platform, new SystemCommand());
 
@@ -70,6 +70,9 @@ DesktopApplication.start(
     isTerminal: Resources.standardDescriptors.some(t => isatty(t)),
     startDetached: (path, args, onFailure) => programs.startDetached(path, args, process.env, onFailure),
     startDetachedAsync: (path, args, environment, folder) => programs.startDetachedAsync(path, args, environment, folder),
+    startApartAsync: async (path, args, environment) => {
+      await new UtilityProcessStarter(utilityProcess, process.env, process.cwd()).startAsync(path, args, environment, devNull);
+    },
     endProcess: t => process.kill(t, "SIGKILL"),
     onUncaughtException: t => process.on(Resources.uncaughtExceptionEvent, t),
     onUnhandledRejection: t => process.on(Resources.unhandledRejectionEvent, t)

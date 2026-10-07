@@ -225,8 +225,13 @@ export class FeedUpdaterTests {
       await writeFile(updater.packagePath, "TeamRun 1.3.0");
       app.download = () => Promise.resolve([updater.packagePath]);
 
+      const before = updater.downloadedFile;
       const signed = await updater.downloadAsync(() => undefined);
       const kept = existsSync(signed);
+      const downloaded = updater.downloadedFile;
+      const again = updater.downloadAsync(() => undefined);
+      const during = updater.downloadedFile;
+      await again;
       failure = "The signature is not the publisher's.";
       const unsigned = await Assert.throwsAsync(() => updater.downloadAsync(() => undefined), UpdateException);
       const isDeleted = !existsSync(updater.packagePath);
@@ -238,6 +243,9 @@ export class FeedUpdaterTests {
       }
 
       Assert.areEqual(updater.packagePath, signed);
+      Assert.isNull(before);
+      Assert.areEqual(updater.packagePath, downloaded);
+      Assert.isNull(during);
       Assert.isTrue(kept);
       Assert.areEqual("The update isn't signed by the publisher.", unsigned.message);
       Assert.isTrue(isDeleted);
@@ -245,7 +253,7 @@ export class FeedUpdaterTests {
       Assert.isTrue(existsSync(updater.packagePath));
       Assert.areEqual(1, lines.length);
       Assert.isTrue(lines[0]?.startsWith("The update that failed its publisher check could not be deleted: Error: EBUSY") === true, lines[0]);
-      Assert.areEqual(JSON.stringify([updater.packagePath, updater.packagePath, updater.packagePath]), JSON.stringify(checked));
+      Assert.areEqual(JSON.stringify(Array(4).fill(updater.packagePath)), JSON.stringify(checked));
     });
   }
 

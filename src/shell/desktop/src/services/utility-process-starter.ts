@@ -8,6 +8,7 @@
 
 import { fileURLToPath } from "node:url";
 
+import "@noldova/teamrun-foundation-core";
 import { type IProcessStarter, LaunchException } from "@noldova/teamrun-shell-runtime";
 
 import type { IUtilityProcessHost } from "../interfaces/i-utility-process-host.js";
@@ -17,10 +18,14 @@ import { Resources } from "../resources.js";
 
 export class UtilityProcessStarter implements IProcessStarter {
   private readonly host: IUtilityProcessHost;
+  private readonly environment: NodeJS.ProcessEnv;
+  private readonly workingDirectory: string | null;
   private readonly entryPath: string;
 
-  public constructor(host: IUtilityProcessHost, entryPath: string = UtilityProcessStarter.entryPath) {
+  public constructor(host: IUtilityProcessHost, environment: NodeJS.ProcessEnv, workingDirectory: string | null = null, entryPath: string = UtilityProcessStarter.entryPath) {
     this.host = host;
+    this.environment = environment;
+    this.workingDirectory = workingDirectory;
     this.entryPath = entryPath;
   }
 
@@ -30,7 +35,12 @@ export class UtilityProcessStarter implements IProcessStarter {
 
   public startAsync(executable: string, launchArguments: readonly string[], environment: NodeJS.ProcessEnv, errorFile: string): Promise<number> {
     const request = new DetachedStartRequest(executable, launchArguments, errorFile, environment);
-    const starter = this.host.fork(this.entryPath, [], { stdio: Resources.ignoredStdio, serviceName: Resources.starterServiceName });
+    const starter = this.host.fork(this.entryPath, [], {
+      stdio: Resources.ignoredStdio,
+      serviceName: Resources.starterServiceName,
+      env: { ...this.environment, [Resources.noConsoleVariable]: Resources.noConsoleValue },
+      ...(Object.isNull(this.workingDirectory) ? {} : { cwd: this.workingDirectory })
+    });
     return new Promise<number>((resolve, reject) => {
       starter.once(Resources.messageEvent, (message: unknown) => {
         starter.postMessage(Resources.starterAcknowledgement);

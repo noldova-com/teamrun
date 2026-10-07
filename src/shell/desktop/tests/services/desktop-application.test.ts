@@ -26,6 +26,7 @@ import { type IIpcEvent, PathCommandException, PathCommandOutcome, UpdateExcepti
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
+import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDeviceFiles } from "../fixtures/fake-device-files.fixture.js";
@@ -2058,7 +2059,7 @@ export class DesktopApplicationTests {
     const connection = new FakeRuntimeConnection();
     const lock = new FakeUpdateCheckLock();
     const electron = await DesktopApplicationTests.startWithUpdaterAsync(process, updater, files, connection, new FakeElectron(), new FakeDeviceIdentity(), lock);
-    await Condition.waitAsync(() => connection.payloads.some(t => JSON.stringify(t).includes("shell.updateChecks")));
+    await Condition.waitAsync(() => connection.payloads.some(t => JSON.stringify(t).includes("shell.updateChecks")) && files.updateReady.reads === 1);
     const window = DesktopStartFixture.firstWindow(electron);
     const trusted = DesktopStartFixture.trustedEvent("linux");
 
@@ -2078,6 +2079,25 @@ export class DesktopApplicationTests {
     Assert.areEqual(3, files.updateReady.reads);
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The updater reported: started").length);
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The update lock reported: started").length);
+  }
+
+  @TestMethod
+  public async logsALeftoverHandoffFolderItCannotRemoveBeforeStartingItsUpdates(): Promise<void> {
+    const electron = new FakeElectron();
+    const process = new FakeDesktopProcess("linux");
+    const installations: Installation[] = [];
+    DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(), installations, () => Promise.resolve(true),
+      () => new FakeUpdater());
+    const [installation] = installations;
+    Assert.isDefined(installation);
+    const handoff = join(installation.folder, "handoff");
+    using _rm = new FailingFileCallFixture("rm", handoff, "EBUSY");
+    const left = "The copy of an update's installer could not be removed, so it is removed at the next start: Error: EBUSY: operation failed, rm '";
+
+    await DesktopStartFixture.openAsync(electron);
+    await Condition.waitAsync(() => DesktopStartFixture.readErrors(process, left).length > 0);
+
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, left).length);
   }
 
   @TestMethod
@@ -2120,6 +2140,30 @@ export class DesktopApplicationTests {
       }]), JSON.stringify(connection.payloads.filter((_, index) => connection.calls[index] === "shell.postNotification")));
       Assert.areEqual(JSON.stringify([{ ...record, notified: true }]), JSON.stringify(files.updateReady.writes));
       Assert.areEqual("Ready", Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", DesktopStartFixture.trustedEvent("linux"))), "kind"));
+    });
+  }
+
+  @TestMethod
+  public waitsForItsRuntimeBeforePostingAReadyUpdateFoundAtStart(): Promise<void> {
+    return DesktopApplicationTests.withReadyFileAsync(async record => {
+      const files = new FakeDeviceFiles();
+      files.updateReady.kept = record;
+      const connection = new FakeRuntimeConnection();
+      connection.answers.set("shell.postNotification", Response.success("r", null));
+      let arrive: (connection: FakeRuntimeConnection) => void = () => undefined;
+      const process = new FakeDesktopProcess("linux");
+
+      const electron = await DesktopApplicationTests.startWithUpdaterAsync(process, new FakeUpdater(String(record["file"])), files, connection, new FakeElectron(), new FakeDeviceIdentity(),
+        new FakeUpdateCheckLock(), new FakeRuntimeLauncher(new Promise(resolve => {
+          arrive = resolve;
+        })));
+      await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", DesktopStartFixture.trustedEvent("linux"))), "kind") === "Ready");
+      const errorsBeforeReady = DesktopStartFixture.readErrors(process, "The runtime refused the ready update's notification").length;
+      arrive(connection);
+      await Condition.waitAsync(() => files.updateReady.writes.length > 0);
+
+      Assert.areEqual(0, errorsBeforeReady);
+      Assert.areEqual(1, connection.calls.filter(t => t === "shell.postNotification").length);
     });
   }
 
@@ -2210,15 +2254,21 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async stopsCheckingForUpdatesWhenQuitting(): Promise<void> {
-    const updater = new FakeUpdater();
-    const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), updater);
+  public stopsCheckingForUpdatesWhenQuitting(): Promise<void> {
+    return DesktopApplicationTests.withReadyFileAsync(async record => {
+      const updater = new FakeUpdater(String(record["file"]));
+      const files = new FakeDeviceFiles();
+      files.updateReady.kept = record;
+      const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), updater, files);
+      const trusted = DesktopStartFixture.trustedEvent("linux");
+      await Condition.waitAsync(() => Reflect.get(Object(electron.ipcMain.invoke("teamrun:readUpdate", trusted)), "kind") === "Ready");
 
-    electron.app.emit("will-quit");
-    const acted = electron.ipcMain.invoke("teamrun:updateAction", DesktopStartFixture.trustedEvent("linux"), "Check");
+      electron.app.emit("will-quit");
+      const acted = electron.ipcMain.invoke("teamrun:updateAction", trusted, "Check");
 
-    Assert.isFalse(acted as boolean);
-    Assert.areEqual(0, updater.checks);
+      Assert.isFalse(acted as boolean);
+      Assert.areEqual(0, updater.checks);
+    });
   }
 
   @TestMethod

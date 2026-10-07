@@ -72,6 +72,7 @@ import { ApplicationMenu } from "./application-menu.js";
 import { DesktopLog } from "./desktop-log.js";
 import { DeviceSettingFollower } from "./device-setting-follower.js";
 import { DeviceState } from "./device-state.js";
+import { InstallerHandoff } from "./installer-handoff.js";
 import { MenuBarTemplate } from "./menu-bar-template.js";
 import { LinkPolicy } from "./link-policy.js";
 import { MainProcessRecovery } from "./main-process-recovery.js";
@@ -127,6 +128,7 @@ export class DesktopApplication {
   private readonly trayHosts: TrayHostWatcher;
   private readonly trayIcon: DeviceSettingFollower;
   private readonly updates: UpdateController | null;
+  private readonly installationFolder: string;
   private readonly updatesOff: UpdateStatus;
   private readonly updateChecks: DeviceSettingFollower;
   private readonly spelling: SpellChecker;
@@ -140,6 +142,7 @@ export class DesktopApplication {
   private device: Promise<string | null> = Promise.resolve(null);
   private knownDevice: string | null = null;
   private isReady: boolean = false;
+  private updatesStarted: Promise<void> = Promise.resolve();
   private hasPassedBarrier: boolean = false;
   private isExiting: boolean = false;
   private runtimeQuit: Promise<void> | null = null;
@@ -213,7 +216,8 @@ export class DesktopApplication {
       t => this.followTrayIconSetting(t), t => this.log.write(t));
     this.updates = Object.isNull(updater) ? null : new UpdateController(updater, createDeviceFile(installation.folder, Resources.updateReadyFile), updateLock,
       RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
-      t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run));
+      t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run), null);
+    this.installationFolder = installation.folder;
     this.updatesOff = updatesOff;
     this.updateChecks = new DeviceSettingFollower(ShellSettings.updateChecks, Resources.automaticUpdateChecks, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.followUpdateChecksSetting(t), t => this.log.write(t));
@@ -233,6 +237,7 @@ export class DesktopApplication {
     createUpdateLock: (installation: Installation, log: (text: string) => void) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
+    TerminalRelaunch.forgetConsole(process);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
     process.onUnhandledRejection(t => recovery.receive(t, MainProcessFailureKind.UnhandledRejection));
     electron.app.setName(Resources.applicationName);
@@ -289,7 +294,7 @@ export class DesktopApplication {
       return;
     }
     app.releaseSingleInstanceLock();
-    void relaunch.startAsync().then(() => app.exit(Resources.quitExitCode), (error: unknown) => this.stayInTerminal(error));
+    void relaunch.startAsync(() => app.whenReady()).then(() => app.exit(Resources.quitExitCode), (error: unknown) => this.stayInTerminal(error));
   }
 
   private stayInTerminal(error: unknown): void {
@@ -391,7 +396,7 @@ export class DesktopApplication {
       this.open();
       this.watch.start();
       if (!Object.isNull(this.updates))
-        void this.startUpdatesAsync(this.updates);
+        this.updatesStarted = this.startUpdatesAsync(this.updates);
       void this.startup.startAsync();
     });
   }
@@ -770,9 +775,9 @@ export class DesktopApplication {
   }
 
   private async startUpdatesAsync(updates: UpdateController): Promise<void> {
+    await InstallerHandoff.clearAsync(this.installationFolder, t => this.log.write(t));
     updates.follow(this.updateChecks.value);
     await updates.startAsync();
-    await updates.notifyAsync();
   }
 
   private async refreshUpdatesAsync(): Promise<void> {
@@ -782,6 +787,7 @@ export class DesktopApplication {
     const device = await this.device;
     if (!Object.isNull(device))
       await this.updateChecks.refreshAsync(device);
+    await this.updatesStarted;
     await updates.notifyAsync();
   }
 

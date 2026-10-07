@@ -11,9 +11,10 @@ import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
 import type { SystemCommand } from "@noldova/teamrun-shell-runtime";
 
 import { UpdateHandoffException } from "../exceptions/update-handoff.exception.js";
+import type { IShipItProcess } from "../interfaces/i-ship-it-process.js";
 import { Resources } from "../resources.js";
 
-export class ShipItProcess {
+export class ShipItProcess implements IShipItProcess {
   private readonly label: string;
   private readonly command: Pick<SystemCommand, "runAsync">;
 

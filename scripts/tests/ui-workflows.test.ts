@@ -24,11 +24,12 @@ class UiWorkflowsTests {
   private static readonly BUILD_ARGUMENTS: readonly (readonly string[])[] = [
     ["--test", "--without", "notes", "--without", "alarm", "--without", "clock", "--without", "reminder", "--output", "_build/variants/no-modules"],
     ["--test", "--without", "alarm", "--without", "clock", "--output", "_build/variants/without-clock"],
+    ["--test", "--update-feed", "http://127.0.0.1:47324/", "--output", "_build/variants/update-feed"],
     ["--test"]
   ];
 
   public static register(): void {
-    test("the UI workflows build the no-modules, without-clock and full test builds in that order, prepare the development app, then type-check and run", async t => {
+    test("the UI workflows build the no-modules, without-clock, update-feed and full test builds in that order, prepare the development app, then type-check and run", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
       const runner = new ProcessRunnerFixture();
       const output = new TextOutputFixture();
@@ -76,7 +77,7 @@ class UiWorkflowsTests {
       assert.equal(currentOutput.text, "The builds of the UI workflows are current.\nprepared\n");
     });
 
-    test("a changed source file or a missing or changed output rebuilds all three", async t => {
+    test("a changed source file or a missing or changed output rebuilds all four", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
       await new UiWorkflows(repository.directory, new ProcessRunnerFixture(), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const changes: readonly [string, () => Promise<void>][] = [
@@ -97,7 +98,7 @@ class UiWorkflowsTests {
 
         await new UiWorkflows(repository.directory, runner, new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
 
-        assert.equal(runner.runs.length, 5, reason);
+        assert.equal(runner.runs.length, 6, reason);
         const unchanged = new ProcessRunnerFixture();
         await new UiWorkflows(repository.directory, unchanged, new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
         assert.equal(unchanged.runs.length, 2, reason);
@@ -124,13 +125,13 @@ class UiWorkflowsTests {
       const failure = new DesktopException("The development binary is supported on Windows, macOS and Linux only.");
 
       await assert.rejects(new UiWorkflows(repository.directory, runner, new TextOutputFixture(), new PreparedBinaryFixture(failure)).runAsync([]), failure);
-      assert.equal(runner.runs.length, 3);
+      assert.equal(runner.runs.length, 4);
     });
 
     test("a failed type check or UI run fails the command with its exit code", async t => {
       const repository = await UiWorkflowsTests.createRepositoryAsync(t);
 
-      const typeCheck = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0, 0, 2]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
+      const typeCheck = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0, 0, 0, 2]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const unknown = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([null]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const workflows = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, 0]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
       const killed = await new UiWorkflows(repository.directory, new ProcessRunnerFixture([0, null]), new TextOutputFixture(), new PreparedBinaryFixture()).runAsync([]);
@@ -172,7 +173,8 @@ class UiWorkflowsTests {
       "_build/product.json": "{\"build\":\"1\"}\n",
       "_build/window/index.html": "<html></html>\n",
       "_build/variants/no-modules/window/index.html": "<html>none</html>\n",
-      "_build/variants/without-clock/window/index.html": "<html>no clock</html>\n"
+      "_build/variants/without-clock/window/index.html": "<html>no clock</html>\n",
+      "_build/variants/update-feed/window/index.html": "<html>update feed</html>\n"
     });
   }
 }
