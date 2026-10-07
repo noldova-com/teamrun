@@ -33,7 +33,7 @@ import TextOutputFixture from "./fixtures/text-output.fixture.ts";
 class BuildTests {
   private static readonly BUILD_TIMEOUT: number = 60_000;
   private static readonly ROOT_MANIFEST: string = JSON.stringify({ teamrun: { modules: [], product: ProductIdentityFixture.json } });
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>] [--update-feed <http or https URL ending in />]]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>] [--update-feed <https URL, or http URL of localhost, ending in />]]\n";
 
   public static register(): void {
     test("a tree without packages builds nothing and succeeds", async t => {
@@ -85,6 +85,8 @@ class BuildTests {
         await readAsync(path.join(tested, "product.json")),
         await readAsync(path.join(withoutNotes, "product.json"))
       ];
+      assert.equal(await BuildTests.create(repository.directory, new TextOutputFixture(), process.env).runAsync(["--packaged"]), 0);
+      const unplaced = (await readAsync(path.join(repository.directory, "_build", "product.json")))["updateFeed"];
 
       assert.equal(
         output.text,
@@ -94,7 +96,8 @@ class BuildTests {
       assert.deepEqual(Object.keys(products[0] ?? {}), [
         "name", "slug", "applicationId", "developmentApplicationId", "dataFolder", "deviceFolders", "dataDirectoryVariable", "icons", "windowsPublisher", "updateFeed", "version", "build"
       ]);
-      assert.deepEqual([products[0]?.["windowsPublisher"], products[0]?.["updateFeed"], ...feeds], [ProductIdentityFixture.json["windowsPublisher"], null, "https://github.com/fixtureworks/studio/releases/latest/download/", "http://127.0.0.1:8080/"]);
+      assert.deepEqual([products[0]?.["windowsPublisher"], products[0]?.["updateFeed"], unplaced, ...feeds],
+        [ProductIdentityFixture.json["windowsPublisher"], null, null, "https://github.com/fixtureworks/studio/releases/latest/download/", "http://127.0.0.1:8080/"]);
       assert.equal(products[0]?.["name"], ProductIdentityFixture.json["name"]);
       assert.deepEqual(products[0]?.["deviceFolders"], ProductIdentityFixture.json["deviceFolders"]);
       assert.equal(products[0]?.["version"], "0.0.7");

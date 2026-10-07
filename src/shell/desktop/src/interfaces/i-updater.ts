@@ -7,6 +7,8 @@
  */
 
 export interface IUpdater {
+  readonly packagePath: string;
   checkAsync(): Promise<string | null>;
   downloadAsync(onProgress: (percent: number) => void): Promise<string>;
+  cancel(): void;
 }

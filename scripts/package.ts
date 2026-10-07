@@ -36,7 +36,7 @@ import ProcessException from "./processes/process.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Package {
-  private static readonly USAGE: string = "Usage: npm run package [-- [--signed] [--update-feed <http or https URL ending in />]]\n";
+  private static readonly USAGE: string = "Usage: npm run package [-- [--signed] [--update-feed <https URL, or http URL of localhost, ending in />]]\n";
   private static readonly SIGNED_OPTION: string = "--signed";
   private static readonly USAGE_EXIT_CODE: number = 2;
   private static readonly TOOL_CACHE_MANIFEST: string = "package.json";

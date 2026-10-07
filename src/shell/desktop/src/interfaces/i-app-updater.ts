@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Logger, ProgressInfo, UpdateInfo } from "electron-updater";
+import type { CancellationToken, Logger, ProgressInfo, UpdateInfo } from "electron-updater";
 
 import type { FeedSource } from "../models/feed-source.js";
 import type { FeedProvider } from "../services/feed-provider.js";
@@ -23,7 +23,7 @@ export interface IAppUpdater {
   isUpdateSupported: (info: UpdateInfo) => boolean | Promise<boolean>;
   setFeedURL(options: { readonly provider: "custom"; readonly updateProvider: typeof FeedProvider; readonly source: FeedSource }): void;
   checkForUpdates(): Promise<{ readonly isUpdateAvailable: boolean; readonly updateInfo: UpdateInfo } | null>;
-  downloadUpdate(): Promise<string[]>;
+  downloadUpdate(cancellationToken: CancellationToken): Promise<string[]>;
   on(event: "download-progress", listener: (info: ProgressInfo) => void): unknown;
   removeListener(event: "download-progress", listener: (info: ProgressInfo) => void): unknown;
 }

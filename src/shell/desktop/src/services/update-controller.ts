@@ -15,6 +15,7 @@ import type { JsonValue } from "@noldova/teamrun-foundation-json";
 import { UpdateStateKind } from "../enums/update-state-kind.js";
 import { UpdateException } from "../exceptions/update.exception.js";
 import type { IDeviceFileStore } from "../interfaces/i-device-file-store.js";
+import type { IUpdateCheckLock } from "../interfaces/i-update-check-lock.js";
 import type { IUpdater } from "../interfaces/i-updater.js";
 import { UpdateReadyRecord } from "../models/update-ready-record.js";
 import { UpdateStatus } from "../models/update-status.js";
@@ -23,7 +24,7 @@ import { Resources } from "../resources.js";
 export class UpdateController {
   private readonly updater: IUpdater;
   private readonly record: IDeviceFileStore;
-  private readonly hashAsync: (file: string) => Promise<string>;
+  private readonly lock: IUpdateCheckLock;
   private readonly currentVersion: string;
   private readonly mustMove: boolean;
   private readonly publish: (status: UpdateStatus) => void;
@@ -38,12 +39,13 @@ export class UpdateController {
   private lastAutomatic: number | null = null;
   private cancelTimer: (() => void) | null = null;
   private isNotifying: boolean = false;
+  private isNotifyPending: boolean = false;
   private isStopped: boolean = false;
 
   public constructor(
     updater: IUpdater,
     record: IDeviceFileStore,
-    hashAsync: (file: string) => Promise<string>,
+    lock: IUpdateCheckLock,
     currentVersion: string,
     mustMove: boolean,
     publish: (status: UpdateStatus) => void,
@@ -53,7 +55,7 @@ export class UpdateController {
     schedule: (delay: number, run: () => void) => () => void) {
     this.updater = updater;
     this.record = record;
-    this.hashAsync = hashAsync;
+    this.lock = lock;
     this.currentVersion = currentVersion;
     this.mustMove = mustMove;
     this.publish = publish;
@@ -100,18 +102,16 @@ export class UpdateController {
   }
 
   public async notifyAsync(): Promise<void> {
-    const ready = this.ready;
-    if (Object.isNull(ready) || ready.isNotified || this.isNotifying)
+    if (this.isNotifying) {
+      this.isNotifyPending = true;
       return;
+    }
     this.isNotifying = true;
     try {
-      if (!await this.postReadyAsync(ready.version))
-        return;
-      this.ready = ready.notified();
-      await this.record.writeAsync(this.ready.toJson());
-    }
-    catch (error) {
-      this.log(Resources.formatUpdateNotNotified(String(error)));
+      do {
+        this.isNotifyPending = false;
+        await this.notifyOnceAsync();
+      } while (this.isNotifyPending);
     }
     finally {
       this.isNotifying = false;
@@ -122,6 +122,28 @@ export class UpdateController {
     this.isStopped = true;
     this.cancelTimer?.();
     this.cancelTimer = null;
+    this.updater.cancel();
+  }
+
+  private async notifyOnceAsync(): Promise<void> {
+    const ready = this.ready;
+    if (Object.isNull(ready) || ready.isNotified || this.isStopped)
+      return;
+    try {
+      const stored = await this.record.readAsync();
+      const notified = Object.isNull(stored) ? null : UpdateReadyRecord.fromJson(stored);
+      if (notified?.version === ready.version && notified.isNotified) {
+        this.ready = notified;
+        return;
+      }
+      if (!await this.postReadyAsync(ready.version))
+        return;
+      this.ready = ready.notified();
+      await this.record.writeAsync(this.ready.toJson());
+    }
+    catch (error) {
+      this.log(Resources.formatUpdateNotNotified(String(error)));
+    }
   }
 
   private arm(): void {
@@ -144,17 +166,37 @@ export class UpdateController {
   private async checkAsync(isRequested: boolean): Promise<void> {
     const previous = this.current;
     this.set(new UpdateStatus(UpdateStateKind.Checking, null, null, previous.checkedAt, null, false));
+    let isHeld: boolean;
+    try {
+      isHeld = await this.lock.tryAcquireAsync();
+    }
+    catch (error) {
+      this.fail(previous, isRequested, error);
+      return;
+    }
+    if (!isHeld) {
+      this.set(isRequested ? new UpdateStatus(UpdateStateKind.Failed, null, null, previous.checkedAt, Resources.updateCheckedElsewhere, this.mustMove) : previous);
+      return;
+    }
+    try {
+      await this.checkHeldAsync(previous, isRequested);
+    }
+    finally {
+      await this.lock.releaseAsync().catch((error: unknown) => this.log(Resources.formatUpdateCheckNotReleased(String(error))));
+    }
+  }
+
+  private async checkHeldAsync(previous: UpdateStatus, isRequested: boolean): Promise<void> {
     let version: string | null;
     try {
       version = await this.updater.checkAsync();
     }
     catch (error) {
-      const reason = this.explain(error);
-      this.set(isRequested
-        ? new UpdateStatus(UpdateStateKind.Failed, null, null, previous.checkedAt, reason, this.mustMove)
-        : new UpdateStatus(previous.kind, previous.version, null, previous.checkedAt, reason, previous.mustMove));
+      this.fail(previous, isRequested, error);
       return;
     }
+    if (this.isStopped)
+      return;
     const checkedAt = this.now();
     if (Object.isNull(version))
       this.set(new UpdateStatus(UpdateStateKind.UpToDate, null, null, checkedAt, null, false));
@@ -173,12 +215,15 @@ export class UpdateController {
         if (progress !== this.current.progress)
           this.set(new UpdateStatus(UpdateStateKind.Downloading, version, progress, checkedAt, null, false));
       });
-      record = new UpdateReadyRecord(version, file, await this.hashAsync(file), false);
+      record = new UpdateReadyRecord(version, file, await UpdateController.hashFileAsync(file), false);
     }
     catch (error) {
-      this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, checkedAt, this.explain(error), false));
+      if (!this.isStopped)
+        this.set(new UpdateStatus(UpdateStateKind.Failed, null, null, checkedAt, this.explain(error), false));
       return;
     }
+    if (this.isStopped)
+      return;
     this.ready = record;
     this.set(new UpdateStatus(UpdateStateKind.Ready, version, null, checkedAt, null, false));
     try {
@@ -199,7 +244,9 @@ export class UpdateController {
       const record = UpdateReadyRecord.fromJson(json);
       if (!UpdateController.isNewer(record.version, this.currentVersion))
         reason = Resources.formatUpdateInstalled(record.version);
-      else if (await this.hashAsync(record.file) !== record.sha512)
+      else if (record.file !== this.updater.packagePath)
+        reason = Resources.updateFileElsewhere;
+      else if (await UpdateController.hashFileAsync(record.file).catch(() => null) !== record.sha512)
         reason = Resources.updateFileChanged;
       else
         return record;
@@ -210,6 +257,13 @@ export class UpdateController {
     this.log(Resources.formatUpdateRecordDropped(reason));
     await this.record.deleteAsync().catch((error: unknown) => this.log(Resources.formatUpdateRecordDropped(String(error))));
     return null;
+  }
+
+  private fail(previous: UpdateStatus, isRequested: boolean, error: unknown): void {
+    const reason = this.explain(error);
+    this.set(isRequested
+      ? new UpdateStatus(UpdateStateKind.Failed, null, null, previous.checkedAt, reason, this.mustMove)
+      : new UpdateStatus(previous.kind, previous.version, null, previous.checkedAt, reason, previous.mustMove));
   }
 
   private explain(error: unknown): string {

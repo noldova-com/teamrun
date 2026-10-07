@@ -25,7 +25,7 @@ import ProcessException from "./processes/process.exception.ts";
 import NpmCommand from "./toolchain/npm-command.ts";
 
 export default class Build {
-  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>] [--update-feed <http or https URL ending in />]]\n";
+  private static readonly USAGE: string = "Usage: npm run build [-- --test [--without <module id>]... [--output <folder>] | --packaged [--output <folder>] [--update-feed <https URL, or http URL of localhost, ending in />]]\n";
   private static readonly NO_PACKAGES: string = "No packages under src/; there is nothing to build.\n";
   private static readonly TEST_OPTION: string = "--test";
   private static readonly PACKAGED_OPTION: string = "--packaged";

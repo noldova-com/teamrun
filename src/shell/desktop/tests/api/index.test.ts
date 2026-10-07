@@ -60,6 +60,7 @@ export class DesktopApiTests {
         "TrayHostWatcher",
         "UpdateBarrierGate",
         "UpdateBarrierWatch",
+        "UpdateCheckLock",
         "UpdateController",
         "UpdateException",
         "UpdateReadyRecord",

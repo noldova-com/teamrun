@@ -736,8 +736,8 @@ The ownership database of section 6 is separate.
 | The commands each device last ran from command search | The shell, in its database, the 20 newest per device |
 | The device's last appearance preferences | The desktop, in `appearance.json` beside the device's identity, outside the data directory; a copy of the settings in effect, replaced on each change, and read before the window opens |
 | The data directories an installation's runtimes have owned, the desktops running from it, and its launch barrier | The installation's folder beside the device's identity, outside every data directory ([Stopping for an update](#stopping-for-an-update)) |
-| The installation's ready update and the updater's settings | The desktop, in `update-ready.json` and `update-config.json` in the installation's folder ([Updates](#updates)) |
-| The one-time hints the device has shown and its last tray setting | The desktop, in `device-state.json` beside the device's identity, outside the data directory; one key for each hint, such as `trayCloseHintShown`, set once the hint has shown, and `trayIcon`, the value of `shell.trayIcon` the desktop follows for the device, written each time it changes |
+| The installation's ready update, the updater's settings and its check lock | The desktop, in `update-ready.json`, `update-config.json` and `update-check.lock` in the installation's folder ([Updates](#updates)) |
+| The one-time hints the device has shown and its last tray setting | The desktop, in `device-state.json` beside the device's identity, outside the data directory; one key for each hint, such as `trayCloseHintShown`, set once the hint has shown, and `trayIcon` and `updateChecks`, the values of `shell.trayIcon` and `shell.updateChecks` the desktop follows for the device, each written when it changes |
 | Layout, window bounds and a window part's view state | The shell keeps layout and window bounds in its database, written through the runtime; the owning module keeps a part's view state in the data directory. State tied to a display or a window is kept for the device and window that recorded it. A device is identified by a random identity kept in the operating system's local application data, outside the data directory, so devices that share a data directory keep their own; the main window is `main`. Transient state stays in memory; the window keeps the transient state of the shell's own tabs, such as Settings' page, under the tab's key while the tab is open, through moves, and drops it when the tab closes |
 | Drafts and other content the person wrote but did not send | The owning module's database, saved through its runtime part |
 | Credentials an external tool manages | That tool, accessed only through its supported interfaces |
@@ -1111,14 +1111,16 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The desktop reads `latest-<platform>-<arch>.yml` for its own platform and processor from the latest release of `teamrun.product.releaseRepository` on GitHub, then downloads the package that file names from the same release, over anonymous HTTPS.
   The product file's `updateFeed` is the feed's URL, `https://github.com/<releaseRepository>/releases/latest/download/`, or `null`.
   The desktop resolves the package's name against the URL the information file came from after its redirects, so the package comes from the release that answered even when a newer release appears meanwhile.
+  A redirect to another protocol fails the check, and so does a feed that hasn't answered with the whole information file within 30 seconds.
   No repository or provider credential is placed in the application or its updater, and a private repository is not made reachable that way.
   Only the latest release is offered.
   A release to any other repository is an unsigned test release ([Publication](#publication)), so it never reaches the feed.
 - **Which builds read it.**
   The build decides, never a setting, a variable or an argument.
   `npm run package` writes the production feed into the packaged product file, and a desktop whose product file names no feed never checks, so a development build, a source build and an incompatible target never read the production feed.
+  A build names a feed only in a packaged product file it writes to an output folder, so the development copy's `_build/product.json` never names one.
   Electron counts the development copy as packaged, so `app.isPackaged` decides nothing.
-  A test build, and a package made for a native update check, name instead a local feed given to the build when it is made, with `--update-feed <url>`, an HTTP or HTTPS URL ending in `/`; `release:assets` refuses a package whose product file names any feed but the production one.
+  A test build, and a package made for a native update check, name instead a local feed given to the build when it is made, with `--update-feed <url>`, an HTTPS URL, or an HTTP URL of `localhost`, `127.0.0.1` or `[::1]`, ending in `/`; `release:assets` refuses a package whose product file names any feed but the production one.
   A desktop that never checks shows its updates as off.
   The Windows install path is checked natively with a package signed by TeamRun's publisher and served from a local feed, and the Linux AppImage path with an unsigned package from a local feed, since it checks no signature.
 - **Versions.**
@@ -1126,24 +1128,30 @@ It uses electron-updater, pinned exactly, with a provider that reads TeamRun's f
   The same version, a lower one or a version with a prerelease suffix leaves TeamRun up to date.
 - **Checks.**
   The device setting `shell.updateChecks` chooses when the desktop checks by itself: Automatically, the default, 30 seconds after it starts and then every hour while it runs; Only at start, once, 30 seconds after it starts; or Only when I ask, never.
+  The desktop remembers the value in `device-state.json` and follows it from the start, before its runtime reports the setting.
   The person can always run Check for updates.
   The desktop's own checks are skipped while a download runs or an update is ready.
+  One desktop of an installation checks at a time: a check and its download hold `update-check.lock` in the installation's folder, which names the desktop's process, and a lock whose process is gone is taken over.
+  Another desktop's check is skipped meanwhile, and one the person asked for says another TeamRun is checking.
   A failed automatic check shows only in About and the log, and the next one runs at its time; a failed check the person asked for shows as a failure.
-  A check fails when TeamRun couldn't reach its update feed, when the feed answers with an HTTP error status, which the reason names, or when the release's information is invalid.
+  A check fails when TeamRun couldn't reach its update feed, when the feed answers with an HTTP error status, which the reason names, when it redirects to another protocol, or when the release's information is invalid; any other error shows as the update stopping on an unexpected error.
 - **Validation.**
   Before downloading, the desktop checks the metadata: its version, the package named `TeamRun-<platform>-<arch>.<ext>` for its target, with a size and a SHA-512.
   After downloading, it checks the file's size and SHA-512 against it.
-  On Windows the installer must also carry a valid signature by TeamRun's publisher, the `publisher` of `teamrun.product`, and no other.
-  electron-updater's own check verifies it; a check that warns, such as one that skips itself because PowerShell doesn't answer in time, or that fails, counts as a failed check, and the desktop log records each check's duration and result.
+  On Windows the installer must also carry a valid signature by TeamRun's publisher, the `windowsPublisher` of `teamrun.product`, and no other.
+  The desktop runs electron-updater's signature check itself on every download, with the publisher from the application's product file and never from a file the person can change; a check that warns, such as one that skips itself because PowerShell doesn't answer in time, or that fails, counts as a failed check, and the desktop log records each check's duration and result.
   A file that fails is deleted and the failure shows with its reason: the release's information is invalid, the download doesn't match the release, the download was interrupted, or the update isn't signed by the publisher; any other error shows as the update stopping on an unexpected error.
+  The update stop's handoff checks the publisher again right before it starts the installer.
   Production signing, notarization and trust stay distinct from an explicitly authorized unsigned trial.
 - **Downloading.**
   A newer version a check finds downloads in the background at once, and only About shows its progress, which is unknown until the first report.
   A failed download shows its reason and can be tried again.
+  Quitting cancels a download in progress, which leaves no record.
 - **The person decides.**
   Restarting to install is the person's choice, Restart to update.
-  Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed or a newer one replaces it.
-  `update-ready.json` in the installation's folder records the ready version, its downloaded file, the file's SHA-512 and whether `shell.updateReady` was posted.
+  Closing TeamRun never installs an update, and a downloaded update stays ready across restarts until it is installed; while it is ready, the desktop doesn't check for a newer one.
+  electron-updater keeps the download in its cache folder for the installation, `<slug>-updater-<installation id>` in the user's cache folder, which `update-config.json` in the installation's folder names, so two installations never share a download.
+  `update-ready.json` in the installation's folder records the ready version, its downloaded file, the file's SHA-512 and whether `shell.updateReady` was posted; a record whose file is not the package in that cache folder's `pending` folder is removed.
   At start the desktop hashes the file again, without the network: when the version is still newer than the installed one and the file still matches, the update shows as ready; otherwise the record is removed and the next check downloads again.
 - **Restart to update.**
   Choosing it starts the [update stop](#stopping-for-an-update), and a cancelled stop leaves the update ready.

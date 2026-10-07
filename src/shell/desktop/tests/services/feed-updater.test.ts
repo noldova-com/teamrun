@@ -6,9 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import type { CancellationToken } from "electron-updater";
 
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { FeedProvider, FeedSource, FeedUpdater, type IFeedResponse, UpdateException } from "@noldova/teamrun-shell-desktop";
@@ -18,13 +21,15 @@ import { FakeAppUpdater } from "../fixtures/fake-app-updater.fixture.js";
 @TestClass
 export class FeedUpdaterTests {
   private static readonly SOURCE: FeedSource = new FeedSource("http://127.0.0.1:8080/", "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage",
-    (): Promise<IFeedResponse> => Promise.reject(new Error("offline")));
+    (): Promise<IFeedResponse> => Promise.reject(new Error("offline")), 30_000);
+  private static readonly INSTALLATION: string = join("/devices", "installations", "0123456789abcdef");
+  private static readonly PACKAGE: string = join("/cache", "teamrun-updater-0123456789abcdef", "pending", "TeamRun-linux-x64.AppImage");
 
   @TestMethod
   public setsTheUpdaterUpToCheckOnlyAndOfferOnlyReleases(): void {
     const app = new FakeAppUpdater();
 
-    new FeedUpdater(app, FeedUpdaterTests.SOURCE, "/installations/1/update-config.json", "CN=Noldova", "teamrun", () => undefined);
+    const updater = FeedUpdaterTests.create(app);
 
     Assert.areEqual(JSON.stringify([false, false, false, false, true, true]),
       JSON.stringify([app.autoDownload, app.autoInstallOnAppQuit, app.allowDowngrade, app.allowPrerelease, app.disableDifferentialDownload, app.disableWebInstaller]));
@@ -32,15 +37,15 @@ export class FeedUpdaterTests {
     Assert.isTrue(app.isUpdateSupported(FakeAppUpdater.info("1.3.0-beta.1")) === false);
     Assert.isNull(app.updateConfigPath);
     Assert.isNull(app.feed);
+    Assert.areEqual(FeedUpdaterTests.PACKAGE, updater.packagePath);
   }
 
   @TestMethod
   public setsTheFeedAfterItsSettingsFileSinceSettingTheFileDropsTheFeed(): Promise<void> {
     return FeedUpdaterTests.withFolderAsync(async folder => {
       const app = new FakeAppUpdater();
-      const updater = new FeedUpdater(app, FeedUpdaterTests.SOURCE, join(folder, "update-config.json"), "CN=Noldova", "teamrun", () => undefined);
 
-      await updater.checkAsync();
+      await FeedUpdaterTests.create(app, folder).checkAsync();
 
       Assert.areEqual("custom", app.feed?.provider);
       Assert.areEqual(FeedProvider, app.feed?.updateProvider);
@@ -53,7 +58,7 @@ export class FeedUpdaterTests {
     const app = new FakeAppUpdater();
     const lines: string[] = [];
 
-    new FeedUpdater(app, FeedUpdaterTests.SOURCE, "/installations/1/update-config.json", "CN=Noldova", "teamrun", t => lines.push(t));
+    new FeedUpdater(app, FeedUpdaterTests.SOURCE, FeedUpdaterTests.INSTALLATION, "/cache", "teamrun", null, t => lines.push(t));
     app.logger?.info("Checking for update");
     app.logger?.warn("Ignoring signature validation");
     app.logger?.error(new Error("socket hang up"));
@@ -65,8 +70,9 @@ export class FeedUpdaterTests {
   public writesItsSettingsBeforeTheFirstCheckOnlyAndGivesTheNewerVersion(): Promise<void> {
     return FeedUpdaterTests.withFolderAsync(async folder => {
       const app = new FakeAppUpdater();
-      const file = join(folder, "installations", "1", "update-config.json");
-      const updater = new FeedUpdater(app, FeedUpdaterTests.SOURCE, file, "CN=Noldova", "teamrun", () => undefined);
+      const installation = join(folder, "installations", "0123456789abcdef");
+      const file = join(installation, "update-config.json");
+      const updater = new FeedUpdater(app, FeedUpdaterTests.SOURCE, installation, "/cache", "teamrun", null, () => undefined);
       app.check = () => Promise.resolve({ isUpdateAvailable: true, updateInfo: FakeAppUpdater.info("1.3.0") });
 
       const found = await updater.checkAsync();
@@ -85,14 +91,13 @@ export class FeedUpdaterTests {
   }
 
   @TestMethod
-  public writesTheSettingsThePublisherCheckAndTheCacheRead(): Promise<void> {
+  public namesTheCacheAfterTheProductAndTheInstallationAndLeavesThePublisherOut(): Promise<void> {
     return FeedUpdaterTests.withFolderAsync(async folder => {
-      const app = new FakeAppUpdater();
-      const file = join(folder, "update-config.json");
+      const installation = join(folder, "0123456789abcdef");
 
-      await new FeedUpdater(app, FeedUpdaterTests.SOURCE, file, "CN=Noldova, O=Noldova", "teamrun", () => undefined).checkAsync();
+      await new FeedUpdater(new FakeAppUpdater(), FeedUpdaterTests.SOURCE, installation, "/cache", "teamrun", null, () => undefined).checkAsync();
 
-      Assert.areEqual(JSON.stringify({ publisherName: ["CN=Noldova, O=Noldova"], updaterCacheDirName: "teamrun-updater" }), await readFile(file, "utf8"));
+      Assert.areEqual(JSON.stringify({ updaterCacheDirName: "teamrun-updater-0123456789abcdef" }), await readFile(join(installation, "update-config.json"), "utf8"));
     });
   }
 
@@ -100,7 +105,7 @@ export class FeedUpdaterTests {
   public givesEachCheckFailureItsReason(): Promise<void> {
     return FeedUpdaterTests.withFolderAsync(async folder => {
       const app = new FakeAppUpdater();
-      const updater = new FeedUpdater(app, FeedUpdaterTests.SOURCE, join(folder, "update-config.json"), "CN=Noldova", "teamrun", () => undefined);
+      const updater = FeedUpdaterTests.create(app, folder);
       const own = new UpdateException("The update feed answered with HTTP status 404.");
       const coded = Object.assign(new Error("Cannot parse"), { code: "ERR_UPDATER_INVALID_UPDATE_INFO" });
 
@@ -116,25 +121,37 @@ export class FeedUpdaterTests {
       Assert.areEqual(own, first);
       Assert.areEqual("The release's information is invalid.", second.message);
       Assert.areEqual(coded, second.cause);
-      Assert.areEqual("TeamRun couldn't reach its update feed.", third.message);
-      Assert.areEqual("TeamRun couldn't reach its update feed.", fourth.message);
+      Assert.areEqual("The update stopped on an unexpected error.", third.message);
+      Assert.areEqual("The update stopped on an unexpected error.", fourth.message);
+    });
+  }
+
+  @TestMethod
+  public saysASettingsFileItCannotWriteIsUnexpected(): Promise<void> {
+    return FeedUpdaterTests.withFolderAsync(async folder => {
+      const blocked = join(folder, "file");
+      await writeFile(blocked, "");
+
+      const failure = await Assert.throwsAsync(() => FeedUpdaterTests.create(new FakeAppUpdater(), join(blocked, "installation")).checkAsync(), UpdateException);
+
+      Assert.areEqual("The update stopped on an unexpected error.", failure.message);
     });
   }
 
   @TestMethod
   public async reportsTheDownloadsWholePercentagesAndGivesItsFile(): Promise<void> {
     const app = new FakeAppUpdater();
-    const updater = new FeedUpdater(app, FeedUpdaterTests.SOURCE, "/installations/1/update-config.json", "CN=Noldova", "teamrun", () => undefined);
+    const updater = FeedUpdaterTests.create(app);
     const progress: number[] = [];
     app.download = () => {
       app.listener?.(FakeAppUpdater.progress(12.7));
       app.listener?.(FakeAppUpdater.progress(100));
-      return Promise.resolve(["/cache/TeamRun-linux-x64.AppImage"]);
+      return Promise.resolve([FeedUpdaterTests.PACKAGE]);
     };
 
     const file = await updater.downloadAsync(t => progress.push(t));
 
-    Assert.areEqual("/cache/TeamRun-linux-x64.AppImage", file);
+    Assert.areEqual(FeedUpdaterTests.PACKAGE, file);
     Assert.areEqual(JSON.stringify([12, 100]), JSON.stringify(progress));
     Assert.isNull(app.listener);
   }
@@ -142,7 +159,7 @@ export class FeedUpdaterTests {
   @TestMethod
   public async givesEachDownloadFailureItsReasonAndStopsListening(): Promise<void> {
     const app = new FakeAppUpdater();
-    const updater = new FeedUpdater(app, FeedUpdaterTests.SOURCE, "/installations/1/update-config.json", "CN=Noldova", "teamrun", () => undefined);
+    const updater = FeedUpdaterTests.create(app);
     const reasons: string[] = [];
 
     for (const code of ["ERR_CHECKSUM_MISMATCH", "ERR_UPDATER_INVALID_SIGNATURE", "ERR_UPDATER_NO_CHECKSUM"]) {
@@ -153,15 +170,74 @@ export class FeedUpdaterTests {
     reasons.push((await Assert.throwsAsync(() => updater.downloadAsync(() => undefined), UpdateException)).message);
     app.download = () => Promise.resolve([]);
     reasons.push((await Assert.throwsAsync(() => updater.downloadAsync(() => undefined), UpdateException)).message);
+    app.download = () => Promise.resolve([join("/cache", "elsewhere", "TeamRun-linux-x64.AppImage")]);
+    reasons.push((await Assert.throwsAsync(() => updater.downloadAsync(() => undefined), UpdateException)).message);
 
     Assert.areEqual(JSON.stringify([
       "The download doesn't match the release.",
       "The update isn't signed by the publisher.",
       "The release's information is invalid.",
       "The download was interrupted.",
-      "The download was interrupted."
+      "The download was interrupted.",
+      "The update stopped on an unexpected error."
     ]), JSON.stringify(reasons));
     Assert.isNull(app.listener);
+  }
+
+  @TestMethod
+  public cancelsTheDownloadInProgressOnly(): Promise<void> {
+    const app = new FakeAppUpdater();
+    const updater = FeedUpdaterTests.create(app);
+    const tokens: CancellationToken[] = [];
+    const download = Promise.withResolvers<string[]>();
+    app.download = t => {
+      tokens.push(t);
+      return download.promise;
+    };
+
+    updater.cancel();
+    const downloading = updater.downloadAsync(() => undefined);
+    updater.cancel();
+    const cancelled = tokens[0]?.cancelled;
+    download.reject(new Error("cancelled"));
+
+    return Assert.throwsAsync(() => downloading, UpdateException).then(failure => {
+      updater.cancel();
+      Assert.isTrue(cancelled === true);
+      Assert.areEqual("The download was interrupted.", failure.message);
+      Assert.areEqual(1, tokens.length);
+    });
+  }
+
+  @TestMethod
+  public checksThePublisherOfEachDownloadAndDeletesOneThatFails(): Promise<void> {
+    return FeedUpdaterTests.withFolderAsync(async folder => {
+      const app = new FakeAppUpdater();
+      const checked: string[] = [];
+      let failure: string | null = null;
+      const updater = new FeedUpdater(app, FeedUpdaterTests.SOURCE, FeedUpdaterTests.INSTALLATION, folder, "teamrun", t => {
+        checked.push(t);
+        return Promise.resolve(failure);
+      }, () => undefined);
+      await mkdir(join(updater.packagePath, ".."), { recursive: true });
+      await writeFile(updater.packagePath, "TeamRun 1.3.0");
+      app.download = () => Promise.resolve([updater.packagePath]);
+
+      const signed = await updater.downloadAsync(() => undefined);
+      const kept = existsSync(signed);
+      failure = "The signature is not the publisher's.";
+      const unsigned = await Assert.throwsAsync(() => updater.downloadAsync(() => undefined), UpdateException);
+
+      Assert.areEqual(updater.packagePath, signed);
+      Assert.isTrue(kept);
+      Assert.areEqual("The update isn't signed by the publisher.", unsigned.message);
+      Assert.isFalse(existsSync(updater.packagePath));
+      Assert.areEqual(JSON.stringify([updater.packagePath, updater.packagePath]), JSON.stringify(checked));
+    });
+  }
+
+  private static create(app: FakeAppUpdater, folder: string = FeedUpdaterTests.INSTALLATION): FeedUpdater {
+    return new FeedUpdater(app, FeedUpdaterTests.SOURCE, folder === FeedUpdaterTests.INSTALLATION ? folder : join(folder, "0123456789abcdef"), "/cache", "teamrun", null, () => undefined);
   }
 
   private static async withFolderAsync(run: (folder: string) => Promise<void>): Promise<void> {

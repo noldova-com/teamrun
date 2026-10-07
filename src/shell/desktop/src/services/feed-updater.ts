@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 
-import type { ProgressInfo } from "electron-updater";
+import { CancellationToken, type ProgressInfo } from "electron-updater";
 
 import "@noldova/teamrun-foundation-core";
 import { ExceptionOptions } from "@noldova/teamrun-foundation-exceptions";
@@ -26,13 +26,27 @@ export class FeedUpdater implements IUpdater {
   private readonly source: FeedSource;
   private readonly configFile: string;
   private readonly configuration: string;
+  private readonly verifyAsync: ((file: string) => Promise<string | null>) | null;
+  private cancellation: CancellationToken | null = null;
   private isConfigured: boolean = false;
 
-  public constructor(updater: IAppUpdater, source: FeedSource, configFile: string, publisher: string, productSlug: string, log: (text: string) => void) {
+  public readonly packagePath: string;
+
+  public constructor(
+    updater: IAppUpdater,
+    source: FeedSource,
+    installationFolder: string,
+    cacheRoot: string,
+    productSlug: string,
+    verifyAsync: ((file: string) => Promise<string | null>) | null,
+    log: (text: string) => void) {
+    const cacheFolder = Resources.formatUpdateCacheFolder(productSlug, basename(installationFolder));
     this.updater = updater;
     this.source = source;
-    this.configFile = configFile;
-    this.configuration = JSON.stringify({ [Resources.publisherNameField]: [publisher], [Resources.updaterCacheFolderField]: Resources.formatUpdateCacheFolder(productSlug) });
+    this.configFile = join(installationFolder, Resources.updateConfigFile);
+    this.configuration = JSON.stringify({ [Resources.updaterCacheFolderField]: cacheFolder });
+    this.verifyAsync = verifyAsync;
+    this.packagePath = join(cacheRoot, cacheFolder, Resources.pendingUpdateFolder, source.packageFile);
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
     updater.allowDowngrade = false;
@@ -50,17 +64,22 @@ export class FeedUpdater implements IUpdater {
       return Object.isNull(result) || !result.isUpdateAvailable ? null : result.updateInfo.version;
     }
     catch (error) {
-      throw FeedUpdater.explain(error, Resources.updateFeedUnreachable);
+      throw FeedUpdater.explain(error, Resources.updateFailedUnexpectedly);
     }
   }
 
   public async downloadAsync(onProgress: (percent: number) => void): Promise<string> {
     const listener = (info: ProgressInfo): void => onProgress(Math.floor(info.percent));
+    const cancellation = new CancellationToken();
+    this.cancellation = cancellation;
     this.updater.on(Resources.downloadProgressEvent, listener);
     try {
-      const [file] = await this.updater.downloadUpdate();
+      const [file] = await this.updater.downloadUpdate(cancellation);
       if (Object.isUndefined(file))
         throw new UpdateException(Resources.updateDownloadInterrupted);
+      if (file !== this.packagePath)
+        throw new UpdateException(Resources.updateFailedUnexpectedly);
+      await this.verifyPublisherAsync(file);
       return file;
     }
     catch (error) {
@@ -68,7 +87,19 @@ export class FeedUpdater implements IUpdater {
     }
     finally {
       this.updater.removeListener(Resources.downloadProgressEvent, listener);
+      this.cancellation = null;
     }
+  }
+
+  public cancel(): void {
+    this.cancellation?.cancel();
+  }
+
+  private async verifyPublisherAsync(file: string): Promise<void> {
+    if (Object.isNull(this.verifyAsync) || Object.isNull(await this.verifyAsync(file)))
+      return;
+    await rm(file, { force: true });
+    throw new UpdateException(Resources.updateNotSigned);
   }
 
   private static explain(error: unknown, otherwise: string): UpdateException {

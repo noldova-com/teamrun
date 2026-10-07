@@ -15,7 +15,7 @@ import type { MenuItemConstructorOptions } from "electron";
 
 import { Assert } from "@noldova/teamrun-foundation-testing";
 import type { Installation, LaunchSettings } from "@noldova/teamrun-shell-runtime";
-import { DesktopApplication, DesktopSettings, type IIpcEvent, type IUpdater } from "@noldova/teamrun-shell-desktop";
+import { DesktopApplication, DesktopSettings, type IIpcEvent, type IUpdateCheckLock, type IUpdater } from "@noldova/teamrun-shell-desktop";
 
 import { Condition } from "./condition.fixture.js";
 import { FakeDesktopProcess } from "./fake-desktop-process.fixture.js";
@@ -25,6 +25,7 @@ import { FakeDeviceIdentity } from "./fake-device-identity.fixture.js";
 import { FakeElectron } from "./fake-electron.fixture.js";
 import { FakePathCommand } from "./fake-path-command.fixture.js";
 import { FakeRuntimeLauncher } from "./fake-runtime-launcher.fixture.js";
+import { FakeUpdateCheckLock } from "./fake-update-check-lock.fixture.js";
 
 export class DesktopStartFixture {
   public static readonly MODULE_URL: string = pathToFileURL("/teamrun/node_modules/@noldova/teamrun-shell-desktop/main.js").href;
@@ -44,13 +45,14 @@ export class DesktopStartFixture {
     pathCommand: FakePathCommand = new FakePathCommand(),
     installations: Installation[] = [],
     recordDesktopAsync: (installation: Installation) => Promise<boolean> = () => Promise.resolve(true),
-    createUpdater: (log: (text: string) => void) => IUpdater | null = () => null): LaunchSettings[] {
+    createUpdater: (log: (text: string) => void) => IUpdater | null = () => null,
+    updateLock: IUpdateCheckLock = new FakeUpdateCheckLock()): LaunchSettings[] {
     const settings: LaunchSettings[] = [];
     DesktopApplication.start(electron, process, DesktopStartFixture.MODULE_URL, (t, installation) => {
       settings.push(t);
       installations.push(installation);
       return launcher;
-    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, log) => createUpdater(log));
+    }, t => device.readAsync(t), (folder, fileName) => files.create(folder, fileName), t => pathCommand.create(t), recordDesktopAsync, (_, log) => createUpdater(log), () => updateLock);
     return settings;
   }
 

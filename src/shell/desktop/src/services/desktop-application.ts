@@ -49,6 +49,7 @@ import type { IQuitPrompt } from "../interfaces/i-quit-prompt.js";
 import type { IRuntimeLauncher } from "../interfaces/i-runtime-launcher.js";
 import type { ISystemNotification } from "../interfaces/i-system-notification.js";
 import type { IUpdateHost } from "../interfaces/i-update-host.js";
+import type { IUpdateCheckLock } from "../interfaces/i-update-check-lock.js";
 import type { IUpdater } from "../interfaces/i-updater.js";
 import { UpdateStatus } from "../models/update-status.js";
 import type { IWindowContents } from "../interfaces/i-window-contents.js";
@@ -155,7 +156,8 @@ export class DesktopApplication {
     spelling: SpellChecker,
     installation: Installation,
     recordDesktopAsync: () => Promise<boolean>,
-    updater: IUpdater | null) {
+    updater: IUpdater | null,
+    updateLock: IUpdateCheckLock) {
     this.electron = electron;
     this.createPathCommand = createPathCommand;
     this.readDeviceAsync = readDeviceAsync;
@@ -204,11 +206,11 @@ export class DesktopApplication {
     this.trayHosts = new TrayHostWatcher(process.platform, process.programs, process.env, t => delay(t, undefined, { ref: false }), t => this.changeTrayHost(t));
     this.trayIcon = new DeviceSettingFollower(ShellSettings.trayIcon, process.platform !== Resources.macPlatform, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
       t => this.followTrayIconSetting(t), t => this.log.write(t));
-    this.updates = Object.isNull(updater) ? null : new UpdateController(updater, createDeviceFile(installation.folder, Resources.updateReadyFile), t => UpdateController.hashFileAsync(t),
+    this.updates = Object.isNull(updater) ? null : new UpdateController(updater, createDeviceFile(installation.folder, Resources.updateReadyFile), updateLock,
       RuntimeBuild.identity.productVersion, process.platform === Resources.macPlatform && !electron.app.isInApplicationsFolder(), t => this.publishUpdate(t), t => this.postUpdateReadyAsync(t),
       t => log.write(t), Date.now, (wait, run) => DesktopApplication.schedule(wait, run));
     this.updateChecks = new DeviceSettingFollower(ShellSettings.updateChecks, Resources.automaticUpdateChecks, t => this.callAsync(ShellMethods.readSetting, t.toJson()),
-      t => this.updates?.follow(t), t => this.log.write(t));
+      t => this.followUpdateChecksSetting(t), t => this.log.write(t));
     this.spelling = spelling;
   }
 
@@ -221,7 +223,8 @@ export class DesktopApplication {
     createDeviceFile: (folder: string, fileName: string) => IDeviceFileStore,
     createPathCommand: (executablePath: string) => PathCommand,
     recordDesktopAsync: (installation: Installation) => Promise<boolean>,
-    createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null): void {
+    createUpdater: (installation: Installation, log: (text: string) => void) => IUpdater | null,
+    createUpdateLock: (installation: Installation) => IUpdateCheckLock): void {
     const redactor = new DiagnosticRedactor(process.homeFolder);
     const recovery = new MainProcessRecovery(electron.app, electron.dialog, process.errorOutput, redactor);
     process.onUncaughtException(t => recovery.receive(t, MainProcessFailureKind.UncaughtException));
@@ -258,7 +261,7 @@ export class DesktopApplication {
       () => electron.session.defaultSession, languages, SpellingDictionaries.addressOf(profileFolder), process.platform, () => electron.app.getPreferredSystemLanguages(), t => log.write(t));
     const application = new DesktopApplication(
       electron, process, DesktopSettings.fromModule(moduleDirectory, process.platform), taskbar, dataDirectory, log, createLauncher(launchSettings, installation), readDeviceAsync, createDeviceFile, createPathCommand, icons,
-      spelling, installation, () => recordDesktopAsync(installation), createUpdater(installation, t => log.write(t)));
+      spelling, installation, () => recordDesktopAsync(installation), createUpdater(installation, t => log.write(t)), createUpdateLock(installation));
     recovery.attach(log, () => application.openLogFolderAsync());
     application.run();
   }
@@ -353,6 +356,9 @@ export class DesktopApplication {
       const trayIcon = state[Resources.trayIconStateKey];
       if (Object.isBoolean(trayIcon))
         this.trayIcon.startFrom(trayIcon);
+      const updateChecks = state[Resources.updateChecksStateKey];
+      if (Object.isString(updateChecks))
+        this.updateChecks.startFrom(updateChecks);
       this.tray.setHostAvailable(this.trayHosts.isAvailable);
       this.tray.setEnabled(this.trayIcon.value === true);
       this.trayHosts.start();
@@ -574,6 +580,11 @@ export class DesktopApplication {
     void this.deviceState.rememberAsync(Resources.trayIconStateKey, value);
   }
 
+  private followUpdateChecksSetting(value: JsonValue): void {
+    this.updates?.follow(value);
+    void this.deviceState.rememberAsync(Resources.updateChecksStateKey, value);
+  }
+
   private followTrayIcon(isShown: boolean): void {
     if (!isShown && this.windows.size === 0 && !this.isQuitting && !this.keepsRunningWithoutWindows())
       this.open();
@@ -719,6 +730,7 @@ export class DesktopApplication {
   }
 
   private async startUpdatesAsync(updates: UpdateController): Promise<void> {
+    updates.follow(this.updateChecks.value);
     await updates.startAsync();
     await updates.notifyAsync();
   }
@@ -744,7 +756,10 @@ export class DesktopApplication {
     const restart = new CommandRun(new QualifiedName(ShellNotifications.updateReady.owner, Resources.restartToUpdateMember), null);
     const post = new NotificationPost(ShellNotifications.updateReady, version, Resources.formatUpdateReadyTitle(version), null, NotificationSeverity.Info, null,
       [new NotificationAction(Resources.restartToUpdateTitle, restart)], null);
-    return !(await this.callAsync(ShellMethods.postNotification, post.toJson())).hasFailed;
+    const failure = (await this.callAsync(ShellMethods.postNotification, post.toJson())).failure;
+    if (!Object.isUndefined(failure))
+      this.log.write(Resources.formatUpdateNotPosted(failure.message));
+    return Object.isUndefined(failure);
   }
 
   private static schedule(wait: number, run: () => void): () => void {

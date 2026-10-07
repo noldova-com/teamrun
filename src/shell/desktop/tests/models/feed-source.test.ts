@@ -18,14 +18,14 @@ export class FeedSourceTests {
     const fetchAsync = (): Promise<IFeedResponse> => Promise.reject(new Error("offline"));
     const files = [["win32", "x64"], ["darwin", "arm64"], ["linux", "x64"], ["linux", "arm64"]].map(([platform, architecture]) => {
       const source = FeedSource.create(FeedSourceTests.FEED, "TeamRun", String(platform), String(architecture), fetchAsync);
-      return [source?.feed, source?.channelFile, source?.packageFile, source?.fetchAsync === fetchAsync];
+      return [source?.feed, source?.channelFile, source?.packageFile, source?.fetchAsync === fetchAsync, source?.timeout];
     });
 
     Assert.areEqual(JSON.stringify([
-      [FeedSourceTests.FEED, "latest-windows-x64.yml", "TeamRun-windows-x64.exe", true],
-      [FeedSourceTests.FEED, "latest-macos-arm64.yml", "TeamRun-macos-arm64.zip", true],
-      [FeedSourceTests.FEED, "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", true],
-      [FeedSourceTests.FEED, "latest-linux-arm64.yml", "TeamRun-linux-arm64.AppImage", true]
+      [FeedSourceTests.FEED, "latest-windows-x64.yml", "TeamRun-windows-x64.exe", true, 30000],
+      [FeedSourceTests.FEED, "latest-macos-arm64.yml", "TeamRun-macos-arm64.zip", true, 30000],
+      [FeedSourceTests.FEED, "latest-linux-x64.yml", "TeamRun-linux-x64.AppImage", true, 30000],
+      [FeedSourceTests.FEED, "latest-linux-arm64.yml", "TeamRun-linux-arm64.AppImage", true, 30000]
     ]), JSON.stringify(files));
   }
 

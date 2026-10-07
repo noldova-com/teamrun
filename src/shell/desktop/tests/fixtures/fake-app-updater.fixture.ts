@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Logger, ProgressInfo, UpdateInfo } from "electron-updater";
+import type { CancellationToken, Logger, ProgressInfo, UpdateInfo } from "electron-updater";
 
 import type { FeedProvider, FeedSource, IAppUpdater } from "@noldova/teamrun-shell-desktop";
 
@@ -24,7 +24,7 @@ export class FakeAppUpdater implements IAppUpdater {
   public configWhenChecked: string | null = null;
   private configPath: string | null = null;
   public check: () => Promise<{ readonly isUpdateAvailable: boolean; readonly updateInfo: UpdateInfo } | null> = () => Promise.resolve(null);
-  public download: () => Promise<string[]> = () => Promise.resolve([]);
+  public download: (cancellation: CancellationToken) => Promise<string[]> = () => Promise.resolve([]);
 
   public get updateConfigPath(): string | null {
     return this.configPath;
@@ -44,8 +44,8 @@ export class FakeAppUpdater implements IAppUpdater {
     return Object.isNull(this.feed) ? Promise.reject(new Error("Unsupported provider: undefined")) : this.check();
   }
 
-  public downloadUpdate(): Promise<string[]> {
-    return this.download();
+  public downloadUpdate(cancellationToken: CancellationToken): Promise<string[]> {
+    return this.download(cancellationToken);
   }
 
   public on(_event: "download-progress", listener: (info: ProgressInfo) => void): unknown {

@@ -8,11 +8,11 @@
 
 import { execFile } from "node:child_process";
 import { homedir } from "node:os";
-import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, ipcMain, net, screen, session, shell, utilityProcess } from "electron";
 import { AppImageUpdater, MacUpdater, NsisUpdater } from "electron-updater";
+import { getAppCacheDir } from "electron-updater/out/AppAdapter.js";
 import { verifySignature } from "electron-updater/out/windowsExecutableCodeSignatureVerifier.js";
 
 import "@noldova/teamrun-foundation-core";
@@ -28,10 +28,12 @@ import { DeviceIdentity } from "./services/device-identity.js";
 import { FeedUpdater } from "./services/feed-updater.js";
 import { PathCommand } from "./services/path-command.js";
 import { PublisherCheck } from "./services/publisher-check.js";
+import { UpdateCheckLock } from "./services/update-check-lock.js";
 import { UtilityProcessStarter } from "./services/utility-process-starter.js";
 
 const starter = process.platform === Resources.windowsPlatform ? new UtilityProcessStarter(utilityProcess) : new ChildProcessStarter();
 const programs = new ChildProgramHost(process.platform, Resources.programTimeout);
+const presence = ProcessPresence.create(process.platform, new SystemCommand());
 
 DesktopApplication.start(
   {
@@ -75,16 +77,14 @@ DesktopApplication.start(
   t => PathCommand.forBundle(t, async (program, args) => {
     await promisify(execFile)(program, [...args]);
   }),
-  t => DesktopRecord.recordAsync(t, ProcessPresence.create(process.platform, new SystemCommand()), process.pid),
+  t => DesktopRecord.recordAsync(t, presence, process.pid),
   (installation, log) => {
     const product = ProductInfo.current;
     const source = FeedSource.create(product.updateFeed, product.name, process.platform, process.arch, t => net.fetch(t));
     if (Object.isNull(source))
       return null;
     const updater = process.platform === Resources.windowsPlatform ? new NsisUpdater() : process.platform === Resources.macPlatform ? new MacUpdater() : new AppImageUpdater();
-    if (updater instanceof NsisUpdater) {
-      const check = new PublisherCheck(product.windowsPublisher, verifySignature, log, Date.now);
-      updater.verifyUpdateCodeSignature = (_, file) => check.checkAsync(file);
-    }
-    return new FeedUpdater(updater, source, join(installation.folder, Resources.updateConfigFile), product.windowsPublisher, product.slug, log);
-  });
+    const check = new PublisherCheck(product.windowsPublisher, verifySignature, log, Date.now);
+    return new FeedUpdater(updater, source, installation.folder, getAppCacheDir(), product.slug, updater instanceof NsisUpdater ? t => check.checkAsync(t) : null, log);
+  },
+  installation => new UpdateCheckLock(installation.folder, async () => (await presence.stampAsync([[process.pid, Resources.clientName]]))[0] ?? null, t => presence.isRunningAsync(t)));

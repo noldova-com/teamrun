@@ -32,13 +32,14 @@ export class FeedProvider extends Provider<UpdateInfo> {
 
   public async getLatestVersion(): Promise<UpdateInfo> {
     const requested = new URL(this.source.channelFile, this.source.feed);
-    const response = await this.source.fetchAsync(requested.href).catch((error: unknown) => {
-      throw new UpdateException(Resources.updateFeedUnreachable, new ExceptionOptions(error));
-    });
+    const signal = AbortSignal.timeout(this.source.timeout);
+    const response = await FeedProvider.reach(this.source.fetchAsync(requested.href, signal));
     if (!response.ok)
       throw new UpdateException(Resources.formatUpdateFeedRefused(response.status));
     const url = response.url.length > 0 ? new URL(response.url) : requested;
-    const info = FeedProvider.parse(await response.text(), this.source.channelFile, url);
+    if (url.protocol !== requested.protocol)
+      throw new UpdateException(Resources.updateFeedRedirected);
+    const info = FeedProvider.parse(await FeedProvider.reach(response.text()), this.source.channelFile, url);
     if (!FeedProvider.isUpdateInfo(info) || Object.isUndefined(FeedProvider.findPackage(info, this.source.packageFile)))
       throw new UpdateException(Resources.updateInfoInvalid);
     this.base = url;
@@ -50,6 +51,15 @@ export class FeedProvider extends Provider<UpdateInfo> {
     if (Object.isNull(this.base) || Object.isUndefined(file))
       throw new UpdateException(Resources.updateInfoInvalid);
     return [{ url: new URL(this.source.packageFile, this.base), info: file }];
+  }
+
+  private static async reach<T>(operation: Promise<T>): Promise<T> {
+    try {
+      return await operation;
+    }
+    catch (error) {
+      throw new UpdateException(Resources.updateFeedUnreachable, new ExceptionOptions(error));
+    }
   }
 
   private static parse(text: string, channelFile: string, url: URL): unknown {

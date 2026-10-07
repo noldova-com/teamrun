@@ -34,6 +34,7 @@ import { FakeElectron } from "../fixtures/fake-electron.fixture.js";
 import { FakePathCommand } from "../fixtures/fake-path-command.fixture.js";
 import { FakeRuntimeConnection } from "../fixtures/fake-runtime-connection.fixture.js";
 import { FakeRuntimeLauncher } from "../fixtures/fake-runtime-launcher.fixture.js";
+import { FakeUpdateCheckLock } from "../fixtures/fake-update-check-lock.fixture.js";
 import { FakeUpdater } from "../fixtures/fake-updater.fixture.js";
 import { TrayFixture } from "../fixtures/tray.fixture.js";
 
@@ -2008,7 +2009,8 @@ export class DesktopApplicationTests {
     const files = new FakeDeviceFiles();
     const process = new FakeDesktopProcess("linux");
     const connection = new FakeRuntimeConnection();
-    const electron = await DesktopApplicationTests.startWithUpdaterAsync(process, updater, files, connection);
+    const lock = new FakeUpdateCheckLock();
+    const electron = await DesktopApplicationTests.startWithUpdaterAsync(process, updater, files, connection, new FakeElectron(), new FakeDeviceIdentity(), lock);
     await Condition.waitAsync(() => connection.payloads.some(t => JSON.stringify(t).includes("shell.updateChecks")));
     const window = DesktopStartFixture.firstWindow(electron);
     const trusted = DesktopStartFixture.trustedEvent("linux");
@@ -2019,8 +2021,7 @@ export class DesktopApplicationTests {
     const state = electron.ipcMain.invoke("teamrun:readUpdate", trusted);
     window.isGone = true;
     electron.ipcMain.invoke("teamrun:updateAction", trusted, "Check");
-    await Condition.waitAsync(() => updater.checks === 2);
-    await setImmediate();
+    await Condition.waitAsync(() => lock.releases === 2);
 
     Assert.isFalse(refused as boolean);
     Assert.isTrue(acted as boolean);
@@ -2039,9 +2040,8 @@ export class DesktopApplicationTests {
       const connection = new FakeRuntimeConnection();
       connection.answers.set("shell.postNotification", Response.success("r", null));
 
-      const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), new FakeUpdater(), files, connection);
+      const electron = await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), new FakeUpdater(String(record.file)), files, connection);
       await Condition.waitAsync(() => files.updateReady.writes.length > 0 && connection.calls.includes("shell.readSetting"));
-      await setImmediate();
 
       Assert.areEqual(JSON.stringify([{
         kind: "shell.updateReady",
@@ -2056,7 +2056,7 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public postsAReadyUpdateWithoutTheDevicesIdentityAndPostsItAgainWhileTheRuntimeRefuses(): Promise<void> {
+  public postsAReadyUpdateWithoutTheDevicesIdentityAndKeepsItUnpostedWhileTheRuntimeRefuses(): Promise<void> {
     return DesktopApplicationTests.withReadyFileAsync(async record => {
       const files = new FakeDeviceFiles();
       files.updateReady.kept = record;
@@ -2065,11 +2065,14 @@ export class DesktopApplicationTests {
       const device = new FakeDeviceIdentity();
       device.failure = new Error("EACCES");
 
-      await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), new FakeUpdater(), files, connection, new FakeElectron(), device);
-      await Condition.waitAsync(() => connection.calls.filter(t => t === "shell.postNotification").length >= 1);
-      await setImmediate();
+      const process = new FakeDesktopProcess("linux");
+      const refused = "The runtime refused the ready update's notification, so the desktop posts it again when the runtime is ready: The database is busy.";
+
+      await DesktopApplicationTests.startWithUpdaterAsync(process, new FakeUpdater(String(record.file)), files, connection, new FakeElectron(), device);
+      await Condition.waitAsync(() => DesktopStartFixture.readErrors(process, refused).length > 0);
 
       Assert.areEqual(0, files.updateReady.writes.length);
+      Assert.isTrue(connection.calls.includes("shell.postNotification"));
     });
   }
 
@@ -2104,6 +2107,38 @@ export class DesktopApplicationTests {
     await Condition.waitAsync(() => DesktopStartFixture.readErrors(process, "The setting shell.updateChecks could not be read for this device, so the desktop keeps its last value: ").length > 0);
 
     Assert.areEqual(JSON.stringify(["The setting shell.updateChecks could not be read for this device, so the desktop keeps its last value: The database is busy."]), JSON.stringify(DesktopStartFixture.readErrors(process, "The setting shell.updateChecks could not be read for this device, so the desktop keeps its last value: ")));
+  }
+
+  @TestMethod
+  public async remembersTheUpdateChecksSettingOfThisDevice(): Promise<void> {
+    const files = new FakeDeviceFiles();
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.readSetting", Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
+    const launcher = new FakeRuntimeLauncher(connection);
+    await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), new FakeUpdater(), files, connection, new FakeElectron(), new FakeDeviceIdentity(), new FakeUpdateCheckLock(), launcher);
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+
+    launcher.listener?.onEvent(new Event(ShellEvents.settingsChanged, { name: "shell.updateChecks", device: FakeDeviceIdentity.ID, value: "OnRequest", isSet: true }));
+    await Condition.waitAsync(() => files.state.writes.length > 0);
+
+    Assert.areEqual(JSON.stringify([{ updateChecks: "OnRequest" }]), JSON.stringify(files.state.writes));
+  }
+
+  @TestMethod
+  public async startsFromTheUpdateChecksSettingItRemembered(): Promise<void> {
+    const files = new FakeDeviceFiles();
+    files.state.kept = { updateChecks: "OnRequest" };
+    const connection = new FakeRuntimeConnection();
+    connection.answers.set("shell.readSetting", Response.failure("r", new Failure(FailureCode.Internal, "The database is busy.")));
+    const launcher = new FakeRuntimeLauncher(connection);
+    await DesktopApplicationTests.startWithUpdaterAsync(new FakeDesktopProcess("linux"), new FakeUpdater(), files, connection, new FakeElectron(), new FakeDeviceIdentity(), new FakeUpdateCheckLock(), launcher);
+    await Condition.waitAsync(() => connection.calls.includes("shell.readSetting"));
+
+    launcher.listener?.onEvent(new Event(ShellEvents.settingsChanged, { name: "shell.updateChecks", device: FakeDeviceIdentity.ID, value: "OnRequest", isSet: true }));
+    launcher.listener?.onEvent(new Event(ShellEvents.settingsChanged, { name: "shell.updateChecks", device: FakeDeviceIdentity.ID, value: "AtStart", isSet: true }));
+    await Condition.waitAsync(() => files.state.writes.length > 0);
+
+    Assert.areEqual(JSON.stringify([{ updateChecks: "AtStart" }]), JSON.stringify(files.state.writes));
   }
 
   @TestMethod
@@ -2457,11 +2492,13 @@ export class DesktopApplicationTests {
     files: FakeDeviceFiles = new FakeDeviceFiles(),
     connection: FakeRuntimeConnection = new FakeRuntimeConnection(),
     electron: FakeElectron = new FakeElectron(),
-    device: FakeDeviceIdentity = new FakeDeviceIdentity()): Promise<FakeElectron> {
-    DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(connection), device, files, new FakePathCommand(), [], () => Promise.resolve(true), log => {
+    device: FakeDeviceIdentity = new FakeDeviceIdentity(),
+    lock: FakeUpdateCheckLock = new FakeUpdateCheckLock(),
+    launcher: FakeRuntimeLauncher = new FakeRuntimeLauncher(connection)): Promise<FakeElectron> {
+    DesktopStartFixture.start(electron, process, launcher, device, files, new FakePathCommand(), [], () => Promise.resolve(true), log => {
       log("The updater reported: started");
       return updater;
-    });
+    }, lock);
     await DesktopStartFixture.openAsync(electron);
     await setImmediate();
     return electron;

@@ -84,7 +84,7 @@ class KeyWitnessFixture extends BuilderFixture {
 class PackageTests {
 
   private static readonly TIMEOUT: number = 120_000;
-  private static readonly USAGE: string = "Usage: npm run package [-- [--signed] [--update-feed <http or https URL ending in />]]\n";
+  private static readonly USAGE: string = "Usage: npm run package [-- [--signed] [--update-feed <https URL, or http URL of localhost, ending in />]]\n";
   private static readonly GALLERY: readonly PinnedPackage[] = TrustedSigningModule.PACKAGES;
   private static readonly CREDENTIALS: Readonly<Record<string, string>> = {
     AZURE_TENANT_ID: "fixture-tenant",

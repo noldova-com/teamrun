@@ -193,7 +193,10 @@ export class Resources {
   public static readonly updateStateChannel: string = "teamrun:updateState";
   public static readonly updateReadyFile: string = "update-ready.json";
   public static readonly updateConfigFile: string = "update-config.json";
-  public static readonly updateCacheSuffix: string = "-updater";
+  public static readonly updateCacheSuffix: string = "-updater-";
+  public static readonly updateCheckLockFile: string = "update-check.lock";
+  public static readonly updateChecksStateKey: string = "updateChecks";
+  public static readonly updateFeedTimeout: number = 30_000;
   public static readonly updateCheckAction: string = "Check";
   public static readonly automaticUpdateChecks: string = "Automatic";
   public static readonly updateChecksAtStart: string = "AtStart";
@@ -211,7 +214,7 @@ export class Resources {
   public static readonly feedSourceMissing: string = "The update feed's provider needs the feed's source in its options.";
   public static readonly customProvider: "custom" = "custom";
   public static readonly downloadProgressEvent: "download-progress" = "download-progress";
-  public static readonly publisherNameField: string = "publisherName";
+  public static readonly pendingUpdateFolder: string = "pending";
   public static readonly updaterCacheFolderField: string = "updaterCacheDirName";
   public static readonly prereleaseSeparator: string = "-";
   public static readonly versionSeparator: string = ".";
@@ -224,6 +227,9 @@ export class Resources {
   public static readonly updateNotSigned: string = "The update isn't signed by the publisher.";
   public static readonly updateFailedUnexpectedly: string = "The update stopped on an unexpected error.";
   public static readonly updateFileChanged: string = "the downloaded file has changed or is gone";
+  public static readonly updateFileElsewhere: string = "its file is not the package in the updater's cache";
+  public static readonly updateFeedRedirected: string = "The update feed redirected to an address with another protocol.";
+  public static readonly updateCheckerUnknown: string = "The desktop could not identify its own process, so it cannot check for updates.";
   public static readonly restartToUpdateTitle: string = "Restart to update";
   public static readonly restartToUpdateMember: string = "restartToUpdate";
   public static readonly updateFailureReasons: ReadonlyMap<string, string> = new Map([
@@ -798,6 +804,14 @@ export class Resources {
     return `The update feed answered with HTTP status ${status}.`;
   }
 
+  public static get updateCheckedElsewhere(): string {
+    return `Another ${Resources.applicationName} is checking for updates.`;
+  }
+
+  public static formatUpdateCheckNotReleased(error: string): string {
+    return `The update check could not let go of its lock: ${error}`;
+  }
+
   public static formatUpdaterMessage(message: string): string {
     return `The updater reported: ${message}`;
   }
@@ -824,6 +838,10 @@ export class Resources {
     return `The ready update could not be recorded, so it downloads again after a restart: ${error}`;
   }
 
+  public static formatUpdateNotPosted(message: string): string {
+    return `The runtime refused the ready update's notification, so the desktop posts it again when the runtime is ready: ${message}`;
+  }
+
   public static formatUpdateNotNotified(error: string): string {
     return `The ready update's notification could not be posted or recorded: ${error}`;
   }
@@ -840,8 +858,8 @@ export class Resources {
     return `${productName}-${platform}-${architecture}.${extension}`;
   }
 
-  public static formatUpdateCacheFolder(slug: string): string {
-    return `${slug}${Resources.updateCacheSuffix}`;
+  public static formatUpdateCacheFolder(slug: string, installationId: string): string {
+    return `${slug}${Resources.updateCacheSuffix}${installationId}`;
   }
 
   public static formatWindowSize(name: string, minimum: number): string {
