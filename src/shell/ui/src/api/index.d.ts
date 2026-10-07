@@ -1892,6 +1892,76 @@ export declare class DragGesture {
 }
 
 /**
+ * Follows one pointer from its press until the drag ends, wherever the
+ * pointer goes. Releasing the button ends the drag; a cancelled pointer, a
+ * lost pointer capture, the window losing focus, a move with the primary
+ * button no longer pressed, a move outside the window, and Escape once the
+ * drag has started cancel it. So a release over the title bar or outside the
+ * window, which the page may never see, never leaves a drag running. The
+ * kit's sash and tree and the window's tab and toolbar drags all use it.
+ */
+export declare class PointerDrag {
+  /**
+   * Starts following the pointer of a press. It listens on the element's
+   * document and window until {@link PointerDrag.stop}, and ignores the
+   * events of other pointers.
+   *
+   * @param element The element that captures the pointer once the drag
+   * starts; the document's root element for a drag that moves over the whole
+   * window.
+   * @param press The `pointerdown` that began the press.
+   * @param move Receives each move while the primary button stays pressed.
+   * @param end Runs when the button is released; it calls
+   * {@link PointerDrag.stop}.
+   * @param cancel Runs when the drag is cancelled; it calls
+   * {@link PointerDrag.stop}.
+   * @example
+   * ```ts
+   * import { PointerDrag } from "@noldova/teamrun-shell-ui";
+   *
+   * export function follow(element: HTMLElement, press: PointerEvent, onMove: (x: number) => void): PointerDrag {
+   *   const drag: PointerDrag = new PointerDrag(element, press, t => onMove(t.clientX), () => drag.stop(), () => drag.stop());
+   *   drag.start();
+   *   return drag;
+   * }
+   * ```
+   */
+  public constructor(element: HTMLElement, press: PointerEvent, move: (event: PointerEvent) => void, end: () => void, cancel: () => void);
+
+  /**
+   * Marks the press as a drag: the element captures the pointer, so every
+   * move and the release reach the document, and Escape now cancels.
+   *
+   * @example
+   * ```ts
+   * import { DragGesture, type PointerDrag } from "@noldova/teamrun-shell-ui";
+   *
+   * export function startOnceFar(drag: PointerDrag, press: PointerEvent, move: PointerEvent): void {
+   *   if (DragGesture.hasStarted(press.clientX, press.clientY, move.clientX, move.clientY))
+   *     drag.start();
+   * }
+   * ```
+   */
+  public start(): void;
+
+  /**
+   * Stops following the pointer: removes every listener and releases the
+   * capture the element still holds. Calling it again does nothing.
+   *
+   * @example
+   * ```ts
+   * import type { PointerDrag } from "@noldova/teamrun-shell-ui";
+   *
+   * export function stopAll(drags: readonly PointerDrag[]): void {
+   *   for (const drag of drags)
+   *     drag.stop();
+   * }
+   * ```
+   */
+  public stop(): void;
+}
+
+/**
  * A validation message below a field, `tr-field-message`: error-colored text
  * that wraps anywhere rather than widen its row, an alert that is announced
  * when it appears. The field names it in `aria-describedby` and takes

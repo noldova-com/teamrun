@@ -401,6 +401,8 @@ export class Resources {
   public static readonly arrowRightKey: string = "ArrowRight";
   public static readonly pointerupEvent: "pointerup" = "pointerup";
   public static readonly pointercancelEvent: "pointercancel" = "pointercancel";
+  public static readonly lostpointercaptureEvent: "lostpointercapture" = "lostpointercapture";
+  public static readonly primaryButtons: number = 1;
   public static readonly blurEvent: "blur" = "blur";
   public static readonly treeItemSelector: string = "[role=treeitem]";
   public static readonly politeAnnouncement: AriaLivePoliteness = "polite";

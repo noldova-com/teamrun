@@ -73,12 +73,12 @@ describe("DockingGuidesComponent", () => {
   }
 
   function start(tab: Tab): void {
-    TestBed.inject(TabDragService).begin(tab, new PointerEvent("pointerdown", { button: 0, clientX: 0, clientY: 0 }));
+    TestBed.inject(TabDragService).begin(tab, new PointerEvent("pointerdown", { pointerId: 1, button: 0, clientX: 0, clientY: 0 }));
   }
 
   function moveOver(selector: string): void {
     under = find(selector);
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 300, clientY: 200 }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: 300, clientY: 200 }));
     fixture.detectChanges();
   }
 
@@ -156,7 +156,7 @@ describe("DockingGuidesComponent", () => {
       expect(find(selector)?.classList.contains("tr-docking-guide-chosen")).toBe(true);
       expectBox(find(".tr-docking-preview"), preview.x, preview.y);
       expectRem(find(".tr-docking-preview")?.style.width, preview.width);
-      document.dispatchEvent(new PointerEvent("pointerup", { button: 0, clientX: 300, clientY: 200 }));
+      document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, button: 0, clientX: 300, clientY: 200 }));
       fixture.detectChanges();
       expect([layout.layout().sideOf(layout.layout().groupOf(LayoutFixture.files)?.id ?? -1), layout.layout().bottomSpan]).toEqual([DockSide.Bottom, span]);
     }

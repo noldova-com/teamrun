@@ -94,7 +94,7 @@ describe("TreeDragSession", () => {
     expect([insideBranch, onItself, moves()]).toEqual([[null, false], [null, false], []]);
   });
 
-  it("ends a drag with Escape, a lost window focus, a cancelled pointer or one released outside the rows, and leaves other keys and other buttons alone", async () => {
+  it("ends a drag with Escape, a lost window focus, a cancelled pointer, a lost capture, a move with no button pressed or a release outside the rows, and leaves other keys and other buttons alone", async () => {
     await renderAsync();
     const escape = (): boolean => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     const shown = async (): Promise<(HTMLElement | null)[]> => {
@@ -111,19 +111,26 @@ describe("TreeDragSession", () => {
     window.dispatchEvent(new Event("blur"));
     const afterBlur = await shown();
     await dragAsync("Notes", "Trash", 0.9, false);
-    document.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true }));
+    document.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1, bubbles: true }));
     const afterCancel = await shown();
     await dragAsync("Notes", "Trash", 0.9, false);
-    pointer("pointermove", document.body, -50);
-    const outside = await shown();
-    pointer("pointerup", document.body, -50);
+    document.documentElement.dispatchEvent(new PointerEvent("lostpointercapture", { pointerId: 1 }));
+    const afterLostCapture = await shown();
+    await dragAsync("Notes", "Trash", 0.9, false);
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 0, bubbles: true }));
+    const afterUnpressedMove = await shown();
+    await dragAsync("Notes", "Trash", 0.9, false);
+    const below = root().getBoundingClientRect().bottom + 20;
+    pointer("pointermove", document.body, below);
+    const outside = (await shown()).map(t => t !== null);
+    pointer("pointerup", document.body, below);
     const afterRelease = await shown();
     const idleEscape = escape();
     pointer("pointerdown", row("Notes"), yAt("Notes", 0.5), 2);
     pointer("pointermove", row("Trash"), yAt("Trash", 0.9));
 
-    expect([other, stillDragging, escaped, afterEscape, afterBlur, afterCancel, outside[1], afterRelease, idleEscape, ghost(), moves()])
-      .toEqual([true, true, false, [null, null], [null, null], [null, null], null, [null, null], true, null, []]);
+    expect([other, stillDragging, escaped, afterEscape, afterBlur, afterCancel, afterLostCapture, afterUnpressedMove, outside, afterRelease, idleEscape, ghost(), moves()])
+      .toEqual([true, true, false, [null, null], [null, null], [null, null], [null, null], [null, null], [true, false], [null, null], true, null, []]);
   });
 
   it("ends a drag when the tree goes away, so the keys and the pointer are the page's again", async () => {

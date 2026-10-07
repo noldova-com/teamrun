@@ -19,6 +19,7 @@ import { TreeGhost } from "../models/tree-ghost";
 import { TreeLine } from "../models/tree-line";
 import type { TreeNode } from "../models/tree.node";
 import { TreePlan } from "../models/tree-plan";
+import { PointerDrag } from "./pointer-drag";
 
 export class TreeDragSession {
   private readonly draggingState: WritableSignal<TreeNode | null> = signal(null);
@@ -29,7 +30,7 @@ export class TreeDragSession {
   private readonly host: HTMLElement;
   private readonly nodes: Signal<readonly TreeNode[]>;
   private readonly hooks: TreeDragHooks;
-  private stopListening: (() => void) | null = null;
+  private pointer: PointerDrag | null = null;
   private releaseClick: (() => void) | null = null;
   private hoverTimer: ReturnType<typeof setTimeout> | null = null;
   private hoverId: string | null = null;
@@ -60,22 +61,7 @@ export class TreeDragSession {
       return;
     this.stop();
     const box = element.getBoundingClientRect();
-    const onMove = (moved: PointerEvent): void => this.move(moved, node, event, box);
-    const onEnd = (): void => this.end();
-    const onCancel = (): void => this.stop();
-    const onKey = (key: KeyboardEvent): void => this.cancelOnEscape(key);
-    this.document.addEventListener(Resources.pointermoveEvent, onMove);
-    this.document.addEventListener(Resources.pointerupEvent, onEnd);
-    this.document.addEventListener(Resources.pointercancelEvent, onCancel);
-    this.document.addEventListener(Resources.keydownEvent, onKey, { capture: true });
-    window.addEventListener(Resources.blurEvent, onCancel);
-    this.stopListening = () => {
-      this.document.removeEventListener(Resources.pointermoveEvent, onMove);
-      this.document.removeEventListener(Resources.pointerupEvent, onEnd);
-      this.document.removeEventListener(Resources.pointercancelEvent, onCancel);
-      this.document.removeEventListener(Resources.keydownEvent, onKey, { capture: true });
-      window.removeEventListener(Resources.blurEvent, onCancel);
-    };
+    this.pointer = new PointerDrag(this.document.documentElement, event, moved => this.move(moved, node, event, box), () => this.end(), () => this.stop());
   }
 
   public reevaluate(): void {
@@ -90,8 +76,8 @@ export class TreeDragSession {
   public stop(): void {
     this.releaseClick?.();
     this.releaseClick = null;
-    this.stopListening?.();
-    this.stopListening = null;
+    this.pointer?.stop();
+    this.pointer = null;
     this.draggingState.set(null);
     this.setTarget(null, null, null);
     this.ghostState.set(null);
@@ -103,6 +89,7 @@ export class TreeDragSession {
       if (!DragGesture.hasStarted(start.clientX, start.clientY, event.clientX, event.clientY))
         return;
       this.draggingState.set(node);
+      this.pointer?.start();
       this.scrollArea = this.scroller() ?? this.host;
       this.rowGap = this.hooks.gap();
     }
@@ -131,14 +118,6 @@ export class TreeDragSession {
     this.document.addEventListener(Resources.clickEvent, swallow, { capture: true, once: true });
     this.releaseClick = release;
     setTimeout(release);
-  }
-
-  private cancelOnEscape(event: KeyboardEvent): void {
-    if (event.key !== Resources.escapeKey || Object.isNull(this.draggingState()))
-      return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.stop();
   }
 
   private refresh(dragged: TreeNode): void {

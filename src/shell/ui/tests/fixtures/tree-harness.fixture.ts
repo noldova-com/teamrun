@@ -63,7 +63,7 @@ export class TreeHarness {
   }
 
   public pointer(type: string, target: EventTarget, y: number, button: number = 0): void {
-    target.dispatchEvent(new PointerEvent(type, { bubbles: true, button, clientX: this.root.getBoundingClientRect().left + 24, clientY: y }));
+    target.dispatchEvent(new PointerEvent(type, { bubbles: true, button, buttons: 1, pointerId: 1, clientX: this.root.getBoundingClientRect().left + 24, clientY: y }));
   }
 
   public async dragAsync(from: string, to: string, fraction: number, release: boolean = true): Promise<void> {

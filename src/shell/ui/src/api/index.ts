@@ -91,6 +91,7 @@ export { AppearanceService } from "../app/services/appearance.service";
 export { ClipboardWriter } from "../app/services/clipboard-writer";
 export { DialogService } from "../app/services/dialog.service";
 export { OverlayBoundsService } from "../app/services/overlay-bounds.service";
+export { PointerDrag } from "../app/services/pointer-drag";
 export { ThemePainter } from "../app/services/theme-painter";
 export { TypographyPainter } from "../app/services/typography-painter";
 export { DefaultTheme } from "../app/models/default-theme";

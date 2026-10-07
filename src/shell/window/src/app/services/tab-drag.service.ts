@@ -10,7 +10,7 @@ import { DOCUMENT } from "@angular/common";
 import { Injectable, type Signal, type WritableSignal, inject, signal } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { DragGesture } from "@noldova/teamrun-shell-ui";
+import { DragGesture, PointerDrag } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../resources";
 import { BottomDockSpan } from "../enums/bottom-dock-span";
@@ -34,7 +34,7 @@ export class TabDragService {
   private readonly hoveredState: WritableSignal<number | null> = signal(null);
   private readonly pointerXState: WritableSignal<number> = signal(0);
   private readonly pointerYState: WritableSignal<number> = signal(0);
-  private stopListening: (() => void) | null = null;
+  private pointer: PointerDrag | null = null;
 
   public readonly dragging: Signal<Tab | null> = this.draggingState.asReadonly();
   public readonly target: Signal<DropTarget | null> = this.targetState.asReadonly();
@@ -48,22 +48,7 @@ export class TabDragService {
     this.stop();
     const startX = event.clientX;
     const startY = event.clientY;
-    const onMove = (moved: PointerEvent): void => this.move(tab, startX, startY, moved);
-    const onEnd = (): void => this.end();
-    const onCancel = (): void => this.stop();
-    const onKey = (key: KeyboardEvent): void => this.cancelOnEscape(key);
-    this.document.addEventListener(Resources.pointerMoveEvent, onMove);
-    this.document.addEventListener(Resources.pointerUpEvent, onEnd);
-    this.document.addEventListener(Resources.pointerCancelEvent, onCancel);
-    this.document.addEventListener(Resources.keyDownEvent, onKey, { capture: true });
-    window.addEventListener(Resources.blurEvent, onCancel);
-    this.stopListening = () => {
-      this.document.removeEventListener(Resources.pointerMoveEvent, onMove);
-      this.document.removeEventListener(Resources.pointerUpEvent, onEnd);
-      this.document.removeEventListener(Resources.pointerCancelEvent, onCancel);
-      this.document.removeEventListener(Resources.keyDownEvent, onKey, { capture: true });
-      window.removeEventListener(Resources.blurEvent, onCancel);
-    };
+    this.pointer = new PointerDrag(this.document.documentElement, event, moved => this.move(tab, startX, startY, moved), () => this.end(), () => this.stop());
   }
 
   public isDropBefore(groupId: number, index: number): boolean {
@@ -75,6 +60,7 @@ export class TabDragService {
       if (!DragGesture.hasStarted(startX, startY, event.clientX, event.clientY))
         return;
       this.draggingState.set(tab);
+      this.pointer?.start();
       this.document.body.classList.add(Resources.draggingClass);
     }
     this.pointerXState.set(event.clientX);
@@ -96,17 +82,9 @@ export class TabDragService {
       this.layout.place(tab, target);
   }
 
-  private cancelOnEscape(event: KeyboardEvent): void {
-    if (event.key !== Resources.escapeKey || Object.isNull(this.draggingState()))
-      return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.stop();
-  }
-
   private stop(): void {
-    this.stopListening?.();
-    this.stopListening = null;
+    this.pointer?.stop();
+    this.pointer = null;
     this.draggingState.set(null);
     this.targetState.set(null);
     this.hoveredState.set(null);
