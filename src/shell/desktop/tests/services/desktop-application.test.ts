@@ -815,15 +815,19 @@ export class DesktopApplicationTests {
   }
 
   @TestMethod
-  public async bringsItsWindowForwardWhenStartedAgain(): Promise<void> {
+  public async bringsItsWindowForwardWhenStartedAgainAndLeavesAWindowNotShownYetToShowWhenReady(): Promise<void> {
     const electron = await DesktopStartFixture.startReadyAsync("linux");
     const window = DesktopStartFixture.firstWindow(electron);
 
     electron.app.emit("second-instance");
+    const beforeShown = [...window.calls];
+    await DesktopStartFixture.showAsync(electron, "linux", window);
+    electron.app.emit("second-instance");
     window.isMinimizedNow = true;
     electron.app.emit("second-instance");
 
-    Assert.areEqual(JSON.stringify(["focus", "restore", "focus"]), JSON.stringify(window.calls));
+    Assert.areEqual(0, beforeShown.length);
+    Assert.areEqual(JSON.stringify(["show", "focus", "restore", "focus"]), JSON.stringify(window.calls.filter(t => ["show", "focus", "restore"].includes(t))));
   }
 
   @TestMethod
@@ -1620,6 +1624,7 @@ export class DesktopApplicationTests {
     const electron = await DesktopStartFixture.startReadyAsync("linux", launcher);
     const window = DesktopStartFixture.firstWindow(electron);
     const later = DesktopApplicationTests.wireNotification(2, "Later");
+    await DesktopStartFixture.showAsync(electron, "linux", window);
 
     launcher.listener?.onEvent(new Event(ShellEvents.notifications, { notifications: [early], quietDevices: [], mutedModules: [], sequence: 1 }));
     await DesktopApplicationTests.requestAsync(electron, DesktopStartFixture.trustedEvent("linux"), "shell.notifications", {});
@@ -2488,8 +2493,8 @@ export class DesktopApplicationTests {
     target.answers.set("shell.work", Response.success("r", { descriptions: ["Indexing the project"], sequence: 1 }));
     await DesktopApplicationTests.restartToUpdateAsync("linux", handoff, async electron => {
       const window = DesktopStartFixture.firstWindow(electron);
-      const focused = window.calls.filter(t => t === "focus").length;
-      await Condition.waitAsync(() => window.calls.filter(t => t === "focus").length > focused);
+      await Condition.waitAsync(() => target.calls.includes("shell.work"));
+      await setImmediate();
       window.destroy();
       await Condition.waitAsync(() => target.isClosed);
 

@@ -1202,9 +1202,7 @@ export class DesktopApplication {
     const [open] = this.windows.values();
     if (Object.isUndefined(open))
       return null;
-    if (open.window.isMinimized())
-      open.window.restore();
-    open.window.focus();
+    open.focus();
     return open;
   }
 
