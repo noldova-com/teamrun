@@ -408,9 +408,10 @@ The shell's workflows cover starting with no module, docking and arranging tabs,
 `npm run build -- --test` makes that build, and `--without <module id>` leaves a module out of it, so a workflow can start the application without one.
 The workflows run on the test build.
 One that needs other modules starts on a variant that `npm run build -- --test --without <module id> --output _build/variants/<name>` builds.
+The update workflows start on the variant `--update-feed http://127.0.0.1:<port>/` builds, whose product file names a feed that a fixture serves on that port; no workflow reaches the published feed.
 `npm run test:ui` builds the test build and every variant itself, the test build last, and skips the builds while the repository files, the declarations and the built outputs are unchanged, so no command lists them; a workflow that needs a new variant adds it to the builds and to the output folders whose changes make the script rebuild, both in `scripts/ui-workflows.ts`.
 It then prepares the development app, so the workflows start TeamRun from it under the [architecture](ARCHITECTURE.md#build-inputs).
-The harness swaps the variant's window and declarations into `_build` before starting TeamRun and restores them once its runtime has exited, and the workflows run one at a time, so swaps never overlap.
+The harness swaps the variant's window, declarations and product file into `_build` before starting TeamRun and restores them once its runtime has exited, and the workflows run one at a time, so swaps never overlap.
 Each module adds the workflows of its own capabilities, run in the application with the modules it depends on.
 Extend them when an accepted UI capability adds a distinct user workflow.
 Assert meaningful application results, not merely that a click succeeded.
