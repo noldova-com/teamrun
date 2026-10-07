@@ -56,7 +56,7 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
   private static readonly NOT_FOUND: string = "gh: Not Found (HTTP 404)";
   private static readonly BAD_GATEWAY: string = "HTTP 502: Bad Gateway (https://uploads.github.com/)";
   private static readonly RELEASE: RegExp = /^\/releases\/(\d+)$/u;
-  private static readonly TAG: RegExp = /^\/git\/ref\/tags\/(.+)$/u;
+  private static readonly TAG: RegExp = /^\/git\/matching-refs\/tags\/(.+)$/u;
   private static readonly ASSET_PREFIX: string = "/releases/assets/";
   private static readonly REFERENCES: string = "/git/refs";
   private static readonly TAG_PREFIX: string = "refs/tags/";
@@ -150,10 +150,10 @@ export default class ReleaseGitHubFixture extends GitHubApiFixture {
     }
     if (tag !== undefined && this.isTagReadFailing)
       return new ProcessResult(1, "", "gh: Server Error (HTTP 500)");
-    const commit = tag === undefined ? undefined : this.tags.get(tag);
-    if (commit !== undefined)
-      return ReleaseGitHubFixture.answer({ ref: `refs/tags/${String(tag)}`, object: { sha: commit, type: this.tagType } });
-    return new ProcessResult(1, "", ReleaseGitHubFixture.NOT_FOUND);
+    if (tag === undefined)
+      return new ProcessResult(1, "", ReleaseGitHubFixture.NOT_FOUND);
+    const commit = this.tags.get(tag);
+    return ReleaseGitHubFixture.answer(commit === undefined ? [] : [{ ref: `refs/tags/${tag}`, object: { sha: commit, type: this.tagType } }]);
   }
 
   private static answer(value: unknown): ProcessResult {
