@@ -35,17 +35,17 @@ describe("ToolbarDragService", () => {
   });
 
   afterEach(() => {
-    document.dispatchEvent(new PointerEvent("pointercancel"));
+    document.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1 }));
     root.remove();
     vi.clearAllMocks();
   });
 
   function start(name: string, button: number = 0): void {
-    drag.begin(name, new PointerEvent("pointerdown", { button, clientX: 10, clientY: 20 }));
+    drag.begin(name, new PointerEvent("pointerdown", { pointerId: 1, button, clientX: 10, clientY: 20 }));
   }
 
   function moveTo(x: number, y: number): void {
-    document.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y }));
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 1, clientX: x, clientY: y }));
   }
 
   it("starts only with the primary button and past the threshold", () => {
@@ -136,27 +136,27 @@ describe("ToolbarDragService", () => {
   it("moves the toolbar to the target it was released over", () => {
     start("a");
     moveTo(150, 20);
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     expect(toolbars.move).toHaveBeenCalledWith("a", 0, 1);
     expect([drag.dragging(), drag.target()]).toEqual([null, null]);
 
     start("c");
     moveTo(50, 2);
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     expect(toolbars.moveToNewRow).toHaveBeenCalledWith("c", 0);
   });
 
   it("does nothing on release without a drag or a target", () => {
     start("a");
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
     start("a");
     moveTo(450, 20);
-    document.dispatchEvent(new PointerEvent("pointerup"));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
 
     expect([toolbars.move, toolbars.moveToNewRow].map(t => t.mock.calls.length)).toEqual([0, 0]);
   });
 
-  it("cancels on Escape, a canceled pointer and a lost focus, and ignores Escape when nothing is dragged", () => {
+  it("cancels on Escape, a canceled pointer, a lost focus, a lost capture or a move with no button pressed, and ignores Escape when nothing is dragged", () => {
     const escape = (): KeyboardEvent => new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
 
     start("a");
@@ -173,12 +173,23 @@ describe("ToolbarDragService", () => {
     moveTo(150, 20);
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     expect(drag.dragging()).toBe("a");
-    document.dispatchEvent(new PointerEvent("pointercancel"));
+    document.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1 }));
     expect(drag.dragging()).toBeNull();
 
     start("a");
     moveTo(150, 20);
     window.dispatchEvent(new Event("blur"));
     expect([drag.dragging(), drag.target()]).toEqual([null, null]);
+
+    start("a");
+    moveTo(150, 20);
+    document.documentElement.dispatchEvent(new PointerEvent("lostpointercapture", { pointerId: 1 }));
+    expect([drag.dragging(), drag.target()]).toEqual([null, null]);
+
+    start("a");
+    moveTo(150, 20);
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, buttons: 0, clientX: 150, clientY: 20 }));
+    document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1 }));
+    expect([drag.dragging(), drag.target(), toolbars.move.mock.calls.length]).toEqual([null, null, 0]);
   });
 });

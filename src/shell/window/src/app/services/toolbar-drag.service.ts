@@ -10,7 +10,7 @@ import { DOCUMENT } from "@angular/common";
 import { Injectable, type Signal, type WritableSignal, inject, signal } from "@angular/core";
 
 import "@noldova/teamrun-foundation-core";
-import { DragGesture } from "@noldova/teamrun-shell-ui";
+import { DragGesture, PointerDrag } from "@noldova/teamrun-shell-ui";
 
 import { Resources } from "../../resources";
 import { ToolbarDropTarget } from "../models/toolbar-drop-target";
@@ -22,7 +22,7 @@ export class ToolbarDragService {
   private readonly toolbars: ToolbarService = inject(ToolbarService);
   private readonly draggingState: WritableSignal<string | null> = signal(null);
   private readonly targetState: WritableSignal<ToolbarDropTarget | null> = signal(null);
-  private stopListening: (() => void) | null = null;
+  private pointer: PointerDrag | null = null;
 
   public readonly dragging: Signal<string | null> = this.draggingState.asReadonly();
   public readonly target: Signal<ToolbarDropTarget | null> = this.targetState.asReadonly();
@@ -33,22 +33,7 @@ export class ToolbarDragService {
     this.stop();
     const startX = event.clientX;
     const startY = event.clientY;
-    const onMove = (moved: PointerEvent): void => this.move(name, startX, startY, moved);
-    const onEnd = (): void => this.end();
-    const onCancel = (): void => this.stop();
-    const onKey = (key: KeyboardEvent): void => this.cancelOnEscape(key);
-    this.document.addEventListener(Resources.pointerMoveEvent, onMove);
-    this.document.addEventListener(Resources.pointerUpEvent, onEnd);
-    this.document.addEventListener(Resources.pointerCancelEvent, onCancel);
-    this.document.addEventListener(Resources.keyDownEvent, onKey, { capture: true });
-    window.addEventListener(Resources.blurEvent, onCancel);
-    this.stopListening = () => {
-      this.document.removeEventListener(Resources.pointerMoveEvent, onMove);
-      this.document.removeEventListener(Resources.pointerUpEvent, onEnd);
-      this.document.removeEventListener(Resources.pointerCancelEvent, onCancel);
-      this.document.removeEventListener(Resources.keyDownEvent, onKey, { capture: true });
-      window.removeEventListener(Resources.blurEvent, onCancel);
-    };
+    this.pointer = new PointerDrag(this.document.documentElement, event, moved => this.move(name, startX, startY, moved), () => this.end(), () => this.stop());
   }
 
   private move(name: string, startX: number, startY: number, event: PointerEvent): void {
@@ -56,6 +41,7 @@ export class ToolbarDragService {
       if (!DragGesture.hasStarted(startX, startY, event.clientX, event.clientY))
         return;
       this.draggingState.set(name);
+      this.pointer?.start();
     }
     const target = this.targetAt(name, event.clientX, event.clientY);
     if (!(target?.equals(this.targetState()) ?? Object.isNull(this.targetState())))
@@ -74,17 +60,9 @@ export class ToolbarDragService {
       this.toolbars.move(name, target.row, target.index);
   }
 
-  private cancelOnEscape(event: KeyboardEvent): void {
-    if (event.key !== Resources.escapeKey || Object.isNull(this.draggingState()))
-      return;
-    event.preventDefault();
-    event.stopPropagation();
-    this.stop();
-  }
-
   private stop(): void {
-    this.stopListening?.();
-    this.stopListening = null;
+    this.pointer?.stop();
+    this.pointer = null;
     this.draggingState.set(null);
     this.targetState.set(null);
   }
