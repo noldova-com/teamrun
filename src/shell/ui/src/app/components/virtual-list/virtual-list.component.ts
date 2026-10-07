@@ -194,7 +194,7 @@ export class VirtualListComponent<T> {
     if (Math.abs(top - this.scrollTop()) < 1)
       return;
     this.follow(viewport.scrollHeight - viewport.clientHeight - top);
-    this.anchor = this.state().ledger.anchorAt(top);
+    this.anchor = this.anchorAt(top);
     this.scrollTop.set(top);
     this.tell();
   }
@@ -411,8 +411,18 @@ export class VirtualListComponent<T> {
 
   private scrollTo(top: number): void {
     this.pendingTop = top;
-    this.anchor = this.state().ledger.anchorAt(top);
+    this.anchor = this.anchorAt(top);
     this.scrollTop.set(top);
+  }
+
+  private anchorAt(top: number): VirtualListAnchor {
+    const { ledger, cache } = this.state();
+    const anchor = ledger.anchorAt(top);
+    const end = top + this.viewHeight();
+    for (let index = anchor.index; index < ledger.count && ledger.offsetOf(index) < end; index++)
+      if (!Object.isUndefined(cache.itemAt(index)))
+        return index === anchor.index ? anchor : new VirtualListAnchor(index, top - ledger.offsetOf(index));
+    return anchor;
   }
 
   private correct(): void {

@@ -4594,8 +4594,9 @@ export declare class VirtualListChoice<T> {
  * with the template a {@link VirtualRowDirective} marks; a row not yet
  * loaded is blank space at its height. Each row takes its own height, which
  * the list measures; rows measured, loaded, unloaded, added or removed above
- * the first row in view move nothing in view, and a row keeps its height
- * while its images load and decode.
+ * the first loaded row in view, or above the first row in view while none
+ * in view has loaded, move nothing in view, and a row keeps its height while
+ * its images load and decode.
  *
  * Its {@link VirtualListComponent.kind} picks its pattern. An options list
  * is a listbox whose rows take the tree row's geometry: Up and Down move,
@@ -4672,8 +4673,9 @@ export declare class VirtualListComponent<T> {
   public readonly activated: OutputEmitterRef<VirtualListChoice<T>>;
 
   /**
-   * Emits where the person reads each time they scroll: the row at the top
-   * of the view and the distance into it. A feed's module keeps the last
+   * Emits where the person reads each time they scroll: the first loaded row
+   * in view, or the row at the top of the view while none in view has
+   * loaded, and how far into it the view starts. A feed's module keeps the last
    * one and gives it back as {@link VirtualListComponent.position} to open
    * there again.
    */
@@ -4798,9 +4800,10 @@ export declare class VirtualListException extends Exception {
 }
 
 /**
- * Where the person reads in a {@link VirtualListComponent}: the row at the
- * top of the view, by its position and its key, and how far into it the
- * view starts. A feed emits it as the person scrolls, and opens at it again
+ * Where the person reads in a {@link VirtualListComponent}: the first
+ * loaded row in view, or the row at the top of the view while none in view
+ * has loaded, by its position and its key, and how far into it the view
+ * starts. A feed emits it as the person scrolls, and opens at it again
  * when given it as its {@link VirtualListComponent.position}.
  */
 export declare class VirtualListPosition {
@@ -4816,7 +4819,8 @@ export declare class VirtualListPosition {
   public readonly key: string | null;
 
   /**
-   * How far into the row the view starts, in CSS pixels.
+   * How far into the row the view starts, in CSS pixels; negative when the
+   * row starts below the view's top.
    */
   public readonly distance: number;
 
