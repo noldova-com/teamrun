@@ -43,7 +43,7 @@ export class FakeRuntimeConnection implements IRuntimeConnection {
       return Promise.resolve(answer);
     if (method.text === ShellMethods.work.text)
       return Promise.resolve(Response.success("r", { descriptions: [], sequence: 0 }));
-    if (method.text === ShellMethods.stop.text || method.text === ShellMethods.updateSaved.text)
+    if (method.text === ShellMethods.stop.text || method.text === ShellMethods.updateSaved.text || method.text === ShellMethods.quitAnswered.text)
       return Promise.resolve(Response.success("r", null));
     if (method.text === ShellMethods.notifications.text)
       return Promise.resolve(Response.success("r", new NotificationState([], false, [], 0).toJson()));

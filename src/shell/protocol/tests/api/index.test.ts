@@ -16,8 +16,8 @@ export class ProtocolApiTests {
     const exportNames = [
       "BuildIdentity", "Cancel", "CommandInfo", "CommandList", "CommandRun", "Event", "Failure", "FailureCode", "FrameReader", "FrameWriter", "Handshake", "KeptRuntime", "KeyChord", "KeyName", "ModuleState", "ModuleStatus", "ModuleStatusList", "Notification", "NotificationAction", "NotificationBroadcast",
       "NotificationList", "NotificationPost", "NotificationReference", "NotificationState", "NotificationSeverity", "NotificationUpdate", "NotificationsQuery", "PreShellData", "ProgramStatus", "ProgramStatusList",
-      "ProtocolException", "QualifiedName", "RecentCommandUse", "RecentCommands", "RecentCommandsQuery", "Request", "Response", "RunningWork", "RuntimeHandover", "SettingChange", "SettingDefinition", "SettingEntry", "SettingKey", "SettingKind", "SettingLocality", "SettingOption",
-      "SettingScope", "SettingType", "SettingValue", "SettingsQuery", "SettingsSnapshot", "ShellEvents", "ShellMethods", "ShellNotifications", "StopPolicy", "StopRequest", "UpdateProcess", "UpdateReady", "UpdateRequest", "UpdateSaved", "WindowStateKey", "WindowStateValue", "WindowStateWrite", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind", "WorkReport"
+      "ProtocolException", "QualifiedName", "QuitAnswer", "QuitAnswered", "QuitReport", "QuitResult", "RecentCommandUse", "RecentCommands", "RecentCommandsQuery", "Request", "Response", "RunningWork", "RuntimeHandover", "SettingChange", "SettingDefinition", "SettingEntry", "SettingKey", "SettingKind", "SettingLocality", "SettingOption",
+      "SettingScope", "SettingType", "SettingValue", "SettingsQuery", "SettingsSnapshot", "ShellClients", "ShellEvents", "ShellMethods", "ShellNotifications", "StopPolicy", "StopRequest", "UpdateProcess", "UpdateReady", "UpdateRequest", "UpdateSaved", "WindowStateKey", "WindowStateValue", "WindowStateWrite", "WireContract", "WireDecoder", "WireMessage", "WireMessageKind", "WorkReport"
     ];
 
     Assert.areEqual(exportNames.sort().join(","), Object.keys(api).sort().join(","));

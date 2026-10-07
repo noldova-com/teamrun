@@ -22,6 +22,7 @@ import {
   type ModuleStatus,
   ModuleStatusList,
   QualifiedName,
+  QuitReport,
   ShellEvents,
   ShellMethods,
   StopPolicy,
@@ -101,6 +102,9 @@ export class Cli {
           return ExitCode.Success;
         case CliCommand.Open:
           output.writeOpened(await this.openAsync(commandLine));
+          return ExitCode.Success;
+        case CliCommand.Quit:
+          output.writeQuit(await this.quitAsync(commandLine));
           return ExitCode.Success;
         case CliCommand.Module:
           return await this.runModuleAsync(commandLine, output);
@@ -206,14 +210,14 @@ export class Cli {
       stopped.reject(new MethodFailureException(failure));
     };
     const interrupt = (): void => stop(new Failure(FailureCode.Cancelled, Resources.cancelled));
-    this.context.signals.on(Resources.interruptSignal, interrupt);
+    this.listen(interrupt);
     const timer = Object.isNull(timeout) ? undefined : setTimeout(() => stop(new Failure(FailureCode.DeadlineExceeded, Resources.timedOut)), timeout);
     try {
       return await Promise.race([work(controller.signal), stopped.promise]);
     }
     finally {
       clearTimeout(timer);
-      this.context.signals.off(Resources.interruptSignal, interrupt);
+      this.unlisten(interrupt);
     }
   }
 
@@ -261,7 +265,7 @@ export class Cli {
     const client = await this.attachAsync(commandLine, this.locate(commandLine), new AttachOptions(commandLine.start, commandLine.takeOver));
     const controller = new AbortController();
     const interrupt = (): void => controller.abort();
-    this.context.signals.on(Resources.interruptSignal, interrupt);
+    this.listen(interrupt);
     try {
       return await Cli.callAsync(client, ShellMethods.runCommand, run.toJson(), commandLine.timeoutMilliseconds ?? undefined, controller.signal);
     }
@@ -274,9 +278,33 @@ export class Cli {
       throw error;
     }
     finally {
-      this.context.signals.off(Resources.interruptSignal, interrupt);
+      this.unlisten(interrupt);
       client.close();
     }
+  }
+
+  private async quitAsync(commandLine: CommandLine): Promise<QuitReport> {
+    const client = await this.attachAsync(commandLine, this.locate(commandLine), new AttachOptions(false, false));
+    const controller = new AbortController();
+    const interrupt = (): void => controller.abort();
+    this.listen(interrupt);
+    try {
+      return QuitReport.fromJson(await Cli.callAsync(client, ShellMethods.quit, null, commandLine.timeoutMilliseconds ?? undefined, controller.signal));
+    }
+    finally {
+      this.unlisten(interrupt);
+      client.close();
+    }
+  }
+
+  private listen(interrupt: () => void): void {
+    for (const signal of Resources.interruptSignals)
+      this.context.signals.on(signal, interrupt);
+  }
+
+  private unlisten(interrupt: () => void): void {
+    for (const signal of Resources.interruptSignals)
+      this.context.signals.off(signal, interrupt);
   }
 
   private async openAsync(commandLine: CommandLine): Promise<string> {

@@ -33,6 +33,11 @@ export class ShellEventsTests {
   }
 
   @TestMethod
+  public namesTheQuitEvent(): void {
+    Assert.areEqual("shell.quitting", ShellEvents.quitting.text);
+  }
+
+  @TestMethod
   public namesTheCommandsEvent(): void {
     Assert.areEqual("shell.commandsChanged", ShellEvents.commandsChanged.text);
   }

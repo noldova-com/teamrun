@@ -15,6 +15,7 @@ export class ShellEvents {
   public static readonly work: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.workMember);
   public static readonly updating: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.updatingMember);
   public static readonly updateEnded: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.updateEndedMember);
+  public static readonly quitting: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.quittingMember);
   public static readonly commandsChanged: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.commandsChangedMember);
   public static readonly programsChanged: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.programsChangedMember);
   public static readonly recentCommandsChanged: QualifiedName = new QualifiedName(Resources.shellOwner, Resources.recentCommandsChangedMember);
