@@ -242,6 +242,41 @@ export class Resources {
   public static readonly queryPrefix: string = "?";
   public static readonly macPlatform: string = "darwin";
   public static readonly linuxPlatform: string = "linux";
+  public static readonly appImageVariables: readonly string[] = ["APPIMAGE", "APPDIR", "ARGV0", "OWD"];
+  public static readonly appImageFolderVariable: string = "APPDIR";
+  public static readonly appRunPathVariables: readonly (readonly [string, readonly string[], readonly string[]])[] = [
+    ["PATH", [String.empty, "/usr/sbin"], []],
+    ["XDG_DATA_DIRS", ["/usr/share/"], ["/usr/share/gnome", "/usr/local/share/", "/usr/share/"]],
+    ["LD_LIBRARY_PATH", ["/usr/lib"], []],
+    ["GSETTINGS_SCHEMA_DIR", ["/usr/share/glib-2.0/schemas"], []]
+  ];
+  public static readonly pathListSeparator: string = ":";
+  public static readonly restartShell: string = "/bin/bash";
+  public static readonly restartShellArguments: readonly string[] = [
+    "--noprofile",
+    "--norc",
+    "-p",
+    "-c",
+    [
+      "holder=$1 image=$2",
+      "shift 2",
+      "while :; do",
+      "  read -r stat < \"/proc/$$/stat\" || exit 1",
+      "  fields=${stat##*\") \"}",
+      "  fields=${fields#* }",
+      "  parent=${fields%% *}",
+      "  (( parent == holder )) || break",
+      "  sleep 0.1",
+      "done",
+      "cd / || exit 1",
+      "if [[ ! -x $image ]]; then echo \"$image cannot be started after the update.\" >&2; exit 1; fi",
+      "exec -- \"$image\" \"$@\" < /dev/null > /dev/null 2>&1"
+    ].join("\n")
+  ];
+  public static get restartName(): string {
+    return `${ProductInfo.current.slug}-restart`;
+  }
+
   public static readonly desktopFileSuffix: string = ".desktop";
   public static get iconFolderSegments(): readonly string[] {
     return ProductInfo.current.icons.split(Resources.folderSeparator);
