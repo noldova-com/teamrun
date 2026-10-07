@@ -1059,9 +1059,10 @@ Each target is packaged on its own platform and processor.
     It checks each package against the SHA-512 its gallery published before expanding any, and expands them into `_build/package/signing`, where signing finds the tools in place and downloads nothing.
     It loads the module from there by path, asserting its version.
   - electron-builder signs through `scripts/packaging/windows-sign-hook.ts`, which signs each file with SHA-256 digests and an RFC 3161 timestamp.
-    Besides the program and the installer, it signs the native addons in `app.asar.unpacked`.
-  - Afterwards PowerShell 7 reads the Authenticode signatures of the installer, the unpacked program and every addon.
-    Packaging fails unless each is valid, timestamped and signed by a subject that has every field of `teamrun.product.windowsPublisher`.
+    Besides the program and the installer, it signs the native addons in `app.asar.unpacked` and Electron's DLLs.
+    A file that already carries a valid signature, such as a DLL Microsoft signed, keeps it, so a DLL a new Electron adds unsigned is signed without a list of names.
+  - Afterwards PowerShell 7 reads the Authenticode signatures of the installer and of every program, addon and DLL in the unpacked application.
+    Packaging fails unless each is valid and timestamped, and each program and addon is signed by a subject that has every field of `teamrun.product.windowsPublisher`; a DLL may instead be signed by Microsoft.
 - **Signing (macOS).**
   `npm run package -- --signed` signs a macOS package with a Developer ID Application certificate and notarizes it with an App Store Connect API key.
   It needs `MAC_CERTIFICATE` (the certificate and its private key as a base64 PKCS #12), `MAC_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8` (the key's text), `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`, and checks them before anything is built.

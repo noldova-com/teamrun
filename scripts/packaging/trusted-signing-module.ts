@@ -56,6 +56,7 @@ export default class TrustedSigningModule {
   ].join(TrustedSigningModule.LINE_SEPARATOR);
   private static readonly SIGN_SCRIPT: string = [
     "$ErrorActionPreference = 'Stop'",
+    `if ((Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $env:${TrustedSigningModule.FILE_VARIABLE}).Status -eq 'Valid') { exit 0 }`,
     TrustedSigningModule.IMPORT_LINE,
     `${TrustedSigningModule.NAME}\\Invoke-TrustedSigning -Endpoint '${TrustedSigningModule.ENDPOINT}' -CodeSigningAccountName '${TrustedSigningModule.ACCOUNT_NAME}' `
       + `-CertificateProfileName '${TrustedSigningModule.CERTIFICATE_PROFILE}' -FileDigest '${TrustedSigningModule.DIGEST}' `

@@ -124,6 +124,9 @@ class TrustedSigningModuleTests {
           TEAMRUN_SIGNING_FILE: file,
           LOCALAPPDATA: path.join(folder, "tools")
         });
+        assert.ok(script.startsWith("$ErrorActionPreference = 'Stop'\n"
+          + "if ((Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $env:TEAMRUN_SIGNING_FILE).Status -eq 'Valid') { exit 0 }\n"
+          + "Microsoft.PowerShell.Core\\Import-Module "), script);
         assert.ok(script.includes("TrustedSigning\\Invoke-TrustedSigning -Endpoint 'https://wus3.codesigning.azure.net/' -CodeSigningAccountName 'noldova-signing' "
           + "-CertificateProfileName 'TeamRun' -FileDigest 'SHA256' -TimestampRfc3161 'http://timestamp.acs.microsoft.com' -TimestampDigest 'SHA256' -Files $env:TEAMRUN_SIGNING_FILE"));
       });
