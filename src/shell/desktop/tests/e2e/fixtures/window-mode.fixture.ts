@@ -8,6 +8,8 @@
 
 import { type Page, expect } from "@playwright/test";
 
+import PageBridgeFixture from "./page-bridge.fixture.ts";
+
 export type WindowMode = "Light" | "Dark";
 
 export default class WindowModeFixture {
@@ -15,8 +17,7 @@ export default class WindowModeFixture {
   public static readonly backgrounds: Readonly<Record<WindowMode, string>> = { Light: "rgb(248, 248, 248)", Dark: "rgb(24, 24, 24)" };
 
   public static async setAsync(window: Page, mode: WindowMode): Promise<void> {
-    await window.evaluate(value => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-      .request("shell.setSetting", { name: "shell.mode", value }), mode);
+    await PageBridgeFixture.evaluateAsync(window, (t, value) => t.request("shell.setSetting", { name: "shell.mode", value }), mode);
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(WindowModeFixture.backgrounds[mode]);
   }
 }

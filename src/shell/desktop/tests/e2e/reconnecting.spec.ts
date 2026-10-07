@@ -12,6 +12,7 @@ import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import NotesOptionsFixture from "./fixtures/notes-options.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 import SettingsFixture from "./fixtures/settings.fixture.ts";
 
 interface IReconnectRecord {
@@ -23,11 +24,6 @@ interface IReconnectRecord {
 interface IReconnectResult {
   readonly isSameWorkspace: boolean;
   readonly card: string;
-}
-
-interface IBridge {
-  request(method: string, payload: unknown): Promise<unknown>;
-  onStartup(listener: (state: unknown) => void): () => void;
 }
 
 interface IKeptRecord {
@@ -60,8 +56,8 @@ async function watchAsync(window: Page): Promise<void> {
 }
 
 function notificationIdsAsync(window: Page, kind: string): Promise<string[]> {
-  return window.evaluate(async name => {
-    const answer = await (Reflect.get(globalThis, "teamrun") as IBridge).request("shell.notifications", {}) as { payload: { notifications: { id: string; post: { kind: string } }[] } };
+  return PageBridgeFixture.evaluateAsync(window, async (t, name) => {
+    const answer = await t.request("shell.notifications", {}) as { payload: { notifications: { id: string; post: { kind: string } }[] } };
     return answer.payload.notifications.filter(t => t.post.kind === name).map(t => t.id);
   }, kind);
 }
@@ -147,9 +143,9 @@ test.describe("reconnecting", () => {
     const first = await runtime.textContent() ?? "";
     const processId = await desktop.readRuntimeProcessIdAsync();
     const posted = await notificationIdsAsync(window, "notes.saveFailed");
-    await window.evaluate(() => {
+    await PageBridgeFixture.evaluateAsync(window, t => {
       const states: string[] = [];
-      (Reflect.get(globalThis, "teamrun") as IBridge).onStartup(t => states.push((t as { kind: string }).kind));
+      t.onStartup(u => states.push((u as { kind: string }).kind));
       Reflect.set(globalThis, "startups", states);
     });
 
@@ -169,9 +165,9 @@ test.describe("reconnecting", () => {
     await expect(runtime).toHaveText(/^Runtime \S+$/);
     await expect(window.locator("[data-fixture-content=clock-face]")).toBeVisible();
     const first = await runtime.textContent() ?? "";
-    await window.evaluate(() => {
+    await PageBridgeFixture.evaluateAsync(window, t => {
       const states: string[] = [];
-      (Reflect.get(globalThis, "teamrun") as IBridge).onStartup(t => states.push((t as { kind: string }).kind));
+      t.onStartup(u => states.push((u as { kind: string }).kind));
       Reflect.set(globalThis, "startups", states);
       Reflect.set(globalThis, "clock", document.querySelector("[data-fixture-content=clock-face]"));
     });
@@ -197,9 +193,9 @@ test.describe("reconnecting backoff", () => {
 
   test("a connection that receives an invalid frame each time it is ready ends, after waits that grow, in the start failure with its cause, and trying again connects", async ({ desktop }) => {
     const window = desktop.window;
-    await window.evaluate(() => {
+    await PageBridgeFixture.evaluateAsync(window, t => {
       const states: IStartupRecord[] = [];
-      (Reflect.get(globalThis, "teamrun") as IBridge).onStartup(t => states.push({ kind: (t as { kind: string }).kind, at: performance.now() }));
+      t.onStartup(u => states.push({ kind: (u as { kind: string }).kind, at: performance.now() }));
       Reflect.set(globalThis, "startups", states);
     });
     const readAsync = (): Promise<IStartupRecord[]> => window.evaluate(() => Reflect.get(globalThis, "startups") as IStartupRecord[]);

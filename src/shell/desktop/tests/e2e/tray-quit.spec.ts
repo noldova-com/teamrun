@@ -16,16 +16,13 @@ import ClockWorkFixture from "./fixtures/clock-work.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import OffCursorPlacement from "./fixtures/off-cursor-placement.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 
 const HINT_REFUSED: RegExp = /The operating system did not show the hint that TeamRun is still running/;
 const PLAYWRIGHT_DEBUGGING: RegExp = /^--(inspect|remote-debugging-port)=/;
 
-interface ITrayBridge {
-  readTrayAvailable(): Promise<unknown>;
-}
-
 async function keepsRunningAsync(desktop: DesktopApplicationFixture): Promise<boolean> {
-  return process.platform === "darwin" || await desktop.window.evaluate(() => (Reflect.get(globalThis, "teamrun") as ITrayBridge).readTrayAvailable()) === true;
+  return process.platform === "darwin" || await PageBridgeFixture.evaluateAsync(desktop.window, t => t.readTrayAvailable()) === true;
 }
 
 async function closeIntoTheTrayAsync(desktop: DesktopApplicationFixture): Promise<string> {

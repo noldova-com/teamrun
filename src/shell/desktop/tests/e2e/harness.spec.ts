@@ -13,6 +13,7 @@ import BuildVariantFixture from "./fixtures/build-variant.fixture.ts";
 import DesktopApplicationFixture from "./fixtures/desktop-application.fixture.ts";
 import { expect, test } from "./fixtures/desktop-test.fixture.ts";
 import LayoutFixture from "./fixtures/layout.fixture.ts";
+import PageBridgeFixture from "./fixtures/page-bridge.fixture.ts";
 import WindowModeFixture from "./fixtures/window-mode.fixture.ts";
 
 test.use({ desktopVariant: BuildVariantFixture.noModules });
@@ -113,8 +114,7 @@ test.describe("the workflows' checkpoints", () => {
     const window = desktop.window;
     const settings = { theme: "shell.default", mode: "Dark", interfaceFont: "Noldova", codeFont: "Noldova", panelSize: 17, messageSize: 14, codeSize: 14 };
     await WindowModeFixture.setAsync(window, "Dark");
-    await window.evaluate(() => (Reflect.get(globalThis, "teamrun") as { request(method: string, payload: unknown): Promise<unknown> })
-      .request("shell.setSetting", { name: "shell.panelSize", value: 17 }));
+    await PageBridgeFixture.evaluateAsync(window, t => t.request("shell.setSetting", { name: "shell.panelSize", value: 17 }));
     await expect.poll(() => window.evaluate(() => getComputedStyle(document.documentElement).fontSize)).not.toBe("16px");
 
     await desktop.checkpointAsync("harness-checkpoint-record");
