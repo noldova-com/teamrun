@@ -257,6 +257,68 @@ export class WindowBoundsKeeperTests {
   }
 
   @TestMethod
+  public async savesAPendingSaveAsItHoldsAndWritesNothingMoreUntilItResumes(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore(null);
+    const log = new FakeDesktopLog();
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 60_000, log, true);
+    await keeper.restoreAsync(store);
+
+    window.bounds = { x: 10, y: 20, width: 800, height: 600 };
+    window.change("move");
+    await keeper.holdAsync();
+    const writesAtHold = store.writes.length;
+    window.bounds = { x: 30, y: 40, width: 900, height: 640 };
+    window.change("resize");
+    await keeper.saveAsync();
+    const writesWhileHeld = store.writes.length;
+    await keeper.saveUnsavedAsync();
+    await keeper.saveUnsavedAsync();
+
+    Assert.areEqual(1, writesAtHold);
+    Assert.areEqual(1, writesWhileHeld);
+    Assert.areEqual(0, log.lines.length);
+    Assert.areEqual(
+      JSON.stringify([{ x: 10, y: 20, width: 800, height: 600, maximized: false }, { x: 30, y: 40, width: 900, height: 640, maximized: false }]),
+      JSON.stringify(store.writes));
+  }
+
+  @TestMethod
+  public async holdsWithoutAWriteWhenNothingIsPendingAndSavesTheBoundsChangedMeanwhileOnTheNextRestore(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore(null);
+    const next = new MemoryStore({ x: 0, y: 0, width: 640, height: 480, maximized: false });
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 60_000, new FakeDesktopLog(), true);
+    await keeper.restoreAsync(store);
+
+    await keeper.holdAsync();
+    window.bounds = { x: 30, y: 40, width: 900, height: 640 };
+    window.change("move");
+    await keeper.saveAsync();
+    await keeper.restoreAsync(next);
+
+    Assert.areEqual(0, store.writes.length);
+    Assert.areEqual(JSON.stringify([{ x: 30, y: 40, width: 900, height: 640, maximized: false }]), JSON.stringify(next.writes));
+    Assert.areEqual(JSON.stringify({ x: 30, y: 40, width: 900, height: 640 }), JSON.stringify(window.bounds));
+  }
+
+  @TestMethod
+  public async holdsEvenWhenItsSaveFails(): Promise<void> {
+    const window = new FakeDesktopWindow({}, 1);
+    const store = new MemoryStore(null);
+    const keeper = new WindowBoundsKeeper(window, new FakeDisplayHost(), 60_000, new FakeDesktopLog(), true);
+    await keeper.restoreAsync(store);
+    store.failure = new WindowStateException("The runtime refused shell.writeWindowBounds: TeamRun is preparing to install an update.");
+
+    window.change("move");
+    await Assert.throwsAsync(() => keeper.holdAsync(), WindowStateException);
+    window.change("resize");
+    await keeper.saveAsync();
+
+    Assert.areEqual(1, store.attempts);
+  }
+
+  @TestMethod
   public async reportsAScheduledSaveThatFails(): Promise<void> {
     const window = new FakeDesktopWindow({}, 1);
     const store = new MemoryStore(null);
