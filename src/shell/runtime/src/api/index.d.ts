@@ -2809,6 +2809,7 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
   /**
    * Lists the processes running now; see {@link IWindowsProcessApi.listProcesses}.
    *
+   * @returns Each process's id and its parent's id.
    * @example
    * ```ts
    * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -2823,6 +2824,9 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
   /**
    * Opens a process; see {@link IWindowsProcessApi.openProcess}.
    *
+   * @param processId The process's id.
+   * @param access The access rights to open it with.
+   * @returns The process's handle, or the Windows error number when it cannot be opened.
    * @example
    * ```ts
    * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -2837,6 +2841,8 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
   /**
    * Reads when a process was created; see {@link IWindowsProcessApi.readCreationTime}.
    *
+   * @param handle The process's handle.
+   * @returns Its creation time, or `null` when it cannot be read.
    * @example
    * ```ts
    * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -2851,6 +2857,8 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
   /**
    * Reads the executable a process runs; see {@link IWindowsProcessApi.readImagePath}.
    *
+   * @param handle The process's handle.
+   * @returns The executable's path, or `null` when it cannot be read.
    * @example
    * ```ts
    * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -2865,6 +2873,8 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
   /**
    * Ends a process; see {@link IWindowsProcessApi.terminateProcess}.
    *
+   * @param handle The process's handle.
+   * @returns Whether Windows accepted ending it.
    * @example
    * ```ts
    * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -2879,6 +2889,8 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
   /**
    * Checks whether a process has exited; see {@link IWindowsProcessApi.hasExited}.
    *
+   * @param handle The process's handle.
+   * @returns Whether it has exited.
    * @example
    * ```ts
    * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -2893,6 +2905,8 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
   /**
    * Opens a file for reading that stays unwritable while held; see {@link IWindowsProcessApi.openFileForReading}.
    *
+   * @param file The file's path.
+   * @returns The file's handle, or the Windows error number when it cannot be opened.
    * @example
    * ```ts
    * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";
@@ -2907,6 +2921,7 @@ export declare class WindowsProcessApi implements IWindowsProcessApi {
   /**
    * Closes a handle; see {@link IWindowsProcessApi.closeHandle}.
    *
+   * @param handle A handle from this API.
    * @example
    * ```ts
    * import type { WindowsProcessApi } from "@noldova/teamrun-shell-runtime";

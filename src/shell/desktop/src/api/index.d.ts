@@ -5929,7 +5929,7 @@ export declare class FeedUpdater implements IUpdater {
   /**
    * The file the last download in this process gave, or `null` before one has.
    */
-  public readonly downloadedFile: string | null;
+  public get downloadedFile(): string | null;
 
   /**
    * Creates the updater and sets electron-updater up.

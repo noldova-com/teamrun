@@ -26,6 +26,7 @@ import { type IIpcEvent, PathCommandException, PathCommandOutcome, UpdateExcepti
 
 import { Condition } from "../fixtures/condition.fixture.js";
 import { DesktopStartFixture } from "../fixtures/desktop-start.fixture.js";
+import { FailingFileCallFixture } from "../fixtures/failing-file-call.fixture.js";
 import { FakeDesktopProcess } from "../fixtures/fake-desktop-process.fixture.js";
 import type { FakeDesktopWindow } from "../fixtures/fake-desktop-window.fixture.js";
 import { FakeDeviceFiles } from "../fixtures/fake-device-files.fixture.js";
@@ -2078,6 +2079,25 @@ export class DesktopApplicationTests {
     Assert.areEqual(3, files.updateReady.reads);
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The updater reported: started").length);
     Assert.areEqual(1, DesktopStartFixture.readErrors(process, "The update lock reported: started").length);
+  }
+
+  @TestMethod
+  public async logsALeftoverHandoffFolderItCannotRemoveBeforeStartingItsUpdates(): Promise<void> {
+    const electron = new FakeElectron();
+    const process = new FakeDesktopProcess("linux");
+    const installations: Installation[] = [];
+    DesktopStartFixture.start(electron, process, new FakeRuntimeLauncher(), new FakeDeviceIdentity(), new FakeDeviceFiles(), new FakePathCommand(), installations, () => Promise.resolve(true),
+      () => new FakeUpdater());
+    const [installation] = installations;
+    Assert.isDefined(installation);
+    const handoff = join(installation.folder, "handoff");
+    using _rm = new FailingFileCallFixture("rm", handoff, "EBUSY");
+    const left = "The copy of an update's installer could not be removed, so it is removed at the next start: Error: EBUSY: operation failed, rm '";
+
+    await DesktopStartFixture.openAsync(electron);
+    await Condition.waitAsync(() => DesktopStartFixture.readErrors(process, left).length > 0);
+
+    Assert.areEqual(1, DesktopStartFixture.readErrors(process, left).length);
   }
 
   @TestMethod

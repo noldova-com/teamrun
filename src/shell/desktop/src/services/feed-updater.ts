@@ -30,9 +30,9 @@ export class FeedUpdater implements IUpdater {
   private readonly log: (text: string) => void;
   private cancellation: CancellationToken | null = null;
   private isConfigured: boolean = false;
+  private downloaded: string | null = null;
 
   public readonly packagePath: string;
-  public downloadedFile: string | null = null;
 
   public constructor(
     updater: IAppUpdater,
@@ -60,6 +60,10 @@ export class FeedUpdater implements IUpdater {
     updater.isUpdateSupported = info => !info.version.includes(Resources.prereleaseSeparator);
   }
 
+  public get downloadedFile(): string | null {
+    return this.downloaded;
+  }
+
   public async checkAsync(): Promise<string | null> {
     try {
       await this.configureAsync();
@@ -83,7 +87,7 @@ export class FeedUpdater implements IUpdater {
       if (file !== this.packagePath)
         throw new UpdateException(Resources.updateFailedUnexpectedly);
       await this.verifyPublisherAsync(file);
-      this.downloadedFile = file;
+      this.downloaded = file;
       return file;
     }
     catch (error) {

@@ -122,6 +122,10 @@ export class SquirrelHandoffTests {
   public downloadsAnUpdateRestoredFromItsRecordAgainBeforeStagingIt(): Promise<void> {
     return SquirrelHandoffFixture.runAsync(async fixture => {
       fixture.updater.check = () => Promise.resolve("1.3.0");
+      fixture.updater.download = onProgress => {
+        onProgress(100);
+        return Promise.resolve(fixture.updater.packagePath);
+      };
       fixture.shipIt.processId = null;
 
       const processId = await fixture.handoff.handOffAsync(fixture.record());
@@ -142,10 +146,13 @@ export class SquirrelHandoffTests {
       const unreachable = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateException);
       fixture.updater.downloadedFile = fixture.updater.packagePath;
       const changed = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record("b3RoZXI=")), UpdateHandoffException);
+      await rm(fixture.updater.packagePath);
+      const missing = await Assert.throwsAsync(() => fixture.handoff.handOffAsync(fixture.record()), UpdateHandoffException);
 
       Assert.areEqual("The update feed no longer offers version 1.3.0.", gone.message);
       Assert.areEqual("TeamRun couldn't reach its update feed.", unreachable.message);
       Assert.areEqual("The downloaded update has changed since it was checked, so it wasn't installed.", changed.message);
+      Assert.areEqual(changed.message, missing.message);
       Assert.areEqual(0, fixture.updater.downloads);
       Assert.areEqual(0, fixture.native.checks);
       Assert.areEqual(0, fixture.shipIt.removals);
