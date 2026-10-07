@@ -69,6 +69,10 @@ export class Resources {
     return `The launch barrier of an unfinished update could not be removed: ${message}`;
   }
 
+  public static formatRelaunchFailed(reason: string): string {
+    return `${Resources.applicationName} could not start itself apart from the terminal, so it runs in the terminal and quits when the terminal closes: ${reason}`;
+  }
+
   public static formatHandoverFailed(reason: string): string {
     return `The newer ${Resources.applicationName} could not be started for the hand-over, so this one quits without it: ${reason}`;
   }
@@ -296,8 +300,13 @@ export class Resources {
   public static readonly queryPrefix: string = "?";
   public static readonly macPlatform: string = "darwin";
   public static readonly linuxPlatform: string = "linux";
+  public static readonly relaunchPlatforms: readonly string[] = [Resources.linuxPlatform, Resources.macPlatform];
   public static readonly appImageVariables: readonly string[] = ["APPIMAGE", "APPDIR", "ARGV0", "OWD"];
   public static readonly appImageFolderVariable: string = "APPDIR";
+  public static readonly appImageWorkingFolderVariable: string = "OWD";
+  public static readonly standardDescriptors: readonly number[] = [0, 1, 2];
+  public static readonly enableLoggingVariable: string = "ELECTRON_ENABLE_LOGGING";
+  public static readonly terminalArguments: readonly string[] = ["--enable-logging", "--remote-debugging-port", "--remote-debugging-pipe"];
   public static readonly appRunPathVariables: readonly (readonly [string, readonly string[], readonly string[]])[] = [
     ["PATH", [String.empty, "/usr/sbin"], []],
     ["XDG_DATA_DIRS", ["/usr/share/"], ["/usr/share/gnome", "/usr/local/share/", "/usr/share/"]],
@@ -411,6 +420,7 @@ export class Resources {
   public static readonly failedEvent: "failed" = "failed";
   public static readonly dataEvent: "data" = "data";
   public static readonly errorEvent: "error" = "error";
+  public static readonly spawnEvent: "spawn" = "spawn";
   public static readonly secondInstanceEvent: "second-instance" = "second-instance";
   public static readonly windowAllClosedEvent: "window-all-closed" = "window-all-closed";
   public static readonly activateEvent: "activate" = "activate";
