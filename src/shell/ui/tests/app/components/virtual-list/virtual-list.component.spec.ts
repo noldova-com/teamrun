@@ -104,7 +104,7 @@ describe("VirtualListComponent", () => {
   });
 
   it("measures each row it renders, gives its template that height, and keeps the estimate for rows it never rendered", async () => {
-    await renderAsync(new ArrayVirtualListSource([`${"long ".repeat(40)}item`, ...Array.from({ length: 999 }, (_, t) => `item ${t + 1}`)], t => t, 20));
+    await renderAsync(new ArrayVirtualListSource([`${"long ".repeat(40)}item`, ...Array.from({ length: 999 }, (_, t) => `item ${t + 1}`)], t => t, 100));
     const slots = options().map(t => t.parentElement as HTMLElement);
     const tall = slots[0] as HTMLElement;
     const rendered = slots.reduce((sum, t) => sum + t.getBoundingClientRect().height, 0);
@@ -112,7 +112,7 @@ describe("VirtualListComponent", () => {
     expect(tall.getBoundingClientRect().height).toBeGreaterThan(100);
     expect(Number(tall.querySelector(".label")?.getAttribute("data-height"))).toBeCloseTo(tall.getBoundingClientRect().height);
     expect(slots.length).toBeLessThan(1000);
-    expect(Math.abs(viewport().scrollHeight - rendered - (1000 - slots.length) * 20)).toBeLessThan(1);
+    expect(Math.abs(viewport().scrollHeight - rendered - (1000 - slots.length) * 100)).toBeLessThan(1);
   });
 
   it("keeps the row being read in place while rows above it are inserted, removed, replaced or measured", async () => {
@@ -156,6 +156,25 @@ describe("VirtualListComponent", () => {
 
     expect([start, down, up, pageDown, pageUp, end, home]).toEqual(["1", "2", "1", "11", "1", ["item 999", 29_700], ["item 0", 0]]);
     expect(host.activations).toEqual(["item 0", "item 1"]);
+  });
+
+  it("takes keys pressed before it renders from the row they moved to, and from the focused row once its source changes", async () => {
+    await renderAsync();
+    host.list().focus();
+    await settleAsync();
+
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+    await settleAsync();
+    const quick = [focusedPlace(), [...host.activations]];
+    host.source.set(new VirtualListSourceFixture(200, 30));
+    await settleAsync();
+    host.list().focus();
+    await settleAsync();
+    host.source.set(new VirtualListSourceFixture(200, 30));
+    await settleAsync();
+    await pressAsync("{ArrowDown}");
+
+    expect([quick, focusedPlace()]).toEqual([["3", ["item 2"]], "2"]);
   });
 
   it("leaves keys with a modifier, and other keys, to the shell and the page", async () => {

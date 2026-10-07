@@ -155,7 +155,7 @@ export class VirtualListComponent<T> {
   protected press(event: KeyboardEvent): void {
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
       return;
-    const from = VirtualListComponent.indexOf(event);
+    const from = this.focusIndex() ?? VirtualListComponent.indexOf(event);
     if (event.key === Resources.enterKey || event.key === Resources.spaceKey) {
       event.preventDefault();
       this.choose(from);
