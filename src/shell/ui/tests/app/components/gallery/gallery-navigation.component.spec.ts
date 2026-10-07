@@ -33,4 +33,16 @@ describe("GalleryNavigationComponent", () => {
 
     expect([before.indexOf("Notes"), labels().indexOf("Notes")]).toEqual([3, 0]);
   });
+
+  it("shows a list of 10,000 items that renders only the rows around its view, a list still loading and a list whose reads fail", async () => {
+    fixture = await GalleryFixture.showAsync();
+    await new Promise<void>(t => requestAnimationFrame(() => requestAnimationFrame(() => t())));
+    await fixture.whenStable();
+    const [items, loading, failing] = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>("tr-gallery-navigation tr-virtual-list")];
+    const options = [...(items as HTMLElement).querySelectorAll("[role=option]")];
+
+    expect([options[0]?.textContent, options[0]?.getAttribute("aria-setsize"), options.length < 60, options[2]?.getAttribute("aria-selected")]).toEqual(["Item 1", "10000", true, "true"]);
+    expect([loading?.querySelector(".tr-virtual-list-status")?.textContent?.trim(), loading?.querySelector("[role=listbox]")?.getAttribute("aria-label")]).toEqual(["Loading…", "Gallery items"]);
+    expect(failing?.querySelector(".tr-virtual-list-failure button")?.textContent).toBe("Retry");
+  });
 });

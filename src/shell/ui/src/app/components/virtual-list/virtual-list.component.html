@@ -1,0 +1,37 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div #viewport class="tr-virtual-list-viewport" (scroll)="onScroll()">
+  <div #list class="tr-virtual-list-rows" role="listbox" [attr.aria-label]="label()" [attr.aria-busy]="gap()?.isFailed === false"
+    [style.padding-top.px]="range().top" [style.padding-bottom.px]="range().bottom" (focusout)="leave($event)">
+    @for (row of rows(); track row.track) {
+      <div #slot class="tr-virtual-list-slot" [attr.data-tr-row]="row.index" [class.tr-virtual-list-slot-outside]="row.top !== null" [style.top.px]="row.top"
+        [style.height.px]="row.context ? null : row.height">
+        <div class="tr-virtual-list-option" role="option" [class.tr-virtual-list-option-selected]="row.isSelected" [attr.aria-selected]="row.isSelected"
+          [attr.aria-posinset]="row.index + 1" [attr.aria-setsize]="state().source.length()" [attr.aria-hidden]="row.context || row.isStop ? null : true"
+          [attr.tabindex]="row.isStop ? 0 : row.context ? -1 : null" (focusin)="enter(row.index)" (keydown)="press($event, row.index)"
+          (click)="choose(row.index)">
+          @if (row.context; as context) {
+            <ng-container *ngTemplateOutlet="rowTemplate().template; context: context" />
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>
+<div class="tr-virtual-list-status" [class.tr-virtual-list-edge-end]="gap()?.isAtStart === false" [class.tr-virtual-list-status-shown]="gap()?.isFailed === false">
+  @if (gap()?.isFailed === false) {
+    {{ resources.virtualListLoading }}
+  }
+</div>
+@if (gap()?.isFailed) {
+  <div class="tr-virtual-list-failure" [class.tr-virtual-list-edge-end]="gap()?.isAtStart === false">
+    <tr-field-message>{{ resources.virtualListFailed }}</tr-field-message>
+    <button type="button" tr-button [variant]="variants.Secondary" (click)="retry()">{{ resources.virtualListRetry }}</button>
+  </div>
+}

@@ -241,6 +241,33 @@ export declare enum ToolbarOrientation {
 }
 
 /**
+ * Where {@link VirtualListComponent.reveal} puts a row in the list's view.
+ */
+export declare enum VirtualListAlign {
+  /**
+   * The row's top at the view's top.
+   */
+  Start = "Start",
+
+  /**
+   * The row's middle at the view's middle.
+   */
+  Center = "Center",
+
+  /**
+   * The row's bottom at the view's bottom.
+   */
+  End = "End",
+
+  /**
+   * The least scrolling that shows the row: none while it is in view, its
+   * top at the view's top when it is above, and its bottom at the view's
+   * bottom when it is below.
+   */
+  Nearest = "Nearest"
+}
+
+/**
  * What a {@link VirtualListSource} tells the objects that observe it once its
  * items change. The kit's list observes its source itself; a module
  * implements this only to follow a source outside a list.
@@ -331,6 +358,40 @@ export interface IVirtualListObserver {
    * ```
    */
   onUpdated(at: number, count: number): void;
+}
+
+/**
+ * What a row of the kit's list gives the template of a
+ * {@link VirtualRowDirective}: the item, its position and the height the
+ * list holds for its row.
+ *
+ * @typeParam T The type of the source's items.
+ * @example
+ * ```ts
+ * import type { IVirtualRowContext } from "@noldova/teamrun-shell-ui";
+ *
+ * export function describeRow(context: IVirtualRowContext<string>): string {
+ *   return `${context.index + 1}: ${context.$implicit}`;
+ * }
+ * ```
+ */
+export interface IVirtualRowContext<T> {
+  /**
+   * The item the row shows, which `let-item` in the template names.
+   */
+  readonly $implicit: T;
+
+  /**
+   * The item's position in the whole list, from 0.
+   */
+  readonly index: number;
+
+  /**
+   * The height in CSS pixels the list holds for the row, the row's padding
+   * included: its height when it was last measured, or its source's
+   * estimate until then.
+   */
+  readonly height: number;
 }
 
 /**
@@ -4458,6 +4519,179 @@ export declare class ViewBadgeComponent {
 }
 
 /**
+ * The row a person chose in a {@link VirtualListComponent}, which its
+ * {@link VirtualListComponent.activated} emits.
+ *
+ * @typeParam T The type of the source's items.
+ */
+export declare class VirtualListChoice<T> {
+  /**
+   * The chosen row's position in the whole list, from 0.
+   */
+  public readonly index: number;
+
+  /**
+   * The chosen row's item, as the list loaded it.
+   */
+  public readonly item: T;
+
+  /**
+   * Creates a choice; the list makes one for each row a person chooses.
+   *
+   * @param index The chosen row's position in the whole list, from 0.
+   * @param item The chosen row's item.
+   * @example
+   * ```ts
+   * import { VirtualListChoice } from "@noldova/teamrun-shell-ui";
+   *
+   * export const choice: VirtualListChoice<string> = new VirtualListChoice(2, "Linus");
+   * ```
+   */
+  public constructor(index: number, item: T);
+}
+
+/**
+ * The kit's list for a long collection, `tr-virtual-list`: a named listbox
+ * of options that renders only the rows in and just beyond its view, so the
+ * rows it renders do not grow with the list's length. It reads its items
+ * from a {@link VirtualListSource} a few pages at a time and draws each
+ * loaded one with the template a {@link VirtualRowDirective} marks; a row
+ * not yet loaded is blank space at its height. Each row takes its own
+ * height, which the list measures; rows measured, loaded, unloaded, added
+ * or removed above the first row in view move nothing in view.
+ *
+ * Its rows take the tree row's geometry, and it follows the listbox
+ * keys: Up and Down move, Page Up and Page Down move by a view, Home and
+ * End go to the first and last row, and Enter or Space chooses. It is one
+ * Tab stop, which returns to the row last focused, or lands on the
+ * selected row, or on the first. While rows in view load, it says so in a
+ * status line, and announces it while the focused row waits for its items;
+ * when a read fails, it says and announces that the items couldn't load and
+ * offers Retry.
+ *
+ * The module sizes the list; it scrolls inside the height it is given.
+ *
+ * @typeParam T The type of the source's items.
+ */
+export declare class VirtualListComponent<T> {
+  /**
+   * The items the list shows. A new source starts the list again at its
+   * first row.
+   */
+  public readonly source: InputSignal<VirtualListSource<T>>;
+
+  /**
+   * The list's accessible name.
+   */
+  public readonly label: InputSignal<string>;
+
+  /**
+   * The position of the selected row, from 0, which is highlighted, selected
+   * for assistive technology and the list's Tab stop until a row has been
+   * focused, whether its item has loaded or not, or null for none; null when
+   * not bound. A position outside the list counts as none. The owner moves
+   * it with the items it adds or removes before it.
+   */
+  public readonly selected: InputSignal<number | null>;
+
+  /**
+   * Emits the loaded row the person chose by a click, Enter or Space, with
+   * its position and its item; the owner usually makes the position
+   * {@link VirtualListComponent.selected}.
+   */
+  public readonly activated: OutputEmitterRef<VirtualListChoice<T>>;
+
+  /**
+   * Emits why a read failed: what {@link VirtualListSource.readAsync}
+   * threw or rejected with, or a {@link VirtualListException} when it
+   * answered with the wrong number of items. The list itself tells the
+   * person and offers Retry; the owner may log it.
+   */
+  public readonly failed: OutputEmitterRef<unknown>;
+
+  /**
+   * Creates the component, which Angular does for each `tr-virtual-list`
+   * element. Destroying it stops its reads and its following of its source.
+   *
+   * @example
+   * ```ts
+   * import { Component } from "@angular/core";
+   * import { ArrayVirtualListSource, VirtualListComponent, VirtualRowDirective } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-contact-list",
+   *   imports: [VirtualListComponent, VirtualRowDirective],
+   *   template: "<tr-virtual-list label=\"Contacts\" [source]=\"contacts\" [selected]=\"chosen\" (activated)=\"chosen = $event.index\"><ng-template [trVirtualRow]=\"contacts\" let-name>{{ name }}</ng-template></tr-virtual-list>",
+   *   styles: "tr-virtual-list { height: 20rem; }"
+   * })
+   * export class ContactListComponent {
+   *   protected readonly contacts: ArrayVirtualListSource<string> = new ArrayVirtualListSource(["Ada", "Grace", "Linus"], t => t, 30);
+   *   protected chosen: number | null = null;
+   * }
+   * ```
+   */
+  public constructor();
+
+  /**
+   * Moves focus to the row last focused, or the selected row, or the first,
+   * and scrolls it into view; nothing happens while the list has no rows.
+   *
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ArrayVirtualListSource, VirtualListComponent, VirtualRowDirective } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-log-lines",
+   *   imports: [VirtualListComponent, VirtualRowDirective],
+   *   template: "<tr-virtual-list label=\"Log\" [source]=\"lines\"><ng-template [trVirtualRow]=\"lines\" let-line>{{ line }}</ng-template></tr-virtual-list><button type=\"button\" (click)=\"showLines()\">Log</button>"
+   * })
+   * export class LogLinesComponent {
+   *   private readonly list: Signal<VirtualListComponent<string>> = viewChild.required<VirtualListComponent<string>>(VirtualListComponent);
+   *
+   *   protected readonly lines: ArrayVirtualListSource<string> = new ArrayVirtualListSource(["Started", "Ready"], t => t);
+   *
+   *   protected showLines(): void {
+   *     this.list().focus();
+   *   }
+   * }
+   * ```
+   */
+  public focus(): void;
+
+  /**
+   * Scrolls the list so the row at a position shows where the alignment
+   * puts it, as far as the list can scroll, without moving focus; a
+   * position beyond either end reveals the row at that end, and nothing
+   * happens while the list has no rows.
+   *
+   * @param index The row's position, from 0.
+   * @param align Where in the view the row goes.
+   * @example
+   * ```ts
+   * import { Component, type Signal, viewChild } from "@angular/core";
+   * import { ArrayVirtualListSource, VirtualListAlign, VirtualListComponent, VirtualRowDirective } from "@noldova/teamrun-shell-ui";
+   *
+   * @Component({
+   *   selector: "tr-history",
+   *   imports: [VirtualListComponent, VirtualRowDirective],
+   *   template: "<tr-virtual-list label=\"History\" [source]=\"entries\"><ng-template [trVirtualRow]=\"entries\" let-entry>{{ entry }}</ng-template></tr-virtual-list><button type=\"button\" (click)=\"showLatest()\">Latest</button>"
+   * })
+   * export class HistoryComponent {
+   *   private readonly list: Signal<VirtualListComponent<string>> = viewChild.required<VirtualListComponent<string>>(VirtualListComponent);
+   *
+   *   protected readonly entries: ArrayVirtualListSource<string> = new ArrayVirtualListSource(["Opened", "Edited", "Saved"], t => t);
+   *
+   *   protected showLatest(): void {
+   *     this.list().reveal(this.entries.length() - 1, VirtualListAlign.End);
+   *   }
+   * }
+   * ```
+   */
+  public reveal(index: number, align: VirtualListAlign): void;
+}
+
+/**
  * The exception a {@link VirtualListSource} throws for a length, an estimate
  * or a change that does not fit the list, and that the kit's list reports
  * when a source answers a read with the wrong number of items.
@@ -4715,4 +4949,44 @@ export declare abstract class VirtualListSource<T> {
    * ```
    */
   public reportUpdated(at: number, count: number): void;
+}
+
+/**
+ * Marks the `ng-template` that draws each loaded row of a
+ * {@link VirtualListComponent}, as `<ng-template [trVirtualRow]="source"
+ * let-item>`. Binding the list's source lets the template checker type the
+ * item; the template also receives the row's `index` and `height`
+ * ({@link IVirtualRowContext}).
+ *
+ * @typeParam T The type of the source's items.
+ */
+export declare class VirtualRowDirective<T> {
+  /**
+   * The template the list draws each loaded row with.
+   */
+  public readonly template: TemplateRef<IVirtualRowContext<T>>;
+
+  /**
+   * The source of the list the template belongs to, which types its item.
+   */
+  public readonly trVirtualRow: InputSignal<VirtualListSource<T>>;
+
+  /**
+   * Tells Angular's template checker that the template's context is an
+   * {@link IVirtualRowContext} of the source's items; Angular calls it, a
+   * module doesn't need to.
+   *
+   * @param _ The directive on the template.
+   * @param _context The template's context.
+   * @returns Always true.
+   * @example
+   * ```ts
+   * import { VirtualRowDirective } from "@noldova/teamrun-shell-ui";
+   *
+   * export function isRowContext(directive: VirtualRowDirective<string>, context: unknown): boolean {
+   *   return VirtualRowDirective.ngTemplateContextGuard(directive, context);
+   * }
+   * ```
+   */
+  public static ngTemplateContextGuard<T>(_: VirtualRowDirective<T>, _context: unknown): _context is IVirtualRowContext<T>;
 }
