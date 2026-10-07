@@ -647,6 +647,23 @@ describe("VirtualListComponent", () => {
     expect([feed.positions.length, first?.index, first?.key, Math.round(first?.distance ?? 0), (second?.index ?? 0) > 90, second?.key]).toEqual([2, 1, "item 1", 19, true, null]);
   });
 
+  it("keeps the first loaded row in view in place while the rows above it in view load, and emits it as where the person reads", async () => {
+    const source = new VirtualListSourceFixture(200, 30);
+    const answerAsync = async (start: number, items?: readonly string[]): Promise<void> => {
+      await source.reads.find(t => t.start === start)?.answerAsync(items);
+      await settleAsync();
+    };
+    await renderFeedAsync(source, new VirtualListPosition(150, null, 0));
+    await answerAsync(150);
+
+    await scrollAsync(viewport().scrollTop - 40);
+    const before = Math.round(offsetOfArticle("item 150"));
+    await answerAsync(100, Array.from({ length: 50 }, (_, t) => `${t === 48 ? "long" : "item"} ${100 + t}`));
+    const position = feed.positions.at(-1);
+
+    expect([before, Math.round(offsetOfArticle("item 150")), position?.index, position?.key, Math.round(position?.distance ?? 0)]).toEqual([40, 40, 150, "item 150", -40]);
+  });
+
   it("moves between articles with Page Up and Page Down from anywhere in one, and with the arrows, Home and End on the article itself", async () => {
     await renderFeedAsync(numbered(50));
     feed.list().focus();
