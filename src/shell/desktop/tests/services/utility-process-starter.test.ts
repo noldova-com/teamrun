@@ -36,7 +36,7 @@ export class UtilityProcessStarterTests {
     const host = new FakeUtilityProcessHost();
     const environment = { ELECTRON_RUN_AS_NODE: "1" };
 
-    const starting = new UtilityProcessStarter(host, "C:\\TeamRun\\utility-entry.js").startAsync("C:\\TeamRun\\TeamRun.exe", ["entry.js"], environment, "C:\\data\\start.log");
+    const starting = new UtilityProcessStarter(host, { PATH: "C:\\Windows" }, "C:\\Users\\person\\work", "C:\\TeamRun\\utility-entry.js").startAsync("C:\\TeamRun\\TeamRun.exe", ["entry.js"], environment, "C:\\data\\start.log");
     const fork = host.forks[0];
     fork?.process.emit("message", DetachedStartReply.started(5120).toJson());
 
@@ -46,6 +46,8 @@ export class UtilityProcessStarterTests {
       Assert.areEqual(0, fork?.args.length);
       Assert.areEqual("ignore", fork?.options.stdio);
       Assert.areEqual("TeamRun runtime starter", fork?.options.serviceName);
+      Assert.areEqual(JSON.stringify({ PATH: "C:\\Windows", ELECTRON_NO_ATTACH_CONSOLE: "1" }), JSON.stringify(fork?.options.env));
+      Assert.areEqual("C:\\Users\\person\\work", fork?.options.cwd);
       Assert.areEqual(
         JSON.stringify(new DetachedStartRequest("C:\\TeamRun\\TeamRun.exe", ["entry.js"], "C:\\data\\start.log", environment).toJson()),
         JSON.stringify(fork?.process.messages[0]));
@@ -63,7 +65,7 @@ export class UtilityProcessStarterTests {
       }
     };
 
-    const processId = await new UtilityProcessStarter(new LinkedUtilityProcessHost(program), "utility-entry.js").startAsync("node", [], {}, "start.log");
+    const processId = await new UtilityProcessStarter(new LinkedUtilityProcessHost(program), {}, null, "utility-entry.js").startAsync("node", [], {}, "start.log");
 
     Assert.areEqual(5120, processId);
     Assert.areEqual("node", programs.join(","));
@@ -72,7 +74,7 @@ export class UtilityProcessStarterTests {
   @TestMethod
   public async reportsAStarterThatFailsOrEnds(): Promise<void> {
     const host = new FakeUtilityProcessHost();
-    const starter = new UtilityProcessStarter(host, "utility-entry.js");
+    const starter = new UtilityProcessStarter(host, {}, null, "utility-entry.js");
 
     const failing = starter.startAsync("node", [], {}, "start.log");
     host.forks[0]?.process.emit("message", DetachedStartReply.failed("LaunchException: The runtime could not be started with node.").toJson());
@@ -87,6 +89,7 @@ export class UtilityProcessStarterTests {
     Assert.areEqual("The runtime starter ended before it started the runtime.", (await Assert.throwsAsync(() => ending, LaunchException)).message);
     await Assert.throwsAsync(() => garbled, JsonException);
     Assert.areEqual("acknowledged,,acknowledged", host.forks.map(t => t.process.messages[1] ?? "").join(","));
+    Assert.isFalse(host.forks.some(t => "cwd" in t.options));
   }
 
   @TestMethod

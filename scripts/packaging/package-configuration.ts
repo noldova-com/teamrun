@@ -172,8 +172,7 @@ export default class PackageConfiguration {
               entitlementsInherit: path.join(this.root, ...PackageConfiguration.ENTITLEMENTS_SEGMENTS),
               notarize: true
             } : {})
-          },
-          ...(this.isSigned ? { dmg: { sign: true } } : {})
+          }
         };
       default:
         return {

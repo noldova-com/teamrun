@@ -967,6 +967,28 @@ export interface IDesktopProcess {
   startDetachedAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv, workingDirectory: string): Promise<void>;
 
   /**
+   * Starts another program detached through the desktop's process starter, which on Windows is a utility process that
+   * gives it none of the desktop's handles, with its standard streams ignored: the copy of itself a desktop started
+   * from a console on Windows starts so that closing the console does not end it. The program starts in the desktop's
+   * working folder. Only after Electron is ready.
+   *
+   * @param executablePath The program.
+   * @param args Its arguments.
+   * @param environment Its environment.
+   * @returns A promise that settles once the program has started.
+   * @throws LaunchException asynchronously when the starter cannot start the program or ends without answering.
+   * @example
+   * ```ts
+   * import type { IDesktopProcess } from "@noldova/teamrun-shell-desktop";
+   *
+   * export function relaunchAsync(process: IDesktopProcess): Promise<void> {
+   *   return process.startApartAsync(process.execPath, process.argv.slice(1), { ...process.env, ELECTRON_NO_ATTACH_CONSOLE: "1" });
+   * }
+   * ```
+   */
+  startApartAsync(executablePath: string, args: readonly string[], environment: NodeJS.ProcessEnv): Promise<void>;
+
+  /**
    * Ends another process at once, for a window's page that did not stop when asked.
    *
    * @param processId The process.
@@ -3017,18 +3039,19 @@ export interface IUtilityProcessHost {
    *
    * @param modulePath The script the utility process runs.
    * @param args The script's arguments.
-   * @param options The utility process's standard streams and the name it shows in task managers; it keeps the desktop's environment.
+   * @param options The utility process's standard streams, the name it shows in task managers, its environment and,
+   * when given, the folder it starts in, which the program it starts inherits.
    * @returns The utility process.
    * @example
    * ```ts
    * import type { IUtilityProcess, IUtilityProcessHost } from "@noldova/teamrun-shell-desktop";
    *
    * export function start(host: IUtilityProcessHost, script: string): IUtilityProcess {
-   *   return host.fork(script, [], { stdio: "ignore", serviceName: "Example" });
+   *   return host.fork(script, [], { stdio: "ignore", serviceName: "Example", env: process.env });
    * }
    * ```
    */
-  fork(modulePath: string, args: string[], options: { stdio: "ignore"; serviceName: string }): IUtilityProcess;
+  fork(modulePath: string, args: string[], options: { stdio: "ignore"; serviceName: string; env: NodeJS.ProcessEnv; cwd?: string }): IUtilityProcess;
 }
 
 /**
@@ -6873,17 +6896,22 @@ export declare class UtilityProcessStarter implements IProcessStarter {
    * Creates the starter.
    *
    * @param host Electron's `utilityProcess`.
+   * @param environment The desktop's own environment, which the utility process gets with `ELECTRON_NO_ATTACH_CONSOLE`
+   * set, so that it never attaches to a console the desktop is attached to and the program it starts gets none of that
+   * console's handles.
+   * @param workingDirectory The folder the utility process, and so the program it starts, starts in, or `null` for
+   * Electron's default. Defaults to `null`.
    * @param entryPath The script the utility process runs. Defaults to {@link UtilityProcessStarter.entryPath}.
    * @example
    * ```ts
    * import { type IUtilityProcessHost, UtilityProcessStarter } from "@noldova/teamrun-shell-desktop";
    *
    * export function createStarter(host: IUtilityProcessHost): UtilityProcessStarter {
-   *   return new UtilityProcessStarter(host);
+   *   return new UtilityProcessStarter(host, process.env);
    * }
    * ```
    */
-  public constructor(host: IUtilityProcessHost, entryPath?: string);
+  public constructor(host: IUtilityProcessHost, environment: NodeJS.ProcessEnv, workingDirectory?: string | null, entryPath?: string);
 
   /**
    * The path of the package's utility script, which answers one start request and ends.
@@ -6902,7 +6930,7 @@ export declare class UtilityProcessStarter implements IProcessStarter {
    *
    * @param executable The program to run.
    * @param launchArguments The program's arguments.
-   * @param environment The program's environment, which the request carries; the utility process keeps the desktop's own.
+   * @param environment The program's environment, which the request carries.
    * @param errorFile The file the program's standard error is appended to.
    * @returns A promise of the started program's process id.
    * @throws LaunchException as a rejection when the utility process cannot start the program or ends without answering.
@@ -6912,7 +6940,7 @@ export declare class UtilityProcessStarter implements IProcessStarter {
    * import { type IUtilityProcessHost, UtilityProcessStarter } from "@noldova/teamrun-shell-desktop";
    *
    * export function startAsync(host: IUtilityProcessHost, errorFile: string): Promise<number> {
-   *   return new UtilityProcessStarter(host).startAsync(process.execPath, ["--version"], process.env, errorFile);
+   *   return new UtilityProcessStarter(host, process.env).startAsync(process.execPath, ["--version"], process.env, errorFile);
    * }
    * ```
    */

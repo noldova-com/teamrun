@@ -11,7 +11,6 @@ import type ProductIdentity from "../../packages/product-identity.ts";
 export default interface IPackageSigning {
   readonly builderEnvironment: NodeJS.ProcessEnv;
   prepareAsync(): Promise<void>;
-  finishAsync(packages: readonly string[]): Promise<void>;
   verifyAsync(packages: readonly string[], product: ProductIdentity): Promise<string>;
   disposeAsync(): Promise<void>;
 }

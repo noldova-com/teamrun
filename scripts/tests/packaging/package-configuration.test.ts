@@ -102,7 +102,7 @@ class PackageConfigurationTests {
       assert.equal("forceCodeSigning" in unsigned, false);
     });
 
-    test("a signed macOS target forces code signing with the hardened runtime and the entitlements file for the app and its helpers, notarizes, signs the disk image, and is not signed ad hoc again", () => {
+    test("a signed macOS target forces code signing with the hardened runtime and the entitlements file for the app and its helpers, notarizes, and is not signed ad hoc again", () => {
       const entitlements = path.join(PackageConfigurationTests.ROOT, "assets", "macos", "entitlements.plist");
       const unsigned = PackageConfigurationTests.create("macos", "x64").toJson();
 
@@ -122,8 +122,7 @@ class PackageConfigurationTests {
           entitlements,
           entitlementsInherit: entitlements,
           notarize: true
-        },
-        dmg: { sign: true }
+        }
       });
     });
 

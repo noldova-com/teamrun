@@ -26,10 +26,6 @@ class AppleSignatureCheckTests {
       const image = path.join(folder, "Fixture Studio-macos-arm64.dmg");
       const runner = new ProcessRunnerFixture([], [
         AppleSignatureCheckTests.SUCCEEDED,
-        new ProcessResult(0, "Authority=Developer ID Application: Fixture Works (FIXTURE123)\n", ""),
-        new ProcessResult(0, "accepted\nsource=Notarized Developer ID\n", ""),
-        AppleSignatureCheckTests.SUCCEEDED,
-        AppleSignatureCheckTests.SUCCEEDED,
         new ProcessResult(1, "", "code object is not signed at all"),
         new ProcessResult(1, "", ""),
         new ProcessResult(3, "", "rejected"),
@@ -41,31 +37,7 @@ class AppleSignatureCheckTests {
         new PackagingException(`The app in ${image} lacks a valid signature, a Developer ID Application signature, notarization, a stapled ticket:`
           + "\ncode object is not signed at all\n\nrejected\ndoes not have a ticket stapled to it"));
 
-      assert.deepEqual(runner.captured.slice(0, 4), [
-        ["codesign", path.join(folder, "check"), "--verify", "--strict", "--verbose=2", image],
-        ["codesign", path.join(folder, "check"), "--display", "--verbose=2", image],
-        ["spctl", path.join(folder, "check"), "--assess", "--type", "open", "--context", "context:primary-signature", "--verbose=2", image],
-        ["xcrun", path.join(folder, "check"), "stapler", "validate", image]
-      ]);
       assert.deepEqual(runner.captured.at(-1), ["hdiutil", path.join(folder, "check"), "detach", path.join(folder, "check", "0"), "-force"]);
-      assert.equal(existsSync(path.join(folder, "check")), false);
-    });
-
-    test("a disk image whose own signature is not Developer ID Application, notarized and stapled fails before it is attached", async t => {
-      const folder = await AppleSignatureCheckTests.createFolderAsync(t);
-      const image = path.join(folder, "Fixture Studio-macos-arm64.dmg");
-      const runner = new ProcessRunnerFixture([], [
-        AppleSignatureCheckTests.SUCCEEDED,
-        new ProcessResult(0, "Authority=Apple Development: Fixture Works (FIXTURE123)\n", ""),
-        new ProcessResult(3, "", "source=Unnotarized Developer ID"),
-        new ProcessResult(65, "", "does not have a ticket stapled to it")
-      ]);
-
-      await assert.rejects(new AppleSignatureCheck(runner, path.join(folder, "check"), {}).verifyAsync([image], "Fixture Studio"),
-        new PackagingException(`The disk image ${image} lacks a Developer ID Application signature, notarization, a stapled ticket:`
-          + "\n\nAuthority=Apple Development: Fixture Works (FIXTURE123)\nsource=Unnotarized Developer ID\ndoes not have a ticket stapled to it"));
-
-      assert.equal(runner.captured.some(t => t[0] === "hdiutil"), false);
       assert.equal(existsSync(path.join(folder, "check")), false);
     });
 

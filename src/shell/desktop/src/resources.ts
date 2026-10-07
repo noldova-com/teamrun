@@ -304,12 +304,14 @@ export class Resources {
   public static readonly queryPrefix: string = "?";
   public static readonly macPlatform: string = "darwin";
   public static readonly linuxPlatform: string = "linux";
-  public static readonly relaunchPlatforms: readonly string[] = [Resources.linuxPlatform, Resources.macPlatform];
+  public static readonly relaunchPlatforms: readonly string[] = [Resources.linuxPlatform, Resources.macPlatform, Resources.windowsPlatform];
   public static readonly appImageVariables: readonly string[] = ["APPIMAGE", "APPDIR", "ARGV0", "OWD"];
   public static readonly appImageFolderVariable: string = "APPDIR";
   public static readonly appImageWorkingFolderVariable: string = "OWD";
   public static readonly standardDescriptors: readonly number[] = [0, 1, 2];
   public static readonly enableLoggingVariable: string = "ELECTRON_ENABLE_LOGGING";
+  public static readonly noConsoleVariable: string = "ELECTRON_NO_ATTACH_CONSOLE";
+  public static readonly noConsoleValue: string = "1";
   public static readonly terminalArguments: readonly string[] = ["--enable-logging", "--remote-debugging-port", "--remote-debugging-pipe"];
   public static readonly appRunPathVariables: readonly (readonly [string, readonly string[], readonly string[]])[] = [
     ["PATH", [String.empty, "/usr/sbin"], []],
