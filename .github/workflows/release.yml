@@ -248,6 +248,13 @@ jobs:
         timeout-minutes: 5
         run: npm run release:assets
 
+      - name: Read the product's name
+        id: product
+        timeout-minutes: 1
+        run: |
+          name=$(npm pkg get teamrun.product.name)
+          echo "name=${name//\"/}" >> "$GITHUB_OUTPUT"
+
       - name: Keep the release files
         id: keep
         continue-on-error: true
@@ -256,11 +263,11 @@ jobs:
         with:
           name: release-${{ matrix.runner }}-${{ matrix.architecture }}
           path: |
-            _build/package/out/TeamRun-*.exe
-            _build/package/out/TeamRun-*.dmg
-            _build/package/out/TeamRun-*.zip
-            _build/package/out/TeamRun-*.AppImage
-            _build/package/out/TeamRun-*.sha256
+            _build/package/out/${{ steps.product.outputs.name }}-*.exe
+            _build/package/out/${{ steps.product.outputs.name }}-*.dmg
+            _build/package/out/${{ steps.product.outputs.name }}-*.zip
+            _build/package/out/${{ steps.product.outputs.name }}-*.AppImage
+            _build/package/out/${{ steps.product.outputs.name }}-*.sha256
             _build/package/out/latest-*.yml
           retention-days: 14
           if-no-files-found: error
@@ -280,11 +287,11 @@ jobs:
         with:
           name: release-${{ matrix.runner }}-${{ matrix.architecture }}
           path: |
-            _build/package/out/TeamRun-*.exe
-            _build/package/out/TeamRun-*.dmg
-            _build/package/out/TeamRun-*.zip
-            _build/package/out/TeamRun-*.AppImage
-            _build/package/out/TeamRun-*.sha256
+            _build/package/out/${{ steps.product.outputs.name }}-*.exe
+            _build/package/out/${{ steps.product.outputs.name }}-*.dmg
+            _build/package/out/${{ steps.product.outputs.name }}-*.zip
+            _build/package/out/${{ steps.product.outputs.name }}-*.AppImage
+            _build/package/out/${{ steps.product.outputs.name }}-*.sha256
             _build/package/out/latest-*.yml
           retention-days: 14
           if-no-files-found: error
@@ -302,11 +309,11 @@ jobs:
         with:
           name: release-${{ matrix.runner }}-${{ matrix.architecture }}
           path: |
-            _build/package/out/TeamRun-*.exe
-            _build/package/out/TeamRun-*.dmg
-            _build/package/out/TeamRun-*.zip
-            _build/package/out/TeamRun-*.AppImage
-            _build/package/out/TeamRun-*.sha256
+            _build/package/out/${{ steps.product.outputs.name }}-*.exe
+            _build/package/out/${{ steps.product.outputs.name }}-*.dmg
+            _build/package/out/${{ steps.product.outputs.name }}-*.zip
+            _build/package/out/${{ steps.product.outputs.name }}-*.AppImage
+            _build/package/out/${{ steps.product.outputs.name }}-*.sha256
             _build/package/out/latest-*.yml
           retention-days: 14
           if-no-files-found: error

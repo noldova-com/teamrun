@@ -23,6 +23,7 @@ class PackageWorkflowTests {
   private static readonly NIGHTLY_PLAN_STEP: string = "List each target's tests and UI workflows";
   private static readonly LIBFUSE_STEP: string = "Remove libfuse2, which a stock Ubuntu does not install";
   private static readonly SMOKE_STEP: string = "Install, start and quit the package";
+  private static readonly PRODUCT_STEP: string = "Read the product's name";
   private static readonly UPLOAD_ACTION: string = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1";
   private static readonly UPLOADS: readonly [string, string, string] = ["Keep the package", "Keep the package again", "Keep the package a last time"];
   private static readonly RESULTS: readonly [string, string, string] = ["Keep the nightly result", "Keep the nightly result again", "Keep the nightly result a last time"];
@@ -117,7 +118,7 @@ class PackageWorkflowTests {
         "fi",
         ""
       ].join("\n"));
-      assert.equal(steps.length, 25);
+      assert.equal(steps.length, 26);
       assert.deepEqual(steps.filter(t => !/\n {8}timeout-minutes: \d+\n/.test(t)), []);
     });
 
@@ -251,6 +252,19 @@ class PackageWorkflowTests {
       assert.deepEqual([kept.status, kept.stdout], [1, "::error::libfuse2 is still installed.\n"]);
     });
 
+    test("the packages are kept by the product's name from the root manifest", { timeout: PackageWorkflowTests.SCRIPT_TIMEOUT }, async t => {
+      const doubles = await CommandDoublesFixture.createAsync();
+      t.after(() => doubles.disposeAsync());
+      await writeFile(path.join(doubles.directory, "outputs.txt"), "");
+      doubles.respond("npm", "pkg get teamrun.product.name", "\"Fixture Studio\"");
+
+      const result = await doubles.runAsync((await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW)).readStepScript(PackageWorkflowTests.PRODUCT_STEP),
+        { GITHUB_OUTPUT: "outputs.txt" });
+
+      assert.deepEqual([result.status, await doubles.readFileAsync("outputs.txt"), await doubles.readCallsAsync()],
+        [0, "name=Fixture Studio\n", ["npm pkg get teamrun.product.name"]]);
+    });
+
     test("a job keeps its packages with three tries, and fails when none was made", async () => {
       const workflow = await WorkflowFileFixture.readAsync(PackageWorkflowTests.WORKFLOW);
       const simulation = new WorkflowSimulation(workflow.text, PackageWorkflowTests.UPLOADS[0], PackageWorkflowTests.UPLOADS[2]);
@@ -260,10 +274,10 @@ class PackageWorkflowTests {
       assert.deepEqual(uploads.map(t => t.settings), uploads.map(() => [
         "name: package-${{ matrix.runner }}-${{ matrix.architecture }}",
         "path: |",
-        "  _build/package/out/TeamRun-*.exe",
-        "  _build/package/out/TeamRun-*.dmg",
-        "  _build/package/out/TeamRun-*.zip",
-        "  _build/package/out/TeamRun-*.AppImage",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.exe",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.dmg",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.zip",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.AppImage",
         "  _build/package/smoke/*.png",
         "  _build/package/package-report.json",
         "retention-days: ${{ matrix.retention }}",
@@ -281,8 +295,10 @@ class PackageWorkflowTests {
       const simulation = new WorkflowSimulation(workflow.text, "Make the package", PackageWorkflowTests.RESULTS[2]);
       const results = PackageWorkflowTests.RESULTS.map(t => simulation.find(t));
 
-      assert.deepEqual(simulation.run({ nightly: "false" }, {}).ran, ["Make the package", PackageWorkflowTests.SMOKE_STEP, PackageWorkflowTests.UPLOADS[0]]);
-      assert.deepEqual(simulation.run({ nightly: "true" }, {}).ran, ["Make the package", PackageWorkflowTests.SMOKE_STEP, PackageWorkflowTests.UPLOADS[0], "Record the nightly result", PackageWorkflowTests.RESULTS[0]]);
+      assert.deepEqual(simulation.run({ nightly: "false" }, {}).ran, ["Make the package", PackageWorkflowTests.SMOKE_STEP, PackageWorkflowTests.PRODUCT_STEP,
+        PackageWorkflowTests.UPLOADS[0]]);
+      assert.deepEqual(simulation.run({ nightly: "true" }, {}).ran, ["Make the package", PackageWorkflowTests.SMOKE_STEP, PackageWorkflowTests.PRODUCT_STEP,
+        PackageWorkflowTests.UPLOADS[0], "Record the nightly result", PackageWorkflowTests.RESULTS[0]]);
       assert.deepEqual(simulation.run({ nightly: "true" }, { "Make the package": "failure", [PackageWorkflowTests.RESULTS[0]]: "failure" }).ran, [
         "Make the package", "Record the nightly result", PackageWorkflowTests.RESULTS[0], "Wait before keeping the nightly result again", PackageWorkflowTests.RESULTS[1]
       ]);

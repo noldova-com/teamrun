@@ -85,6 +85,7 @@ export default class PackageSmoke {
   private readonly temporaryFolder: TemporaryFolder;
   private readonly environment: NodeJS.ProcessEnv;
   private readonly output: Writable;
+  private slug: string = "";
   private folder: string | null = null;
   private runtime: number | null = null;
   private hasRuntimeOutlived: boolean = false;
@@ -133,6 +134,7 @@ export default class PackageSmoke {
   private async checkAsync(): Promise<void> {
     const target = PackageTarget.fromProcess(this.platform, this.architecture);
     const manifest = await RootManifest.readAsync(this.root);
+    this.slug = manifest.product.slug;
     const folder = await this.temporaryFolder.createAsync(this.platform, PackageSmoke.FOLDER_PREFIX);
     this.folder = folder;
     const installer = new PackageInstaller(this.root, this.runner, this.environment);
@@ -145,7 +147,7 @@ export default class PackageSmoke {
       await this.requireOnPathAsync(userPath, installed.command, "The user's Path holds");
     const data = path.join(folder, PackageSmoke.DATA_FOLDER);
     await this.requireNoRuntimeAsync(installed, data, folder, "before the start");
-    this.output.write("teamrun status before the start: no runtime.\n");
+    this.output.write(`${this.slug} status before the start: no runtime.\n`);
 
     const log = path.join(folder, PackageSmoke.DESKTOP_LOG);
     const logs = [log, path.join(data, ...PackageSmoke.DATA_LOG_SEGMENTS)];
@@ -171,7 +173,7 @@ export default class PackageSmoke {
 
       await this.quitAsync(installed, data, folder);
       if (!await desktop.waitAsync(PackageSmoke.QUIT_LIMIT))
-        throw new PackagingException(`The desktop did not exit within ${PackageSmoke.QUIT_LIMIT} ms after teamrun quit said it quit:\n${await PackageSmoke.readTailAsync(logs)}`);
+        throw new PackagingException(`The desktop did not exit within ${PackageSmoke.QUIT_LIMIT} ms after ${this.slug} quit said it quit:\n${await PackageSmoke.readTailAsync(logs)}`);
       if (desktop.exitCode !== 0)
         throw new PackagingException(`The desktop quit with exit code ${desktop.exitCode}:\n${await PackageSmoke.readTailAsync(logs)}`);
       this.output.write("The desktop quit.\n");
@@ -215,7 +217,7 @@ export default class PackageSmoke {
       PackageSmoke.DATA_DIRECTORY_OPTION, `'${data}';`, "exit", "$LASTEXITCODE"].join(" ");
     const status = await this.runner.captureAsync(PackageSmoke.POWERSHELL, [...PackageSmoke.POWERSHELL_OPTIONS, line], folder, PackageSmoke.COMMAND_LIMIT, this.createCommandEnvironment(command));
     if (!status.isSuccessful)
-      throw new PackagingException(`teamrun status through PowerShell exited with ${status.exitCode}:\n${status.text}`);
+      throw new PackagingException(`${this.slug} status through PowerShell exited with ${status.exitCode}:\n${status.text}`);
     this.checkStarted(status.output, version, data, "through PowerShell");
   }
 
@@ -224,7 +226,7 @@ export default class PackageSmoke {
     await this.runner.requireAsync(PackageSmoke.LINK, [PackageSmoke.SYMBOLIC_OPTION, command, link], folder, PackageSmoke.COMMAND_LIMIT);
     const status = await this.runner.captureAsync(link, PackageSmoke.formatArguments(PackageSmoke.STATUS_ARGUMENTS, data, folder), folder, PackageSmoke.COMMAND_LIMIT, this.environment);
     if (!status.isSuccessful)
-      throw new PackagingException(`teamrun status through a link to ${command} exited with ${status.exitCode}:\n${status.text}`);
+      throw new PackagingException(`${this.slug} status through a link to ${command} exited with ${status.exitCode}:\n${status.text}`);
     this.checkStarted(status.output, version, data, "through a link to the app's command");
   }
 
@@ -363,7 +365,7 @@ export default class PackageSmoke {
   private async requireNoRuntimeAsync(installed: InstalledPackage, data: string, folder: string, moment: string): Promise<void> {
     const status = await this.queryStatusAsync(installed, data, folder);
     if (status.exitCode !== PackageSmoke.NO_RUNTIME_EXIT_CODE)
-      throw new PackagingException(`teamrun status ${moment} exited with ${status.exitCode} instead of ${PackageSmoke.NO_RUNTIME_EXIT_CODE}:\n${status.text}`);
+      throw new PackagingException(`${this.slug} status ${moment} exited with ${status.exitCode} instead of ${PackageSmoke.NO_RUNTIME_EXIT_CODE}:\n${status.text}`);
   }
 
   private async waitForRuntimeAsync(installed: InstalledPackage, data: string, folder: string, desktop: StartedProcess, logs: readonly string[]): Promise<string> {
@@ -375,7 +377,7 @@ export default class PackageSmoke {
       if (desktop.hasExited)
         throw new PackagingException(`The desktop exited with ${desktop.exitCode} before its runtime answered:\n${await PackageSmoke.readTailAsync(logs)}`);
       if (Date.now() - started >= PackageSmoke.START_LIMIT)
-        throw new PackagingException(`The desktop's runtime did not answer teamrun status within ${PackageSmoke.START_LIMIT} ms; the last answer was exit code ${status.exitCode}:\n${status.text}\n${await PackageSmoke.readTailAsync(logs)}`);
+        throw new PackagingException(`The desktop's runtime did not answer ${this.slug} status within ${PackageSmoke.START_LIMIT} ms; the last answer was exit code ${status.exitCode}:\n${status.text}\n${await PackageSmoke.readTailAsync(logs)}`);
       await timers.setTimeout(PackageSmoke.PAUSE);
     }
   }
@@ -385,10 +387,10 @@ export default class PackageSmoke {
     const reportedVersion = PackageSmoke.readField(PackageSmoke.readField(value, PackageSmoke.BUILD_FIELD), PackageSmoke.VERSION_FIELD);
     const directory = PackageSmoke.readField(value, PackageSmoke.DATA_DIRECTORY_FIELD);
     if (typeof reportedVersion !== "string" || typeof directory !== "string")
-      throw new PackagingException(`teamrun status --json answered without a build version and a data directory:\n${answer.trim()}`);
+      throw new PackagingException(`${this.slug} status --json answered without a build version and a data directory:\n${answer.trim()}`);
     if (reportedVersion !== version || directory !== data)
-      throw new PackagingException(`teamrun status reported version ${reportedVersion} in ${directory} instead of ${version} in ${data}.`);
-    this.output.write(`teamrun status ${moment}: version ${reportedVersion} in ${directory}.\n`);
+      throw new PackagingException(`${this.slug} status reported version ${reportedVersion} in ${directory} instead of ${version} in ${data}.`);
+    this.output.write(`${this.slug} status ${moment}: version ${reportedVersion} in ${directory}.\n`);
   }
 
   private async waitForExitAsync(runtime: number, limit: number): Promise<boolean> {
@@ -421,7 +423,7 @@ export default class PackageSmoke {
   private async quitAsync(installed: InstalledPackage, data: string, folder: string): Promise<void> {
     const quit = await this.runCommandLineAsync(installed, PackageSmoke.QUIT_ARGUMENTS, data, folder, PackageSmoke.QUIT_LIMIT + PackageSmoke.COMMAND_LIMIT);
     if (!quit.isSuccessful || PackageSmoke.readField(PackageSmoke.parse(quit.output), PackageSmoke.OUTCOME_FIELD) !== PackageSmoke.QUIT_OUTCOME)
-      throw new PackagingException(`teamrun quit did not answer the outcome ${PackageSmoke.QUIT_OUTCOME}; it exited with ${quit.exitCode}:\n${quit.text}`);
+      throw new PackagingException(`${this.slug} quit did not answer the outcome ${PackageSmoke.QUIT_OUTCOME}; it exited with ${quit.exitCode}:\n${quit.text}`);
   }
 }
 

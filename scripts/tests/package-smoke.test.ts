@@ -210,7 +210,7 @@ class PackageSmokeTests {
 
   public static register(): void {
     test("on Linux the AppImage is unpacked, the desktop starts from the AppImage and the command line from the unpacked program, both with the check's own device folder, " +
-      "the runtime holds its own mount while the desktop runs, teamrun quit quits the desktop, and the mount ends with the runtime after the quit",
+      "the runtime holds its own mount while the desktop runs, a quit from the command line quits the desktop, and the mount ends with the runtime after the quit",
       { timeout: PackageSmokeTests.TIMEOUT }, async t => {
         const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
         const runner = new SmokeRunnerFixture(["none", "none", "failed", "running", "none"]);
@@ -233,8 +233,8 @@ class PackageSmokeTests {
         assert.match(lines[0] ?? "", /^Installed in \d+\.\d s: /);
         assert.equal([lines[0]?.slice(lines[0].indexOf(": ") + 2), ...lines.slice(1)].join("\n"), [
           appImage,
-          "teamrun status before the start: no runtime.",
-          `teamrun status after the start: version 0.0.7 in ${path.join(runner.folder, "data")}.`,
+          "fixture-studio status before the start: no runtime.",
+          `fixture-studio status after the start: version 0.0.7 in ${path.join(runner.folder, "data")}.`,
           "The runtime holds its own mount of the AppImage, process 6161.",
           "The desktop quit.",
           "The runtime stopped once idle.",
@@ -244,7 +244,7 @@ class PackageSmokeTests {
         assert.equal(existsSync(runner.folder), false);
       });
 
-    test("on Linux with APPIMAGE_EXTRACT_AND_RUN teamrun quit quits the desktop as well, and the runtime holds its own extraction while the desktop runs, which ends with the runtime",
+    test("on Linux with APPIMAGE_EXTRACT_AND_RUN a quit from the command line quits the desktop as well, and the runtime holds its own extraction while the desktop runs, which ends with the runtime",
       { timeout: PackageSmokeTests.TIMEOUT }, async t => {
         const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
         const runner = new SmokeRunnerFixture(["none", "running", "none"]);
@@ -277,7 +277,7 @@ class PackageSmokeTests {
           Object.assign(runner, { copy, mounterRuns, copyEnds });
           const output = new TextOutputFixture();
           assert.equal(await PackageSmokeTests.runAsync(t, repository, "linux", runner, output, "x64", variables), 1, output.text);
-          const started = output.text.indexOf("teamrun status after the start: ");
+          const started = output.text.indexOf("fixture-studio status after the start: ");
           texts.push(output.text.slice(output.text.indexOf("\n", started) + 1));
         }
 
@@ -292,7 +292,7 @@ class PackageSmokeTests {
           + "The runtime's copy of the AppImage was still there 10000 ms after the runtime stopped: teamrun-copy mount 6060 6161 /fixture.AppImage\n");
       });
 
-    test("on Windows the installer installs silently for the user and adds its command to the user's Path, the command line answers through cmd and PowerShell, teamrun quit through cmd quits the desktop, and installing again and uninstalling keep the Path right",
+    test("on Windows the installer installs silently for the user and adds its command to the user's Path, the command line answers through cmd and PowerShell, a quit from the command line through cmd quits the desktop, and installing again and uninstalling keep the Path right",
       { timeout: PackageSmokeTests.TIMEOUT }, async t => {
         const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-windows-x64.exe");
         const runner = new SmokeRunnerFixture(["none", "running", "none"]);
@@ -336,9 +336,9 @@ class PackageSmokeTests {
         assert.equal(lines[0]?.slice(lines[0].indexOf(": ") + 2), program);
         assert.deepEqual(lines.slice(1), [
           `The user's Path holds ${bin} once.`,
-          "teamrun status before the start: no runtime.",
-          `teamrun status after the start: version 0.0.7 in ${data}.`,
-          `teamrun status through PowerShell: version 0.0.7 in ${data}.`,
+          "fixture-studio status before the start: no runtime.",
+          `fixture-studio status after the start: version 0.0.7 in ${data}.`,
+          `fixture-studio status through PowerShell: version 0.0.7 in ${data}.`,
           "The desktop quit.",
           "The runtime stopped once idle.",
           `Installed again over itself, the user's Path still holds ${bin} once.`,
@@ -377,7 +377,7 @@ class PackageSmokeTests {
         ]);
       });
 
-    test("on macOS the app comes out of the disk image, the command line answers through a link to the app's command, the screen is captured with the window, and teamrun quit quits the desktop",
+    test("on macOS the app comes out of the disk image, the command line answers through a link to the app's command, the screen is captured with the window, and a quit from the command line quits the desktop",
       { timeout: PackageSmokeTests.TIMEOUT }, async t => {
         const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-macos-arm64.dmg");
         const runner = new SmokeRunnerFixture(["none", "running", "running", "none"]);
@@ -392,7 +392,7 @@ class PackageSmokeTests {
         const command = path.join("Fixture Studio.app", "Contents", "Resources", "bin", "fixture-studio");
         const quit = ["Fixture Studio", path.join("Fixture Studio.app", "Contents", "Resources", PackageSmokeTests.CLI), ...PackageSmokeTests.QUIT];
         assert.deepEqual(runner.calls.slice(3), [status, status, ["ln", "-s", command, "fixture-studio"], ["fixture-studio", ...PackageSmokeTests.STATUS], ["screencapture", "-x", screen], quit, status]);
-        assert.ok(output.text.includes(`\nteamrun status through a link to the app's command: version 0.0.7 in ${path.join(runner.folder, "data")}.\n`), output.text);
+        assert.ok(output.text.includes(`\nfixture-studio status through a link to the app's command: version 0.0.7 in ${path.join(runner.folder, "data")}.\n`), output.text);
         assert.equal(existsSync(path.dirname(screen)), true);
         assert.ok(output.text.includes(`\nThe screen with the window: ${screen}\nThe desktop quit.\n`), output.text);
         assert.deepEqual(runner.starts, [[path.join("Fixture Studio.app", "Contents", "MacOS", "Fixture Studio"), `--device-dir=${path.join(runner.folder, "device")}`,
@@ -434,10 +434,10 @@ class PackageSmokeTests {
       const command = path.join(runners[1].folder, "Fixture Studio.app", "Contents", "Resources", "bin", "fixture-studio");
       assert.deepEqual(exitCodes, [1, 1], outputs.map(t => t.text).join());
       assert.ok(outputs[0].text.includes("ln broke"), outputs[0].text);
-      assert.ok(outputs[1].text.includes(`teamrun status through a link to ${command} exited with 1:\nThe runtime could not start.\n`), outputs[1].text);
+      assert.ok(outputs[1].text.includes(`fixture-studio status through a link to ${command} exited with 1:\nThe runtime could not start.\n`), outputs[1].text);
     });
 
-    test("a failed install, or a teamrun quit that leaves TeamRun open or finds no desktop, stops the smoke check, and a desktop left running is stopped", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
+    test("a failed install, or a quit from the command line that leaves TeamRun open or finds no desktop, stops the smoke check, and a desktop left running is stopped", { timeout: PackageSmokeTests.TIMEOUT }, async t => {
       const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
       const extract = new SmokeRunnerFixture(["none"], undefined, ["--appimage-extract"]);
       const kept = new SmokeRunnerFixture(["none", "running"]);
@@ -455,8 +455,8 @@ class PackageSmokeTests {
       assert.deepEqual(exitCodes, [1, 1, 1]);
       assert.equal(outputs[0].text, "Fixture Studio-linux-x64.AppImage --appimage-extract failed with exit code 9:\nFixture Studio-linux-x64.AppImage broke\n");
       assert.deepEqual(extract.starts, []);
-      assert.match(outputs[1].text, /\nteamrun quit did not answer the outcome Quit; it exited with 6:\nTeamRun stayed open: it was kept open while work was in progress\.\n$/);
-      assert.match(outputs[2].text, /\nteamrun quit did not answer the outcome Quit; it exited with 0:\n\{"outcome":"NoDesktop"\}\n$/);
+      assert.match(outputs[1].text, /\nfixture-studio quit did not answer the outcome Quit; it exited with 6:\nTeamRun stayed open: it was kept open while work was in progress\.\n$/);
+      assert.match(outputs[2].text, /\nfixture-studio quit did not answer the outcome Quit; it exited with 0:\n\{"outcome":"NoDesktop"\}\n$/);
       assert.deepEqual([kept.desktop.signals, alone.desktop.signals], [["SIGKILL"], ["SIGKILL"]]);
     });
 
@@ -475,15 +475,15 @@ class PackageSmokeTests {
 
       assert.deepEqual(exitCodes, [1, 1, 1]);
       assert.equal(early.starts.length, 0);
-      assert.match(outputs[0].text, /^Installed in \d+\.\d s: .+\nteamrun status before the start exited with 0 instead of 3:\n\{"build"/);
+      assert.match(outputs[0].text, /^Installed in \d+\.\d s: .+\nfixture-studio status before the start exited with 0 instead of 3:\n\{"build"/);
       assert.match(outputs[1].text, /\nThe desktop exited with 4 before its runtime answered:\n.+desktop\.log:\nThe desktop's log\.\n$/);
-      assert.match(outputs[2].text, /\nThe desktop's runtime did not answer teamrun status within 60000 ms; the last answer was exit code 1:\nThe runtime could not start\.\n.+desktop\.log:\nThe desktop's log\.\n$/);
+      assert.match(outputs[2].text, /\nThe desktop's runtime did not answer fixture-studio status within 60000 ms; the last answer was exit code 1:\nThe runtime could not start\.\n.+desktop\.log:\nThe desktop's log\.\n$/);
       assert.equal(silent.statuses, 1 + 60_000 / 500 + 1);
       assert.deepEqual(silent.desktop.signals, ["SIGKILL"]);
       assert.deepEqual(ended.desktop.signals, []);
     });
 
-    test("an unreadable or another build's answer, a desktop that does not exit within 30 s after teamrun quit or one that quits with an error fails the smoke check, and a desktop left running is stopped",
+    test("an unreadable or another build's answer, a desktop that does not exit within 30 s after a quit from the command line or one that quits with an error fails the smoke check, and a desktop left running is stopped",
       { timeout: PackageSmokeTests.TIMEOUT }, async t => {
         const repository = await PackageSmokeTests.createAsync(t, "Fixture Studio-linux-x64.AppImage");
         const unreadable = new SmokeRunnerFixture(["none", "unreadable"]);
@@ -500,11 +500,11 @@ class PackageSmokeTests {
         ];
 
         assert.deepEqual(exitCodes, [1, 1, 1, 1]);
-        assert.match(outputs[0].text, /\nteamrun status --json answered without a build version and a data directory:\n\{"build":\n$/);
+        assert.match(outputs[0].text, /\nfixture-studio status --json answered without a build version and a data directory:\n\{"build":\n$/);
         assert.deepEqual(unreadable.desktop.signals, ["SIGKILL"]);
-        assert.match(outputs[1].text, /\nteamrun status reported version 0\.0\.6 in .+ instead of 0\.0\.7 in .+\.\n$/);
+        assert.match(outputs[1].text, /\nfixture-studio status reported version 0\.0\.6 in .+ instead of 0\.0\.7 in .+\.\n$/);
         assert.deepEqual(other.desktop.signals, ["SIGKILL"]);
-        assert.match(outputs[2].text, /\nThe desktop did not exit within 30000 ms after teamrun quit said it quit:\n.+desktop\.log:\nThe desktop's log\.\n$/);
+        assert.match(outputs[2].text, /\nThe desktop did not exit within 30000 ms after fixture-studio quit said it quit:\n.+desktop\.log:\nThe desktop's log\.\n$/);
         assert.deepEqual(stuck.desktop.signals, ["SIGKILL"]);
         assert.match(outputs[3].text, /\nThe desktop quit with exit code 5:\n.+desktop\.log:\nThe desktop's log\.\n$/);
       });
@@ -532,7 +532,7 @@ class PackageSmokeTests {
         assert.deepEqual(lingering.killed, [5151]);
         assert.match(outputs[1].text, /\nThe runtime's discovery file .+runtime\.json names no process\.\n$/);
         assert.deepEqual(hidden.desktop.signals, ["SIGKILL"]);
-        assert.match(outputs[2].text, /\nThe runtime holds its own mount of the AppImage, process 6161\.\nThe desktop quit\.\nteamrun status after the runtime stopped exited with 0 instead of 3:\n\{"build"/);
+        assert.match(outputs[2].text, /\nThe runtime holds its own mount of the AppImage, process 6161\.\nThe desktop quit\.\nfixture-studio status after the runtime stopped exited with 0 instead of 3:\n\{"build"/);
         assert.deepEqual([lingering, hidden, answering].map(t => existsSync(t.folder)), [false, false, false]);
       });
 
