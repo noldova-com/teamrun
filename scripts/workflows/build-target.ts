@@ -21,6 +21,7 @@ export default class BuildTarget {
   public readonly runsSmokeOnPullRequests: boolean;
   public readonly uiShardCount: number;
   public readonly splitsTests: boolean;
+  public readonly packagesEachNight: boolean;
 
   public constructor(name: string, runner: string, architecture: string, options: IBuildTargetOptions) {
     this.name = name;
@@ -31,6 +32,7 @@ export default class BuildTarget {
     this.runsSmokeOnPullRequests = options.runsSmokeOnPullRequests;
     this.uiShardCount = options.uiShardCount;
     this.splitsTests = options.splitsTests;
+    this.packagesEachNight = options.packagesEachNight;
   }
 
   public get key(): string {
@@ -39,6 +41,10 @@ export default class BuildTarget {
 
   public get operatingSystem(): string {
     return this.name.slice(0, this.name.indexOf(BuildTarget.WORD_SEPARATOR));
+  }
+
+  public get platform(): string {
+    return this.operatingSystem.toLowerCase();
   }
 
   public get uiShards(): readonly UiShard[] {

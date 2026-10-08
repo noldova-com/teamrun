@@ -13,6 +13,7 @@ import { test } from "node:test";
 
 import BuildMatrix from "../../../workflows/build-matrix.ts";
 import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
+import TargetListFixture from "../../fixtures/target-list.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
 
@@ -43,7 +44,7 @@ class NightlyWorkflowTests {
       assert.deepEqual(text.match(/^\s+\w[\w-]*: write$/gm), ["      issues: write"]);
       assert.ok(text.includes("    permissions:\n      contents: read\n      issues: write\n"));
       assert.deepEqual([...text.matchAll(/\$\{\{ ([^}]+) \}\}/g)].map(t => t[1] ?? "").filter(t => t.startsWith("secrets.")), []);
-      assert.equal(text.match(/persist-credentials: false/g)?.length, 2);
+      assert.equal(text.match(/persist-credentials: false/g)?.length, 3);
     });
 
     test("each target's tests and UI workflows are jobs of their own, on the targets every build and test run validates, and the report also expects the packaging of Linux x64 and Windows x64", { timeout: NightlyWorkflowTests.SCRIPT_TIMEOUT }, async t => {
@@ -52,6 +53,7 @@ class NightlyWorkflowTests {
       const doubles = await CommandDoublesFixture.createAsync();
       t.after(() => doubles.disposeAsync());
       await writeFile(path.join(doubles.directory, "outputs.txt"), "");
+      TargetListFixture.answer(doubles);
 
       const result = await doubles.runAsync(workflow.readStepScript(NightlyWorkflowTests.PLAN_STEP), { GITHUB_OUTPUT: "outputs.txt" });
       const outputs = new Map((await doubles.readFileAsync("outputs.txt")).trimEnd().split("\n").map(line => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]));
@@ -77,7 +79,7 @@ class NightlyWorkflowTests {
       const [own, validated] = [nightly.text, validation.text.replaceAll("inputs.architecture", "matrix.architecture")]
         .map(t => new WorkflowSimulation(t, ...restores).steps.map(step => [step.name, step.uses, step.settings]));
       assert.deepEqual(own, validated);
-      for (const first of ["Set up Node.js", "Set up Node.js to report"]) {
+      for (const first of ["Set up Node.js", "Set up Node.js to report", "Set up Node.js to list the jobs"]) {
         const [again, last] = [`${first} again`, `${first} a last time`];
         const simulation = new WorkflowSimulation(nightly.text, first, last);
         const attempts = [first, again, last].map(t => simulation.find(t));

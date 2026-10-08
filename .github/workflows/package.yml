@@ -60,7 +60,6 @@ jobs:
           fi
 
       - name: Check out the revision
-        if: github.event_name == 'workflow_dispatch' && inputs.signed
         timeout-minutes: 5
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -68,7 +67,6 @@ jobs:
 
       - name: Set up Node.js
         id: node
-        if: github.event_name == 'workflow_dispatch' && inputs.signed
         continue-on-error: true
         timeout-minutes: 5
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -125,6 +123,7 @@ jobs:
             fi
             echo "Signing the packages of: $signing."
           fi
+          table=$(node scripts/list-targets.ts)
           targets=''
           signed_targets=''
           while IFS='|' read -r target runner architecture platform night; do
@@ -141,14 +140,7 @@ jobs:
             else
               targets="$targets${targets:+,}$entry"
             fi
-          done <<'TARGETS'
-          Linux x64|ubuntu-24.04|x64|linux|nightly
-          Linux ARM64|ubuntu-24.04-arm|arm64|linux|manual
-          Windows x64|windows-2025|x64|windows|nightly
-          Windows ARM64|windows-11-arm|arm64|windows|manual
-          macOS x64|macos-15-intel|x64|macos|manual
-          macOS ARM64|macos-15|arm64|macos|manual
-          TARGETS
+          done <<< "$table"
           echo "targets=[$targets]" >> "$GITHUB_OUTPUT"
           echo "signed-targets=[$signed_targets]" >> "$GITHUB_OUTPUT"
 
