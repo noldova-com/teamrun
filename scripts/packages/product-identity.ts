@@ -13,6 +13,7 @@ import path from "node:path";
 
 import PackageException from "./package.exception.ts";
 import UpdateFeed from "./update-feed.ts";
+import WindowsSigningAccount from "./windows-signing-account.ts";
 
 export default class ProductIdentity {
   public static readonly WINDOWS_ICON_FILE: string = "icon-dark.ico";
@@ -27,6 +28,8 @@ export default class ProductIdentity {
   private static readonly VARIABLE: RegExp = /^[A-Z][A-Z0-9_]*$/;
   private static readonly REPOSITORY: RegExp = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\/[A-Za-z0-9._-]+$/;
   private static readonly DISTINGUISHED_NAME: RegExp = /^CN=[^,=+"\\<>;\n\r]+(?:, [A-Z]+=[^,=+"\\<>;\n\r]+)*$/;
+  private static readonly SIGNING_ENDPOINT: RegExp = /^https:\/\/[a-z0-9]+(?:[.-][a-z0-9]+)*\/$/;
+  private static readonly SIGNING_NAME: RegExp = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
   private static readonly UNSAFE_NAME: RegExp = /["\\\n\r]/;
   private static readonly UNSAFE_SEGMENT: RegExp = /[\\:*?"<>|]/;
   private static readonly SEPARATOR: string = "/";
@@ -46,6 +49,7 @@ export default class ProductIdentity {
   public readonly icons: string;
   public readonly releaseRepository: string;
   public readonly windowsPublisher: string;
+  public readonly windowsSigning: WindowsSigningAccount;
 
   public constructor(
     name: string,
@@ -58,8 +62,10 @@ export default class ProductIdentity {
     dataDirectoryVariable: string,
     icons: string,
     releaseRepository: string,
-    windowsPublisher: string) {
+    windowsPublisher: string,
+    windowsSigning: readonly [endpoint: string, account: string, profile: string]) {
     const [windows, macos, linux] = deviceFolders;
+    const [endpoint, account, profile] = windowsSigning;
     ProductIdentity.require(name.trim().length > 0 && !ProductIdentity.UNSAFE_NAME.test(name), "name", "a name without quotes, backslashes or line breaks");
     ProductIdentity.require(publisher.trim().length > 0 && !ProductIdentity.UNSAFE_NAME.test(publisher), "publisher", "a name without quotes, backslashes or line breaks");
     ProductIdentity.require(ProductIdentity.SLUG.test(slug), "slug", "lowercase kebab-case");
@@ -72,6 +78,9 @@ export default class ProductIdentity {
     ProductIdentity.require(ProductIdentity.REPOSITORY.test(releaseRepository), "releaseRepository", "a GitHub repository written as owner/name");
     ProductIdentity.require(ProductIdentity.DISTINGUISHED_NAME.test(windowsPublisher), "windowsPublisher",
       "the distinguished name of the Windows signing certificate's subject, starting with CN= and with its fields separated by \", \"");
+    ProductIdentity.require(ProductIdentity.SIGNING_ENDPOINT.test(endpoint), "windowsSigning.endpoint", "the HTTPS URL of the Artifact Signing endpoint, ending in /");
+    for (const [field, name] of [["windowsSigning.account", account], ["windowsSigning.profile", profile]] as const)
+      ProductIdentity.require(ProductIdentity.SIGNING_NAME.test(name), field, "a name of letters, digits and hyphens that starts and ends with a letter or digit");
 
     this.name = name;
     this.publisher = publisher;
@@ -86,6 +95,7 @@ export default class ProductIdentity {
     this.icons = icons;
     this.releaseRepository = releaseRepository;
     this.windowsPublisher = windowsPublisher;
+    this.windowsSigning = new WindowsSigningAccount(endpoint, account, profile);
   }
 
   public static async readAsync(root: string): Promise<ProductIdentity> {
@@ -104,6 +114,7 @@ export default class ProductIdentity {
     if (product === null)
       throw new PackageException(ProductIdentity.formatMissing());
     const folders = ProductIdentity.readRecord(product, "deviceFolders");
+    const signing = ProductIdentity.readRecord(product, "windowsSigning");
     return new ProductIdentity(
       ProductIdentity.readText(product, "name"),
       ProductIdentity.readText(product, "publisher"),
@@ -115,7 +126,8 @@ export default class ProductIdentity {
       ProductIdentity.readText(product, "dataDirectoryVariable"),
       ProductIdentity.readText(product, "icons"),
       ProductIdentity.readText(product, "releaseRepository"),
-      ProductIdentity.readText(product, "windowsPublisher"));
+      ProductIdentity.readText(product, "windowsPublisher"),
+      [ProductIdentity.readText(signing, "endpoint"), ProductIdentity.readText(signing, "account"), ProductIdentity.readText(signing, "profile")]);
   }
 
   public get literals(): readonly string[] {
@@ -128,7 +140,10 @@ export default class ProductIdentity {
       this.macosDeviceFolder,
       this.linuxDeviceFolder,
       this.dataDirectoryVariable,
-      this.icons
+      this.icons,
+      this.windowsSigning.endpoint,
+      this.windowsSigning.account,
+      this.windowsSigning.profile
     ])];
   }
 

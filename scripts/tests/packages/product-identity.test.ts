@@ -13,11 +13,17 @@ import { test } from "node:test";
 
 import PackageException from "../../packages/package.exception.ts";
 import ProductIdentity from "../../packages/product-identity.ts";
+import WindowsSigningAccount from "../../packages/windows-signing-account.ts";
 import ProductIdentityFixture from "../fixtures/product-identity.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class ProductIdentityTests {
   private static readonly MISSING: string = "The root package.json must declare teamrun.product.";
+  private static readonly SIGNING: Readonly<Record<string, string>> = {
+    endpoint: "https://fixtureville.signing.example/",
+    account: "fixture-works-signing",
+    profile: "Fixture-Studio"
+  };
 
   public static register(): void {
     test("the product's identity is read from the root manifest's teamrun.product", async t => {
@@ -33,9 +39,11 @@ class ProductIdentityTests {
         ["Fixture Studio", "Fixture Works", "fixture-studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
           "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons", "fixtureworks/studio",
           "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US"]);
+      assert.deepEqual(product.windowsSigning, new WindowsSigningAccount("https://fixtureville.signing.example/", "fixture-works-signing", "Fixture-Studio"));
       assert.deepEqual(product.literals, [
         "Fixture Studio", "org.fixtureworks.studio", "org.fixtureworks.studio.development", ".fixtureworks/studio",
-        "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons"
+        "Fixture Works/Studio", "Fixture Works/Studio Mac", "fixtureworks/studio", "FIXTURE_STUDIO_DATA_DIR", "assets/fixture-icons",
+        "https://fixtureville.signing.example/", "fixture-works-signing", "Fixture-Studio"
       ]);
     });
 
@@ -64,6 +72,15 @@ class ProductIdentityTests {
 
     test("the update feed is the latest release download of the release repository", () => {
       assert.equal(ProductIdentity.fromManifest(ProductIdentityFixture.manifest()).updateFeed, "https://github.com/fixtureworks/studio/releases/latest/download/");
+    });
+
+    test("a signing profile named like the product is one literal", () => {
+      const product = ProductIdentity.fromManifest(ProductIdentityFixture.manifest({
+        name: "FixtureStudio",
+        windowsSigning: { endpoint: "https://fixtureville.signing.example/", account: "fixture-works-signing", profile: "FixtureStudio" }
+      }));
+
+      assert.deepEqual(product.literals.filter(t => t === "FixtureStudio"), ["FixtureStudio"]);
     });
 
     test("the same device folder on several systems is one literal", () => {
@@ -105,7 +122,19 @@ class ProductIdentityTests {
         [{ releaseRepository: "-works/studio" }, "releaseRepository must be a GitHub repository written as owner/name"],
         [{ releaseRepository: "works/studio/extra" }, "releaseRepository must be a GitHub repository written as owner/name"],
         ...["O=Fixture Works, CN=Fixture Works", "CN=Fixture Works,O=Fixture Works", "CN=Fixture, Works", "CN=Fixture Works, O=\"Works\""].map((t): [Readonly<Record<string, unknown>>, string] =>
-          [{ windowsPublisher: t }, "windowsPublisher must be the distinguished name of the Windows signing certificate's subject, starting with CN= and with its fields separated by \", \""])
+          [{ windowsPublisher: t }, "windowsPublisher must be the distinguished name of the Windows signing certificate's subject, starting with CN= and with its fields separated by \", \""]),
+        ...["http://fixtureville.signing.example/", "https://fixtureville.signing.example", "https://fixtureville.signing.example/path/", "https://user@fixtureville.signing.example/",
+          "https://Fixtureville.signing.example/", "https://fixtureville..example/"].map((t): [Readonly<Record<string, unknown>>, string] =>
+          [{ windowsSigning: { ...ProductIdentityTests.SIGNING, endpoint: t } }, "windowsSigning.endpoint must be the HTTPS URL of the Artifact Signing endpoint, ending in /"]),
+        [{ windowsSigning: null }, "windowsSigning.endpoint must be the HTTPS URL of the Artifact Signing endpoint, ending in /"],
+        ...["", "-fixture", "fixture-", "fixture signing", "fixture'signing", "fixture_signing"].flatMap((t): [Readonly<Record<string, unknown>>, string][] => [
+          [{ windowsSigning: { ...ProductIdentityTests.SIGNING, account: t } },
+            "windowsSigning.account must be a name of letters, digits and hyphens that starts and ends with a letter or digit"],
+          [{ windowsSigning: { ...ProductIdentityTests.SIGNING, profile: t } },
+            "windowsSigning.profile must be a name of letters, digits and hyphens that starts and ends with a letter or digit"]
+        ]),
+        [{ windowsSigning: { endpoint: "https://fixtureville.signing.example/", account: "fixture-works-signing" } },
+          "windowsSigning.profile must be a name of letters, digits and hyphens that starts and ends with a letter or digit"]
       ];
 
       for (const [overrides, problem] of cases)
