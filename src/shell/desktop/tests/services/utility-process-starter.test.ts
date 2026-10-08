@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -28,7 +28,6 @@ import { PlatformFixture } from "../fixtures/platform.fixture.js";
 
 @TestClass
 export class UtilityProcessStarterTests {
-  private static readonly START_TIMEOUT: number = 15_000;
   private static readonly BINARY_MISSING: string = "Electron's binary is not installed; run npm run build to install it.";
 
   @TestMethod
@@ -102,18 +101,20 @@ export class UtilityProcessStarterTests {
   @TestMethod
   public async keepsTheDesktopsHandlesOutOfTheRuntimeOnWindows(): Promise<void> {
     const root = await mkdtemp(path.join(tmpdir(), "tr-utility-"));
+    const desktop = UtilityProcessStarterTests.startDesktop("utility-start-main.fixture.js", root);
     try {
-      const desktop = await UtilityProcessStarterTests.runDesktopAsync("utility-start-main.fixture.js", root);
+      await desktop.ended;
+      const runtime = UtilityProcessStarterTests.readProcessId(desktop.text, "runtime");
 
-      Assert.areEqual(0, desktop.code, desktop.errors);
-      const runtime = UtilityProcessStarterTests.readProcessId(desktop.output, "runtime");
-      Assert.isTrue(desktop.outputLag < 2_000, `the desktop's output ended ${desktop.outputLag} ms after it exited`);
-      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(UtilityProcessStarterTests.readProcessId(desktop.output, "utility")));
+      Assert.isTrue(UtilityProcessStarterTests.isRunning(runtime), "the desktop's output ends while the runtime runs");
+      Assert.areEqual(0, await desktop.exited, desktop.text.errors);
+      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(UtilityProcessStarterTests.readProcessId(desktop.text, "utility")));
       Assert.isTrue(UtilityProcessStarterTests.isRunning(runtime), "the runtime outlives the desktop");
       process.kill(runtime);
       await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(runtime));
     }
     finally {
+      desktop.process.kill();
       await rm(`${root}-installation`, { recursive: true, force: true });
       await rm(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 50 });
     }
@@ -123,35 +124,29 @@ export class UtilityProcessStarterTests {
   @TestMethod
   public async endsAStarterWhoseDesktopEndedBeforeAcknowledgingOnWindows(): Promise<void> {
     const root = await mkdtemp(path.join(tmpdir(), "tr-utility-"));
+    const desktop = UtilityProcessStarterTests.startDesktop("utility-orphan-main.fixture.js", root);
     try {
-      const desktop = await UtilityProcessStarterTests.runDesktopAsync("utility-orphan-main.fixture.js", root);
+      await desktop.ended;
 
-      Assert.areEqual(0, desktop.code, desktop.errors);
-      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(UtilityProcessStarterTests.readProcessId(desktop.output, "utility")));
+      Assert.areEqual(0, await desktop.exited, desktop.text.errors);
+      await Condition.waitAsync(() => !UtilityProcessStarterTests.isRunning(UtilityProcessStarterTests.readProcessId(desktop.text, "utility")));
     }
     finally {
+      desktop.process.kill();
       await rm(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 50 });
     }
   }
 
-  private static async runDesktopAsync(fixture: string, root: string): Promise<{ code: unknown; output: string; errors: string; outputLag: number }> {
+  private static startDesktop(fixture: string, root: string): { process: ChildProcess; text: { output: string; errors: string }; ended: Promise<unknown>; exited: Promise<unknown> } {
     const electron = UtilityProcessStarterTests.findElectron();
     const main = fileURLToPath(new URL(`../fixtures/${fixture}`, import.meta.url));
     const environment = { ...process.env };
     delete environment["ELECTRON_RUN_AS_NODE"];
     const desktop = spawn(electron, [main, root], { stdio: ["ignore", "pipe", "pipe"], env: environment });
-    let output = "";
-    let errors = "";
-    desktop.stdout.setEncoding("utf8").on("data", (chunk: string) => output += chunk);
-    desktop.stderr.setEncoding("utf8").on("data", (chunk: string) => errors += chunk);
-    const ended = once(desktop.stdout, "end").then(() => Date.now());
-    const timer = setTimeout(() => desktop.kill(), UtilityProcessStarterTests.START_TIMEOUT);
-
-    const [code] = await once(desktop, "exit");
-    const exited = Date.now();
-    const endedAt = await ended;
-    clearTimeout(timer);
-    return { code, output, errors, outputLag: endedAt - exited };
+    const text = { output: "", errors: "" };
+    desktop.stdout.setEncoding("utf8").on("data", (chunk: string) => text.output += chunk);
+    desktop.stderr.setEncoding("utf8").on("data", (chunk: string) => text.errors += chunk);
+    return { process: desktop, text, ended: once(desktop.stdout, "end"), exited: once(desktop, "exit").then(([code]: unknown[]) => code) };
   }
 
   private static findElectron(): string {
@@ -163,8 +158,9 @@ export class UtilityProcessStarterTests {
     return String(require("electron"));
   }
 
-  private static readProcessId(output: string, name: string): number {
-    return JsonReader.fromValue(JSON.parse(output.trim())).readInteger(name);
+  private static readProcessId(text: { output: string; errors: string }, name: string): number {
+    Assert.isFalse(String.isNullOrWhitespace(text.output), text.errors);
+    return JsonReader.fromValue(JSON.parse(text.output.trim())).readInteger(name);
   }
 
   private static isRunning(processId: number): boolean {
