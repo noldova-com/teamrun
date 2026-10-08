@@ -249,7 +249,10 @@ class PackageTests {
         assert.deepEqual(builder.environments.map(t => Object.fromEntries(Object.entries(t ?? {})
           .filter(([name]) => [...SigningCredentials.NAMES, "CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_API_KEY"].includes(name) || name.startsWith("TEAMRUN_")))), [{
           ...PackageTests.CREDENTIALS,
-          TEAMRUN_SIGNING_FOLDER: path.join(folder, "signing")
+          TEAMRUN_SIGNING_FOLDER: path.join(folder, "signing"),
+          TEAMRUN_SIGNING_ENDPOINT: "https://fixtureville.signing.example/",
+          TEAMRUN_SIGNING_ACCOUNT: "fixture-works-signing",
+          TEAMRUN_SIGNING_PROFILE: "Fixture-Studio"
         }]);
         assert.equal(configuration.forceCodeSigning, true);
         assert.deepEqual(configuration.win["signtoolOptions"], {
@@ -406,7 +409,7 @@ class PackageTests {
         const out = path.join(repository.directory, "_build", "package", "out");
         assert.deepEqual(exitCodes, [1, 1, 2, 0, 1, 1]);
         assert.equal(linux.text, "--signed signs Windows and macOS packages only, so it cannot sign the linux-x64 package.\n");
-        assert.equal(uncredentialed.text, "Signing Windows packages needs AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with noldova-signing.\n");
+        assert.equal(uncredentialed.text, "Signing Windows packages needs AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with fixture-works-signing.\n");
         assert.equal(twice.text, PackageTests.USAGE);
         assert.equal(signed.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], made.map(t => path.join(out, t)).join("\n"));
         assert.equal(signed.captureEnvironments[1]?.["TEAMRUN_SIGNED_LIBRARIES"], "");

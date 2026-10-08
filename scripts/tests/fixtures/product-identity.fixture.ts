@@ -18,7 +18,8 @@ export default class ProductIdentityFixture {
     dataDirectoryVariable: "FIXTURE_STUDIO_DATA_DIR",
     icons: "assets/fixture-icons",
     releaseRepository: "fixtureworks/studio",
-    windowsPublisher: "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US"
+    windowsPublisher: "CN=Fixture Works, O=Fixture Works, L=Fixtureville, C=US",
+    windowsSigning: { endpoint: "https://fixtureville.signing.example/", account: "fixture-works-signing", profile: "Fixture-Studio" }
   };
 
   public static manifest(overrides: Readonly<Record<string, unknown>> = {}, modules: readonly string[] = [], settings: Readonly<Record<string, unknown>> = {}): Readonly<Record<string, unknown>> {
