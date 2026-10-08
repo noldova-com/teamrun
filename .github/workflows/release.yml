@@ -112,9 +112,10 @@ jobs:
           SIGNING: ${{ steps.check.outputs.signed }}
         run: |
           set -euo pipefail
+          table=$(node scripts/list-targets.ts)
           targets=''
           signed_targets=''
-          while IFS='|' read -r target runner architecture platform; do
+          while IFS='|' read -r target runner architecture platform _; do
             signed=false
             case " $SIGNING " in
               *" $platform "*) signed=true ;;
@@ -125,14 +126,7 @@ jobs:
             else
               targets="$targets${targets:+,}$entry"
             fi
-          done <<'TARGETS'
-          Linux x64|ubuntu-24.04|x64|linux
-          Linux ARM64|ubuntu-24.04-arm|arm64|linux
-          Windows x64|windows-2025|x64|windows
-          Windows ARM64|windows-11-arm|arm64|windows
-          macOS x64|macos-15-intel|x64|macos
-          macOS ARM64|macos-15|arm64|macos
-          TARGETS
+          done <<< "$table"
           echo "targets=[$targets]" >> "$GITHUB_OUTPUT"
           echo "signed-targets=[$signed_targets]" >> "$GITHUB_OUTPUT"
 

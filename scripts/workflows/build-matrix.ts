@@ -12,12 +12,12 @@ import UiShard from "./ui-shard.ts";
 
 export default class BuildMatrix {
   public static readonly TARGETS: readonly BuildTarget[] = [
-    new BuildTarget("Linux x64", "ubuntu-24.04", "x64", { runsOnPullRequests: true, runsOnPushes: true, runsSmokeOnPullRequests: false, uiShardCount: 5, splitsTests: true }),
-    new BuildTarget("Linux ARM64", "ubuntu-24.04-arm", "arm64", { runsOnPullRequests: true, runsOnPushes: true, runsSmokeOnPullRequests: false, uiShardCount: 5, splitsTests: true }),
-    new BuildTarget("Windows x64", "windows-2025", "x64", { runsOnPullRequests: true, runsOnPushes: true, runsSmokeOnPullRequests: true, uiShardCount: 3, splitsTests: true }),
-    new BuildTarget("Windows ARM64", "windows-11-arm", "arm64", { runsOnPullRequests: false, runsOnPushes: true, runsSmokeOnPullRequests: true, uiShardCount: 3, splitsTests: true }),
-    new BuildTarget("macOS x64", "macos-15-intel", "x64", { runsOnPullRequests: false, runsOnPushes: false, runsSmokeOnPullRequests: true, uiShardCount: 3, splitsTests: false }),
-    new BuildTarget("macOS ARM64", "macos-15", "arm64", { runsOnPullRequests: true, runsOnPushes: true, runsSmokeOnPullRequests: true, uiShardCount: 2, splitsTests: false })
+    new BuildTarget("Linux x64", "ubuntu-24.04", "x64", { runsOnPullRequests: true, runsOnPushes: true, runsSmokeOnPullRequests: false, uiShardCount: 5, splitsTests: true, packagesEachNight: true }),
+    new BuildTarget("Linux ARM64", "ubuntu-24.04-arm", "arm64", { runsOnPullRequests: true, runsOnPushes: true, runsSmokeOnPullRequests: false, uiShardCount: 5, splitsTests: true, packagesEachNight: false }),
+    new BuildTarget("Windows x64", "windows-2025", "x64", { runsOnPullRequests: true, runsOnPushes: true, runsSmokeOnPullRequests: true, uiShardCount: 3, splitsTests: true, packagesEachNight: true }),
+    new BuildTarget("Windows ARM64", "windows-11-arm", "arm64", { runsOnPullRequests: false, runsOnPushes: true, runsSmokeOnPullRequests: true, uiShardCount: 3, splitsTests: true, packagesEachNight: false }),
+    new BuildTarget("macOS x64", "macos-15-intel", "x64", { runsOnPullRequests: false, runsOnPushes: false, runsSmokeOnPullRequests: true, uiShardCount: 3, splitsTests: false, packagesEachNight: false }),
+    new BuildTarget("macOS ARM64", "macos-15", "arm64", { runsOnPullRequests: true, runsOnPushes: true, runsSmokeOnPullRequests: true, uiShardCount: 2, splitsTests: false, packagesEachNight: false })
   ];
 
   private static readonly SMOKE_GREP: string = "@smoke";

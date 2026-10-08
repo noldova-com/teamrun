@@ -13,6 +13,7 @@ import { test, type TestContext } from "node:test";
 
 import BuildMatrix from "../../../workflows/build-matrix.ts";
 import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
+import TargetListFixture from "../../fixtures/target-list.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
 
@@ -69,8 +70,7 @@ class PackageWorkflowTests {
       assert.ok(workflow.text.includes("        include: ${{ fromJSON(needs.plan.outputs.targets) }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 75\n    steps: &package-steps\n"));
       assert.ok(workflow.text.endsWith(PackageWorkflowTests.SIGNED_JOB));
       assert.ok(workflow.text.includes(`      - name: ${PackageWorkflowTests.MAIN_STEP}\n${condition}`));
-      assert.ok(workflow.text.includes(`      - name: Check out the revision\n${condition}`));
-      assert.ok(workflow.text.includes(`      - name: Set up Node.js\n        id: node\n${condition}`));
+      assert.equal(workflow.text.split(condition).length, 2);
       assert.ok(workflow.text.includes("    outputs:\n      targets: ${{ steps.targets.outputs.targets }}\n      signed-targets: ${{ steps.targets.outputs.signed-targets }}\n"));
       assert.ok(workflow.text.includes("          SIGNED: ${{ github.event_name == 'workflow_dispatch' && inputs.signed }}\n        run: |\n"));
       assert.equal(workflow.text.match(/^ {4}env:$/gm), null);
@@ -133,6 +133,7 @@ class PackageWorkflowTests {
           t.after(() => doubles.disposeAsync());
           await writeFile(path.join(doubles.directory, "outputs.txt"), "");
           doubles.respond("node", "scripts/signed-platforms.ts", declared, exitCode);
+          TargetListFixture.answer(doubles);
           const result = await doubles.runAsync(workflow.readStepScript(PackageWorkflowTests.PLAN_STEP), { GITHUB_OUTPUT: "outputs.txt", NIGHTLY: nightly, SIGNED: signed });
           const outputs = (await doubles.readFileAsync("outputs.txt")).split("\n").filter(t => t.length > 0).map(t => JSON.parse(t.slice(t.indexOf("=") + 1)));
           return { status: result.status, stdout: result.stdout, outputs, calls: await doubles.readCallsAsync() };
@@ -149,14 +150,14 @@ class PackageWorkflowTests {
         const misspelled = await run("true", "", "The root package.json's teamrun.signedPlatforms must list distinct platforms among windows, macos.\n", 1);
         const nightlyByHand = await run("", "true", "windows macos\n");
 
-        assert.deepEqual([signed.status, signed.stdout, signed.calls], [0, "Signing the packages of: windows macos.\n", ["node scripts/signed-platforms.ts"]]);
+        assert.deepEqual([signed.status, signed.stdout, signed.calls], [0, "Signing the packages of: windows macos.\n", ["node scripts/signed-platforms.ts", TargetListFixture.CALL]]);
         assert.deepEqual(signed.outputs, [
           targets.filter(t => !isSigned(t.platform)).map(t => ({ ...t, signed: "false" })),
           targets.filter(t => isSigned(t.platform)).map(t => ({ ...t, signed: "true" }))
         ]);
         assert.deepEqual([misspelled.status, misspelled.stdout, misspelled.outputs],
           [1, "::error::The root package.json's teamrun.signedPlatforms must list distinct platforms among windows, macos.\n", []]);
-        assert.deepEqual([nightlyByHand.status, nightlyByHand.calls], [0, []]);
+        assert.deepEqual([nightlyByHand.status, nightlyByHand.calls], [0, [TargetListFixture.CALL]]);
         assert.deepEqual(nightlyByHand.outputs, [
           targets.filter(t => PackageWorkflowTests.NIGHTLY_TARGETS.includes(t.target)).map(t => ({ ...t, signed: "false", nightly: "true", retention: 3 })),
           []
@@ -315,6 +316,7 @@ class PackageWorkflowTests {
     const doubles = await CommandDoublesFixture.createAsync();
     t.after(() => doubles.disposeAsync());
     await writeFile(path.join(doubles.directory, "outputs.txt"), "");
+    TargetListFixture.answer(doubles);
     const result = await doubles.runAsync(script, { GITHUB_OUTPUT: "outputs.txt", ...environment });
     assert.equal(result.status, 0, result.stderr);
     const line = (await doubles.readFileAsync("outputs.txt")).split("\n").find(t => t.startsWith(`${name}=`));

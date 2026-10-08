@@ -31,13 +31,58 @@ jobs:
       legs: ${{ steps.legs.outputs.legs }}
       labels: ${{ steps.legs.outputs.labels }}
     steps:
+      - name: Check out the target table
+        timeout-minutes: 5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js to list the jobs
+        id: node
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to list the jobs again
+        if: steps.node.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Set up Node.js to list the jobs again
+        id: node-again
+        if: steps.node.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
+      - name: Wait before setting up Node.js to list the jobs a last time
+        if: steps.node-again.outcome == 'failure'
+        timeout-minutes: 1
+        run: sleep 30
+
+      - name: Set up Node.js to list the jobs a last time
+        if: steps.node-again.outcome == 'failure'
+        timeout-minutes: 5
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.7.0'
+          package-manager-cache: false
+
       - name: List each target's tests and UI workflows
         id: legs
         run: |
           set -euo pipefail
+          table=$(node scripts/list-targets.ts)
           legs=''
           labels=''
-          while IFS='|' read -r target runner architecture; do
+          packaging=''
+          while IFS='|' read -r target runner architecture _ night; do
             for part in tests workflows; do
               if [ "$part" = tests ]; then
                 label="$target, tests"
@@ -47,19 +92,12 @@ jobs:
               legs="$legs${legs:+,}{\"label\":\"$label\",\"part\":\"$part\",\"runner\":\"$runner\",\"architecture\":\"$architecture\"}"
               labels="$labels${labels:+,}\"$label\""
             done
-          done <<'TARGETS'
-          Linux x64|ubuntu-24.04|x64
-          Linux ARM64|ubuntu-24.04-arm|arm64
-          Windows x64|windows-2025|x64
-          Windows ARM64|windows-11-arm|arm64
-          macOS x64|macos-15-intel|x64
-          macOS ARM64|macos-15|arm64
-          TARGETS
-          for target in 'Linux x64' 'Windows x64'; do
-            labels="$labels,\"packaging $target\""
-          done
+            if [ "$night" = nightly ]; then
+              packaging="$packaging,\"packaging $target\""
+            fi
+          done <<< "$table"
           echo "legs=[$legs]" >> "$GITHUB_OUTPUT"
-          echo "labels=[$labels]" >> "$GITHUB_OUTPUT"
+          echo "labels=[$labels$packaging]" >> "$GITHUB_OUTPUT"
 
   repeat:
     name: Repeat five times (${{ matrix.label }})

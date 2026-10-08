@@ -13,6 +13,7 @@ import { test } from "node:test";
 
 import BuildMatrix from "../../../workflows/build-matrix.ts";
 import CommandDoublesFixture from "../../fixtures/command-doubles.fixture.ts";
+import TargetListFixture from "../../fixtures/target-list.fixture.ts";
 import WorkflowFileFixture from "../../fixtures/workflow-file.fixture.ts";
 import WorkflowSimulation from "../../fixtures/workflow-simulation.fixture.ts";
 
@@ -80,6 +81,7 @@ class ReleaseWorkflowTests {
         const doubles = await CommandDoublesFixture.createAsync();
         t.after(() => doubles.disposeAsync());
         await writeFile(path.join(doubles.directory, "outputs.txt"), "");
+        TargetListFixture.answer(doubles);
         const result = await doubles.runAsync(workflow.readStepScript(ReleaseWorkflowTests.LIST_STEP), { GITHUB_OUTPUT: "outputs.txt", SIGNING: signing });
         assert.equal(result.status, 0, result.stderr);
         return (await doubles.readFileAsync("outputs.txt")).split("\n").filter(t => t.length > 0).map(t => JSON.parse(t.slice(t.indexOf("=") + 1)));

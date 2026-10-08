@@ -282,6 +282,8 @@ A target whose pull request level is the smoke set has no build job: when it spl
 That job has 30 minutes instead of a test job's 20, so a slow `npm test` leaves the set its time, and the set starts a flaky test record of its own, so the job's tests are not recorded twice.
 The classification plans each target's build and shards, and `scripts/workflows/build-matrix.ts` says which targets run the smoke set on a pull request and which run on a push to `main`.
 Each target's shard count is set in `scripts/workflows/build-matrix.ts`, chosen from measured times so that no shard takes much more than about three minutes, setup included; the PR that changes one records those times.
+`scripts/workflows/build-matrix.ts` is the one table of targets and their runners, and it also says which targets the nightly run packages.
+The Package, Release and Nightly repeats workflows read it through `node scripts/list-targets.ts`, so no workflow writes out a target.
 A PR's own runs, and a merge group's, build and test Linux x64, Linux ARM64, Windows x64 and macOS ARM64, each running every test once and the UI workflows its [level](#ci-levels) selects.
 Windows ARM64 and macOS x64, whose runners are the slowest and scarcest, are not built or tested on a PR's own runs or in a merge group, which count them as expected skips and name them in the run's summary.
 Windows ARM64 builds and tests, and runs every UI workflow, on every push to `main`; macOS x64 is skipped there too and named the same way, and runs only in manual runs and every night.
