@@ -183,7 +183,7 @@ describe("ConfigurationTableComponent", () => {
     expect(box("table").right - box("tr-configuration-table").right).toBeLessThanOrEqual(0.5);
   });
 
-  it("runs past its end only once the table can shrink no further, with no scrollbar of its own, keeping the free-text column a text field wide and room for a focus outline at its edges inside the area that scrolls it", async () => {
+  it("runs past its end only once the table can shrink no further, with no scrollbar of its own, keeping the free-text column a text field wide and room for a focus outline at its edges inside the area that scrolls it, the outline painted whole wherever within a pixel the table ends", async () => {
     await renderAsync();
     const holder = fixture.nativeElement as HTMLElement;
     holder.style.display = "block";
@@ -203,12 +203,19 @@ describe("ConfigurationTableComponent", () => {
 
     await changeAsync(t => t.width.set("12rem"));
     holder.style.width = "12rem";
-    holder.scrollLeft = holder.scrollWidth;
+    const shim = document.createElement("span");
+    shim.style.display = "inline-block";
+    find(".long td").append(shim);
+    const hidden = ["0px", "0.3px", "0.5px", "0.7px"].map(width => {
+      shim.style.width = width;
+      holder.scrollLeft = holder.scrollWidth;
+      const left = holder.getBoundingClientRect().left;
+      return [width, Math.round(box(".remove").right + outline - left) - holder.clientWidth, Math.round(box(".remove").left - left)];
+    });
 
     expect(box("table").width).toBeGreaterThan(box("tr-configuration-table").width);
     expect(box(".short .tr-configuration-table-fill").width).toBeGreaterThanOrEqual(AppearanceFixture.measureLook("text-field-width") - 0.5);
     AppearanceFixture.expectPixels(box(".tr-configuration-table-body").right - box(".remove").right, room);
-    expect(holder.getBoundingClientRect().left + holder.clientWidth - box(".remove").right).toBeGreaterThanOrEqual(outline);
-    expect(box(".remove").left).toBeGreaterThanOrEqual(holder.getBoundingClientRect().left);
+    expect(hidden.filter(t => Number(t[1]) > 0 || Number(t[2]) < 0)).toEqual([]);
   });
 });
