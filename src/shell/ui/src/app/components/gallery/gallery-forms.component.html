@@ -101,34 +101,36 @@ LICENSE file in the root directory of this source tree.
 </tr-gallery-specimen>
 
 <ng-template #configurationTable let-table>
-  <tr-configuration-table class="tr-gallery-table" [class.tr-gallery-narrow]="table.isNarrow" [heading]="table.heading" [level]="4" [label]="table.label" [explanation]="table.explanation">
-    @if (table.hasAdd) {
-      <button type="button" tr-button trConfigurationTableAction [variant]="variants.Secondary">{{ text.configurationAdd }}</button>
-    }
-    <table trConfigurationTable>
-      <thead>
-        <tr>
-          <th scope="col">{{ text.configurationName }}</th>
-          <th scope="col" trConfigurationTableFill>{{ text.configurationValue }}</th>
-          <th scope="col">{{ text.configurationScope }}</th>
-          <th scope="col" [attr.aria-label]="text.configurationActions"></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (row of text.configurationRows.slice(0, table.rowCount); track row.name) {
+  <div class="tr-gallery-table-holder" [class.tr-gallery-narrow]="table.isNarrow">
+    <tr-configuration-table class="tr-gallery-table" [heading]="table.heading" [level]="4" [label]="table.label" [explanation]="table.explanation">
+      @if (table.hasAdd) {
+        <button type="button" tr-button trConfigurationTableAction [variant]="variants.Secondary">{{ text.configurationAdd }}</button>
+      }
+      <table trConfigurationTable>
+        <thead>
           <tr>
-            <td>{{ row.name }}</td>
-            <td trConfigurationTableFill>{{ row.value }}</td>
-            <td>{{ row.scope }}</td>
-            <td>
-              <span class="tr-gallery-table-actions">
-                <button type="button" tr-button [variant]="variants.Secondary" [attr.aria-label]="row.edit">{{ text.configurationEdit }}</button>
-                <button type="button" tr-button [variant]="variants.Secondary" [attr.aria-label]="row.remove">{{ text.configurationRemove }}</button>
-              </span>
-            </td>
+            <th scope="col">{{ text.configurationName }}</th>
+            <th scope="col" trConfigurationTableFill>{{ text.configurationValue }}</th>
+            <th scope="col">{{ text.configurationScope }}</th>
+            <th scope="col" [attr.aria-label]="text.configurationActions"></th>
           </tr>
-        }
-      </tbody>
-    </table>
-  </tr-configuration-table>
+        </thead>
+        <tbody>
+          @for (row of text.configurationRows.slice(0, table.rowCount); track row.name) {
+            <tr>
+              <td>{{ row.name }}</td>
+              <td trConfigurationTableFill>{{ row.value }}</td>
+              <td>{{ row.scope }}</td>
+              <td>
+                <span class="tr-gallery-table-actions">
+                  <button type="button" tr-button [variant]="variants.Secondary" [attr.aria-label]="row.edit">{{ text.configurationEdit }}</button>
+                  <button type="button" tr-button [variant]="variants.Secondary" [attr.aria-label]="row.remove">{{ text.configurationRemove }}</button>
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </tr-configuration-table>
+  </div>
 </ng-template>

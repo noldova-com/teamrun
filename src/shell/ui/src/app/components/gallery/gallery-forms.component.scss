@@ -20,6 +20,13 @@
   max-width: 12rem;
 }
 
+.tr-gallery-table-holder {
+  width: 100%;
+  margin-block: calc(var(--tr-space-1) * -1);
+  padding-block: var(--tr-space-1);
+  overflow-x: auto;
+}
+
 .tr-gallery-bar {
   width: 12.5rem;
 }

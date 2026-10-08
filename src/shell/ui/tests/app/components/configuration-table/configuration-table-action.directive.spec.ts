@@ -17,6 +17,6 @@ describe("ConfigurationTableActionDirective", () => {
     const element: HTMLElement = fixture.nativeElement;
 
     expect([element.querySelector(".add")?.parentElement?.className, element.querySelector("table")?.parentElement?.className])
-      .toEqual(["tr-configuration-table-actions", "tr-configuration-table-scroll"]);
+      .toEqual(["tr-configuration-table-actions", "tr-configuration-table-body"]);
   });
 });

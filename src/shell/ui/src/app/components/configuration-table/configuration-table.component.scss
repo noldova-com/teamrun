@@ -51,10 +51,11 @@
   min-width: 0;
 }
 
-.tr-configuration-table-scroll {
+.tr-configuration-table-body {
+  width: fit-content;
+  min-width: 100%;
   margin: calc(var(--tr-configuration-table-focus-room) * -1);
   padding: var(--tr-configuration-table-focus-room);
-  overflow-x: auto;
 }
 
 .tr-configuration-table-grid {
