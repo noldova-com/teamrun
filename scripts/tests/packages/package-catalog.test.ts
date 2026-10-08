@@ -72,13 +72,12 @@ class PackageCatalogTests {
     });
 
     test("colliding names, unknown dependencies and cycles are refused", async t => {
-      const colliding = await PackageCatalogTests.createAsync(t, { "src/shell/ui": [] });
-      await colliding.writeAsync({ "src/shell-ui/package.json": JSON.stringify({ name: "@noldova/teamrun-shell-ui", version: "__VERSION__" }) });
+      const colliding = await PackageCatalogTests.createAsync(t, { "src/shell/ui-kit": [], "src/shell/ui/kit": [] });
       const unknown = await PackageCatalogTests.createAsync(t, { "src/shell/ui": ["foundation-core"] });
       const cycle = await PackageCatalogTests.createAsync(t, { "src/foundation/core": [], "src/shell/ui": ["shell-window", "foundation-core"], "src/shell/window": ["shell-ui"] });
 
       await assert.rejects(new PackageCatalog(colliding.directory).listPackagesAsync(false),
-        new PackageException("Package paths produce the same name: src/shell-ui, src/shell/ui."));
+        new PackageException("Package paths produce the same name: src/shell/ui-kit, src/shell/ui/kit."));
       await assert.rejects(new PackageCatalog(unknown.directory).listPackagesAsync(false),
         new PackageException("src/shell/ui depends on @noldova/teamrun-foundation-core, which is not a package under src/."));
       await assert.rejects(new PackageCatalog(cycle.directory).listPackagesAsync(false),
