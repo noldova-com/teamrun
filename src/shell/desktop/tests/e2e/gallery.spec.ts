@@ -337,7 +337,7 @@ test.describe("gallery", () => {
     }
   });
 
-  test("a configuration table shows its heading and Add above its explanation and separated rows, or without a heading its explanation beside Add, grows a row for long text and scrolls sideways only when narrow, in light and in dark", async ({ desktop }) => {
+  test("a configuration table shows its heading and Add above its explanation and separated rows, or without a heading its explanation beside Add, grows a row for long text and runs past its end, into an area that scrolls sideways, only when narrow, in light and in dark", async ({ desktop }) => {
     const window = desktop.window;
     await SettingsFixture.openGalleryAsync(window);
 
@@ -345,7 +345,7 @@ test.describe("gallery", () => {
       const specimen = scope(window, mode).locator(".tr-gallery-specimen[aria-label=\"Configuration table\"]");
       const table = specimen.getByRole("table", { name: "Environment variables", exact: true });
       const narrow = specimen.getByRole("table", { name: "Narrow environment variables" });
-      const areas = specimen.locator(".tr-configuration-table-scroll");
+      const areas = specimen.locator(".tr-configuration-table-body");
       await specimen.scrollIntoViewIfNeeded();
 
       await expect(specimen.getByRole("heading", { name: "Environment variables" })).toBeVisible();
@@ -354,7 +354,7 @@ test.describe("gallery", () => {
       await expect(table.getByRole("button", { name: "Remove NOTES_HOME" })).toBeVisible();
       await expect(areas).toHaveCount(3);
       await expect(narrow.getByRole("row")).toHaveCount(3);
-      const [wide, small] = [areas.first(), areas.filter({ has: window.getByRole("table", { name: "Narrow environment variables" }) })];
+      const [wide, small] = [areas.first(), specimen.locator(".tr-gallery-table-holder.tr-gallery-narrow")];
       const unheaded = specimen.locator("tr-configuration-table").filter({ has: window.getByRole("table", { name: "Global environment variables" }) });
       const [heading, add, explanation, grid] = await Promise.all([
         specimen.locator(".tr-configuration-table-heading").boundingBox(),

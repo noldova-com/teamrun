@@ -31,7 +31,7 @@ describe("ConfigurationTableComponent", () => {
   const find = (selector: string): HTMLElement => fixture.nativeElement.querySelector(selector);
   const box = (selector: string): DOMRect => find(selector).getBoundingClientRect();
   const cells = (): HTMLElement[] => [...fixture.nativeElement.querySelectorAll("th, td")];
-  const scroll = (): HTMLElement => find(".tr-configuration-table-scroll");
+  const body = (): HTMLElement => find(".tr-configuration-table-body");
   const lines = (cell: Element): number => {
     const range = document.createRange();
     range.selectNodeContents(cell);
@@ -180,28 +180,35 @@ describe("ConfigurationTableComponent", () => {
     expect(wrapped).toBeGreaterThan(1);
     expect(box(".long").height).toBeGreaterThan(box(".short").height);
     expect(box(".long").height).toBeGreaterThanOrEqual(wrapped * Number.parseFloat(style.lineHeight) + 2 * Number.parseFloat(style.paddingTop));
-    expect(scroll().scrollWidth - scroll().clientWidth).toBeLessThanOrEqual(0);
+    expect(box("table").right - box("tr-configuration-table").right).toBeLessThanOrEqual(0.5);
   });
 
-  it("scrolls sideways only once the table can shrink no further, keeping the free-text column a text field wide and leaving room for a focus outline at its edges", async () => {
+  it("runs past its end only once the table can shrink no further, with no scrollbar of its own, keeping the free-text column a text field wide and room for a focus outline at its edges inside the area that scrolls it", async () => {
     await renderAsync();
+    const holder = fixture.nativeElement as HTMLElement;
+    holder.style.display = "block";
+    holder.style.overflowX = "auto";
     const remove = find(".remove");
     await userEvent.tab();
     await userEvent.tab();
     const outline = Number.parseFloat(getComputedStyle(remove).outlineWidth) + Number.parseFloat(getComputedStyle(remove).outlineOffset);
-    const room = box(".tr-configuration-table-scroll").right - box(".remove").right;
+    const room = box(".tr-configuration-table-body").right - box(".remove").right;
 
     expect(document.activeElement).toBe(remove);
-    expect(getComputedStyle(scroll()).overflowX).toBe("auto");
-    expect(scroll().scrollWidth - scroll().clientWidth).toBeLessThanOrEqual(0);
+    expect(getComputedStyle(body()).overflowX).toBe("visible");
+    expect(Math.round(box("table").right - box("tr-configuration-table").right)).toBe(0);
     expect(outline).toBeGreaterThan(0);
     expect(room).toBeGreaterThanOrEqual(outline);
-    AppearanceFixture.expectPixels(box("table").left - box(".tr-configuration-table-scroll").left, room);
+    AppearanceFixture.expectPixels(box("table").left - box(".tr-configuration-table-body").left, room);
 
     await changeAsync(t => t.width.set("12rem"));
+    holder.style.width = "12rem";
+    holder.scrollLeft = holder.scrollWidth;
 
-    expect(scroll().scrollWidth - scroll().clientWidth).toBeGreaterThan(0);
     expect(box("table").width).toBeGreaterThan(box("tr-configuration-table").width);
     expect(box(".short .tr-configuration-table-fill").width).toBeGreaterThanOrEqual(AppearanceFixture.measureLook("text-field-width") - 0.5);
+    AppearanceFixture.expectPixels(box(".tr-configuration-table-body").right - box(".remove").right, room);
+    expect(holder.getBoundingClientRect().left + holder.clientWidth - box(".remove").right).toBeGreaterThanOrEqual(outline);
+    expect(box(".remove").left).toBeGreaterThanOrEqual(holder.getBoundingClientRect().left);
   });
 });

@@ -208,7 +208,7 @@ describe("SettingsComponent", () => {
     expect(offsets).toEqual([0, 0, 0]);
   });
 
-  it("starts and ends the shortcuts table's text, actions and row lines at the column's content edges, whether or not the column has reached its reading width, and Reset all beside the explanation", async () => {
+  it("starts and ends the shortcuts table's text, actions and row lines at the column's content edges at its reading width, and Reset all beside the explanation", async () => {
     const host = render();
     await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
     fixture.detectChanges();
@@ -222,7 +222,7 @@ describe("SettingsComponent", () => {
     const rows = [...(host.querySelector(".tr-shortcuts-table") as HTMLTableElement).rows];
     const actions = rows.flatMap(t => [...(t.cells[t.cells.length - 1] as HTMLTableCellElement).querySelectorAll("button")].slice(-1));
     const textEnd = (): number => column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight);
-    const offsets = ["100rem", "60rem"].map(width => {
+    const offsets = ["100rem"].map(width => {
       host.style.width = width;
       const start = textLeft(heading);
       const end = textEnd();
@@ -241,6 +241,37 @@ describe("SettingsComponent", () => {
     expect(Math.round(reset - textEnd())).toBe(0);
     expect(rows.every(t => getComputedStyle(t.cells[0] as HTMLTableCellElement).borderBottomStyle === "solid")).toBe(true);
   });
+
+  for (const owner of ["Clock", "Clockwork Almanac"])
+    it(`scrolls its content sideways, under its own scrollbar at the pane's bottom edge, whenever Keyboard shortcuts is wider than the column, with every row's actions within its scroll and the table scrolling nothing itself, at 40rem, 60rem and 100rem with "${owner}" in the From column`, async () => {
+      ModuleStatusFixture.report(ModuleStatusFixture.create("clock", owner));
+      const host = render(ThemeMode.Light, "30rem");
+      host.style.width = "100rem";
+      await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
+      fixture.detectChanges();
+      const content = host.querySelector(".tr-settings-content") as HTMLElement;
+      const actions = [...(host.querySelector(".tr-shortcuts-table") as HTMLTableElement).tBodies[0]?.rows ?? []]
+        .flatMap(t => [...(t.cells[t.cells.length - 1] as HTMLTableCellElement).querySelectorAll("button")]);
+      const views: (readonly [string, boolean, number, number])[] = [];
+      for (const width of ["40rem", "60rem", "100rem"]) {
+        host.style.width = width;
+        content.scrollTo(0, 0);
+        await framesAsync();
+        const box = content.getBoundingClientRect();
+        const reach = box.left + content.scrollWidth;
+        const outOfReach = actions.filter(t => t.getBoundingClientRect().left < box.left || t.getBoundingClientRect().right > reach).length;
+        views.push([width, content.scrollWidth > content.clientWidth, Math.round(box.bottom - host.getBoundingClientRect().bottom), outOfReach]);
+      }
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect([getComputedStyle(content).overflowX, getComputedStyle(host.querySelector(".tr-configuration-table-body") as HTMLElement).overflowX]).toEqual(["auto", "visible"]);
+      AppearanceFixture.expectLook(getComputedStyle(content, "::-webkit-scrollbar").height, DefaultTheme.theme, "scrollbar-size", "height");
+      expect(views).toEqual([
+        ["40rem", true, 0, 0],
+        ["60rem", owner.includes(" ") || views[1]?.[1] === true, 0, 0],
+        ["100rem", false, 0, 0]
+      ]);
+    });
 
   it("mirrors its insets right to left, so its scroller meets the left edge and its start inset is on the right", () => {
     const host = render();
@@ -314,12 +345,14 @@ describe("SettingsComponent", () => {
       await AppearanceFixture.expectThumbRevealsOnHoverAsync(element().querySelector(area) as HTMLElement);
   });
 
-  it("sets every page's content between the column's content edges, the Settings content inset from both its ends, beside the page list and below 37rem with the select: a built-in page's rows, a module's rows, the shortcuts table and the Gallery", async () => {
+  it("sets every page's content between the column's content edges, the Settings content inset from both its ends, at 100rem, 60rem and 40rem beside the page list and below 37rem with the select, sideways only on Keyboard shortcuts: a built-in page's rows, a module's rows, the shortcuts table and the Gallery", async () => {
     gallery = FakeGalleryComponent;
     const host = render();
     const column = host.querySelector(".tr-settings-column") as HTMLElement;
     const wide = "100rem";
-    const widths = [wide, "calc(37rem - 1px)"];
+    const widths = [wide, "60rem", "40rem", "calc(37rem - 1px)"];
+    const content = host.querySelector(".tr-settings-content") as HTMLElement;
+    const sideways: boolean[] = [];
     const measure = (selector: string): readonly (readonly number[])[] => {
       const columnBox = column.getBoundingClientRect();
       const box = (host.querySelector(selector) as HTMLElement).getBoundingClientRect();
@@ -334,6 +367,8 @@ describe("SettingsComponent", () => {
       fixture.detectChanges();
       return widths.map(t => {
         host.style.width = t;
+        if (title !== "Keyboard shortcuts")
+          sideways.push(content.scrollWidth > content.clientWidth);
         return measure(selector);
       });
     };
@@ -359,8 +394,9 @@ describe("SettingsComponent", () => {
       return [style.paddingLeft, `${parseFloat(style.paddingRight) - columnEnd}px`];
     });
 
-    expect(lists).toEqual([["shown", "hidden"], ["hidden", "shown"]]);
+    expect(lists).toEqual([["shown", "hidden"], ["shown", "hidden"], ["shown", "hidden"], ["hidden", "shown"]]);
     expect(shown.flat().map(t => t[1])).toEqual(shown.flat().map(t => t[0]));
+    expect(sideways.filter(t => t)).toEqual([]);
     for (const inset of insets.flat())
       AppearanceFixture.expectLook(inset, DefaultTheme.theme, "settings-content-inset", "padding-left");
   });

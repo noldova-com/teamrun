@@ -355,10 +355,10 @@ test.describe("settings", () => {
     }
   });
 
-  test("in the narrowest window every command's id stays within its Command cell, which keeps a text field's width, and the table scrolls sideways to its row actions", async ({ desktop }) => {
+  test("in the narrowest window every command's id stays within its Command cell, which keeps a text field's width, and the Settings content scrolls sideways to its row actions under a scrollbar at its bottom edge, shown at the top of the page", async ({ desktop }) => {
     const window = desktop.window;
     const longest = window.locator("[data-command=\"shell.moveTabToPreviousGroup\"]");
-    const scroll = window.locator("tr-shortcuts .tr-configuration-table-scroll");
+    const scroll = window.locator("tr-settings .tr-settings-content");
     await SettingsFixture.openPageAsync(window, "Keyboard shortcuts");
 
     await desktop.useViewportAsync(640, 480);
@@ -381,6 +381,9 @@ test.describe("settings", () => {
     expect(overflows.filter(t => t[1] !== 0)).toEqual([]);
     expect(await longest.locator("td").first().evaluate(t => t.getBoundingClientRect().width)).toBeGreaterThanOrEqual(fieldWidth - 0.5);
     expect(await scroll.evaluate(t => t.scrollWidth - t.clientWidth)).toBeGreaterThan(0);
+    const bottoms = await window.evaluate(() => [".tr-settings-content", "tr-settings"].map(t => Math.round((document.querySelector(t) as HTMLElement).getBoundingClientRect().bottom)));
+    expect([await ScrollAreaFixture.scrollTopAsync(scroll), (await ScrollAreaFixture.scrollbarSizesAsync(scroll)).horizontal > 0, bottoms[0] === bottoms[1]]).toEqual([0, true, true]);
+    expect(await ScrollAreaFixture.thumbChangesOnHoverAsync(window, scroll, "horizontal")).toBe(true);
     await longest.scrollIntoViewIfNeeded();
     await scroll.evaluate(t => {
       t.scrollLeft = 0;

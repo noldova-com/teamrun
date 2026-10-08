@@ -161,7 +161,7 @@ describe("ShortcutsComponent", () => {
   });
 
   for (const query of ["", "Each"])
-    it(`keeps every id within its Command cell, which stays a text field wide, wraps an id longer than the cell at its word boundaries, and scrolls the table sideways when the page is narrow${query === "" ? "" : ` and a search marks "${query}" in it`}`, async () => {
+    it(`keeps every id within its Command cell, which stays a text field wide, wraps an id longer than the cell at its word boundaries, and scrolls the Settings content sideways when the page is narrow${query === "" ? "" : ` and a search marks "${query}" in it`}`, async () => {
       const long = "notes.sortByTheLastChangeThenByTheTitleOfEachNote";
       AppearanceFixture.apply();
       await renderAsync();
@@ -187,7 +187,7 @@ describe("ShortcutsComponent", () => {
         range.selectNodeContents(t);
         return [t.textContent, range.getClientRects().length, Math.round(range.getBoundingClientRect().left - name.getBoundingClientRect().left)];
       });
-      const scroll = element().querySelector(".tr-configuration-table-scroll") as HTMLElement;
+      const scroll = element().querySelector(".tr-settings-content") as HTMLElement;
 
       expect(overflows.length).toBeGreaterThan(query === "" ? 20 : 0);
       expect(overflows.filter(t => t[1] !== 0)).toEqual([]);

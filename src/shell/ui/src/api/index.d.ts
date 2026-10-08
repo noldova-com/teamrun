@@ -1298,8 +1298,10 @@ export declare class ConfigurationTableActionDirective {
  * each row's first and last cells, and a line runs under the header and
  * every row. Every column keeps to one line except the one marked with
  * {@link ConfigurationTableFillDirective}, which takes the rest of the width,
- * stays at least a text field wide and wraps. The table scrolls sideways
- * only when it can shrink no further.
+ * stays at least a text field wide and wraps. Once it can shrink no further,
+ * the table runs past the component's end, keeping room for a focus outline
+ * at its edges, and the area that holds it scrolls sideways; the table has no
+ * scrollbar of its own.
  *
  * @example
  * ```ts
