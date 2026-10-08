@@ -9,13 +9,13 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import PackageManifest from "../../packages/package-manifest.ts";
+import PackageNameFixture from "./package-name.fixture.ts";
 import ProductIdentityFixture from "./product-identity.fixture.ts";
 import type RepositoryFixture from "./repository.fixture.ts";
 import SourceTreeFixture from "./source-tree.fixture.ts";
 
 export default class PackageTreeFixture {
-  private static readonly NAME_PREFIX: string = "@noldova/teamrun-";
-
   public static async writeRootAsync(repository: RepositoryFixture, modules: readonly string[] = []): Promise<void> {
     await repository.writeAsync({
       "package.json": `${JSON.stringify({ name: "fixture", version: "0.0.7", teamrun: { protocolVersion: 3, modules, product: ProductIdentityFixture.json }, private: true, type: "module" }, null, 2)}\n`,
@@ -34,17 +34,17 @@ export default class PackageTreeFixture {
     directory: string = `src/${id.replace("-", "/")}`): Promise<void> {
     const base = `${"../".repeat(directory.split("/").length + 1)}tsconfig.base.json`;
     const project = `${JSON.stringify({ extends: base }, null, 2)}\n`;
-    const imports = dependencies.map(t => `import { Resources as ${PackageTreeFixture.formatSymbol(t)} } from "${PackageTreeFixture.NAME_PREFIX}${t}";\n`).join("");
+    const imports = dependencies.map(t => `import { Resources as ${PackageTreeFixture.formatSymbol(t)} } from "${PackageNameFixture.forId(t)}";\n`).join("");
     const uses = dependencies.map(t => `${PackageTreeFixture.formatSymbol(t)}.version`).join(", ");
     const files: Record<string, string> = {
       [`${directory}/package.json`]: `${JSON.stringify({
-        name: `${PackageTreeFixture.NAME_PREFIX}${id}`,
+        name: PackageManifest.formatName(directory),
         version: "__VERSION__",
         private: true,
         type: "module",
         main: "api/index.js",
         types: "api/index.d.ts",
-        dependencies: Object.fromEntries(dependencies.map(t => [`${PackageTreeFixture.NAME_PREFIX}${t}`, "__VERSION__"]))
+        dependencies: Object.fromEntries(dependencies.map(t => [PackageNameFixture.forId(t), "__VERSION__"]))
       }, null, 2)}\n`,
       [`${directory}/src/tsconfig.json`]: project,
       [`${directory}/src/resources.ts`]: "export default class Resources {\n  public static readonly version: string = \"__VERSION__\";\n  public static readonly protocol: string = \"__PROTOCOL_VERSION__\";\n}\n",
@@ -58,7 +58,7 @@ export default class PackageTreeFixture {
     }
     if (withTests) {
       files[`${directory}/tests/tsconfig.json`] = project;
-      files[`${directory}/tests/api/index.test.ts`] = `import { Resources } from "${PackageTreeFixture.NAME_PREFIX}${id}";\n\nexport const version: string = Resources.version;\n`;
+      files[`${directory}/tests/api/index.test.ts`] = `import { Resources } from "${PackageManifest.formatName(directory)}";\n\nexport const version: string = Resources.version;\n`;
     }
     await repository.writeAsync(files);
   }

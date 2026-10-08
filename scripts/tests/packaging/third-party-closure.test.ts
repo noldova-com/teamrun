@@ -110,7 +110,7 @@ class ThirdPartyClosureTests {
   }
 
   private static createManifest(directory: string, external: Readonly<Record<string, string>>): PackageManifest {
-    return new PackageManifest(directory, `@noldova/teamrun-${directory.slice("src/".length).split("/").join("-")}`, [], "[]", [], new Map(Object.entries(external)));
+    return new PackageManifest(directory, PackageManifest.formatName(directory), [], "[]", [], new Map(Object.entries(external)));
   }
 
   private static lock(name: string, version: string, fields: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {

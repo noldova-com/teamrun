@@ -86,6 +86,12 @@ export default class PackageManifest {
       new Map(external.map(([name, version]) => [name, String(version)])));
   }
 
+  public static formatName(directory: string): string {
+    return PackageManifest.isFixtureDirectory(directory)
+      ? PackageNaming.nameFixturePackage(directory.slice(PackageManifest.FIXTURE_PREFIX.length))
+      : PackageNaming.nameSourcePackage(directory);
+  }
+
   public get id(): string {
     const folder = this.isFixture
       ? `${PackageManifest.FIXTURE_ID_PREFIX}${this.directory.slice(PackageManifest.FIXTURE_PREFIX.length)}`
@@ -101,9 +107,4 @@ export default class PackageManifest {
     return directory.startsWith(PackageManifest.FIXTURE_PREFIX);
   }
 
-  private static formatName(directory: string): string {
-    return PackageManifest.isFixtureDirectory(directory)
-      ? PackageNaming.nameFixturePackage(directory.slice(PackageManifest.FIXTURE_PREFIX.length))
-      : PackageNaming.nameSourcePackage(directory);
-  }
 }
