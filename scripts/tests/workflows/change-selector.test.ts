@@ -15,13 +15,13 @@ import PackageCatalog from "../../packages/package-catalog.ts";
 import PackageManifest from "../../packages/package-manifest.ts";
 import ChangeSelection from "../../workflows/change-selection.ts";
 import ChangeSelector from "../../workflows/change-selector.ts";
+import PackageNameFixture from "../fixtures/package-name.fixture.ts";
 import SourceTreeFixture from "../fixtures/source-tree.fixture.ts";
 
 class ChangeSelectorTests {
-  private static readonly PREFIX: string = "@noldova/teamrun-";
   private static readonly RELATIVE_IMPORT: RegExp = /(?:\bfrom |^import )"(\.[^"]+)"/gm;
   private static readonly ANY_IMPORT: RegExp = /(?:\bfrom |^import |\bimport\()["']/m;
-  private static readonly PACKAGE_IMPORT: RegExp = /(?:\bfrom |^import )"(@noldova\/teamrun-[a-z-]+)"/gm;
+  private static readonly PACKAGE_IMPORT: RegExp = /(?:\bfrom |^import )"(@noldova\/[a-z-]+)"/gm;
   private static readonly GRAPH: readonly (readonly [string, readonly string[]])[] = [
     ["foundation/core", []],
     ["foundation/exceptions", ["foundation-core"]],
@@ -153,7 +153,7 @@ class ChangeSelectorTests {
 
   private static createPackages(): PackageManifest[] {
     return ChangeSelectorTests.GRAPH.map(([directory, dependencies]) =>
-      new PackageManifest(`src/${directory}`, `${ChangeSelectorTests.PREFIX}${directory.replace("/", "-")}`, dependencies.map(t => `${ChangeSelectorTests.PREFIX}${t}`)));
+      new PackageManifest(`src/${directory}`, PackageManifest.formatName(`src/${directory}`), dependencies.map(t => PackageNameFixture.forId(t))));
   }
 
   private static createSelector(): ChangeSelector {
@@ -162,7 +162,7 @@ class ChangeSelectorTests {
 
   private static assertSelection(selection: ChangeSelection, packages: readonly string[], runsAngularTests: boolean, runsScriptTests: boolean, uiWorkflows: readonly string[] | undefined): void {
     assert.deepEqual([selection.isEverything, selection.tests?.packages, selection.tests?.runsAngularTests, selection.tests?.runsScriptTests, selection.uiWorkflows],
-      [false, packages.map(t => `${ChangeSelectorTests.PREFIX}${t}`), runsAngularTests, runsScriptTests, uiWorkflows], selection.summary);
+      [false, packages.map(t => PackageNameFixture.forId(t)), runsAngularTests, runsScriptTests, uiWorkflows], selection.summary);
   }
 }
 

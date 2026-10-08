@@ -12,6 +12,7 @@ import { test, type TestContext } from "node:test";
 import PackageLayoutCheck from "../../checks/package-layout-check.ts";
 import ModuleCatalog from "../../modules/module-catalog.ts";
 import PackageCatalog from "../../packages/package-catalog.ts";
+import PackageManifest from "../../packages/package-manifest.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
@@ -74,9 +75,7 @@ class PackageLayoutCheckTests {
     t.after(() => repository.disposeAsync());
     const files: Record<string, string> = {};
     for (const [directory, present] of Object.entries(packages)) {
-      const name = directory.startsWith(`${ModuleCatalog.FIXTURE_FOLDER}/`)
-        ? `@noldova/teamrun-fixture-${directory.slice(ModuleCatalog.FIXTURE_FOLDER.length + 1).split("/").join("-")}`
-        : `@noldova/teamrun-${directory.slice("src/".length).split("/").join("-")}`;
+      const name = PackageManifest.formatName(directory);
       files[`${directory}/package.json`] = `${JSON.stringify({ name, version: "__VERSION__" })}\n`;
       for (const file of present)
         files[`${directory}/${file}`] = "{}\n";

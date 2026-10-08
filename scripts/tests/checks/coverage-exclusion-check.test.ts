@@ -11,6 +11,7 @@ import { test, type TestContext } from "node:test";
 
 import CoverageExclusionCheck from "../../checks/coverage-exclusion-check.ts";
 import PackageCatalog from "../../packages/package-catalog.ts";
+import PackageManifest from "../../packages/package-manifest.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
@@ -102,7 +103,7 @@ class CoverageExclusionCheckTests {
     if (contract !== null)
       files["docs/TESTING.md"] = `${contract}\n`;
     for (const [directory, exclusions] of Object.entries(packages)) {
-      const name = `@noldova/teamrun-${directory.slice("src/".length).split("/").join("-")}`;
+      const name = PackageManifest.formatName(directory);
       files[`${directory}/package.json`] = `${JSON.stringify({ name, version: "__VERSION__", ...exclusions === undefined ? {} : { teamrun: { coverageExclusions: exclusions } } })}\n`;
     }
     await repository.writeAsync(files);

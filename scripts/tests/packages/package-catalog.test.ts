@@ -11,7 +11,9 @@ import { test, type TestContext } from "node:test";
 
 import ModuleCatalog from "../../modules/module-catalog.ts";
 import PackageCatalog from "../../packages/package-catalog.ts";
+import PackageManifest from "../../packages/package-manifest.ts";
 import PackageException from "../../packages/package.exception.ts";
+import PackageNameFixture from "../fixtures/package-name.fixture.ts";
 import RepositoryFixture from "../fixtures/repository.fixture.ts";
 
 class PackageCatalogTests {
@@ -91,9 +93,9 @@ class PackageCatalogTests {
     const files: Record<string, string> = {};
     for (const [directory, dependencies] of Object.entries(packages))
       files[`${directory}/package.json`] = JSON.stringify({
-        name: `@noldova/teamrun-${directory.slice("src/".length).replaceAll("/", "-")}`,
+        name: PackageManifest.formatName(directory),
         version: "__VERSION__",
-        dependencies: Object.fromEntries(dependencies.map(t => [`@noldova/teamrun-${t}`, "__VERSION__"]))
+        dependencies: Object.fromEntries(dependencies.map(t => [PackageNameFixture.forId(t), "__VERSION__"]))
       });
     await repository.writeAsync(files);
     return repository;
