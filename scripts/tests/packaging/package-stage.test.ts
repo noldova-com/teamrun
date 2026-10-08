@@ -73,7 +73,7 @@ class PackageStageTests {
       });
       assert.deepEqual((await readdir(path.join(folder, "node_modules", "@noldova"))).sort(), [
         "teamrun-foundation-alpha", "teamrun-foundation-beta", "teamrun-modules-tasks-cli", "teamrun-modules-tasks-runtime", "teamrun-shell-cli", "teamrun-shell-desktop"
-      ]);
+      ].sort());
       assert.equal(JSON.parse(await readFile(path.join(folder, "node_modules", "@noldova", "teamrun-modules-tasks-runtime", "package.json"), "utf8")).version, "0.3.0");
       assert.equal(existsSync(path.join(folder, "node_modules", "electron")), false);
       assert.equal(await readFile(path.join(folder, "_build", "window", "browser", "index.html"), "utf8"), PackagedBuildFixture.WINDOW);

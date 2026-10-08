@@ -34,7 +34,7 @@ class PackageManifestTests {
       assert.equal(window.directory, "src/modules/terminal/window");
       assert.equal(window.name, "@noldova/teamrun-modules-terminal-window");
       assert.equal(window.id, "modules-terminal-window");
-      assert.deepEqual(window.dependencies, ["@noldova/teamrun-foundation-core", "@noldova/teamrun-shell-ui"]);
+      assert.deepEqual(window.dependencies, ["@noldova/teamrun-shell-ui", "@noldova/teamrun-foundation-core"].sort());
       assert.deepEqual(window.externalDependencies, new Map([["@xterm/headless", "6.0.0"]]));
       assert.deepEqual(core.dependencies, []);
       assert.deepEqual(core.externalDependencies, new Map());
@@ -68,7 +68,7 @@ class PackageManifestTests {
 
     test("a name that does not follow the package's path is refused", () => {
       assert.throws(
-        () => new PackageManifest("src/shell/ui", "@noldova/teamrun-ui", []),
+        () => new PackageManifest("src/shell/ui", PackageManifest.formatName("src/shell/kit"), []),
         new PackageException("src/shell/ui/package.json must be named \"@noldova/teamrun-shell-ui\", the package's path below src/ joined with hyphens."));
     });
 

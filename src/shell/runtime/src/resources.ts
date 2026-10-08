@@ -665,6 +665,10 @@ export class Resources {
     return `The build's product file ${file} is not valid: ${reason}`;
   }
 
+  public static formatCheckoutVariable(slug: string): string {
+    return `${slug.toUpperCase().replaceAll("-", "_")}_CHECKOUT`;
+  }
+
   public static formatDeclarationsUnreadable(file: string, reason: string): string {
     return `The module declarations ${file} are not valid: ${reason}`;
   }

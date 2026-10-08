@@ -67,7 +67,7 @@ class ConceptFileCheckTests {
       const runtime = ConceptFileCheckTests.RUNTIME;
       await repository.writeAsync({
         "package.json": ConceptFileCheckTests.MANIFEST,
-        "scripts/teamrun.ts": "export default class TeamRunCommand {}\n",
+        "scripts/tools/launcher.ts": "export default class LaunchCommand {}\n",
         "scripts/api/api-symbol.walker.ts": "export default class ApiSymbolWalker {}\n",
         "scripts/repository/git-hub-api.ts": "export default class GitHubApi {}\n",
         "scripts/shapes/pair.ts": "class Pair {}\ninterface IPair {}\n",
@@ -87,7 +87,7 @@ class ConceptFileCheckTests {
         `scripts/shapes/many.ts: declares 3 concepts, (anonymous), Many, Count${rule}`,
         `scripts/shapes/nameless.ts:3: declares a class without a name to name the file for${rule}`,
         `scripts/shapes/pair.ts: declares 2 concepts, Pair, IPair${rule}`,
-        `scripts/teamrun.ts:1: TeamRunCommand is not in its file teamrun-command.ts${rule}`,
+        `scripts/tools/launcher.ts:1: LaunchCommand is not in its file launch-command.ts${rule}`,
         `src/shell/desktop/src/preload.cts:1: PreloadBridge is not in its file preload-bridge.cts${rule}`,
         `${runtime}/interfaces/event-sink.ts:1: IEventSink is not in its file i-event-sink.ts${rule}`,
         `${runtime}/services/settings/settings-service.ts:1: SettingsService is not in its file settings.service.ts${rule}`,

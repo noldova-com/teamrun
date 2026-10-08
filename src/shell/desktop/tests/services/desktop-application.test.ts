@@ -2760,8 +2760,8 @@ export class DesktopApplicationTests {
       electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, ""),
       electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, 5),
       electron.ipcMain.invoke("teamrun:replaceMisspelling", trusted, "x".repeat(101)),
-      electron.ipcMain.invoke("teamrun:addToDictionary", trusted, "TeamRun"),
-      electron.ipcMain.invoke("teamrun:addToDictionary", untrusted, "TeamRun"),
+      electron.ipcMain.invoke("teamrun:addToDictionary", trusted, "Studio"),
+      electron.ipcMain.invoke("teamrun:addToDictionary", untrusted, "Studio"),
       electron.ipcMain.invoke("teamrun:addToDictionary", trusted, "two words"),
       electron.ipcMain.invoke("teamrun:addToDictionary", trusted, "x".repeat(101)),
       electron.ipcMain.invoke("teamrun:addToDictionary", trusted, 5)
@@ -2773,7 +2773,7 @@ export class DesktopApplicationTests {
     ]), JSON.stringify(contents.sent.filter(t => t[0] === "teamrun:fieldMenu")));
     Assert.areEqual("true,false,false,false,false,true,false,false,false,false", answers.join(","));
     Assert.areEqual("replaceMisspelling world", contents.calls.filter(t => t.startsWith("replace")).join("|"));
-    Assert.areEqual("add TeamRun", electron.defaultSession.spellCalls.filter(t => t.startsWith("add")).join("|"));
+    Assert.areEqual("add Studio", electron.defaultSession.spellCalls.filter(t => t.startsWith("add")).join("|"));
   }
 
   @TestMethod

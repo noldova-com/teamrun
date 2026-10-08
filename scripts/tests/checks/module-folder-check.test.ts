@@ -36,8 +36,9 @@ class ModuleFolderCheckTests {
     test("invalid or reserved ids, missing documents and stray files fail the check", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
+      const reserved = "shell";
       await repository.writeAsync({
-        "src/modules/shell/README.md": "# Shell\n",
+        [`src/modules/${reserved}/README.md`]: "# Reserved\n",
         "src/modules/Bad_Id/README.md": "# Bad\n",
         "src/modules/-dash/README.md": "# Dash\n",
         "src/modules/notes.md": "# Notes\n"
@@ -49,11 +50,13 @@ class ModuleFolderCheckTests {
 
       assert.equal(passed, false);
       assert.equal(output.text, [
-        "src/modules/-dash: \"-dash\" is not a module id; an id is lowercase kebab-case and not \"shell\".",
-        "src/modules/Bad_Id: \"Bad_Id\" is not a module id; an id is lowercase kebab-case and not \"shell\".",
-        "src/modules/empty has no README.md.",
-        "src/modules/notes.md is not a module folder.",
-        "src/modules/shell: \"shell\" is not a module id; an id is lowercase kebab-case and not \"shell\".",
+        ...[
+          `src/modules/-dash: "-dash" is not a module id; an id is lowercase kebab-case and not "${reserved}".`,
+          `src/modules/Bad_Id: "Bad_Id" is not a module id; an id is lowercase kebab-case and not "${reserved}".`,
+          "src/modules/empty has no README.md.",
+          "src/modules/notes.md is not a module folder.",
+          `src/modules/${reserved}: "${reserved}" is not a module id; an id is lowercase kebab-case and not "${reserved}".`
+        ].sort(),
         "Checked 5 module folders.",
         ""
       ].join("\n"));

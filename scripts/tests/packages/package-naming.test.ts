@@ -31,12 +31,18 @@ class PackageNamingTests {
       assert.equal(PackageNaming.locateModulePrefix("notes", false), "@noldova/teamrun-modules-notes-");
     });
 
-    test("the repository's own packages are those of the table, and foundation's and the shell's are the published ones", () => {
-      const names = ["@noldova/teamrun-foundation-core", "@noldova/teamrun-shell-cli", "@noldova/teamrun-modules-notes-cli", "@noldova/teamrun-fixture-clock-cli", "@noldova/teamrun-scripts", "@angular/core"];
+    test("the repository's own packages are those of the table", () => {
+      const names = ["@noldova/teamrun-foundation-core", "@noldova/teamrun-shell-cli", "@noldova/teamrun-modules-notes-cli", "@noldova/teamrun-fixture-clock-cli", "@noldova/scripts", "@angular/core"];
 
       assert.deepEqual(names.map(t => PackageNaming.isOwn(t)), [true, true, true, true, false, false]);
-      assert.deepEqual(names.map(t => PackageNaming.isPublished(t)), [true, true, false, false, false, false]);
       assert.equal(PackageNaming.SCOPE, "@noldova/");
+    });
+
+    test("a file in a folder of foundation or the shell belongs to that folder's published package, and other files to none", () => {
+      const files = ["src/foundation/core/src/index.ts", "src/shell/window/src/app/app.ts", "src/shell/desktop/tests/e2e/fixtures/modules/clock/runtime/package.json", "src/shell/README.md", "src/modules/notes/runtime/src/index.ts", "scripts/test.ts"];
+
+      assert.deepEqual(files.map(t => PackageNaming.locatePublishedPackage(t)),
+        [PackageNaming.nameSourcePackage("src/foundation/core"), PackageNaming.nameSourcePackage("src/shell/window"), PackageNaming.nameSourcePackage("src/shell/desktop"), null, null, null]);
     });
   }
 }

@@ -40,7 +40,8 @@ class ModuleImportCheckTests {
         "src/modules/notes/loose.ts": "import \"./other.ts\";\n",
         "src/modules/notes/window/tests/view.spec.ts": "import \"../../../other/window/src/internal.ts\";\n",
         "src/modules/notes/window/src/styles.scss": "@import \"../../../other/theme\";\n",
-        "src/shell/window/src/app.ts": "import \"../../../modules/notes/window/src/view.ts\";\n"
+        "src/shell/window/src/app.ts": "import \"../../../modules/notes/window/src/view.ts\";\n",
+        "src/foundation/core/src/index.ts": "export {};\n"
       });
       const output = new TextOutputFixture();
 
@@ -51,7 +52,7 @@ class ModuleImportCheckTests {
       assert.equal(check.title, "Module imports");
     });
 
-    test("imports from outside the package, inside another package's API, of another module, of a fixture module or of other TeamRun packages fail", async t => {
+    test("imports from outside the package, inside another package's API, of another module, of a fixture module or of other TeamRun packages, such as one of no shell folder, fail", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
@@ -68,8 +69,11 @@ class ModuleImportCheckTests {
           "import \"@noldova/teamrun-scripts\";",
           "import \"@noldova/teamrun-fixture-clock-runtime\";",
           "import \"@noldova/teamrun-modules-clock-runtime\";",
+          "import \"@noldova/teamrun-shell-other\";",
           ""
-        ].join("\n")
+        ].join("\n"),
+        "src/shell/window/src/app.ts": "export {};\n",
+        "src/foundation/core/src/index.ts": "export {};\n"
       });
       const output = new TextOutputFixture();
 
@@ -88,6 +92,7 @@ class ModuleImportCheckTests {
         `${file}:7: the import "@noldova/teamrun-scripts" is not a TeamRun package a module may use${rule}`,
         `${file}:8: the import "@noldova/teamrun-fixture-clock-runtime" is not a TeamRun package a module may use${rule}`,
         `${file}:9: the import "@noldova/teamrun-modules-clock-runtime" is not a TeamRun package a module may use${rule}`,
+        `${file}:10: the import "@noldova/teamrun-shell-other" is not a TeamRun package a module may use${rule}`,
         "Checked the imports of 1 production script files of modules.",
         ""
       ].join("\n"));
