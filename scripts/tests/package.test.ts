@@ -103,13 +103,11 @@ class PackageTests {
   private static readonly STAGED: string = "The packaged window holds no Gallery.\nPackages in the stage: @noldova/teamrun-foundation-beta, "
     + "@noldova/teamrun-foundation-alpha, @noldova/teamrun-shell-cli, @noldova/teamrun-shell-desktop.\nThird-party packages in the stage: none.\n";
 
-  private static archives: PackageArchivesFixture | null = null;
+  private static archives: Promise<PackageArchivesFixture> | null = null;
 
   public static register(): void {
-    before(async () => {
-      PackageTests.archives = await PackageArchivesFixture.createAsync();
-    });
-    after(() => PackageTests.archives?.disposeAsync());
+    before(() => PackageTests.archives = PackageArchivesFixture.createAsync());
+    after(() => PackageTests.archives?.then(t => t.disposeAsync()));
 
     test("packaging stages the app, writes the configuration for the host and runs electron-builder with its own CommonJS tool cache, no signing identity and only the variables it needs",
       { timeout: PackageTests.TIMEOUT }, async t => {
@@ -462,7 +460,7 @@ class PackageTests {
     const repository = await RepositoryFixture.createAsync();
     t.after(() => repository.disposeAsync());
     assert.ok(PackageTests.archives !== null);
-    await PackageTests.archives.writeSourcesAsync(repository, modules);
+    await (await PackageTests.archives).writeSourcesAsync(repository, modules);
     await repository.writeAsync({
       "node_modules/electron/package.json": JSON.stringify({ name: "electron", version: "44.5.1" }),
       "node_modules/electron/dist/electron": "program\n"

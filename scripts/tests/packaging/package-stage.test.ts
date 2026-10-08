@@ -32,13 +32,11 @@ class PackageStageTests {
   private static readonly TIMEOUT: number = 120_000;
   private static readonly TARGET: PackageTarget = PackageTarget.fromProcess(process.platform, process.arch);
 
-  private static archives: PackageArchivesFixture | null = null;
+  private static archives: Promise<PackageArchivesFixture> | null = null;
 
   public static register(): void {
-    before(async () => {
-      PackageStageTests.archives = await PackageArchivesFixture.createAsync();
-    });
-    after(() => PackageStageTests.archives?.disposeAsync());
+    before(() => PackageStageTests.archives = PackageArchivesFixture.createAsync());
+    after(() => PackageStageTests.archives?.then(t => t.disposeAsync()));
 
     test("the stage is built with --packaged, holds the shipped packages, the modules' runtime and CLI parts among them, from the build's archives without the Electron the desktop runs in, and the identity's files, and leaves the Gallery file as development had it", { timeout: PackageStageTests.TIMEOUT }, async t => {
       const repository = await PackageStageTests.createAsync(t, ["tasks", "notes"]);
@@ -198,7 +196,7 @@ class PackageStageTests {
     const repository = await RepositoryFixture.createAsync();
     t.after(() => repository.disposeAsync());
     assert.ok(PackageStageTests.archives !== null);
-    await PackageStageTests.archives.writeSourcesAsync(repository, modules, variant);
+    await (await PackageStageTests.archives).writeSourcesAsync(repository, modules, variant);
     return repository;
   }
 }
