@@ -20,16 +20,14 @@ import TarballServerFixture from "../fixtures/tarball-server.fixture.ts";
 import TarballFixture from "../fixtures/tarball.fixture.ts";
 
 class ThirdPartyPackageTests {
-  private static server: TarballServerFixture | null = null;
+  private static server: Promise<TarballServerFixture> | null = null;
 
   public static register(): void {
-    before(async () => {
-      ThirdPartyPackageTests.server = await TarballServerFixture.startAsync();
-    });
-    after(() => ThirdPartyPackageTests.server?.disposeAsync());
+    before(() => ThirdPartyPackageTests.server = TarballServerFixture.startAsync());
+    after(() => ThirdPartyPackageTests.server?.then(t => t.disposeAsync()));
 
     test("a package's tarball is downloaded from its locked URL, checked against its SHA-512, kept, and gives its license and license files", async t => {
-      const server = ThirdPartyPackageTests.getServer();
+      const server = await ThirdPartyPackageTests.getServerAsync();
       const folder = await ThirdPartyPackageTests.createFolderAsync(t);
       const data = TarballFixture.packFiles({ "package.json": ThirdPartyPackageTests.manifest("@scope/fixture", "1.0.0", "(MIT OR Apache-2.0)"), "LICENSE-MIT": "MIT text\n", "COPYING": " Copying text ",
         "index.js": "" });
@@ -47,7 +45,7 @@ class ThirdPartyPackageTests {
     });
 
     test("license files are named LICENSE, LICENCE, COPYING or UNLICENSE, with an -id or _id after or an id- or id_ before, and no extension or .md, .txt or .markdown", async t => {
-      const server = ThirdPartyPackageTests.getServer();
+      const server = await ThirdPartyPackageTests.getServerAsync();
       const folder = await ThirdPartyPackageTests.createFolderAsync(t);
       const taken = ["LICENSE", "licence.md", "LICENSE_MIT", "LICENSE-Apache-2.0.txt", "MIT-LICENSE", "BSD_licence.markdown", "UNLICENSE", "COPYING.txt"];
       const left = ["license.js", "license.json", "LICENSE.html", "LICENSE-notes.js", "LICENSES", "README.md", "COPYING.LESSER"];
@@ -60,7 +58,7 @@ class ThirdPartyPackageTests {
     });
 
     test("a kept tarball that matches is used without downloading it again, and one that does not is downloaded again", async t => {
-      const server = ThirdPartyPackageTests.getServer();
+      const server = await ThirdPartyPackageTests.getServerAsync();
       const folder = await ThirdPartyPackageTests.createFolderAsync(t);
       const data = ThirdPartyPackageTests.pack("kept", "2.0.0", "MIT");
       const locked = new LockedPackage("node_modules/kept", server.lock("kept.tgz", data, { version: "2.0.0" }));
@@ -76,7 +74,7 @@ class ThirdPartyPackageTests {
     });
 
     test("a tarball whose SHA-512 differs from the lockfile's is refused and not kept", async t => {
-      const server = ThirdPartyPackageTests.getServer();
+      const server = await ThirdPartyPackageTests.getServerAsync();
       const folder = await ThirdPartyPackageTests.createFolderAsync(t);
       const locked = new LockedPackage("node_modules/swapped", server.lock("swapped.tgz", ThirdPartyPackageTests.pack("swapped", "1.0.0", "MIT"), { version: "1.0.0" }));
       server.publish("swapped.tgz", ThirdPartyPackageTests.pack("swapped", "1.0.0", "ISC"));
@@ -87,7 +85,7 @@ class ThirdPartyPackageTests {
     });
 
     test("a tarball that cannot be downloaded is refused with the URL and the reason", async t => {
-      const server = ThirdPartyPackageTests.getServer();
+      const server = await ThirdPartyPackageTests.getServerAsync();
       const folder = await ThirdPartyPackageTests.createFolderAsync(t);
       const missing = new LockedPackage("node_modules/missing", { version: "1.0.0", resolved: server.locate("missing.tgz"), integrity: "sha512-AAAA" });
       const closed = new LockedPackage("node_modules/closed", { version: "1.0.0", resolved: await TarballServerFixture.locateClosedAsync("closed.tgz"), integrity: "sha512-AAAA" });
@@ -101,7 +99,7 @@ class ThirdPartyPackageTests {
     });
 
     test("a tarball whose package.json is missing, unreadable, not an object, or names another package or version is refused and named", async t => {
-      const server = ThirdPartyPackageTests.getServer();
+      const server = await ThirdPartyPackageTests.getServerAsync();
       const folder = await ThirdPartyPackageTests.createFolderAsync(t);
       const cases: readonly (readonly [string, Buffer, (resolved: string) => string])[] = [
         ["bare", TarballFixture.packFiles({ "LICENSE": "text" }), u => `The tarball of bare@1.0.0 from ${u} has no package.json, so it cannot ship.`],
@@ -119,7 +117,7 @@ class ThirdPartyPackageTests {
     });
 
     test("a package without a license, with one outside the list or without a license file is refused and named", async t => {
-      const server = ThirdPartyPackageTests.getServer();
+      const server = await ThirdPartyPackageTests.getServerAsync();
       const folder = await ThirdPartyPackageTests.createFolderAsync(t);
       const allowed = "one of MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, 0BSD, BlueOak-1.0.0, Python-2.0, or an OR expression with one of them";
       const cases: readonly (readonly [string, Buffer, string])[] = [
@@ -137,7 +135,7 @@ class ThirdPartyPackageTests {
     });
 
     test("a package whose tarball has no license file ships the reviewed text kept for its exact version, and another version of it is refused", async t => {
-      const server = ThirdPartyPackageTests.getServer();
+      const server = await ThirdPartyPackageTests.getServerAsync();
       const folder = await ThirdPartyPackageTests.createFolderAsync(t);
       const reviewed = path.join(folder, "reviewed");
       await mkdir(reviewed);
@@ -155,7 +153,7 @@ class ThirdPartyPackageTests {
     });
   }
 
-  private static getServer(): TarballServerFixture {
+  private static getServerAsync(): Promise<TarballServerFixture> {
     assert.ok(ThirdPartyPackageTests.server !== null);
     return ThirdPartyPackageTests.server;
   }
