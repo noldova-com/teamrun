@@ -208,7 +208,7 @@ describe("SettingsComponent", () => {
     expect(offsets).toEqual([0, 0, 0]);
   });
 
-  it("starts and ends the shortcuts table's text, actions and row lines at the column's content edges at its reading width, and Reset all beside the explanation", async () => {
+  it("starts and ends the shortcuts table's text, actions and row lines at the column's content edges, whether or not the column has reached its reading width, with one-word names in the From column, and Reset all beside the explanation", async () => {
     const host = render();
     await page.getByRole("treeitem", { name: "Keyboard shortcuts" }).click();
     fixture.detectChanges();
@@ -222,7 +222,7 @@ describe("SettingsComponent", () => {
     const rows = [...(host.querySelector(".tr-shortcuts-table") as HTMLTableElement).rows];
     const actions = rows.flatMap(t => [...(t.cells[t.cells.length - 1] as HTMLTableCellElement).querySelectorAll("button")].slice(-1));
     const textEnd = (): number => column.getBoundingClientRect().right - parseFloat(getComputedStyle(column).paddingRight);
-    const offsets = ["100rem"].map(width => {
+    const offsets = ["100rem", "60rem"].map(width => {
       host.style.width = width;
       const start = textLeft(heading);
       const end = textEnd();
@@ -242,7 +242,7 @@ describe("SettingsComponent", () => {
     expect(rows.every(t => getComputedStyle(t.cells[0] as HTMLTableCellElement).borderBottomStyle === "solid")).toBe(true);
   });
 
-  for (const owner of ["Clock", "Clockwork Almanac"])
+  for (const [owner, isWideAt60] of [["Clock", false], ["Clockwork Almanac", true]] as const)
     it(`scrolls its content sideways, under its own scrollbar at the pane's bottom edge, whenever Keyboard shortcuts is wider than the column, with every row's actions within its scroll and the table scrolling nothing itself, at 40rem, 60rem and 100rem with "${owner}" in the From column`, async () => {
       ModuleStatusFixture.report(ModuleStatusFixture.create("clock", owner));
       const host = render(ThemeMode.Light, "30rem");
@@ -268,7 +268,7 @@ describe("SettingsComponent", () => {
       AppearanceFixture.expectLook(getComputedStyle(content, "::-webkit-scrollbar").height, DefaultTheme.theme, "scrollbar-size", "height");
       expect(views).toEqual([
         ["40rem", true, 0, 0],
-        ["60rem", owner.includes(" ") || views[1]?.[1] === true, 0, 0],
+        ["60rem", isWideAt60, 0, 0],
         ["100rem", false, 0, 0]
       ]);
     });
