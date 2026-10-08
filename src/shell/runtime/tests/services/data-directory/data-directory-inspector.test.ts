@@ -69,7 +69,7 @@ export class DataDirectoryInspectorTests {
     const inspection = await DataDirectoryInspector.inspectAsync(directory);
 
     Assert.areEqual(DataDirectoryState.PreShell, inspection.state);
-    Assert.areEqual("attachments,runtime.lock,runtime.lock.sqlite,teamrun.db", inspection.entries.join(","));
+    Assert.areEqual(["attachments", "runtime.lock", "runtime.lock.sqlite", "teamrun.db"].sort().join(","), inspection.entries.join(","));
   }
 
   @TestMethod
@@ -84,7 +84,7 @@ export class DataDirectoryInspectorTests {
 
     Assert.areEqual(path.join(folder.path, "teamrun-before-shell-20261001T123456Z"), destination);
     Assert.isTrue((await readdir(directory.root)).every(t => ["discovery", "ownership.sqlite", "ownership.sqlite-journal"].includes(t)));
-    Assert.areEqual("attachments,runtime.lock,runtime.lock.sqlite,teamrun.db", (await readdir(destination ?? "")).sort().join(","));
+    Assert.areEqual(["attachments", "runtime.lock", "runtime.lock.sqlite", "teamrun.db"].sort().join(","), (await readdir(destination ?? "")).sort().join(","));
     Assert.areEqual("old records", await readFile(path.join(destination ?? "", "teamrun.db"), "utf8"));
     Assert.areEqual(DataDirectoryState.Empty, (await DataDirectoryInspector.inspectAsync(directory)).state);
   }

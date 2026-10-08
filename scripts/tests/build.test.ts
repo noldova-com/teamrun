@@ -21,6 +21,7 @@ import BuildVariant from "../modules/build-variant.ts";
 import ModuleArtifacts from "../modules/module-artifacts.ts";
 import ModuleCatalog from "../modules/module-catalog.ts";
 import PackageBuild from "../packages/package-build.ts";
+import PackageManifest from "../packages/package-manifest.ts";
 import ProcessException from "../processes/process.exception.ts";
 import ProcessRunner from "../processes/process-runner.ts";
 import NpmCommand from "../toolchain/npm-command.ts";
@@ -184,7 +185,7 @@ class BuildTests {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await PackageTreeFixture.writeRootAsync(repository);
-      await repository.writeAsync({ "src/shell/ui/package.json": "{ \"name\": \"@noldova/teamrun-ui\", \"version\": \"__VERSION__\" }\n" });
+      await repository.writeAsync({ "src/shell/ui/package.json": `${JSON.stringify({ name: PackageManifest.formatName("src/shell/kit"), version: "__VERSION__" })}\n` });
       const invalid = new TextOutputFixture();
       assert.equal(await BuildTests.create(repository.directory, invalid, process.env).runAsync([]), 1);
 

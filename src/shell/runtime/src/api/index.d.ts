@@ -4670,6 +4670,13 @@ export declare class ProductInfo {
   public readonly dataDirectoryVariable: string;
 
   /**
+   * The environment variable that names the development checkout the command
+   * line runs from: the slug in upper case, with `_` for each `-`, followed by
+   * `_CHECKOUT`.
+   */
+  public readonly checkoutVariable: string;
+
+  /**
    * The folder of the product's icons, relative to the repository, its
    * segments separated by `/`.
    */

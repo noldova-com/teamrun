@@ -41,9 +41,9 @@ export class ProductInfoTests {
 
       Assert.areEqual(
         "Fixture Studio|fixture-studio|org.fixtureworks.studio|org.fixtureworks.studio.development|.fixtureworks/studio|Fixture Works/Studio|Fixture Works/Studio Mac|" +
-          "fixtureworks/studio|FIXTURE_STUDIO_DATA_DIR|assets/fixture-icons|CN=Fixture Works, O=Fixture Works, C=US|https://example.com/feed/|1.2.3|abc123",
+          "fixtureworks/studio|FIXTURE_STUDIO_DATA_DIR|FIXTURE_STUDIO_CHECKOUT|assets/fixture-icons|CN=Fixture Works, O=Fixture Works, C=US|https://example.com/feed/|1.2.3|abc123",
         [product.name, product.slug, product.applicationId, product.developmentApplicationId, product.dataFolder, product.windowsDeviceFolder,
-          product.macosDeviceFolder, product.linuxDeviceFolder, product.dataDirectoryVariable, product.icons, product.windowsPublisher, product.updateFeed, product.version,
+          product.macosDeviceFolder, product.linuxDeviceFolder, product.dataDirectoryVariable, product.checkoutVariable, product.icons, product.windowsPublisher, product.updateFeed, product.version,
           product.build].join("|"));
       await writeFile(file, JSON.stringify({ ...ProductInfoTests.PRODUCT, updateFeed: null }));
       Assert.isNull(ProductInfo.read(file).updateFeed);

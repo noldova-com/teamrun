@@ -43,10 +43,11 @@ export default class ModuleImportCheck implements ICheck {
     const dependencies = new Map<string, readonly string[]>(declarations.filter(t => !t.isFixture).map(t => [t.id, t.dependencies]));
     const modulePackages = new Map<string, ModuleDeclaration>(declarations.flatMap(t =>
       ModuleImportCheck.PART_NAMES.map(u => [PackageNaming.nameModulePackage(t.id, u, t.isFixture), t] as const)));
+    const published = new Set<string>(inventory.files.flatMap(t => PackageNaming.locatePublishedPackage(t.path) ?? []));
     const findings: string[] = [];
     for (const file of files)
       for (const literal of new SourceScanner(file.text).scan().imports) {
-        const problem = ModuleImportCheck.findProblem(file, literal.value, dependencies.get(file.owner) ?? [], modulePackages);
+        const problem = ModuleImportCheck.findProblem(file, literal.value, dependencies.get(file.owner) ?? [], modulePackages, published);
         if (problem !== null)
           findings.push(ModuleImportCheck.formatFinding(file, literal, problem));
       }
@@ -57,7 +58,7 @@ export default class ModuleImportCheck implements ICheck {
     return findings.length === 0;
   }
 
-  private static findProblem(file: SourceFile, specifier: string, dependencies: readonly string[], modulePackages: ReadonlyMap<string, ModuleDeclaration>): string | null {
+  private static findProblem(file: SourceFile, specifier: string, dependencies: readonly string[], modulePackages: ReadonlyMap<string, ModuleDeclaration>, published: ReadonlySet<string>): string | null {
     if (specifier.startsWith(ModuleImportCheck.ABSOLUTE_PREFIX))
       return "is an absolute path";
     if (specifier.startsWith(ModuleImportCheck.RELATIVE_PREFIX))
@@ -70,7 +71,7 @@ export default class ModuleImportCheck implements ICheck {
     const packageName = ModuleImportCheck.readPackageName(specifier);
     const module = modulePackages.get(packageName);
     if (module === undefined)
-      return PackageNaming.isPublished(packageName) ? ModuleImportCheck.findApiProblem(specifier, packageName) : ModuleImportCheck.NOT_USABLE;
+      return published.has(packageName) ? ModuleImportCheck.findApiProblem(specifier, packageName) : ModuleImportCheck.NOT_USABLE;
     if (module.isFixture)
       return ModuleImportCheck.NOT_USABLE;
     if (module.id === file.owner)

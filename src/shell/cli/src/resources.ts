@@ -23,7 +23,7 @@ export class Resources {
   }
 
   public static get checkoutVariable(): string {
-    return `${Resources.productSlug.toUpperCase()}_CHECKOUT`;
+    return ProductInfo.current.checkoutVariable;
   }
 
   public static readonly clientName: string = ShellClients.commandLine;
