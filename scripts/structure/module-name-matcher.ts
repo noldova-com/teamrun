@@ -6,16 +6,21 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import PackageNaming from "../packages/package-naming.ts";
+
 export default class ModuleNameMatcher {
-  private static readonly MODULE_PACKAGE: RegExp = /@noldova\/teamrun-modules-[a-z0-9-]*/;
+  private static readonly PACKAGE_END: RegExp = /[^@a-z0-9/-][\s\S]*$/;
   private static readonly NAME_SEPARATOR: string = ".";
 
   private readonly moduleIds: readonly string[];
+  private readonly packagePrefixes: readonly string[];
   private readonly patterns: ReadonlyMap<string, RegExp>;
 
   public constructor(moduleIds: readonly string[]) {
+    const longestFirst = [...moduleIds].sort((first, second) => second.length - first.length);
     this.moduleIds = moduleIds;
-    this.patterns = new Map([...moduleIds].sort((first, second) => second.length - first.length).map(t => [t, new RegExp(`(?<![a-z0-9-])modules/${t}(?![a-z0-9-])|(?<![a-z0-9])tr-${t}(?![a-z0-9])`)]));
+    this.packagePrefixes = longestFirst.map(t => PackageNaming.locateModulePrefix(t, false));
+    this.patterns = new Map(longestFirst.map(t => [t, new RegExp(`(?<![a-z0-9-])modules/${t}(?![a-z0-9-])|(?<![a-z0-9])tr-${t}(?![a-z0-9])`)]));
   }
 
   public findInLiteral(value: string): string | null {
@@ -24,9 +29,11 @@ export default class ModuleNameMatcher {
   }
 
   public findInText(text: string): string | null {
-    const modulePackage = ModuleNameMatcher.MODULE_PACKAGE.exec(text);
-    if (modulePackage !== null)
-      return `the module package "${modulePackage[0]}"`;
+    for (const prefix of this.packagePrefixes) {
+      const start = text.indexOf(prefix);
+      if (start !== -1)
+        return `the module package "${text.slice(start).replace(ModuleNameMatcher.PACKAGE_END, "")}"`;
+    }
 
     for (const [id, pattern] of this.patterns)
       if (pattern.test(text))

@@ -10,6 +10,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import PackageNaming from "../packages/package-naming.ts";
 import type RepositoryFiles from "../repository/repository-files.ts";
 import type ICheck from "./interfaces/i-check.ts";
 
@@ -21,7 +22,6 @@ export default class DependencyPinCheck implements ICheck {
   private static readonly SECTIONS: readonly string[] = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies", "overrides"];
   private static readonly OVERRIDES: string = "overrides";
   private static readonly OVERRIDE_SELF: string = ".";
-  private static readonly OWN_PREFIX: string = "@noldova/teamrun-";
   private static readonly OWN_VERSION: string = "__VERSION__";
   private static readonly EXACT_VERSION: RegExp = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
   private static readonly LINE_SEPARATOR: string = "\n";
@@ -92,7 +92,7 @@ export default class DependencyPinCheck implements ICheck {
         findings.push(...DependencyPinCheck.validateEntries(file, `${location} ${name}`, value, true, name));
       else if (typeof value !== "string")
         findings.push(`${file}: ${location} ${name} has no version string.`);
-      else if (dependency.startsWith(DependencyPinCheck.OWN_PREFIX)) {
+      else if (PackageNaming.isOwn(dependency)) {
         if (value !== DependencyPinCheck.OWN_VERSION)
           findings.push(`${file}: ${location} ${name} is "${value}"; TeamRun's own packages take "${DependencyPinCheck.OWN_VERSION}", which the build stamps.`);
       }
@@ -118,10 +118,10 @@ export default class DependencyPinCheck implements ICheck {
 
   private static readShipped(file: string, text: string): readonly (readonly [string, string, string])[] {
     const manifest = DependencyPinCheck.parse(text);
-    if (!DependencyPinCheck.isRecord(manifest) || typeof manifest["name"] !== "string" || !manifest["name"].startsWith(DependencyPinCheck.OWN_PREFIX))
+    if (!DependencyPinCheck.isRecord(manifest) || typeof manifest["name"] !== "string" || !PackageNaming.isOwn(manifest["name"]))
       return [];
     return Object.entries(DependencyPinCheck.readRecord(manifest, DependencyPinCheck.SHIPPED_SECTION))
-      .filter((t): t is [string, string] => !t[0].startsWith(DependencyPinCheck.OWN_PREFIX) && typeof t[1] === "string")
+      .filter((t): t is [string, string] => !PackageNaming.isOwn(t[0]) && typeof t[1] === "string")
       .map(([name, version]) => [file, name, version] satisfies readonly [string, string, string]);
   }
 
