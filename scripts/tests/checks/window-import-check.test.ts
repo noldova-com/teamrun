@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import WindowImportCheck from "../../checks/window-import-check.ts";
+import ModuleCatalog from "../../modules/module-catalog.ts";
 import ProcessRunner from "../../processes/process-runner.ts";
 import Git from "../../repository/git.ts";
 import RepositoryFiles from "../../repository/repository-files.ts";
@@ -19,13 +20,14 @@ import TextOutputFixture from "../fixtures/text-output.fixture.ts";
 
 class WindowImportCheckTests {
   public static register(): void {
-    test("the window side may import the protocol, the kit, foundation and its own files, and other parts are not checked", async t => {
+    test("the window side may import the protocol, the kit, foundation, its own files and packages of no declared module, and other parts are not checked", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
         "src/shell/window/src/app/app.ts": "import { Envelope } from \"@noldova/teamrun-shell-protocol\";\nimport { Button } from \"@noldova/teamrun-shell-ui\";\nimport { Panel } from \"./panel.ts\";\n",
         "src/shell/ui/tests/app/button.spec.ts": "import { JsonReader } from \"@noldova/teamrun-foundation-json\";\n",
-        "src/modules/notes/window/src/view.ts": "import { NotesRequest } from \"@noldova/teamrun-modules-notes-protocol\";\nimport \"../../protocol/src/index.ts\";\n",
+        ...WindowImportCheckTests.declare("notes", false),
+        "src/modules/notes/window/src/view.ts": "import { NotesRequest } from \"@noldova/teamrun-modules-notes-protocol\";\nimport \"../../protocol/src/index.ts\";\nimport \"@noldova/teamrun-modules-ghost-runtime\";\n",
         "src/shell/desktop/tests/e2e/fixtures/modules/clock/window/src/face.ts": "import { Window } from \"@noldova/teamrun-shell-window\";\n",
         "src/shell/desktop/src/main.ts": "import { app } from \"electron\";\nimport { Runtime } from \"@noldova/teamrun-shell-runtime\";\n",
         "src/foundation/core/src/core.ts": "import { app } from \"electron\";\n",
@@ -56,6 +58,8 @@ class WindowImportCheckTests {
           ""
         ].join("\n"),
         "src/shell/ui/src/app/button.ts": "import \"../../../desktop/src/preload.ts\";\n",
+        ...WindowImportCheckTests.declare("notes", false),
+        ...WindowImportCheckTests.declare("clock", true),
         "src/modules/notes/window/src/view.ts": "import \"@noldova/teamrun-modules-notes-runtime\";\nimport \"../../cli/src/command.ts\";\n",
         "src/shell/desktop/tests/e2e/fixtures/modules/clock/window/src/face.ts": "import \"@noldova/teamrun-fixture-clock-runtime\";\nimport \"../../runtime/src/clock.ts\";\n"
       });
@@ -83,9 +87,14 @@ class WindowImportCheckTests {
     });
   }
 
+  private static declare(id: string, isFixture: boolean): Readonly<Record<string, string>> {
+    const folder = isFixture ? ModuleCatalog.FIXTURE_FOLDER : "src/modules";
+    return { [`${folder}/${id}/module.json`]: JSON.stringify({ id, version: "0.0.1", displayName: id, description: "Used by the tests.", parts: [], dependencies: [], contributes: {} }) };
+  }
+
   private static createCheck(repository: RepositoryFixture): WindowImportCheck {
     const directory = repository.directory;
-    return new WindowImportCheck(new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))));
+    return new WindowImportCheck(new SourceTree(directory, new RepositoryFiles(directory, new Git(directory, new ProcessRunner()))), new ModuleCatalog(directory));
   }
 }
 

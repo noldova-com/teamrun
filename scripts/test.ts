@@ -248,7 +248,7 @@ export default class Test {
       new ShellIndependenceCheck(tree),
       new ProductIdentityCheck(tree, () => ProductIdentity.readAsync(this.root)),
       new ModuleImportCheck(tree, modules),
-      new WindowImportCheck(tree),
+      new WindowImportCheck(tree, modules),
       new TestMirrorCheck(this.root, tree),
       new CoverageExclusionCheck(this.root, new PackageCatalog(this.root)),
       new NameUniquenessCheck(tree, modules),

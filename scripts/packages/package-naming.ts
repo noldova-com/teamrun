@@ -20,7 +20,7 @@ export default class PackageNaming {
     ["src/shell", PackageNaming.SHELL_PREFIX],
     ["src/modules", PackageNaming.MODULES_PREFIX]
   ];
-  private static readonly PUBLISHED_PREFIXES: readonly string[] = [PackageNaming.FOUNDATION_PREFIX, PackageNaming.SHELL_PREFIX];
+  private static readonly PUBLISHED_GROUPS: readonly string[] = ["src/foundation", "src/shell"];
   private static readonly OWN_PREFIXES: readonly string[] = [...PackageNaming.GROUPS.map(([, t]) => t), PackageNaming.FIXTURE_PREFIX];
   private static readonly FOLDER_SEPARATOR: string = "/";
   private static readonly NAME_SEPARATOR: string = "-";
@@ -48,8 +48,10 @@ export default class PackageNaming {
     return PackageNaming.OWN_PREFIXES.some(t => name.startsWith(t));
   }
 
-  public static isPublished(name: string): boolean {
-    return PackageNaming.PUBLISHED_PREFIXES.some(t => name.startsWith(t));
+  public static locatePublishedPackage(filePath: string): string | null {
+    const group = PackageNaming.PUBLISHED_GROUPS.find(t => filePath.startsWith(`${t}${PackageNaming.FOLDER_SEPARATOR}`));
+    const [folder, ...rest] = group === undefined ? [] : filePath.slice(group.length + 1).split(PackageNaming.FOLDER_SEPARATOR);
+    return group === undefined || folder === undefined || rest.length === 0 ? null : PackageNaming.nameSourcePackage(`${group}${PackageNaming.FOLDER_SEPARATOR}${folder}`);
   }
 
   private static join(folder: string): string {

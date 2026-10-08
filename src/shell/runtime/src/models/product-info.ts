@@ -29,6 +29,7 @@ export class ProductInfo {
   public readonly macosDeviceFolder: string;
   public readonly linuxDeviceFolder: string;
   public readonly dataDirectoryVariable: string;
+  public readonly checkoutVariable: string;
   public readonly icons: string;
   public readonly windowsPublisher: string;
   public readonly updateFeed: string | null;
@@ -46,6 +47,7 @@ export class ProductInfo {
     this.macosDeviceFolder = folders.readNonBlankString(Resources.macosField);
     this.linuxDeviceFolder = folders.readNonBlankString(Resources.linuxField);
     this.dataDirectoryVariable = reader.readNonBlankString(Resources.dataDirectoryVariableField);
+    this.checkoutVariable = Resources.formatCheckoutVariable(this.slug);
     this.icons = reader.readNonBlankString(Resources.iconsField);
     this.windowsPublisher = reader.readNonBlankString(Resources.windowsPublisherField);
     this.updateFeed = reader.readNullableString(Resources.updateFeedField);

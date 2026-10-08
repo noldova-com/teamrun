@@ -90,7 +90,7 @@ export class DesktopApiTests {
         "WindowState",
         "WindowStateException",
         "WindowStateUnavailableException"
-      ]),
+      ].sort()),
       JSON.stringify(Object.keys(api).sort()));
   }
 }

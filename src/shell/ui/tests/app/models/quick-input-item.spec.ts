@@ -13,12 +13,12 @@ import { TitleSegment } from "../../../src/app/models/title-segment";
 
 describe("QuickInputItem", () => {
   it("holds a choice's id, title, icon, detail, key label and section, which is none by default", () => {
-    const item = new QuickInputItem("shell.closeTab", "Close the tab", "close", "TeamRun", "Ctrl+W");
+    const item = new QuickInputItem("shell.closeTab", "Close the tab", "close", "TaskRun", "Ctrl+W");
 
     expect([item.id, item.title, item.icon, item.detail, item.keyLabel, item.matches, item.detailMatches, item.section])
-      .toEqual(["shell.closeTab", "Close the tab", "close", "TeamRun", "Ctrl+W", [], [], null]);
+      .toEqual(["shell.closeTab", "Close the tab", "close", "TaskRun", "Ctrl+W", [], [], null]);
     expect(new QuickInputItem("shell.closeTab", "Close the tab", null, null, null, [], [], "recently used").section).toBe("recently used");
-    expect([item.segments, item.detailSegments]).toEqual([[new TitleSegment("Close the tab", false)], [new TitleSegment("TeamRun", false)]]);
+    expect([item.segments, item.detailSegments]).toEqual([[new TitleSegment("Close the tab", false)], [new TitleSegment("TaskRun", false)]]);
   });
 
   it("splits its title into runs of matched and unmatched characters", () => {
@@ -31,9 +31,9 @@ describe("QuickInputItem", () => {
   });
 
   it("splits its detail into runs of matched and unmatched characters, and has none without a detail", () => {
-    const item = new QuickInputItem("shell.closeTab", "Close the tab", null, "TeamRun", null, [], [4, 5, 6]);
+    const item = new QuickInputItem("shell.closeTab", "Close the tab", null, "TaskRun", null, [], [4, 5, 6]);
 
-    expect(item.detailSegments).toEqual([new TitleSegment("Team", false), new TitleSegment("Run", true)]);
+    expect(item.detailSegments).toEqual([new TitleSegment("Task", false), new TitleSegment("Run", true)]);
     expect(new QuickInputItem("notes.sync", "Sync", null, null, null).detailSegments).toEqual([]);
   });
 

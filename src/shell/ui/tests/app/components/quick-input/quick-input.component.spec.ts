@@ -377,7 +377,7 @@ describe("QuickInputComponent", () => {
   });
 
   it("shows an option's icon, its title and detail with the matched characters marked in the list highlight and no added space, and its key", async () => {
-    host.items.set([new QuickInputItem("shell.closeTab", "Close the tab", "close", "TeamRun", "Ctrl+W", [6, 7, 8], [4, 5, 6]), new QuickInputItem("notes.sync", "Sync", null, null, null)]);
+    host.items.set([new QuickInputItem("shell.closeTab", "Close the tab", "close", "TaskRun", "Ctrl+W", [6, 7, 8], [4, 5, 6]), new QuickInputItem("notes.sync", "Sync", null, null, null)]);
     fixture.detectChanges();
     await fixture.whenStable();
     const [full, bare] = options();
@@ -387,7 +387,7 @@ describe("QuickInputComponent", () => {
     expect([...full?.querySelectorAll("mark") ?? []].map(t => t.textContent)).toEqual(["the", "Run"]);
     expect([mark.color, mark.fontWeight, mark.backgroundColor]).toEqual([AppearanceFixture.readColor(DefaultTheme.theme, ThemeMode.Light, "list.highlightForeground"), "600", "rgba(0, 0, 0, 0)"]);
     expect([full?.querySelector(".tr-quick-input-title")?.textContent, full?.querySelector(".tr-quick-input-detail")?.textContent, full?.querySelector(".tr-quick-input-key")?.textContent])
-      .toEqual(["Close the tab", "TeamRun", "Ctrl+W"]);
+      .toEqual(["Close the tab", "TaskRun", "Ctrl+W"]);
     expect([bare?.querySelector(".tr-quick-input-icon")?.textContent, bare?.querySelector(".tr-quick-input-detail"), bare?.querySelector(".tr-quick-input-key")]).toEqual(["", null, null]);
     expect(bare?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width).toBe(full?.querySelector(".tr-quick-input-icon")?.getBoundingClientRect().width);
     expect(bare?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left).toBe(full?.querySelector(".tr-quick-input-title")?.getBoundingClientRect().left);

@@ -13,6 +13,8 @@ import * as api from "@noldova/teamrun-shell-cli";
 export class CliApiTests {
   @TestMethod
   public exportsTheCompleteCatalog(): void {
-    Assert.areEqual("Cli,CliCommandException,CliCommandResult,CliContext,CliEntry,DesktopOpener,ExitCode,UsageException", Object.keys(api).sort().join(","));
+    const exportNames = ["Cli", "CliCommandException", "CliCommandResult", "CliContext", "CliEntry", "DesktopOpener", "ExitCode", "UsageException"];
+
+    Assert.areEqual(exportNames.sort().join(","), Object.keys(api).sort().join(","));
   }
 }

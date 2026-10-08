@@ -9,6 +9,8 @@
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import type ModuleCatalog from "../modules/module-catalog.ts";
+import PackageNaming from "../packages/package-naming.ts";
 import type SourceFile from "../structure/source-file.ts";
 import SourceScanner from "../structure/source-scanner.ts";
 import type SourceTree from "../structure/source-tree.ts";
@@ -22,23 +24,33 @@ export default class WindowImportCheck implements ICheck {
   ];
   private static readonly WINDOW_PARTS: ReadonlySet<string> = new Set(["window", "ui"]);
   private static readonly FORBIDDEN_PARTS: ReadonlySet<string> = new Set(["runtime", "desktop", "cli"]);
-  private static readonly FORBIDDEN_PACKAGE: RegExp = /^(?:(?:@noldova\/teamrun-(?:shell-(?:runtime|desktop|cli)|(?:modules|fixture)-.+-(?:runtime|cli))|electron)(?:\/|$)|node:)/;
+  private static readonly FORBIDDEN_MODULE_PARTS: readonly string[] = ["runtime", "cli"];
+  private static readonly FORBIDDEN_PLATFORM: RegExp = /^(?:electron(?:\/|$)|node:)/;
+  private static readonly SHELL_FOLDER: string = "src/shell";
   private static readonly RELATIVE_PREFIX: string = ".";
+  private static readonly SEPARATOR: string = "/";
+  private static readonly PACKAGE_NAME_SEGMENTS: number = 2;
 
   private readonly tree: SourceTree;
+  private readonly modules: ModuleCatalog;
 
   public readonly title: string = "Window imports";
 
-  public constructor(tree: SourceTree) {
+  public constructor(tree: SourceTree, modules: ModuleCatalog) {
     this.tree = tree;
+    this.modules = modules;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
     const files = (await this.tree.readAsync()).files.filter(t => t.isScript && WindowImportCheck.WINDOW_PARTS.has(WindowImportCheck.findPart(t.path) ?? ""));
+    const forbidden = new Set<string>([
+      ...[...WindowImportCheck.FORBIDDEN_PARTS].map(t => PackageNaming.nameSourcePackage(`${WindowImportCheck.SHELL_FOLDER}${WindowImportCheck.SEPARATOR}${t}`)),
+      ...(await this.modules.readAllAsync()).declarations.flatMap(t => WindowImportCheck.FORBIDDEN_MODULE_PARTS.map(u => PackageNaming.nameModulePackage(t.id, u, t.isFixture)))
+    ]);
     const findings: string[] = [];
     for (const file of files)
       for (const literal of new SourceScanner(file.text).scan().imports)
-        if (WindowImportCheck.isForbidden(file, literal.value))
+        if (WindowImportCheck.isForbidden(file, literal.value, forbidden))
           findings.push(`${file.formatLocation(literal.line)}: imports "${literal.value}"; ARCHITECTURE.md section 2 keeps the window, the kit and modules' window parts browser-safe, so they import no runtime, desktop or command-line package, Electron or Node.js module, and reach the runtime through @noldova/teamrun-shell-protocol and the preload bridge.`);
 
     for (const finding of findings)
@@ -47,9 +59,10 @@ export default class WindowImportCheck implements ICheck {
     return findings.length === 0;
   }
 
-  private static isForbidden(file: SourceFile, specifier: string): boolean {
+  private static isForbidden(file: SourceFile, specifier: string, forbidden: ReadonlySet<string>): boolean {
     if (!specifier.startsWith(WindowImportCheck.RELATIVE_PREFIX))
-      return WindowImportCheck.FORBIDDEN_PACKAGE.test(specifier);
+      return WindowImportCheck.FORBIDDEN_PLATFORM.test(specifier)
+        || forbidden.has(specifier.split(WindowImportCheck.SEPARATOR).slice(0, WindowImportCheck.PACKAGE_NAME_SEGMENTS).join(WindowImportCheck.SEPARATOR));
     const part = WindowImportCheck.findPart(`${path.posix.join(path.posix.dirname(file.path), specifier)}/`);
     return part !== null && WindowImportCheck.FORBIDDEN_PARTS.has(part);
   }

@@ -25,14 +25,14 @@ export class InstallationTests {
 
   @TestMethod
   public isNamedByItsProgramsResolvedPathIgnoringCaseOnWindows(): void {
-    const folder = Installation.locate("device", path.join("opt", "TeamRun", "teamrun"), "linux");
+    const folder = Installation.locate("device", path.join("opt", "Studio", "studio"), "linux");
 
     Assert.areEqual(path.join("device", "installations"), path.dirname(folder));
     Assert.isTrue(/^[0-9a-f]{16}$/.test(path.basename(folder)), folder);
-    Assert.areEqual(folder, Installation.locate("device", path.join("opt", "other", "..", "TeamRun", "teamrun"), "linux"));
-    Assert.areNotEqual(folder, Installation.locate("device", path.join("opt", "TeamRun", "other"), "linux"));
-    Assert.areNotEqual(folder, Installation.locate("device", path.join("opt", "teamrun", "TEAMRUN"), "linux"));
-    Assert.areEqual(Installation.locate("device", path.join("opt", "TeamRun", "teamrun"), "win32"), Installation.locate("device", path.join("opt", "teamrun", "TEAMRUN"), "win32"));
+    Assert.areEqual(folder, Installation.locate("device", path.join("opt", "other", "..", "Studio", "studio"), "linux"));
+    Assert.areNotEqual(folder, Installation.locate("device", path.join("opt", "Studio", "other"), "linux"));
+    Assert.areNotEqual(folder, Installation.locate("device", path.join("opt", "studio", "STUDIO"), "linux"));
+    Assert.areEqual(Installation.locate("device", path.join("opt", "Studio", "studio"), "win32"), Installation.locate("device", path.join("opt", "studio", "STUDIO"), "win32"));
   }
 
   @TestMethod

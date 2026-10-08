@@ -130,7 +130,7 @@ class ChangeSelectorTests {
       }
       const packages = (await new PackageCatalog(SourceTreeFixture.root).listPackagesAsync(false)).map(t => t.name);
 
-      assert.deepEqual([...imported].filter(t => packages.includes(t)).sort(), ChangeSelector.WINDOW_DEPENDENCIES);
+      assert.deepEqual([...imported].filter(t => packages.includes(t)).sort(), [...ChangeSelector.WINDOW_DEPENDENCIES].sort());
       assert.deepEqual([...imported].filter(t => !packages.includes(t)).sort(), ["@noldova/teamrun-shell-ui", "@noldova/teamrun-shell-window"]);
     });
 
