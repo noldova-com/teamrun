@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { CommandLineNames } from "../../src/shell/cli/src/models/command-line-names.ts";
+import PackageNaming from "../packages/package-naming.ts";
 import type IModuleDeclarationJson from "./interfaces/i-module-declaration-json.ts";
 import ModuleCliCommands from "./module-cli-commands.ts";
 import ModuleMenus from "./module-menus.ts";
@@ -178,6 +179,6 @@ export default class ModuleDeclaration {
   }
 
   private locatePackage(part: string): string | null {
-    return this.parts.includes(part) ? `@noldova/teamrun-${this.isFixture ? "fixture" : "modules"}-${this.id}-${part}` : null;
+    return this.parts.includes(part) ? PackageNaming.nameModulePackage(this.id, part, this.isFixture) : null;
   }
 }

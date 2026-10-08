@@ -10,14 +10,16 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import ModuleCatalog from "../modules/module-catalog.ts";
+import PackageNaming from "./package-naming.ts";
 import PackageException from "./package.exception.ts";
 
 export default class PackageManifest {
   private static readonly FILE_NAME: string = "package.json";
   private static readonly SOURCE_PREFIX: string = "src/";
-  private static readonly NAME_PREFIX: string = "@noldova/teamrun-";
-  private static readonly FIXTURE_NAME_PREFIX: string = "@noldova/teamrun-fixture-";
   private static readonly FIXTURE_PREFIX: string = `${ModuleCatalog.FIXTURE_FOLDER}/`;
+  private static readonly FIXTURE_ID_PREFIX: string = "fixture-";
+  private static readonly FOLDER_SEPARATOR: string = "/";
+  private static readonly ID_SEPARATOR: string = "-";
   private static readonly VERSION_PLACEHOLDER: string = "__VERSION__";
   private static readonly NO_EXCLUSIONS: string = "[]";
   private static readonly ADDON_NAME: RegExp = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -62,8 +64,8 @@ export default class PackageManifest {
     const dependencies = "dependencies" in manifest ? manifest.dependencies : {};
     if (typeof dependencies !== "object" || dependencies === null)
       throw new PackageException(`${file} must list its dependencies as an object.`);
-    const own = Object.entries(dependencies).filter(([name]) => name.startsWith(PackageManifest.NAME_PREFIX));
-    const external = Object.entries(dependencies).filter(([name]) => !name.startsWith(PackageManifest.NAME_PREFIX));
+    const own = Object.entries(dependencies).filter(([name]) => PackageNaming.isOwn(name));
+    const external = Object.entries(dependencies).filter(([name]) => !PackageNaming.isOwn(name));
     const unpinned = external.filter(([, version]) => typeof version !== "string").map(([name]) => name);
     if (unpinned.length > 0)
       throw new PackageException(`${file} must pin ${unpinned.join(", ")} to an exact version.`);
@@ -85,7 +87,10 @@ export default class PackageManifest {
   }
 
   public get id(): string {
-    return this.name.slice(PackageManifest.NAME_PREFIX.length);
+    const folder = this.isFixture
+      ? `${PackageManifest.FIXTURE_ID_PREFIX}${this.directory.slice(PackageManifest.FIXTURE_PREFIX.length)}`
+      : this.directory.slice(PackageManifest.SOURCE_PREFIX.length);
+    return folder.split(PackageManifest.FOLDER_SEPARATOR).join(PackageManifest.ID_SEPARATOR);
   }
 
   public get isFixture(): boolean {
@@ -98,7 +103,7 @@ export default class PackageManifest {
 
   private static formatName(directory: string): string {
     return PackageManifest.isFixtureDirectory(directory)
-      ? `${PackageManifest.FIXTURE_NAME_PREFIX}${directory.slice(PackageManifest.FIXTURE_PREFIX.length).split("/").join("-")}`
-      : `${PackageManifest.NAME_PREFIX}${directory.slice(PackageManifest.SOURCE_PREFIX.length).split("/").join("-")}`;
+      ? PackageNaming.nameFixturePackage(directory.slice(PackageManifest.FIXTURE_PREFIX.length))
+      : PackageNaming.nameSourcePackage(directory);
   }
 }

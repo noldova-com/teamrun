@@ -29,13 +29,15 @@ class ModuleNameMatcherTests {
         [null, null, null, null, null, null, null, null, null]);
     });
 
-    test("text lines are searched for packages, folders, selectors and tokens but not for bare ids", () => {
+    test("text lines are searched for the modules' packages, folders, selectors and tokens but not for bare ids", () => {
       const matcher = new ModuleNameMatcher(["notes"]);
 
       assert.equal(matcher.findInText("<tr-notes-list></tr-notes-list>"), 'module "notes"');
       assert.equal(matcher.findInText("  color: var(--tr-notes-accent);"), 'module "notes"');
       assert.equal(matcher.findInText("Take notes here."), null);
-      assert.equal(new ModuleNameMatcher([]).findInText("@noldova/teamrun-modules-"), 'the module package "@noldova/teamrun-modules-"');
+      assert.equal(matcher.findInText("import \"@noldova/teamrun-modules-notes-runtime\";"), 'the module package "@noldova/teamrun-modules-notes-runtime"');
+      assert.equal(matcher.findInText("@noldova/teamrun-modules-notes-cli"), 'the module package "@noldova/teamrun-modules-notes-cli"');
+      assert.equal(matcher.findInText("import \"@noldova/teamrun-shell-runtime\";"), null);
     });
   }
 }
