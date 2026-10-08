@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import WindowsSigningAccount from "../packages/windows-signing-account.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import PackageConfiguration from "./package-configuration.ts";
 import PackagingException from "./packaging.exception.ts";
@@ -37,10 +38,13 @@ export default class TrustedSigningModule {
   private static readonly DESTINATIONS_VARIABLE: string = "TEAMRUN_SIGNING_DESTINATIONS";
   private static readonly FOLDER_VARIABLE: string = "TEAMRUN_SIGNING_FOLDER";
   private static readonly FILE_VARIABLE: string = "TEAMRUN_SIGNING_FILE";
+  private static readonly ENDPOINT_VARIABLE: string = "TEAMRUN_SIGNING_ENDPOINT";
+  private static readonly ACCOUNT_VARIABLE: string = "TEAMRUN_SIGNING_ACCOUNT";
+  private static readonly PROFILE_VARIABLE: string = "TEAMRUN_SIGNING_PROFILE";
+  private static readonly ACCOUNT_VARIABLES: readonly string[] = [
+    TrustedSigningModule.ENDPOINT_VARIABLE, TrustedSigningModule.ACCOUNT_VARIABLE, TrustedSigningModule.PROFILE_VARIABLE
+  ];
   private static readonly FILE_SEPARATOR: string = ",";
-  private static readonly ENDPOINT: string = "https://wus3.codesigning.azure.net/";
-  private static readonly ACCOUNT_NAME: string = "noldova-signing";
-  private static readonly CERTIFICATE_PROFILE: string = "TeamRun";
   private static readonly TIMESTAMP_SERVER: string = "http://timestamp.acs.microsoft.com";
   private static readonly DIGEST: string = "SHA256";
   private static readonly LINE_SEPARATOR: string = "\n";
@@ -58,8 +62,8 @@ export default class TrustedSigningModule {
   private static readonly STOP_LINE: string = "$ErrorActionPreference = 'Stop'";
   private static readonly SIGN_LINES: readonly string[] = [
     TrustedSigningModule.IMPORT_LINE,
-    `${TrustedSigningModule.NAME}\\Invoke-TrustedSigning -Endpoint '${TrustedSigningModule.ENDPOINT}' -CodeSigningAccountName '${TrustedSigningModule.ACCOUNT_NAME}' `
-      + `-CertificateProfileName '${TrustedSigningModule.CERTIFICATE_PROFILE}' -FileDigest '${TrustedSigningModule.DIGEST}' `
+    `${TrustedSigningModule.NAME}\\Invoke-TrustedSigning -Endpoint $env:${TrustedSigningModule.ENDPOINT_VARIABLE} `
+      + `-CodeSigningAccountName $env:${TrustedSigningModule.ACCOUNT_VARIABLE} -CertificateProfileName $env:${TrustedSigningModule.PROFILE_VARIABLE} -FileDigest '${TrustedSigningModule.DIGEST}' `
       + `-TimestampRfc3161 '${TrustedSigningModule.TIMESTAMP_SERVER}' -TimestampDigest '${TrustedSigningModule.DIGEST}' -Files $env:${TrustedSigningModule.FILE_VARIABLE}`
   ];
   private static readonly SIGN_SCRIPT: string = [TrustedSigningModule.STOP_LINE, ...TrustedSigningModule.SIGN_LINES].join(TrustedSigningModule.LINE_SEPARATOR);
@@ -82,11 +86,13 @@ export default class TrustedSigningModule {
 
   private readonly runner: ProcessRunner;
   private readonly folder: string;
+  private readonly account: WindowsSigningAccount;
   private readonly environment: NodeJS.ProcessEnv;
 
-  public constructor(runner: ProcessRunner, folder: string, environment: NodeJS.ProcessEnv) {
+  public constructor(runner: ProcessRunner, folder: string, account: WindowsSigningAccount, environment: NodeJS.ProcessEnv) {
     this.runner = runner;
     this.folder = folder;
+    this.account = account;
     this.environment = environment;
   }
 
@@ -94,14 +100,19 @@ export default class TrustedSigningModule {
     const folder = environment[TrustedSigningModule.FOLDER_VARIABLE] ?? "";
     if (!path.isAbsolute(folder))
       throw new PackagingException(`${TrustedSigningModule.FOLDER_VARIABLE} must name the folder that holds the prepared ${TrustedSigningModule.NAME} module, not "${folder}".`);
-    return new TrustedSigningModule(runner, folder, environment);
+    const account = new WindowsSigningAccount(environment[TrustedSigningModule.ENDPOINT_VARIABLE] ?? "", environment[TrustedSigningModule.ACCOUNT_VARIABLE] ?? "",
+      environment[TrustedSigningModule.PROFILE_VARIABLE] ?? "");
+    const missing = TrustedSigningModule.ACCOUNT_VARIABLES.filter(t => (environment[t] ?? "").length === 0);
+    if (missing.length > 0)
+      throw new PackagingException(`Signing a Windows file needs ${missing.join(", ")}, which packaging sets from teamrun.product.windowsSigning.`);
+    return new TrustedSigningModule(runner, folder, account, environment);
   }
 
   public describeEnvironment(credentials: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     const missing = TrustedSigningModule.CREDENTIALS.filter(t => (credentials[t] ?? "").length === 0);
     if (missing.length > 0)
-      throw new PackagingException(`Signing Windows packages needs ${missing.join(", ")}, the Azure service principal that signs with ${TrustedSigningModule.ACCOUNT_NAME}.`);
-    return { ...Object.fromEntries(TrustedSigningModule.CREDENTIALS.map(t => [t, credentials[t]])), [TrustedSigningModule.FOLDER_VARIABLE]: this.folder };
+      throw new PackagingException(`Signing Windows packages needs ${missing.join(", ")}, the Azure service principal that signs with ${this.account.account}.`);
+    return { ...Object.fromEntries(TrustedSigningModule.CREDENTIALS.map(t => [t, credentials[t]])), [TrustedSigningModule.FOLDER_VARIABLE]: this.folder, ...this.accountVariables };
   }
 
   public async prepareAsync(sources: readonly PinnedPackage[]): Promise<void> {
@@ -134,9 +145,18 @@ export default class TrustedSigningModule {
       throw new PackagingException(`${TrustedSigningModule.NAME} takes a comma-separated list of files, so it cannot sign ${file}.`);
     const script = path.extname(file) === PackageConfiguration.LIBRARY_EXTENSION ? TrustedSigningModule.LIBRARY_SIGN_SCRIPT : TrustedSigningModule.SIGN_SCRIPT;
     await this.runAsync(script, {
+      ...this.accountVariables,
       [TrustedSigningModule.FILE_VARIABLE]: path.resolve(file),
       [TrustedSigningModule.TOOLS_VARIABLE]: path.join(this.folder, TrustedSigningModule.TOOLS_FOLDER)
     }, path.dirname(path.resolve(file)), `signing ${file} with`);
+  }
+
+  private get accountVariables(): NodeJS.ProcessEnv {
+    return {
+      [TrustedSigningModule.ENDPOINT_VARIABLE]: this.account.endpoint,
+      [TrustedSigningModule.ACCOUNT_VARIABLE]: this.account.account,
+      [TrustedSigningModule.PROFILE_VARIABLE]: this.account.profile
+    };
   }
 
   private static createTool(name: string, version: string, sha512: string): PinnedPackage {
