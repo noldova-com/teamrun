@@ -97,7 +97,7 @@ class ReleaseWorkflowTests {
         assert.ok(workflow.text.includes(`      - name: ${step}\n`), step);
       assert.deepEqual(["Build", "Test", "Write the checksums and the update information"].map(t => workflow.readStepScript(t)),
         ["npm run build\n", "npm test\n", "npm run release:assets\n"]);
-      for (const step of ["Install, start and quit the package", "Remove libfuse2, which a stock Ubuntu does not install", "Make the package"])
+      for (const step of ["Install, start and quit the package", "Remove libfuse2, which a stock Ubuntu does not install", "Make the package", "Read the product's name"])
         assert.equal(workflow.readStepScript(step), package_.readStepScript(step), step);
       assert.deepEqual(steps.filter(t => !/\n {8}timeout-minutes: \d+\n/.test(t)), []);
     });
@@ -159,11 +159,11 @@ class ReleaseWorkflowTests {
       assert.deepEqual(uploads.map(t => t.settings), uploads.map(() => [
         "name: release-${{ matrix.runner }}-${{ matrix.architecture }}",
         "path: |",
-        "  _build/package/out/TeamRun-*.exe",
-        "  _build/package/out/TeamRun-*.dmg",
-        "  _build/package/out/TeamRun-*.zip",
-        "  _build/package/out/TeamRun-*.AppImage",
-        "  _build/package/out/TeamRun-*.sha256",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.exe",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.dmg",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.zip",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.AppImage",
+        "  _build/package/out/${{ steps.product.outputs.name }}-*.sha256",
         "  _build/package/out/latest-*.yml",
         "retention-days: 14",
         "if-no-files-found: error",

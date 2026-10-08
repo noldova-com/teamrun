@@ -13,6 +13,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
+import WindowsSigningAccount from "../../packages/windows-signing-account.ts";
 import PackagingException from "../../packaging/packaging.exception.ts";
 import PinnedPackage from "../../packaging/pinned-package.ts";
 import TrustedSigningModule from "../../packaging/trusted-signing-module.ts";
@@ -28,6 +29,12 @@ class TrustedSigningModuleTests {
     AZURE_TENANT_ID: "fixture-tenant",
     AZURE_CLIENT_ID: "fixture-client",
     AZURE_CLIENT_SECRET: "fixture-secret"
+  };
+  private static readonly ACCOUNT: WindowsSigningAccount = new WindowsSigningAccount("https://fixtureville.signing.example/", "fixture-works-signing", "Fixture-Studio");
+  private static readonly ACCOUNT_VARIABLES: Readonly<Record<string, string>> = {
+    TEAMRUN_SIGNING_ENDPOINT: "https://fixtureville.signing.example/",
+    TEAMRUN_SIGNING_ACCOUNT: "fixture-works-signing",
+    TEAMRUN_SIGNING_PROFILE: "Fixture-Studio"
   };
 
   public static register(): void {
@@ -47,14 +54,14 @@ class TrustedSigningModuleTests {
       ]);
     });
 
-    test("signing needs every Azure credential, and passes only those and the module's folder on", () => {
+    test("signing needs every Azure credential, and passes only those, the module's folder and the signing account on", () => {
       const folder = path.resolve("signing");
-      const signing = new TrustedSigningModule(new ProcessRunnerFixture(), folder, { GH_TOKEN: "fixture-token" });
+      const signing = new TrustedSigningModule(new ProcessRunnerFixture(), folder, TrustedSigningModuleTests.ACCOUNT, { GH_TOKEN: "fixture-token" });
 
       assert.deepEqual(signing.describeEnvironment({ ...TrustedSigningModuleTests.CREDENTIALS, MAC_CERTIFICATE: "fixture-certificate" }),
-        { ...TrustedSigningModuleTests.CREDENTIALS, TEAMRUN_SIGNING_FOLDER: folder });
+        { ...TrustedSigningModuleTests.CREDENTIALS, TEAMRUN_SIGNING_FOLDER: folder, ...TrustedSigningModuleTests.ACCOUNT_VARIABLES });
       assert.throws(() => signing.describeEnvironment({ AZURE_CLIENT_ID: "fixture-client", AZURE_CLIENT_SECRET: "" }),
-        new PackagingException("Signing Windows packages needs AZURE_TENANT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with noldova-signing."));
+        new PackagingException("Signing Windows packages needs AZURE_TENANT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with fixture-works-signing."));
     });
 
     test("the downloaded packages are expanded into a fresh folder and the module loaded only when every SHA-512 is the recorded one, and their archives are removed after", async t => {
@@ -64,7 +71,7 @@ class TrustedSigningModuleTests {
       await writeFile(path.join(folder, "stale.psm1"), "stale\n");
       const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "", "")]);
 
-      await new TrustedSigningModule(runner, folder, { PATH: "fixture-path" }).prepareAsync(gallery.packages);
+      await new TrustedSigningModule(runner, folder, TrustedSigningModuleTests.ACCOUNT, { PATH: "fixture-path" }).prepareAsync(gallery.packages);
 
       const [command, directory, ...options] = runner.captured[0] ?? [];
       const script = Buffer.from(String(options.at(-1)), "base64").toString("utf16le");
@@ -89,7 +96,7 @@ class TrustedSigningModuleTests {
       const [repository, gallery] = await TrustedSigningModuleTests.createAsync(t);
       const folder = path.join(repository.directory, "signing");
       const runner = new ProcessRunnerFixture([], [new ProcessResult(1, "", "Expand-Archive broke")]);
-      const signing = new TrustedSigningModule(runner, folder, {});
+      const signing = new TrustedSigningModule(runner, folder, TrustedSigningModuleTests.ACCOUNT, {});
       const unreachable = new PinnedPackage("http://127.0.0.1:1/tool", gallery.tool.sha512, PackageGalleryFixture.TOOL_FOLDER);
 
       await assert.rejects(signing.prepareAsync(gallery.withToolHash("recorded")), new PackagingException(
@@ -105,7 +112,8 @@ class TrustedSigningModuleTests {
       assert.deepEqual(await readdir(folder), []);
     });
 
-    test("a file is signed by the prepared module and its pinned tools with SHA-256 digests and an RFC 3161 timestamp, named through the environment, and a failure names the file; "
+    test("a file is signed by the prepared module and its pinned tools with SHA-256 digests and an RFC 3161 timestamp, the file and the signing account named through the environment, "
+      + "and a failure names the file; "
       + "only a library that already carries a valid signature keeps it",
       async t => {
         const [repository] = await TrustedSigningModuleTests.createAsync(t);
@@ -113,7 +121,12 @@ class TrustedSigningModuleTests {
         const file = path.join(repository.directory, "out", "Fixture Studio.exe");
         const library = path.join(repository.directory, "out", "ffmpeg.dll");
         const runner = new ProcessRunnerFixture([], [new ProcessResult(0, "", ""), new ProcessResult(0, "", ""), new ProcessResult(5, "", "Invoke-TrustedSigning broke")]);
-        const signing = TrustedSigningModule.fromEnvironment(runner, { ...TrustedSigningModuleTests.CREDENTIALS, LocalAppData: "fixture-local", TEAMRUN_SIGNING_FOLDER: folder });
+        const signing = TrustedSigningModule.fromEnvironment(runner, {
+          ...TrustedSigningModuleTests.CREDENTIALS,
+          ...TrustedSigningModuleTests.ACCOUNT_VARIABLES,
+          LocalAppData: "fixture-local",
+          TEAMRUN_SIGNING_FOLDER: folder
+        });
 
         await signing.signAsync(file);
         await signing.signAsync(library);
@@ -123,6 +136,7 @@ class TrustedSigningModuleTests {
         assert.equal(runner.captured[0]?.[1], path.dirname(file));
         assert.deepEqual(runner.captureEnvironments[0], {
           ...TrustedSigningModuleTests.CREDENTIALS,
+          ...TrustedSigningModuleTests.ACCOUNT_VARIABLES,
           TEAMRUN_SIGNING_FOLDER: folder,
           TEAMRUN_SIGNING_FILE: file,
           LOCALAPPDATA: path.join(folder, "tools")
@@ -133,17 +147,24 @@ class TrustedSigningModuleTests {
         assert.equal(libraryScript, "$ErrorActionPreference = 'Stop'\n"
           + "if ((Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $env:TEAMRUN_SIGNING_FILE).Status -eq 'Valid') { exit 0 }\n"
           + script.slice("$ErrorActionPreference = 'Stop'\n".length));
-        assert.ok(script.includes("TrustedSigning\\Invoke-TrustedSigning -Endpoint 'https://wus3.codesigning.azure.net/' -CodeSigningAccountName 'noldova-signing' "
-          + "-CertificateProfileName 'TeamRun' -FileDigest 'SHA256' -TimestampRfc3161 'http://timestamp.acs.microsoft.com' -TimestampDigest 'SHA256' -Files $env:TEAMRUN_SIGNING_FILE"));
+        assert.ok(script.includes("TrustedSigning\\Invoke-TrustedSigning -Endpoint $env:TEAMRUN_SIGNING_ENDPOINT -CodeSigningAccountName $env:TEAMRUN_SIGNING_ACCOUNT "
+          + "-CertificateProfileName $env:TEAMRUN_SIGNING_PROFILE -FileDigest 'SHA256' -TimestampRfc3161 'http://timestamp.acs.microsoft.com' -TimestampDigest 'SHA256' "
+          + "-Files $env:TEAMRUN_SIGNING_FILE"));
       });
 
-    test("a file name with a comma, which the module would split, and a missing or relative module folder are refused, also from electron-builder's hook", async () => {
+    test("a file name with a comma, which the module would split, a missing or relative module folder and a missing signing account are refused, "
+      + "also from electron-builder's hook", async () => {
       const runner = new ProcessRunnerFixture();
-      const signing = TrustedSigningModule.fromEnvironment(runner, { TEAMRUN_SIGNING_FOLDER: path.resolve("signing") });
+      const folder = path.resolve("signing");
+      const signing = TrustedSigningModule.fromEnvironment(runner, { ...TrustedSigningModuleTests.ACCOUNT_VARIABLES, TEAMRUN_SIGNING_FOLDER: folder });
 
       await assert.rejects(signing.signAsync("a,b.exe"), new PackagingException("TrustedSigning takes a comma-separated list of files, so it cannot sign a,b.exe."));
-      assert.throws(() => TrustedSigningModule.fromEnvironment(runner, { TEAMRUN_SIGNING_FOLDER: "signing" }),
+      assert.throws(() => TrustedSigningModule.fromEnvironment(runner, { ...TrustedSigningModuleTests.ACCOUNT_VARIABLES, TEAMRUN_SIGNING_FOLDER: "signing" }),
         new PackagingException("TEAMRUN_SIGNING_FOLDER must name the folder that holds the prepared TrustedSigning module, not \"signing\"."));
+      assert.throws(() => TrustedSigningModule.fromEnvironment(runner, { TEAMRUN_SIGNING_ACCOUNT: "fixture-works-signing", TEAMRUN_SIGNING_PROFILE: "", TEAMRUN_SIGNING_FOLDER: folder }),
+        new PackagingException("Signing a Windows file needs TEAMRUN_SIGNING_ENDPOINT, TEAMRUN_SIGNING_PROFILE, which packaging sets from teamrun.product.windowsSigning."));
+      assert.throws(() => TrustedSigningModule.fromEnvironment(runner, { TEAMRUN_SIGNING_FOLDER: folder }), new PackagingException(
+        "Signing a Windows file needs TEAMRUN_SIGNING_ENDPOINT, TEAMRUN_SIGNING_ACCOUNT, TEAMRUN_SIGNING_PROFILE, which packaging sets from teamrun.product.windowsSigning."));
       await assert.rejects(signWindowsFile({ path: "Fixture Studio.exe" }),
         new PackagingException("TEAMRUN_SIGNING_FOLDER must name the folder that holds the prepared TrustedSigning module, not \"\"."));
       assert.deepEqual(runner.captured, []);

@@ -12,6 +12,7 @@ import path from "node:path";
 
 import type ProductIdentity from "../packages/product-identity.ts";
 import WindowsAddonBuilder from "../packages/windows-addon-builder.ts";
+import type WindowsSigningAccount from "../packages/windows-signing-account.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import AuthenticodeCheck from "./authenticode-check.ts";
 import type IPackageSigning from "./interfaces/i-package-signing.ts";
@@ -39,14 +40,14 @@ export default class WindowsSigning implements IPackageSigning {
 
   public readonly builderEnvironment: NodeJS.ProcessEnv;
 
-  public constructor(runner: ProcessRunner, root: string, folder: string, output: string, target: PackageTarget, environment: NodeJS.ProcessEnv, credentials: NodeJS.ProcessEnv,
-    packages: readonly PinnedPackage[]) {
+  public constructor(runner: ProcessRunner, root: string, folder: string, output: string, target: PackageTarget, account: WindowsSigningAccount, environment: NodeJS.ProcessEnv,
+    credentials: NodeJS.ProcessEnv, packages: readonly PinnedPackage[]) {
     this.runner = runner;
     this.root = root;
     this.output = output;
     this.target = target;
     this.environment = environment;
-    this.module = new TrustedSigningModule(runner, folder, environment);
+    this.module = new TrustedSigningModule(runner, folder, account, environment);
     this.packages = packages;
     this.builderEnvironment = this.module.describeEnvironment(credentials);
   }

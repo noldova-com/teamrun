@@ -24,6 +24,7 @@ class ModuleImportCheckTests {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
+        ...ModuleImportCheckTests.declare("notes", ["window"]),
         "src/modules/notes/window/package.json": "{}\n",
         "src/modules/notes/window/src/view.ts": [
           "import \"@noldova/teamrun-foundation-core\";",
@@ -50,10 +51,12 @@ class ModuleImportCheckTests {
       assert.equal(check.title, "Module imports");
     });
 
-    test("imports from outside the package, inside another package's API, of another module or of other TeamRun packages fail", async t => {
+    test("imports from outside the package, inside another package's API, of another module, of a fixture module or of other TeamRun packages fail", async t => {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
+        ...ModuleImportCheckTests.declare("tasks"),
+        ...ModuleImportCheckTests.declare("clock", [], [], true),
         "src/modules/notes/window/package.json": "{}\n",
         "src/modules/notes/window/src/view.ts": [
           "import Data from \"../../runtime/src/data.ts\";",
@@ -63,6 +66,8 @@ class ModuleImportCheckTests {
           "const tasks = await import(\"@noldova/teamrun-modules-tasks-protocol\");",
           "import \"@noldova/teamrun-modules-tasks\";",
           "import \"@noldova/teamrun-scripts\";",
+          "import \"@noldova/teamrun-fixture-clock-runtime\";",
+          "import \"@noldova/teamrun-modules-clock-runtime\";",
           ""
         ].join("\n")
       });
@@ -81,6 +86,8 @@ class ModuleImportCheckTests {
         `${file}:5: the import "@noldova/teamrun-modules-tasks-protocol" belongs to module "tasks", but module "notes" declares no dependency on "tasks"${rule}`,
         `${file}:6: the import "@noldova/teamrun-modules-tasks" is not a TeamRun package a module may use${rule}`,
         `${file}:7: the import "@noldova/teamrun-scripts" is not a TeamRun package a module may use${rule}`,
+        `${file}:8: the import "@noldova/teamrun-fixture-clock-runtime" is not a TeamRun package a module may use${rule}`,
+        `${file}:9: the import "@noldova/teamrun-modules-clock-runtime" is not a TeamRun package a module may use${rule}`,
         "Checked the imports of 1 production script files of modules.",
         ""
       ].join("\n"));
@@ -90,7 +97,9 @@ class ModuleImportCheckTests {
       const repository = await RepositoryFixture.createAsync();
       t.after(() => repository.disposeAsync());
       await repository.writeAsync({
-        "src/modules/notes/module.json": JSON.stringify({ id: "notes", version: "0.0.1", displayName: "Notes", description: "Used by the tests.", parts: ["window"], dependencies: ["tasks"], contributes: {} }),
+        ...ModuleImportCheckTests.declare("notes", ["window"], ["tasks"]),
+        ...ModuleImportCheckTests.declare("tasks"),
+        ...ModuleImportCheckTests.declare("clock"),
         "src/modules/notes/window/package.json": "{}\n",
         "src/modules/notes/window/src/view.ts": [
           "import { Task } from \"@noldova/teamrun-modules-tasks-protocol\";",
@@ -113,6 +122,11 @@ class ModuleImportCheckTests {
         ""
       ].join("\n"));
     });
+  }
+
+  private static declare(id: string, parts: readonly string[] = [], dependencies: readonly string[] = [], isFixture: boolean = false): Readonly<Record<string, string>> {
+    const folder = isFixture ? ModuleCatalog.FIXTURE_FOLDER : "src/modules";
+    return { [`${folder}/${id}/module.json`]: JSON.stringify({ id, version: "0.0.1", displayName: id, description: "Used by the tests.", parts, dependencies, contributes: {} }) };
   }
 
   private static createCheck(repository: RepositoryFixture): ModuleImportCheck {

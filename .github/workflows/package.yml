@@ -255,6 +255,13 @@ jobs:
             npm run package:smoke
           fi
 
+      - name: Read the product's name
+        id: product
+        timeout-minutes: 1
+        run: |
+          name=$(npm pkg get teamrun.product.name)
+          echo "name=${name//\"/}" >> "$GITHUB_OUTPUT"
+
       - name: Keep the package
         id: keep
         continue-on-error: true
@@ -263,10 +270,10 @@ jobs:
         with:
           name: package-${{ matrix.runner }}-${{ matrix.architecture }}
           path: |
-            _build/package/out/TeamRun-*.exe
-            _build/package/out/TeamRun-*.dmg
-            _build/package/out/TeamRun-*.zip
-            _build/package/out/TeamRun-*.AppImage
+            _build/package/out/${{ steps.product.outputs.name }}-*.exe
+            _build/package/out/${{ steps.product.outputs.name }}-*.dmg
+            _build/package/out/${{ steps.product.outputs.name }}-*.zip
+            _build/package/out/${{ steps.product.outputs.name }}-*.AppImage
             _build/package/smoke/*.png
             _build/package/package-report.json
           retention-days: ${{ matrix.retention }}
@@ -287,10 +294,10 @@ jobs:
         with:
           name: package-${{ matrix.runner }}-${{ matrix.architecture }}
           path: |
-            _build/package/out/TeamRun-*.exe
-            _build/package/out/TeamRun-*.dmg
-            _build/package/out/TeamRun-*.zip
-            _build/package/out/TeamRun-*.AppImage
+            _build/package/out/${{ steps.product.outputs.name }}-*.exe
+            _build/package/out/${{ steps.product.outputs.name }}-*.dmg
+            _build/package/out/${{ steps.product.outputs.name }}-*.zip
+            _build/package/out/${{ steps.product.outputs.name }}-*.AppImage
             _build/package/smoke/*.png
             _build/package/package-report.json
           retention-days: ${{ matrix.retention }}
@@ -309,10 +316,10 @@ jobs:
         with:
           name: package-${{ matrix.runner }}-${{ matrix.architecture }}
           path: |
-            _build/package/out/TeamRun-*.exe
-            _build/package/out/TeamRun-*.dmg
-            _build/package/out/TeamRun-*.zip
-            _build/package/out/TeamRun-*.AppImage
+            _build/package/out/${{ steps.product.outputs.name }}-*.exe
+            _build/package/out/${{ steps.product.outputs.name }}-*.dmg
+            _build/package/out/${{ steps.product.outputs.name }}-*.zip
+            _build/package/out/${{ steps.product.outputs.name }}-*.AppImage
             _build/package/smoke/*.png
             _build/package/package-report.json
           retention-days: ${{ matrix.retention }}

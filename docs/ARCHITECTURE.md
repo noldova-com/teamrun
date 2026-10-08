@@ -899,7 +899,7 @@ Restarting for an update runs the same saves in every window of the installation
 - Exact external dependency versions and lockfiles describe the install inputs.
 - The root manifest declares the product version and, separately, the protocol version.
   The build stamps each module part package's manifest with its module's version and every other package's manifest with the product version ([Modules and versions](#modules-and-versions)).
-- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder, release repository and the distinguished name its Windows signatures carry.
+- The root manifest's `teamrun.product` owns the product's identity: its name, publisher, slug, application and development application IDs, data folder, per-device folders, data-directory variable, icons folder, release repository, the distinguished name its Windows signatures carry and, under `windowsSigning`, the Artifact Signing endpoint, account and certificate profile that sign its Windows packages.
   Windows' app user model ID, the macOS bundle ID and the Linux desktop name (`<id>.desktop`) derive from the application IDs.
   A packaged build uses the application ID.
   A development build uses `<development application ID>.<checkout hash>`, where the hash is the first eight hexadecimal digits of the SHA-256 of the checkout's absolute path.
@@ -1057,12 +1057,13 @@ Each target is packaged on its own platform and processor.
   The macOS program is signed ad hoc again after its fuses change, because Apple silicon starts no program whose signature no longer matches.
 - **Signing (Windows).**
   `npm run package` makes unsigned packages; `npm run package -- --signed` signs a Windows or macOS package and refuses a Linux one.
-  It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing endpoint, account and certificate profile in `scripts/packaging/trusted-signing-module.ts`, and checks them before anything is built.
+  It needs `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`, a service principal allowed to sign with the Artifact Signing endpoint, account and certificate profile in `teamrun.product.windowsSigning`, and checks them before anything is built.
   Packaging takes them out of its own environment as it starts, so staging, the module's preparation and the signature check run without them; only electron-builder receives them, and only with `--signed`.
   - It downloads Microsoft's TrustedSigning PowerShell module 0.5.8 from the PowerShell Gallery, and from nuget.org the three packages that module would otherwise install unchecked as it first signs: `Microsoft.Windows.SDK.BuildTools` 10.0.26100.4188, `Microsoft.Trusted.Signing.Client` 1.0.95 and `sign` 0.9.1-beta.24469.1.
     It checks each package against the SHA-512 its gallery published before expanding any, and expands them into `_build/package/signing`, where signing finds the tools in place and downloads nothing.
     It loads the module from there by path, asserting its version.
   - electron-builder signs through `scripts/packaging/windows-sign-hook.ts`, which signs each file with SHA-256 digests and an RFC 3161 timestamp.
+    Packaging passes the hook the endpoint, account and profile in environment variables, and the hook passes them to PowerShell the same way, so no identity value is written into a script.
     Besides the program and the installer, it signs the native addons in `app.asar.unpacked` and Electron's DLLs.
     A DLL that already carries a valid signature, such as one Microsoft signed, keeps it, so a DLL a new Electron adds unsigned is signed without a list of names; a program or addon is always signed with TeamRun's signature, even when it arrives signed by someone else.
   - Afterwards PowerShell 7 reads the Authenticode signatures of the installer and of every program, addon and DLL in the unpacked application.
