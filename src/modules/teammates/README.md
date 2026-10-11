@@ -66,7 +66,7 @@ The log records ids and counts, never a name, a role or a model preference.
 
 New teammate asks for the name, the role, the command line and the model preference, none by default.
 The command line is any one `providers` supports, whatever its status, so a teammate can be prepared before its command line is installed or signed in to; the Teammates document shows that status beside it.
-The module checks only the model preference's bounds: whether the command line knows the model shows when a session starts, as a `startFailed` error that names the teammate to edit.
+The module checks only the model preference's bounds: whether the command line knows the model shows when a session starts, as a `StartFailed` error that names the teammate to edit.
 
 An edit changes the teammate for every thread that holds it:
 
@@ -76,14 +76,14 @@ An edit changes the teammate for every thread that holds it:
 
 ### In a conversation
 
-The conversations module's composer offers the teammates whose command line `providers` reports as `signedIn`, and, for each such command line, a plain agent without a role.
+The conversations module's composer offers the teammates whose command line `providers` reports as `SignedIn`, and, for each such command line, a plain agent without a role.
 A teammate whose command line has another status shows that status and cannot be picked.
 
 - A teammate joins a thread once, as one of its agents; its accent comes from the thread, as conversations assigns it ([Agents in a thread](../conversations/README.md#agents-in-a-thread)).
 - The thread's agent keeps the teammate's id, and reads its name from this module, so a rename shows in every thread.
 - Each session of a teammate starts with its command line and model preference as they are then.
   When the teammate's command line changed since the agent's last session, the agent drops the provider's session id it kept, takes the teammate's new command line, and starts a new session, and the timeline says that the agent starts without its earlier context, as for a session that cannot be resumed.
-  A changed model preference keeps the session: the agent resumes it and sets the session's `model` configuration option to the new model, and where the command line keeps the earlier model on resuming, the timeline shows the model the session reports.
+  A changed model preference keeps the session: the agent resumes it and sets the session's `Model` configuration option to the new model, and where the command line keeps the earlier model on resuming, the timeline shows the model the session reports.
 - Its role reaches the agent as the opening part of each session's first prompt, as quoted text marked as the teammate's instructions, since every command line takes a prompt and not every one takes added instructions.
   When the role changed since it last reached the session, whether the session stayed open between turns or was resumed, the next prompt opens with the new role marked as updated instructions.
   The person's message shows that it carried the role, which opens on request.

@@ -69,8 +69,8 @@ It opens as any document a part opens while activating does, so it never takes t
 
 The guide lists each command line the providers module supports, with its status, and checks again when the person asks.
 
-- **Found:** a command line whose status is `signedOut`, `signedIn` or `unknown` is found, and the guide goes on to sign-in.
-- **None found:** when every command line is `notFound`, the guide says, in words, what to install: each supported command line by the name the providers module shows, with one sentence on how it is installed, and that TeamRun finds it on the PATH or at a program path set in Settings.
+- **Found:** a command line whose status is `SignedOut`, `SignedIn` or `Unknown` is found, and the guide goes on to sign-in.
+- **None found:** when every command line is `NotFound`, the guide says, in words, what to install: each supported command line by the name the providers module shows, with one sentence on how it is installed, and that TeamRun finds it on the PATH or at a program path set in Settings.
   It offers no download and no link to a provider's site ([Missing decisions](#7-missing-decisions)), and Check again runs discovery again.
 - **Unsupported:** a command line whose version is outside its supported range, or whose approvals cannot be routed to TeamRun, shows its status's reason and cannot help.
 
@@ -78,9 +78,9 @@ The guide lists each command line the providers module supports, with its status
 
 For each found command line, the guide shows whether the person is signed in, from the command line's own status interface.
 
-- A command line that is `signedOut` shows its own sign-in command, as the Agents document does, with Copy, for the person to run in a terminal, and Check again.
-- `unknown` shows the reason and Check again.
-- The step goes on when at least one command line is `signedIn`, or when the person skips it.
+- A command line that is `SignedOut` shows its own sign-in command, as the Agents document does, with Copy, for the person to run in a terminal, and Check again.
+- `Unknown` shows the reason and Check again.
+- The step goes on when at least one command line is `SignedIn`, or when the person skips it.
 
 TeamRun never signs in for the person, runs a sign-in command, or takes, reads or stores a credential.
 
@@ -92,8 +92,8 @@ Until the window offers a folder chooser, the step offers no project alone and s
 
 ### 4. Pick who helps
 
-The guide offers what the conversations module's composer offers: the teammates whose command line is `signedIn`, and a plain agent for each `signedIn` command line ([In a conversation](../teammates/README.md#in-a-conversation)).
-The first `signedIn` command line's plain agent is the default.
+The guide offers what the conversations module's composer offers: the teammates whose command line is `SignedIn`, and a plain agent for each `SignedIn` command line ([In a conversation](../teammates/README.md#in-a-conversation)).
+The first `SignedIn` command line's plain agent is the default.
 Create a teammate opens the Teammates document; a teammate created there joins the list when the guide reads it again.
 With no command line signed in, the step says why nobody can help yet and goes back to sign-in.
 

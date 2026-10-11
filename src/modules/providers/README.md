@@ -43,8 +43,9 @@ The window part reads the command lines' status through the module's own methods
 
 ### The event schema
 
-The schema follows the shapes of the [Agent Client Protocol](https://agentclientprotocol.com/protocol/overview), version 1: its session updates, content blocks, tool calls, plans, permission requests and stop reasons keep the protocol's field names and values.
+The schema follows the shapes of the [Agent Client Protocol](https://agentclientprotocol.com/protocol/overview), version 1: its session updates, content blocks, tool calls, plans, permission requests and stop reasons keep the protocol's field names and the meaning of its values.
 TeamRun uses no package of the protocol's; its protocol package defines these models itself, and every adapter maps its command line's stream into them.
+TeamRun's enumerated values are PascalCase, and each adapter maps the protocol's spelling to them: the protocol's `end_turn`, `in_progress` and `tool_call_update` are `EndTurn`, `InProgress` and `ToolCallUpdate` here.
 Names of protocols and products belong to their owners, and naming them implies no endorsement.
 
 An event is one JSON object with these fields:
@@ -67,12 +68,12 @@ Consumers use `sequence` to tell a missed event from a late one and never reorde
 |---|---|---|
 | `session.started` | The command line's id and version, the adapter kind, the working folder, `configOptions`, `modes` when the command line gives no configuration options, and the provider's own session id when the session can be resumed | The `session/new` response, with its `configOptions` and its `SessionModeState` |
 | `session.update` | `update`: one of the protocol's session updates, below | The `session/update` notification's `update` |
-| `session.ended` | The reason: `ended` when its owner ended it, `stopped` when cancelling stopped its process, `exited` when the command line exited by itself, with its exit code, or `failed`, with an [error](#errors) | None: a session ends with its process |
+| `session.ended` | The reason: `Ended` when its owner ended it, `Stopped` when cancelling stopped its process, `Exited` when the command line exited by itself, with its exit code, or `Failed`, with an [error](#errors) | None: a session ends with its process |
 | `turn.started` | The prompt's id, which the session's owner gave it | The `session/prompt` request, without its content |
-| `turn.finished` | The outcome: the protocol's `stopReason`, `end_turn`, `max_tokens`, `max_turn_requests`, `refusal` or `cancelled`, or `failed`, with an [error](#errors); and the usage the command line reports: input, output and cached tokens, the duration, and the cost, each absent when not reported | The `session/prompt` response |
+| `turn.finished` | The outcome: the protocol's stop reason, `EndTurn`, `MaxTokens`, `MaxTurnRequests`, `Refusal` or `Cancelled`, or `Failed`, with an [error](#errors); and the usage the command line reports: input, output and cached tokens, the duration, and the cost, each absent when not reported | The `session/prompt` response |
 | `tool.output` | `toolCallId` and the next piece of the call's output, such as a command's | None ([Differences](#differences-from-the-protocol)) |
 | `permission.requested` | The runtime permission request's id, and the request's `toolCall` and `options` | The `session/request_permission` request, without `sessionId` |
-| `permission.resolved` | The runtime request's id; its decision: `allowedOnce`, `allowedAlways`, `denied`, `deniedAlways`, `withdrawn` or `expired`; and the `outcome` the command line was sent | The `session/request_permission` response's `outcome` |
+| `permission.resolved` | The runtime request's id; its decision: `AllowedOnce`, `AllowedAlways`, `Denied`, `DeniedAlways`, `Withdrawn` or `Expired`; and the `outcome` the command line was sent | The `session/request_permission` response's `outcome` |
 | `agent.started` | The subagent's id, the `toolCallId` that started it, and its task's description | None |
 | `agent.finished` | The subagent's id and its outcome, as a turn's | None |
 | `error.reported` | An [error](#errors) | None |
@@ -81,20 +82,20 @@ A `session.update` holds one of the protocol's session updates, by its `sessionU
 
 | `sessionUpdate` | Holds | Consumers |
 |---|---|---|
-| `agent_message_chunk` | A reply's next `content` block and its `messageId` | Show the reply |
-| `agent_thought_chunk` | The agent's reasoning's next `content` block and its `messageId` | Show the reasoning |
-| `tool_call` | A new call: `toolCallId`, `title`, `kind`, `status`, `content`, `locations`, `rawInput` and `name` when given | Show the call |
-| `tool_call_update` | `toolCallId` and the fields that changed; `content` and `locations` replace the call's whole list, and `rawOutput` holds the result | Update the call |
-| `plan` | The whole plan's `entries`, each with its `content`, `priority` and `status` | Replace the plan |
-| `config_option_update` | The session's whole `configOptions`, each with its `id`, `name`, `category`, such as `model` or `mode`, and `currentValue` | Show the model and mode |
-| `current_mode_update` | `currentModeId`, from a command line that reports modes and no configuration options | Show the mode |
-| `usage_update` | `used` and `size` of the context in tokens, and the session's `cost` when reported | Show the usage |
-| `available_commands_update` and any other | As the protocol defines them | Informational: stored and skipped |
+| `AgentMessageChunk` | A reply's next `content` block and its `messageId` | Show the reply |
+| `AgentThoughtChunk` | The agent's reasoning's next `content` block and its `messageId` | Show the reasoning |
+| `ToolCall` | A new call: `toolCallId`, `title`, `kind`, `status`, `content`, `locations`, `rawInput` and `name` when given | Show the call |
+| `ToolCallUpdate` | `toolCallId` and the fields that changed; `content` and `locations` replace the call's whole list, and `rawOutput` holds the result | Update the call |
+| `Plan` | The whole plan's `entries`, each with its `content`, `priority` and `status` | Replace the plan |
+| `ConfigOptionUpdate` | The session's whole `configOptions`, each with its `id`, `name`, `category`, such as `Model` or `Mode`, and `currentValue` | Show the model and mode |
+| `CurrentModeUpdate` | `currentModeId`, from a command line that reports modes and no configuration options | Show the mode |
+| `UsageUpdate` | `used` and `size` of the context in tokens, and the session's `cost` when reported | Show the usage |
+| `AvailableCommandsUpdate` and any other | As the protocol defines them | Informational: stored and skipped |
 
-A tool call's `kind` is one of the protocol's `read`, `edit`, `delete`, `move`, `search`, `execute`, `think`, `fetch`, `switch_mode` and `other`, so a consumer can show a call it does not know by name.
-Its `status` is `pending`, `in_progress`, `completed` or `failed`; a call that has not finished when its turn finishes `cancelled` is shown as cancelled, as the protocol advises the client, and a call whose permission was denied fails.
+A tool call's `kind` is one of the protocol's kinds, `Read`, `Edit`, `Delete`, `Move`, `Search`, `Execute`, `Think`, `Fetch`, `SwitchMode` and `Other`, so a consumer can show a call it does not know by name.
+Its `status` is `Pending`, `InProgress`, `Completed` or `Failed`; a call that has not finished when its turn finishes `Cancelled` is shown as cancelled, as the protocol advises the client, and a call whose permission was denied fails.
 A session's model and mode are its configuration options, by their `category`: an adapter whose command line reports them another way, or reports only modes, gives them in these shapes.
-A file a call changed is a `diff` item of its `content`, with its `path`, its `oldText`, null for a new file, and its `newText`.
+A file a call changed is a `Diff` item of its `content`, with its `path`, its `oldText`, null for a new file, and its `newText`.
 Chunks with the same `messageId` belong to one message; a chunk with another `messageId`, another update or the turn's end ends it.
 An adapter whose command line gives whole messages only sends one chunk per message.
 
@@ -104,7 +105,7 @@ Every text is plain text or Markdown, which the consumer renders under the [secu
 
 Each kind's model validates its fields under the [wire contract](../../../docs/CODING-STANDARDS.md#the-wire-contract).
 A text field is bounded at 1 MiB, and an adapter that reads a longer one sends it in pieces where the kind has pieces, and cuts it with a marker where it has not.
-A `diff` whose `oldText` or `newText` is over 1 MiB is sent as a `content` item that names the file and says the change is too large to show.
+A `Diff` item whose `oldText` or `newText` is over 1 MiB is sent as a `Content` item that names the file and says the change is too large to show.
 
 ### Differences from the protocol
 
@@ -122,11 +123,11 @@ Each difference has its reason:
   It bounds the cost of rendering and storing a stream.
 - **`tool.output`:** a call's output streams as appended pieces, where the protocol replaces a call's `content` with each update or shows a terminal the client runs.
   Replacing the content would send all output again with each piece, and TeamRun does not run the agent's terminals ([Missing decisions](#7-missing-decisions)).
-- **Paths relative to the working folder:** a path inside the session's working folder, in `locations` and `diff` items, is relative to it; one outside stays absolute, where the protocol always uses absolute paths.
+- **Paths relative to the working folder:** a path inside the session's working folder, in `locations` and `Diff` items, is relative to it; one outside stays absolute, where the protocol always uses absolute paths.
   Stored records outlive a device's paths, and the architecture keeps records free of them.
-- **`failed` turns:** `turn.finished` records `failed` with an error, where the protocol answers the prompt with a JSON-RPC error and no stop reason.
+- **`Failed` turns:** `turn.finished` records `Failed` with an error, where the protocol answers the prompt with a JSON-RPC error and no stop reason.
   A stored turn always has an outcome.
-- **Usage per turn:** `turn.finished` holds the turn's tokens, duration and cost, beside the protocol's `usage_update` of the session's context and cost.
+- **Usage per turn:** `turn.finished` holds the turn's tokens, duration and cost, beside the `UsageUpdate` of the session's context and cost.
   The person sees what each turn cost.
 - **Permission decisions:** `permission.requested` and `permission.resolved` carry the runtime request's id, and the resolved event keeps both TeamRun's decision and the `outcome` the command line was sent.
   TeamRun keeps remembered answers itself and answers the command line with allow-once ([Permissions](#permissions)), so the two differ.
@@ -134,10 +135,12 @@ Each difference has its reason:
   Conversations shows a subagent's calls under the call that started it.
 - **Session lifecycle:** `session.ended` and `error.reported`, which the protocol has no shape for.
   A session's process can end or fail outside any request.
-- **Resuming:** an adapter that loads an earlier session drops the updates the command line replays, such as `user_message_chunk`.
+- **Resuming:** an adapter that loads an earlier session drops the updates the command line replays, such as the person's earlier messages.
   Conversations keeps the earlier timeline and the person's messages itself.
 - **No prompt content:** `turn.started` holds the prompt's id, not its content blocks.
   The session's owner keeps the prompt, and the schema does not hold it twice.
+- **PascalCase values:** the schema spells every enumerated value in PascalCase, `EndTurn` where the protocol has `end_turn`, and the adapters map each value from the protocol's spelling.
+  TeamRun's enumerations hold values that match their members, and a spelling fixed outside TeamRun stays out of them ([naming](../../../docs/CODING-STANDARDS.md#10-naming-and-formatting)), so one spelling holds for the values TeamRun adds, such as `Failed`, and those it takes from the protocol.
 - **Bounds:** the text bounds above and the [16 MiB line bound](#errors), which the protocol leaves to implementations.
 
 ### Versioning
@@ -148,7 +151,7 @@ The schema starts at version `1.0`, following version 1 of the protocol.
   Consumers ignore fields, informational kinds and session updates they don't know, as the schema allows them, and read an open field's unknown value as its fallback below.
 - Anything else is a major version: a removed or renamed field, a changed meaning, a new or removed value of a closed field, or a new kind or session update that asks for an answer or changes a turn's outcome.
   A consumer refuses a major version it does not know before acting on any event of it.
-- `session.started`, `turn.finished`, `permission.requested` and `session.ended`, and the `tool_call` and `tool_call_update` session updates, are never informational: a consumer that cannot read one fails the session closed.
+- `session.started`, `turn.finished`, `permission.requested` and `session.ended`, and the `ToolCall` and `ToolCallUpdate` session updates, are never informational: a consumer that cannot read one fails the session closed.
 - Following a newer protocol version is a schema change under these rules: a minor version when the protocol's change only adds what a minor version may add, and a major version otherwise.
   An adapter that speaks a newer protocol version to its command line maps it into the schema's current shapes, so a command line's protocol version never changes the schema by itself.
 - Stored events outlive builds, so the protocol package reads every version it has ever written, mapping each older form into the current one.
@@ -165,14 +168,14 @@ Each enumerated field is open or closed:
 | `turn.finished`'s and `agent.finished`'s outcome | Closed | Refused, failing the session closed |
 | A content block's `type` | Open | Shown as content the build cannot show, by its type |
 | A tool call content item's `type` | Open | Skipped |
-| A tool call's `kind` | Open | `other` |
+| A tool call's `kind` | Open | `Other` |
 | A tool call's `status` | Closed | Refused, failing the session closed |
 | A configuration option's `category` | Open | Shown by its `name`, as neither the model nor the mode |
-| A plan entry's `priority` | Open | `medium` |
+| A plan entry's `priority` | Open | `Medium` |
 | A plan entry's `status` | Closed | Refused, failing the session closed |
 | A permission option's `kind` | Closed | Refused, failing the session closed |
 | `permission.resolved`'s decision and its `outcome` | Closed | Refused, failing the session closed |
-| An error's code | Open | `providerError`, keeping its message and whether the session can go on |
+| An error's code | Open | `ProviderError`, keeping its message and whether the session can go on |
 
 ## 4. Contributions
 
@@ -204,10 +207,10 @@ Discovery runs on the first request, never at activation, and again when the per
 For each command line the module finds the program, as `startProcessAsync` would find it or from its path setting, and runs the command line's own version command.
 Its status is one of:
 
-- `notFound`: no program on the PATH or at the set path;
-- `unsupported`: a version outside the range its adapter supports, which the status names, or a command line whose approvals cannot be routed to TeamRun ([Permissions](#permissions));
-- `signedOut` or `signedIn`, from the command line's own status interface: its status command, or its protocol's account request where the adapter's protocol has one;
-- `unknown`: the status interface failed or did not answer within 10 seconds, with the reason.
+- `NotFound`: no program on the PATH or at the set path;
+- `Unsupported`: a version outside the range its adapter supports, which the status names, or a command line whose approvals cannot be routed to TeamRun ([Permissions](#permissions));
+- `SignedOut` or `SignedIn`, from the command line's own status interface: its status command, or its protocol's account request where the adapter's protocol has one;
+- `Unknown`: the status interface failed or did not answer within 10 seconds, with the reason.
 
 The module reads only whether the person is signed in, and the account's display label where the status interface gives one, which the Agents document shows and nothing logs.
 It never reads credential files, environment values or keychains, and never signs in for the person.
@@ -228,7 +231,7 @@ A session is one agent process, started in the session's working folder with the
 - A session is resumed only through the command line's own resume interface, with the provider's session id the session reported in `session.started`, which the owner keeps.
 
 Cancelling a turn asks the command line to stop it through its own interrupt, then waits for its end.
-When the command line offers no interrupt, or the turn has not finished within 5 seconds, the module stops the process: the turn finishes `cancelled` and the session ends `stopped`.
+When the command line offers no interrupt, or the turn has not finished within 5 seconds, the module stops the process: the turn finishes `Cancelled` and the session ends `Stopped`.
 The owner may resume a stopped session in a new one.
 Cancelling withdraws the turn's pending permission requests.
 Ending a session cancels its turn and stops its process; the runtime ends what is left when the module's part deactivates (architecture, [Programs modules run](../../../docs/ARCHITECTURE.md#programs-modules-run)).
@@ -240,11 +243,11 @@ Every permission request goes through the runtime permission contract, desktop-c
 - **The agent's own tools:** the adapter turns the command line's approval request into a runtime request from `providers`, with the session, the call and the options the command line offers, and sends `permission.requested`.
   It sends the decision back to the command line in the command line's own terms and sends `permission.resolved`.
   TeamRun keeps remembered answers itself, so an allowed request is answered with the command line's allow-once option, never its allow-always one, and later requests still reach TeamRun.
-  A request withdrawn because its turn was cancelled is answered with the protocol's `cancelled` outcome, where the adapter's protocol has one, and denied otherwise; a request that expires is denied with the command line's reject-once option.
+  A request withdrawn because its turn was cancelled is answered with the `Cancelled` outcome, where the adapter's protocol has one, and denied otherwise; a request that expires is denied with the command line's reject-once option.
 - **Tools that tool modules serve:** a tool module raises its own runtime request for its action, under the tool module contract (teamrun#775).
   The request never passes through the agent's stream or this schema, since the MCP server never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as the [conversations module](../conversations/README.md#permissions) describes.
   Each session reaches the tool modules through MCP connections of its own, so a tool module knows the calling session from the connection, never from the tool's arguments.
-  A denied or withdrawn request ends the call with an MCP error result, which the agent's stream shows as a `tool_call_update` with the status `failed`.
+  A denied or withdrawn request ends the call with an MCP error result, which the agent's stream shows as a `ToolCallUpdate` with the status `Failed`.
 - **No double prompt:** for each session the adapter allows, in the command line's own allow configuration, exactly the tools TeamRun serves on that session's connections, so the person is asked once, by the tool module.
   Each allow entry names one served tool by its full name, never by a wildcard, under a server name only TeamRun uses: a name of its own with the session's random suffix, which no configuration written before the session can name.
   It never turns on a command line's global mode that skips approvals, so the agent's own tools still ask.
@@ -254,9 +257,9 @@ The adapter holds the session against them:
 
 - It starts the command line with an explicit approval mode that sends every approval to TeamRun, and limits the configuration the command line reads to the session's own where the command line offers that, through its own options.
 - It checks what the command line reports at the start, such as its approval mode and its MCP servers, where it reports them.
-  An approval mode other than the one asked for, or another server under one of TeamRun's names, ends the session `failed` with `configurationConflict` before any prompt.
+  An approval mode other than the one asked for, or another server under one of TeamRun's names, ends the session `Failed` with `ConfigurationConflict` before any prompt.
 - It never writes or changes the person's or the project's configuration, not even to remove a conflict.
-- A command line that cannot be held to this is `unsupported`, and its status says that its approvals cannot be routed to TeamRun.
+- A command line that cannot be held to this is `Unsupported`, and its status says that its approvals cannot be routed to TeamRun.
   Whether each adapter kind can be held is a blocking [missing decision](#7-missing-decisions).
 
 The agent's output cannot grant a permission, answer a request or widen what a session may reach.
@@ -265,15 +268,15 @@ The agent's output cannot grant a permission, answer a request or widen what a s
 
 A subagent's events carry its id in `agent`, between its `agent.started` and `agent.finished`.
 The call that started it stays open until the subagent finishes.
-When a command line shows only a subagent's result, the adapter sends it as a call of the kind `other` and no `agent` events.
+When a command line shows only a subagent's result, the adapter sends it as a call of the kind `Other` and no `agent` events.
 
 ### Errors
 
 An error has a code, a message for people and whether the session can go on.
-Codes: `commandLineMissing`, `unsupportedVersion`, `signedOut`, `startFailed`, `configurationConflict`, `exited`, `protocolViolation` and `providerError`, the command line's own error, with its message.
+Codes: `CommandLineMissing`, `UnsupportedVersion`, `SignedOut`, `StartFailed`, `ConfigurationConflict`, `Exited`, `ProtocolViolation` and `ProviderError`, the command line's own error, with its message.
 
-- A line or message the adapter cannot read, or one over 16 MiB, is a `protocolViolation`: the turn finishes `failed`, the process stops and the session ends `failed`.
-- A provider's error that ends a turn finishes it `failed`; one that does not, such as a retried request, is reported and the turn goes on.
+- A line or message the adapter cannot read, or one over 16 MiB, is a `ProtocolViolation`: the turn finishes `Failed`, the process stops and the session ends `Failed`.
+- A provider's error that ends a turn finishes it `Failed`; one that does not, such as a retried request, is reported and the turn goes on.
 - Messages are redacted as the runtime's log is, and carry no environment value or credential.
   The command line's standard error is read with a bound of 64 KiB per turn and goes only into the error it explains.
 
@@ -295,8 +298,8 @@ An Agent Client Protocol session already speaks the schema's shapes, so its adap
 | Permissions | A permission tool the module serves on the session's own MCP connection, which the command line calls before each tool it would ask about | Approval requests from the server, answered with a decision | Permission requests with the options to choose from, answered with one |
 | Subagents | Events carrying the id of the call that started the subagent | Shown as their parent call when the stream gives no more | Shown as their parent call when the stream gives no more |
 | Turn end | The result event, with its usage and cost | A turn completed notification | The prompt's answer and its stop reason |
-| Cancelling | The interrupt the command line offers, or stopping the process | An interrupt request | A cancel notification, after which the turn ends `cancelled` |
-| Sign-in status | The command line's status command | The protocol's account request | The command line's status command; without one, `unknown` until starting a session reports that authentication is required |
+| Cancelling | The interrupt the command line offers, or stopping the process | An interrupt request | A cancel notification, after which the turn ends `Cancelled` |
+| Sign-in status | The command line's status command | The protocol's account request | The command line's status command; without one, `Unknown` until starting a session reports that authentication is required |
 
 Adapters are tested against synthetic streams written from each command line's public documentation, never against recordings of real sessions, until a decision allows those.
 
@@ -311,5 +314,5 @@ Resolve these before dependent implementation:
 - **Permission contract:** the runtime permission contract, desktop-core#14, its request and decision shapes and remembered answers; the permission section above follows it once it is defined.
 - **Client capabilities:** whether TeamRun serves an Agent Client Protocol session's file and terminal requests itself, or the agent keeps its own.
 - **Prompt content:** images and files in a prompt, and the sizes allowed.
-- **Models and modes:** how the person and teammates choose a model and mode per command line through its `model` and `mode` configuration options.
+- **Models and modes:** how the person and teammates choose a model and mode per command line through its `Model` and `Mode` configuration options.
 - **Live use:** running real command lines and recording real streams for tests, which the Owner decides.
