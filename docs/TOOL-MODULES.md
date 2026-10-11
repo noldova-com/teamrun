@@ -108,6 +108,16 @@ No module writes another's files, and what authenticates a connection never goes
   A request that names no session shows nowhere yet, so it expires as denied and the action does not run ([Conversations' Permissions](../src/modules/conversations/README.md#permissions)).
 - **Withdrawing:** Conversations never withdraws a tool's request itself; the tool does, when the call ends.
 
+### Turned off
+
+A tool can be present in the build but turned off, by a setting its wrapper contributes.
+While it is off, the wrapper places none of its views, registers no source with `conversations.tools`, and the tool raises no request, so no session reaches it and nothing of it shows.
+Turning it off closes its open connections, which withdraws their pending requests and ends their calls with an error result; sessions already running go on without its tools.
+Turning it on registers its source again, so the sessions that start from then on reach it.
+
+A tool in preview has such a setting, off by default, and a Preview label in its views and its setting.
+Its version stays a plain number, never with a suffix.
+
 ## 4. Ownership
 
 | Concern | Owner |
@@ -118,7 +128,7 @@ No module writes another's files, and what authenticates a connection never goes
 | The permission card the person answers, and the policy per conversation: which requests reach the person and which remembered answers apply | TeamRun's Conversations module |
 | The `conversations.tools` contract, and opening and closing each session's connections through it | TeamRun's Conversations module |
 | Writing a session's connections into the command line's configuration, its allow configuration, and turning the agent's own approval requests into runtime requests | TeamRun's providers module |
-| Declaring the tool, placing its window part, registering it with `conversations.tools` and naming its requester | TeamRun's wrapper |
+| Declaring the tool, placing its window part, registering it with `conversations.tools`, naming its requester, and the setting that turns it on and off | TeamRun's wrapper |
 
 ## 5. The first release
 
@@ -137,6 +147,7 @@ A surface the shell does not offer yet is asked for in the base's repository, an
 - **Agents:** navigate, give input, take a screenshot and read the console.
 - **Origins:** an allow list of origins; navigation outside it, downloads and new windows are refused unless the person approves them.
 - **Shell surface:** a guarded embedded-browser pane, asked for in [desktop-core#12](https://github.com/noldova-com/desktop-core/issues/12).
+- **Preview:** it ships in preview, turned off until the person turns it on ([Turned off](#turned-off)).
 
 ### Computer use
 
@@ -145,6 +156,7 @@ A surface the shell does not offer yet is asked for in the base's repository, an
 - **Agents:** read the screen, and give mouse and keyboard input.
 - **The system's prompts:** the operating system's privacy prompts are the person's to answer.
   The tool never answers, works around or changes them, or any other security setting.
+- **Preview:** it ships in preview, turned off until the person turns it on ([Turned off](#turned-off)).
 
 ### Git
 
@@ -161,7 +173,5 @@ Resolve these before dependent implementation:
 
 - **The base:** the surfaces this document names are the base's, and TeamRun still runs its own shell.
   Whether TeamRun takes them from the base's packages, and when, is not decided here.
-- **Preview:** whether the embedded browser and computer use ship as a preview.
-  A preview has a label in its views and a setting that turns it on, never a version suffix, and the contract is the same either way.
 - **Risk levels:** the scale of risk levels comes with the base's permission contract.
 - **Requests without a session:** where a request that names no agent session shows, which Conversations decides ([Missing decisions](../src/modules/conversations/README.md#7-missing-decisions)).
