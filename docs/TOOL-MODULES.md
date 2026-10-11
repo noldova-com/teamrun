@@ -166,8 +166,11 @@ The tool never depends on that module or on anything else of TeamRun's.
 
 - **Asked once:** for each session, `providers` allows the tools it serves on that session's connection in the command line's own allow configuration, so the person is asked only by the tool's request ([providers' Permissions](../src/modules/providers/README.md#permissions)).
   It never turns on a command line's mode that skips every approval, so the agent's own built-in tools still ask.
-- **The policy:** Conversations' policy asks by default.
-  A conversation may let a low-risk call that its tool lets go without an ask run without asking, and it keeps every ask a tool requires.
+- **The policy:** Conversations' policy asks by default, and keeps every ask a tool requires.
+  The first low-risk request in a conversation that its tool lets go without an ask offers Always allow, with the scope "this tool's low-risk actions in this conversation".
+  One approval then covers them, such as the browser's clicks, keys and navigation within its allow list, and the grant is listed and revocable, as the permission contract keeps remembered answers ([desktop-core#14](https://github.com/noldova-com/desktop-core/issues/14)).
+- **Never low risk:** in the browser, a click or key that submits a form, starts a download or moves to another origin is never low risk, whatever the tool's descriptor says.
+  No low-risk grant covers it, and it always asks.
 - **Where a request shows:** a tool's request shows in its session's thread at the position it arrives, as its own entry.
   It is not nested in the agent's tool call: the host never sees the command line's id for that call, and matching a request to a call by its name or its order would be a race.
   A request that names no session shows nowhere yet, so it expires and the action does not run ([Conversations' Permissions](../src/modules/conversations/README.md#permissions)).
@@ -214,6 +217,7 @@ A surface the shell does not offer yet is asked for in the base's repository, an
 - **Isolation:** a separate profile for each workspace the app names, picked by the profile the app binds to the session, with no access to the app's own window, its bridge to the desktop, its protocol or its credentials.
 - **Agents:** navigate, take a snapshot of the page's accessibility tree with element references, give input, take a screenshot and read the console.
 - **Asking:** navigating within an allow list of origins, a click, a key press or typing into an ordinary field needs no ask.
+  A click or key that would submit a form, start a download or move to another origin is the exception: the tool marks it in the request's details and asks for it every time, at medium risk or higher, and no low-risk grant covers it.
   Navigating off the list asks at medium risk, with a flag in its details when the origin was never allowed in that workspace.
   Typing into a password, one-time-code or card field asks at high risk on every call.
 - **Refused:** downloads and new windows are refused in the first release, with no request.
