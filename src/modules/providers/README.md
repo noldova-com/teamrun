@@ -36,7 +36,7 @@ From the shell, the runtime part needs:
 The runtime part publishes the service `providers.agents` to the modules that depend on it.
 
 - **Command lines:** list each supported command line with its [status](#discovery-and-sign-in), and check them again on request.
-- **Sessions:** start a session, send it a prompt, cancel its running turn and end it.
+- **Sessions:** start a session, send it a prompt, set one of its configuration options, such as its model, cancel its running turn and end it.
   A session delivers its events in order to the module that started it, which alone may prompt, cancel or end it.
 
 The window part reads the command lines' status through the module's own methods, `providers.commandLines` and `providers.checkCommandLines`, and follows the event `providers.commandLinesChanged`.
@@ -65,9 +65,8 @@ Consumers use `sequence` to tell a missed event from a late one and never reorde
 
 | Kind | Data | The protocol's shape |
 |---|---|---|
-| `session.started` | The command line's id and version, the adapter kind, the working folder, the model when the command line reports it, `modes`, and the provider's own session id when the session can be resumed | The `session/new` response, with `modes` as its `SessionModeState` |
+| `session.started` | The command line's id and version, the adapter kind, the working folder, `configOptions`, `modes` when the command line gives no configuration options, and the provider's own session id when the session can be resumed | The `session/new` response, with its `configOptions` and its `SessionModeState` |
 | `session.update` | `update`: one of the protocol's session updates, below | The `session/update` notification's `update` |
-| `session.updated` | A changed model | None: version 1 has no model in its session shapes |
 | `session.ended` | The reason: `ended` when its owner ended it, `stopped` when cancelling stopped its process, `exited` when the command line exited by itself, with its exit code, or `failed`, with an [error](#errors) | None: a session ends with its process |
 | `turn.started` | The prompt's id, which the session's owner gave it | The `session/prompt` request, without its content |
 | `turn.finished` | The outcome: the protocol's `stopReason`, `end_turn`, `max_tokens`, `max_turn_requests`, `refusal` or `cancelled`, or `failed`, with an [error](#errors); and the usage the command line reports: input, output and cached tokens, the duration, and the cost, each absent when not reported | The `session/prompt` response |
@@ -87,12 +86,14 @@ A `session.update` holds one of the protocol's session updates, by its `sessionU
 | `tool_call` | A new call: `toolCallId`, `title`, `kind`, `status`, `content`, `locations`, `rawInput` and `name` when given | Show the call |
 | `tool_call_update` | `toolCallId` and the fields that changed; `content` and `locations` replace the call's whole list, and `rawOutput` holds the result | Update the call |
 | `plan` | The whole plan's `entries`, each with its `content`, `priority` and `status` | Replace the plan |
-| `current_mode_update` | `currentModeId` | Show the mode |
+| `config_option_update` | The session's whole `configOptions`, each with its `id`, `name`, `category`, such as `model` or `mode`, and `currentValue` | Show the model and mode |
+| `current_mode_update` | `currentModeId`, from a command line that reports modes and no configuration options | Show the mode |
 | `usage_update` | `used` and `size` of the context in tokens, and the session's `cost` when reported | Show the usage |
 | `available_commands_update` and any other | As the protocol defines them | Informational: stored and skipped |
 
 A tool call's `kind` is one of the protocol's `read`, `edit`, `delete`, `move`, `search`, `execute`, `think`, `fetch`, `switch_mode` and `other`, so a consumer can show a call it does not know by name.
 Its `status` is `pending`, `in_progress`, `completed` or `failed`; a call that has not finished when its turn finishes `cancelled` is shown as cancelled, as the protocol advises the client, and a call whose permission was denied fails.
+A session's model and mode are its configuration options, by their `category`: an adapter whose command line reports them another way, or reports only modes, gives them in these shapes.
 A file a call changed is a `diff` item of its `content`, with its `path`, its `oldText`, null for a new file, and its `newText`.
 Chunks with the same `messageId` belong to one message; a chunk with another `messageId`, another update or the turn's end ends it.
 An adapter whose command line gives whole messages only sends one chunk per message.
@@ -123,8 +124,6 @@ Each difference has its reason:
   Replacing the content would send all output again with each piece, and TeamRun does not run the agent's terminals ([Missing decisions](#7-missing-decisions)).
 - **Paths relative to the working folder:** a path inside the session's working folder, in `locations` and `diff` items, is relative to it; one outside stays absolute, where the protocol always uses absolute paths.
   Stored records outlive a device's paths, and the architecture keeps records free of them.
-- **Replacing lists:** `tool_call_update`'s `content` and `locations` replace the call's whole list, which the protocol leaves unstated.
-  Every adapter and consumer must read an update one way.
 - **`failed` turns:** `turn.finished` records `failed` with an error, where the protocol answers the prompt with a JSON-RPC error and no stop reason.
   A stored turn always has an outcome.
 - **Usage per turn:** `turn.finished` holds the turn's tokens, duration and cost, beside the protocol's `usage_update` of the session's context and cost.
@@ -133,8 +132,8 @@ Each difference has its reason:
   TeamRun keeps remembered answers itself and answers the command line with allow-once ([Permissions](#permissions)), so the two differ.
 - **Subagents:** `agent` and `agent.started` and `agent.finished`, which the protocol has no shape for.
   Conversations shows a subagent's calls under the call that started it.
-- **Session lifecycle:** `session.ended`, `session.updated` and `error.reported`, which the protocol has no shape for.
-  A session's process can end or fail, and its model can change, outside any request.
+- **Session lifecycle:** `session.ended` and `error.reported`, which the protocol has no shape for.
+  A session's process can end or fail outside any request.
 - **Resuming:** an adapter that loads an earlier session drops the updates the command line replays, such as `user_message_chunk`.
   Conversations keeps the earlier timeline and the person's messages itself.
 - **No prompt content:** `turn.started` holds the prompt's id, not its content blocks.
@@ -168,6 +167,7 @@ Each enumerated field is open or closed:
 | A tool call content item's `type` | Open | Skipped |
 | A tool call's `kind` | Open | `other` |
 | A tool call's `status` | Closed | Refused, failing the session closed |
+| A configuration option's `category` | Open | Shown by its `name`, as neither the model nor the mode |
 | A plan entry's `priority` | Open | `medium` |
 | A plan entry's `status` | Closed | Refused, failing the session closed |
 | A permission option's `kind` | Closed | Refused, failing the session closed |
@@ -240,7 +240,7 @@ Every permission request goes through the runtime permission contract, desktop-c
 - **The agent's own tools:** the adapter turns the command line's approval request into a runtime request from `providers`, with the session, the call and the options the command line offers, and sends `permission.requested`.
   It sends the decision back to the command line in the command line's own terms and sends `permission.resolved`.
   TeamRun keeps remembered answers itself, so an allowed request is answered with the command line's allow-once option, never its allow-always one, and later requests still reach TeamRun.
-  A request that is withdrawn or expires is denied to the command line.
+  A request withdrawn because its turn was cancelled is answered with the protocol's `cancelled` outcome, where the adapter's protocol has one, and denied otherwise; a request that expires is denied with the command line's reject-once option.
 - **Tools that tool modules serve:** a tool module raises its own runtime request for its action, under the tool module contract (teamrun#775).
   The request never passes through the agent's stream or this schema, since the MCP server never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as the [conversations module](../conversations/README.md#permissions) describes.
   Each session reaches the tool modules through MCP connections of its own, so a tool module knows the calling session from the connection, never from the tool's arguments.
@@ -311,5 +311,5 @@ Resolve these before dependent implementation:
 - **Permission contract:** the runtime permission contract, desktop-core#14, its request and decision shapes and remembered answers; the permission section above follows it once it is defined.
 - **Client capabilities:** whether TeamRun serves an Agent Client Protocol session's file and terminal requests itself, or the agent keeps its own.
 - **Prompt content:** images and files in a prompt, and the sizes allowed.
-- **Models and modes:** how the person and teammates choose a model and mode per command line, and how `session.updated` reaches them.
+- **Models and modes:** how the person and teammates choose a model and mode per command line through its `model` and `mode` configuration options.
 - **Live use:** running real command lines and recording real streams for tests, which the Owner decides.

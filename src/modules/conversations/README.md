@@ -163,7 +163,7 @@ Entries take positions in the order the runtime part receives what they show; a 
 | The plan | `plan` | One plan per turn, a checklist updated where it first appeared, with its progress, such as 3 of 7, in the composer while the turn runs |
 | A permission request | The runtime permission contract | A permission card ([Permissions](#permissions)) |
 | The turn's end | `turn.finished`, `usage_update` | Its outcome when not `end_turn`, and the usage reported: tokens, the duration, the context used and the cost |
-| A notice | `session.started`, `session.updated`, `current_mode_update`, `session.ended`, `error.reported` | An agent joining, its model or mode changing, a session ending other than by its owner, and errors, with whether the agent can go on |
+| A notice | `session.started`, `config_option_update`, `current_mode_update`, `session.ended`, `error.reported` | An agent joining, its model or mode changing, a session ending other than by its owner, and errors, with whether the agent can go on |
 
 - Consecutive entries of one author share one header.
 - While the person is at the end of the timeline, it follows new entries; once they scroll up, it stays, and Jump to latest shows with the count of new entries.
@@ -196,7 +196,7 @@ The card's output loads when it expands, from its stored pieces, and then follow
 A diff a call made shows inside its card as a read-only diff view, unified or side by side.
 The runtime part compares each `diff` item's `oldText` and `newText` by lines into the diff view's hunks, each with its line numbers and an id made of the call's id, the file's path and the hunk's place in the file, so a hunk keeps its id while the call reports again.
 A file whose `oldText` is null shows as added, and any other as modified; a file a call deletes or moves shows in its card, by its `delete` or `move` kind, without a diff.
-Nested calls show 20 at a time, then Show N more, with the step passed to the card.
+Nested calls show 20 at a time, then Show N more, with the step passed to the card, as [agreed for the tool-call card](https://github.com/noldova-com/components/issues/37#issuecomment-6105184931).
 A line comment the diff view asks for puts the file and line, as `path:line`, into the composer.
 
 ### Composer
@@ -225,7 +225,7 @@ The module answers every request of the runtime permission contract, desktop-cor
   Always allow at high risk asks for an inline confirmation.
 - **States:** the card's status is `Pending`, with the request's expiry time; `Sending`, with the options disabled; `SendFailed`, with a retry; `Decided`, with the chosen option's id, whose effect and scope show in place of the options with who decided and when; `Expired`; or `Withdrawn`.
   A request the contract answers from a remembered answer shows as a decided card that names the rule.
-  Cancelling a turn withdraws, through `providers`, the agent's own waiting requests; a tool module's request belongs to its requester, which withdraws it when its call ends, and the module never withdraws it itself.
+  Cancelling a turn withdraws, through `providers`, the agent's own waiting requests, which their cards show as `Withdrawn`; a tool module's request belongs to its requester, which withdraws it when its call ends, and the module never withdraws it itself.
 - **Focus:** a card never takes focus by itself; `conversations.nextRequest` and the composer's count select it, and the kit's list marks it selected.
 - **Authority:** only the person's choice in the window part answers a request.
   The runtime part checks that the request waits and that the option is one it offered, and returns the decision to the contract, which records it.
