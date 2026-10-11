@@ -78,6 +78,7 @@ Reuse guidance already read until it changes or the subject changes; a cross-ref
 | One module's behavior, data and interface | Its document, `src/modules/<id>/README.md` |
 | Appearance, the shared kit, layout, interaction and accessibility | [UI-STANDARDS.md](docs/UI-STANDARDS.md) |
 | Tests, coverage, UI automation, verification and evidence | [TESTING.md](docs/TESTING.md) |
+| Moving onto the base's shell packages | [MIGRATION.md](docs/MIGRATION.md) |
 | Contributions, issue/PR requirements and ordinary support | [CONTRIBUTING.md](.github/CONTRIBUTING.md) |
 | Private vulnerability reporting and disclosure | [SECURITY.md](.github/SECURITY.md) |
 | License terms | [LICENSE](LICENSE) |
