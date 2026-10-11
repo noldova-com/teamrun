@@ -45,7 +45,7 @@ It keeps the guide's progress per device, since each device has its own command 
 | Device | The device the guide ran on ([Missing decisions](#7-missing-decisions)) |
 | State | Not started, in progress, skipped or finished |
 | Step | The step to resume at, while in progress |
-| Choices | The choices made so far: no folder or a chosen one, the command line or teammate that helps, and the suggested task picked |
+| Choices | The choices made so far: no folder or a chosen one, the command line or teammate that helps, and which suggested task was picked; an edited suggestion's or the person's own text is never kept, so resuming offers the suggestion again |
 
 A chosen folder is kept only as the choice that one was made; its path goes to the conversations module, which owns folders, and never into this database.
 The log records the steps reached, skipped and finished, never a path, a name or a task's text.
@@ -58,10 +58,11 @@ The window part opens the guide when it activates and the device's state is not 
 It opens as any document a part opens while activating does, so it never takes the place of a saved layout's active tab (architecture, [Lifecycle](../../../docs/ARCHITECTURE.md#lifecycle)).
 
 - **Skip:** Skip guide, on every step, ends the guide as skipped; it never opens by itself again.
-  Skip this step goes on to the next step without its choice.
+  Skip this step goes on to the next step without its choice; on the last step, it finishes the guide without opening a conversation.
 - **Resume:** closing the guide's tab keeps it in progress at its step, and it opens there at the next start.
   Every step can go back to the one before, keeping its choices.
 - **Run again:** `first-run.open`, from Settings or command search, opens the guide at its first step with its earlier choices, in any state, and running it to its end finishes it again.
+- **Choices checked again:** resuming or running again checks each earlier choice against what the modules report then, and drops one that no longer applies, such as a deleted teammate or a command line no longer signed in, so Start conversation never hands over an agent that cannot start.
   Running it again changes nothing the guide's earlier runs handed over, such as a conversation.
 
 ### 1. Find the agent command lines
