@@ -18,7 +18,7 @@ The module sees agents only through the providers module's [event schema](../pro
 - **Window:** the Conversations view, the thread document with its timeline and composer, and the module's settings ([Contributions](#4-contributions)).
 
 The module depends on `providers`, for the service `providers.agents` and the schema's models in its protocol package, and on `teammates`, for the service `teammates.directory`.
-It never imports a tool module: each session's MCP connections come from the tool module contract (teamrun#775), and the module passes them to `providers` when it starts the session.
+It never imports a tool module: `providers` serves each session the tools that tool modules publish, under the [tool module contract](../../../docs/TOOL-MODULES.md#the-host-providers), and the module names the session's conversation as its scope when it starts the session.
 
 From the shell, the runtime part needs:
 
@@ -215,17 +215,17 @@ How attachments reach each command line is a [missing decision](#7-missing-decis
 
 ### Permissions
 
-The module answers every request of the runtime permission contract, desktop-core#14, as `providers` and the tool module contract (teamrun#775) agree.
+The module answers every request of the runtime permission contract, desktop-core#14, as `providers` and the [tool module contract](../../../docs/TOOL-MODULES.md#permission-requests) agree.
 
 - **Where a request shows:** an agent's own request, which `permission.requested` ties to its call, shows right under that call's card.
-  A tool module's request names the agent session from the session's own MCP connection, and shows in that session's thread at the position it arrives.
+  A request for a tool's action, which the tool host in `providers` or the tool itself raises, names the agent session from the connection the call arrived on, and shows in that session's thread at the position it arrives.
   A request that names no session shows nowhere yet, so it expires as denied ([Missing decisions](#7-missing-decisions)).
 - **The card:** the requester, the action, its description, the risk as text and icon, the exact details as code, and the options the request offers, each with its effect, Allow or Deny, and its scope, Once or Always.
   The card's default option is Allow once at low risk and Deny at medium and high risk.
   Always allow at high risk asks for an inline confirmation.
 - **States:** the card's status is `Pending`, with the request's expiry time; `Sending`, with the options disabled; `SendFailed`, with a retry; `Decided`, with the chosen option's id, whose effect and scope show in place of the options with who decided and when; `Expired`; or `Withdrawn`.
   A request the contract answers from a remembered answer shows as a decided card that names the rule.
-  Cancelling a turn withdraws, through `providers`, the agent's own waiting requests, which their cards show as `Withdrawn`; a tool module's request belongs to its requester, which withdraws it when its call ends, and the module never withdraws it itself.
+  Cancelling a turn withdraws, through `providers`, the agent's own waiting requests, which their cards show as `Withdrawn`; a request for a tool's action is withdrawn by whoever raised it when its call ends, and the module never withdraws it itself.
 - **Focus:** a card never takes focus by itself; `conversations.nextRequest` and the composer's count select it, and the kit's list marks it selected.
 - **Authority:** only the person's choice in the window part answers a request.
   The runtime part checks that the request waits and that the option is one it offered, and returns the decision to the contract, which records it.
@@ -271,7 +271,6 @@ The composer, the plan checklist, the thread rows, the turn's end and the notice
 Resolve these before dependent implementation:
 
 - **Permission contract:** desktop-core#14's request and decision shapes, the scopes of remembered answers and which the card offers, and where a request that names no agent session shows.
-- **Tool connections:** how the tool module contract, teamrun#775, gives each session its MCP connections, which the module passes to `providers`.
 - **Prompt content:** how images and files reach each command line, and their sizes, which the providers module decides ([Missing decisions](../providers/README.md#7-missing-decisions)); until then the composer offers no attachments.
 - **Models and modes:** how the person picks an agent's model and mode, which the providers module decides; until then the composer shows what the session reports.
 - **Choosing a folder:** the window offers no folder chooser to a window part yet, so New conversation can offer only No folder until the shell offers one.
