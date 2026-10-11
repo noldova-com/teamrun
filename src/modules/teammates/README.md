@@ -71,7 +71,8 @@ The module checks only the model preference's bounds: whether the command line k
 An edit changes the teammate for every thread that holds it:
 
 - its name shows everywhere at once, in the timeline's past entries too;
-- its role, command line and model preference take effect at its next session in each thread ([In a conversation](#in-a-conversation)), never in a running one.
+- its role takes effect at its next prompt in each thread, never in a running turn;
+- its command line and model preference take effect when each thread's agent next starts or resumes its session, never in a running one ([In a conversation](#in-a-conversation)).
 
 ### In a conversation
 
@@ -81,11 +82,14 @@ A teammate whose command line has another status shows that status and cannot be
 - A teammate joins a thread once, as one of its agents; its accent comes from the thread, as conversations assigns it ([Agents in a thread](../conversations/README.md#agents-in-a-thread)).
 - The thread's agent keeps the teammate's id, and reads its name from this module, so a rename shows in every thread.
 - Each session of a teammate starts with its command line and model preference as they are then.
+  When the teammate's command line changed since the agent's last session, the agent drops the provider's session id it kept, takes the teammate's new command line, and starts a new session, and the timeline says that the agent starts without its earlier context, as for a session that cannot be resumed.
+  A changed model preference keeps the session: the agent resumes it and asks for the new model, and where the command line keeps the earlier model on resuming, the timeline shows the model the session reports.
 - Its role reaches the agent as the opening part of each session's first prompt, as quoted text marked as the teammate's instructions, since every command line takes a prompt and not every one takes added instructions.
-  When the role changed since the session's first prompt, as when a resumed session goes on, the next prompt opens with the new role marked as updated instructions.
+  When the role changed since it last reached the session, whether the session stayed open between turns or was resumed, the next prompt opens with the new role marked as updated instructions.
   The person's message shows that it carried the role, which opens on request.
 - A deleted teammate stays in the threads that hold it, named as deleted.
   It cannot be addressed until it is restored, and its running turn, if any, goes on to its end.
+  Its queued prompts are held, marked as held, until it is restored, and the person can withdraw them meanwhile.
 
 A role is the person's own text, but it reaches the agent as part of a prompt: it can ask the agent to behave a certain way and grants nothing.
 A teammate's tool calls ask for permission as any agent's do, and the conversation's answers apply to it ([Permissions](../conversations/README.md#permissions)).
@@ -95,7 +99,7 @@ A teammate's tool calls ask for permission as any agent's do, and the conversati
 The first release creates, edits, deletes and restores teammates, and picks them in a conversation.
 These stay out of it:
 
-- sharing teammates with other people or devices, and exporting or importing them;
+- sharing teammates with other people, or with devices outside the data directory, and exporting or importing them;
 - permissions of a teammate's own, beyond the conversation's;
 - tools, MCP servers, working folders or settings of a teammate's own;
 - avatars and colors of a teammate's own, beyond the accent its thread gives it;
