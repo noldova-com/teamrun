@@ -58,14 +58,14 @@ It tells a tool when an agent session ends, so the tool ends what it holds for t
 
 | Shared code | Means |
 |---|---|
-| `refused` | The input was invalid, such as a path outside the bound resources. |
-| `denied` | The person, or the app's policy, denied the permission request. |
-| `expired` | Nobody answered the permission request in time. |
-| `withdrawn` | The call ended before its request was answered. |
-| `stale` | What the request showed changed after the grant, so nothing ran. |
-| `timedOut` | The call's deadline passed. |
-| `tooLarge` | The result cannot fit its limit, even cut. |
-| `unavailable` | The tool cannot serve the call now, such as when it is switched off. |
+| `Refused` | The input was invalid, such as a path outside the bound resources. |
+| `Denied` | The person, or the app's policy, denied the permission request. |
+| `Expired` | Nobody answered the permission request in time. |
+| `Withdrawn` | The call ended before its request was answered. |
+| `Stale` | What the request showed changed after the grant, so nothing ran. |
+| `TimedOut` | The call's deadline passed. |
+| `TooLarge` | The result cannot fit its limit, even cut. |
+| `Unavailable` | The tool cannot serve the call now, such as when it is switched off. |
 
 The shared codes take the base's names once its permission contract and registry define them.
 
@@ -78,7 +78,7 @@ So the app's policy sees every call, and a tool never lets a call skip it.
   The host raises it before it calls the handler, with the details the descriptor gives for the input.
   The tool raises it when the details depend on state only the tool sees when the call runs, such as a terminal's shell and working folder, a repository's HEAD and what a discard would lose, or the origin a page would go to.
 - **What a grant binds:** the action runs exactly as its request showed it.
-  The tool checks that state again just before it acts, and when it changed, nothing runs and the call fails as `stale`.
+  The tool checks that state again just before it acts, and when it changed, nothing runs and the call fails as `Stale`.
 - **Risk per call:** the request carries the call's risk level, which the tool sets between its descriptor's default and maximum, such as a higher risk for reading a terminal the person shared than one the agent opened.
 - **Whether it asks:** the tool sets, for each call, whether the person must be asked and which options the request offers, including whether an answer may be remembered and for what.
   The app's policy may add an ask and narrow the options, but never skips an ask the tool requires or widens its options, and a remembered answer applies only where the tool offered remembering.
@@ -95,7 +95,7 @@ The request carries:
 The outcomes are:
 
 - **Granted:** the action runs.
-- **Denied, expired or withdrawn:** the action does not run, and the call fails as `denied`, `expired` or `withdrawn`.
+- **Denied, expired or withdrawn:** the action does not run, and the call fails as `Denied`, `Expired` or `Withdrawn`.
   A request nobody answers expires.
 - **Call ended:** whoever raised the request withdraws it when its call ends without an answer: the agent cancels the call, the session's connection closes, or the tool is switched off.
 
@@ -109,7 +109,7 @@ An app has one host that serves every published tool to its agents over the Mode
 No tool module runs a server.
 
 - **What it serves:** each agent session gets the tools listed in the registry when the session starts.
-  The list stays as it was at the start, since the agent's allow configuration names those tools; a tool switched off since is not callable, so its later calls fail as `unavailable`.
+  The list stays as it was at the start, since the agent's allow configuration names those tools; a tool switched off since is not callable, so its later calls fail as `Unavailable`.
 - **Binding a connection to a session:** each session reaches the host through a connection of its own, which names the session by an id that is not secret, in its path, and carries a random secret of at least 256 bits made for that session alone, as the bearer token the agent's command line sends.
   The host finds the session by that id and compares the session's secret with the token in constant time, so the lookup never compares secrets.
   It refuses a request without a valid token, and revokes the secret when the session ends, which ends the session's calls and withdraws their pending requests.
@@ -180,7 +180,7 @@ The tool never depends on that module or on anything else of TeamRun's.
 
 A tool can be present in the build but switched off, by its module's setting.
 While it is off, its module places none of its views and the registry neither lists nor calls its tools, so the host serves none of them, no session reaches it, it raises no request, and nothing of it shows.
-Switching it off ends its running calls as `unavailable` and withdraws their pending requests; sessions already running go on without its tools.
+Switching it off ends its running calls as `Unavailable` and withdraws their pending requests; sessions already running go on without its tools.
 Switching it on lists its tools again, for the sessions that start from then on.
 
 A tool in preview has such a setting, off by default, and a Preview label in its views and its setting.
@@ -207,7 +207,7 @@ A surface the shell does not offer yet is asked for in the base's repository, an
 
 - **Agents:** `terminal_list`, `terminal_read`, `terminal_open`, `terminal_run`, `terminal_write`, `terminal_interrupt` and `terminal_close`, only in the terminals the session opened or the person shared.
 - **Permission:** one request per command, which the tool raises, with the command, the terminal, its shell and its working folder as the details.
-  The tool checks just before writing that the terminal still waits at an empty prompt, and writes only on a grant and only the bytes the request showed, with control characters shown escaped; a terminal that changed fails the call as `stale`.
+  The tool checks just before writing that the terminal still waits at an empty prompt, and writes only on a grant and only the bytes the request showed, with control characters shown escaped; a terminal that changed fails the call as `Stale`.
   The working folder it shows comes only from the terminal's own verified integration marks, never from text a program printed.
 - **Results:** a command's output as untrusted text, with its exit code, whether it still runs, whether it was cut, and the working folder; a command still running at its deadline returns its output so far, and `terminal_read` goes on from there.
 - **Shell surface:** a pseudo-terminal on every target, from the tool's own native addon, built and signed with the app, through the path for module addons asked for in [desktop-core#13](https://github.com/noldova-com/desktop-core/issues/13).
