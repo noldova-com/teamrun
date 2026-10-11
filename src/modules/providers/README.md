@@ -98,6 +98,8 @@ The schema starts at version `1.0`.
 - Anything else is a major version: a removed or renamed field, a changed meaning, a new or removed value of a closed field, or a new kind that asks for an answer or changes a turn's outcome.
   A consumer refuses a major version it does not know before acting on any event of it.
 - `session.started`, `turn.finished`, `tool.finished`, `permission.requested` and `session.ended` are never informational: a consumer that cannot read one fails the session closed.
+- Stored events outlive builds, so the protocol package reads every version it has ever written, mapping each older form into the current one.
+  Its tests keep the older forms and refuse a newer major.
 
 Each enumerated field is open or closed:
 
@@ -114,8 +116,6 @@ Each enumerated field is open or closed:
 | A changed file's change in `diff.reported` | Open | `changed` |
 | `permission.resolved`'s decision | Closed | Refused, failing the session closed |
 | An error's code | Open | `providerError`, keeping its message and whether the session can go on |
-- Stored events outlive builds, so the protocol package reads every version it has ever written, mapping each older form into the current one.
-  Its tests keep the older forms and refuse a newer major.
 
 ## 4. Contributions
 
@@ -185,7 +185,7 @@ Every permission request goes through the runtime permission contract, desktop-c
   TeamRun keeps remembered answers itself, so an allowed request is answered with the command line's allow-once option, never its allow-always one, and later requests still reach TeamRun.
   A request that is withdrawn or expires is denied to the command line.
 - **Tools that tool modules serve:** a tool module raises its own runtime request for its action, under the tool module contract (teamrun#775).
-  The request never passes through the agent's stream or this schema, since the MCP server never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as teamrun#772 decides.
+  The request never passes through the agent's stream or this schema, since the MCP server never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as the [conversations module](../conversations/README.md#permissions) describes.
   Each session reaches the tool modules through MCP connections of its own, so a tool module knows the calling session from the connection, never from the tool's arguments.
   A denied or withdrawn request ends the call with an MCP error result, which the agent's stream shows as `tool.finished` with `refused` or `failed`.
 - **No double prompt:** for each session the adapter allows, in the command line's own allow configuration, exactly the tools TeamRun serves on that session's connections, so the person is asked once, by the tool module.
@@ -251,7 +251,6 @@ Resolve these before dependent implementation:
 - **Holding approvals, blocking every adapter:** for each adapter kind, whether its command lines offer the options to set the approval mode and limit the configuration they read, and to report both at the start, so that a session can be held to TeamRun's approvals ([Permissions](#permissions)).
   An adapter kind that cannot be held is not supported.
 - **Permission contract:** the runtime permission contract, desktop-core#14, its request and decision shapes and remembered answers; the permission section above follows it once it is defined.
-- **Conversations:** what conversations stores of each session, and for how long, is the conversations module's decision (teamrun#772).
 - **Client capabilities:** whether TeamRun serves an agent-protocol session's file and terminal requests itself, or the agent keeps its own.
 - **Prompt content:** images and files in a prompt, and the sizes allowed.
 - **Models and modes:** how the person and teammates choose a model and mode per command line, and how `session.updated` reaches them.
