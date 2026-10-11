@@ -79,6 +79,7 @@ Reuse guidance already read until it changes or the subject changes; a cross-ref
 | The tool module contract: a tool's interface, the app's host, how TeamRun takes one in, ownership and first-release needs | [TOOL-MODULES.md](docs/TOOL-MODULES.md) |
 | Appearance, the shared kit, layout, interaction and accessibility | [UI-STANDARDS.md](docs/UI-STANDARDS.md) |
 | Tests, coverage, UI automation, verification and evidence | [TESTING.md](docs/TESTING.md) |
+| Moving onto the base's shell packages | [MIGRATION.md](docs/MIGRATION.md) |
 | Contributions, issue/PR requirements and ordinary support | [CONTRIBUTING.md](.github/CONTRIBUTING.md) |
 | Private vulnerability reporting and disclosure | [SECURITY.md](.github/SECURITY.md) |
 | License terms | [LICENSE](LICENSE) |
