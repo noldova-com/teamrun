@@ -13,11 +13,11 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
-import WindowsSigningAccount from "../../packages/windows-signing-account.ts";
 import PackagingException from "../../packaging/packaging.exception.ts";
 import PinnedPackage from "../../packaging/pinned-package.ts";
 import TrustedSigningModule from "../../packaging/trusted-signing-module.ts";
 import signWindowsFile from "../../packaging/windows-sign-hook.ts";
+import WindowsSigningAccount from "../../packaging/windows-signing-account.ts";
 import ProcessResult from "../../processes/process-result.ts";
 import PackageGalleryFixture from "../fixtures/package-gallery.fixture.ts";
 import ProcessRunnerFixture from "../fixtures/process-runner.fixture.ts";
@@ -61,7 +61,7 @@ class TrustedSigningModuleTests {
       assert.deepEqual(signing.describeEnvironment({ ...TrustedSigningModuleTests.CREDENTIALS, MAC_CERTIFICATE: "fixture-certificate" }),
         { ...TrustedSigningModuleTests.CREDENTIALS, TEAMRUN_SIGNING_FOLDER: folder, ...TrustedSigningModuleTests.ACCOUNT_VARIABLES });
       assert.throws(() => signing.describeEnvironment({ AZURE_CLIENT_ID: "fixture-client", AZURE_CLIENT_SECRET: "" }),
-        new PackagingException("Signing Windows packages needs AZURE_TENANT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with fixture-works-signing."));
+        new PackagingException("Signing Windows packages needs AZURE_TENANT_ID, AZURE_CLIENT_SECRET, the Azure service principal for the signing account in AZURE_SIGNING_ACCOUNT."));
     });
 
     test("the downloaded packages are expanded into a fresh folder and the module loaded only when every SHA-512 is the recorded one, and their archives are removed after", async t => {
@@ -152,6 +152,30 @@ class TrustedSigningModuleTests {
           + "-Files $env:TEAMRUN_SIGNING_FILE"));
       });
 
+    test("a failed signing or expansion reports PowerShell's output with the endpoint, its host, the account and the profile replaced by their secrets' names", async t => {
+      const [repository, gallery] = await TrustedSigningModuleTests.createAsync(t);
+      const folder = path.join(repository.directory, "signing");
+      const file = path.join(repository.directory, "out", "Fixture Studio.exe");
+      const output = "Signing with endpoint https://fixtureville.signing.example/, account fixture-works-signing, profile Fixture-Studio\n";
+      const errorOutput = "Invoke-TrustedSigning: fixtureville.signing.example refused the certificate profile Fixture-Studio of fixture-works-signing";
+      const redacted = "Signing with endpoint AZURE_SIGNING_ENDPOINT, account AZURE_SIGNING_ACCOUNT, profile AZURE_SIGNING_PROFILE\n"
+        + "Invoke-TrustedSigning: AZURE_SIGNING_ENDPOINT refused the certificate profile AZURE_SIGNING_PROFILE of AZURE_SIGNING_ACCOUNT";
+      const runner = new ProcessRunnerFixture([], [new ProcessResult(1, output, errorOutput), new ProcessResult(1, output, errorOutput)]);
+      const signing = TrustedSigningModule.fromEnvironment(runner, { ...TrustedSigningModuleTests.ACCOUNT_VARIABLES, TEAMRUN_SIGNING_FOLDER: folder });
+
+      const failures = [
+        await signing.signAsync(file).then(() => null, (error: unknown) => error),
+        await signing.prepareAsync(gallery.packages).then(() => null, (error: unknown) => error)
+      ];
+
+      for (const failure of failures) {
+        assert.ok(failure instanceof PackagingException);
+        for (const value of ["https://fixtureville.signing.example/", "fixtureville.signing.example", "fixture-works-signing", "Fixture-Studio"])
+          assert.equal(failure.message.includes(value), false, value);
+        assert.ok(failure.message.endsWith(`:\n${redacted}`), failure.message);
+      }
+    });
+
     test("a file name with a comma, which the module would split, a missing or relative module folder and a missing signing account are refused, "
       + "also from electron-builder's hook", async () => {
       const runner = new ProcessRunnerFixture();
@@ -162,9 +186,9 @@ class TrustedSigningModuleTests {
       assert.throws(() => TrustedSigningModule.fromEnvironment(runner, { ...TrustedSigningModuleTests.ACCOUNT_VARIABLES, TEAMRUN_SIGNING_FOLDER: "signing" }),
         new PackagingException("TEAMRUN_SIGNING_FOLDER must name the folder that holds the prepared TrustedSigning module, not \"signing\"."));
       assert.throws(() => TrustedSigningModule.fromEnvironment(runner, { TEAMRUN_SIGNING_ACCOUNT: "fixture-works-signing", TEAMRUN_SIGNING_PROFILE: "", TEAMRUN_SIGNING_FOLDER: folder }),
-        new PackagingException("Signing a Windows file needs TEAMRUN_SIGNING_ENDPOINT, TEAMRUN_SIGNING_PROFILE, which packaging sets from teamrun.product.windowsSigning."));
+        new PackagingException("Signing a Windows file needs TEAMRUN_SIGNING_ENDPOINT, TEAMRUN_SIGNING_PROFILE, which packaging sets from AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_ACCOUNT, AZURE_SIGNING_PROFILE."));
       assert.throws(() => TrustedSigningModule.fromEnvironment(runner, { TEAMRUN_SIGNING_FOLDER: folder }), new PackagingException(
-        "Signing a Windows file needs TEAMRUN_SIGNING_ENDPOINT, TEAMRUN_SIGNING_ACCOUNT, TEAMRUN_SIGNING_PROFILE, which packaging sets from teamrun.product.windowsSigning."));
+        "Signing a Windows file needs TEAMRUN_SIGNING_ENDPOINT, TEAMRUN_SIGNING_ACCOUNT, TEAMRUN_SIGNING_PROFILE, which packaging sets from AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_ACCOUNT, AZURE_SIGNING_PROFILE."));
       await assert.rejects(signWindowsFile({ path: "Fixture Studio.exe" }),
         new PackagingException("TEAMRUN_SIGNING_FOLDER must name the folder that holds the prepared TrustedSigning module, not \"\"."));
       assert.deepEqual(runner.captured, []);
