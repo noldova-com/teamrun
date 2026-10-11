@@ -39,6 +39,22 @@ The tool serves its actions to agents as tools over the Model Context Protocol.
   Each agent-facing tool is one of the tool's actions, under a stable name the tool owns.
 - **Results are data.**
   A tool's result tells the agent what happened, and a tool's output never grants a permission ([Trust](ARCHITECTURE.md#trust)).
+- **A fixed list.**
+  The tool's interface lists the names of the tools its server serves, so an app can allow exactly those for a session.
+
+### Hosting
+
+- **Where it runs:** the tool's server runs in the app's runtime, inside the runtime part of the app's module for the tool, never as a program an agent's command line starts.
+  A program the tool needs besides, such as a helper with native access, is started through the runtime part's context and ends with the part ([Programs modules run](ARCHITECTURE.md#programs-modules-run)).
+- **Transport:** the Model Context Protocol's HTTP transport, on one listener for the tool, bound to the loopback address only, on a port the system picks.
+  The server refuses a request whose `Origin` header names a web origin, so a page in a browser cannot reach it.
+- **Binding a connection to a session:** `openSessionAsync` makes a new random secret of at least 256 bits for that session alone.
+  The description it returns carries the secret, as the bearer token the command line sends with every request.
+  The server finds the session from the secret, compares secrets in constant time, and refuses a request without a valid one.
+  `closeSessionAsync` revokes the secret at once, so the session's later requests are refused and its pending permission requests are withdrawn.
+- **The secret is data:** it lives in the server's memory and in the description it returns, never in a log, an event, a command line's arguments or its environment.
+- **Lifetime:** the listener starts with the first connection a session opens, not when the part activates, so activation stays light ([Lifecycle](ARCHITECTURE.md#lifecycle)).
+  It stops, closing every connection, when the part deactivates or the tool is turned off.
 
 ### Permission requests
 
@@ -77,6 +93,7 @@ The wrapper:
 
 - declares the tool, with `module.json` and a line in the build's module list, as every module does ([Components](ARCHITECTURE.md#2-components-and-dependency-direction));
 - places the tool's window part as its module's views and documents, under its own id ([Vocabulary and identity](ARCHITECTURE.md#3-vocabulary-and-identity));
+- hosts the tool's server in its runtime part ([Hosting](#hosting));
 - registers the tool with Conversations as a source of agent-facing tools ([Connections](#connections));
 - gives the tool its module id as the requester of its permission requests.
 
@@ -90,9 +107,17 @@ Conversations starts every agent session, and it imports no tool module ([Conver
 It publishes one contract, `conversations.tools`, which each wrapper implements and registers, as the architecture's [Cooperation](ARCHITECTURE.md#cooperation) rule describes.
 The wrapper declares `conversations` as a dependency, so the dependencies run from the wrapper to Conversations to `providers`, without a cycle.
 
-A registered source has the tool's two calls, `openSessionAsync(agentSessionId, workingFolder)` and `closeSessionAsync(agentSessionId)`, which the wrapper passes through to the tool.
+The wrapper's runtime part hosts the tool's server ([Hosting](#hosting)) and registers one source for it:
 
-- When Conversations starts a session, it opens a connection from every registered source and passes the descriptions to `providers` in memory.
+- **What a source declares:** the wrapper's module id, the server's name, the names of the tools it serves, from the tool's fixed list, and the tool's two calls, `openSessionAsync(agentSessionId, workingFolder)` and `closeSessionAsync(agentSessionId)`, which the wrapper passes through to the tool.
+- **When:** the runtime part registers the source when it activates with the tool turned on, and when the tool is turned on later.
+  It withdraws the source when the tool is turned off and when the part deactivates ([Turned off](#turned-off)).
+- **One per module:** Conversations refuses a second source from the same module id, so a session never holds two connections to one tool.
+
+What Conversations does with the sources:
+
+- When Conversations starts a session, it opens a connection from every source registered at that moment and passes the descriptions to `providers` in memory.
+  A session's tools stay as they were when it started, apart from a source that is withdrawn.
 - `providers` writes them into its own session folder, in the command line's configuration for that session only, and removes them with the folder ([providers' Sessions](../src/modules/providers/README.md#sessions)).
 - Conversations closes the session's connections when the session ends.
 - A source that fails to open leaves its tools out of that session and is reported under its module's id; it never stops the session from starting.
@@ -111,9 +136,9 @@ No module writes another's files, and what authenticates a connection never goes
 ### Turned off
 
 A tool can be present in the build but turned off, by a setting its wrapper contributes.
-While it is off, the wrapper places none of its views, registers no source with `conversations.tools`, and the tool raises no request, so no session reaches it and nothing of it shows.
-Turning it off closes its open connections, which withdraws their pending requests and ends their calls with an error result; sessions already running go on without its tools.
-Turning it on registers its source again, so the sessions that start from then on reach it.
+While it is off, the wrapper places none of its views, registers no source with `conversations.tools`, and its server does not listen, so no session reaches it, it raises no request, and nothing of it shows.
+Turning it off withdraws the source and stops the server, which closes its open connections, withdraws their pending requests and ends their calls with an error result; sessions already running go on without its tools.
+Turning it on registers the source again, so the sessions that start from then on reach it.
 
 A tool in preview has such a setting, off by default, and a Preview label in its views and its setting.
 Its version stays a plain number, never with a suffix.
@@ -123,12 +148,12 @@ Its version stays a plain number, never with a suffix.
 | Concern | Owner |
 |---|---|
 | The tool's actions, their names, the details each request shows, each action's risk level, and which read-only actions need no request | The tool |
-| The agent-facing tools, their connections per session, and the window part's behavior | The tool |
+| The agent-facing tools, their server and its listener, binding each connection to one session, and the window part's behavior | The tool |
 | Routing requests, recording decisions, storing, listing and revoking remembered answers, and expiry | The base's permission contract |
 | The permission card the person answers, and the policy per conversation: which requests reach the person and which remembered answers apply | TeamRun's Conversations module |
 | The `conversations.tools` contract, and opening and closing each session's connections through it | TeamRun's Conversations module |
 | Writing a session's connections into the command line's configuration, its allow configuration, and turning the agent's own approval requests into runtime requests | TeamRun's providers module |
-| Declaring the tool, placing its window part, registering it with `conversations.tools`, naming its requester, and the setting that turns it on and off | TeamRun's wrapper |
+| Declaring the tool, hosting its server in the runtime part, placing its window part, registering it with `conversations.tools`, naming its requester, and the setting that turns it on and off | TeamRun's wrapper |
 
 ## 5. The first release
 
