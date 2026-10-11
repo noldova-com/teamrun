@@ -44,7 +44,7 @@ The window part reaches the runtime part through the module's own methods and ev
   Its title is the thread's title; its breadcrumb is the folder's name, or No folder.
   It holds the timeline and, below it, the composer.
   Its tab shows the working mark while any of its agents runs a turn.
-- **Commands:** `conversations.newThread`, `conversations.openThread` with the thread's id, `conversations.cancelTurn`, `conversations.nextRequest`, which selects the thread's next waiting card, and `conversations.focusComposer`.
+- **Commands:** `conversations.newThread`, with an optional folder, first agent and draft, `conversations.openThread` with the thread's id, `conversations.cancelTurn`, `conversations.nextRequest`, which selects the thread's next waiting card, and `conversations.focusComposer`.
   Default keys come with the design pass.
 - **Notifications:** `conversations.requestWaiting`, `conversations.turnFinished` and `conversations.sessionFailed` ([Notifications](#notifications)).
 - **Settings**, on a Conversations page, all `Shared`:
@@ -116,7 +116,7 @@ The log records ids, kinds, counts and states, never a title, a prompt, a reply,
 
 ### Threads
 
-New conversation asks for a folder, or none, and for the first agent.
+New conversation asks for a folder, or none, and for the first agent, filled in from the command's arguments when it has them; a draft goes into the new thread's composer for the person to send.
 A thread's title is the first line of its first prompt, cut at 80 characters, until the person renames it; no model is asked for a title.
 A thread's folder does not change once its first session has started.
 
