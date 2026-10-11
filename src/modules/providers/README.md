@@ -19,7 +19,7 @@ Each command line gets one adapter, of the kind its stream needs, which knows th
 
 The module depends on no other module.
 Conversations depends on it.
-The module never imports a tool module: the MCP servers an agent session reaches come from the caller that starts the session ([Sessions](#sessions)).
+The module never imports a tool module: its [tool host](#tool-host) serves agents the tools that tool modules publish in the shell's tool registry.
 
 From the shell, the runtime part needs:
 
@@ -28,8 +28,10 @@ From the shell, the runtime part needs:
 - `publishService`, for the [published API](#3-published-api);
 - its module folder, for each session's generated configuration;
 - settings, protocol methods and events, for the window part;
-- the runtime permission contract, desktop-core#14, to raise the permission requests of agents' own tools and receive the decisions.
+- the runtime permission contract, desktop-core#14, to raise the permission requests of agents' own tools and of the tools the host serves, and receive the decisions.
   The shell does not offer it yet; until it does, the adapter denies every approval request to the command line and reports it, so nothing an agent asks to do runs unapproved.
+- the tool registry, desktop-core#21, to list the tools that tool modules publish and call their handlers.
+  The shell does not offer it yet; until it does, the host serves no tool module's tools.
 
 ## 3. Published API
 
@@ -161,8 +163,8 @@ A session is one agent process, started in the session's working folder with the
 
 - The process gets the environment `startProcessAsync` gives every program, plus the variables its command line's definition names for its own configuration, inherited by name.
   The module never reads their values.
-- The session's owner gives the working folder, the model and mode when it chooses them, and the MCP servers the agent may reach.
-  The adapter writes them into the command line's own configuration for this session only, in files in the session's folder, never in the person's or the project's configuration.
+- The session's owner gives the working folder, the model and mode when it chooses them, and the scope the tool host passes to the tools' handlers.
+  The adapter writes the working folder, the model, the mode and the session's connection to the tool host into the command line's own configuration for this session only, in files in the session's folder, never in the person's or the project's configuration.
   The command line's arguments may name those files but never hold their content.
 - Whatever identifies or authenticates a session's connection, such as a token or a per-session address, goes only into the session's folder: never into the arguments, the environment, the log or an event, so no other program reads it from the process list.
   It is removed with the folder.
@@ -184,11 +186,11 @@ Every permission request goes through the runtime permission contract, desktop-c
   It sends the decision back to the command line in the command line's own terms and sends `permission.resolved`.
   TeamRun keeps remembered answers itself, so an allowed request is answered with the command line's allow-once option, never its allow-always one, and later requests still reach TeamRun.
   A request that is withdrawn or expires is denied to the command line.
-- **Tools that tool modules serve:** a tool module raises its own runtime request for its action, under the tool module contract (teamrun#775).
-  The request never passes through the agent's stream or this schema, since the MCP server never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as the [conversations module](../conversations/README.md#permissions) describes.
-  Each session reaches the tool modules through MCP connections of its own, so a tool module knows the calling session from the connection, never from the tool's arguments.
+- **Tools from tool modules:** the [tool host](#tool-host) raises the runtime request for a tool's action before it calls the tool's handler, naming the tool's module as the requester, unless the tool raises its own, as the [tool module contract](../../../docs/TOOL-MODULES.md#permission-requests) describes.
+  The request never passes through the agent's stream or this schema, since the host never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as the [conversations module](../conversations/README.md#permissions) describes.
+  The host knows the calling session from the session's own connection, never from the tool's input.
   A denied or withdrawn request ends the call with an MCP error result, which the agent's stream shows as `tool.finished` with `refused` or `failed`.
-- **No double prompt:** for each session the adapter allows, in the command line's own allow configuration, exactly the tools TeamRun serves on that session's connections, so the person is asked once, by the tool module.
+- **No double prompt:** for each session the adapter allows, in the command line's own allow configuration, exactly the tools the tool host serves on that session's connection, so the person is asked once, by the tool's request.
   Each allow entry names one served tool by its full name, never by a wildcard, under a server name only TeamRun uses: a name of its own with the session's random suffix, which no configuration written before the session can name.
   It never turns on a command line's global mode that skips approvals, so the agent's own tools still ask.
 
@@ -203,6 +205,18 @@ The adapter holds the session against them:
   Whether each adapter kind can be held is a blocking [missing decision](#7-missing-decisions).
 
 The agent's output cannot grant a permission, answer a request or widen what a session may reach.
+
+### Tool host
+
+The tool host is TeamRun's host under the [tool module contract](../../../docs/TOOL-MODULES.md#3-the-apps-host), which owns its rules; this section says how the module keeps them.
+It is a section of the runtime part with its own interface to the adapters: an adapter asks it for a session's connection when the session starts, writes the description it gets into the session's folder, and tells it when the session ends.
+The host never reads an adapter's stream and the adapters never read the registry, so the host can move to a module of its own without changing either.
+
+- **What it serves:** on each session's connection, the tools the registry lists when the session starts, and the permission tool the line-delimited adapter needs ([Adapters](#adapters)).
+- **The connection:** one listener for every session, as the contract describes, under the session's server name ([Permissions](#permissions)).
+  The session's secret goes only into its folder, in the command line's configuration, and is revoked when the session ends.
+- **Calls:** a handler gets the session's id, its working folder and the scope its owner named.
+- **Lifetime:** the listener starts with the first session and stops when the runtime part deactivates.
 
 ### Subagents
 
@@ -250,6 +264,7 @@ Resolve these before dependent implementation:
   Naming them waits for the Owner's decision on naming integrations.
 - **Holding approvals, blocking every adapter:** for each adapter kind, whether its command lines offer the options to set the approval mode and limit the configuration they read, and to report both at the start, so that a session can be held to TeamRun's approvals ([Permissions](#permissions)).
   An adapter kind that cannot be held is not supported.
+- **The tool host's protocol:** whether the host implements the part of the Model Context Protocol it needs, its HTTP transport and its tool calls, or takes a protocol package under the [dependency rules](../../../docs/CODING-STANDARDS.md#11-automation-and-scripts).
 - **Permission contract:** the runtime permission contract, desktop-core#14, its request and decision shapes and remembered answers; the permission section above follows it once it is defined.
 - **Client capabilities:** whether TeamRun serves an agent-protocol session's file and terminal requests itself, or the agent keeps its own.
 - **Prompt content:** images and files in a prompt, and the sizes allowed.
