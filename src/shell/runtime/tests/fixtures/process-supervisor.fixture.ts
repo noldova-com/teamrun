@@ -11,7 +11,7 @@ import { once } from "node:events";
 
 import "@noldova/teamrun-foundation-core";
 import { Assert, Wait } from "@noldova/teamrun-foundation-testing";
-import { type OwnedProcess, ProcessClock, ProcessSettings, ProcessSupervisor, SystemCommand } from "@noldova/teamrun-shell-runtime";
+import { type IWindowsProcessApi, type OwnedProcess, ProcessClock, ProcessSettings, ProcessSupervisor, SystemCommand } from "@noldova/teamrun-shell-runtime";
 
 import { ProcessClockFixture } from "./process-clock.fixture.js";
 import { ProgramFixture } from "./program.fixture.js";
@@ -81,7 +81,7 @@ export class ProcessSupervisorFixture {
     environment: NodeJS.ProcessEnv = process.env,
     command: SystemCommand = new SystemCommand(),
     clock: ProcessClock = ProcessClock.create(process.platform),
-    windows?: WindowsProcessApiFixture): ProcessSupervisor {
+    windows?: IWindowsProcessApi): ProcessSupervisor {
     return Object.isUndefined(windows)
       ? ProcessSupervisor.create(settings.database, platform, environment, command, settings.diagnostics, new ProcessSettings(300, 500), clock)
       : new ProcessSupervisor(settings.database, platform, environment, command, settings.diagnostics, windows, new ProcessSettings(300, 500), clock);
