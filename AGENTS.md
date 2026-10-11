@@ -76,6 +76,7 @@ Reuse guidance already read until it changes or the subject changes; a cross-ref
 | Code ownership, APIs, naming, scripts, security and documentation | [CODING-STANDARDS.md](docs/CODING-STANDARDS.md) |
 | The shell, the module contract, runtime, storage and delivery | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | One module's behavior, data and interface | Its document, `src/modules/<id>/README.md` |
+| The tool module contract: a tool's interface, how TeamRun takes one in, ownership and first-release needs | [TOOL-MODULES.md](docs/TOOL-MODULES.md) |
 | Appearance, the shared kit, layout, interaction and accessibility | [UI-STANDARDS.md](docs/UI-STANDARDS.md) |
 | Tests, coverage, UI automation, verification and evidence | [TESTING.md](docs/TESTING.md) |
 | Contributions, issue/PR requirements and ordinary support | [CONTRIBUTING.md](.github/CONTRIBUTING.md) |

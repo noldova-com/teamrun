@@ -200,6 +200,7 @@ Database calls are synchronous and every client shares one runtime, so queries s
 Modules cooperate through published APIs, including contracts others implement and register.
 They never access another's database, files, settings or internals, directly or through shell internals.
 Section 2 governs dependencies.
+A module that wraps a tool from its own repository follows the [tool module contract](TOOL-MODULES.md).
 
 ### Trust
 

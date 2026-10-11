@@ -18,7 +18,7 @@ The module sees agents only through the providers module's [event schema](../pro
 - **Window:** the Conversations view, the thread document with its timeline and composer, and the module's settings ([Contributions](#4-contributions)).
 
 The module depends on `providers`, for the service `providers.agents` and the schema's models in its protocol package.
-It never imports a tool module: each session's MCP connections come from the tool module contract (teamrun#775), and the module passes them to `providers` when it starts the session.
+It never imports a tool module: each session's MCP connections come from the tool wrappers registered with `conversations.tools`, and the module passes them to `providers` when it starts the session.
 
 From the shell, the runtime part needs:
 
@@ -33,7 +33,7 @@ Turns are active work, which `providers` reports; the module reports none of its
 
 ## 3. Published API
 
-The module publishes no service yet.
+The module publishes `conversations.tools`, the contract each tool wrapper implements and registers, so the module can open each agent session's connections to the tools; the [tool module contract](../../../docs/TOOL-MODULES.md#connections) defines it.
 The window part reaches the runtime part through the module's own methods and events ([Contributions](#4-contributions)).
 
 ## 4. Contributions
@@ -267,7 +267,6 @@ The composer, the plan checklist, the thread rows, the turn's end and the notice
 Resolve these before dependent implementation:
 
 - **Permission contract:** desktop-core#14's request and decision shapes, the scopes of remembered answers and which the card offers, and where a request that names no agent session shows.
-- **Tool connections:** how the tool module contract, teamrun#775, gives each session its MCP connections, which the module passes to `providers`.
 - **Prompt content:** how images and files reach each command line, and their sizes, which the providers module decides ([Missing decisions](../providers/README.md#7-missing-decisions)); until then the composer offers no attachments.
 - **Models and modes:** how the person picks an agent's model and mode, which the providers module decides; until then the composer shows what the session reports.
 - **Choosing a folder:** the window offers no folder chooser to a window part yet, so New conversation can offer only No folder until the shell offers one.
