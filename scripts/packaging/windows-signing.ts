@@ -12,7 +12,6 @@ import path from "node:path";
 
 import type ProductIdentity from "../packages/product-identity.ts";
 import WindowsAddonBuilder from "../packages/windows-addon-builder.ts";
-import type WindowsSigningAccount from "../packages/windows-signing-account.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import AuthenticodeCheck from "./authenticode-check.ts";
 import type IPackageSigning from "./interfaces/i-package-signing.ts";
@@ -21,9 +20,10 @@ import type PackageTarget from "./package-target.ts";
 import PackagingException from "./packaging.exception.ts";
 import type PinnedPackage from "./pinned-package.ts";
 import TrustedSigningModule from "./trusted-signing-module.ts";
+import WindowsSigningAccount from "./windows-signing-account.ts";
 
 export default class WindowsSigning implements IPackageSigning {
-  public static readonly CREDENTIALS: readonly string[] = TrustedSigningModule.CREDENTIALS;
+  public static readonly CREDENTIALS: readonly string[] = [...TrustedSigningModule.CREDENTIALS, ...WindowsSigningAccount.VARIABLES];
 
   private static readonly FOLDER_PREFIX: string = "win";
   private static readonly UNPACKED_FOLDER_SUFFIX: string = "unpacked";
@@ -40,14 +40,14 @@ export default class WindowsSigning implements IPackageSigning {
 
   public readonly builderEnvironment: NodeJS.ProcessEnv;
 
-  public constructor(runner: ProcessRunner, root: string, folder: string, output: string, target: PackageTarget, account: WindowsSigningAccount, environment: NodeJS.ProcessEnv,
-    credentials: NodeJS.ProcessEnv, packages: readonly PinnedPackage[]) {
+  public constructor(runner: ProcessRunner, root: string, folder: string, output: string, target: PackageTarget, environment: NodeJS.ProcessEnv, credentials: NodeJS.ProcessEnv,
+    packages: readonly PinnedPackage[]) {
     this.runner = runner;
     this.root = root;
     this.output = output;
     this.target = target;
     this.environment = environment;
-    this.module = new TrustedSigningModule(runner, folder, account, environment);
+    this.module = new TrustedSigningModule(runner, folder, WindowsSigningAccount.fromCredentials(credentials), environment);
     this.packages = packages;
     this.builderEnvironment = this.module.describeEnvironment(credentials);
   }

@@ -10,11 +10,11 @@ import { createHash } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import WindowsSigningAccount from "../packages/windows-signing-account.ts";
 import type ProcessRunner from "../processes/process-runner.ts";
 import PackageConfiguration from "./package-configuration.ts";
 import PackagingException from "./packaging.exception.ts";
 import PinnedPackage from "./pinned-package.ts";
+import WindowsSigningAccount from "./windows-signing-account.ts";
 
 export default class TrustedSigningModule {
   public static readonly NAME: string = "TrustedSigning";
@@ -104,14 +104,14 @@ export default class TrustedSigningModule {
       environment[TrustedSigningModule.PROFILE_VARIABLE] ?? "");
     const missing = TrustedSigningModule.ACCOUNT_VARIABLES.filter(t => (environment[t] ?? "").length === 0);
     if (missing.length > 0)
-      throw new PackagingException(`Signing a Windows file needs ${missing.join(", ")}, which packaging sets from teamrun.product.windowsSigning.`);
+      throw new PackagingException(`Signing a Windows file needs ${missing.join(", ")}, which packaging sets from ${WindowsSigningAccount.VARIABLES.join(", ")}.`);
     return new TrustedSigningModule(runner, folder, account, environment);
   }
 
   public describeEnvironment(credentials: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     const missing = TrustedSigningModule.CREDENTIALS.filter(t => (credentials[t] ?? "").length === 0);
     if (missing.length > 0)
-      throw new PackagingException(`Signing Windows packages needs ${missing.join(", ")}, the Azure service principal that signs with ${this.account.account}.`);
+      throw new PackagingException(`Signing Windows packages needs ${missing.join(", ")}, the Azure service principal for the signing account in ${WindowsSigningAccount.ACCOUNT_VARIABLE}.`);
     return { ...Object.fromEntries(TrustedSigningModule.CREDENTIALS.map(t => [t, credentials[t]])), [TrustedSigningModule.FOLDER_VARIABLE]: this.folder, ...this.accountVariables };
   }
 
@@ -186,6 +186,6 @@ export default class TrustedSigningModule {
     const result = await this.runner.captureAsync(TrustedSigningModule.POWERSHELL, [...TrustedSigningModule.OPTIONS, command], directory, TrustedSigningModule.LIMIT,
       { ...inherited, [TrustedSigningModule.FOLDER_VARIABLE]: this.folder, ...variables });
     if (!result.isSuccessful)
-      throw new PackagingException(`${TrustedSigningModule.POWERSHELL} failed ${action} the ${TrustedSigningModule.NAME} module with exit code ${result.exitCode}:\n${result.text}`);
+      throw new PackagingException(`${TrustedSigningModule.POWERSHELL} failed ${action} the ${TrustedSigningModule.NAME} module with exit code ${result.exitCode}:\n${this.account.redact(result.text)}`);
   }
 }

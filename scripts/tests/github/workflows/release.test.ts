@@ -29,7 +29,8 @@ class ReleaseWorkflowTests {
   private static readonly PUBLISH_NEEDS: string = "    needs: [build, build-signed]\n"
     + "    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.build-signed.result == 'success' || needs.build-signed.result == 'skipped') }}\n";
   private static readonly CREDENTIALS: readonly (readonly [string, string])[] = [
-    ["windows", "AZURE_TENANT_ID"], ["windows", "AZURE_CLIENT_ID"], ["windows", "AZURE_CLIENT_SECRET"], ["macos", "MAC_CERTIFICATE"], ["macos", "MAC_CERTIFICATE_PASSWORD"],
+    ["windows", "AZURE_TENANT_ID"], ["windows", "AZURE_CLIENT_ID"], ["windows", "AZURE_CLIENT_SECRET"], ["windows", "AZURE_SIGNING_ENDPOINT"], ["windows", "AZURE_SIGNING_ACCOUNT"],
+    ["windows", "AZURE_SIGNING_PROFILE"], ["macos", "MAC_CERTIFICATE"], ["macos", "MAC_CERTIFICATE_PASSWORD"],
     ["macos", "APPLE_API_KEY_P8"], ["macos", "APPLE_API_KEY_ID"], ["macos", "APPLE_API_ISSUER"]
   ];
   private static readonly REQUEST: string = "          RELEASE_REPOSITORY: ${{ github.repository }}\n          RELEASE_VERSION: ${{ inputs.version }}\n"

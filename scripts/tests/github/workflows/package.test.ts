@@ -35,7 +35,8 @@ class PackageWorkflowTests {
     + "    if: needs.plan.outputs.signed-targets != '[]'\n    strategy:\n      fail-fast: false\n      matrix:\n        include: ${{ fromJSON(needs.plan.outputs.signed-targets) }}\n"
     + "    runs-on: ${{ matrix.runner }}\n    environment: release\n    timeout-minutes: 75\n    steps: *package-steps\n";
   private static readonly CREDENTIALS: readonly (readonly [string, string])[] = [
-    ["windows", "AZURE_TENANT_ID"], ["windows", "AZURE_CLIENT_ID"], ["windows", "AZURE_CLIENT_SECRET"], ["macos", "MAC_CERTIFICATE"], ["macos", "MAC_CERTIFICATE_PASSWORD"],
+    ["windows", "AZURE_TENANT_ID"], ["windows", "AZURE_CLIENT_ID"], ["windows", "AZURE_CLIENT_SECRET"], ["windows", "AZURE_SIGNING_ENDPOINT"], ["windows", "AZURE_SIGNING_ACCOUNT"],
+    ["windows", "AZURE_SIGNING_PROFILE"], ["macos", "MAC_CERTIFICATE"], ["macos", "MAC_CERTIFICATE_PASSWORD"],
     ["macos", "APPLE_API_KEY_P8"], ["macos", "APPLE_API_KEY_ID"], ["macos", "APPLE_API_ISSUER"]
   ];
 

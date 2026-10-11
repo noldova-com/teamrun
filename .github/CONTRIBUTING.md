@@ -161,7 +161,8 @@ Only the maintainer starts the **Release** workflow or a signed **Package** run,
   It allows only `main`, requires the maintainer's review and cannot be bypassed by administrators.
 - The `publish` environment guards the publish job, the only job that may write to the repository, and waits for the maintainer's approval the same way.
 - The `release` environment's secrets, named here and nowhere given a value:
-  - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`: the service principal that signs Windows packages with the Artifact Signing values in the code.
+  - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`: the service principal that signs Windows packages.
+  - `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT` and `AZURE_SIGNING_PROFILE`: the Artifact Signing endpoint, account and certificate profile it signs with.
   - `MAC_CERTIFICATE` and `MAC_CERTIFICATE_PASSWORD`: the Developer ID Application certificate with its private key, as a base64 PKCS #12, and its password.
   - `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`: the App Store Connect API key's text, its ID and its issuer, which notarize macOS packages.
 

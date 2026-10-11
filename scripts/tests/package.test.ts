@@ -86,11 +86,17 @@ class PackageTests {
   private static readonly TIMEOUT: number = 120_000;
   private static readonly USAGE: string = "Usage: npm run package [-- [--signed] [--update-feed <https URL, or http URL of localhost, ending in />]]\n";
   private static readonly GALLERY: readonly PinnedPackage[] = TrustedSigningModule.PACKAGES;
-  private static readonly CREDENTIALS: Readonly<Record<string, string>> = {
+  private static readonly PRINCIPAL: Readonly<Record<string, string>> = {
     AZURE_TENANT_ID: "fixture-tenant",
     AZURE_CLIENT_ID: "fixture-client",
     AZURE_CLIENT_SECRET: "fixture-secret"
   };
+  private static readonly SIGNING_ACCOUNT: Readonly<Record<string, string>> = {
+    AZURE_SIGNING_ENDPOINT: "https://fixtureville.signing.example/",
+    AZURE_SIGNING_ACCOUNT: "fixture-works-signing",
+    AZURE_SIGNING_PROFILE: "Fixture-Studio"
+  };
+  private static readonly CREDENTIALS: Readonly<Record<string, string>> = { ...PackageTests.PRINCIPAL, ...PackageTests.SIGNING_ACCOUNT };
   private static readonly MAC_CREDENTIALS: Readonly<Record<string, string>> = {
     MAC_CERTIFICATE: "fixture-certificate",
     MAC_CERTIFICATE_PASSWORD: "fixture-password",
@@ -246,7 +252,7 @@ class PackageTests {
         assert.deepEqual(CredentialWitnessFixture.find(process.env), []);
         assert.deepEqual(builder.environments.map(t => Object.fromEntries(Object.entries(t ?? {})
           .filter(([name]) => [...SigningCredentials.NAMES, "CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_API_KEY"].includes(name) || name.startsWith("TEAMRUN_")))), [{
-          ...PackageTests.CREDENTIALS,
+          ...PackageTests.PRINCIPAL,
           TEAMRUN_SIGNING_FOLDER: path.join(folder, "signing"),
           TEAMRUN_SIGNING_ENDPOINT: "https://fixtureville.signing.example/",
           TEAMRUN_SIGNING_ACCOUNT: "fixture-works-signing",
@@ -390,14 +396,15 @@ class PackageTests {
         const signed = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(0, "Signed.", "")]);
         const unchecked = new BuilderFixture(made, [], null, [new ProcessResult(0, "", ""), new ProcessResult(1, "Not signed.", "")]);
         const programless = new BuilderFixture([made[0] ?? ""], [], null, [new ProcessResult(0, "", "")]);
-        const [linux, uncredentialed, twice, arm64, unverified, missing] = [1, 2, 3, 4, 5, 6].map(() => new TextOutputFixture());
+        const [linux, uncredentialed, unaccounted, twice, arm64, unverified, missing] = [1, 2, 3, 4, 5, 6, 7].map(() => new TextOutputFixture());
         const runAsync = (platform: string, architecture: string, builder: BuilderFixture, environment: NodeJS.ProcessEnv, output: TextOutputFixture, options: readonly string[] = ["--signed"]): Promise<number> =>
           new Package(repository.directory, platform, architecture, PackageTests.createStage(repository), builder, { ...environment }, output, gallery.packages).runAsync(options);
-        assert.ok(linux !== undefined && uncredentialed !== undefined && twice !== undefined && arm64 !== undefined && unverified !== undefined && missing !== undefined);
+        assert.ok(linux !== undefined && uncredentialed !== undefined && unaccounted !== undefined && twice !== undefined && arm64 !== undefined && unverified !== undefined && missing !== undefined);
 
         const exitCodes = [
           await runAsync("linux", "x64", new BuilderFixture([]), PackageTests.CREDENTIALS, linux, ["--update-feed", "http://127.0.0.1:8080/", "--signed"]),
-          await runAsync("win32", "x64", new BuilderFixture([]), { AZURE_TENANT_ID: "fixture-tenant" }, uncredentialed),
+          await runAsync("win32", "x64", new BuilderFixture([]), { ...PackageTests.SIGNING_ACCOUNT, AZURE_TENANT_ID: "fixture-tenant" }, uncredentialed),
+          await runAsync("win32", "x64", new BuilderFixture([]), { ...PackageTests.PRINCIPAL, AZURE_SIGNING_ACCOUNT: "fixture-works-signing" }, unaccounted),
           await runAsync("win32", "x64", new BuilderFixture([]), PackageTests.CREDENTIALS, twice, ["--signed", "--signed"]),
           await runAsync("win32", "arm64", signed, PackageTests.CREDENTIALS, arm64),
           await runAsync("win32", "arm64", unchecked, PackageTests.CREDENTIALS, unverified),
@@ -405,9 +412,10 @@ class PackageTests {
         ];
 
         const out = path.join(repository.directory, "_build", "package", "out");
-        assert.deepEqual(exitCodes, [1, 1, 2, 0, 1, 1]);
+        assert.deepEqual(exitCodes, [1, 1, 1, 2, 0, 1, 1]);
         assert.equal(linux.text, "--signed signs Windows and macOS packages only, so it cannot sign the linux-x64 package.\n");
-        assert.equal(uncredentialed.text, "Signing Windows packages needs AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, the Azure service principal that signs with fixture-works-signing.\n");
+        assert.equal(uncredentialed.text, "Signing Windows packages needs AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, the Azure service principal for the signing account in AZURE_SIGNING_ACCOUNT.\n");
+        assert.equal(unaccounted.text, "Signing Windows packages needs AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_PROFILE, the Artifact Signing endpoint, account and certificate profile.\n");
         assert.equal(twice.text, PackageTests.USAGE);
         assert.equal(signed.captureEnvironments[1]?.["TEAMRUN_SIGNED_FILES"], made.map(t => path.join(out, t)).join("\n"));
         assert.equal(signed.captureEnvironments[1]?.["TEAMRUN_SIGNED_LIBRARIES"], "");
