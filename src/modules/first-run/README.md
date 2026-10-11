@@ -42,7 +42,7 @@ It keeps the guide's progress per device, since each device has its own command 
 
 | Field | Holds |
 |---|---|
-| Device | The device the window's requests name |
+| Device | The device the guide ran on ([Missing decisions](#7-missing-decisions)) |
 | State | Not started, in progress, skipped or finished |
 | Step | The step to resume at, while in progress |
 | Choices | The choices made so far: no folder or a chosen one, the command line or teammate that helps, and the suggested task picked |
@@ -125,4 +125,5 @@ Resolve these before dependent implementation:
 
 - **Install words and links:** what the guide says to install for each command line, and whether it may link to a provider's site or offer a download, wait for the Owner's decision on naming integrations; until then it gives words only.
 - **Choosing a folder:** the window offers no folder chooser to a window part yet, as the [conversations module](../conversations/README.md#7-missing-decisions) also records.
+- **Device identity:** how a runtime part learns which device a window's request comes from; until the shell offers it, the guide keeps one progress for the data directory.
 - **Suggested tasks:** the exact suggestions' text, which the design pass writes.
