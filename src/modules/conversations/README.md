@@ -62,21 +62,27 @@ The database is `modules/conversations/conversations.sqlite` ([architecture](../
 | Thread | Its id, a UUID; its title; its folder or none; when it was created and last active; whether it is archived; the agent last addressed |
 | Folder | Its id, a UUID, and its path on each device, for a thread with a folder of its own |
 | Agent | Its thread, its command line's id, its display name, its accent, the model and mode the session last reported, the provider's session id when the session can be resumed, and its queued prompts |
-| Event | Each event its sessions reported, in the schema's JSON with its version, by session and sequence |
-| Entry | The timeline, by thread and position, derived from the events and from the requests of tool modules |
-| Output | Each tool call's output, read only when its card expands |
-| Request | Each permission request the module showed: its id, its requester, its action, details, risk and options, its state, its decision, and who decided and when |
+| Message | Each prompt the person sent: its text, its attachments, the agents it went to and its arrival number |
+| Event | Each event its sessions reported, whole, in the schema's JSON with its version, by session and sequence, with its arrival number |
+| Request | Each permission request the module showed: its id, its requester, its action, details, risk and options, its session when it names one, its arrival number, its state, its decision, and who decided and when |
+| Entry | The timeline, by thread and position, derived from the messages, the events and the requests |
 | Draft | Each thread's unsent text and attachments |
-| Attachment | Its id, its name, its media type, its size and its file in `modules/conversations/attachments/<id>` |
+| Attachment | Its id, its name, its media type, its size and its file in `modules/conversations/attachments/<id>`; an attachment no draft or message holds is removed when the draft that held it is saved without it, and when the runtime part starts |
 
-### Stored events
+### Stored records
 
-A session's events are the authority for its part of the timeline; entries are derived from them.
-The module keeps every event of a thread's sessions for as long as the thread exists.
-Pieces, `message.chunk` and `tool.output`, are added to their entry's text or to their call's output and recorded in the log by their sequence alone, so the log stays gapless without holding text twice.
-An event of a kind or version the module does not know is stored as it came, so a later build can show it.
+The messages, the events and the requests are the authority for the timeline; entries are derived from them and hold nothing a rebuild could not derive again.
+The stored records are the authority, rather than the entries, because events are what the providers protocol package reads in every version it has written: a later build that shows the timeline differently derives it again from what was received, and loses nothing.
 
-A call's output is kept up to 4 MiB: its first 2 MiB and its last 2 MiB, with a marker for the size left out between.
+- The module keeps every event of a thread's sessions, whole, for as long as the thread exists: pieces, `message.chunk` and `tool.output`, keep their text.
+- An entry keeps no text of its own: it names the records it shows, and reading it joins its pieces' text in sequence order, so no text is stored twice.
+- Each message, event and request takes the thread's next arrival number as the runtime part stores it, so a rebuild puts the sessions' events, the person's messages and the tool modules' requests back in the order they arrived.
+- An event of a kind or version the module does not know is stored as it came, so a later build can show it.
+- A call's output is kept up to 4 MiB: the `tool.output` pieces of its first 2 MiB and its last 2 MiB are kept, and those between are kept by their sequence and size alone, with a marker for the size left out.
+
+Tool inputs and outputs, replies and diffs can hold whatever an agent read, such as a file's content.
+The module keeps them as the person's content, in its database alone, until the thread is deleted, and never in its log.
+It keeps no credential of its own.
 Remembered answers belong to the runtime permission contract, not to this module.
 
 ### Folders
@@ -89,8 +95,8 @@ A folder missing on this device is reported for the person to find again, never 
 
 Migrations are the fixed, ordered list the architecture requires.
 
-- A migration that changes how entries derive from events marks the affected threads for rebuilding.
-  After activation the runtime part rebuilds them from their stored events in short batches, a thread the person opens first, and the thread shows its history as loading until its rebuild ends.
+- A migration that changes how entries derive from the stored records marks the affected threads for rebuilding.
+  After activation the runtime part rebuilds them from their stored records in short batches, a thread the person opens first, and the thread shows its history as loading until its rebuild ends.
 - Reading a stored event of an older schema version goes through the providers protocol package, which reads every version it has written ([Versioning](../providers/README.md#versioning)).
 - A stored event of a newer major version than the build knows leaves its thread read-only, with a notice, and nothing is changed or removed.
 
@@ -183,8 +189,10 @@ Each call shows as a tool-call card, collapsed by default, and a failed one expa
 | Status `succeeded`, `cancelled` | Succeeded, cancelled |
 | Status `failed`, `refused` | Failed, with refused as its error for `refused` |
 
-The card's output loads when it expands, from the stored output, and then follows the call's stream while it runs.
+The card's output loads when it expands, from its stored pieces, and then follows the call's stream while it runs.
 A diff a call made shows inside its card as a read-only diff view, unified or side by side.
+The runtime part parses each file's unified diff into the diff view's hunks, each with its line numbers and an id made of the call's id, the file's path and the hunk's place in the file, so a hunk keeps its id while the call reports again.
+`added`, `changed`, `removed` and `renamed` show as added, modified, deleted and renamed, with a renamed file's old path from its diff's header; a file whose diff marks it binary shows as binary, and a diff the part cannot parse shows as text in a code block.
 A line comment the diff view asks for puts the file and line, as `path:line`, into the composer.
 
 ### Composer
@@ -213,7 +221,7 @@ The module answers every request of the runtime permission contract, desktop-cor
   Always allow at high risk asks for an inline confirmation.
 - **States:** pending, with the request's expiry time; sending, with the options disabled; failed to send, with a retry; and, once decided, the outcome in place of the options, with who decided and when: allowed once, always allowed, denied, always denied, expired or withdrawn.
   A request the contract answers from a remembered answer shows as a decided card that names the rule.
-  Cancelling a turn withdraws its waiting requests.
+  Cancelling a turn withdraws, through `providers`, the agent's own waiting requests; a tool module's request belongs to its requester, which withdraws it when its call ends, and the module never withdraws it itself.
 - **Focus:** a card never takes focus by itself; `conversations.nextRequest` and the composer's count select it, and the kit's list marks it selected.
 - **Authority:** only the person's choice in the window part answers a request.
   The runtime part checks that the request waits and that the option is one it offered, and returns the decision to the contract, which records it.
