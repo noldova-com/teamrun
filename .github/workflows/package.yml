@@ -196,6 +196,9 @@ jobs:
           AZURE_TENANT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_TENANT_ID || '' }}
           AZURE_CLIENT_ID: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_ID || '' }}
           AZURE_CLIENT_SECRET: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_CLIENT_SECRET || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_SIGNING_ENDPOINT || '' }}
+          AZURE_SIGNING_ACCOUNT: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_SIGNING_ACCOUNT || '' }}
+          AZURE_SIGNING_PROFILE: ${{ matrix.signed == 'true' && matrix.platform == 'windows' && secrets.AZURE_SIGNING_PROFILE || '' }}
           MAC_CERTIFICATE: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE || '' }}
           MAC_CERTIFICATE_PASSWORD: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
           APPLE_API_KEY_P8: ${{ matrix.signed == 'true' && matrix.platform == 'macos' && secrets.APPLE_API_KEY_P8 || '' }}
