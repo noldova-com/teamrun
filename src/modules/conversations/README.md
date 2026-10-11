@@ -135,7 +135,7 @@ The composer offers the person's teammates and a plain agent for each command li
 - When another agent already runs a turn in the same folder, the composer says so before sending; it does not block.
 - A session starts with its agent's first prompt, never when the thread opens.
   It ends after 15 minutes without a running turn, when the thread is deleted, or when the runtime stops.
-  The next prompt resumes it through `providers`, with the provider's session id the agent keeps; when it cannot be resumed, a new session starts, and the timeline says that the agent starts without its earlier context.
+  The next prompt resumes it through `providers`, with the provider's session id the agent keeps; when it cannot be resumed, or when the agent's teammate moved to another command line since its last session, a new session starts, and the timeline says that the agent starts without its earlier context ([In a conversation](../teammates/README.md#in-a-conversation)).
 
 ### Prompts and turns
 
