@@ -17,7 +17,7 @@ The module sees agents only through the providers module's [event schema](../pro
 - **Runtime:** the database, the threads and their folders, the agent sessions and their prompt queues, the stored events, and the answers to permission requests.
 - **Window:** the Conversations view, the thread document with its timeline and composer, and the module's settings ([Contributions](#4-contributions)).
 
-The module depends on `providers`, for the service `providers.agents` and the schema's models in its protocol package.
+The module depends on `providers`, for the service `providers.agents` and the schema's models in its protocol package, and on `teammates`, for the service `teammates.directory`.
 It never imports a tool module: each session's MCP connections come from the tool wrappers registered with `conversations.tools`, and the module passes them to `providers` when it starts the session.
 
 From the shell, the runtime part needs:
@@ -61,13 +61,13 @@ The database is `modules/conversations/conversations.sqlite` ([architecture](../
 |---|---|
 | Thread | Its id, a UUID; its title; its folder or none; when it was created and last active; whether it is archived; the agent last addressed |
 | Folder | Its id, a UUID, and its path on each device, for a thread with a folder of its own |
-| Agent | Its thread, its command line's id, its display name, its accent, the model and mode the session last reported, the provider's session id when the session can be resumed, and its queued prompts |
+| Agent | Its thread, the teammate it is or none, its command line's id, its display name when it is no teammate, its accent, the model and mode the session last reported, the provider's session id when the session can be resumed, and its queued prompts |
 | Message | Each prompt the person sent: its text, its attachments, the agents it went to and its arrival number |
 | Event | Each event its sessions reported, whole, in the schema's JSON with its version, by session and sequence, with its arrival number |
 | Request | Each permission request the module showed: its id, its requester, its action, details, risk and options, its session when it names one, its arrival number, its state, its decision, and who decided and when |
 | Entry | The timeline, by thread and position, derived from the messages, the events and the requests |
 | Draft | Each thread's unsent text and attachments |
-| Attachment | Its id, its name, its media type, its size and its file in `modules/conversations/attachments/<id>`; an attachment no draft or message holds is removed when the draft that held it is saved without it, and when the runtime part starts |
+| Attachment | Its id, its name, its media type, its size and its file in `modules/conversations/attachments/<id>`; an attachment no draft or message holds is removed when the draft that held it is saved without it, and when the runtime part starts; removing one removes only the module's own copy, never the file the person attached from |
 
 ### Stored records
 
@@ -123,7 +123,7 @@ A thread's folder does not change once its first session has started.
 ### Agents in a thread
 
 A thread has one or more agents, each one agent session of a command line from `providers`.
-The composer offers the command lines `providers` reports as `signedIn`; the others show their status and open the Agents document.
+The composer offers the person's teammates and a plain agent for each command line `providers` reports as `signedIn`, as the [teammates module](../teammates/README.md#in-a-conversation) describes; the other command lines show their status and open the Agents document.
 
 - Each agent gets an accent, from the kit's keys `author-1` to `author-8`, in the order it joined the thread, so up to eight agents in a thread never share one.
 - A prompt goes to the agents the person picks in the composer, the agent last addressed by default.
@@ -135,7 +135,7 @@ The composer offers the command lines `providers` reports as `signedIn`; the oth
 - When another agent already runs a turn in the same folder, the composer says so before sending; it does not block.
 - A session starts with its agent's first prompt, never when the thread opens.
   It ends after 15 minutes without a running turn, when the thread is deleted, or when the runtime stops.
-  The next prompt resumes it through `providers`, with the provider's session id the agent keeps; when it cannot be resumed, a new session starts, and the timeline says that the agent starts without its earlier context.
+  The next prompt resumes it through `providers`, with the provider's session id the agent keeps; when it cannot be resumed, or when the agent's teammate moved to another command line since its last session, a new session starts, and the timeline says that the agent starts without its earlier context ([In a conversation](../teammates/README.md#in-a-conversation)).
 
 ### Prompts and turns
 
