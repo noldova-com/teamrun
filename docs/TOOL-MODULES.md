@@ -86,7 +86,7 @@ So the app's policy sees every call, and a tool never lets a call skip it.
 
 The request carries:
 
-- the requester, which the base sets from the registry's record of the module that published the tool, so neither the host nor the tool can name another module;
+- the requester, the tool's module, also when the host raises the request ([Raising for a tool](#7-missing-decisions));
 - the action;
 - the exact details the person decides on, such as the command, the address, the app or the files, and the state the grant binds;
 - the call's risk level, whether it asks, and the options;
@@ -192,7 +192,7 @@ Its version stays a plain number, never with a suffix.
 |---|---|
 | The tool's actions, their names and descriptors, the details each request shows and the state a grant binds, each call's risk level, whether it asks and the options it offers, and who raises each request | The tool |
 | The handlers, the requests a tool raises itself, its results and failures, and the window part's behavior | The tool |
-| Publishing, listing and calling tools, stamping each request's requester, session-end events, and leaving out a switched-off module's tools | The base's tool registry |
+| Publishing, listing and calling tools, session-end events, and leaving out a switched-off module's tools | The base's tool registry |
 | Routing requests, recording decisions, storing, listing and revoking remembered answers, and expiry | The base's permission contract |
 | The permission card the person answers, the policy per conversation within each tool's limits, and the scope and resources each session is bound to | TeamRun's Conversations module |
 | The host: serving the registry's tools, binding each connection to one session, the requests it raises, writing each session's connection and allow configuration, and turning the agent's own approval requests into runtime requests | TeamRun's providers module |
@@ -255,6 +255,7 @@ Resolve these before dependent implementation:
   Whether TeamRun takes them from the base's packages, and when, is not decided here, nor whether its build can then declare a tool's module straight from the package.
 - **The registry's interface:** its descriptors, handlers, calls, failures, events and versioning, which [desktop-core#21](https://github.com/noldova-com/desktop-core/issues/21) defines; section 2 follows it once it is defined.
 - **Risk levels:** the scale of risk levels comes with the base's permission contract, and each tool's levels map onto it.
+- **Raising for a tool:** how the host raises a request that names the tool's module as its requester, set by the base from the registry's record of the module that published the tool so the host cannot name another module, pending [desktop-core#14](https://github.com/noldova-com/desktop-core/issues/14) and [desktop-core#6](https://github.com/noldova-com/desktop-core/issues/6); neither provides it yet ([the question on desktop-core#14](https://github.com/noldova-com/desktop-core/issues/14#issuecomment-6105275886)).
 - **The host's protocol:** whether the host implements the part of the protocol it needs or takes a protocol package ([providers' Missing decisions](../src/modules/providers/README.md#7-missing-decisions)).
 - **The fallback:** whether there is one, and if so how a tool's stdio server learns its session and raises its requests, and who owns and ends its process ([The fallback](#the-fallback)).
 - **Requests without a session:** where a request that names no agent session shows, which Conversations decides ([Missing decisions](../src/modules/conversations/README.md#7-missing-decisions)).

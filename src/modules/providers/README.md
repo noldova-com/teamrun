@@ -244,7 +244,7 @@ Every permission request goes through the runtime permission contract, desktop-c
   TeamRun keeps remembered answers itself, so an allowed request is answered with the command line's allow-once option, never its allow-always one, and later requests still reach TeamRun.
   A request withdrawn because its turn was cancelled is answered with the protocol's `cancelled` outcome, where the adapter's protocol has one, and denied otherwise; a request that expires is denied with the command line's reject-once option.
 - **Tools from tool modules:** every call raises one runtime request: the [tool host](#tool-host) raises it before it calls the tool's handler, unless the tool's descriptor names the tool as its raiser, as the [tool module contract](../../../docs/TOOL-MODULES.md#permission-requests) describes.
-  The base sets the requester, the tool's module, from the registry, never the host.
+  The request names the tool's module as its requester, which waits on desktop-core#14 and #6 ([Raising for a tool](../../../docs/TOOL-MODULES.md#7-missing-decisions)).
   The request never passes through the agent's stream or this schema, since the host never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as the [conversations module](../conversations/README.md#permissions) describes.
   The host knows the calling session from the session's own connection, never from the tool's input.
   A denied or withdrawn request ends the call with an MCP error result, which the agent's stream shows as a `tool_call_update` with the status `failed`.
