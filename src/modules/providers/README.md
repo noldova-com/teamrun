@@ -75,7 +75,7 @@ Consumers use `sequence` to tell a missed event from a late one and never reorde
 | `plan.updated` | The whole plan, each entry with its text and status, `pending`, `inProgress` or `completed` |
 | `diff.reported` | The call's id when a tool made it, and each file the agent changed: its path relative to the working folder, `added`, `changed`, `removed` or `renamed`, and the change as a unified diff |
 | `permission.requested` | The call's id, the runtime permission request's id and the options the command line offers ([Permissions](#permissions)) |
-| `permission.resolved` | The runtime request's id and its decision: `allowedOnce`, `allowedAlways`, `denied`, `withdrawn` or `expired` |
+| `permission.resolved` | The runtime request's id and its decision: `allowedOnce`, `allowedAlways`, `denied`, `deniedAlways`, `withdrawn` or `expired` |
 | `agent.started` | The subagent's id, the call that started it, and its task's description |
 | `agent.finished` | The subagent's id and its outcome, as a turn's |
 | `error.reported` | An [error](#errors) |
@@ -93,11 +93,27 @@ A text field is bounded at 1 MiB, and an adapter that reads a longer one sends i
 
 The schema starts at version `1.0`.
 
-- A minor version only adds: an optional field, a new value of a field consumers must accept as unknown, or a new kind that is informational only.
-  Consumers ignore fields and informational kinds they don't know, as the schema allows them.
-- Anything else is a major version: a removed or renamed field, a changed meaning, or a new kind that asks for an answer or changes a turn's outcome.
+- A minor version only adds: an optional field, a new value of an open field, or a new kind that is informational only.
+  Consumers ignore fields and informational kinds they don't know, as the schema allows them, and read an open field's unknown value as its fallback below.
+- Anything else is a major version: a removed or renamed field, a changed meaning, a new or removed value of a closed field, or a new kind that asks for an answer or changes a turn's outcome.
   A consumer refuses a major version it does not know before acting on any event of it.
 - `session.started`, `turn.finished`, `tool.finished`, `permission.requested` and `session.ended` are never informational: a consumer that cannot read one fails the session closed.
+
+Each enumerated field is open or closed:
+
+| Field | Open or closed | An unknown value is read as |
+|---|---|---|
+| `kind` | Open for informational kinds only | Skipped |
+| `session.started`'s adapter kind | Open | Shown as unknown; nothing depends on it |
+| `session.ended`'s reason | Closed | Refused, failing the session closed |
+| `turn.finished`'s and `agent.finished`'s outcome | Closed | Refused, failing the session closed |
+| `message.started`'s kind | Open | `reply` |
+| `tool.started`'s category | Open | `other` |
+| `tool.finished`'s status | Closed | Refused, failing the session closed |
+| A plan entry's status | Closed | Refused, failing the session closed |
+| A changed file's change in `diff.reported` | Open | `changed` |
+| `permission.resolved`'s decision | Closed | Refused, failing the session closed |
+| An error's code | Open | `providerError`, keeping its message and whether the session can go on |
 - Stored events outlive builds, so the protocol package reads every version it has ever written, mapping each older form into the current one.
   Its tests keep the older forms and refuse a newer major.
 
@@ -116,10 +132,11 @@ The module keeps no database.
 A session's events go to its owner as they come, and the owner keeps what it needs; the module holds nothing that outlives a session.
 
 A session's generated configuration, such as the MCP servers it may reach, goes in `modules/providers/sessions/<session id>` and is removed when the session ends.
+The module creates the folder so that only the person's own account can read it.
 A starting runtime removes the folders a stopped one left behind.
 
 The module never reads, copies or stores a command line's credentials or session files.
-Its log records event kinds, counts, exit codes and adapter failures, never prompts, replies, tool inputs, outputs, arguments or environment.
+Its log records event kinds, counts, exit codes and the codes of adapter failures, never prompts, replies, tool inputs, outputs, a provider's error text, arguments or environment.
 
 ## 6. Behavior
 
@@ -131,7 +148,7 @@ For each command line the module finds the program, as `startProcessAsync` would
 Its status is one of:
 
 - `notFound`: no program on the PATH or at the set path;
-- `unsupported`: a version outside the range its adapter supports, which the status names;
+- `unsupported`: a version outside the range its adapter supports, which the status names, or a command line whose approvals cannot be routed to TeamRun ([Permissions](#permissions));
 - `signedOut` or `signedIn`, from the command line's own status interface: its status command, or its protocol's account request where the adapter's protocol has one;
 - `unknown`: the status interface failed or did not answer within 10 seconds, with the reason.
 
@@ -145,7 +162,10 @@ A session is one agent process, started in the session's working folder with the
 - The process gets the environment `startProcessAsync` gives every program, plus the variables its command line's definition names for its own configuration, inherited by name.
   The module never reads their values.
 - The session's owner gives the working folder, the model and mode when it chooses them, and the MCP servers the agent may reach.
-  The adapter writes them into the command line's own configuration for this session only, in the session's folder or its arguments, never in the person's or the project's configuration.
+  The adapter writes them into the command line's own configuration for this session only, in files in the session's folder, never in the person's or the project's configuration.
+  The command line's arguments may name those files but never hold their content.
+- Whatever identifies or authenticates a session's connection, such as a token or a per-session address, goes only into the session's folder: never into the arguments, the environment, the log or an event, so no other program reads it from the process list.
+  It is removed with the folder.
 - Each turn is active work while it runs.
 - A prompt sent while a turn runs is refused; the owner queues prompts.
 - A session is resumed only through the command line's own resume interface, with the provider's session id the session reported in `session.started`, which the owner keeps.
@@ -165,11 +185,22 @@ Every permission request goes through the runtime permission contract, desktop-c
   TeamRun keeps remembered answers itself, so an allowed request is answered with the command line's allow-once option, never its allow-always one, and later requests still reach TeamRun.
   A request that is withdrawn or expires is denied to the command line.
 - **Tools that tool modules serve:** a tool module raises its own runtime request for its action, under the tool module contract (teamrun#775).
-  The request never passes through the agent's stream or this schema, since the MCP server never sees the call's id; conversations shows it as its own entry in the session, ordered by the runtime request.
+  The request never passes through the agent's stream or this schema, since the MCP server never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as teamrun#772 decides.
   Each session reaches the tool modules through MCP connections of its own, so a tool module knows the calling session from the connection, never from the tool's arguments.
   A denied or withdrawn request ends the call with an MCP error result, which the agent's stream shows as `tool.finished` with `refused` or `failed`.
 - **No double prompt:** for each session the adapter allows, in the command line's own allow configuration, exactly the tools TeamRun serves on that session's connections, so the person is asked once, by the tool module.
+  Each allow entry names one served tool by its full name, never by a wildcard, under a server name only TeamRun uses: a name of its own with the session's random suffix, which no configuration written before the session can name.
   It never turns on a command line's global mode that skips approvals, so the agent's own tools still ask.
+
+The person's and the project's own configuration of a command line could pre-allow the agent's tools, turn on the mode that skips approvals, or define a server under one of TeamRun's names, so that requests bypass the runtime contract.
+The adapter holds the session against them:
+
+- It starts the command line with an explicit approval mode that sends every approval to TeamRun, and limits the configuration the command line reads to the session's own where the command line offers that, through its own options.
+- It checks what the command line reports at the start, such as its approval mode and its MCP servers, where it reports them.
+  An approval mode other than the one asked for, or another server under one of TeamRun's names, ends the session `failed` with `configurationConflict` before any prompt.
+- It never writes or changes the person's or the project's configuration, not even to remove a conflict.
+- A command line that cannot be held to this is `unsupported`, and its status says that its approvals cannot be routed to TeamRun.
+  Whether each adapter kind can be held is a blocking [missing decision](#7-missing-decisions).
 
 The agent's output cannot grant a permission, answer a request or widen what a session may reach.
 
@@ -182,7 +213,7 @@ When a command line shows only a subagent's result, the adapter sends the call a
 ### Errors
 
 An error has a code, a message for people and whether the session can go on.
-Codes: `commandLineMissing`, `unsupportedVersion`, `signedOut`, `startFailed`, `exited`, `protocolViolation` and `providerError`, the command line's own error, with its message.
+Codes: `commandLineMissing`, `unsupportedVersion`, `signedOut`, `startFailed`, `configurationConflict`, `exited`, `protocolViolation` and `providerError`, the command line's own error, with its message.
 
 - A line or message the adapter cannot read, or one over 16 MiB, is a `protocolViolation`: the turn finishes `failed`, the process stops and the session ends `failed`.
 - A provider's error that ends a turn finishes it `failed`; one that does not, such as a retried request, is reported and the turn goes on.
@@ -217,6 +248,8 @@ Resolve these before dependent implementation:
 
 - **Command lines:** which command lines TeamRun supports, which adapter kind each uses, and the version range of each.
   Naming them waits for the Owner's decision on naming integrations.
+- **Holding approvals, blocking every adapter:** for each adapter kind, whether its command lines offer the options to set the approval mode and limit the configuration they read, and to report both at the start, so that a session can be held to TeamRun's approvals ([Permissions](#permissions)).
+  An adapter kind that cannot be held is not supported.
 - **Permission contract:** the runtime permission contract, desktop-core#14, its request and decision shapes and remembered answers; the permission section above follows it once it is defined.
 - **Conversations:** what conversations stores of each session, and for how long, is the conversations module's decision (teamrun#772).
 - **Client capabilities:** whether TeamRun serves an agent-protocol session's file and terminal requests itself, or the agent keeps its own.
