@@ -45,12 +45,12 @@ export default class Test {
   private readonly environment: NodeJS.ProcessEnv;
   private readonly checks: IGateChecks;
 
-  public constructor(root: string, runner: ProcessRunner, output: Writable, environment: NodeJS.ProcessEnv, checks?: IGateChecks) {
+  public constructor(root: string, runner: ProcessRunner, output: Writable, environment: NodeJS.ProcessEnv, checks: IGateChecks) {
     this.root = root;
     this.runner = runner;
     this.output = output;
     this.environment = environment;
-    this.checks = checks ?? new GateChecks(root, runner, environment);
+    this.checks = checks;
   }
 
   public async runAsync(selection: readonly string[]): Promise<number> {
@@ -188,5 +188,8 @@ export default class Test {
   }
 }
 
-if (import.meta.main)
-  process.exitCode = await new Test(process.cwd(), new ProcessRunner(), process.stdout, process.env).runAsync(process.argv.slice(2));
+if (import.meta.main) {
+  const root = process.cwd();
+  const runner = new ProcessRunner();
+  process.exitCode = await new Test(root, runner, process.stdout, process.env, new GateChecks(root, runner, process.env)).runAsync(process.argv.slice(2));
+}
