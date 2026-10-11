@@ -124,7 +124,7 @@ A thread's folder does not change once its first session has started.
 ### Agents in a thread
 
 A thread has one or more agents, each one agent session of a command line from `providers`.
-The composer offers the person's teammates and a plain agent for each command line `providers` reports as `signedIn`, as the [teammates module](../teammates/README.md#in-a-conversation) describes; the other command lines show their status and open the Agents document.
+The composer offers the person's teammates and a plain agent for each command line `providers` reports as `SignedIn`, as the [teammates module](../teammates/README.md#in-a-conversation) describes; the other command lines show their status and open the Agents document.
 
 - Each agent gets an accent, from the kit's keys `author-1` to `author-8`, in the order it joined the thread, so up to eight agents in a thread never share one.
 - A prompt goes to the agents the person picks in the composer, the agent last addressed by default.
@@ -143,9 +143,9 @@ The composer offers the person's teammates and a plain agent for each command li
 `providers` refuses a prompt while a turn runs, so the module queues prompts per agent.
 
 - A queued prompt shows as the person's message marked queued, which the person can edit or withdraw until it is sent.
-- Queued prompts go in order, each when the agent's turn finishes with `end_turn`.
+- Queued prompts go in order, each when the agent's turn finishes with `EndTurn`.
 - Cancelling a turn, from the composer's stop button or `conversations.cancelTurn`, cancels it through `providers` and pauses the agent's queue; the composer then offers to send the next prompt.
-- A turn that finishes with `refusal`, `max_tokens`, `max_turn_requests` or `failed` pauses the queue the same way.
+- A turn that finishes with `Refusal`, `MaxTokens`, `MaxTurnRequests` or `Failed` pauses the queue the same way.
 - Retrying a failed reply queues its prompt again to the same agent.
 
 ### The timeline
@@ -156,14 +156,14 @@ Entries take positions in the order the runtime part receives what they show; a 
 | Entry | From | Shows |
 |---|---|---|
 | The person's message | The composer | Its text, its attachments and the agents it went to |
-| The agent's reply | `agent_message_chunk` | A message control, streaming until its message ends |
-| Reasoning | `agent_thought_chunk` | A collapsed block in the agent's turn, or nothing, as `conversations.reasoning` chooses |
-| A tool call | `tool_call`, `tool_call_update` and `tool.output` | A tool-call card ([Tool calls](#tool-calls)) |
+| The agent's reply | `AgentMessageChunk` | A message control, streaming until its message ends |
+| Reasoning | `AgentThoughtChunk` | A collapsed block in the agent's turn, or nothing, as `conversations.reasoning` chooses |
+| A tool call | `ToolCall`, `ToolCallUpdate` and `tool.output` | A tool-call card ([Tool calls](#tool-calls)) |
 | A subagent | `agent.started` to `agent.finished` | Its events as calls nested under the call that started it |
-| The plan | `plan` | One plan per turn, a checklist updated where it first appeared, with its progress, such as 3 of 7, in the composer while the turn runs |
+| The plan | `Plan` | One plan per turn, a checklist updated where it first appeared, with its progress, such as 3 of 7, in the composer while the turn runs |
 | A permission request | The runtime permission contract | A permission card ([Permissions](#permissions)) |
-| The turn's end | `turn.finished`, `usage_update` | Its outcome when not `end_turn`, and the usage reported: tokens, the duration, the context used and the cost |
-| A notice | `session.started`, `config_option_update`, `current_mode_update`, `session.ended`, `error.reported` | An agent joining, its model or mode changing, a session ending other than by its owner, and errors, with whether the agent can go on |
+| The turn's end | `turn.finished`, `UsageUpdate` | Its outcome when not `EndTurn`, and the usage reported: tokens, the duration, the context used and the cost |
+| A notice | `session.started`, `ConfigOptionUpdate`, `CurrentModeUpdate`, `session.ended`, `error.reported` | An agent joining, its model or mode changing, a session ending other than by its owner, and errors, with whether the agent can go on |
 
 - Consecutive entries of one author share one header.
 - While the person is at the end of the timeline, it follows new entries; once they scroll up, it stays, and Jump to latest shows with the count of new entries.
@@ -182,20 +182,20 @@ Each call shows as a tool-call card, collapsed by default, and a failed one expa
 
 | Schema | Card |
 |---|---|
-| Kind `read`, `search`, `execute`, `fetch` | Kind read, search, run command, fetch |
-| Kind `edit`, `delete`, `move` | Kind edit |
-| Kind `think`, `switch_mode`, `other` | Kind other, with the tool's `name` when given, and nested calls for a subagent |
+| Kind `Read`, `Search`, `Execute`, `Fetch` | Kind read, search, run command, fetch |
+| Kind `Edit`, `Delete`, `Move` | Kind edit |
+| Kind `Think`, `SwitchMode`, `Other` | Kind other, with the tool's `name` when given, and nested calls for a subagent |
 | `title` and `locations` | The title, and the files it names as its target, or the command from its `rawInput` |
-| Status `pending`, with a waiting `permission.requested` | Waiting for permission |
-| Status `pending`, `in_progress` | Pending, running |
-| Status `completed` | Succeeded |
-| Status `failed` | Failed, with refused as its error when its permission was denied |
-| Not finished when its turn finishes `cancelled` | Cancelled |
+| Status `Pending`, with a waiting `permission.requested` | Waiting for permission |
+| Status `Pending`, `InProgress` | Pending, running |
+| Status `Completed` | Succeeded |
+| Status `Failed` | Failed, with refused as its error when its permission was denied |
+| Not finished when its turn finishes `Cancelled` | Cancelled |
 
 The card's output loads when it expands, from its stored pieces, and then follows the call's stream while it runs.
 A diff a call made shows inside its card as a read-only diff view, unified or side by side.
-The runtime part compares each `diff` item's `oldText` and `newText` by lines into the diff view's hunks, each with its line numbers and an id made of the call's id, the file's path and the hunk's place in the file, so a hunk keeps its id while the call reports again.
-A file whose `oldText` is null shows as added, and any other as modified; a file a call deletes or moves shows in its card, by its `delete` or `move` kind, without a diff.
+The runtime part compares each `Diff` item's `oldText` and `newText` by lines into the diff view's hunks, each with its line numbers and an id made of the call's id, the file's path and the hunk's place in the file, so a hunk keeps its id while the call reports again.
+A file whose `oldText` is null shows as added, and any other as modified; a file a call deletes or moves shows in its card, by its `Delete` or `Move` kind, without a diff.
 Nested calls show 20 at a time, then Show N more, with the step passed to the card, as [agreed for the tool-call card](https://github.com/noldova-com/components/issues/37#issuecomment-6105184931).
 A line comment the diff view asks for puts the file and line, as `path:line`, into the composer.
 
@@ -236,7 +236,7 @@ The runtime part posts a notification when the thread it concerns is not in view
 
 - `conversations.requestWaiting`, when a request waits;
 - `conversations.turnFinished`, when a turn ends;
-- `conversations.sessionFailed`, when a session ends `failed` or a turn finishes `failed`.
+- `conversations.sessionFailed`, when a session ends `Failed` or a turn finishes `Failed`.
 
 Opening one runs `conversations.openThread` and selects its entry.
 No notification answers a request; the person answers on the card.
