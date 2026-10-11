@@ -3,8 +3,9 @@
 **Scope:** The plan for replacing TeamRun's own shell with the shared base's shell packages: what each area of the repository becomes, the order of the pull requests, what must not be lost and the decisions still open.
 
 The base, in the `desktop-core` repository, is the shell TeamRun's own shell was copied from: the same foundation, protocol, runtime, command line, desktop, kit and window, without TeamRun's modules.
-It is to ship as `@noldova/*` npm packages that carry the installer build, the signing step and the updater, and an app is then its modules, its identity and a call to a shared release workflow (desktop-core#6).
-TeamRun moves onto those packages in pull requests that each keep `main` green and keep the repository's history.
+It is to ship as `@noldova/*` npm packages that carry the installer build, the signing step and the updater, and an app is then its modules, its identity and a call to a shared release workflow, per desktop-core#6, which settles the app repository's shape.
+TeamRun moves onto those packages in place, in this repository, replacing its own shell in pull requests that each keep `main` green and keep the repository's history.
+That is the decided direction: the history, issues, pull requests, releases, update address and required checks all stay where they are.
 
 Comparable families of desktop apps share one framework, shipped as packages, and keep each app's identity, modules and releases in the app's own repository; this plan does the same.
 
@@ -14,7 +15,7 @@ Each top-level area of `src/`, `scripts/` and `.github/` is marked:
 
 - **Replaced:** a base package or the base's shared workflow takes its place, and the area is removed in the pull request that switches to it.
 - **Kept:** it stays TeamRun's own.
-- **Later:** it waits for a decision in [Open decisions](#5-open-decisions); it stays as it is until then.
+- **Later:** what the app repository holds here is not settled yet, per desktop-core#6, or it waits for another [open decision](#5-open-decisions); it stays as it is until then.
 
 ### `src/`
 
@@ -28,7 +29,7 @@ Each top-level area of `src/`, `scripts/` and `.github/` is marked:
 | `shell/ui/` | Replaced | The base's kit, which it imports as `@noldova/components` and which is not a package yet |
 | `shell/window/` | Replaced | The base's window, `@noldova/desktop-window`, which is not a package yet |
 | `modules/` | Kept | TeamRun's modules are the app: checkpoints, conversations, first-run, providers and teammates |
-| `angular.json`, `package.json`, `package-lock.json`, `tsconfig.app.json`, `tsconfig.json`, `tsconfig.spec.json`, `vitest.config.mts`, `.npmrc` | Later | The app keeps an Angular project for its modules' window parts, but its shape depends on how the base ships the window and the kit |
+| `angular.json`, `package.json`, `package-lock.json`, `tsconfig.app.json`, `tsconfig.json`, `tsconfig.spec.json`, `vitest.config.mts`, `.npmrc` | Later | The app keeps an Angular project for its modules' window parts, but its shape depends on how the base ships the window and the kit, per desktop-core#6 |
 
 ### `scripts/`
 
@@ -40,23 +41,23 @@ What an app runs itself, and what comes to it from a base package or a shared wo
 | `packaging/`, `packages/`, `release/`, `package.ts`, `package-smoke.ts`, `release-assets.ts`, `release-check.ts`, `release-publish.ts`, `signed-platforms.ts` | Replaced | The installer build, signing, the update feed and releasing move into the base's packages and its shared release workflow |
 | `desktop/`, `toolchain/` | Replaced | They fetch the Electron binary and build the runtime's native addon, which the base's desktop and runtime packages carry |
 | `modules/`, `ordering/` | Replaced | They read the build's module list and declarations, which the base's build does for any app |
-| `build.ts`, `test.ts`, `test-part.ts`, `test-options.ts`, `test-options.exception.ts`, `list-targets.ts`, `classify-changes.ts`, `tsconfig.json` | Later | The build and test runner; an app needs one for its modules, from the base or its own |
-| `checks/`, `structure/`, `api/`, `angular/` | Later | The structure, API and Angular checks; most apply to any app, and those for TeamRun's modules must stay ([What must not be lost](#4-what-must-not-be-lost)) |
-| `documents/`, `format-documents.ts` | Later | The document checks, which TeamRun's module documents need whoever carries them |
-| `processes/`, `repository/`, `totals/`, `run-totals.ts` | Later | Helpers the runner, the checks and the reports share; they follow those |
-| `workflows/`, `ui-workflows.ts`, `ui-summary.ts` | Later | Change classification, the job plan and the UI workflows' reports, which follow the workflows that run them |
-| `nightly-report.ts`, `nightly-result.ts`, `flaky-report.ts`, `flaky-week-summary.ts`, `watch-pull-requests.ts` | Later | The nightly, flake and pull-request tooling, which must not be lost; it stays until the base carries it |
-| `tests/` | Later | The scripts' tests follow the scripts they test, area by area |
+| `build.ts`, `test.ts`, `test-part.ts`, `test-options.ts`, `test-options.exception.ts`, `list-targets.ts`, `classify-changes.ts`, `tsconfig.json` | Later | The build and test runner; an app needs one for its modules, from the base or its own, per desktop-core#6 |
+| `checks/`, `structure/`, `api/`, `angular/` | Later | The structure, API and Angular checks; most apply to any app, and those for TeamRun's modules must stay ([What must not be lost](#4-what-must-not-be-lost)), per desktop-core#6 |
+| `documents/`, `format-documents.ts` | Later | The document checks, which TeamRun's module documents need whoever carries them, per desktop-core#6 |
+| `processes/`, `repository/`, `totals/`, `run-totals.ts` | Later | Helpers the runner, the checks and the reports share; they follow those, per desktop-core#6 |
+| `workflows/`, `ui-workflows.ts`, `ui-summary.ts` | Later | Change classification, the job plan and the UI workflows' reports, which follow the workflows that run them, per desktop-core#6 |
+| `nightly-report.ts`, `nightly-result.ts`, `flaky-report.ts`, `flaky-week-summary.ts`, `watch-pull-requests.ts` | Later | The nightly, flake and pull-request tooling, which must not be lost; it stays until the base carries it, per desktop-core#6 |
+| `tests/` | Later | The scripts' tests follow the scripts they test, area by area, per desktop-core#6 |
 
 ### `.github/`
 
 | Area | Mark | Reason |
 |---|---|---|
 | `workflows/release.yml`, `workflows/package.yml` | Replaced | A call to the base's shared release workflow takes their place; the base's own release workflow is not reusable yet |
-| `workflows/build-and-test.yml`, `workflows/build-and-test-target.yml`, `workflows/ui-workflows.yml` | Later | They run the build, the tests and the UI workflows, from the base's reusable workflows or TeamRun's own |
-| `workflows/nightly.yml`, `workflows/flaky-tests.yml`, `workflows/watch-pull-requests.yml` | Later | The nightly repeats, the flake reports and the pull-request watcher, which must not be lost |
+| `workflows/build-and-test.yml`, `workflows/build-and-test-target.yml`, `workflows/ui-workflows.yml` | Later | They run the build, the tests and the UI workflows, from the base's reusable workflows or TeamRun's own, per desktop-core#6 |
+| `workflows/nightly.yml`, `workflows/flaky-tests.yml`, `workflows/watch-pull-requests.yml` | Later | The nightly repeats, the flake reports and the pull-request watcher, which must not be lost, per desktop-core#6 |
 | `workflows/require-linked-issue.yml`, `workflows/clear-work-labels.yml` | Kept | They hold this repository's own issue and pull-request rules |
-| `actions/` (`prepare`, `ui-workflows`) | Later | They follow the workflows that use them |
+| `actions/` (`prepare`, `ui-workflows`) | Later | They follow the workflows that use them, per desktop-core#6 |
 | `ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE.md`, `CONTRIBUTING.md`, `SECURITY.md` | Kept | They belong to the repository, whatever builds it |
 
 Outside these three areas, the root `package.json` keeps TeamRun's identity and module list, `assets/` keeps its icons, and `docs/` keeps the rules that are TeamRun's own while the shell's rules move to the base's documents (the last pull request below).
@@ -104,9 +105,8 @@ Waiting for the base's app-on-shell design (desktop-core#6):
 - **Packages and versions:** when the packages are published, how TeamRun pins and updates them, and how a base change that breaks a module reaches TeamRun.
 - **The window and the kit:** whether they ship as packages built from source in the app's Angular project or as built libraries, and whether the kit moves to a repository of its own.
 - **Tooling:** whether the runner, the checks and the reports come to apps as a package, as reusable workflows or not at all, and which checks the base runs on an app's modules.
-- **The manifest:** the key under which an app declares its modules and identity, which is `teamrun` in TeamRun and `desktop` in the base.
+- **The manifest:** per desktop-core#6, the key under which an app declares its modules and identity, which is `teamrun` in TeamRun and `desktop` in the base.
 
 TeamRun's own:
 
-- **In place or a new repository:** this plan moves TeamRun in place, keeping its history, issues, pull requests, releases, update address and required checks; starting a new repository and archiving this one would lose them from the working repository, so it is not recommended.
 - **The order of 5 to 8:** settled once the base's needs for them are known.
