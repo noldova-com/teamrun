@@ -12,6 +12,7 @@ import { userEvent } from "vitest/browser";
 
 import { GalleryResources } from "../../../../src/app/components/gallery/gallery-resources";
 import { GalleryStateDirective } from "../../../../src/app/components/gallery/gallery-state.directive";
+import { GalleryComponent } from "../../../../src/app/components/gallery/gallery.component";
 import { GalleryState } from "../../../../src/app/enums/gallery-state";
 import { AppearanceFixture } from "../../../fixtures/appearance.fixture";
 import { GalleryFixture } from "../../../fixtures/gallery.fixture";
@@ -79,10 +80,10 @@ describe("GalleryStateDirective", () => {
 
   it("shows in each of the Gallery's Hover cells the look its control has when the pointer is really over it", async () => {
     await MotionFixture.reduceAsync();
-    const fixture = await GalleryFixture.showAsync();
-    const frame = GalleryFixture.frames(fixture)[0] as HTMLElement;
+    const frame = (await renderAsync(GalleryComponent)).querySelector(".tr-gallery-scope-frame") as HTMLElement;
     const marked = [...frame.querySelectorAll<HTMLElement>(`[${GalleryResources.stateAttribute}="${GalleryState.Hover}"]`)];
 
+    expect(frame.getAttribute("aria-label")).toBe("Default, light mode");
     expect(marked.map(t => name(t))).toEqual(["Button / Hover", "Button / Secondary, hover", "Icon button / Hover", "Choice pills / Hover", "Tab / Hover", "Toolbar button / Hover",
       "Menu / Rows", "Menu / Menu bar, hover"]);
     await PointerFixture.hoverAsync(park);
@@ -92,7 +93,7 @@ describe("GalleryStateDirective", () => {
     const plain = marked.map(t => namedLook(t));
     const real: (readonly [string, readonly string[]])[] = [];
     for (const element of marked) {
-      await userEvent.hover(element);
+      await PointerFixture.hoverAsync(element);
       real.push(namedLook(element));
     }
     await PointerFixture.hoverAsync(park);
