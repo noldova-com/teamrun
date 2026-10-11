@@ -44,7 +44,8 @@ describe("GalleryComponent", () => {
     fixture = await GalleryFixture.showAsync();
     const controls = Object.entries(kit).filter(([, value]) => typeof value === "function" && ("ɵcmp" in value || "ɵdir" in value));
     const held = fixture.debugElement.queryAll(By.all()).flatMap(t => Object.values((t.componentInstance ?? {}) as object)).filter(isSignal).map(t => t());
-    const isShown = (type: Type<unknown>): boolean => fixture.debugElement.queryAllNodes(By.directive(type)).length > 0 || held.some(t => t instanceof type);
+    const tokens = new Set(fixture.debugElement.queryAllNodes(By.all()).flatMap(t => t.providerTokens));
+    const isShown = (type: Type<unknown>): boolean => tokens.has(type) || held.some(t => t instanceof type);
 
     const missing = controls.filter(([, value]) => !isShown(value as Type<unknown>)).map(([name]) => name);
 
