@@ -15,7 +15,6 @@ import AngularProject from "./angular/angular-project.ts";
 import GalleryFile from "./angular/gallery-file.ts";
 import ModuleException from "./modules/module.exception.ts";
 import PackageException from "./packages/package.exception.ts";
-import type ProductIdentity from "./packages/product-identity.ts";
 import RootManifest from "./packages/root-manifest.ts";
 import UpdateFeed from "./packages/update-feed.ts";
 import ElectronDistribution from "./packaging/electron-distribution.ts";
@@ -89,7 +88,7 @@ export default class Package {
     try {
       const target = PackageTarget.fromProcess(this.platform, this.architecture);
       const manifest = await RootManifest.readAsync(this.root);
-      const signing = options.length === 0 ? null : this.createSigning(target, layout, manifest.product, credentials);
+      const signing = options.length === 0 ? null : this.createSigning(target, layout, credentials);
       await this.stage.stageAsync(target, this.output, updateFeed);
       await rm(layout.output, { recursive: true, force: true });
       const electron = new ElectronDistribution(this.root, layout.electron);
@@ -111,11 +110,10 @@ export default class Package {
     }
   }
 
-  private createSigning(target: PackageTarget, layout: PackageLayout, product: ProductIdentity, credentials: NodeJS.ProcessEnv): IPackageSigning {
+  private createSigning(target: PackageTarget, layout: PackageLayout, credentials: NodeJS.ProcessEnv): IPackageSigning {
     switch (target.platform) {
       case PackageTarget.WINDOWS:
-        return new WindowsSigning(this.runner, this.root, layout.signing, layout.output, target, product.windowsSigning, this.environment, credentials,
-          this.signingPackages);
+        return new WindowsSigning(this.runner, this.root, layout.signing, layout.output, target, this.environment, credentials, this.signingPackages);
       case PackageTarget.MACOS:
         return new MacSigning(this.runner, layout.signing, this.environment, credentials);
       default:

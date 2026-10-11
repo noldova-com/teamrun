@@ -19,12 +19,7 @@
       "dataDirectoryVariable": "TEAMRUN_DATA_DIR",
       "icons": "assets/icons",
       "releaseRepository": "noldova-com/teamrun",
-      "windowsPublisher": "CN=Rostislav Rotaru, O=Rostislav Rotaru, C=US",
-      "windowsSigning": {
-        "endpoint": "https://wus3.codesigning.azure.net/",
-        "account": "noldova-signing",
-        "profile": "TeamRun"
-      }
+      "windowsPublisher": "CN=Rostislav Rotaru, O=Rostislav Rotaru, C=US"
     },
     "supportedTargets": [],
     "signedPlatforms": [
