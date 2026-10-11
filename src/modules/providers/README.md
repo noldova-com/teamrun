@@ -220,7 +220,7 @@ A session is one agent process, started in the session's working folder with the
 
 - The process gets the environment `startProcessAsync` gives every program, plus the variables its command line's definition names for its own configuration, inherited by name.
   The module never reads their values.
-- The session's owner gives the working folder, the model and mode when it chooses them, and the scope the tool host passes to the tools' handlers.
+- The session's owner gives the working folder, the model and mode when it chooses them, and the scope and bound resources the tool host passes to the tools' handlers.
   The adapter writes the working folder, the model, the mode and the session's connection to the tool host into the command line's own configuration for this session only, in files in the session's folder, never in the person's or the project's configuration.
   The command line's arguments may name those files but never hold their content.
 - Whatever identifies or authenticates a session's connection, such as a token or a per-session address, goes only into the session's folder: never into the arguments, the environment, the log or an event, so no other program reads it from the process list.
@@ -243,7 +243,8 @@ Every permission request goes through the runtime permission contract, desktop-c
   It sends the decision back to the command line in the command line's own terms and sends `permission.resolved`.
   TeamRun keeps remembered answers itself, so an allowed request is answered with the command line's allow-once option, never its allow-always one, and later requests still reach TeamRun.
   A request withdrawn because its turn was cancelled is answered with the protocol's `cancelled` outcome, where the adapter's protocol has one, and denied otherwise; a request that expires is denied with the command line's reject-once option.
-- **Tools from tool modules:** the [tool host](#tool-host) raises the runtime request for a tool's action before it calls the tool's handler, naming the tool's module as the requester, unless the tool raises its own, as the [tool module contract](../../../docs/TOOL-MODULES.md#permission-requests) describes.
+- **Tools from tool modules:** every call raises one runtime request: the [tool host](#tool-host) raises it before it calls the tool's handler, unless the tool's descriptor names the tool as its raiser, as the [tool module contract](../../../docs/TOOL-MODULES.md#permission-requests) describes.
+  The base sets the requester, the tool's module, from the registry, never the host.
   The request never passes through the agent's stream or this schema, since the host never sees the call's id; conversations shows it as its own entry in the session, placed where it arrives among the session's events received so far, as the [conversations module](../conversations/README.md#permissions) describes.
   The host knows the calling session from the session's own connection, never from the tool's input.
   A denied or withdrawn request ends the call with an MCP error result, which the agent's stream shows as a `tool_call_update` with the status `failed`.
@@ -271,8 +272,9 @@ The host never reads an adapter's stream and the adapters never read the registr
 
 - **What it serves:** on each session's connection, the tools the registry lists when the session starts, and the permission tool the line-delimited adapter needs ([Adapters](#adapters)).
 - **The connection:** one listener for every session, as the contract describes, under the session's server name ([Permissions](#permissions)).
-  The session's secret goes only into its folder, in the command line's configuration, and is revoked when the session ends.
-- **Calls:** a handler gets the session's id, its working folder and the scope its owner named.
+  The connection's path names the session by an id that is not secret; the session's secret goes only into its folder, in the command line's configuration, and is revoked when the session ends.
+- **Calls:** a handler gets the session's id, its working folder, and the scope and bound resources its owner named.
+- **A session's end:** the host tells the registry, so each tool ends what it holds for the session.
 - **Lifetime:** the listener starts with the first session and stops when the runtime part deactivates.
 
 ### Subagents
