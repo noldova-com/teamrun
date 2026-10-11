@@ -74,7 +74,7 @@ The database is `modules/conversations/conversations.sqlite` ([architecture](../
 The messages, the events and the requests are the authority for the timeline; entries are derived from them and hold nothing a rebuild could not derive again.
 The stored records are the authority, rather than the entries, because events are what the providers protocol package reads in every version it has written: a later build that shows the timeline differently derives it again from what was received, and loses nothing.
 
-- The module keeps every event of a thread's sessions, whole, for as long as the thread exists: pieces, `message.chunk` and `tool.output`, keep their text.
+- The module keeps every event of a thread's sessions, whole, for as long as the thread exists: pieces, message chunks and `tool.output`, keep their text.
 - An entry keeps no text of its own: it names the records it shows, and reading it joins its pieces' text in sequence order, so no text is stored twice.
 - Each message, event and request takes the thread's next arrival number as the runtime part stores it, so a rebuild puts the sessions' events, the person's messages and the tool modules' requests back in the order they arrived.
 - An event of a kind or version the module does not know is stored as it came, so a later build can show it.
@@ -109,6 +109,7 @@ It never touches a folder the person chose.
 ### What stays on the device
 
 The thread document's scroll position, as the entry at its top and an offset, is kept per device and window as view state.
+Each card's shown count of nested calls lives only in the view, in memory: the virtual list recreates a row when it scrolls back in, and the window part passes the count back to its card.
 
 The log records ids, kinds, counts and states, never a title, a prompt, a reply, a tool's input or output, an attachment's name or a path.
 
@@ -142,9 +143,9 @@ The composer offers the person's teammates and a plain agent for each command li
 `providers` refuses a prompt while a turn runs, so the module queues prompts per agent.
 
 - A queued prompt shows as the person's message marked queued, which the person can edit or withdraw until it is sent.
-- Queued prompts go in order, each when the agent's turn finishes `completed`.
+- Queued prompts go in order, each when the agent's turn finishes with `end_turn`.
 - Cancelling a turn, from the composer's stop button or `conversations.cancelTurn`, cancels it through `providers` and pauses the agent's queue; the composer then offers to send the next prompt.
-- A turn that finishes `refused`, `limitReached` or `failed` pauses the queue the same way.
+- A turn that finishes with `refusal`, `max_tokens`, `max_turn_requests` or `failed` pauses the queue the same way.
 - Retrying a failed reply queues its prompt again to the same agent.
 
 ### The timeline
@@ -155,15 +156,14 @@ Entries take positions in the order the runtime part receives what they show; a 
 | Entry | From | Shows |
 |---|---|---|
 | The person's message | The composer | Its text, its attachments and the agents it went to |
-| The agent's reply | `message.*` with the kind `reply` | A message control, streaming until `message.finished` |
-| Reasoning | `message.*` with the kind `reasoning` | A collapsed block in the agent's turn, or nothing, as `conversations.reasoning` chooses |
-| A tool call | `tool.*` | A tool-call card ([Tool calls](#tool-calls)) |
+| The agent's reply | `agent_message_chunk` | A message control, streaming until its message ends |
+| Reasoning | `agent_thought_chunk` | A collapsed block in the agent's turn, or nothing, as `conversations.reasoning` chooses |
+| A tool call | `tool_call`, `tool_call_update` and `tool.output` | A tool-call card ([Tool calls](#tool-calls)) |
 | A subagent | `agent.started` to `agent.finished` | Its events as calls nested under the call that started it |
-| The plan | `plan.updated` | One plan per turn, a checklist updated where it first appeared, with its progress, such as 3 of 7, in the composer while the turn runs |
-| A diff | `diff.reported` | A diff view in its call's card, or as its own entry when no call made it |
+| The plan | `plan` | One plan per turn, a checklist updated where it first appeared, with its progress, such as 3 of 7, in the composer while the turn runs |
 | A permission request | The runtime permission contract | A permission card ([Permissions](#permissions)) |
-| The turn's end | `turn.finished` | Its outcome when not `completed`, and the usage reported: tokens, the duration and the cost |
-| A notice | `session.*`, `error.reported` | An agent joining, its model or mode changing, a session ending other than by its owner, and errors, with whether the agent can go on |
+| The turn's end | `turn.finished`, `usage_update` | Its outcome when not `end_turn`, and the usage reported: tokens, the duration, the context used and the cost |
+| A notice | `session.started`, `session.updated`, `current_mode_update`, `session.ended`, `error.reported` | An agent joining, its model or mode changing, a session ending other than by its owner, and errors, with whether the agent can go on |
 
 - Consecutive entries of one author share one header.
 - While the person is at the end of the timeline, it follows new entries; once they scroll up, it stays, and Jump to latest shows with the count of new entries.
@@ -172,7 +172,7 @@ Entries take positions in the order the runtime part receives what they show; a 
 - A link opens through `openLinkAsync`, which opens only `http`, `https` and `mailto` links; anything else shows as text.
 - Strings are English; times show through `Intl` in the application's locale, relative, with the absolute time on hover and focus.
 
-A consumer's rules from the schema apply ([Versioning](../providers/README.md#versioning)): an unknown informational kind is stored and skipped, an open field's unknown value shows as its fallback, and an unknown major version or a closed field's unknown value fails the session closed.
+A consumer's rules from the schema apply ([Versioning](../providers/README.md#versioning)): an unknown informational kind or session update is stored and skipped, an open field's unknown value shows as its fallback, and an unknown major version or a closed field's unknown value fails the session closed.
 A gap or a repeat in a session's sequence also fails it closed: the module logs it, ends the session and shows the agent stopped with an error.
 An agent's output is data: it cannot answer a request, pick a recipient, run a command of TeamRun's or change a setting.
 
@@ -182,17 +182,21 @@ Each call shows as a tool-call card, collapsed by default, and a failed one expa
 
 | Schema | Card |
 |---|---|
-| Category `command`, `fileRead`, `fileEdit`, `search`, `web` | Kind run command, read, edit, search, fetch |
-| Category `mcp`, `subagent`, `other` | Kind other, with the tool's name, and nested calls for a subagent |
-| `tool.started` | Running, with the title and the files or command it names as its target |
-| A waiting `permission.requested` | Waiting for permission |
-| Status `succeeded`, `cancelled` | Succeeded, cancelled |
-| Status `failed`, `refused` | Failed, with refused as its error for `refused` |
+| Kind `read`, `search`, `execute`, `fetch` | Kind read, search, run command, fetch |
+| Kind `edit`, `delete`, `move` | Kind edit |
+| Kind `think`, `switch_mode`, `other` | Kind other, with the tool's `name` when given, and nested calls for a subagent |
+| `title` and `locations` | The title, and the files it names as its target, or the command from its `rawInput` |
+| Status `pending`, with a waiting `permission.requested` | Waiting for permission |
+| Status `pending`, `in_progress` | Pending, running |
+| Status `completed` | Succeeded |
+| Status `failed` | Failed, with refused as its error when its permission was denied |
+| Not finished when its turn finishes `cancelled` | Cancelled |
 
 The card's output loads when it expands, from its stored pieces, and then follows the call's stream while it runs.
 A diff a call made shows inside its card as a read-only diff view, unified or side by side.
-The runtime part parses each file's unified diff into the diff view's hunks, each with its line numbers and an id made of the call's id, the file's path and the hunk's place in the file, so a hunk keeps its id while the call reports again.
-`added`, `changed`, `removed` and `renamed` show as added, modified, deleted and renamed, with a renamed file's old path from its diff's header; a file whose diff marks it binary shows as binary, and a diff the part cannot parse shows as text in a code block.
+The runtime part compares each `diff` item's `oldText` and `newText` by lines into the diff view's hunks, each with its line numbers and an id made of the call's id, the file's path and the hunk's place in the file, so a hunk keeps its id while the call reports again.
+A file whose `oldText` is null shows as added, and any other as modified; a file a call deletes or moves shows in its card, by its `delete` or `move` kind, without a diff.
+Nested calls show 20 at a time, then Show N more, with the step passed to the card.
 A line comment the diff view asks for puts the file and line, as `path:line`, into the composer.
 
 ### Composer
@@ -216,10 +220,10 @@ The module answers every request of the runtime permission contract, desktop-cor
 - **Where a request shows:** an agent's own request, which `permission.requested` ties to its call, shows right under that call's card.
   A tool module's request names the agent session from the session's own MCP connection, and shows in that session's thread at the position it arrives.
   A request that names no session shows nowhere yet, so it expires as denied ([Missing decisions](#7-missing-decisions)).
-- **The card:** the requester, the action, its description, the risk as text and icon, the exact details as code, and the options the request offers.
+- **The card:** the requester, the action, its description, the risk as text and icon, the exact details as code, and the options the request offers, each with its effect, Allow or Deny, and its scope, Once or Always.
   The card's default option is Allow once at low risk and Deny at medium and high risk.
   Always allow at high risk asks for an inline confirmation.
-- **States:** pending, with the request's expiry time; sending, with the options disabled; failed to send, with a retry; and, once decided, the outcome in place of the options, with who decided and when: allowed once, always allowed, denied, always denied, expired or withdrawn.
+- **States:** the card's status is `Pending`, with the request's expiry time; `Sending`, with the options disabled; `SendFailed`, with a retry; `Decided`, with the chosen option's id, whose effect and scope show in place of the options with who decided and when; `Expired`; or `Withdrawn`.
   A request the contract answers from a remembered answer shows as a decided card that names the rule.
   Cancelling a turn withdraws, through `providers`, the agent's own waiting requests; a tool module's request belongs to its requester, which withdraws it when its call ends, and the module never withdraws it itself.
 - **Focus:** a card never takes focus by itself; `conversations.nextRequest` and the composer's count select it, and the kit's list marks it selected.
@@ -255,9 +259,9 @@ The window part uses these kit controls:
 |---|---|---|
 | Virtual list | The kit | The timeline and the thread list; the list owns the busy state while a message streams, and its selection is single and set by the module |
 | Message control | components#36 | The person's and the agents' messages, with author accents `author-1` to `author-8`, attachments and child controls |
-| Tool-call card | components#37 | Tool calls, with output loading on expand through its output request |
+| Tool-call card | components#37 | Tool calls, with output loading on expand through its output request, and nested calls paged in steps of 20 |
 | Diff view | components#38 | Diffs, read-only, without word-level highlights or comments; its line comment request only emits its event |
-| Permission card | components#39 | Requests; the module sets its expired, sending and failed states |
+| Permission card | components#39 | Requests, each option with its effect and scope; the module sets its status: `Pending`, `Sending`, `SendFailed`, `Decided` with the chosen option's id, `Expired` or `Withdrawn` |
 | Code block, text input, buttons, menus and badges | The kit | The composer, details and actions |
 
 The composer, the plan checklist, the thread rows, the turn's end and the notices belong to the module, built from kit tokens under the [UI standards](../../../docs/UI-STANDARDS.md#9-the-shared-kit-and-modules).
