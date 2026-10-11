@@ -12,6 +12,7 @@ import "@noldova/teamrun-foundation-core";
 import { Assert, TestClass, TestMethod } from "@noldova/teamrun-foundation-testing";
 import { ProcessClock, SystemCommand } from "@noldova/teamrun-shell-runtime";
 
+import { ListedProcessesFixture } from "../fixtures/listed-processes.fixture.js";
 import { ProcessClockFixture } from "../fixtures/process-clock.fixture.js";
 import { ProcessSupervisorFixture } from "../fixtures/process-supervisor.fixture.js";
 import { ProgramFixture } from "../fixtures/program.fixture.js";
@@ -33,7 +34,7 @@ export class ProcessRecordTests {
       settings.database.run(ProcessSupervisorFixture.INSERT, "notes", processId, process.execPath, process.execPath, clock.boot, hourAgo, hourAgo, hourAgo, clock.offset());
       if (process.platform === "win32")
         settings.database.run(ProcessSupervisorFixture.INSERT, "notes", processId, "other.exe", path.join(ProcessSupervisorFixture.SYSTEM_ROOT, "other.exe"), clock.boot, now, now, now, clock.offset());
-      const processes = ProcessSupervisorFixture.create(settings, process.platform, process.env, new SystemCommand(), clock);
+      const processes = ProcessSupervisorFixture.create(settings, process.platform, process.env, new SystemCommand(), clock, new ListedProcessesFixture([processId]));
 
       await processes.cleanUpAsync();
 
