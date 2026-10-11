@@ -67,7 +67,7 @@ The database is `modules/conversations/conversations.sqlite` ([architecture](../
 | Request | Each permission request the module showed: its id, its requester, its action, details, risk and options, its session when it names one, its arrival number, its state, its decision, and who decided and when |
 | Entry | The timeline, by thread and position, derived from the messages, the events and the requests |
 | Draft | Each thread's unsent text and attachments |
-| Attachment | Its id, its name, its media type, its size and its file in `modules/conversations/attachments/<id>`; an attachment no draft or message holds is removed when the draft that held it is saved without it, and when the runtime part starts |
+| Attachment | Its id, its name, its media type, its size and its file in `modules/conversations/attachments/<id>`; an attachment no draft or message holds is removed when the draft that held it is saved without it, and when the runtime part starts; removing one removes only the module's own copy, never the file the person attached from |
 
 ### Stored records
 
