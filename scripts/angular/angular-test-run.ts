@@ -1,0 +1,29 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import type { ICoverageCount } from "../totals/interfaces/i-coverage-count.ts";
+import type { RunnerResult } from "../totals/runner-result.ts";
+import type { RetriedTest } from "./retried-test.ts";
+
+export class AngularTestRun {
+  public readonly exitCode: number | null;
+  public readonly result: RunnerResult | null;
+  public readonly coverage: ICoverageCount | null;
+  public readonly retried: readonly RetriedTest[];
+
+  public constructor(exitCode: number | null, result: RunnerResult | null, coverage: ICoverageCount | null, retried: readonly RetriedTest[]) {
+    this.exitCode = exitCode;
+    this.result = result;
+    this.coverage = coverage;
+    this.retried = retried;
+  }
+
+  public get isSuccessful(): boolean {
+    return this.exitCode === 0;
+  }
+}

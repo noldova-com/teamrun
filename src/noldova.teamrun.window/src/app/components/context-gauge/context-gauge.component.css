@@ -1,0 +1,93 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.nol-teamrun-context-gauge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  min-width: 0;
+  min-block-size: var(--nol-pointer-target);
+  border-radius: var(--nol-radius-small);
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  white-space: nowrap;
+}
+
+.nol-teamrun-context-gauge:focus-visible {
+  outline: calc(var(--nol-border-width) * 2) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -2);
+
+  @media (forced-colors: active) {
+    outline-color: Highlight;
+  }
+}
+
+.nol-teamrun-context-track-only {
+  position: relative;
+  overflow: hidden;
+}
+
+.nol-teamrun-context-track-only .nol-teamrun-context-track {
+  margin-inline-end: var(--nol-space-1);
+}
+
+.nol-teamrun-context-track-only .nol-teamrun-context-text {
+  position: absolute;
+  inset-inline-start: 0;
+  visibility: hidden;
+}
+
+.nol-teamrun-context-track {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  inline-size: var(--nol-space-6);
+  block-size: var(--nol-space-1);
+  margin-inline-start: var(--nol-space-1);
+  overflow: hidden;
+  border-radius: var(--nol-radius-small);
+  background: var(--nol-border);
+
+  @media (forced-colors: active) {
+    border: var(--nol-border-width) solid CanvasText;
+    background: Canvas;
+  }
+}
+
+.nol-teamrun-context-fill {
+  display: block;
+  block-size: 100%;
+  background: var(--nol-progress);
+
+  @media (forced-colors: active) {
+    background: Highlight;
+  }
+}
+
+.nol-teamrun-context-compact {
+  position: absolute;
+  inset-block: 0;
+  inline-size: var(--nol-border-width);
+  background: var(--nol-text);
+
+  @media (forced-colors: active) {
+    background: CanvasText;
+  }
+}
+
+.nol-teamrun-context-text {
+  margin-inline-end: var(--nol-space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

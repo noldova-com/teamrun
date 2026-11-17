@@ -1,0 +1,243 @@
+{
+  "commands": [
+    {
+      "name": "teamrun.listProjects",
+      "summary": "Lists the projects.",
+      "description": "Prints each project's id, name and folder.",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "teamrun.openFolder",
+      "summary": "Opens a folder as a project.",
+      "description": "Opens the folder as a project, or gives the project already open there, and prints its id, name and folder. A folder given as a relative path is read from the current folder, a leading ~ is the home folder, and a folder that isn't there is refused.",
+      "arguments": [
+        { "name": "folder", "description": "The project's folder." }
+      ],
+      "options": [],
+      "examples": [
+        { "arguments": "~/work/site", "description": "Opens ~/work/site as a project." }
+      ]
+    },
+    {
+      "name": "teamrun.forgetProject",
+      "summary": "Forgets a project and deletes its chats.",
+      "description": "Forgets the project and deletes its chats and their messages; the folder's files stay.",
+      "arguments": [
+        { "name": "projectId", "description": "The id of the project." }
+      ],
+      "options": []
+    },
+    {
+      "name": "teamrun.listChats",
+      "summary": "Lists the chats.",
+      "description": "Prints each chat's id, title and teammates, and whether a reply is running, of every project and the chats without one, or of the project given.",
+      "arguments": [],
+      "options": [
+        { "name": "project", "description": "The id of the project whose chats to list.", "type": "Text" }
+      ],
+      "examples": [
+        { "arguments": "--project 7f3c", "description": "Lists the chats of project 7f3c." }
+      ]
+    },
+    {
+      "name": "teamrun.newChat",
+      "summary": "Starts a chat, in a project or in a folder of its own.",
+      "description": "Starts an empty chat in the project, or without a project in an empty folder of its own, and prints its id and title.",
+      "arguments": [
+        { "name": "projectId", "description": "The id of the project the chat belongs to; a chat without a project when left out.", "required": false }
+      ],
+      "options": [
+        { "name": "title", "description": "The chat's title; by default TeamRun's own.", "type": "Text" }
+      ],
+      "examples": [
+        { "arguments": "7f3c --title Notes", "description": "Starts the chat Notes in project 7f3c." },
+        { "arguments": "--title Notes", "description": "Starts the chat Notes without a project." }
+      ]
+    },
+    {
+      "name": "teamrun.renameChat",
+      "summary": "Renames a chat.",
+      "arguments": [
+        { "name": "chatId", "description": "The id of the chat." },
+        { "name": "title", "description": "The new title, the rest of the line.", "variadic": true }
+      ],
+      "options": [],
+      "examples": [
+        { "arguments": "c41a Release notes", "description": "Renames chat c41a to Release notes." }
+      ]
+    },
+    {
+      "name": "teamrun.deleteChat",
+      "summary": "Deletes a chat and its messages.",
+      "arguments": [
+        { "name": "chatId", "description": "The id of the chat." }
+      ],
+      "options": []
+    },
+    {
+      "name": "teamrun.moveChat",
+      "summary": "Moves a chat to another project.",
+      "description": "Moves the chat to the project, and prints its id, project and title.",
+      "arguments": [
+        { "name": "chatId", "description": "The id of the chat." },
+        { "name": "projectId", "description": "The id of the project to move it to." }
+      ],
+      "options": []
+    },
+    {
+      "name": "teamrun.search",
+      "summary": "Finds chats by their title or messages.",
+      "description": "Prints each chat whose title or messages hold the text, ignoring case, the latest active first: its id and title, and where the text is, in the title or in a message, with that message's number and the text around it.",
+      "arguments": [
+        { "name": "text", "description": "The text to find, the rest of the line.", "variadic": true }
+      ],
+      "options": [
+        { "name": "limit", "description": "How many chats to list at most, from 1 to 100.", "type": "Number", "default": 20 }
+      ],
+      "examples": [
+        { "arguments": "release notes --limit 5", "description": "Lists at most five chats that mention release notes." }
+      ]
+    },
+    {
+      "name": "teamrun.listMessages",
+      "summary": "Lists a chat's messages.",
+      "description": "Prints the chat's latest messages, or those before a sequence number, each with its number, author, status and text. The person's own messages are by User, and a message a teammate sent from another chat names that teammate and chat, such as @Alice in chat \"Release\" (c41a), or the default teammate (Codex) in chat \"Release\" (c41a).",
+      "arguments": [
+        { "name": "chatId", "description": "The id of the chat." }
+      ],
+      "options": [
+        { "name": "before", "description": "Lists only the messages before this sequence number.", "type": "Number" },
+        { "name": "limit", "description": "How many messages to list at most.", "type": "Number", "default": 20 }
+      ],
+      "examples": [
+        { "arguments": "c41a --before 40 --limit 10", "description": "Lists the ten messages of chat c41a before message 40." }
+      ]
+    },
+    {
+      "name": "teamrun.send",
+      "summary": "Sends a message to a chat.",
+      "description": "Sends the message as the app does, with @mentions naming teammates, and prints the ids of the message and of the replies it started, without waiting for them. When it names no teammate and no kind, the default teammate answers, not the responder chosen in the chat's composer, with the model, effort and provider given here in place of its own. Run from a teammate's process in a chat, it sends as that teammate and chat, and a chat whose reply is running starts it after.",
+      "arguments": [
+        { "name": "chatId", "description": "The id of the chat." },
+        { "name": "text", "description": "The message, the rest of the line, or - alone to read it from standard input.", "variadic": true }
+      ],
+      "options": [
+        { "name": "teammate", "description": "The teammate who answers, by name.", "type": "Text" },
+        { "name": "kind", "description": "The kind of provider, such as codex or claude, that answers when no teammate is named, in place of the default teammate; give it with --provider, one of that kind's providers.", "type": "Text" },
+        { "name": "model", "description": "The provider's model, at its own default effort unless --effort is given.", "type": "Text" },
+        { "name": "effort", "description": "The model's effort.", "type": "Text" },
+        { "name": "provider", "description": "The id of the provider that answers when no teammate is named. In place of the default teammate's, one of another kind answers with its own model and effort, and one of its kind keeps the default's model and effort only where that provider's models list them.", "type": "Text" }
+      ],
+      "examples": [
+        { "arguments": "c41a @Reviewer please check the release notes", "description": "Asks the teammate Reviewer in chat c41a." },
+        { "arguments": "c41a --teammate Reviewer Check the release notes", "description": "Sends the message for the teammate Reviewer to answer." },
+        { "arguments": "c41a - --teammate Reviewer", "description": "Sends what standard input holds for the teammate Reviewer to answer." }
+      ]
+    },
+    {
+      "name": "teamrun.cancel",
+      "summary": "Stops a chat's working replies.",
+      "arguments": [
+        { "name": "chatId", "description": "The id of the chat." }
+      ],
+      "options": []
+    },
+    {
+      "name": "teamrun.rewind",
+      "summary": "Removes a message and those after it.",
+      "description": "Removes the chat's message and every message after it, and prints how many it removed and whether the provider's session continues from there or the next reply starts a fresh one. With --restore-files it also puts back the files the removed replies changed, where their checkpoints allow, and says why when it can't.",
+      "arguments": [
+        { "name": "chatId", "description": "The id of the chat." },
+        { "name": "messageId", "description": "The id of the first message to remove." }
+      ],
+      "options": [
+        { "name": "restoreFiles", "description": "Puts back the files the removed replies changed.", "type": "Boolean" }
+      ],
+      "examples": [
+        { "arguments": "c41a m7 --restore-files", "description": "Removes message m7 of chat c41a and those after it, and puts their files back." }
+      ]
+    },
+    {
+      "name": "teamrun.listApprovals",
+      "summary": "Lists a chat's approvals.",
+      "description": "Prints each approval's id, status, summary and options.",
+      "arguments": [
+        { "name": "chatId", "description": "The id of the chat." }
+      ],
+      "options": [
+        { "name": "pending", "description": "Lists only the approvals that wait for an answer.", "type": "Boolean" }
+      ],
+      "examples": [
+        { "arguments": "c41a --pending", "description": "Lists the approvals chat c41a waits on." }
+      ]
+    },
+    {
+      "name": "teamrun.listProviders",
+      "summary": "Lists the providers.",
+      "description": "Prints each provider's id, kind, name and sign-in status.",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "teamrun.checkProvider",
+      "summary": "Checks a provider's sign-in.",
+      "arguments": [
+        { "name": "providerId", "description": "The id of the provider." }
+      ],
+      "options": []
+    },
+    {
+      "name": "teamrun.addProvider",
+      "summary": "Adds a provider with a profile folder of its own.",
+      "description": "Adds a provider of the kind, with the label, signed in as its profile folder is, and prints its id, label and kind. A folder given as a relative path is read from the current folder, a leading ~ is the home folder, and a folder that isn't there is refused. Some kinds take one provider at most, and no two providers share a folder.",
+      "arguments": [
+        { "name": "kind", "description": "The kind of provider, such as codex or claude." },
+        { "name": "label", "description": "The provider's label." },
+        { "name": "profileFolder", "description": "The folder the provider keeps its sign-in and settings in." }
+      ],
+      "options": [],
+      "examples": [
+        { "arguments": "codex Work ~/.codex", "description": "Adds the Codex provider Work, signed in as ~/.codex is." }
+      ]
+    },
+    {
+      "name": "teamrun.removeProvider",
+      "summary": "Removes a provider.",
+      "description": "Removes the provider and leaves its profile folder as it is; a default teammate that answered with it has no provider until one is chosen.",
+      "arguments": [
+        { "name": "providerId", "description": "The id of the provider." }
+      ],
+      "options": []
+    },
+    {
+      "name": "teamrun.listModels",
+      "summary": "Lists a provider's models.",
+      "description": "Prints each model's id, name and efforts, and which is the provider's default.",
+      "arguments": [
+        { "name": "providerId", "description": "The id of the provider." }
+      ],
+      "options": []
+    },
+    {
+      "name": "teamrun.liveCheck",
+      "summary": "Runs one reply of a provider end to end.",
+      "description": "Starts a chat without a project, in an empty folder of its own, sends the prompt to the provider at its default model, waits for the reply, deletes the chat and its folder, and prints the reply. It fails when the reply ends other than completed, with the reply's error. A reply that asks for an approval, which only the window answers, is stopped, and the check fails. A chat it can't delete is named, for delete-chat to remove. Ctrl+C, --timeout or a runtime that goes away ends the command at once and leaves the reply running in the chat Live check: list-chats finds it, cancel <chatId> stops the reply and delete-chat <chatId> removes the chat.",
+      "arguments": [],
+      "options": [
+        { "name": "provider", "description": "The id of the provider to check.", "type": "Text", "required": true },
+        { "name": "prompt", "description": "The message to send.", "type": "Text", "default": "Reply with the single word PONG and do nothing else." }
+      ],
+      "examples": [
+        { "arguments": "--provider a1 --timeout 120", "description": "Checks provider a1, giving it two minutes." }
+      ]
+    },
+    {
+      "name": "teamrun.listTeammates",
+      "summary": "Lists the teammates.",
+      "description": "Prints each teammate's id, name, harness, provider with its email, model and effort, the chats it is in, and whether it is answering now, then its role, its last reply's usage in each chat and its provider's plan use. The JSON gives the same fields, leaving out the figures a provider doesn't report, and never a credential or the profile folder.",
+      "arguments": [],
+      "options": []
+    }
+  ]
+}

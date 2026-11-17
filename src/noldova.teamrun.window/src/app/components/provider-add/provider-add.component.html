@@ -1,0 +1,74 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<section class="nol-teamrun-add-panel" [attr.aria-label]="resources.addProviderLabel" (keydown.escape)="close()">
+  <h4 class="nol-teamrun-add-title">{{ resources.addProviderLabel }}</h4>
+  <div class="nol-teamrun-kind-cards" role="group" [attr.aria-label]="resources.kindLabel">
+    @for (card of cards(); track card.id) {
+      <button type="button" class="nol-teamrun-kind-card" [class.nol-teamrun-chosen]="card.id === kind()" [attr.aria-pressed]="card.id === kind()"
+        [attr.data-kind]="card.id" [class.nol-teamrun-kind-taken]="card.takenReason !== null" [disabled]="busy() || card.takenReason !== null" (click)="choose(card)">
+        <span class="nol-teamrun-kind-card-name">{{ card.name }}</span>
+        <span class="nol-teamrun-kind-card-note" [class.nol-teamrun-kind-card-warning]="card.isWarning">{{ card.note }}</span>
+      </button>
+    }
+  </div>
+  <label class="nol-teamrun-field">
+    <span class="nol-teamrun-field-label">{{ resources.providerNameLabel }}</span>
+    <span class="nol-teamrun-name-row">
+      <input nol-text-field class="nol-teamrun-add-name" name="label" [attr.aria-label]="resources.providerNameLabel" [value]="label()" [disabled]="busy()"
+        [attr.aria-describedby]="shownAsId" (input)="editLabel($event)" (keydown.enter)="add()">
+      <span class="nol-teamrun-muted nol-teamrun-shown-as" [id]="shownAsId">{{ shownAs() }}</span>
+    </span>
+  </label>
+  @if (progress(); as installing) {
+    @let installingText = resources.formatAddInstalling(chosen().name, installing);
+    <div class="nol-teamrun-add-progress">
+      <span class="nol-teamrun-muted nol-teamrun-add-progress-text" role="status">{{ installingText }}</span>
+      <span class="nol-teamrun-add-progress-row">
+        <nol-progress class="nol-teamrun-add-bar" [label]="installingText" [value]="progressValue()" />
+        @if (installing.cancellable) {
+          <button type="button" nol-button class="nol-teamrun-add-cancel-install" [variant]="text"
+            (click)="cancelInstall(installing.kind)">{{ resources.cancelInstallLabel }}</button>
+        }
+      </span>
+    </div>
+  } @else if (unavailable(); as unavailableInstall) {
+    <div class="nol-teamrun-add-step" role="alert">
+      <span class="nol-teamrun-add-step-text nol-teamrun-add-unavailable">{{ resources.formatUnavailableStep(unavailableInstall.reason) }}</span>
+      <button type="button" nol-button class="nol-teamrun-add-try-again" [variant]="outlined" [disabled]="store().isBusy()"
+        (click)="tryAgain(unavailableInstall.kind)">{{ resources.tryAgainLabel }}</button>
+    </div>
+  } @else if (toolCommand(); as command) {
+    <div class="nol-teamrun-add-step">
+      <span class="nol-teamrun-muted nol-teamrun-add-step-text">{{ resources.formatToolInstallStep(chosen().name) }} <code nol-inline-code>{{ command }}</code></span>
+      @if (hiddenToolSession(); as session) {
+        <button type="button" nol-button class="nol-teamrun-add-show-terminal" [variant]="text" (click)="showTerminal(session)">{{ resources.showTerminalLabel }}</button>
+      }
+      <button type="button" nol-button class="nol-teamrun-add-look-again" [variant]="outlined" [busy]="lookingAgain()" [disabled]="lookingAgain()"
+        (click)="lookAgain()">{{ resources.tryAgainLabel }}</button>
+    </div>
+  }
+  <p class="nol-teamrun-muted nol-teamrun-add-folder">
+    <span class="nol-teamrun-add-folder-text">{{ folderNote() }}</span>
+    <button type="button" nol-button class="nol-teamrun-use-folder" [variant]="text" [disabled]="busy()" (click)="pickFolder()">{{ resources.useExistingFolderLabel }}</button>
+  </p>
+  @if (error(); as message) {
+    <nol-field-message class="nol-teamrun-add-error">{{ message }}</nol-field-message>
+  }
+  <div class="nol-teamrun-add-foot">
+    <button type="button" nol-button class="nol-teamrun-add-cancel" [variant]="text" [disabled]="saving()" (click)="close()">{{ resources.cancelAddLabel }}</button>
+    @if (busy()) {
+      <nol-spinner class="nol-teamrun-add-busy" [label]="resources.workingLabel" [isDelayed]="false" />
+    }
+    <button type="button" nol-button class="nol-teamrun-add-save" [disabled]="!canAdd()" (click)="add()">{{ addLabel() }}</button>
+  </div>
+</section>
+@if (toolSession(); as session) {
+  <nol-teamrun-provider-terminal class="nol-teamrun-add-terminal" [sessionId]="session" [title]="resources.formatTerminalInstallTitle(chosen().name)"
+    (closed)="hideTerminal(session)" />
+}

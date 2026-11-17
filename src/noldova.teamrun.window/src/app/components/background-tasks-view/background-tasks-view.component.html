@@ -1,0 +1,69 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<ng-template #taskRow let-task>
+  <div class="task" [attr.data-nol-teamrun-task]="task.id">
+    @if (calls().get(task.id); as call) {
+      <nol-tool-call [call]="call" [views]="viewsOf(task)" (viewsChange)="remember(task, $event)" (cancel)="stop(task)" (outputRequest)="tasks.readOutput(task)" />
+    }
+    @if (tasks.stopErrors().get(task.id); as error) {
+      <p class="task-error" role="alert">{{ error }}</p>
+    }
+  </div>
+</ng-template>
+
+@if (conversationId(); as conversation) {
+  @if (hasTasks()) {
+    <section class="tasks-group" [attr.aria-labelledby]="id + '-finished'">
+      <div class="tasks-header">
+        <span class="tasks-heading" role="heading" [attr.aria-level]="resources.backgroundTasksHeadingLevel">
+          <button #finishedToggle type="button" class="tasks-toggle" [id]="id + '-finished'" [attr.aria-expanded]="isFinishedOpen()" [attr.aria-controls]="id + '-finished-list'"
+            (click)="toggleFinished()">
+            <span class="tasks-twistie material-symbols-rounded" aria-hidden="true">{{ isFinishedOpen() ? resources.expandedIcon : resources.collapsedIcon }}</span>
+            <span class="tasks-title">{{ resources.finishedTasksTitle }}</span><span class="tasks-count">{{ finishedCountOf(conversation) }}</span>
+          </button>
+        </span>
+        <button #clearButton type="button" nol-icon-button class="tasks-clear" [icon]="resources.clearFinishedTasksIcon" [label]="resources.clearFinishedTasksLabel"
+          [nolTooltip]="resources.clearFinishedTasksLabel" [disabled]="finishedCountOf(conversation) === 0 || tasks.clearing().has(conversation)" (click)="clear(conversation)"></button>
+      </div>
+      @if (tasks.clearErrors().get(conversation); as error) {
+        <p class="tasks-error tasks-clear-error" role="alert">{{ error }}</p>
+      }
+      <div #finishedList class="tasks-list" [id]="id + '-finished-list'" [hidden]="!isFinishedOpen()">
+        @if (isFinishedOpen()) {
+          @if (shownFinished().length < finishedCountOf(conversation)) {
+            <button type="button" nol-button class="tasks-more" [variant]="text" [disabled]="tasks.loadingMore().has(conversation)"
+              (click)="showMore(conversation)">{{ resources.showMoreTasksLabel }}</button>
+          }
+          @for (task of shownFinished(); track task.id) {
+            <ng-container [ngTemplateOutlet]="taskRow" [ngTemplateOutletContext]="{ $implicit: task }" />
+          }
+        }
+      </div>
+    </section>
+    <section class="tasks-group" [attr.aria-labelledby]="id + '-running'">
+      <div class="tasks-header">
+        <span class="tasks-heading" role="heading" [attr.aria-level]="resources.backgroundTasksHeadingLevel" [id]="id + '-running'">
+          <span class="tasks-title">{{ resources.runningTasksTitle }}</span><span class="tasks-count">{{ running().length }}</span>
+        </span>
+      </div>
+      @for (task of running(); track task.id) {
+        <ng-container [ngTemplateOutlet]="taskRow" [ngTemplateOutletContext]="{ $implicit: task }" />
+      }
+    </section>
+  }
+  @if (loadError(); as error) {
+    <div class="tasks-failure">
+      <p class="tasks-error" role="alert">{{ error }}</p>
+      <button type="button" nol-button [variant]="text" (click)="retry(conversation)">{{ resources.replyHistoryRetry }}</button>
+    </div>
+  }
+}
+@if (isEmpty()) {
+  <p class="tasks-empty">{{ resources.noBackgroundTasksText }}</p>
+}

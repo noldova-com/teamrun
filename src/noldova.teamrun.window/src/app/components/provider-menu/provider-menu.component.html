@@ -1,0 +1,53 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@let item = provider();
+@let chatStore = store();
+<button type="button" nol-icon-button class="nol-teamrun-row-menu" [icon]="resources.providerMenuIcon" [label]="resources.formatProviderMenu(item.label)"
+  [nolMenuTriggerFor]="providerMenu" [nolMenuAlignment]="end"></button>
+<ng-template #providerMenu>
+  <nol-menu [attr.aria-label]="resources.formatProviderMenu(item.label)">
+    @if (item.enabled && chatStore.terminalSignOuts().has(item.id)) {
+      <button nol-menu-item class="nol-teamrun-stop-sign-out" [label]="resources.stopSignOutLabel" (triggered)="chatStore.stopTerminalSignOut(item.id)"></button>
+    } @else if (item.enabled && !resources.signInStatuses.includes(item.authStatus) && (item.authStatus !== signedIn || chatStore.confirmsSignInAtPrompt(item.kind)) &&
+      !chatStore.signingIn().has(item.id) && !chatStore.terminalSignIns().has(item.id) && chatStore.canSignIn(item) && chatStore.hasServer(item)) {
+      <button nol-menu-item class="nol-teamrun-sign-in" [label]="resources.signInLabel" [disabled]="chatStore.isBusy()"
+        (triggered)="chatStore.signInProvider(item.id, report(), false)"></button>
+    }
+    @if (!chatStore.signingIn().has(item.id) && !chatStore.terminalSignIns().has(item.id) && !chatStore.terminalSignOuts().has(item.id)) {
+      @if (chatStore.canSignOut(item)) {
+        <button nol-menu-item class="nol-teamrun-sign-out" [label]="resources.signOutLabel" [disabled]="chatStore.isBusy()" (triggered)="signOut()"></button>
+      } @else if (signOutRefusal(); as reason) {
+        <button nol-menu-item class="nol-teamrun-sign-out" [label]="resources.signOutLabel" [disabled]="true" [nolTooltip]="reason"></button>
+      }
+    }
+    @if (chatStore.hasKind(item.kind)) {
+      <button nol-menu-item class="nol-teamrun-edit" [label]="resources.editProviderMenuLabel"
+        [disabled]="chatStore.isBusy() || chatStore.signingIn().has(item.id) || chatStore.terminalSignIns().has(item.id) ||
+          chatStore.terminalSignOuts().has(item.id)"
+        (triggered)="edit()"></button>
+      @if (item.enabled && !chatStore.signingIn().has(item.id)) {
+        <button nol-menu-item class="nol-teamrun-check" [label]="resources.checkProviderLabel" [disabled]="chatStore.isBusy()"
+          (triggered)="chatStore.checkProvider(item.id, report())"></button>
+      }
+    }
+    <button nol-menu-item class="nol-teamrun-show-folder" [label]="resources.showProfileFolderLabel" (triggered)="showFolder()"></button>
+    <nol-menu-separator />
+    @if (chatStore.hasKind(item.kind)) {
+      @if (item.enabled) {
+        <button nol-menu-item class="nol-teamrun-disable" [label]="resources.disableProviderLabel" [disabled]="chatStore.isBusy()"
+          (triggered)="chatStore.setProviderEnabled(item.id, false, report())"></button>
+      } @else {
+        <button nol-menu-item class="nol-teamrun-enable" [label]="resources.enableProviderLabel" [disabled]="chatStore.isBusy()"
+          (triggered)="chatStore.setProviderEnabled(item.id, true, report())"></button>
+      }
+    }
+    <button nol-menu-item class="nol-teamrun-remove" [label]="resources.removeProviderLabel" [disabled]="chatStore.isBusy() || chatStore.signingIn().has(item.id)"
+      (triggered)="remove()"></button>
+  </nol-menu>
+</ng-template>

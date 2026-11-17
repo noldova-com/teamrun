@@ -1,0 +1,32 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@let item = provider();
+@let chatStore = store();
+@if (chatStore.terminalSignIns().has(item.id)) {
+  @if (chatStore.terminalSessions().has(item.id)) {
+    <button type="button" nol-button class="nol-teamrun-step-show-terminal" [variant]="outlined" (click)="terminalShown.emit()">{{ resources.showTerminalLabel }}</button>
+  }
+  <button type="button" nol-button class="nol-teamrun-step-cancel" [variant]="text" [attr.aria-label]="resources.formatKindAction(resources.cancelSignInLabel, item.label)"
+    (click)="chatStore.stopTerminalSignIn(item.id)">{{ resources.cancelLabel }}</button>
+} @else if (chatStore.signingIn().has(item.id)) {
+  @if (chatStore.signInLinks().get(item.id); as link) {
+    <span class="nol-teamrun-muted nol-teamrun-step-note">{{ resources.signInDidNotOpen }}</span>
+    @if (clipboard; as writer) {
+      <button type="button" nol-button class="nol-teamrun-step-copy-link" [variant]="text" (click)="copyLink(writer, link)">{{ resources.copyLinkLabel }}</button>
+    }
+    <button type="button" nol-button class="nol-teamrun-step-open-sign-in" [variant]="outlined"
+      (click)="openSignInLink($event, item.id, link)" (auxclick)="openSignInLink($event, item.id, link)">{{ resources.openSignInLabel }}</button>
+  }
+  <button type="button" nol-button class="nol-teamrun-step-cancel" [variant]="text" [attr.aria-label]="resources.formatKindAction(resources.cancelSignInLabel, item.label)"
+    (click)="chatStore.cancelSignIn(item.id, report())">{{ resources.cancelLabel }}</button>
+} @else if (needsSignIn()) {
+  <button type="button" nol-button class="nol-teamrun-step-sign-in" [variant]="primary" [disabled]="chatStore.isBusy()"
+    [attr.aria-label]="resources.formatKindAction(signInLabel(), item.label)"
+    (click)="chatStore.signInProvider(item.id, report(), false)">{{ signInLabel() }}</button>
+}

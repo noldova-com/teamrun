@@ -1,0 +1,19 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (isBusy()) {
+  <div class="busy" role="group" [attr.aria-label]="resources.shellRunBusy">
+    <p class="busy-text">{{ resources.shellRunBusy }}</p>
+    <button type="button" nol-button class="busy-stop" [variant]="outlined" (click)="answer(true)">{{ resources.shellRunStop }}</button>
+    <button type="button" nol-button class="busy-new" [variant]="outlined" (click)="answer(false)">{{ resources.shellRunNewTerminal }}</button>
+  </div>
+}
+@if (output(); as output) {
+  <nol-code-block class="output" [code]="output" [language]="null" />
+}
+<div #live class="live"></div>

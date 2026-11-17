@@ -1,0 +1,51 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<button type="button" class="header" data-nol-resizes-row [attr.aria-expanded]="collapsible() ? isOpen() : null" (click)="toggled.emit()">
+  @if (author(); as author) {
+    <nol-avatar class="avatar" [name]="author.name" [image]="author.avatar" [initials]="author.initials" [color]="author.accent" [filledColor]="author.avatarColor"
+      [unavailable]="author.unavailable" [size]="small" [decorative]="true" />
+    <span class="name" [class.unavailable]="author.unavailable">{{ author.name }}</span>
+    @if (time(); as time) {
+      <span class="time">{{ time }}</span>
+    }
+  } @else {
+    <span class="glyph material-symbols-rounded" aria-hidden="true">{{ resources.planViewIcon }}</span>
+    <span class="title">{{ title() }}</span>
+  }
+  @if (progress(); as progress) {
+    <span class="progress">{{ progress }}</span>
+  }
+  @if (collapsible()) {
+    <span class="chevron material-symbols-rounded" aria-hidden="true">{{ open() ? resources.expandedIcon : resources.collapsedIcon }}</span>
+  }
+</button>
+@if (isOpen()) {
+  <div class="body">
+    @if (plan().text; as text) {
+      <nol-markdown-view class="text" [text]="text" [mentions]="mentions()" [fileLinks]="fileLinks()" [shellRuns]="shellRuns()"
+        [shellRunOutputs]="shellRunOutputs()" [shellRunStates]="shellRunStates()" (linkOpen)="linkOpen.emit($event)" (fileActivate)="fileActivate.emit($event)"
+        (shellRun)="shellRun.emit($event)">
+        <ng-template nolShellRunOutput let-block>
+          @if (terminalOwner(); as owner) {
+            <nol-teamrun-inline-terminal [owner]="owner" [messageId]="messageId()" [site]="resources.runPlanSite" [block]="block" />
+          }
+        </ng-template>
+      </nol-markdown-view>
+    }
+    @if (checklist(); as checklist) {
+      <nol-plan class="checklist" [plan]="checklist" [framed]="false" />
+    }
+  </div>
+}
+@if (approvable()) {
+  <div class="actions">
+    <button type="button" nol-button class="approve" [variant]="primary" [attr.aria-disabled]="approving() ? 'true' : null"
+      (click)="approveClicked()">{{ resources.approvePlanLabel }}</button>
+  </div>
+}

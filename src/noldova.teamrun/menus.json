@@ -1,0 +1,77 @@
+{
+  "places": [
+    {
+      "name": "teamrun.chats",
+      "title": "Chat",
+      "shows": "menuBar"
+    }
+  ],
+  "groups": [
+    {
+      "name": "teamrun.start",
+      "place": "teamrun.chats",
+      "items": [
+        {
+          "command": "teamrun.newConversation"
+        },
+        {
+          "command": "teamrun.openProject"
+        }
+      ]
+    },
+    {
+      "name": "teamrun.move",
+      "place": "teamrun.chats",
+      "items": [
+        {
+          "command": "teamrun.searchConversations"
+        },
+        {
+          "command": "teamrun.previousConversation"
+        },
+        {
+          "command": "teamrun.nextConversation"
+        }
+      ]
+    },
+    {
+      "name": "teamrun.reply",
+      "place": "teamrun.chats",
+      "items": [
+        {
+          "command": "teamrun.focusComposer"
+        },
+        {
+          "command": "teamrun.stopReply"
+        }
+      ]
+    },
+    {
+      "name": "teamrun.manage",
+      "place": "desktop.view",
+      "items": [
+        {
+          "command": "teamrun.showTeammates"
+        },
+        {
+          "command": "teamrun.showProviders"
+        },
+        {
+          "command": "teamrun.showMcpServers"
+        },
+        {
+          "command": "teamrun.showComputerUseGrants"
+        }
+      ]
+    },
+    {
+      "name": "teamrun.terminals",
+      "place": "terminal.shellMenu",
+      "items": [
+        {
+          "command": "teamrun.newChatTerminal"
+        }
+      ]
+    }
+  ]
+}

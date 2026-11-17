@@ -1,0 +1,38 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.stats-note {
+  margin: 0;
+}
+
+.stats-rows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--nol-space-1) var(--nol-space-4);
+  margin: 0;
+}
+
+.stats-row {
+  display: contents;
+}
+
+.stats-row dt {
+  white-space: nowrap;
+  color: var(--nol-text-muted);
+}
+
+.stats-row.part dt {
+  padding-inline-start: var(--nol-space-3);
+}
+
+.stats-row dd {
+  margin: 0;
+  text-align: end;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}

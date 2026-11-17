@@ -1,0 +1,303 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<form #form class="nol-teamrun-composer" [class.nol-teamrun-composer-tight]="fold() >= folds.tight" [attr.aria-label]="resources.composerLabel"
+  (submit)="submit($event)" (paste)="paste($event)" (dragover)="dragOver($event)" (dragleave)="dragLeave()" (drop)="drop($event)">
+  <nol-teamrun-waiting-messages [chatId]="conversationId()" [editable]="text().length === 0 && attachments().length === 0" (edit)="editWaiting($event)" />
+  <div #card class="nol-teamrun-composer-card" [class.nol-teamrun-composer-dropping]="dropping()" [class.nol-teamrun-composer-idle]="!canCompose()">
+    <input #filePicker type="file" multiple hidden (change)="pickFiles(filePicker)">
+    @if (attachments().length > 0) {
+      <ul class="nol-teamrun-composer-attachments" [attr.aria-label]="resources.attachmentsLabel">
+        @for (attachment of attachments(); track attachment.key) {
+          <li class="nol-teamrun-composer-attachment" [class.nol-teamrun-composer-image]="attachment.previewUrl() !== null">
+            @if (attachment.previewUrl(); as url) {
+              <button #frame type="button" class="nol-teamrun-composer-frame" [attr.aria-label]="attachment.name" [nolTooltip]="attachment.name"
+                [nolContextMenuTriggerFor]="imageMenu" (click)="openAttachment(attachment, frame)">
+                <img class="nol-teamrun-composer-preview" [src]="url" [alt]="attachment.name" decoding="async" (error)="attachment.previewFailed()">
+              </button>
+              <ng-template #imageMenu>
+                <nol-menu [attr.aria-label]="resources.imageMenuLabel">
+                  <button type="button" nol-menu-item [label]="resources.imageOpenActionLabels[alternative()]" [icon]="resources.imageOpenActionGlyphs[alternative()]"
+                    (triggered)="openAttachment(attachment, frame, alternative())"></button>
+                  <nol-menu-separator />
+                  @if (canCopy) {
+                    <button type="button" nol-menu-item [label]="resources.copyImageLabel" [icon]="resources.copyImageGlyph" [disabled]="copying()"
+                      (triggered)="copyAttachment(attachment)"></button>
+                  }
+                  <button type="button" nol-menu-item [label]="resources.downloadImageLabel" [icon]="resources.downloadImageGlyph" (triggered)="saveAttachment(attachment)"></button>
+                </nol-menu>
+              </ng-template>
+            } @else {
+              <nol-file-badge [fileName]="attachment.name" />
+              <span class="nol-teamrun-composer-attachment-name" [nolTooltip]="attachment.name" [nolTooltipTruncated]="true">{{ attachment.name }}</span>
+            }
+            <button type="button" nol-icon-button class="nol-teamrun-composer-remove" [overlay]="attachment.previewUrl() !== null" [icon]="resources.removeGlyph" [label]="resources.formatRemoveAttachment(attachment.name)"
+              [nolTooltip]="resources.removeAttachmentLabel" [disabled]="!canCompose()" (click)="removeAttachment(attachment)"></button>
+          </li>
+        }
+      </ul>
+    }
+    @if (attachmentError(); as error) {
+      <nol-field-message>{{ error }}</nol-field-message>
+    }
+    @if (signOutFailure(); as failure) {
+      <nol-field-message class="nol-teamrun-composer-sign-out-failure">{{ failure }}</nol-field-message>
+    } @else if (signOutNote(); as note) {
+      <p class="nol-teamrun-composer-note" role="status">{{ note }}</p>
+    }
+    @if (store.kindsFailed()) {
+      <div class="nol-teamrun-composer-unavailable">
+        <nol-field-message>{{ resources.kindsUnavailable }}</nol-field-message>
+        <button #retry type="button" nol-button class="nol-teamrun-composer-retry" [variant]="variants.Outlined" [attr.aria-disabled]="store.loadingKinds()" (click)="retryKinds()">{{ resources.retryLabel }}</button>
+      </div>
+    } @else if (unavailableReason(); as reason) {
+      <div class="nol-teamrun-composer-unavailable">
+        <nol-field-message>{{ reason }}</nol-field-message>
+        @if (store.providers().length === 0) {
+          <button type="button" nol-button class="nol-teamrun-composer-add-provider" [variant]="variants.Outlined" (click)="showProviders()">{{ resources.addAProviderLabel }}</button>
+        } @else {
+          <button type="button" nol-button class="nol-teamrun-composer-manage" [variant]="variants.Outlined" (click)="showProviders()">{{ resources.providersTitle }}</button>
+        }
+      </div>
+    }
+    @if (imagesUnsupported()) {
+      <nol-field-message>{{ resources.modelImagesUnsupported }}</nol-field-message>
+    } @else if (imagesLeftOut().length > 0) {
+      <p class="nol-teamrun-composer-note" role="status">{{ resources.formatImagesNotSeen(imagesLeftOut()) }}</p>
+    }
+    @if (editing() !== null) {
+      <div class="nol-teamrun-composer-editing" role="status">
+        <span class="nol-teamrun-composer-note">{{ resources.editingWaitingNote }}</span>
+        <button type="button" nol-button class="nol-teamrun-composer-cancel-edit" [variant]="variants.Text" (click)="cancelEditing()">{{ resources.cancelEditingLabel }}</button>
+      </div>
+    }
+    <textarea #box class="nol-teamrun-composer-text" name="text" rows="1" [nolMentionField]="candidates()"
+      [nolMentionFieldLabel]="resources.mentionListLabel" [nolMentionValue]="value()" [placeholder]="resources.composerPlaceholder"
+      [attr.aria-label]="resources.composerLabel" [readonly]="!canCompose()" (nolMentionValueChange)="edit($event)" (keydown)="onKeyDown($event)"></textarea>
+    <div #bar class="nol-teamrun-composer-bar">
+      <button #add type="button" nol-icon-button [icon]="resources.addGlyph" [label]="resources.addFilesLabel" [nolTooltip]="resources.addFilesLabel"
+        [disabled]="!canCompose()" (click)="filePicker.click()"></button>
+      <button #access type="button" nol-button class="nol-teamrun-composer-access" [class.nol-teamrun-composer-folded]="fold() >= folds.accessIcon"
+        [class.nol-teamrun-composer-in-menu]="fold() >= folds.accessInMenu" [variant]="variants.Outlined" [nolMenuTriggerFor]="permissionsMenu"
+        [nolTooltip]="resources.chatPermissionsLabel" [attr.aria-label]="resources.formatChatPermissions(accessName())" [disabled]="catalog().modes.length === 0">
+        <span #accessMark class="nol-teamrun-composer-glyph material-symbols-rounded" [class.nol-teamrun-composer-risky]="unrestricted() && !planFirst()" nolButtonIcon aria-hidden="true">{{ accessGlyph() }}</span>
+        <span class="nol-teamrun-composer-summary">
+          <span #accessLabel class="nol-teamrun-composer-label">{{ accessName() }}</span>
+          <span class="nol-teamrun-composer-glyph material-symbols-rounded" aria-hidden="true">{{ resources.expandGlyph }}</span>
+        </span>
+      </button>
+      <span class="nol-teamrun-composer-space"></span>
+      @if (chatContext(); as chat) {
+        <nol-teamrun-context-gauge class="nol-teamrun-composer-context" [context]="chat.context" [teammate]="contextTeammate()"
+          [trackOnly]="fold() >= folds.gaugeTrack" />
+      }
+      @if (providerLine(); as line) {
+        <span #line class="nol-teamrun-composer-provider" [class.nol-teamrun-composer-folded]="fold() >= folds.lineHidden">{{ line }}</span>
+      }
+      <button #picker type="button" nol-button class="nol-teamrun-composer-picker" [class.nol-teamrun-composer-folded]="fold() >= folds.buttonShort" [variant]="variants.Text"
+        [nolMenuTriggerFor]="pickerMenu" [nolMenuAlignment]="alignments.End"
+        [nolTooltip]="fold() >= folds.accessInMenu ? resources.permissionsAndPickerLabel : resources.pickerLabel"
+        [attr.aria-label]="fold() >= folds.accessInMenu ? resources.formatPermissionsAndPicker(accessName(), summary()) : resources.formatPicker(summary())"
+        [disabled]="!kind()">
+        @if (unrestricted() && !planFirst()) {
+          <span class="nol-teamrun-composer-badge material-symbols-rounded" aria-hidden="true">{{ resources.unrestrictedModeGlyph }}</span>
+        }
+        <span #pickerSummary class="nol-teamrun-composer-summary">
+          <span #pickerLabel class="nol-teamrun-composer-label">{{ buttonLabel() }}</span>
+          <span #pickerShort class="nol-teamrun-composer-short">{{ who() }}</span>
+          <span #pickerGlyph class="nol-teamrun-composer-glyph material-symbols-rounded" aria-hidden="true">{{ resources.expandGlyph }}</span>
+        </span>
+      </button>
+      @if (runningReply(); as reply) {
+        <button type="button" nol-icon-button class="nol-teamrun-composer-stop" [icon]="resources.stopGlyph" [label]="resources.stopLabel"
+          [nolTooltip]="resources.stopLabel" [disabled]="stopping()" (click)="stop()"></button>
+        @let chosen = editing() !== null ? null : store.whileReplying();
+        <nol-split-button #end class="nol-teamrun-composer-deliver" [icon]="chosen === null ? resources.sendGlyph : resources.deliveryGlyphs[chosen]"
+          [label]="chosen === null ? resources.saveWaitingLabel : resources.deliveryLabels[chosen]" [menuLabel]="resources.deliveryMenuLabel" [menu]="deliveryMenu"
+          [menuAlignment]="alignments.End" [disabled]="!canSend()" (triggered)="sendAs(null)" />
+        <ng-template #deliveryMenu>
+          <nol-menu [attr.aria-label]="resources.deliveryMenuLabel">
+            @for (delivery of deliveries; track delivery) {
+              <button type="button" nol-menu-item class="nol-teamrun-deliver" [attr.data-delivery]="delivery" [icon]="resources.deliveryGlyphs[delivery]" [label]="resources.deliveryLabels[delivery]"
+                [shortcut]="shortcutOf(delivery)" [disabled]="!canSend() || editing() !== null" (triggered)="sendAs(delivery)"></button>
+            }
+          </nol-menu>
+        </ng-template>
+      } @else {
+        <button #end type="submit" nol-icon-button class="nol-teamrun-composer-send" [icon]="resources.sendGlyph" [label]="resources.sendLabel" [filled]="true"
+          [nolTooltip]="resources.sendLabel" [disabled]="!canSend()"></button>
+      }
+    </div>
+    <span class="nol-teamrun-composer-loading" role="status">{{ modelsLoading() ? resources.loadingModelsLabel : "" }}</span>
+  </div>
+</form>
+<ng-template #pickerMenu>
+  <nol-menu class="nol-teamrun-composer-picker-menu" [attr.aria-label]="fold() >= folds.accessInMenu ? resources.permissionsAndPickerLabel : resources.pickerLabel">
+    @if (fold() >= folds.accessInMenu) {
+      <button #permissionsRow type="button" nol-menu-item class="nol-teamrun-permissions" [label]="resources.chatPermissionsLabel" [value]="accessName()"
+        [icon]="accessGlyph()" [disabled]="catalog().modes.length === 0" [nolMenuTriggerFor]="permissionsMenu"></button>
+      <nol-menu-separator />
+    }
+    <div class="nol-teamrun-composer-columns">
+      <nol-menu-group class="nol-teamrun-composer-models" [label]="resources.modelLabel">
+        <button type="button" nol-icon-button nolMenuGroupAction class="nol-teamrun-refresh-models" [icon]="resources.refreshGlyph" [label]="resources.refreshModelsLabel"
+          [nolTooltip]="resources.refreshModelsLabel" [nolMenuOpensOn]="opensAtRefresh()" [disabled]="modelsLoading()" (triggered)="loadModels(true)"></button>
+        @if (modelsLoading()) {
+          <button type="button" nol-menu-item [label]="resources.loadingModelsLabel" [disabled]="true"></button>
+        }
+        @if (catalog().failed) {
+          <button type="button" nol-menu-item [label]="resources.modelCatalogUnavailable" [disabled]="true"></button>
+        }
+        @if (unlistedReason()) {
+          <button type="button" nol-menu-item [label]="unlistedReason()!" [disabled]="true"></button>
+        }
+        @if (planNote()) {
+          <button type="button" nol-menu-item [label]="planNote()!" [disabled]="true"></button>
+        }
+        @if (chosenModel() && !selectedModel()) {
+          <button type="button" nol-menu-item [label]="resources.formatUnlisted(chosenModel()!)" [checked]="true" [disabled]="true"></button>
+        }
+        @if (chosenDescriptor(); as descriptor) {
+          <button type="button" nol-menu-item [label]="resources.formatProviderDefault(descriptor.displayName, defaultModelName())"
+            [checked]="chosenModel() === null || catalog().isAlias(selectedModel())" [disabled]="modelsLoading()" (triggered)="selectModel(null)"></button>
+        }
+        @for (choice of catalog().choices; track choice.id) {
+          @if (choice.unavailableReason; as reason) {
+            <button type="button" nol-menu-item class="nol-teamrun-unavailable-model" [label]="resources.formatModelUnavailable(choice.displayName, reason)" [checked]="false" [disabled]="true"></button>
+          } @else {
+            <button type="button" nol-menu-item [label]="choice.displayName" [checked]="chosenModel() !== null && choice.matches(chosenModel())" [disabled]="modelsLoading()"
+              (triggered)="selectModel(choice.id)"></button>
+          }
+        }
+      </nol-menu-group>
+      <div class="nol-teamrun-composer-column">
+        @if (effortRefusal(); as reason) {
+          <nol-menu-group class="nol-teamrun-composer-efforts" [label]="resources.effortLabel">
+            <button type="button" nol-menu-item class="nol-teamrun-effort" [label]="reason" [disabled]="true"></button>
+          </nol-menu-group>
+        } @else if (hasEfforts()) {
+          <nol-menu-group class="nol-teamrun-composer-efforts" [label]="resources.effortLabel">
+            @if (selectedEffort(); as effort) {
+              @if (!effortLevels().includes(effort)) {
+                <button type="button" nol-menu-item [label]="resources.formatUnlisted(selectedModel()?.effortNames[effort] ?? effort)" [checked]="true" [disabled]="true"></button>
+              }
+            }
+            @for (level of effortLevels(); track level) {
+              <button type="button" nol-menu-item [label]="catalog().effortName(chosenModel(), level)"
+                [tag]="level === recommendedEffort() ? resources.recommendedEffortTag : null" [checked]="level === selectedEffort()"
+                [disabled]="modelsLoading()" (triggered)="selectEffort(level)"></button>
+            }
+          </nol-menu-group>
+        }
+        @if (speedRefusal(); as reason) {
+          <nol-menu-group class="nol-teamrun-composer-speeds" [label]="resources.speedLabel">
+            <button type="button" nol-menu-item class="nol-teamrun-speed" [label]="reason" [disabled]="true"></button>
+          </nol-menu-group>
+        } @else if (speeds().length > 0) {
+          <nol-menu-group class="nol-teamrun-composer-speeds" [label]="resources.speedLabel">
+            @if (chosenSpeed(); as speed) {
+              @if (!hasSpeed(speed)) {
+                <button type="button" nol-menu-item [label]="resources.formatUnlisted(resources.formatEffort(speed))" [checked]="true" [disabled]="true"></button>
+              }
+            }
+            @if (defaultSpeed() === null) {
+              <button type="button" nol-menu-item [label]="resources.modelDefaultSpeed" [checked]="chosenSpeed() === null" [disabled]="modelsLoading()"
+                (triggered)="selectSpeed(null)"></button>
+            }
+            @for (choice of speeds(); track choice.id) {
+              <button type="button" nol-menu-item [label]="choice.name ?? resources.formatEffort(choice.id)" [description]="choice.description"
+                [checked]="choice.id === (chosenSpeed() ?? defaultSpeed())" [disabled]="modelsLoading()" (triggered)="selectSpeed(choice.id)"></button>
+            }
+            @if (speedNote(); as note) {
+              <button type="button" nol-menu-item class="nol-teamrun-speed-note" [label]="note" [disabled]="true"></button>
+            }
+          </nol-menu-group>
+        }
+      </div>
+    </div>
+    @if (responder(); as teammate) {
+      <nol-menu-separator />
+      <p class="nol-teamrun-composer-scope">{{ resources.formatAppliesInChat(teammate.name) }}</p>
+      <button type="button" nol-menu-item class="nol-teamrun-make-default" [label]="resources.formatMakeDefault(teammate.name)" [disabled]="memberSettings() === null"
+        (triggered)="makeDefault(teammate)"></button>
+    }
+    <nol-menu-separator />
+    @if (chosenDescriptor(); as kind) {
+      <button type="button" nol-menu-item class="nol-teamrun-provider-row" [label]="providerNameOf(kind)" [nolMenuTriggerFor]="providerMenu"></button>
+    }
+    @if (responder() === null) {
+      @for (choice of otherProviders(); track choice.key) {
+        <button type="button" nol-menu-item class="nol-teamrun-other-provider" [label]="choice.menuLabel" [tag]="usedUpOf(choice.providerId)"
+          (triggered)="selectOtherProvider(choice)"></button>
+      }
+    }
+    @if (responder(); as teammate) {
+      <button type="button" nol-menu-item class="nol-teamrun-edit-teammate" [label]="resources.formatEditTeammate(resources.formatMention(teammate.name))"
+        (triggered)="editResponder(teammate)"></button>
+      <button type="button" nol-menu-item class="nol-teamrun-without-teammate" [label]="resources.answerWithoutTeammateLabel" (triggered)="selectResponder(null)"></button>
+    }
+  </nol-menu>
+</ng-template>
+<ng-template #permissionsMenu>
+  <nol-menu class="nol-teamrun-composer-permissions" [attr.aria-label]="resources.chatPermissionsLabel" [minWidth]="resources.settingsMenuWidth">
+    <nol-menu-group [label]="permissionsTitle()">
+      @if (!selectedMode()) {
+        <button type="button" nol-menu-item [label]="modeName()" [checked]="true" [disabled]="true"></button>
+      }
+      @for (choice of catalog().modes; track choice.id) {
+        <button type="button" nol-menu-item [label]="choice.name" [description]="choice.description" [icon]="choice.unrestricted ? resources.unrestrictedModeGlyph : null"
+          [tag]="choice.id === defaultModeId() ? defaultModeTag() : null" [checked]="choice.id === selectedMode()?.id" [disabled]="modelsLoading()"
+          (triggered)="selectMode(choice.id)"></button>
+      }
+      @for (refused of refusedModes(); track refused.name) {
+        <button type="button" nol-menu-item class="nol-teamrun-refused-mode" [label]="refused.name" [icon]="refused.unrestricted ? resources.unrestrictedModeGlyph : null"
+          [disabled]="true" [nolTooltip]="refused.reason"></button>
+      }
+    </nol-menu-group>
+    @if (planFirstRefusal(); as reason) {
+      <nol-menu-separator />
+      <button type="button" nol-menu-item class="nol-teamrun-plan-first" [label]="resources.planFirstLabel" [description]="resources.planFirstDescription"
+        [checkbox]="true" [checked]="false" [disabled]="true" [nolTooltip]="reason"></button>
+    } @else if (planFirstOffered()) {
+      <nol-menu-separator />
+      <button type="button" nol-menu-item class="nol-teamrun-plan-first" [label]="resources.planFirstLabel" [description]="resources.planFirstDescription"
+        [checkbox]="true" [checked]="planFirst()" [disabled]="modelsLoading()" (triggered)="togglePlanFirst()"></button>
+    }
+    <nol-menu-separator />
+    @if (responder(); as teammate) {
+      <button type="button" nol-menu-item class="nol-teamrun-change-default" [label]="resources.formatChangeDefaultMode(teammate.name)" [description]="resources.toolsFollowMode"
+        (triggered)="editResponder(teammate)"></button>
+    } @else {
+      <button type="button" nol-menu-item [label]="resources.toolsFollowMode" [disabled]="true"></button>
+    }
+  </nol-menu>
+</ng-template>
+<ng-template #kindMenu>
+  <nol-menu [attr.aria-label]="resources.kindLabel" [minWidth]="resources.settingsMenuWidth">
+    @for (choice of store.kinds(); track choice.id) {
+      <button type="button" nol-menu-item [label]="choice.displayName" [checked]="choice.id === chosenKind()" (triggered)="selectKind(choice.id)"></button>
+    }
+  </nol-menu>
+</ng-template>
+<ng-template #providerMenu>
+  <nol-menu [attr.aria-label]="resources.providerLabel" [minWidth]="resources.settingsMenuWidth">
+    @if (!responder()) {
+      <button type="button" nol-menu-item class="nol-teamrun-kind" [label]="resources.kindLabel" [value]="chosenDescriptor()?.displayName ?? null" [nolMenuTriggerFor]="kindMenu"></button>
+      <nol-menu-separator />
+    }
+    @if (chosenProvider() && !selectedProvider()) {
+      <button type="button" nol-menu-item [label]="resources.unavailableProviderLabel" [disabled]="true"></button>
+    }
+    @for (choice of providers(); track choice.key) {
+      <button type="button" nol-menu-item [label]="choice.label" [tag]="usedUpOf(choice.providerId)" [checked]="choice.key === pickedProvider()?.key"
+        (triggered)="selectProvider(choice)"></button>
+    } @empty {
+      <button type="button" nol-menu-item class="nol-teamrun-add-provider" [label]="resources.addProviderLabel" (triggered)="addProvider()"></button>
+    }
+  </nol-menu>
+</ng-template>

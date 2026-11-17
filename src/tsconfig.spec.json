@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../_build/angular/spec-tsc",
+    "types": [
+      "vitest/globals"
+    ],
+    "paths": {
+      "@noldova/teamrun.window": [
+        "./noldova.teamrun.window/src/api/index.ts"
+      ],
+      "@noldova/teamrun/window": [
+        "./noldova.teamrun/src/api/window.ts"
+      ],
+      "@noldova/teamrun/menus.json": [
+        "./noldova.teamrun/menus.json"
+      ],
+      "@noldova/teamrun/module.json": [
+        "./noldova.teamrun/module.json"
+      ],
+      "@noldova/teamrun/settings.json": [
+        "./noldova.teamrun/settings.json"
+      ]
+    }
+  },
+  "include": [
+    "noldova.teamrun/src/api/window.ts",
+    "noldova.teamrun.window/src/**/*.ts",
+    "noldova.teamrun.window/tests/**/*.ts"
+  ]
+}

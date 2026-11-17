@@ -1,0 +1,15 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  --nol-teamrun-column-side: max(calc(var(--nol-space-4) * 2), calc((100cqw - 55rem) / 2));
+
+  display: block;
+  max-width: 55rem;
+  margin-inline: var(--nol-teamrun-column-side) calc(var(--nol-teamrun-column-side) - (100cqw - 100%));
+}

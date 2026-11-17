@@ -1,0 +1,147 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: fixed;
+  inset: 0;
+  display: block;
+  outline: none;
+}
+
+:host(.nol-teamrun-image-viewer-tab) {
+  position: relative;
+  height: 100%;
+}
+
+.nol-teamrun-image-viewer {
+  display: grid;
+  grid-template:
+    "header header header" auto
+    "previous viewport next" minmax(0, 1fr)
+    "tools tools tools" auto / auto minmax(0, 1fr) auto;
+  gap: var(--nol-space-3);
+  box-sizing: border-box;
+  height: 100%;
+  padding: calc(var(--nol-window-row-height) + var(--nol-space-4)) var(--nol-space-4) var(--nol-space-4);
+  background-color: var(--nol-overlay);
+}
+
+:host(.nol-teamrun-image-viewer-tab) .nol-teamrun-image-viewer {
+  padding: var(--nol-space-4);
+  background-color: transparent;
+}
+
+.nol-teamrun-image-viewer-title,
+.nol-teamrun-image-viewer-actions,
+.nol-teamrun-image-viewer-step,
+.nol-teamrun-image-viewer-tools,
+.nol-teamrun-image-viewer-chip,
+.nol-teamrun-image-viewer-percent {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  app-region: no-drag;
+}
+
+.nol-teamrun-image-viewer-step,
+.nol-teamrun-image-viewer-chip {
+  border-radius: 50%;
+}
+
+:host(.nol-teamrun-image-viewer-tab) .nol-teamrun-image-viewer-percent {
+  padding-inline: var(--nol-space-1);
+  border-radius: calc(var(--nol-button-height) / 2);
+}
+
+:host(.nol-teamrun-image-viewer-tab) :is(.nol-teamrun-image-viewer-step, .nol-teamrun-image-viewer-chip, .nol-teamrun-image-viewer-percent) {
+  background-color: var(--nol-raised);
+}
+
+.nol-teamrun-image-viewer-header {
+  display: flex;
+  grid-area: header;
+  justify-content: space-between;
+  gap: var(--nol-space-3);
+  min-width: 0;
+  app-region: no-drag;
+}
+
+.nol-teamrun-image-viewer-title {
+  min-width: 0;
+  color: var(--nol-overlay-text);
+}
+
+:host(.nol-teamrun-image-viewer-tab) .nol-teamrun-image-viewer-title {
+  color: var(--nol-text);
+}
+
+.nol-teamrun-image-viewer-actions {
+  flex: none;
+}
+
+.nol-teamrun-image-viewer-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nol-teamrun-image-viewer-step {
+  z-index: 1;
+  align-self: center;
+}
+
+.nol-teamrun-image-viewer-step-unused {
+  visibility: hidden;
+}
+
+.nol-teamrun-image-viewer-previous {
+  grid-area: previous;
+}
+
+.nol-teamrun-image-viewer-next {
+  grid-area: next;
+}
+
+.nol-teamrun-image-viewer-viewport {
+  grid-area: viewport;
+  overflow: auto;
+}
+
+.nol-teamrun-image-viewer-canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.nol-teamrun-image-viewer-image {
+  display: block;
+  flex: none;
+  max-width: none;
+  user-select: none;
+}
+
+.nol-teamrun-image-viewer-status {
+  padding: var(--nol-space-1) var(--nol-space-3);
+  border-radius: var(--nol-radius-large);
+  background-color: var(--nol-panel);
+  color: var(--nol-text);
+}
+
+.nol-teamrun-image-viewer-tools {
+  grid-area: tools;
+  justify-self: center;
+}
+
+.nol-teamrun-image-viewer-error {
+  padding-inline: var(--nol-space-2);
+  color: var(--nol-error);
+}

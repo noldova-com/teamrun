@@ -1,0 +1,12 @@
+{
+  "methods": [
+    { "name": "Runtime.evaluate", "parameters": { "expression": { "required": true, "values": ["1"] } } }
+  ],
+  "keys": [
+    { "name": "reload", "keys": ["Mod+R", "F5"], "macKeys": ["Mod+R"] },
+    { "name": "zoomIn", "keys": ["Mod+Equal", "Mod+Shift+Equal"] },
+    { "name": "zoomOut", "keys": ["Mod+Minus"] },
+    { "name": "actualSize", "keys": ["Mod+0"] },
+    { "name": "print", "keys": ["Mod+P"] }
+  ]
+}

@@ -1,0 +1,149 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Build and test
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  versions:
+    name: Versions
+    uses: noldova-com/.github/.github/workflows/versions.yml@7930c8dcf906cccb753aa7559220ac2b139c89aa # v2.34.0
+    permissions: {}
+    with:
+      targets: linux-x64 windows-x64 macos-x64 macos-arm64
+
+  build-and-test:
+    name: Build and test
+    uses: noldova-com/.github/.github/workflows/build-and-test.yml@ca4ec084bd2907b4050679523deba3e3cc010fb7 # v2.36.0
+    permissions:
+      contents: read
+      packages: read
+    with:
+      targets: ${{ github.event_name == 'push' && 'linux-x64 windows-x64 macos-x64 macos-arm64' || 'linux-x64 windows-x64 macos-arm64' }}
+      separate-test: angular
+      separate-test-report: |
+        node_modules/.vite
+        _build/angular-tests.log
+        _build/angular-pre-bundle.json
+        _build/angular-spec-transforms
+      end-to-end: e2e
+      end-to-end-prepare: npm run install:app && npm run build:app
+      end-to-end-report: _build/e2e
+      timeout-minutes: 55
+
+  angular:
+    name: ${{ matrix.target }}, Angular tests and app
+    needs: versions
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(github.event_name == 'push' && '["Windows x64", "macOS x64", "macOS arm64"]' || '["Windows x64", "macOS arm64"]') }}
+    runs-on: ${{ fromJSON(matrix.target == 'Windows x64' && needs.versions.outputs.runs-on-windows-x64 || matrix.target == 'macOS x64' && needs.versions.outputs.runs-on-macos-x64 || needs.versions.outputs.runs-on-macos-arm64) }}
+    timeout-minutes: 55
+    env:
+      npm_config_ignore_scripts: 'true'
+    steps:
+      - name: Check out the revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '26.13.1'
+          package-manager-cache: false
+
+      - name: Verify the toolchain
+        run: |
+          node --version
+          npm --version
+          test "$(node --version)" = v26.13.1
+          test "$(npm --version)" = 11.20.0
+
+      - name: Install the dependencies
+        timeout-minutes: 8
+        run: npm run install:root
+
+      - name: Build
+        timeout-minutes: 6
+        run: npm run build
+
+      - name: Test
+        id: test
+        timeout-minutes: 12
+        run: npm run test:angular
+
+      - name: Keep the Angular tests' log and pre-bundle
+        if: failure() && steps.test.outcome == 'failure'
+        timeout-minutes: 5
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: angular-pre-bundle-${{ matrix.target }}-${{ github.run_attempt }}
+          path: |
+            node_modules/.vite
+            _build/angular-tests.log
+            _build/angular-pre-bundle.json
+            _build/angular-spec-transforms
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Install the app
+        timeout-minutes: 10
+        run: npm run install:app
+
+      - name: Build the app
+        timeout-minutes: 10
+        run: npm run build:app
+
+  package:
+    name: Package unsigned
+    needs: versions
+    uses: noldova-com/desktop/.github/workflows/package-app.yml@4d7955e6086c27667752d6692ecfd1771be5a753 # v0.0.3
+    with:
+      app-folder: app
+      prepare: npm run build && npm run install:app && npm run build:app
+      targets: ${{ format('[{{"target":"Linux x64","runner":{0},"architecture":"x64","platform":"linux","signed":"false"}}]', toJSON(needs.versions.outputs.runs-on-linux-x64)) }}
+      signed: false
+
+  all-targets:
+    name: All targets
+    needs: [build-and-test, angular, package]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require the shared build and test, the Angular tests and app on every other target, and the package to pass
+        env:
+          RESULT: ${{ needs.build-and-test.result }}
+          ANGULAR_RESULT: ${{ needs.angular.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+        run: |
+          echo "The shared build and test's result: $RESULT; the Angular tests and app's result: $ANGULAR_RESULT; the package's result: $PACKAGE_RESULT"
+          if [ "$RESULT" = cancelled ] || [ "$ANGULAR_RESULT" = cancelled ] || [ "$PACKAGE_RESULT" = cancelled ]; then
+            echo "::error::A job was cancelled, not failed by a test: it ran out its time limit, or a newer push replaced the run."
+          fi
+          test "$RESULT" = success
+          test "$ANGULAR_RESULT" = success
+          test "$PACKAGE_RESULT" = success

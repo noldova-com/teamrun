@@ -1,0 +1,126 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-3);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: var(--nol-space-3);
+  border: var(--nol-border-width) solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  color: var(--nol-text);
+  font-size: var(--nol-text-panel);
+  line-height: var(--nol-line-panel);
+}
+
+.nol-teamrun-question-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.nol-teamrun-question-card-heading {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-question-card-asker {
+  margin: 0;
+  color: var(--nol-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.nol-teamrun-question-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-1) var(--nol-space-2);
+  min-width: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+}
+
+.nol-teamrun-question-header {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-question-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-question-options {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nol-teamrun-question-other {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.nol-teamrun-question-card-failed {
+  margin: 0;
+  color: var(--nol-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-question-card-answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.nol-teamrun-question-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.nol-teamrun-question-card-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  margin: 0;
+}
+
+.nol-teamrun-question-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nol-space-1) var(--nol-space-2);
+  min-width: 0;
+}
+
+.nol-teamrun-question-card-label {
+  min-width: 0;
+}
+
+.nol-teamrun-question-card-reply {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}

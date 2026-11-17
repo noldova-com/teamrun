@@ -1,0 +1,225 @@
+{
+  "settings": [
+    {
+      "name": "teamrun.chainHopLimit",
+      "title": "Teammate hand-offs",
+      "description": "How many times in a row a teammate may start another reply: the teammates its reply mentions, or the chat it sends a message to. At 0, a teammate starts no one. Your own messages are never limited.",
+      "type": { "kind": "Number", "minimum": 0, "maximum": 100, "step": 1 },
+      "default": 4,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Replies"
+    },
+    {
+      "name": "teamrun.titleModel",
+      "title": "Title model",
+      "description": "The model that names a new chat from its first message, in a separate background session with no TeamRun tools, in its provider's most restricted mode, where every permission request is refused. Each new chat makes one extra request on that model, which counts against its plan. Same as the chat is the model answering that message: the mentioned one, or the first mentioned when there are several. When you choose a model, first messages also go to its provider. If it can't answer, the chat's model is asked, and if that fails too the title stays the message's first characters. Only providers that can name a chat are offered.",
+      "type": { "kind": "Choice", "dynamic": true },
+      "default": "",
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Chats"
+    },
+    {
+      "name": "teamrun.sendKey",
+      "title": "Send a message with",
+      "description": "The key that sends what you type in the composer. With Enter, Shift+Enter starts a new line; with Ctrl+Enter, or Cmd+Enter on macOS, Enter starts a new line.",
+      "type": {
+        "kind": "Choice",
+        "options": [
+          { "value": "Enter", "title": "Enter" },
+          { "value": "ModEnter", "title": "Ctrl+Enter (Cmd+Enter on macOS)" }
+        ]
+      },
+      "default": "Enter",
+      "locality": "Device",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Composer"
+    },
+    {
+      "name": "teamrun.whileReplying",
+      "title": "While a reply runs, Enter",
+      "description": "What Enter does with a message typed while a teammate's reply runs. Steer puts it into the running reply, or queues it where the reply's provider can't take one; Queue sends it once the replies end; Stop and send stops the replies and sends it. The other two keep their keys: Alt+Enter queues, and Ctrl+Enter, or Cmd+Enter on macOS, stops and sends.",
+      "type": {
+        "kind": "Choice",
+        "options": [
+          { "value": "Steer", "title": "Steer" },
+          { "value": "Queue", "title": "Queue" },
+          { "value": "StopAndSend", "title": "Stop and send" }
+        ]
+      },
+      "default": "Steer",
+      "locality": "Device",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Composer"
+    },
+    {
+      "name": "teamrun.imageOpenMode",
+      "title": "Open images",
+      "description": "Show images in a popup or in a separate tab beside your chats.",
+      "type": {
+        "kind": "Choice",
+        "options": [
+          { "value": "Popup", "title": "Popup" },
+          { "value": "Tab", "title": "Tab" }
+        ]
+      },
+      "default": "Popup",
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Images"
+    },
+    {
+      "name": "teamrun.newTerminals",
+      "title": "New terminals",
+      "description": "Whether a terminal from the terminal panel's +, Toggle Terminal's first open or a shell in its shell menu is a general one, or belongs to the chat on screen and shows only with that chat. New terminal and New chat terminal open their own kind either way.",
+      "type": {
+        "kind": "Choice",
+        "options": [
+          { "value": "General", "title": "General" },
+          { "value": "Chat", "title": "This chat" }
+        ]
+      },
+      "default": "General",
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Terminals"
+    },
+    {
+      "name": "teamrun.runOpensIn",
+      "title": "Run opens in",
+      "description": "Where a reply's Run shows the terminal its code runs in: under the block in the chat, or the chat's terminal in the Terminals panel, as before. A change applies from the next Run.",
+      "type": {
+        "kind": "Choice",
+        "options": [
+          { "value": "Chat", "title": "Chat" },
+          { "value": "Panel", "title": "Terminals panel" }
+        ]
+      },
+      "default": "Chat",
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Terminals"
+    },
+    {
+      "name": "teamrun.defaultTeammate",
+      "title": "Default teammate",
+      "description": "The provider, model and effort a new chat starts with. Until you choose one, a new chat starts from the last message you sent.",
+      "type": { "kind": "Action", "command": "teamrun.chooseDefaultTeammate", "label": "Choose default teammate" },
+      "default": null,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Default teammate"
+    },
+    {
+      "name": "teamrun.manageTeammates",
+      "title": "Teammates",
+      "description": "The teammates you bring into chats, each with its provider, model, effort and role.",
+      "type": { "kind": "Action", "command": "teamrun.showTeammates", "label": "Manage teammates" },
+      "default": null,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Teammates and providers"
+    },
+    {
+      "name": "teamrun.manageProviders",
+      "title": "Providers",
+      "description": "The providers TeamRun uses on this computer, each through one of its kind's profile folders.",
+      "type": { "kind": "Action", "command": "teamrun.showProviders", "label": "Manage providers" },
+      "default": null,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Teammates and providers"
+    },
+    {
+      "name": "teamrun.manageMcpServers",
+      "title": "MCP servers",
+      "description": "The shared MCP servers you add for your providers and teammates, and the ones each provider's own configuration names, which TeamRun keeps off unless you switch them on for that provider.",
+      "type": { "kind": "Action", "command": "teamrun.showMcpServers", "label": "Manage MCP servers" },
+      "default": null,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Teammates and providers"
+    },
+    {
+      "name": "teamrun.manageComputerUse",
+      "title": "Computer use",
+      "description": "The apps, and the screen, you allowed a chat to control, which it uses without asking again. Revoke an app, and the chat's next input to it is refused; revoke the screen, and the chat's next session asks for it again.",
+      "type": { "kind": "Action", "command": "teamrun.showComputerUseGrants", "label": "Manage computer use" },
+      "default": null,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Teammates and providers"
+    },
+    {
+      "name": "teamrun.idleCompaction",
+      "title": "Compact idle Claude chats",
+      "description": "Compacts a Claude chat on Claude's one-hour prompt cache with a large context, 150,000 tokens or more, 54 minutes after its last turn, while the cache still holds it, so the next message starts from a summary instead of paying to write the whole chat to the cache again. Never while a turn, background task or sub-agent runs, and the chat shows a row when it happens. Off, no chat is compacted while idle.",
+      "type": { "kind": "Boolean" },
+      "default": true,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Teammates and providers"
+    },
+    {
+      "name": "teamrun.outsideSessions",
+      "title": "Outside sessions",
+      "description": "Lets a coding agent running outside TeamRun on this computer list your recent chats, post into any of them or into a teammate's own chat for outside messages, and read the replies to its own messages, through TeamRun's outside endpoint and its token. Its messages show as coming from outside TeamRun, and the teammate treats them as data from an unknown sender. Off stops every outside session at once.",
+      "type": { "kind": "Boolean" },
+      "default": false,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Outside sessions"
+    },
+    {
+      "name": "teamrun.outsidePort",
+      "title": "Outside port",
+      "description": "The port on this computer where outside sessions reach TeamRun. Choose another when this one is in use.",
+      "type": { "kind": "Number", "minimum": 1024, "maximum": 65535, "step": 1 },
+      "default": 47391,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Outside sessions"
+    },
+    {
+      "name": "teamrun.connectOutsideAgents",
+      "title": "Connect an outside agent",
+      "description": "The endpoint's address and token, to copy into the outside agent's MCP settings, and Reset token, which stops every outside session until it has the new one.",
+      "type": { "kind": "Action", "command": "teamrun.showOutsideSessions", "label": "Connect outside agents" },
+      "default": null,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Outside sessions"
+    },
+    {
+      "name": "teamrun.dataFolder",
+      "title": "Data folder",
+      "description": "Where TeamRun keeps its database. The command-line client uses the same folder.",
+      "type": { "kind": "Action", "command": "teamrun.showDataFolder", "label": "Show in folder" },
+      "default": null,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Data"
+    }
+  ],
+  "pages": [
+    { "name": "teamrun.abilities", "title": "What each provider can do" }
+  ]
+}

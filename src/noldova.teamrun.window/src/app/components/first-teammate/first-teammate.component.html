@@ -1,0 +1,36 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<form class="nol-teamrun-form nol-teamrun-first-teammate" aria-labelledby="nol-teamrun-first-teammate-title" (submit)="start($event)">
+  <h3 class="nol-teamrun-first-teammate-title" id="nol-teamrun-first-teammate-title">{{ resources.firstTeammateStepTitle }}</h3>
+  <p class="nol-teamrun-muted nol-teamrun-first-teammate-text">{{ resources.firstTeammateStepText }}</p>
+  <label class="nol-teamrun-field">
+    <span class="nol-teamrun-field-label">{{ resources.teammateNameLabel }}</span>
+    <span class="nol-teamrun-first-teammate-name">
+      <input #nameField nol-text-field class="nol-teamrun-teammate-name" name="name" [attr.aria-label]="resources.teammateNameLabel" [value]="name()" [disabled]="saving()"
+        [attr.aria-describedby]="error() ? messageId : null" [attr.aria-invalid]="isNameMarked() ? true : null" (input)="editName()">
+      <span class="nol-teamrun-muted nol-teamrun-first-teammate-mention" aria-hidden="true">{{ mention() }}</span>
+    </span>
+  </label>
+  <div class="nol-teamrun-field">
+    <span class="nol-teamrun-field-label">{{ resources.answeredByLabel }}</span>
+    <nol-select class="nol-teamrun-provider" [label]="resources.answeredByLabel" [options]="providerOptions()" [value]="providerId()"
+      [disabled]="saving() || providerOptions().length === 0" (valueChange)="changeProvider($event)" />
+  </div>
+  <p class="nol-teamrun-muted nol-teamrun-first-teammate-defaults">
+    {{ resources.firstTeammateDefaults }}
+    <button type="button" nol-button class="nol-teamrun-choose-now" [variant]="text" [disabled]="saving()" (click)="chooseNow()">{{ resources.chooseNowLabel }}</button>
+  </p>
+  @if (error(); as message) {
+    <nol-field-message class="nol-teamrun-dialog-error" [attr.id]="messageId">{{ message }}</nol-field-message>
+  }
+  <div class="nol-teamrun-first-teammate-actions">
+    <button type="button" nol-button class="nol-teamrun-not-now" [variant]="text" [disabled]="saving()" (click)="dismiss()">{{ resources.notNowLabel }}</button>
+    <button type="submit" nol-button class="nol-teamrun-start-chatting" [disabled]="!canStart()">{{ resources.startChattingLabel }}</button>
+  </div>
+</form>

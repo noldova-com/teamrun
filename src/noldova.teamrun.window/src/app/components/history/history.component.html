@@ -1,0 +1,32 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (isEmpty()) {
+  <div class="empty">
+    <p class="nol-teamrun-history-empty-text">{{ resources.emptyHistoryText }}</p>
+    @if (offersFolder()) {
+      <div class="nol-teamrun-history-actions">
+        <button type="button" nol-button class="nol-teamrun-history-open-folder" [variant]="outlined" (click)="openFolder()">{{ resources.openFolderLabel }}</button>
+      </div>
+    }
+  </div>
+} @else if (source(); as source) {
+  <nol-virtual-list [source]="source" [label]="resources.historyLabel" [kind]="feed" [position]="position()" [busy]="isBusy()" [readAhead]="resources.historyReadAhead"
+    (positionChange)="remember($event)" (jumped)="jumpToLatest($event)">
+    <ng-template [nolVirtualRow]="source" [nolVirtualRowHidden]="isSteered" let-item let-labelId="labelId">
+      @if (usageHandOffOf(item); as note) {
+        <nol-teamrun-usage-hand-off-line [note]="note" [labelId]="labelId" />
+      } @else {
+        <nol-teamrun-history-message [message]="item" [labelId]="labelId" [flashStart]="item.id === flashRowId() ? flashStart() : null"
+          [revealsPlan]="item.id === flashRowId() && flashesPlan()" [revealsStep]="item.id === flashRowId() ? flashStep() : null"
+          [flashedSteerId]="item.id === flashRowId() && item.id !== flashId() ? flashId() : null"
+          [awaitsFlash]="item.id === flashRowId() && flashStart() === null" (flashReady)="startFlash()" />
+      }
+    </ng-template>
+  </nol-virtual-list>
+}

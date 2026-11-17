@@ -1,0 +1,16 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="request().title" (dismissed)="answered.emit(false)">
+  <p nolDialogDescription>{{ request().text }}</p>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" (click)="answered.emit(false)">{{ resources.closeLabel }}</button>
+  @if (request().otherLabel; as label) {
+    <button type="button" nol-button nolDialogAction class="nol-teamrun-other" [variant]="secondary" (click)="other.emit()">{{ label }}</button>
+  }
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-confirm" [danger]="request().danger" (click)="answered.emit(true)">{{ request().confirmLabel }}</button>
+</nol-dialog>

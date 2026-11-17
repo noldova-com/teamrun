@@ -1,0 +1,73 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-question-card-title">
+  <div class="nol-teamrun-question-card-heading" [id]="id + '-heading'">{{ heading() }}</div>
+  @if (asker(); as asker) {
+    <p class="nol-teamrun-question-card-asker" [id]="id + '-asker'">{{ resources.formatSubAgentAsks(asker) }}</p>
+  }
+</div>
+@if (isOpen()) {
+  @for (question of approval().questions; track question.id; let index = $index) {
+    <div class="nol-teamrun-question" [attr.role]="question.multiple ? 'group' : null" [attr.aria-labelledby]="question.multiple ? id + '-text-' + index : null">
+      @if (question.header || question.multiple) {
+        <div class="nol-teamrun-question-title">
+          @if (question.header) {
+            <nol-chip class="nol-teamrun-question-header" [kind]="tagKind">{{ question.header }}</nol-chip>
+          }
+          @if (question.multiple) {
+            <span class="nol-teamrun-question-hint">{{ resources.questionPickAny }}</span>
+          }
+        </div>
+      }
+      <p class="nol-teamrun-question-text" [id]="id + '-text-' + index">{{ question.text }}</p>
+      @if (question.options.length > 0) {
+        @if (question.multiple) {
+          <div class="nol-teamrun-question-options">
+            @for (option of question.options; track option.label) {
+              <nol-choice-row [type]="checkbox" [label]="option.label" [description]="option.description" [checked]="isPicked(question, option.label)"
+                [disabled]="isSending()" (checkedChange)="pick(question, option.label, $event)" />
+            }
+          </div>
+        } @else {
+          <nol-radio-group [label]="question.text" [value]="pickOf(question)">
+            @for (option of question.options; track option.label) {
+              <nol-choice-row [value]="option.label" [label]="option.label" [description]="option.description" [disabled]="isSending()"
+                (checkedChange)="pick(question, option.label, $event)" />
+            }
+          </nol-radio-group>
+        }
+      }
+      @if (question.other) {
+        <input nol-text-field class="nol-teamrun-question-other" [type]="question.secret ? 'password' : 'text'" autocomplete="off" spellcheck="false"
+          [placeholder]="question.options.length > 0 ? resources.questionOtherPlaceholder : resources.questionTextPlaceholder"
+          [attr.aria-labelledby]="id + '-text-' + index" [value]="textOf(question)" [disabled]="isSending()" (input)="type(question, $event)" />
+      }
+    </div>
+  }
+  @if (isFailed()) {
+    <p class="nol-teamrun-question-card-failed" role="alert">{{ resources.questionSendFailed }}</p>
+  }
+  <div class="nol-teamrun-question-card-answer">
+    <div class="nol-teamrun-question-card-actions" nolToolbar [nolToolbarLabel]="resources.questionActionsLabel">
+      <button type="button" nol-button nolToolbarItem class="nol-teamrun-question-card-submit" [variant]="primary" [busy]="isSendingOf(resources.answerOptionId)"
+        [attr.aria-disabled]="(isSending() && !isSendingOf(resources.answerOptionId)) || !answers() ? 'true' : null" (click)="submit()">{{ resources.questionAnswerLabel }}</button>
+      <button type="button" nol-button nolToolbarItem class="nol-teamrun-question-card-skip" [variant]="secondary" [busy]="isSendingOf(resources.skipOptionId)"
+        [attr.aria-disabled]="isSending() && !isSendingOf(resources.skipOptionId) ? 'true' : null" (click)="skip()">{{ resources.questionSkipLabel }}</button>
+    </div>
+  </div>
+} @else if (approval().status === statuses.Approved) {
+  <dl class="nol-teamrun-question-card-summary">
+    @for (summary of summaries(); track summary.questionId) {
+      <div class="nol-teamrun-question-card-row">
+        <dt class="nol-teamrun-question-card-label"><nol-chip class="nol-teamrun-question-header" [kind]="tagKind">{{ summary.label }}</nol-chip></dt>
+        <dd class="nol-teamrun-question-card-reply">{{ summary.reply }}</dd>
+      </div>
+    }
+  </dl>
+}

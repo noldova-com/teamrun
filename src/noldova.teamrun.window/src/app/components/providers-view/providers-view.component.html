@@ -1,0 +1,135 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-settings-view">
+  @if (store.welcoming()) {
+    <div class="nol-teamrun-welcome" role="note" aria-labelledby="nol-teamrun-welcome-title">
+      <h3 class="nol-teamrun-welcome-title" id="nol-teamrun-welcome-title">{{ resources.welcomeTitle }}</h3>
+      <p class="nol-teamrun-muted nol-teamrun-welcome-text">{{ resources.welcomeLine }}</p>
+    </div>
+  }
+  @if (error(); as message) {
+    <div class="nol-teamrun-error" role="alert">
+      <span class="nol-teamrun-error-text">{{ message }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss" [variant]="text" (click)="error.set(null)">{{ resources.dismissLabel }}</button>
+    </div>
+  }
+  @if (store.kindsFailed()) {
+    <div class="nol-teamrun-error nol-teamrun-kinds-failed" role="alert">
+      <span class="nol-teamrun-error-text">{{ resources.kindsUnavailableForProviders }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss nol-teamrun-retry-kinds" [variant]="text" [attr.aria-disabled]="store.loadingKinds()"
+        (click)="retryKinds()">{{ resources.retryLabel }}</button>
+    </div>
+  }
+  @if (teammateStep()) {
+    <nol-teamrun-first-teammate [store]="store" [context]="context" (closed)="teammateStep.set(false)" />
+  } @else {
+    <nol-configuration-table [heading]="resources.providersTitle" [explanation]="resources.providersHint">
+      <div class="nol-teamrun-providers-parts">
+        <nol-configuration-table class="nol-teamrun-your-providers" [heading]="resources.yourProvidersTitle" [level]="4">
+          @if (checking()) {
+            <span nolConfigurationTableAction class="nol-teamrun-muted nol-teamrun-part-time nol-teamrun-checking">
+              <nol-spinner [label]="resources.checkingLabel" />
+            </span>
+          } @else if (checked(); as when) {
+            <span nolConfigurationTableAction class="nol-teamrun-muted nol-teamrun-part-time nol-teamrun-checked">{{ when }}</span>
+          }
+          <button type="button" nol-icon-button nolConfigurationTableAction class="nol-teamrun-check-all" [icon]="resources.refreshGlyph" [label]="resources.checkAllLabel"
+            [disabled]="checking() || store.isBusy() || checkable().length === 0" (click)="checkAll()"></button>
+          @for (line of installs(); track line.installation.kind) {
+            <div class="nol-teamrun-install-line" [attr.data-kind]="line.installation.kind">
+              <nol-spinner />
+              <span class="nol-teamrun-install-text">{{ line.text }}</span>
+              @if (line.installation.cancellable) {
+                <button type="button" nol-button class="nol-teamrun-cancel-install" [variant]="text"
+                  [attr.aria-label]="resources.formatKindAction(resources.cancelInstallLabel, line.name)" (click)="cancelInstall(line.installation.kind)">{{ resources.cancelInstallLabel }}</button>
+              }
+            </div>
+          }
+          <nol-teamrun-provider-list [label]="resources.yourProvidersTitle" [groups]="yourGroups()"
+            [empty]="found().length > 0 ? resources.noProvidersBesideFound : resources.noProviders" [kindActions]="kindActions" [rowStep]="rowStep"
+            [rowActions]="rowActions" [asking]="asking()" [question]="question()" />
+          @for (line of terminals(); track line.sessionId) {
+            <nol-teamrun-provider-terminal class="nol-teamrun-sign-in-terminal" [sessionId]="line.sessionId" [title]="line.title"
+              (closed)="hideTerminal(line.sessionId)" />
+          }
+          @for (line of installTerminals(); track line.sessionId) {
+            <nol-teamrun-provider-terminal class="nol-teamrun-install-terminal" [sessionId]="line.sessionId" [title]="line.title"
+              (closed)="hideTerminal(line.sessionId)" />
+          }
+        </nol-configuration-table>
+        <nol-configuration-table class="nol-teamrun-found-providers" [heading]="resources.foundProvidersTitle" [level]="4">
+          @if (searching()) {
+            <span nolConfigurationTableAction class="nol-teamrun-muted nol-teamrun-part-time nol-teamrun-searching">
+              <nol-spinner [label]="resources.searchingLabel" />
+            </span>
+          } @else {
+            <span nolConfigurationTableAction class="nol-teamrun-muted nol-teamrun-part-time nol-teamrun-searched">{{ searched() }}</span>
+          }
+          <button type="button" nol-icon-button nolConfigurationTableAction class="nol-teamrun-search-again" [icon]="resources.refreshGlyph"
+            [label]="resources.searchAgainLabel" [disabled]="searching() || !store.kindsLoaded()" (click)="search()"></button>
+          <nol-teamrun-provider-list [label]="resources.foundProvidersTitle" [groups]="foundGroups()" [empty]="foundEmpty()"
+            [foundActions]="foundActions" />
+        </nol-configuration-table>
+        @if (addOpen()) {
+          <nol-teamrun-provider-add [store]="store" [chooseFolder]="chooseFolder" (closed)="closeAdd()" (chosenKind)="addKind.set($event)" />
+        } @else {
+          <div class="nol-teamrun-add-row">
+            <button type="button" nol-button class="nol-teamrun-add" (click)="add()">{{ resources.addProviderLabel }}</button>
+          </div>
+        }
+      </div>
+    </nol-configuration-table>
+    @if (store.welcoming()) {
+      <div class="nol-teamrun-welcome-actions">
+        <button type="button" nol-button class="nol-teamrun-skip" [variant]="text" [disabled]="finishing()" (click)="skip()">{{ resources.skipForNowLabel }}</button>
+        <button type="button" nol-button class="nol-teamrun-continue" [disabled]="finishing() || !canContinue()" (click)="continue()">{{ resources.continueLabel }}</button>
+      </div>
+    }
+    <div class="nol-teamrun-muted nol-teamrun-notice">{{ resources.namesNotice }}</div>
+  }
+</div>
+
+<ng-template #kindActions let-group>
+  @if (group.installation?.state === states.Installing) {
+    @if (group.installation.cancellable) {
+      <button type="button" nol-button class="nol-teamrun-cancel-install" [variant]="text"
+        [attr.aria-label]="resources.formatKindAction(resources.cancelInstallLabel, group.name)" (click)="cancelInstall(group.kind)">{{ resources.cancelInstallLabel }}</button>
+    }
+  } @else {
+    @if (updateOf(group); as update) {
+      <button type="button" nol-button class="nol-teamrun-update" [variant]="outlined" [disabled]="store.isBusy()"
+        [attr.aria-label]="resources.formatKindAction(resources.formatUpdateTo(update), group.name)" (click)="updateKind(group.kind)">{{ resources.formatUpdateTo(update) }}</button>
+    }
+  }
+</ng-template>
+
+<ng-template #rowStep let-row>
+  @if (row.provider.id !== asking()) {
+    <nol-teamrun-provider-step [store]="store" [provider]="row.provider" [report]="report" (terminalShown)="showTerminal(row.provider.id)" />
+  }
+</ng-template>
+
+<ng-template #rowActions let-row>
+  @let provider = row.provider;
+  @if (provider.id === asking()) {
+    <button type="button" nol-button class="nol-teamrun-keep" [variant]="text" [attr.aria-label]="resources.formatRowAction(resources.keepLabel, provider.label)"
+      [attr.aria-describedby]="questionIdOf(provider.id)" (keydown.escape)="keep(provider)" (click)="keep(provider)">{{ resources.keepLabel }}</button>
+    <button type="button" nol-button class="nol-teamrun-confirm-remove" [danger]="true" [disabled]="store.isBusy()"
+      [attr.aria-label]="resources.formatRowAction(resources.removeLabel, provider.label)" [attr.aria-describedby]="questionIdOf(provider.id)"
+      (keydown.escape)="keep(provider)" (click)="remove(provider)">{{ resources.removeLabel }}</button>
+  } @else {
+    <nol-teamrun-provider-menu [store]="store" [provider]="provider" [context]="context" [report]="report" [askRemove]="askRemove" />
+  }
+</ng-template>
+
+<ng-template #foundActions let-row>
+  <button type="button" nol-button class="nol-teamrun-add-found" [variant]="outlined" [disabled]="store.isBusy() || adding().has(row.profile.profileDir)"
+    [attr.data-profile]="row.profile.profileDir" [attr.aria-label]="resources.formatAddFound(row.profile.label, row.isNote ? row.profile.profileDir : row.account)"
+    (click)="addFound(row)">{{ resources.addFoundLabel }}</button>
+</ng-template>

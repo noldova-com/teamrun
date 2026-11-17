@@ -1,0 +1,23 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="resources.rewindTitle" (dismissed)="dismiss()">
+  <form id="nol-teamrun-rewind-form" class="nol-teamrun-form" (submit)="rewind($event)">
+    <div class="nol-teamrun-rewind-choice">
+      <span class="nol-teamrun-rewind-text nol-teamrun-muted" nolDialogDescription>{{ resources.rewindRemovedText }} {{ forkUnavailable() ?? resources.rewindKeptText }}</span>
+      <nol-checkbox class="nol-teamrun-restore-files" [checked]="restoreFiles()" [disabled]="rewinding()" (checkedChange)="restoreFiles.set($event)">
+        {{ resources.restoreFilesLabel }}
+      </nol-checkbox>
+    </div>
+    @if (error(); as message) {
+      <nol-field-message class="nol-teamrun-dialog-error">{{ message }}</nol-field-message>
+    }
+  </form>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" [disabled]="rewinding()" (click)="dismiss()">{{ resources.closeLabel }}</button>
+  <button type="submit" form="nol-teamrun-rewind-form" nol-button nolDialogAction class="nol-teamrun-confirm" [disabled]="rewinding()">{{ resources.rewindConfirmLabel }}</button>
+</nol-dialog>

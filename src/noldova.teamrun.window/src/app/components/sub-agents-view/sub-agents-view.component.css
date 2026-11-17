@@ -1,0 +1,192 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  padding: var(--nol-view-padding-block) var(--nol-content-padding-inline);
+  overflow: auto;
+}
+
+.sub-agents-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.sub-agents-group + .sub-agents-group {
+  margin-top: var(--nol-space-4);
+}
+
+.sub-agents-heading {
+  padding-inline: var(--nol-space-2);
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+}
+
+.sub-agents-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sub-agent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  min-width: 0;
+  padding: var(--nol-space-2);
+  border-radius: var(--nol-radius-large);
+  cursor: pointer;
+}
+
+.sub-agent-selected {
+  background-color: var(--nol-raised);
+
+  @media (forced-colors: active) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+    outline-offset: calc(var(--nol-border-width) * -2);
+  }
+}
+
+.sub-agent-top {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  color: var(--nol-text-strong);
+}
+
+.sub-agent-status {
+  flex: none;
+  width: var(--nol-icon);
+  font-size: var(--nol-icon);
+  line-height: 1;
+}
+
+.sub-agent-glyph {
+  color: var(--nol-text-muted);
+}
+
+.sub-agent-glyph[data-status="Failed"] {
+  color: var(--nol-error);
+}
+
+.sub-agent-mark {
+  flex: none;
+}
+
+.sub-agent-description {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--nol-radius-hover);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sub-agent-description:focus-visible {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+
+  @media (forced-colors: active) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+}
+
+.sub-agent-stop {
+  flex: none;
+}
+
+.sub-agent-meta,
+.sub-agent-summary,
+.sub-agent-error,
+.sub-agent-open {
+  margin-inline-start: calc(var(--nol-icon) + var(--nol-space-2));
+}
+
+.sub-agent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--nol-space-2);
+  min-width: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+}
+
+.sub-agent-meta:empty {
+  display: none;
+}
+
+.sub-agent-background {
+  padding-inline: var(--nol-space-1);
+  border: var(--nol-border-width) solid var(--nol-border);
+  border-radius: var(--nol-radius-small);
+}
+
+.sub-agent-summary {
+  display: -webkit-box;
+  margin-block: 0;
+  margin-inline-end: 0;
+  overflow: hidden;
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.sub-agent-error {
+  margin-block: 0;
+  margin-inline-end: 0;
+  color: var(--nol-error);
+  overflow-wrap: anywhere;
+}
+
+.sub-agent-open {
+  align-self: flex-start;
+}
+
+.sub-agents-empty,
+.sub-agents-loading {
+  margin: 0;
+  padding: var(--nol-space-2);
+  color: var(--nol-text-muted);
+}
+
+.sub-agents-failure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.sub-agents-error {
+  margin: 0;
+  padding: var(--nol-space-2);
+  color: var(--nol-error);
+  overflow-wrap: anywhere;
+}

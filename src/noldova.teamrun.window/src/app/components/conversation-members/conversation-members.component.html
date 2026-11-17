@@ -1,0 +1,34 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<span class="nol-teamrun-default" [nolTooltip]="defaultDescription()"><nol-teamrun-teammate-avatar [teammate]="null" [label]="defaultDescription()" /></span>
+<div class="nol-teamrun-members">
+  @for (teammate of members(); track teammate.id) {
+    <button type="button" class="nol-teamrun-member" [attr.aria-label]="store.disabledMarkedName(teammate)" [nolTooltip]="description(teammate)" [nolMenuTriggerFor]="memberMenu">
+      <nol-teamrun-teammate-avatar [teammate]="teammate" [unavailable]="store.isTeammateUnavailable(teammate.id)" [decorative]="true" />
+    </button>
+    <ng-template #memberMenu>
+      <nol-menu>
+        <button nol-menu-item [label]="resources.removeMemberLabel" [disabled]="store.isWorking(conversationId())" (triggered)="store.removeMember(conversationId(), teammate.id)"></button>
+      </nol-menu>
+    </ng-template>
+  }
+</div>
+<button type="button" nol-icon-button class="nol-teamrun-add-member" [icon]="resources.addIcon" [label]="resources.addMemberLabel" [nolTooltip]="resources.addMemberLabel" [nolMenuTriggerFor]="addMenu"></button>
+<ng-template #addMenu>
+  <nol-menu>
+    @if (others().length === 0) {
+      <button nol-menu-item [label]="resources.noTeammatesToAdd" [disabled]="true"></button>
+    }
+    @for (teammate of others(); track teammate.id) {
+      <button nol-menu-item [label]="store.listedName(teammate)" (triggered)="store.addMember(conversationId(), teammate.id)">
+        <nol-teamrun-teammate-avatar nolMenuItemLead [teammate]="teammate" [unavailable]="store.isTeammateUnavailable(teammate.id)" [decorative]="true" />
+      </button>
+    }
+  </nol-menu>
+</ng-template>

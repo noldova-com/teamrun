@@ -1,0 +1,47 @@
+{
+  "name": "@noldova/teamrun.core",
+  "version": "__VERSION__",
+  "private": true,
+  "description": "TeamRun's chat engine: projects, conversations, members, messages and their replies, approvals, attachments, providers and teammates, kept in SQLite, and the contract its provider adapters implement.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noldova-com/teamrun.git",
+    "directory": "src/noldova.teamrun.core"
+  },
+  "homepage": "https://github.com/noldova-com/teamrun#readme",
+  "bugs": {
+    "url": "https://github.com/noldova-com/teamrun/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./api/index.d.ts",
+      "default": "./api/index.js"
+    },
+    "./testing": {
+      "types": "./api/testing.d.ts",
+      "default": "./api/testing.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "**/*.js",
+    "**/*.js.map",
+    "api/index.d.ts",
+    "api/testing.d.ts"
+  ],
+  "dependencies": {
+    "@noldova/teamrun.protocol": "__VERSION__",
+    "@noldova/teamrun.services": "__VERSION__"
+  },
+  "peerDependencies": {
+    "@noldova/checkpoints.protocol": "0.0.3",
+    "@noldova/context.core": ">=0.0.8 <0.1.0",
+    "@noldova/context.data": ">=0.0.8 <0.1.0",
+    "@noldova/context.data.sql": ">=0.0.8 <0.1.0",
+    "@noldova/context.data.sql.sqlite": ">=0.0.8 <0.1.0",
+    "@noldova/context.exceptions": ">=0.0.8 <0.1.0",
+    "@noldova/context.json": ">=0.0.8 <0.1.0"
+  }
+}

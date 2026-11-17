@@ -1,0 +1,106 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  border: var(--nol-border-width) solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background-color: var(--nol-code);
+  color: var(--nol-text);
+}
+
+.header {
+  display: flex;
+  gap: var(--nol-space-2);
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--nol-code-header-height);
+  padding: 0 var(--nol-space-3);
+  border: 0;
+  background-color: var(--nol-code-header);
+  color: var(--nol-text);
+  font: inherit;
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  text-align: start;
+  cursor: pointer;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-weight: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name.unavailable {
+  opacity: 0.5;
+}
+
+.avatar,
+.time {
+  flex-shrink: 0;
+}
+
+.time {
+  color: var(--nol-text-muted);
+}
+
+:host(.authored) .header {
+  padding-inline: calc((var(--nol-code-header-height) - var(--nol-icon-button)) / 2)
+    calc((var(--nol-code-header-height) + var(--nol-icon-button-target)) / 2 + var(--nol-space-2));
+}
+
+:host(.authored) .progress {
+  margin-inline-start: auto;
+}
+
+.glyph,
+.progress,
+.chevron {
+  flex-shrink: 0;
+  color: var(--nol-text-muted);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  padding: calc(0.875rem - var(--nol-border-width)) 0.875rem 0.875rem;
+  border-top: var(--nol-border-width) solid var(--nol-card-border);
+}
+
+.actions {
+  display: flex;
+  padding: calc(var(--nol-space-2) - var(--nol-border-width)) 0.875rem var(--nol-space-2);
+  border-top: var(--nol-border-width) solid var(--nol-card-border);
+}
+
+:host(.selected) .header {
+  background-color: var(--nol-code-header-raised);
+}
+
+:host(.selected) .body {
+  background-color: var(--nol-panel);
+}

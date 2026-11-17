@@ -1,0 +1,70 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+}
+
+.nol-teamrun-first-teammate {
+  padding: var(--nol-space-3);
+  border: var(--nol-border-width) solid var(--nol-accent);
+  border-radius: var(--nol-radius-medium);
+}
+
+.nol-teamrun-first-teammate-title,
+.nol-teamrun-field-label {
+  color: var(--nol-text);
+  font-size: var(--nol-text-small);
+  font-weight: var(--nol-weight-strong);
+}
+
+.nol-teamrun-first-teammate-title {
+  margin: 0;
+}
+
+.nol-teamrun-first-teammate-text,
+.nol-teamrun-first-teammate-defaults {
+  margin: 0;
+}
+
+.nol-teamrun-first-teammate-name {
+  display: grid;
+  align-items: center;
+}
+
+.nol-teamrun-first-teammate-name > * {
+  grid-area: 1 / 1;
+}
+
+.nol-teamrun-first-teammate-name > input.nol-teamrun-teammate-name {
+  box-sizing: border-box;
+  width: 100%;
+  padding-inline-end: 50%;
+}
+
+.nol-teamrun-first-teammate-mention {
+  box-sizing: border-box;
+  justify-self: end;
+  max-width: 50%;
+  overflow: hidden;
+  padding-inline-end: var(--nol-space-2);
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nol-teamrun-first-teammate-defaults > button {
+  margin-inline-start: calc(var(--nol-button-padding) * -1 + var(--nol-space-1));
+}
+
+.nol-teamrun-first-teammate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nol-space-2);
+}

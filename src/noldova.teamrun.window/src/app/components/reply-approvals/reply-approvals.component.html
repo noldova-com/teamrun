@@ -1,0 +1,19 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@for (item of approvals(); track item.approval.id) {
+  @if (item.approval.id === lowRiskApprovalId() && lowRiskLine(); as line) {
+    <p class="nol-teamrun-low-risk-line"><span class="nol-teamrun-low-risk-glyph material-symbols-rounded" aria-hidden="true">{{ resources.lowRiskIcon }}</span><span class="nol-teamrun-low-risk-text">{{ line }}</span></p>
+  }
+  @if (item.request; as request) {
+    <nol-permission-card [request]="request" [detailLines]="resources.permissionDetailLines" [attr.data-nol-teamrun-approval]="request.id" (decide)="decide(request.id, $event)" (focusin)="focused.emit(request.id)" />
+  } @else {
+    <nol-teamrun-question-card [approval]="item.approval" [attr.data-nol-teamrun-approval]="item.approval.id" [requester]="requester()"
+      [answer]="item.answer" (answered)="answer(item.approval.id, $event)" (skipped)="skip(item.approval.id)" (focusin)="focused.emit(item.approval.id)" />
+  }
+}

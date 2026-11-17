@@ -1,0 +1,79 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<ng-template #card let-card>
+  <li class="sub-agent" [class.sub-agent-selected]="card.shows(selected())" (click)="choose(card)">
+    <div class="sub-agent-top">
+      @if (card.agent.isRunning) {
+        <nol-spinner class="sub-agent-status" [label]="resources.runningTasksTitle" />
+      } @else {
+        <span class="sub-agent-status sub-agent-glyph material-symbols-rounded" [attr.data-status]="card.agent.status" aria-hidden="true">{{ glyphOf(card) }}</span>
+      }
+      <nol-avatar class="sub-agent-mark" [name]="card.author" [initials]="card.initials" [color]="card.color" [size]="small" [unavailable]="card.isAuthorUnavailable"
+        [decorative]="true" />
+      <button type="button" class="sub-agent-description" [attr.aria-current]="card.shows(selected()) ? 'true' : null">{{ card.agent.description }}</button>
+      @if (stops().get(card.key); as task) {
+        <button type="button" nol-icon-button class="sub-agent-stop" [icon]="resources.stopGlyph" [label]="resources.formatStopSubAgent(card.agent.description)"
+          [nolTooltip]="card.stopRefusal ?? resources.stopSubAgentLabel" [disabled]="tasks.stopping().has(task.id)"
+          [attr.aria-disabled]="card.stopRefusal ? 'true' : null" (click)="stop($event, card, task)"></button>
+      }
+    </div>
+    <div class="sub-agent-meta">
+      @for (part of metaOf(card); track $index) {
+        <span>{{ part }}</span>
+      }
+      @if (card.agent.isBackground) {
+        <span class="sub-agent-background">{{ resources.backgroundSubAgentLabel }}</span>
+      }
+    </div>
+    @if (stops().get(card.key); as task) {
+      @if (tasks.stopErrors().get(task.id); as error) {
+        <p class="sub-agent-error" role="alert">{{ error }}</p>
+      }
+    }
+    @if (!card.agent.isRunning && card.agent.summary; as summary) {
+      <p class="sub-agent-summary">{{ summary }}</p>
+    }
+    @if (card.shows(selected())) {
+      <button type="button" nol-button class="sub-agent-open" [variant]="text">{{ resources.openTranscriptLabel }}</button>
+    }
+  </li>
+</ng-template>
+
+@if (finished().length > 0) {
+  <section class="sub-agents-group" [attr.aria-labelledby]="id + '-finished'">
+    <span class="sub-agents-heading" role="heading" [attr.aria-level]="resources.backgroundTasksHeadingLevel" [id]="id + '-finished'">{{ resources.finishedTasksTitle }}</span>
+    <ul class="sub-agents-list">
+      @for (item of finished(); track item.key) {
+        <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ $implicit: item }" />
+      }
+    </ul>
+  </section>
+}
+@if (running().length > 0) {
+  <section class="sub-agents-group" [attr.aria-labelledby]="id + '-running'">
+    <span class="sub-agents-heading" role="heading" [attr.aria-level]="resources.backgroundTasksHeadingLevel" [id]="id + '-running'">{{ resources.runningTasksTitle }}</span>
+    <ul class="sub-agents-list">
+      @for (item of running(); track item.key) {
+        <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ $implicit: item }" />
+      }
+    </ul>
+  </section>
+}
+@if (isEmpty()) {
+  <p class="sub-agents-empty">{{ resources.noSubAgentsText }}</p>
+}
+@if (history.loading()) {
+  <p class="sub-agents-loading" role="status">{{ resources.replyHistoryLoading }}</p>
+}
+@if (history.error(); as error) {
+  <div class="sub-agents-failure">
+    <p class="sub-agents-error" role="alert">{{ error }}</p>
+    <button type="button" nol-button [variant]="text" (click)="history.retry()">{{ resources.replyHistoryRetry }}</button>
+  </div>
+}

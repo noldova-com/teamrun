@@ -1,0 +1,118 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-page-toolbar" nolToolbar [nolToolbarLabel]="resources.toolbarLabel">
+  <button nol-toolbar-button nolToolbarItem type="button" data-action="reload" [label]="resources.reload" [icon]="resources.reloadGlyph"
+    [nolTooltip]="resources.reload" [nolTooltipSide]="below" (click)="reload()"></button>
+  <div class="nol-teamrun-page-title" nolToolbarItem role="group" [attr.aria-label]="name()" [nolTooltip]="name()" [nolTooltipDescription]="authors()"
+    [nolTooltipSide]="below" [nolTooltipTruncated]="true">
+    <span class="nol-teamrun-page-name" data-truncates>{{ name() }}</span>
+    <span class="nol-teamrun-page-authors" data-truncates>{{ authors() }}</span>
+  </div>
+  @if (view(); as current) {
+    <button nol-toolbar-button nolToolbarItem type="button" data-action="open" [label]="resources.openInBrowser" [icon]="resources.openGlyph"
+      [nolTooltip]="resources.openInBrowser" [nolTooltipSide]="below" (click)="openInBrowser(current)"></button>
+    <button nol-toolbar-button nolToolbarItem type="button" data-action="save" [label]="resources.saveAsFile" [icon]="resources.saveGlyph"
+      [nolTooltip]="resources.saveAsFile" [nolTooltipSide]="below" (click)="save(current)"></button>
+    <button nol-toolbar-button nolToolbarItem type="button" data-action="print" [label]="resources.print" [icon]="resources.printGlyph"
+      [nolTooltip]="printTooltip" [nolTooltipSide]="below" (click)="openInBrowser(current)"></button>
+  } @else {
+    <button nol-toolbar-button nolToolbarItem type="button" data-action="open" [label]="resources.openInBrowser" [icon]="resources.openGlyph"
+      [isUnavailable]="true" [nolTooltip]="resources.openInBrowser" [nolTooltipSide]="below"></button>
+    <button nol-toolbar-button nolToolbarItem type="button" data-action="save" [label]="resources.saveAsFile" [icon]="resources.saveGlyph"
+      [isUnavailable]="true" [nolTooltip]="resources.saveAsFile" [nolTooltipSide]="below"></button>
+    <button nol-toolbar-button nolToolbarItem type="button" data-action="print" [label]="resources.print" [icon]="resources.printGlyph"
+      [isUnavailable]="true" [nolTooltip]="printTooltip" [nolTooltipSide]="below"></button>
+  }
+  <button #more nol-toolbar-button nolToolbarItem type="button" data-action="more" [label]="resources.more" [icon]="resources.moreGlyph"
+    [nolTooltip]="resources.more" [nolTooltipSide]="below" [nolMenuTriggerFor]="moreMenu" [nolMenuAlignment]="end"></button>
+</div>
+<ng-template #moreMenu>
+  <nol-menu>
+    @if (view(); as current) {
+      @if (clipboard; as writer) {
+        <button nol-menu-item [label]="resources.copyPath" [icon]="resources.copyGlyph" (triggered)="copyPath(writer, current)"></button>
+      }
+      <button nol-menu-item [label]="resources.showInFolder" [icon]="resources.folderGlyph" (triggered)="showInFolder(current)"></button>
+      <button nol-menu-item [label]="resources.versions" [icon]="resources.versionsGlyph" [tag]="current.versions.length.toString()"
+        [nolMenuTriggerFor]="versionsMenu"></button>
+    } @else {
+      @if (clipboard) {
+        <button nol-menu-item [label]="resources.copyPath" [icon]="resources.copyGlyph" [disabled]="true"></button>
+      }
+      <button nol-menu-item [label]="resources.showInFolder" [icon]="resources.folderGlyph" [disabled]="true"></button>
+      <button nol-menu-item [label]="resources.versions" [icon]="resources.versionsGlyph" [disabled]="true"></button>
+    }
+    <nol-menu-separator />
+    <button nol-menu-item [label]="resources.zoomIn" [icon]="resources.zoomInGlyph" [shortcut]="zoomInShortcut" [disabled]="view() === null" (triggered)="zoom(1)"></button>
+    <button nol-menu-item [label]="resources.zoomOut" [icon]="resources.zoomOutGlyph" [shortcut]="zoomOutShortcut" [disabled]="view() === null" (triggered)="zoom(-1)"></button>
+    <button nol-menu-item [label]="resources.actualSize" [icon]="resources.actualSizeGlyph" [shortcut]="actualSizeShortcut" [disabled]="view() === null" (triggered)="zoom(0)"></button>
+    <nol-menu-separator />
+    <button nol-menu-item [label]="resources.closePage" [icon]="resources.closeGlyph" [shortcut]="closeShortcut" (triggered)="close()"></button>
+  </nol-menu>
+</ng-template>
+<ng-template #versionsMenu>
+  <nol-menu>
+    <nol-menu-group [label]="resources.versionsHeading" [uppercase]="true">
+      @if (view(); as current) {
+        @for (version of current.versions; track version.version) {
+          <button nol-menu-item [label]="versionRow(version)" [description]="versionMeta(version, current)" [checked]="version.version === current.version"
+            (triggered)="showVersion(version, current)"></button>
+        }
+      }
+    </nol-menu-group>
+    <nol-menu-separator />
+    <button nol-menu-item [label]="resources.keptVersions" [disabled]="true"></button>
+  </nol-menu>
+</ng-template>
+@if (view(); as shown) {
+  @if (isOlder()) {
+    <div class="nol-teamrun-page-bar" role="status">
+      <span class="nol-teamrun-page-bar-glyph material-symbols-rounded" aria-hidden="true">{{ resources.versionsGlyph }}</span>
+      <p class="nol-teamrun-page-bar-message">{{ olderText(shown) }}</p>
+      <span class="nol-teamrun-page-bar-actions">
+        <button nol-button type="button" data-action="restore" [variant]="secondary" (click)="restore(shown)">{{ resources.restore }}</button>
+        <button nol-button type="button" data-action="current" [variant]="quiet" (click)="reload()">{{ resources.backToCurrent }}</button>
+      </span>
+    </div>
+  } @else if (updatedBy(); as page) {
+    <div class="nol-teamrun-page-bar" role="status">
+      <span class="nol-teamrun-page-bar-glyph material-symbols-rounded" aria-hidden="true">{{ resources.updatedGlyph }}</span>
+      <p class="nol-teamrun-page-bar-message">{{ updatedText(page) }}</p>
+      <span class="nol-teamrun-page-bar-actions">
+        <button nol-button type="button" data-action="dismiss" [variant]="quiet" (click)="updatedBy.set(null)">{{ resources.dismiss }}</button>
+      </span>
+    </div>
+  }
+}
+@if (isOffline()) {
+  <div class="nol-teamrun-page-bar nol-teamrun-page-bar-warning" role="status">
+    <span class="nol-teamrun-page-bar-glyph material-symbols-rounded" aria-hidden="true">{{ resources.offlineGlyph }}</span>
+    <p class="nol-teamrun-page-bar-message">{{ resources.offline }}</p>
+    <span class="nol-teamrun-page-bar-actions">
+      <button nol-button type="button" data-action="offline-reload" [variant]="secondary" (click)="reload()">{{ resources.reload }}</button>
+    </span>
+  </div>
+}
+@if (failure(); as failure) {
+  <div class="nol-teamrun-page-bar nol-teamrun-page-bar-warning" role="alert">
+    <p class="nol-teamrun-page-bar-message">{{ failure }}</p>
+  </div>
+}
+<div class="nol-teamrun-page-area">
+  @if (isStopped() || isUnopened()) {
+    <div class="nol-teamrun-page-state">
+      <span class="nol-teamrun-page-state-glyph material-symbols-rounded" aria-hidden="true">{{ resources.stoppedGlyph }}</span>
+      <h2 class="nol-teamrun-page-state-heading">{{ isStopped() ? resources.stoppedHeading : resources.openFailedHeading }}</h2>
+      <p class="nol-teamrun-page-state-detail">{{ isStopped() ? resources.stoppedDetail : resources.openFailedDetail }}</p>
+      <button nol-button type="button" data-action="restart" [variant]="primary" (click)="reload()">{{ resources.reload }}</button>
+    </div>
+  } @else {
+    <div #placeholder class="nol-teamrun-page-view"></div>
+  }
+</div>

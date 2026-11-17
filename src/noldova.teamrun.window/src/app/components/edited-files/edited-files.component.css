@@ -1,0 +1,144 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  box-sizing: border-box;
+  min-width: 0;
+  border: var(--nol-border-width) solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background-color: var(--nol-raised);
+  color: var(--nol-text);
+  font-size: var(--nol-text-message);
+  line-height: var(--nol-line-message);
+  overflow-wrap: anywhere;
+}
+
+.header {
+  display: flex;
+  gap: var(--nol-space-3);
+  align-items: center;
+  padding: var(--nol-space-2) var(--nol-space-4);
+}
+
+.files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--nol-border-width) solid var(--nol-card-border);
+}
+
+.files > li + li {
+  border-top: var(--nol-border-width) solid var(--nol-card-border);
+}
+
+.file {
+  display: flex;
+  gap: var(--nol-space-1);
+  align-items: center;
+  padding-inline-end: var(--nol-space-4);
+}
+
+.name {
+  display: flex;
+  flex: 1;
+  gap: var(--nol-space-3);
+  align-items: center;
+  min-width: 0;
+  min-height: var(--nol-pointer-target);
+  padding: var(--nol-space-2) var(--nol-space-4);
+  border: 0;
+  background: none;
+  color: var(--nol-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.name:disabled {
+  cursor: default;
+}
+
+.label {
+  display: flex;
+  flex: 1;
+  gap: var(--nol-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glyph {
+  flex-shrink: 0;
+  color: var(--nol-text-muted);
+}
+
+.directory {
+  color: var(--nol-text-muted);
+}
+
+.kind {
+  flex-shrink: 0;
+  color: var(--nol-text-muted);
+}
+
+.added {
+  color: var(--nol-added);
+}
+
+.removed {
+  margin-inline-start: var(--nol-space-1);
+  color: var(--nol-removed);
+}
+
+.diff {
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr);
+  max-height: 24rem;
+  overflow: auto;
+  padding: var(--nol-space-2) 0;
+  border-top: var(--nol-border-width) solid var(--nol-card-border);
+  font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-code);
+  line-height: var(--nol-line-code);
+  white-space: pre;
+}
+
+.diff.wrapped {
+  grid-template-columns: minmax(0, 1fr);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff > div {
+  padding-inline: var(--nol-space-4);
+}
+
+.added-line {
+  background-color: var(--nol-added-background);
+}
+
+.removed-line {
+  background-color: var(--nol-removed-background);
+}
+
+.meta-line {
+  color: var(--nol-text-muted);
+}
+
+.more {
+  display: flex;
+  padding: var(--nol-space-1);
+}

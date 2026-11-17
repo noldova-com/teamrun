@@ -1,0 +1,18 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<span #meter class="nol-teamrun-context-gauge" [class.nol-teamrun-context-track-only]="trackOnly()" role="meter" tabindex="0" aria-valuemin="0" aria-valuemax="100"
+  [attr.aria-valuenow]="percent()" [attr.aria-valuetext]="label()" [attr.aria-label]="trackOnly() ? hint() : detail()" [nolTooltip]="hint()">
+  <span #track class="nol-teamrun-context-track" aria-hidden="true">
+    <span class="nol-teamrun-context-fill" [style.inline-size.%]="percent()"></span>
+    @if (compactAt() !== null) {
+      <span class="nol-teamrun-context-compact" [style.inset-inline-start.%]="compactAt()"></span>
+    }
+  </span>
+  <span #text class="nol-teamrun-context-text">{{ label() }}</span>
+</span>

@@ -1,0 +1,356 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.nol-teamrun-settings-view {
+  container-type: inline-size;
+}
+
+.nol-teamrun-shared-mcp-secrets-saved {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+}
+
+.nol-teamrun-shared-mcp-secrets-saved-text {
+  flex: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-title {
+  margin: 0;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-title);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-title);
+}
+
+.nol-teamrun-mcp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--nol-teamrun-mcp-details-width);
+  grid-template-rows: auto auto auto 1fr;
+  align-items: start;
+  column-gap: var(--nol-space-4);
+  row-gap: var(--nol-space-2);
+
+  --nol-teamrun-mcp-details-width: 21rem;
+}
+
+.nol-teamrun-mcp-layout > * {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.nol-teamrun-mcp-layout > .nol-teamrun-mcp-details {
+  grid-row: 2 / -1;
+  grid-column: 2;
+}
+
+.nol-teamrun-own-mcp-head {
+  margin-block-start: var(--nol-space-4);
+}
+
+@container (width < 48rem) {
+  .nol-teamrun-mcp-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+  }
+
+  .nol-teamrun-mcp-layout > .nol-teamrun-mcp-details {
+    grid-row: auto;
+    grid-column: 1;
+  }
+}
+
+.nol-teamrun-mcp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nol-space-4);
+}
+
+.nol-teamrun-mcp-head-text {
+  min-width: 0;
+}
+
+.nol-teamrun-mcp-heading {
+  margin: 0;
+  color: var(--nol-text-strong);
+  font-size: inherit;
+  font-weight: var(--nol-weight-emphasis);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-hint {
+  margin: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-list {
+  display: block;
+  overflow: hidden;
+}
+
+.nol-teamrun-mcp-row {
+  display: grid;
+  box-sizing: border-box;
+  align-items: center;
+  width: 100%;
+  min-height: 3.25rem;
+  column-gap: var(--nol-space-3);
+  margin: 0;
+  padding: var(--nol-space-2) var(--nol-space-3);
+  border: 0;
+  border-block-start: var(--nol-border-width) solid var(--nol-card-border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+.nol-teamrun-mcp-row:first-child {
+  border-block-start: 0;
+}
+
+.nol-teamrun-mcp-row-note {
+  display: flex;
+  gap: var(--nol-space-1);
+  min-height: 0;
+}
+
+.nol-teamrun-shared-mcp-row {
+  grid-template-columns: 0.5rem minmax(9rem, 1fr) minmax(11rem, 1.2fr) var(--nol-icon);
+  cursor: pointer;
+}
+
+.nol-teamrun-shared-mcp-row:hover {
+  background: var(--nol-hover);
+}
+
+.nol-teamrun-mcp-row-chosen,
+.nol-teamrun-mcp-row-chosen:hover {
+  background: var(--nol-selected);
+}
+
+.nol-teamrun-shared-mcp-row:is(:focus-visible, [data-nol-state="Focus"]) {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+@media (forced-colors: active) {
+  .nol-teamrun-shared-mcp-row:is(:focus-visible, [data-nol-state="Focus"]) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+
+  .nol-teamrun-mcp-row-chosen {
+    outline: var(--nol-border-width) solid Highlight;
+    outline-offset: calc(var(--nol-border-width) * -1);
+  }
+}
+
+.nol-teamrun-shared-mcp-row > .nol-teamrun-status-dot {
+  margin: 0;
+}
+
+.nol-teamrun-shared-mcp-server {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nol-teamrun-item-name {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-sub {
+  color: var(--nol-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-shared-mcp-state {
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+}
+
+.nol-teamrun-mcp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.nol-teamrun-mcp-chevron {
+  justify-self: end;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-icon);
+}
+
+.nol-teamrun-own-mcp-row {
+  grid-template-columns: minmax(8rem, 0.8fr) minmax(12rem, 1.4fr) var(--nol-switch-width);
+}
+
+.nol-teamrun-own-mcp-servers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.nol-teamrun-own-mcp-held .nol-teamrun-own-mcp-name {
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.nol-teamrun-mcp-note {
+  display: block;
+  color: var(--nol-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-unread,
+.nol-teamrun-mcp-sub.nol-teamrun-mcp-unread {
+  color: var(--nol-error);
+}
+
+.nol-teamrun-mcp-row-note > .nol-teamrun-mcp-note {
+  flex: auto;
+  min-width: 0;
+}
+
+.nol-teamrun-mcp-link {
+  vertical-align: baseline;
+}
+
+.nol-teamrun-mcp-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  margin: 0;
+  padding: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-4);
+  padding: var(--nol-space-4);
+}
+
+.nol-teamrun-mcp-details-head,
+.nol-teamrun-mcp-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.nol-teamrun-mcp-details-name {
+  font-size: var(--nol-text-title);
+  line-height: var(--nol-line-title);
+}
+
+.nol-teamrun-shared-mcp-command {
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+}
+
+.nol-teamrun-shared-mcp-sign-in {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--nol-space-1);
+}
+
+.nol-teamrun-shared-mcp-sign-in > .nol-teamrun-status-dot {
+  margin-inline-end: var(--nol-space-1);
+}
+
+.nol-teamrun-shared-mcp-sign-in-state {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-group-heading {
+  margin: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-label);
+}
+
+.nol-teamrun-mcp-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 1.5rem;
+  column-gap: var(--nol-space-2);
+}
+
+.nol-teamrun-mcp-line-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-fold {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  padding-block-start: var(--nol-space-1);
+  border-block-start: var(--nol-border-width) dashed var(--nol-card-border);
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-mcp-reason-groups {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-reach-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-1) var(--nol-space-2);
+}
+
+.nol-teamrun-shared-mcp-exception-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--nol-space-1) var(--nol-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nol-teamrun-shared-mcp-exception {
+  display: contents;
+}
+
+.nol-teamrun-shared-mcp-teammate-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-mcp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nol-space-2);
+}

@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "agents": [
+    {
+      "id": "e2e-registry-agent",
+      "name": "Registry double agent",
+      "version": "1.0.0",
+      "description": "An agent the end-to-end registry double lists",
+      "authors": ["Registry double"],
+      "license": "MIT",
+      "license_url": "https://e2e-registry-agent.example.invalid/LICENSE",
+      "distribution": {
+        "npx": {
+          "package": "e2e-registry-agent@1.0.0",
+          "args": ["--acp"]
+        }
+      },
+      "icon": "https://cdn.agentclientprotocol.com/registry/v1/latest/e2e-registry-agent.svg"
+    }
+  ],
+  "extensions": []
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@noldova/teamrun.protocol",
+  "version": "__VERSION__",
+  "private": true,
+  "description": "TeamRun's protocol: the chat models, the methods with their parameters and results, and the events.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noldova-com/teamrun.git",
+    "directory": "src/noldova.teamrun.protocol"
+  },
+  "homepage": "https://github.com/noldova-com/teamrun#readme",
+  "bugs": {
+    "url": "https://github.com/noldova-com/teamrun/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./api/index.d.ts",
+      "default": "./api/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "**/*.js",
+    "**/*.js.map",
+    "api/index.d.ts"
+  ],
+  "dependencies": {
+    "@noldova/teamrun.services": "__VERSION__"
+  },
+  "peerDependencies": {
+    "@noldova/context.core": ">=0.0.8 <0.1.0",
+    "@noldova/context.exceptions": ">=0.0.8 <0.1.0",
+    "@noldova/context.json": ">=0.0.8 <0.1.0"
+  }
+}

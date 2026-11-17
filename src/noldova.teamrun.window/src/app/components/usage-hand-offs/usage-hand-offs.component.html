@@ -1,0 +1,67 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (unavailableReasonId(); as reasonId) {
+  <div class="nol-teamrun-usage-hand-offs-off">
+    <span class="nol-teamrun-usage-hand-offs-heading" role="heading" [attr.aria-level]="resources.usageHandOffsHeadingLevel">{{ resources.usageHandOffsTitle }}</span>
+    <button type="button" nol-button class="nol-teamrun-add-usage-hand-off" [variant]="secondary" [disabled]="true"
+      [attr.aria-describedby]="reasonId">{{ resources.addUsageHandOffLabel }}</button>
+  </div>
+} @else {
+  <nol-configuration-table class="nol-teamrun-usage-hand-offs" [heading]="resources.usageHandOffsTitle" [explanation]="resources.usageHandOffsHint">
+    <button type="button" nol-button nolConfigurationTableAction class="nol-teamrun-add-usage-hand-off" [variant]="secondary" [disabled]="disabled() || !canAdd()" (click)="add()">
+      {{ resources.addUsageHandOffLabel }}</button>
+    <table nolConfigurationTable>
+      <thead>
+        <tr>
+          <th scope="col">{{ resources.usageHandOffPositionColumn }}</th>
+          <th scope="col" nolConfigurationTableFill>{{ resources.usageHandOffTeammateColumn }}</th>
+          <th scope="col">{{ resources.modelLabel }}</th>
+          <th scope="col" [nolConfigurationTableRowActions]="resources.actionsColumn"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (teammate of rows(); track teammate.id; let index = $index, first = $first, last = $last) {
+          <tr class="nol-teamrun-usage-hand-off">
+            <td class="nol-teamrun-muted">{{ index + 1 }}</td>
+            <td nolConfigurationTableFill>
+              <div class="nol-teamrun-usage-hand-off-stack">
+                @if (added().has(teammate.id)) {
+                  <nol-select class="nol-teamrun-usage-hand-off-teammate" [label]="resources.formatUsageHandOffField(index + 1)" [options]="options(teammate)"
+                    [value]="teammate.id" [disabled]="disabled()" (valueChange)="change(index, $event)" />
+                } @else {
+                  <div class="nol-teamrun-usage-hand-off-line nol-teamrun-usage-hand-off-name">{{ teammate.name }}</div>
+                }
+                <div class="nol-teamrun-usage-hand-off-line nol-teamrun-muted nol-teamrun-usage-hand-off-provider">{{ providerOf(teammate) }}</div>
+              </div>
+            </td>
+            <td>
+              <div class="nol-teamrun-usage-hand-off-stack nol-teamrun-usage-hand-off-model-stack">
+                <div class="nol-teamrun-usage-hand-off-line nol-teamrun-usage-hand-off-model">{{ modelOf(teammate) }}</div>
+                <div class="nol-teamrun-usage-hand-off-line nol-teamrun-muted nol-teamrun-usage-hand-off-effort">{{ effortOf(teammate) }}</div>
+              </div>
+            </td>
+            <td nolConfigurationTableRowActions>
+              <button type="button" nol-icon-button class="nol-teamrun-usage-hand-off-up" [icon]="resources.moveRowUpIcon" [label]="resources.formatMoveUp(teammate.name)"
+                [nolTooltip]="resources.moveUpLabel" [disabled]="disabled() || first" (click)="move(index, -1)"></button>
+              <button type="button" nol-icon-button class="nol-teamrun-usage-hand-off-down" [icon]="resources.moveRowDownIcon"
+                [label]="resources.formatMoveDown(teammate.name)" [nolTooltip]="resources.moveDownLabel" [disabled]="disabled() || last" (click)="move(index, 1)"></button>
+              <button type="button" nol-icon-button class="nol-teamrun-usage-hand-off-remove" [icon]="resources.closeIcon" [label]="resources.formatRemove(teammate.name)"
+                [nolTooltip]="resources.removeLabel" [disabled]="disabled()" (click)="remove(index)"></button>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="4" class="nol-teamrun-muted nol-teamrun-no-usage-hand-offs">{{ resources.usageHandOffsOff }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </nol-configuration-table>
+  @if (refusal(); as message) {
+    <nol-field-message class="nol-teamrun-usage-hand-offs-refusal">{{ message }}</nol-field-message>
+  }
+}

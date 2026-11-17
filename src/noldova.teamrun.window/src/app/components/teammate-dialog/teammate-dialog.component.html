@@ -1,0 +1,127 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="title()" [size]="medium" (dismissed)="dismiss()">
+  <form id="nol-teamrun-teammate-form" class="nol-teamrun-form" (submit)="save($event)">
+    @if (!choosesDefault()) {
+      <label class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.teammateNameLabel }}</span>
+        <input nol-text-field class="nol-teamrun-teammate-name" name="name" [attr.aria-label]="resources.teammateNameLabel" [value]="name()" [disabled]="saving()"
+          [attr.aria-describedby]="nameDescribedBy()" [attr.aria-invalid]="isNameMarked() ? true : null" (input)="editName($event)">
+        <span class="nol-teamrun-muted" [id]="nameHintId">{{ resources.teammateNameHint }}</span>
+      </label>
+    }
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.providerLabel }}</span>
+      <nol-select class="nol-teamrun-provider" [label]="resources.providerLabel" [options]="providerOptions()" [value]="providerId()"
+        [disabled]="saving() || providerOptions().length === 0" (valueChange)="changeProvider($event)" />
+    </div>
+    @if (store().enabledProviders().length === 0 && !teammate()) {
+      <span class="nol-teamrun-muted nol-teamrun-no-providers">{{ resources.noProvidersForTeammate }}</span>
+    }
+    <div class="nol-teamrun-field">
+      <div class="nol-teamrun-field-label-row">
+        <span class="nol-teamrun-field-label">{{ resources.modelLabel }}</span>
+        <button type="button" nol-button class="nol-teamrun-refresh" [variant]="text" [disabled]="loading() || !provider() || saving()"
+          (click)="loadModels(true)">{{ loading() ? resources.loadingModelsLabel : resources.refreshModelsLabel }}</button>
+      </div>
+      <nol-select class="nol-teamrun-model" [label]="resources.modelLabel" [options]="modelOptions()" [value]="modelValue()"
+        [disabled]="saving() || loading() || !provider() || (unlistedReason() !== null && !model())" (valueChange)="changeModel($event)" />
+    </div>
+    @if (catalog()?.failed) {
+      <span class="nol-teamrun-muted" role="status">{{ resources.modelCatalogUnavailable }}</span>
+    }
+    @if (unlistedReason()) {
+      <span class="nol-teamrun-muted" role="status">{{ unlistedReason() }}</span>
+    }
+    @if (planNote()) {
+      <span class="nol-teamrun-muted" role="status">{{ planNote() }}</span>
+    }
+    @if (effortRefusal(); as reason) {
+      <div class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.effortLabel }}</span>
+        <nol-select class="nol-teamrun-effort" [label]="resources.effortLabel" [options]="refusedEffortOptions" [value]="''" [disabled]="true"
+          [describedBy]="effortRefusalId" />
+        <span class="nol-teamrun-muted nol-teamrun-refusal" [id]="effortRefusalId">{{ reason }}</span>
+      </div>
+    } @else {
+      <div class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.effortLabel }}</span>
+        <nol-select class="nol-teamrun-effort" [label]="resources.effortLabel" [options]="effortOptions()" [value]="effortValue()"
+          [disabled]="saving() || loading() || !provider() || (efforts().length === 0 && !effort())" (valueChange)="changeEffort($event)" />
+      </div>
+      @if (effortNote()) {
+        <span class="nol-teamrun-muted nol-teamrun-effort-note" role="status">{{ effortNote() }}</span>
+      }
+    }
+    @if (speedRefusal(); as reason) {
+      <div class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.speedLabel }}</span>
+        <nol-select class="nol-teamrun-speed" [label]="resources.speedLabel" [options]="refusedSpeedOptions" [value]="''" [disabled]="true"
+          [describedBy]="speedRefusalId" />
+        <span class="nol-teamrun-muted nol-teamrun-refusal" [id]="speedRefusalId">{{ reason }}</span>
+      </div>
+    } @else if (hasSpeeds()) {
+      <div class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.speedLabel }}</span>
+        <nol-select class="nol-teamrun-speed" [label]="resources.speedLabel" [options]="speedOptions()" [value]="speedValue()"
+          [disabled]="saving() || loading()" (valueChange)="changeSpeed($event)" />
+      </div>
+    }
+    @if (windowRefusal(); as reason) {
+      <div class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.contextWindowLabel }}</span>
+        <nol-select class="nol-teamrun-context-window" [label]="resources.contextWindowLabel" [options]="refusedWindowOptions" [value]="''" [disabled]="true"
+          [describedBy]="windowRefusalId" />
+        <span class="nol-teamrun-muted nol-teamrun-refusal" [id]="windowRefusalId">{{ reason }}</span>
+      </div>
+    } @else if (hasWindows()) {
+      <div class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.contextWindowLabel }}</span>
+        <nol-select class="nol-teamrun-context-window" [label]="resources.contextWindowLabel" [options]="windowOptions()" [value]="windowValue()"
+          [describedBy]="windowHintId" [disabled]="saving() || loading()" (valueChange)="changeWindow($event)" />
+        @if (isCustomWindow()) {
+          <input nol-text-field class="nol-teamrun-context-window-size" name="contextWindow" [attr.aria-label]="resources.customContextWindowLabel"
+            [value]="customWindowText()" [disabled]="saving()" [attr.aria-describedby]="windowHintId"
+            [attr.aria-invalid]="isWindowMarked() ? true : null" (input)="editCustomWindow($event)">
+        }
+        <span class="nol-teamrun-muted" [id]="windowHintId">{{ windowHint() }}</span>
+      </div>
+    }
+    @if (hasModes()) {
+      <div class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.permissionModeLabel }}</span>
+        <nol-select class="nol-teamrun-mode" [label]="resources.permissionModeLabel" [options]="modeOptions()" [value]="modeValue()"
+          [describedBy]="modeDescribedBy()" [disabled]="saving() || loading()" (valueChange)="changeMode($event)" />
+        @if (selectedMode()?.description; as description) {
+          <span [id]="resources.modeHintId" class="nol-teamrun-muted">{{ description }}</span>
+        }
+        @if (modeRefusal(); as reason) {
+          <span class="nol-teamrun-muted nol-teamrun-refusal" [id]="modeRefusalId">{{ reason }}</span>
+        }
+      </div>
+    }
+    @if (!choosesDefault()) {
+      <nol-teamrun-sustain-settings [store]="store()" [providerId]="providerId()" [model]="model()" [effort]="savedEffort()" [disabled]="saving()"
+        [refusal]="sustainRefusal()" [sustain]="sustain()" (sustainChange)="chosenSustain.set($event)" [(fallbacks)]="fallbacks" [(resetsSoonestFirst)]="resetsSoonestFirst">
+        <nol-teamrun-usage-hand-offs [store]="store()" [teammateId]="teammate()?.id ?? null" [disabled]="saving()" [(handOffs)]="usageHandOffs" [refusal]="handOffsRefusal()"
+          [unavailableReasonId]="descriptor()?.reportsLimits === false ? resources.sustainReasonId : null" />
+      </nol-teamrun-sustain-settings>
+      <label class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.teammateRoleLabel }}</span>
+        <textarea nol-text-field class="nol-teamrun-teammate-role" name="role" [attr.aria-label]="resources.teammateRoleLabel" [rows]="resources.teammateRoleRows"
+          [value]="role()" [disabled]="saving()" (input)="editRole($event)"></textarea>
+      </label>
+    }
+    @if (sustainRefusal() === null && handOffsRefusal() === null ? error() : null; as message) {
+      <nol-field-message class="nol-teamrun-dialog-error" [attr.id]="nameMessageId">{{ message }}</nol-field-message>
+    }
+  </form>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" [disabled]="saving()" (click)="dismiss()">{{ first() ? resources.notNowLabel : resources.closeLabel }}</button>
+  <button type="submit" form="nol-teamrun-teammate-form" nol-button nolDialogAction class="nol-teamrun-save" [disabled]="!canSave()">{{ resources.saveLabel }}</button>
+</nol-dialog>

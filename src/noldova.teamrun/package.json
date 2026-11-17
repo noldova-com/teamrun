@@ -1,0 +1,53 @@
+{
+  "name": "@noldova/teamrun",
+  "version": "__VERSION__",
+  "private": true,
+  "description": "TeamRun's module for apps on Noldova Desktop: its declaration, module.json, its runtime part, its window part and its command-line part.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noldova-com/teamrun.git",
+    "directory": "src/noldova.teamrun"
+  },
+  "homepage": "https://github.com/noldova-com/teamrun#readme",
+  "bugs": {
+    "url": "https://github.com/noldova-com/teamrun/issues"
+  },
+  "exports": {
+    "./runtime": {
+      "types": "./api/index.d.ts",
+      "default": "./api/index.js"
+    },
+    "./window": {
+      "types": "./api/window.d.ts",
+      "default": "./api/window.js"
+    },
+    "./cli": {
+      "types": "./api/cli.d.ts",
+      "default": "./api/cli.js"
+    },
+    "./cli.json": "./cli.json",
+    "./menus.json": "./menus.json",
+    "./module.json": "./module.json",
+    "./settings.json": "./settings.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "**/*.js",
+    "**/*.js.map",
+    "api/index.d.ts",
+    "api/window.d.ts",
+    "api/cli.d.ts",
+    "module.json",
+    "menus.json",
+    "settings.json",
+    "cli.json",
+    "webViews.json"
+  ],
+  "dependencies": {
+    "@noldova/teamrun.cli": "__VERSION__",
+    "@noldova/teamrun.runtime": "__VERSION__",
+    "@noldova/teamrun.window": "__VERSION__"
+  }
+}

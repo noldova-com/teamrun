@@ -1,0 +1,136 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.nol-teamrun-acp-agents {
+  --nol-text-field-width: 100%;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--nol-space-3);
+  min-height: 0;
+  padding: var(--nol-document-padding-block) var(--nol-content-padding-inline);
+  overflow-y: auto;
+}
+
+.nol-teamrun-acp-muted {
+  margin: 0;
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-acp-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nol-teamrun-acp-agent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--nol-space-3);
+}
+
+.nol-teamrun-acp-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
+}
+
+.nol-teamrun-acp-mark {
+  background-color: currentColor;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+
+  @media (forced-colors: active) {
+    forced-color-adjust: none;
+    background-color: CanvasText;
+  }
+}
+
+.nol-teamrun-acp-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nol-radius-small);
+  background-color: var(--nol-hover);
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-acp-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-acp-version,
+.nol-teamrun-acp-not-checked {
+  margin-inline-start: var(--nol-space-2);
+}
+
+.nol-teamrun-acp-not-checked {
+  color: var(--nol-warning);
+}
+
+.nol-teamrun-acp-actions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.nol-teamrun-acp-progress {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  white-space: nowrap;
+}
+
+.nol-teamrun-acp-heading {
+  margin: var(--nol-space-4) 0 0;
+  color: var(--nol-text-strong);
+  font-size: inherit;
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.nol-teamrun-acp-form,
+.nol-teamrun-acp-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-acp-form {
+  gap: var(--nol-space-3);
+}
+
+.nol-teamrun-acp-variable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-acp-variable > input {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.nol-teamrun-acp-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nol-space-2);
+}

@@ -1,0 +1,24 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<span class="nol-teamrun-placeholder-mark" aria-hidden="true"></span>
+<p class="nol-teamrun-placeholder-text">{{ resources.noConversationText }}</p>
+<div class="nol-teamrun-placeholder-actions">
+  @if (store.loaded()) {
+    @if (store.providers().length === 0) {
+      <button type="button" nol-button class="nol-teamrun-placeholder-add-provider" (click)="addProvider()">{{ resources.addAProviderLabel }}</button>
+    }
+    <button type="button" nol-button class="nol-teamrun-placeholder-new-chat" [variant]="store.providers().length === 0 ? outlined : primary" (click)="startChat()"><span nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.newConversationIcon }}</span>{{ resources.newConversationLabel }}</button>
+    <button type="button" nol-button class="nol-teamrun-placeholder-open-folder" [variant]="outlined" (click)="openFolder()"><span nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.openProjectIcon }}</span>{{ resources.openFolderLabel }}</button>
+  }
+</div>
+<div class="nol-teamrun-placeholder-hints">
+  @for (hint of hints; track hint.label) {
+    <span class="nol-teamrun-placeholder-hint">{{ hint.label }}@for (name of hint.keys; track $index) {<nol-chip [kind]="key">{{ name }}</nol-chip>}</span>
+  }
+</div>

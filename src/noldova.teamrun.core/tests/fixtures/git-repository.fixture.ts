@@ -1,0 +1,38 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { execFileSync } from "node:child_process";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+export class GitRepository {
+  public readonly path: string;
+
+  public constructor(path: string) {
+    this.path = path;
+    mkdirSync(path, { recursive: true });
+    this.git("init", "-q");
+    appendFileSync(join(path, ".git", "config"), "[user]\n\temail = test@example.com\n\tname = TeamRun tests\n[core]\n\tautocrlf = false\n");
+  }
+
+  public write(name: string, content: string | Buffer): string {
+    const path = join(this.path, name);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+    return path;
+  }
+
+  public commit(message: string = "commit"): void {
+    this.git("add", "-A");
+    this.git("commit", "-q", "-m", message, "--allow-empty");
+  }
+
+  public git(...args: string[]): string {
+    return execFileSync("git", args, { cwd: this.path, encoding: "utf8", windowsHide: true });
+  }
+}

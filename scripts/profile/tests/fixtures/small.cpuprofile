@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    { "id": 1, "callFrame": { "functionName": "(root)", "scriptId": "0", "url": "", "lineNumber": -1, "columnNumber": -1 }, "children": [2, 5] },
+    { "id": 2, "callFrame": { "functionName": "main", "scriptId": "1", "url": "app://teamrun/app.js?v=1", "lineNumber": 8, "columnNumber": 0 }, "children": [3, 4] },
+    { "id": 3, "callFrame": { "functionName": "keep", "scriptId": "1", "url": "app://teamrun/app.js?v=1", "lineNumber": 9, "columnNumber": 4 } },
+    { "id": 4, "callFrame": { "functionName": "tokens", "scriptId": "2", "url": "app://teamrun/highlight.js", "lineNumber": 0, "columnNumber": 10 }, "children": [6] },
+    { "id": 5, "callFrame": { "functionName": "(idle)", "scriptId": "0", "url": "", "lineNumber": -1, "columnNumber": -1 } },
+    { "id": 6, "callFrame": { "functionName": "tokenizeLine2", "scriptId": "2", "url": "app://teamrun/highlight.js", "lineNumber": 2, "columnNumber": 0 } }
+  ],
+  "startTime": 1000,
+  "endTime": 16000,
+  "samples": [3, 3, 4, 6, 6, 6, 5, 2],
+  "timeDeltas": [1000, 2000, 2000, 500, 500, 500, 4000, 1000]
+}

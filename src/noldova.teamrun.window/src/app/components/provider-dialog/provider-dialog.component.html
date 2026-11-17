@@ -1,0 +1,99 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="title()" (dismissed)="dismiss()">
+  <form id="nol-teamrun-provider-form" class="nol-teamrun-form" (submit)="save($event)">
+    <span class="nol-teamrun-muted" nolDialogDescription>{{ hint() }}</span>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.kindLabel }}</span>
+      <nol-select class="nol-teamrun-kind" [label]="resources.kindLabel" [options]="kindOptions()" [value]="kind()"
+        [disabled]="saving() || provider() !== null" [describedBy]="kindRefusal() ? resources.kindRefusalId : null" (valueChange)="chooseKind($event)" />
+      @if (kindRefusal(); as reason) {
+        <span class="nol-teamrun-muted nol-teamrun-refusal" [id]="resources.kindRefusalId">{{ reason }}</span>
+      }
+      @if (install(); as row) {
+        <span class="nol-teamrun-install-row">
+          <span class="nol-teamrun-muted nol-teamrun-install-status" role="status">{{ row.status }}</span>
+          @if (row.canInstall || (row.isInstalling && !row.isUpdating)) {
+            <button type="button" nol-button class="nol-teamrun-install" [variant]="outlined" [busy]="row.isInstalling" [disabled]="!row.isInstalling && store().isBusy()"
+              (click)="installKind(row)">{{ resources.installLabel }}</button>
+          }
+          @if (row.canUpdate || row.isUpdating) {
+            <button type="button" nol-button class="nol-teamrun-update" [variant]="outlined" [busy]="row.isUpdating" [disabled]="!row.isUpdating && store().isBusy()"
+              (click)="installKind(row)">{{ resources.updateLabel }}</button>
+          }
+          @if (row.canCancelInstall) {
+            <button type="button" nol-button class="nol-teamrun-cancel-install" [variant]="text" (click)="cancelInstall(row)">{{ resources.cancelInstallLabel }}</button>
+          }
+          @if (row.subscribeUrl; as url) {
+            <button type="button" nol-button class="nol-teamrun-subscribe" [variant]="text" (click)="subscribe($event, url)" (auxclick)="subscribe($event, url)">{{ resources.subscribeLabel }}</button>
+          }
+        </span>
+      }
+    </div>
+    <div>
+      <label class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.providerNameLabel }}</span>
+        <input nol-text-field class="nol-teamrun-provider-name" name="label" [attr.aria-label]="resources.providerNameLabel" [placeholder]="resources.providerNameHint"
+          [value]="label()" [disabled]="saving()" [attr.aria-describedby]="namelessReason() ? nameMessageId + ' ' + hintId : hintId"
+          [attr.aria-invalid]="namelessReason() ? true : null" (input)="editLabel($event)">
+      </label>
+      @if (namelessLabel(); as reason) {
+        <nol-field-message class="nol-teamrun-name-message" [class.nol-teamrun-kept-hidden]="!makesFolder()" [attr.id]="makesFolder() ? nameMessageId : null">{{ reason }}</nol-field-message>
+      }
+    </div>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.profileFolderLabel }}</span>
+      @if (provider() === null) {
+        <nol-radio-group class="nol-teamrun-folder-choice" [label]="resources.profileFolderLabel" [value]="folderChoice()" [attr.aria-describedby]="hintId"
+          (valueChange)="folderChoice.set($event)">
+          <nol-radio class="nol-teamrun-new-folder" [value]="newFolderChoice" [disabled]="saving()">{{ resources.newFolderLabel }}</nol-radio>
+          <nol-radio class="nol-teamrun-existing-folder" [value]="existingFolderChoice" [disabled]="saving()">{{ resources.existingFolderLabel }}</nol-radio>
+        </nol-radio-group>
+        <div class="nol-teamrun-folder-panes">
+          <div class="nol-teamrun-folder-pane nol-teamrun-new-folder-pane" [class.nol-teamrun-kept-hidden]="!makesFolder()">
+            <span class="nol-teamrun-muted nol-teamrun-profile-hint" [attr.id]="makesFolder() ? hintId : null">{{ folderHint() }}@if (signInCommand(); as profile) {<ng-container
+              >{{ resources.hintSeparator + resources.newFolderCommandStart }}<code nol-inline-code>{{ profile.signInCommand }}</code
+              >{{ resources.newFolderCommandMiddle }}<code nol-inline-code>{{ profile.variable }}</code>{{ resources.newFolderCommandEnd }}</ng-container
+              >} @else {<ng-container>{{ signInText() }}</ng-container>}</span>
+          </div>
+          <div class="nol-teamrun-folder-pane" [class.nol-teamrun-kept-hidden]="makesFolder()">
+            <ng-container [ngTemplateOutlet]="folderRow" [ngTemplateOutletContext]="{ $implicit: resources.existingProfileFolderLabel }" />
+            <span class="nol-teamrun-muted nol-teamrun-profile-hint" [attr.id]="makesFolder() ? null : hintId">{{ kindHint() }}</span>
+          </div>
+        </div>
+      } @else {
+        <ng-container [ngTemplateOutlet]="folderRow" [ngTemplateOutletContext]="{ $implicit: resources.profileFolderLabel }" />
+      }
+    </div>
+    @if (provider() !== null) {
+      <span class="nol-teamrun-muted nol-teamrun-profile-hint" [id]="hintId">{{ kindHint() }}</span>
+    }
+    @if (choosesServerPath()) {
+      <label class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.binaryPathLabel }}</span>
+        <input nol-text-field class="nol-teamrun-binary-path" name="binaryPath" [attr.aria-label]="resources.binaryPathLabel" [value]="binaryPath()"
+          [disabled]="saving()" [attr.aria-describedby]="binaryHintId" (input)="editBinaryPath($event)">
+      </label>
+      <span class="nol-teamrun-muted nol-teamrun-binary-path-hint" [id]="binaryHintId">{{ resources.binaryPathHint }}</span>
+    }
+    @if (error(); as message) {
+      <nol-field-message class="nol-teamrun-dialog-error">{{ message }}</nol-field-message>
+    }
+  </form>
+  <ng-template #folderRow let-name>
+    <span class="nol-teamrun-field-row">
+      <input nol-text-field class="nol-teamrun-profile-folder" name="profileDir" [attr.aria-label]="name" [value]="profileDir()"
+        [disabled]="saving()" [attr.aria-describedby]="hintId" (input)="editProfileDir($event)">
+      <button type="button" nol-icon-button class="nol-teamrun-choose-folder" [icon]="resources.openProjectIcon" [label]="resources.chooseProfileLabel"
+        [disabled]="saving()" (click)="pickProfile()"></button>
+    </span>
+  </ng-template>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" [disabled]="saving()" (click)="dismiss()">{{ resources.closeLabel }}</button>
+  <button type="submit" form="nol-teamrun-provider-form" nol-button nolDialogAction class="nol-teamrun-save" [disabled]="!canSave()">{{ saveLabel() }}</button>
+</nol-dialog>

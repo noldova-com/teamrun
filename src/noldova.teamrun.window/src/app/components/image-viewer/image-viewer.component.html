@@ -1,0 +1,79 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-image-viewer" (click)="closeBackdrop($event)">
+  <header class="nol-teamrun-image-viewer-header">
+    <span class="nol-teamrun-image-viewer-title">
+      <span class="nol-teamrun-image-viewer-name" data-truncates [attr.id]="titleId()" [nolTooltip]="current().name" [nolTooltipTruncated]="true">{{ current().name }}</span>
+    </span>
+    <span class="nol-teamrun-image-viewer-actions">
+      @if (viewer().canCopy) {
+        <span class="nol-teamrun-image-viewer-chip">
+          <button type="button" nol-icon-button [overlay]="!embedded()" [backdrop]="true" [buttonHeight]="true" class="nol-teamrun-image-copy"
+            [icon]="copied.shown() ? resources.copiedImageGlyph : resources.copyImageGlyph" [label]="copied.shown() ? resources.copiedImageLabel : resources.copyImageLabel"
+            [nolTooltip]="copied.shown() ? resources.copiedImageLabel : resources.copyImageLabel" disabled [disabled]="!loaded()" [attr.aria-disabled]="viewer().copying() || null"
+            (click)="copy()"></button>
+        </span>
+      }
+      <span class="nol-teamrun-image-viewer-chip">
+        <button type="button" nol-icon-button [overlay]="!embedded()" [backdrop]="true" [buttonHeight]="true" class="nol-teamrun-image-download" [icon]="resources.downloadImageGlyph" [label]="resources.downloadImageLabel"
+          [nolTooltip]="resources.downloadImageLabel" disabled [disabled]="!loaded()" (click)="save()"></button>
+      </span>
+      @if (!embedded()) {
+        <span class="nol-teamrun-image-viewer-chip">
+          <button type="button" nol-icon-button [overlay]="true" [backdrop]="true" [buttonHeight]="true" class="nol-teamrun-image-close" [icon]="resources.closeIcon" [label]="resources.closeLabel"
+            [nolTooltip]="resources.closeLabel" (click)="closed.emit()"></button>
+        </span>
+      }
+    </span>
+  </header>
+  <span class="nol-teamrun-image-viewer-step nol-teamrun-image-viewer-previous" [class.nol-teamrun-image-viewer-step-unused]="data().images.length < 2">
+    <button #previous type="button" nol-icon-button [overlay]="!embedded()" [backdrop]="true" [buttonHeight]="true" class="nol-teamrun-image-previous" [icon]="resources.previousImageGlyph" [label]="resources.previousImageLabel"
+      [nolTooltip]="resources.previousImageLabel" [disabled]="index() === 0" (click)="move(-1)"></button>
+  </span>
+  <span class="nol-teamrun-image-viewer-step nol-teamrun-image-viewer-next" [class.nol-teamrun-image-viewer-step-unused]="data().images.length < 2">
+    <button #next type="button" nol-icon-button [overlay]="!embedded()" [backdrop]="true" [buttonHeight]="true" class="nol-teamrun-image-next" [icon]="resources.nextImageGlyph" [label]="resources.nextImageLabel"
+      [nolTooltip]="resources.nextImageLabel" [disabled]="index() === data().images.length - 1" (click)="move(1)"></button>
+  </span>
+  <div #viewport class="nol-teamrun-image-viewer-viewport">
+    <div class="nol-teamrun-image-viewer-canvas" (click)="closeBackdrop($event)">
+      @if (loaded(); as image) {
+        <img class="nol-teamrun-image-viewer-image" [src]="image.src" [alt]="current().name" draggable="false" [nolContextMenuTriggerFor]="menu"
+          [style.width.px]="loadedSize()!.width * zoom()" [style.height.px]="loadedSize()!.height * zoom()">
+      } @else {
+        <span class="nol-teamrun-image-viewer-status" role="status">{{ failed() ? resources.imageLoadFailed : resources.imageLoading }}</span>
+      }
+    </div>
+  </div>
+  <footer class="nol-teamrun-image-viewer-tools">
+    @if (error(); as error) {
+      <span class="nol-teamrun-image-viewer-error" role="alert">{{ error }}</span>
+    }
+    <span class="nol-teamrun-image-viewer-chip">
+      <button #zoomOut type="button" nol-icon-button [overlay]="!embedded()" [backdrop]="true" [buttonHeight]="true" class="nol-teamrun-zoom-out" [icon]="resources.zoomOutGlyph" [label]="resources.zoomOutLabel"
+        [nolTooltip]="resources.zoomOutLabel" disabled [disabled]="!loaded() || zoom() <= resources.imageMinimumZoom" (click)="changeZoom(false)"></button>
+    </span>
+    <span class="nol-teamrun-image-viewer-percent">
+      <button type="button" nol-button class="nol-teamrun-zoom-fit" [variant]="text" [overlay]="!embedded()" [backdrop]="true" [nolTooltip]="resources.fitImageLabel" disabled [disabled]="!loaded()"
+        (click)="fit()">{{ percent() }}%</button>
+    </span>
+    <span class="nol-teamrun-image-viewer-chip">
+      <button #zoomIn type="button" nol-icon-button [overlay]="!embedded()" [backdrop]="true" [buttonHeight]="true" class="nol-teamrun-zoom-in" [icon]="resources.zoomInGlyph" [label]="resources.zoomInLabel"
+        [nolTooltip]="resources.zoomInLabel" disabled [disabled]="!loaded() || zoom() >= resources.imageMaximumZoom" (click)="changeZoom(true)"></button>
+    </span>
+  </footer>
+</div>
+
+<ng-template #menu>
+  <nol-menu [attr.aria-label]="resources.imageMenuLabel">
+    @if (viewer().canCopy) {
+      <button type="button" nol-menu-item [label]="resources.copyImageLabel" [icon]="resources.copyImageGlyph" [disabled]="viewer().copying()" (triggered)="copy()"></button>
+    }
+    <button type="button" nol-menu-item [label]="resources.downloadImageLabel" [icon]="resources.downloadImageGlyph" (triggered)="save()"></button>
+  </nol-menu>
+</ng-template>

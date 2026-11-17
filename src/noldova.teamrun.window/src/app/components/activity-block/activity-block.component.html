@@ -1,0 +1,69 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<p class="summary">{{ summary() }}</p>
+@if (compact()) {
+  <ol class="steps">
+    @for (step of steps(); track step.sequence) {
+      <li>
+        <button type="button" class="step" data-nol-resizes-row [attr.aria-expanded]="isOpen(step)" (click)="toggle(step)">
+          <span class="step-glyph material-symbols-rounded" aria-hidden="true">{{ step.glyph }}</span>
+          <span class="step-title" [class.open]="isOpen(step)" [class.command]="step.isCommand">{{ step.title }}</span>
+          @if (step.isDenied) {
+            <span class="step-status">{{ resources.deniedStepLabel }}</span>
+          }
+        </button>
+        @if (isOpen(step) && step.body !== null) {
+          @if (step.isThought) {
+            <p class="step-thought">{{ step.body }}</p>
+          } @else {
+            <pre class="step-body" [class.failed]="step.isFailed">{{ shownBody(step, step.body) }}</pre>
+            @if (hasMore(step.body)) {
+              <button type="button" nol-button class="step-more" data-nol-resizes-row [variant]="text" [attr.aria-expanded]="showsAll(step)" (click)="toggleAll(step)">{{ showsAll(step) ? resources.showLessLabel : resources.showMoreLabel }}</button>
+            }
+          }
+        }
+      </li>
+    }
+  </ol>
+} @else {
+  <ol class="calls">
+    @for (row of rows(); track row.key) {
+      <li [attr.data-step]="row.key" [class.sub-agent-step]="subAgentSteps().has(row.key)">
+        @if (row.call; as call) {
+          <nol-tool-call [call]="call" [views]="viewsOf(call)" [childrenStep]="resources.activityChildrenStep" [shownTitles]="shownTitles()" [titleTooltip]="null" (viewsChange)="remember(call, $event)">
+            <ng-template nolToolCallOutput let-shown>
+              @if (plans().get(shown.id); as plan) {
+                <nol-plan class="sub-agent-plan" [plan]="plan" />
+              }
+              @if (shown.output; as output) {
+                <pre class="step-body sub-agent-output">{{ output }}</pre>
+              }
+              @if (pages().get(shown.id); as page) {
+                <button type="button" nol-button class="step-page" [variant]="text" [attr.aria-label]="resources.formatBrowserShowPage(page)" (click)="pageActivate.emit()">{{ page }}</button>
+              }
+              @if (screenshots().get(shown.id); as shot) {
+                <nol-teamrun-image-preview class="step-screenshot" [image]="shot" [showCaption]="false" />
+              }
+            </ng-template>
+          </nol-tool-call>
+        } @else {
+          <nol-markdown-view class="step-text" [text]="row.text" [mentions]="mentions()" [fileLinks]="true" [shellRuns]="shellRuns()"
+            [shellRunOutputs]="runOutputsOf(row.key)" [shellRunStates]="runStatesOf(row.key)" (linkOpen)="linkOpen.emit($event)" (fileActivate)="fileActivate.emit($event)"
+            (shellRun)="shellRun.emit({ run: $event, site: siteOf(row.key) })">
+            <ng-template nolShellRunOutput let-block>
+              @if (terminalOwner(); as owner) {
+                <nol-teamrun-inline-terminal [owner]="owner" [messageId]="message().id" [site]="siteOf(row.key)" [block]="block" />
+              }
+            </ng-template>
+          </nol-markdown-view>
+        }
+      </li>
+    }
+  </ol>
+}

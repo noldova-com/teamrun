@@ -1,0 +1,130 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.nol-teamrun-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-3);
+}
+
+.nol-teamrun-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+}
+
+.nol-teamrun-field > :is(input, textarea, nol-select) {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.nol-teamrun-install-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-install-status {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-field-label {
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nol-space-2);
+  margin-block: calc((var(--nol-line-panel) - var(--nol-button-height)) / 2);
+}
+
+.nol-teamrun-field-label-row > button {
+  flex: none;
+  margin-inline-end: calc(var(--nol-button-padding) * -1);
+}
+
+.nol-teamrun-field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-field-row > :first-child {
+  flex: auto;
+  min-width: 0;
+}
+
+.nol-teamrun-muted {
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-shared-mcp-values-head,
+.nol-teamrun-shared-mcp-value {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: baseline;
+  gap: var(--nol-space-1) var(--nol-space-2);
+  padding-block: var(--nol-space-2);
+  border-block-end: var(--nol-border-width) solid var(--nol-card-border);
+}
+
+.nol-teamrun-shared-mcp-values-head {
+  padding-block-start: 0;
+}
+
+.nol-teamrun-shared-mcp-variable {
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-shared-mcp-value-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.nol-teamrun-shared-mcp-value > nol-field-message {
+  grid-column: 2;
+  margin-top: 0;
+}
+
+.nol-teamrun-shared-mcp-reveal,
+.nol-teamrun-shared-mcp-change,
+.nol-teamrun-shared-mcp-remove {
+  flex: none;
+}
+
+.nol-teamrun-shared-mcp-moved {
+  margin: 0;
+}
+
+.nol-teamrun-folder-panes {
+  display: grid;
+  margin-top: var(--nol-space-1);
+}
+
+.nol-teamrun-folder-pane {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-3);
+  min-width: 0;
+}
+
+.nol-teamrun-new-folder-pane {
+  padding-top: var(--nol-space-1);
+}
+
+.nol-teamrun-kept-hidden {
+  visibility: hidden;
+}

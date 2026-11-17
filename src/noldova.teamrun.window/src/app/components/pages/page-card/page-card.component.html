@@ -1,0 +1,25 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (current(); as page) {
+  <span class="glyph material-symbols-rounded" aria-hidden="true">{{ resources.pageIcon }}</span>
+  <span class="text">
+    <span class="title" data-truncates [nolTooltip]="page.title" [nolTooltipTruncated]="true">{{ page.title }}</span>
+    @if (editing(); as editing) {
+      <span class="meta editing">
+        <nol-spinner class="spinner" [label]="editing" />
+        <span class="meta-text" data-truncates aria-hidden="true" [nolTooltip]="editing" [nolTooltipTruncated]="true">{{ editing }}</span>
+      </span>
+    } @else {
+      <span class="meta"><span class="meta-text" data-truncates [nolTooltip]="metaOf(page)" [nolTooltipTruncated]="true">{{ metaOf(page) }}</span></span>
+    }
+  </span>
+  @if (!isOpen()) {
+    <button type="button" nol-button class="open" [variant]="text" [attr.aria-label]="resources.formatOpen(page.title)" (click)="openPage(page)">{{ resources.openLabel }}</button>
+  }
+}

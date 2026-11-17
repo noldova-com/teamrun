@@ -1,0 +1,40 @@
+{
+  "name": "@noldova/teamrun.providers",
+  "version": "__VERSION__",
+  "private": true,
+  "description": "TeamRun's providers: the Claude, Codex, Grok, OpenCode, Cursor and fx agents and the ACP client, behind the chat engine's provider contract.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noldova-com/teamrun.git",
+    "directory": "src/noldova.teamrun.providers"
+  },
+  "homepage": "https://github.com/noldova-com/teamrun#readme",
+  "bugs": {
+    "url": "https://github.com/noldova-com/teamrun/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./api/index.d.ts",
+      "default": "./api/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "**/*.js",
+    "**/*.js.map",
+    "api/index.d.ts"
+  ],
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.263",
+    "@anthropic-ai/sdk": "0.127.0",
+    "@noldova/teamrun.core": "__VERSION__",
+    "@noldova/teamrun.protocol": "__VERSION__"
+  },
+  "peerDependencies": {
+    "@noldova/context.core": ">=0.0.8 <0.1.0",
+    "@noldova/context.exceptions": ">=0.0.8 <0.1.0",
+    "@noldova/context.json": ">=0.0.8 <0.1.0"
+  }
+}

@@ -1,0 +1,32 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (history.source(); as source) {
+  @if (source.length() > 0) {
+    <nol-virtual-list #list [source]="source" [label]="label()" [kind]="feed" [latest]="newestLast" [busy]="history.loading()" (positionChange)="remember($event)">
+      <ng-template [nolVirtualRow]="source" let-item let-index="index" let-labelId="labelId">
+        <nol-teamrun-reply-history-row [class.nol-teamrun-reply-first]="index === 0" [class.nol-teamrun-reply-last]="index === source.length() - 1"
+          [summary]="item" [panel]="panel()" [labelId]="labelId"
+          [selected]="item.preview.id === selectedId()" (resized)="keepPinned(source, list)"
+          (chosen)="choose(item)" />
+      </ng-template>
+    </nol-virtual-list>
+  }
+}
+@if (isEmpty()) {
+  <p class="nol-teamrun-reply-empty">{{ emptyText() }}</p>
+}
+@if (history.loading()) {
+  <p class="nol-teamrun-reply-loading" role="status">{{ resources.replyHistoryLoading }}</p>
+}
+@if (history.error(); as error) {
+  <div class="nol-teamrun-reply-failure">
+    <p class="nol-teamrun-reply-error" role="alert">{{ error }}</p>
+    <button type="button" nol-button [variant]="text" (click)="history.retry()">{{ resources.replyHistoryRetry }}</button>
+  </div>
+}

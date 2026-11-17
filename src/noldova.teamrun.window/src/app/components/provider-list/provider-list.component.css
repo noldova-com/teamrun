@@ -1,0 +1,305 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  height: auto;
+  min-height: auto;
+  overflow: visible;
+  container-type: inline-size;
+}
+
+.nol-teamrun-list-empty {
+  margin: 0;
+}
+
+.nol-teamrun-provider-groups {
+  display: grid;
+  grid-template-columns: [main-start] minmax(0, 1fr) [main-end plan-start] max-content [plan-end limits-start] repeat(3, max-content) [limits-end menu-start] max-content
+    [menu-end];
+}
+
+.nol-teamrun-group-head {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: var(--nol-space-2);
+  margin: 0 0 var(--nol-space-2);
+}
+
+.nol-teamrun-group-heading {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  margin: 0;
+  color: var(--nol-text);
+  font-size: var(--nol-text-small);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-label);
+}
+
+.nol-teamrun-provider-list + .nol-teamrun-group-head {
+  margin-block-start: var(--nol-space-4);
+}
+
+.nol-teamrun-group-count,
+.nol-teamrun-group-note {
+  color: var(--nol-text-muted);
+  font-weight: normal;
+}
+
+.nol-teamrun-group-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--nol-space-2);
+  height: var(--nol-line-label);
+}
+
+.nol-teamrun-provider-list {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: var(--nol-border-width) solid var(--nol-menu-border);
+  border-radius: var(--nol-radius-medium);
+  background-color: var(--nol-window);
+  list-style: none;
+}
+
+.nol-teamrun-item {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  padding: 0.5625rem var(--nol-space-3);
+}
+
+.nol-teamrun-item-failed {
+  background-color: color-mix(in srgb, var(--nol-error) 10%, transparent);
+}
+
+.nol-teamrun-item-warning {
+  background-color: color-mix(in srgb, var(--nol-warning) 10%, transparent);
+}
+
+.nol-teamrun-asking {
+  background-color: color-mix(in srgb, var(--nol-error) 10%, transparent);
+}
+
+.nol-teamrun-item + .nol-teamrun-item {
+  border-top: var(--nol-border-width) solid var(--nol-menu-border);
+}
+
+.nol-teamrun-name-cell {
+  display: flex;
+  grid-column: main;
+  align-items: flex-start;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.nol-teamrun-name-cell > .nol-teamrun-status-dot {
+  flex-shrink: 0;
+  margin-block-start: calc((1lh - 0.5rem) / 2);
+  margin-inline-end: 0;
+}
+
+.nol-teamrun-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nol-teamrun-item-title,
+.nol-teamrun-item-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.nol-teamrun-item-title {
+  gap: 0;
+}
+
+.nol-teamrun-question {
+  display: block;
+  color: var(--nol-text-muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-item-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+  text-overflow: ellipsis;
+}
+
+.nol-teamrun-account,
+.nol-teamrun-found-folder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nol-teamrun-account-note,
+.nol-teamrun-account-command {
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-account-command {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nol-teamrun-account-failed {
+  color: var(--nol-error);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-account-warning {
+  display: block;
+  color: var(--nol-warning);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+nol-chip.nol-teamrun-same-account {
+  flex-shrink: 0;
+  border-color: var(--nol-avatar-amber-text);
+  color: var(--nol-avatar-amber-text);
+}
+
+.nol-teamrun-plan-cell,
+.nol-teamrun-found-account {
+  grid-column: plan;
+  padding-inline-start: var(--nol-space-4);
+}
+
+.nol-teamrun-limits-cell,
+.nol-teamrun-found-state {
+  grid-column: limits;
+  padding-inline-start: var(--nol-space-4);
+}
+
+.nol-teamrun-limits-cell {
+  display: grid;
+  grid-template-columns: subgrid;
+  row-gap: var(--nol-space-1);
+}
+
+.nol-teamrun-limit {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  column-gap: var(--nol-space-2);
+}
+
+.nol-teamrun-limit-label {
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-no-limits {
+  grid-column: 1 / -1;
+}
+
+.nol-teamrun-found-state {
+  white-space: nowrap;
+}
+
+.nol-teamrun-menu-cell {
+  display: flex;
+  grid-column: menu;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--nol-space-2);
+  padding-inline-start: var(--nol-space-4);
+}
+
+.nol-teamrun-step-slot,
+.nol-teamrun-actions-slot {
+  display: contents;
+}
+
+.nol-teamrun-meter {
+  display: block;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 4.5rem;
+  height: 0.3125rem;
+  overflow: hidden;
+  border: 1px solid var(--nol-menu-border);
+  border-radius: var(--nol-radius-hover);
+  background-color: color-mix(in srgb, var(--nol-text-muted) 25%, transparent);
+  @media (forced-colors: active) {
+    border-color: CanvasText;
+    background-color: Canvas;
+  }
+}
+
+.nol-teamrun-meter-bar {
+  display: block;
+  width: calc(var(--nol-teamrun-meter-percent) * 1%);
+  border-top: 0.3125rem solid currentColor;
+  color: var(--nol-status-ok);
+}
+
+.nol-teamrun-meter-warning > .nol-teamrun-meter-bar,
+.nol-teamrun-meter-text.nol-teamrun-meter-warning {
+  color: var(--nol-avatar-amber-text);
+}
+
+.nol-teamrun-meter-critical > .nol-teamrun-meter-bar,
+.nol-teamrun-meter-text.nol-teamrun-meter-critical {
+  color: var(--nol-error);
+}
+
+.nol-teamrun-meter-text {
+  white-space: nowrap;
+}
+
+@container (width < 40rem) {
+  .nol-teamrun-meter,
+  .nol-teamrun-meter-room {
+    display: none;
+  }
+
+  .nol-teamrun-row-menu-cell {
+    display: contents;
+  }
+
+  .nol-teamrun-step-slot,
+  .nol-teamrun-actions-slot {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--nol-space-2);
+  }
+
+  .nol-teamrun-step-slot {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+
+  .nol-teamrun-actions-slot {
+    grid-row: 1;
+    grid-column: menu;
+    padding-inline-start: var(--nol-space-4);
+  }
+}

@@ -1,0 +1,71 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.nol-teamrun-waiting {
+  box-sizing: border-box;
+  max-width: 55rem;
+  margin-inline: auto;
+  margin-block-end: var(--nol-space-2);
+  padding-inline: var(--nol-space-3);
+  color: var(--nol-text);
+}
+
+.nol-teamrun-waiting-title {
+  margin: 0 0 var(--nol-space-1);
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  font-weight: inherit;
+  line-height: var(--nol-line-label);
+}
+
+.nol-teamrun-waiting-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nol-teamrun-waiting-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  column-gap: var(--nol-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.nol-teamrun-waiting-text {
+  font-size: var(--nol-text-message);
+  line-height: var(--nol-line-message);
+}
+
+.nol-teamrun-waiting-files {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  white-space: nowrap;
+}
+
+.nol-teamrun-waiting-menu {
+  grid-column: 4;
+}
+
+.nol-teamrun-waiting-note {
+  grid-column: 2 / -1;
+  margin: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+}

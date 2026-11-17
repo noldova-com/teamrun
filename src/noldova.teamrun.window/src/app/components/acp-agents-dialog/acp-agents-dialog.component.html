@@ -1,0 +1,136 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="resources.acpAgentsTitle" [size]="large" (dismissed)="done()">
+  <div class="nol-teamrun-acp-agents">
+    <p class="nol-teamrun-acp-muted" nolDialogDescription>{{ resources.acpAgentsHint }}</p>
+    @if (error(); as message) {
+      <nol-field-message class="nol-teamrun-acp-error">{{ message }}</nol-field-message>
+    }
+    @if (listing()?.failure; as failure) {
+      <p class="nol-teamrun-acp-muted nol-teamrun-acp-failure">{{ resources.formatAcpListOld(failure) }}</p>
+    }
+    <input nol-text-field class="nol-teamrun-acp-search" type="search" name="search" [attr.aria-label]="resources.acpSearchLabel" [placeholder]="resources.acpSearchLabel"
+      [value]="query()" (input)="edit(query, $event)">
+    <ul class="nol-teamrun-acp-list" [attr.aria-label]="resources.acpAgentsTitle">
+      @for (agent of visible(); track agent.id) {
+        <li class="nol-teamrun-acp-agent" [attr.data-agent]="agent.id">
+          @if (icons().get(agent.id); as icon) {
+            @if (masks(icon)) {
+              <span class="nol-teamrun-acp-icon nol-teamrun-acp-mark" aria-hidden="true" [style.mask-image]="resources.formatAcpIconMask(icon)"></span>
+            } @else {
+              <img class="nol-teamrun-acp-icon" alt="" [src]="icon">
+            }
+          } @else {
+            <span class="nol-teamrun-acp-icon nol-teamrun-acp-letter" aria-hidden="true">{{ letterOf(agent) }}</span>
+          }
+          <div class="nol-teamrun-acp-text">
+            <span class="nol-teamrun-acp-name">{{ agent.name }}</span>
+            @if (agent.version) {
+              <span class="nol-teamrun-acp-muted nol-teamrun-acp-version">{{ agent.version }}</span>
+            }
+            @if (agent.notChecked) {
+              <span class="nol-teamrun-acp-not-checked" [title]="resources.acpNotCheckedHint">{{ resources.acpNotCheckedLabel }}</span>
+            }
+            @if (agent.description) {
+              <p class="nol-teamrun-acp-muted nol-teamrun-acp-description">{{ agent.description }}</p>
+            }
+            @if (agent.unavailable; as reason) {
+              <p class="nol-teamrun-acp-muted nol-teamrun-acp-unavailable">{{ reason }}</p>
+            }
+          </div>
+          <div class="nol-teamrun-acp-actions">
+            @if (agent.about; as page) {
+              <button type="button" nol-button class="nol-teamrun-acp-about" [variant]="text"
+                [attr.aria-label]="resources.formatKindAction(resources.acpAboutLabel, agent.name)" (click)="about($event, page)" (auxclick)="about($event, page)">{{ resources.acpAboutLabel }}</button>
+            }
+            @if (agent.added && !installingOf(agent)) {
+              <button type="button" nol-button class="nol-teamrun-acp-remove" [variant]="outlined" [disabled]="working().has(agent.id)"
+                [attr.aria-label]="resources.formatKindAction(resources.acpRemoveLabel, agent.name)" (click)="remove(agent)">{{ resources.acpRemoveLabel }}</button>
+            } @else {
+              @let installation = installingOf(agent);
+              @if (installation) {
+                <span class="nol-teamrun-acp-progress" role="status">{{ resources.formatInstalling(installation) }}</span>
+              }
+              <button type="button" nol-button class="nol-teamrun-acp-add" [variant]="outlined" [busy]="!!installation || working().has(agent.id)" [disabled]="!!agent.unavailable"
+                [attr.aria-label]="resources.formatKindAction(resources.acpAddLabel, agent.name)" (click)="add(agent)">{{ resources.acpAddLabel }}</button>
+              @if (installation?.cancellable) {
+                <button type="button" nol-button class="nol-teamrun-acp-cancel-install" [variant]="text"
+                  [attr.aria-label]="resources.formatKindAction(resources.cancelInstallLabel, agent.name)" (click)="cancelInstall(agent)">{{ resources.cancelInstallLabel }}</button>
+              }
+            }
+          </div>
+        </li>
+      } @empty {
+        @if (listing()) {
+          <li class="nol-teamrun-acp-muted nol-teamrun-acp-none">{{ resources.acpNoAgentsText }}</li>
+        }
+      }
+    </ul>
+    <h3 class="nol-teamrun-acp-heading">{{ resources.acpLocalHeading }}</h3>
+    @if (listing()?.localCommands; as commands) {
+      @if (commands.length > 0) {
+        <ul class="nol-teamrun-acp-list" [attr.aria-label]="resources.acpLocalHeading">
+          @for (command of commands; track command.id) {
+            <li class="nol-teamrun-acp-agent" [attr.data-agent]="command.id">
+              <span class="nol-teamrun-acp-icon nol-teamrun-acp-letter" aria-hidden="true">{{ letterOf(command) }}</span>
+              <div class="nol-teamrun-acp-text"><span class="nol-teamrun-acp-name">{{ command.name }}</span></div>
+              <div class="nol-teamrun-acp-actions">
+                <button type="button" nol-button class="nol-teamrun-acp-remove" [variant]="outlined" [disabled]="working().has(command.id)"
+                  [attr.aria-label]="resources.formatKindAction(resources.acpRemoveLabel, command.name)" (click)="remove(command)">{{ resources.acpRemoveLabel }}</button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    }
+    @if (formOpen()) {
+      <form class="nol-teamrun-acp-form" novalidate (submit)="addLocal($event)">
+        <label class="nol-teamrun-acp-field">
+          <span>{{ resources.acpLocalNameLabel }}</span>
+          <input nol-text-field class="nol-teamrun-acp-local-name" name="name" [attr.aria-label]="resources.acpLocalNameLabel" [value]="name()" (input)="edit(name, $event)">
+        </label>
+        <label class="nol-teamrun-acp-field">
+          <span>{{ resources.acpLocalCommandLabel }}</span>
+          <input nol-text-field class="nol-teamrun-acp-local-command" name="command" [attr.aria-label]="resources.acpLocalCommandLabel" [value]="command()" (input)="edit(command, $event)">
+        </label>
+        <label class="nol-teamrun-acp-field">
+          <span>{{ resources.acpLocalArgumentsLabel }}</span>
+          <textarea nol-text-field class="nol-teamrun-acp-local-arguments" name="arguments" [attr.aria-label]="resources.acpLocalArgumentsLabel" [rows]="resources.acpLocalArgumentRows"
+            [value]="argumentLines()" (input)="edit(argumentLines, $event)"></textarea>
+          <span class="nol-teamrun-acp-muted">{{ resources.acpLocalArgumentsHint }}</span>
+        </label>
+        <div class="nol-teamrun-acp-field">
+          <span>{{ resources.acpLocalVariablesLabel }}</span>
+          <span class="nol-teamrun-acp-muted">{{ resources.acpLocalVariablesHint }}</span>
+          @for (variable of variables(); track $index) {
+            <div class="nol-teamrun-acp-variable">
+              <input nol-text-field class="nol-teamrun-acp-variable-name" [attr.aria-label]="resources.acpLocalVariableNameLabel" [placeholder]="resources.acpLocalVariableNameLabel"
+                [value]="variable.name" (input)="editVariableName($index, $event)">
+              <input nol-text-field class="nol-teamrun-acp-variable-value" type="password" autocomplete="off" [attr.aria-label]="resources.acpLocalVariableValueLabel"
+                [placeholder]="resources.acpLocalVariableValueLabel" [value]="variable.value" (input)="editVariableValue($index, $event)">
+              <button type="button" nol-button class="nol-teamrun-acp-variable-remove" [variant]="text" (click)="removeVariable($index)">{{ resources.acpRemoveLabel }}</button>
+            </div>
+          }
+          <div>
+            <button type="button" nol-button class="nol-teamrun-acp-variable-add" [variant]="text" (click)="addVariable()">{{ resources.acpLocalAddVariableLabel }}</button>
+          </div>
+        </div>
+        <div class="nol-teamrun-acp-form-actions">
+          <button type="button" nol-button class="nol-teamrun-acp-local-cancel" [variant]="text" (click)="closeForm()">{{ resources.acpLocalCancelLabel }}</button>
+          <button type="submit" nol-button class="nol-teamrun-acp-local-add" [disabled]="working().has(resources.acpLocalFormKey)">{{ resources.acpLocalAddLabel }}</button>
+        </div>
+      </form>
+    } @else {
+      <div>
+        <button type="button" nol-button class="nol-teamrun-acp-local-open" [variant]="outlined" (click)="formOpen.set(true)">{{ resources.acpLocalOpenLabel }}</button>
+      </div>
+    }
+  </div>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-acp-done" (click)="done()">{{ resources.doneLabel }}</button>
+</nol-dialog>

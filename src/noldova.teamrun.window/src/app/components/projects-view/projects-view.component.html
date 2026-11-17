@@ -1,0 +1,158 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nav class="nol-teamrun-projects" [attr.aria-label]="resources.projectsViewTitle">
+  <button type="button" class="nol-teamrun-row nol-teamrun-action" (click)="startConversation(store.selectedProjectId())">
+    <span class="nol-teamrun-glyph material-symbols-rounded" aria-hidden="true">{{ resources.newConversationIcon }}</span>
+    <span class="nol-teamrun-label">{{ resources.newConversationLabel }}</span>
+  </button>
+  <button type="button" class="nol-teamrun-row nol-teamrun-action" (click)="openProject()">
+    <span class="nol-teamrun-glyph material-symbols-rounded" aria-hidden="true">{{ resources.openProjectIcon }}</span>
+    <span class="nol-teamrun-label">{{ resources.openProjectLabel }}</span>
+  </button>
+  @if (canOpenBrowser()) {
+    <button type="button" class="nol-teamrun-row nol-teamrun-action" (click)="openBrowser()">
+      <span class="nol-teamrun-glyph material-symbols-rounded" aria-hidden="true">{{ resources.openBrowserIcon }}</span>
+      <span class="nol-teamrun-label">{{ resources.openBrowserLabel }}</span>
+    </button>
+  }
+
+  @if (pinnedConversations().length > 0) {
+    <nol-section-header [uppercase]="true" [label]="resources.pinnedTitle" [icon]="resources.pinnedIcon" [collapsible]="true" [controls]="resources.pinnedGroupId" [expanded]="isGroupOpen(groups.Pinned)"
+      (expandedChange)="openGroup(groups.Pinned, $event)" />
+    <div cdkDropList class="nol-teamrun-drop-list nol-teamrun-pins" role="tree" [id]="resources.pinnedGroupId" [attr.aria-label]="resources.pinnedTitle"
+      (cdkDropListDropped)="dropPin($event)">
+      @if (isGroupOpen(groups.Pinned)) {
+        @for (conversation of pinnedConversations(); track conversation.id) {
+          <div cdkDrag class="nol-teamrun-drag-item" role="none" [cdkDragData]="conversation.id">
+            <ng-container [ngTemplateOutlet]="conversationRow" [ngTemplateOutletContext]="{ $implicit: conversation, tree: pinsTree, parentKey: null }" />
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <nol-section-header [uppercase]="true" [label]="resources.projectsViewTitle" [icon]="resources.projectsIcon" [collapsible]="true" [controls]="resources.projectsGroupId" [expanded]="isGroupOpen(groups.Projects)"
+    (expandedChange)="openGroup(groups.Projects, $event)" />
+  @if (isGroupOpen(groups.Projects) && store.projects().length === 0) {
+    <p class="nol-teamrun-row nol-teamrun-muted">{{ resources.noProjects }}</p>
+  }
+  <div cdkDropList class="nol-teamrun-drop-list nol-teamrun-project-list" [id]="resources.projectsGroupId" [attr.role]="store.projects().length === 0 ? null : 'tree'"
+    [attr.aria-label]="store.projects().length === 0 ? null : resources.projectsViewTitle" (cdkDropListDropped)="dropProject($event)">
+    @if (isGroupOpen(groups.Projects)) {
+      @for (project of orderedProjects(); track project.id) {
+        <div cdkDrag class="nol-teamrun-drag-item" role="none" [cdkDragData]="project.id">
+          <div cdkDragHandle class="nol-teamrun-row nol-teamrun-project-row" [class.nol-teamrun-selected]="isMarked(project.id)" [attr.aria-selected]="isMarked(project.id)"
+            [nolTooltip]="store.isFolderMissing(project.id) ? resources.formatProjectFolderMissing(project.rootPath) : project.rootPath"
+            [nolTooltipSide]="beside" [nolTeamrunTreeItem]="projectsTree" [treeKey]="project.id"
+            [treeLabel]="project.name" [treeExpanded]="!isCollapsed(project.id)" [treeMovable]="true" [attr.aria-owns]="isCollapsed(project.id) ? null : listIdOf(project.id)"
+            [attr.aria-keyshortcuts]="moveShortcuts" [nolContextMenuTriggerFor]="projectMenu" (toggled)="layout.toggleProject(project.id)"
+            (activated)="layout.toggleProject(project.id)" (moved)="moveProject(project, $event)">
+            <span class="nol-teamrun-twistie" aria-hidden="true" (click)="layout.toggleProject(project.id)">
+              <span class="nol-teamrun-glyph material-symbols-rounded">{{ isCollapsed(project.id) ? resources.collapsedIcon : resources.expandedIcon }}</span>
+            </span>
+            <span class="nol-teamrun-label nol-teamrun-project-name" [class.nol-teamrun-muted]="store.isFolderMissing(project.id)" (click)="layout.toggleProject(project.id)">{{ project.name }}</span>
+            @if (store.isFolderMissing(project.id)) {
+              <span class="nol-teamrun-glyph nol-teamrun-folder-missing material-symbols-rounded" role="img" [attr.aria-label]="resources.folderMissingLabel">{{ resources.folderMissingIcon }}</span>
+            }
+            <button type="button" nol-icon-button class="nol-teamrun-row-actions" tabindex="-1" aria-hidden="true" [tabAction]="true" [icon]="resources.moreIcon" [label]="resources.rowMenuLabel"
+              [nolMenuTriggerFor]="projectMenu"></button>
+            <ng-template #projectMenu>
+              <nol-menu>
+                <button nol-menu-item [icon]="resources.addIcon" [label]="resources.newConversationLabel" (triggered)="startConversation(project.id)"></button>
+                <button nol-menu-item [icon]="resources.forgetIcon" [label]="resources.forgetProjectLabel" (triggered)="forget(project)"></button>
+              </nol-menu>
+            </ng-template>
+          </div>
+          @if (!isCollapsed(project.id)) {
+            <div cdkDropList class="nol-teamrun-drop-list nol-teamrun-conversation-list" role="group" [id]="listIdOf(project.id)" [cdkDropListData]="project.id"
+              [cdkDropListConnectedTo]="listIds()" (cdkDropListDropped)="dropConversation($event)">
+              @if (store.conversationsOf(project.id).length === 0) {
+                <p class="nol-teamrun-row nol-teamrun-nested nol-teamrun-muted" [nolTeamrunTreeItem]="projectsTree" [treeKey]="resources.noConversationsKeyPrefix + project.id"
+                  [treeLabel]="resources.noConversations" [treeParent]="project.id" aria-disabled="true">{{ resources.noConversations }}</p>
+              }
+              @for (conversation of shownConversationsOf(project.id); track conversation.id) {
+                <div cdkDrag class="nol-teamrun-drag-item" role="none" [cdkDragData]="conversation.id">
+                  <ng-container [ngTemplateOutlet]="conversationRow" [ngTemplateOutletContext]="{ $implicit: conversation, tree: projectsTree, parentKey: project.id }" />
+                </div>
+              }
+              @if (hiddenCountOf(project.id) > 0) {
+                <div class="nol-teamrun-row nol-teamrun-nested nol-teamrun-muted nol-teamrun-show-more" [nolTeamrunTreeItem]="projectsTree"
+                  [treeKey]="resources.showMoreKeyPrefix + project.id" [treeLabel]="resources.formatShowMore(hiddenCountOf(project.id))" [treeParent]="project.id"
+                  (click)="showAll(project.id)" (activated)="showAll(project.id)">
+                  {{ resources.formatShowMore(hiddenCountOf(project.id)) }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+
+  @if (chats().length > 0) {
+    <nol-section-header [uppercase]="true" [label]="resources.chatsTitle" [icon]="resources.chatsIcon" [collapsible]="true" [controls]="resources.chatsGroupId"
+      [expanded]="isGroupOpen(groups.Chats)" (expandedChange)="openGroup(groups.Chats, $event)" />
+    <div cdkDropList class="nol-teamrun-drop-list nol-teamrun-chat-list" role="tree" [id]="resources.chatsGroupId" [attr.aria-label]="resources.chatsTitle"
+      (cdkDropListDropped)="dropChat($event)">
+      @if (isGroupOpen(groups.Chats)) {
+        @for (conversation of shownChats(); track conversation.id) {
+          <div cdkDrag class="nol-teamrun-drag-item" role="none" [cdkDragData]="conversation.id">
+            <ng-container [ngTemplateOutlet]="conversationRow" [ngTemplateOutletContext]="{ $implicit: conversation, tree: chatsTree, parentKey: null }" />
+          </div>
+        }
+        @if (chats().length > shownChats().length) {
+          <div class="nol-teamrun-row nol-teamrun-muted nol-teamrun-show-more" [nolTeamrunTreeItem]="chatsTree" [treeKey]="resources.chatsShowMoreKey"
+            [treeLabel]="resources.formatShowMore(chats().length - shownChats().length)" (click)="showAllChats()" (activated)="showAllChats()">
+            {{ resources.formatShowMore(chats().length - shownChats().length) }}
+          </div>
+        }
+      }
+    </div>
+  }
+</nav>
+
+<ng-template #conversationRow let-conversation let-tree="tree" let-parentKey="parentKey">
+  <div class="nol-teamrun-row nol-teamrun-conversation-row" [class.nol-teamrun-nested]="parentKey !== null"
+    [class.nol-teamrun-selected]="conversation.id === store.markedConversationId()" [nolTooltip]="tooltipOf(conversation)" [nolTooltipSide]="beside"
+    [nolTeamrunTreeItem]="tree" [treeKey]="conversation.id" [treeLabel]="conversation.title" [treeParent]="parentKey" [treeMovable]="true"
+    [attr.aria-selected]="conversation.id === store.markedConversationId()" [attr.aria-keyshortcuts]="rowShortcuts"
+    [nolContextMenuTriggerFor]="conversationMenu" (activated)="open(conversation)" (renamed)="rename(conversation, tree)" (moved)="moveConversation(conversation, tree, parentKey, $event)">
+    <span class="nol-teamrun-label nol-teamrun-conversation-title" (click)="open(conversation)" (dblclick)="keepOpen(conversation)">{{ conversation.title }}</span>
+    @if (store.isAwaitingAnswer(conversation.id)) {
+      <span class="nol-teamrun-waiting material-symbols-rounded" role="img" [attr.aria-label]="resources.awaitingAnswerLabel">{{ resources.awaitingAnswerGlyph }}</span>
+    } @else if (store.isAwaitingApproval(conversation.id)) {
+      <span class="nol-teamrun-waiting material-symbols-rounded" role="img" [attr.aria-label]="resources.awaitingApprovalLabel">{{ resources.awaitingApprovalGlyph }}</span>
+    } @else if (store.isWorking(conversation.id)) {
+      <span class="nol-teamrun-working" role="img" [attr.aria-label]="resources.workingLabel"><nol-spinner /></span>
+    }
+    <button type="button" nol-icon-button class="nol-teamrun-row-actions" tabindex="-1" aria-hidden="true" [tabAction]="true" [icon]="resources.moreIcon" [label]="resources.rowMenuLabel"
+      [nolMenuTriggerFor]="conversationMenu"></button>
+    <ng-template #conversationMenu>
+      <nol-menu>
+        <button nol-menu-item [icon]="isPinned(conversation.id) ? resources.unpinIcon : resources.pinIcon"
+          [label]="isPinned(conversation.id) ? resources.unpinLabel : resources.pinLabel" (triggered)="layout.togglePin(conversation.id)"></button>
+        <button nol-menu-item [icon]="resources.editIcon" [label]="resources.renameConversationLabel" (triggered)="rename(conversation, tree)"></button>
+        <button nol-menu-item [icon]="resources.moveToProjectIcon"
+          [label]="conversation.projectId === null ? resources.moveToProjectLabel : resources.moveToAnotherProjectLabel" [nolMenuTriggerFor]="moveMenu"></button>
+        <button nol-menu-item [icon]="resources.forgetIcon" [label]="resources.deleteConversationLabel" (triggered)="remove(conversation)"></button>
+      </nol-menu>
+    </ng-template>
+    <ng-template #moveMenu>
+      <nol-menu>
+        @for (project of otherProjectsOf(conversation); track project.id) {
+          <button nol-menu-item [label]="project.name" (triggered)="moveToProject(conversation, project)"></button>
+        }
+        @if (otherProjectsOf(conversation).length > 0) {
+          <nol-menu-separator />
+        }
+        <button nol-menu-item [label]="resources.moveToFolderLabel" (triggered)="moveToFolder(conversation)"></button>
+      </nol-menu>
+    </ng-template>
+  </div>
+</ng-template>

@@ -1,0 +1,121 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import "@noldova/context.core";
+import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/context.exceptions";
+import { JsonException } from "@noldova/context.json";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
+import { ProtocolVersion } from "@noldova/teamrun.protocol";
+
+@TestClass
+export class ProtocolVersionTests {
+  @TestMethod
+  public currentIsZeroDotTwo(): void {
+    Assert.areEqual(0, ProtocolVersion.current.major);
+    Assert.areEqual(2, ProtocolVersion.current.minor);
+    Assert.areEqual("0.2", ProtocolVersion.current.toString());
+  }
+
+  @TestMethod
+  public parsesMajorDotMinorText(): void {
+    const version = ProtocolVersion.parse("12.3");
+
+    Assert.areEqual(12, version.major);
+    Assert.areEqual(3, version.minor);
+  }
+
+  @TestMethod
+  public rejectsMalformedText(): void {
+    for (const text of ["1", "1.2.3", "a.b", "-1.0", "1.5.", String.empty, "1.-2"])
+      Assert.throws(() => ProtocolVersion.parse(text), ArgumentException);
+  }
+
+  @TestMethod
+  @TestData(".1")
+  @TestData("0.")
+  @TestData(".")
+  @TestData("0x0.1")
+  @TestData("0.0x1")
+  @TestData("0b0.1")
+  @TestData("1e0.1")
+  @TestData("0.1e0")
+  @TestData("+0.1")
+  @TestData("0.+1")
+  @TestData(" 0.1")
+  @TestData("0.1 ")
+  @TestData("0.1\n")
+  @TestData("0.1\r\n")
+  @TestData("0.\t1")
+  @TestData("٠.١")
+  public rejectsMissingPartsAndNonDecimalSyntax(text: string): void {
+    const exception = Assert.throws(() => ProtocolVersion.parse(text), ArgumentException);
+
+    Assert.areEqual("text", exception.parameterName);
+  }
+
+  @TestMethod
+  public preservesDecimalPartsWithLeadingZeroes(): void {
+    Assert.areEqual("0.1", ProtocolVersion.parse("00.01").toString());
+  }
+
+  @TestMethod
+  public rejectsComponentsThatOverflowNumbers(): void {
+    const overflow = "9".repeat(309);
+
+    for (const text of [overflow + ".1", "0." + overflow])
+      Assert.areEqual("text", Assert.throws(() => ProtocolVersion.parse(text), ArgumentException).parameterName);
+  }
+
+  @TestMethod
+  public rejectsNegativeOrFractionalParts(): void {
+    Assert.throws(() => new ProtocolVersion(-1, 0), ArgumentOutOfRangeException);
+    Assert.throws(() => new ProtocolVersion(1, -1), ArgumentOutOfRangeException);
+    Assert.throws(() => new ProtocolVersion(1.5, 0), ArgumentOutOfRangeException);
+    Assert.throws(() => new ProtocolVersion(1, 0.5), ArgumentOutOfRangeException);
+  }
+
+  @TestMethod
+  public servesOnlyAnExactVersionMatch(): void {
+    const runtime = new ProtocolVersion(1, 2);
+
+    Assert.isTrue(runtime.canServe(new ProtocolVersion(1, 2)));
+    Assert.isFalse(runtime.canServe(new ProtocolVersion(1, 0)));
+    Assert.isFalse(runtime.canServe(new ProtocolVersion(1, 3)));
+    Assert.isFalse(runtime.canServe(new ProtocolVersion(2, 0)));
+    Assert.isFalse(runtime.canServe(new ProtocolVersion(0, 2)));
+  }
+
+  @TestMethod
+  public currentRejectsDifferentMajorOrMinorVersions(): void {
+    Assert.isTrue(ProtocolVersion.current.canServe(new ProtocolVersion(0, 2)));
+    Assert.isFalse(ProtocolVersion.current.canServe(new ProtocolVersion(0, 1)));
+    Assert.isFalse(ProtocolVersion.current.canServe(new ProtocolVersion(0, 3)));
+    Assert.isFalse(ProtocolVersion.current.canServe(new ProtocolVersion(1, 1)));
+  }
+
+  @TestMethod
+  public comparesForEquality(): void {
+    Assert.isTrue(new ProtocolVersion(1, 2).equals(new ProtocolVersion(1, 2)));
+    Assert.isFalse(new ProtocolVersion(1, 2).equals(new ProtocolVersion(1, 3)));
+    Assert.isFalse(new ProtocolVersion(1, 2).equals(new ProtocolVersion(2, 2)));
+  }
+
+  @TestMethod
+  public roundTripsThroughJson(): void {
+    const version = ProtocolVersion.fromJson(new ProtocolVersion(3, 4).toJson());
+
+    Assert.areEqual(3, version.major);
+    Assert.areEqual(4, version.minor);
+  }
+
+  @TestMethod
+  public reportsInvalidJsonWithThePath(): void {
+    Assert.areEqual("$.version.minor", Assert.throws(() => ProtocolVersion.fromJson({ major: 1 }, "$.version"), JsonException).path);
+    Assert.areEqual("$.major", Assert.throws(() => ProtocolVersion.fromJson({ major: "1", minor: 0 }), JsonException).path);
+  }
+}

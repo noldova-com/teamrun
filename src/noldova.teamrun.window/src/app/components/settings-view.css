@@ -1,0 +1,172 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.nol-teamrun-settings-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-3);
+  padding: var(--nol-document-padding-block) var(--nol-content-padding-inline);
+}
+
+.nol-teamrun-error {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  color: var(--nol-error);
+}
+
+.nol-teamrun-error-text {
+  flex: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-dismiss {
+  flex: none;
+}
+
+.nol-teamrun-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-unavailable {
+  opacity: 0.5;
+}
+
+.nol-teamrun-detail {
+  display: block;
+  color: var(--nol-text-muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-kind-name,
+.nol-teamrun-install-unavailable,
+.nol-teamrun-status-error {
+  white-space: normal;
+}
+
+.nol-teamrun-install-unavailable {
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-profile {
+  margin-top: var(--nol-space-1);
+  font-size: var(--nol-text-label);
+}
+
+.nol-teamrun-status {
+  display: block;
+}
+
+.nol-teamrun-status-dot {
+  display: inline-block;
+  margin-inline-end: var(--nol-space-2);
+  border: 0.25rem solid currentColor;
+  border-radius: 50%;
+  color: var(--nol-text-muted);
+  vertical-align: middle;
+}
+
+.nol-teamrun-status-dot-live {
+  color: var(--nol-accent);
+  animation: nol-teamrun-status-pulse 1.4s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes nol-teamrun-status-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.nol-teamrun-status-dot-connected {
+  color: var(--nol-status-ok);
+}
+
+.nol-teamrun-status-dot-needed,
+.nol-teamrun-status-dot-failed {
+  color: var(--nol-status-failed);
+}
+
+.nol-teamrun-status-dot-warning {
+  color: var(--nol-warning);
+}
+
+.nol-teamrun-status-error {
+  display: block;
+  margin-top: var(--nol-space-1);
+  color: var(--nol-error);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-muted {
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-model-name,
+.nol-teamrun-connection-name {
+  display: block;
+}
+
+.nol-teamrun-model-note {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  white-space: normal;
+}
+
+.nol-teamrun-action-slot {
+  visibility: hidden;
+}
+
+.nol-teamrun-grant-app-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-grant-icon {
+  display: flex;
+  flex: none;
+  align-self: flex-start;
+  align-items: center;
+  width: var(--nol-icon);
+  height: 1lh;
+}
+
+.nol-teamrun-grant-icon > img {
+  display: block;
+  width: var(--nol-icon);
+  height: var(--nol-icon);
+}
+
+.nol-teamrun-grant-app-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-grant-chat-text {
+  display: block;
+  width: 0;
+  min-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

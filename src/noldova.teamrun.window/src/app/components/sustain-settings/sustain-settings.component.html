@@ -1,0 +1,109 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<section class="nol-teamrun-sustain" [attr.aria-labelledby]="headingId" [attr.aria-describedby]="unavailable() === null ? null : reasonId">
+  <span class="nol-teamrun-field-label nol-teamrun-sustain-heading" [id]="headingId">{{ resources.sustainGroupLabel }}</span>
+  <div class="nol-teamrun-sustain-row">
+    <nol-switch class="nol-teamrun-sustain-switch" [label]="resources.sustainSwitchLabel" [checked]="sustain()" [disabled]="disabled() || unavailable() !== null"
+      (checkedChange)="sustain.set($event)" />
+    <span class="nol-teamrun-sustain-label" [class.nol-teamrun-sustain-label-off]="disabled() || unavailable() !== null" aria-hidden="true"
+      (click)="toggleSustain()">{{ resources.sustainSwitchLabel }}</span>
+  </div>
+  @if (unavailable() === null && sustain()) {
+    <span class="nol-teamrun-muted nol-teamrun-sustain-hint">{{ resources.sustainHint }}</span>
+    <nol-configuration-table class="nol-teamrun-fallbacks" [heading]="resources.fallbackOrderTitle" [explanation]="resources.fallbackOrderHint">
+      <button type="button" nol-button nolConfigurationTableAction class="nol-teamrun-add-fallback" [variant]="secondary" [disabled]="disabled() || listedProviders().length === 0"
+        (click)="add()">{{ resources.addFallbackLabel }}</button>
+      <table nolConfigurationTable>
+        <thead>
+          <tr>
+            <th scope="col">{{ resources.fallbackPositionColumn }}</th>
+            <th scope="col" nolConfigurationTableFill>{{ resources.connectionColumn }}</th>
+            <th scope="col">{{ resources.modelLabel }}</th>
+            <th scope="col" [nolConfigurationTableRowActions]="resources.actionsColumn"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="nol-teamrun-fallback-own">
+            <td class="nol-teamrun-muted">1</td>
+            <td nolConfigurationTableFill>
+              <div class="nol-teamrun-fallback-stack">
+                <div class="nol-teamrun-fallback-line">{{ ownProvider() }}</div>
+                <div class="nol-teamrun-fallback-line nol-teamrun-muted">{{ resources.sustainOwnChoiceWay }}</div>
+              </div>
+            </td>
+            <td>
+              <div class="nol-teamrun-fallback-stack nol-teamrun-fallback-model-stack">
+                <div class="nol-teamrun-fallback-line">{{ ownModel() }}</div>
+                <div class="nol-teamrun-fallback-line nol-teamrun-muted">{{ ownEffort() }}</div>
+              </div>
+            </td>
+            <td nolConfigurationTableRowActions>
+              @for (slot of resources.fallbackActionSlots; track slot) {
+                <button type="button" nol-icon-button class="nol-teamrun-action-slot" [icon]="resources.closeIcon" [label]="resources.removeLabel" inert
+                  aria-hidden="true"></button>
+              }
+            </td>
+          </tr>
+          @for (entry of fallbacks(); track $index; let index = $index, first = $first, last = $last) {
+            <tr class="nol-teamrun-fallback">
+              <td class="nol-teamrun-muted">{{ index + 2 }}</td>
+              <td nolConfigurationTableFill>
+                <div class="nol-teamrun-fallback-stack">
+                  @if (added().has(entry)) {
+                    <nol-select class="nol-teamrun-fallback-line nol-teamrun-fallback-connection"
+                      [label]="resources.formatFallbackField(index + 2, resources.connectionColumn)" [options]="providerOptions(entry)" [value]="entry.providerId"
+                      [disabled]="disabled()" (valueChange)="changeProvider(index, $event)" />
+                  } @else {
+                    <div class="nol-teamrun-fallback-line">{{ titleOf(listedOptions(entry), entry.providerId) }}</div>
+                  }
+                  <div class="nol-teamrun-fallback-line nol-teamrun-muted nol-teamrun-fallback-way">{{ wayOf(index) }}</div>
+                </div>
+              </td>
+              <td>
+                <div class="nol-teamrun-fallback-stack nol-teamrun-fallback-model-stack">
+                  @if (added().has(entry)) {
+                    <nol-select class="nol-teamrun-fallback-line nol-teamrun-fallback-model" [label]="resources.formatFallbackField(index + 2, resources.modelLabel)"
+                      [options]="modelOptions(entry)" [value]="entry.model ?? ''" [disabled]="disabled()" (valueChange)="changeModel(index, $event)" />
+                    <nol-select class="nol-teamrun-fallback-line nol-teamrun-fallback-effort" [label]="resources.formatFallbackField(index + 2, resources.effortLabel)"
+                      [options]="effortOptions(entry)" [value]="entry.effort ?? ''" [disabled]="disabled()" (valueChange)="changeEffort(index, $event)" />
+                  } @else {
+                    <div class="nol-teamrun-fallback-line">{{ titleOf(modelOptions(entry), entry.model ?? '') }}</div>
+                    <div class="nol-teamrun-fallback-line nol-teamrun-muted">{{ titleOf(effortOptions(entry), entry.effort ?? '') }}</div>
+                  }
+                </div>
+              </td>
+              <td nolConfigurationTableRowActions>
+                <button type="button" nol-icon-button class="nol-teamrun-fallback-up" [icon]="resources.moveRowUpIcon" [label]="resources.formatMoveUp(entryLabel(index, entry))"
+                  [nolTooltip]="resources.moveUpLabel" [disabled]="disabled() || first" (click)="move(index, -1)"></button>
+                <button type="button" nol-icon-button class="nol-teamrun-fallback-down" [icon]="resources.moveRowDownIcon"
+                  [label]="resources.formatMoveDown(entryLabel(index, entry))" [nolTooltip]="resources.moveDownLabel" [disabled]="disabled() || last"
+                  (click)="move(index, 1)"></button>
+                <button type="button" nol-icon-button class="nol-teamrun-fallback-remove" [icon]="resources.closeIcon" [label]="resources.formatRemove(entryLabel(index, entry))"
+                  [nolTooltip]="resources.removeLabel" [disabled]="disabled()" (click)="remove(index)"></button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </nol-configuration-table>
+    @if (refusal(); as message) {
+      <nol-field-message class="nol-teamrun-sustain-refusal">{{ message }}</nol-field-message>
+    }
+    <nol-checkbox class="nol-teamrun-resets-soonest" [checked]="resetsSoonestFirst()" [disabled]="disabled()" (checkedChange)="resetsSoonestFirst.set($event)">
+      {{ resources.resetsSoonestFirstLabel }}</nol-checkbox>
+  } @else {
+    @if (refusal(); as message) {
+      <nol-field-message class="nol-teamrun-sustain-refusal">{{ message }}</nol-field-message>
+    }
+  }
+  <ng-content />
+  @if (unavailable(); as reason) {
+    <span class="nol-teamrun-muted nol-teamrun-sustain-reason" [id]="reasonId">{{ reason }}</span>
+  }
+</section>

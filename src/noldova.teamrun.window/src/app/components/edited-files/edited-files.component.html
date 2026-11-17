@@ -1,0 +1,49 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<header class="header">
+  <span class="glyph material-symbols-rounded" aria-hidden="true">{{ resources.editedFilesGlyph }}</span>
+  <span>{{ title() }}</span>
+  <span><span class="added">+{{ additions() }}</span> <span class="removed">-{{ deletions() }}</span></span>
+</header>
+<ul class="files">
+  @for (edit of shown(); track edit.path) {
+    <li>
+      <div class="file">
+        <button type="button" class="name" data-nol-resizes-row [nolTooltip]="edit.path" (click)="toggle(edit.path)" [disabled]="!edit.hasDiff" [attr.aria-expanded]="edit.hasDiff ? isOpen(edit.path) : null">
+          <span class="label">
+            <nol-file-badge [fileName]="edit.path" />
+            <span class="path"><span class="directory">{{ directoryOf(edit.path) }}</span>{{ fileNameOf(edit.path) }}</span>
+          </span>
+          <span class="kind">{{ formatter.fileChangeLabel(edit.kind) }}</span>
+          <span><span class="added">+{{ edit.additions }}</span> <span class="removed">-{{ edit.deletions }}</span></span>
+        </button>
+        @if (edit.hasDiff) {
+          <button nol-icon-button type="button" data-nol-resizes-row [icon]="resources.wordWrapIcon" [pressed]="isWrapped(edit.path)"
+            [label]="isWrapped(edit.path) ? resources.disableWordWrapLabel : resources.enableWordWrapLabel"
+            [nolTooltip]="isWrapped(edit.path) ? resources.disableWordWrapLabel : resources.enableWordWrapLabel" (click)="toggleWrap(edit.path)"></button>
+          <button nol-icon-button type="button" data-nol-resizes-row [icon]="isOpen(edit.path) ? resources.collapseIcon : resources.expandIcon"
+            [label]="isOpen(edit.path) ? resources.collapseDiffLabel : resources.expandDiffLabel" [attr.aria-expanded]="isOpen(edit.path)"
+            [nolTooltip]="isOpen(edit.path) ? resources.collapseDiffLabel : resources.expandDiffLabel" (click)="toggle(edit.path)"></button>
+        }
+      </div>
+      @if (isOpen(edit.path)) {
+        <div class="diff" [class.wrapped]="isWrapped(edit.path)">
+          @for (line of linesOf(edit.path); track $index) {
+            <div [class.added-line]="line.kind === added" [class.removed-line]="line.kind === removed" [class.meta-line]="line.kind === meta">{{ prefixOf(line.kind) }}{{ line.text }}</div>
+          }
+        </div>
+      }
+    </li>
+  }
+</ul>
+@if (hidden() > 0) {
+  <div class="more">
+    <button nol-button type="button" data-nol-resizes-row [variant]="secondary" (click)="showAll()">{{ resources.formatShowMoreFiles(hidden()) }}</button>
+  </div>
+}

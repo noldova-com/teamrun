@@ -1,0 +1,41 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (messages().length > 0) {
+  <section class="nol-teamrun-waiting" [attr.aria-label]="resources.waitingMessagesLabel">
+    <h2 class="nol-teamrun-waiting-title">{{ resources.formatWaitingCount(messages().length) }}</h2>
+    <ul class="nol-teamrun-waiting-list">
+      @for (waiting of messages(); track waiting.id) {
+        @let line = firstLineOf(waiting);
+        @let note = noteOf(waiting);
+        <li class="nol-teamrun-waiting-row">
+          <nol-chip class="nol-teamrun-waiting-delivery" [kind]="kindOf(waiting)">{{ resources.deliveryLabels[waiting.delivery] }}</nol-chip>
+          <span class="nol-teamrun-waiting-text" data-truncates [nolTooltip]="line" [nolTooltipTruncated]="true">{{ line }}</span>
+          @if (waiting.message.attachments.length > 0) {
+            <span class="nol-teamrun-waiting-files">{{ resources.formatFileCount(waiting.message.attachments.length) }}</span>
+          }
+          <button type="button" nol-icon-button class="nol-teamrun-waiting-menu" [icon]="resources.providerMenuIcon" [label]="resources.formatWaitingMenu(line)"
+            [nolMenuTriggerFor]="waitingMenu" [nolMenuAlignment]="end"></button>
+          <ng-template #waitingMenu>
+            <nol-menu [attr.aria-label]="resources.formatWaitingMenu(line)">
+              <button nol-menu-item class="nol-teamrun-waiting-edit" [icon]="resources.editIcon" [label]="resources.editWaitingLabel" [disabled]="!editable()" (triggered)="edit.emit(waiting)"></button>
+              <button nol-menu-item class="nol-teamrun-waiting-send-now" [icon]="resources.sendGlyph" [label]="resources.sendWaitingNowLabel"
+                (triggered)="sendNow(waiting)"></button>
+              <nol-menu-separator />
+              <button nol-menu-item class="nol-teamrun-waiting-remove" [icon]="resources.forgetIcon" [label]="resources.removeWaitingLabel"
+                (triggered)="remove(waiting)"></button>
+            </nol-menu>
+          </ng-template>
+          @if (note !== null) {
+            <p class="nol-teamrun-waiting-note">{{ note }}</p>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@noldova/teamrun.services",
+  "version": "__VERSION__",
+  "private": true,
+  "description": "The response envelope that TeamRun's services answer with: a status, and a payload or what went wrong.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noldova-com/teamrun.git",
+    "directory": "src/noldova.teamrun.services"
+  },
+  "homepage": "https://github.com/noldova-com/teamrun#readme",
+  "bugs": {
+    "url": "https://github.com/noldova-com/teamrun/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./api/index.d.ts",
+      "default": "./api/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "**/*.js",
+    "**/*.js.map",
+    "api/index.d.ts"
+  ],
+  "peerDependencies": {
+    "@noldova/context.exceptions": ">=0.0.8 <0.1.0"
+  }
+}

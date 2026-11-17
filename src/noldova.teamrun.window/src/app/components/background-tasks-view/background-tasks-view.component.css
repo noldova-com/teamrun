@@ -1,0 +1,157 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding: var(--nol-view-padding-block) var(--nol-content-padding-inline);
+}
+
+.tasks-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.tasks-group + .tasks-group {
+  margin-block-start: var(--nol-space-3);
+}
+
+.tasks-header {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  box-sizing: border-box;
+  min-height: var(--nol-section-header-height);
+  padding-inline: calc(var(--nol-border-width) + var(--nol-space-1)) calc(var(--nol-border-width) + var(--nol-space-3) - (var(--nol-icon-button-target) - var(--nol-icon)) / 2);
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-label);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-label);
+}
+
+.tasks-heading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+}
+
+.tasks-heading:not(:has(.tasks-toggle)),
+.tasks-toggle {
+  padding-inline: var(--nol-space-1);
+}
+
+.tasks-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--nol-space-1);
+  min-width: 0;
+  min-height: var(--nol-pointer-target);
+  margin: 0;
+  border: 0;
+  border-radius: var(--nol-radius-hover);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.tasks-toggle:is(:hover, [data-nol-state="Hover"]) {
+  background-color: var(--nol-hover);
+}
+
+.tasks-toggle:is(:focus-visible, [data-nol-state="Focus"]) {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+@media (forced-colors: active) {
+  .tasks-toggle:is(:focus-visible, [data-nol-state="Focus"]) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+}
+
+.tasks-twistie {
+  flex: none;
+  width: var(--nol-icon);
+  font-size: var(--nol-icon);
+  line-height: 1;
+}
+
+.tasks-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tasks-count {
+  flex: none;
+  margin-inline-start: var(--nol-space-1);
+  color: var(--nol-text-muted);
+  font-weight: normal;
+}
+
+.tasks-clear {
+  flex: none;
+}
+
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.tasks-list[hidden] {
+  display: none;
+}
+
+.task {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tasks-more {
+  align-self: flex-start;
+}
+
+.tasks-empty {
+  margin: 0;
+  padding: var(--nol-space-2);
+  color: var(--nol-text-muted);
+}
+
+.task-error,
+.tasks-error {
+  margin: 0;
+  color: var(--nol-error);
+  overflow-wrap: anywhere;
+}
+
+.task-error,
+.tasks-clear-error {
+  padding-inline: var(--nol-space-2);
+}
+
+.tasks-failure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nol-space-1);
+  padding-block: var(--nol-space-2);
+}

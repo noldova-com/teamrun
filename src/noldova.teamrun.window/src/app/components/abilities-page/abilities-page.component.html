@@ -1,0 +1,45 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<section class="nol-settings-group nol-teamrun-abilities-provider">
+  <div class="nol-settings-rows">
+    <div class="nol-setting-row">
+      <div class="nol-setting-row-heading">
+        <span class="nol-setting-row-title">{{ resources.abilitiesProviderLabel }}</span>
+      </div>
+      <div class="nol-setting-row-control">
+        @if (options().length === 0) {
+          <span class="nol-teamrun-muted" role="status">{{ resources.abilitiesNoProviders }}</span>
+        } @else {
+          <nol-select class="nol-teamrun-abilities-kind" [label]="resources.abilitiesProviderLabel" [options]="options()" [value]="kind()?.id ?? ''"
+            (valueChange)="choose($event)" />
+        }
+      </div>
+    </div>
+  </div>
+</section>
+@for (group of groups(); track group.title) {
+  <section class="nol-settings-group nol-teamrun-ability-group" [attr.aria-label]="group.title">
+    <h3 class="nol-settings-group-title">{{ group.title }}</h3>
+    <div class="nol-settings-rows">
+      @for (row of group.rows; track row.ability) {
+        <div class="nol-setting-row nol-teamrun-ability" [attr.data-ability]="row.ability" [attr.data-setting]="row.settingId">
+          <div class="nol-setting-row-heading">
+            <span class="nol-setting-row-title">{{ row.name }}</span>
+            <span class="nol-setting-row-end nol-teamrun-ability-answer" [class.nol-teamrun-muted]="!row.works">{{ row.answer }}</span>
+          </div>
+          @if (row.description) {
+            <div class="nol-setting-row-description nol-teamrun-ability-description" [class.nol-teamrun-muted]="row.works">
+              <span>{{ row.description }}</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </section>
+}

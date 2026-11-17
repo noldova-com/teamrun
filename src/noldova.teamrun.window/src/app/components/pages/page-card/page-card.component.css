@@ -1,0 +1,87 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  gap: var(--nol-space-3);
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 26.25rem;
+  padding: 0.625rem var(--nol-space-3);
+  border: var(--nol-border-width) solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background-color: var(--nol-raised);
+  color: var(--nol-text);
+  line-height: var(--nol-line-panel);
+}
+
+:host(.empty) {
+  display: none;
+}
+
+:host(:focus-visible) {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+@media (forced-colors: active) {
+  :host(:focus-visible) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+}
+
+.glyph {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--nol-radius-medium);
+  background-color: var(--nol-selected);
+  color: var(--nol-text);
+  font-size: 1.375rem;
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title,
+.meta-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.meta {
+  display: flex;
+  gap: var(--nol-space-2);
+  align-items: center;
+  min-width: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+}
+
+.spinner {
+  flex-shrink: 0;
+}
+
+.open {
+  flex-shrink: 0;
+}

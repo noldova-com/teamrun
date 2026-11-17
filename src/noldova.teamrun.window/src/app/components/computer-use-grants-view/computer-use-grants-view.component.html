@@ -1,0 +1,54 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-settings-view">
+  @if (error(); as message) {
+    <div class="nol-teamrun-error" role="alert">
+      <span class="nol-teamrun-error-text">{{ message }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss" [variant]="text" (click)="error.set(null)">{{ resources.dismissLabel }}</button>
+    </div>
+  }
+  <nol-configuration-table class="nol-teamrun-computer-use-grants" [heading]="resources.computerUseGrantsTableTitle" [explanation]="resources.computerUseGrantsHint">
+    <table nolConfigurationTable>
+      <thead>
+        <tr>
+          <th scope="col" [nolConfigurationTableShare]="resources.computerUseGrantColumnShares.app">{{ resources.grantAppColumn }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.computerUseGrantColumnShares.chat" nolConfigurationTableFill>{{ resources.grantChatColumn }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.computerUseGrantColumnShares.granted">{{ resources.grantGrantedColumn }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.computerUseGrantColumnShares.actions" [nolConfigurationTableRowActions]="resources.actionsColumn"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (grant of grants(); track grant.id) {
+          <tr class="nol-teamrun-item">
+            <td class="nol-teamrun-grant-app">
+              <span class="nol-teamrun-grant-app-label">
+                <span class="nol-teamrun-grant-icon">
+                  @if (iconOf(grant); as source) {
+                    <img alt="" [src]="source" (error)="hideIcon(grant)">
+                  }
+                </span>
+                <span class="nol-teamrun-grant-app-name">{{ appName(grant) }}</span>
+              </span>
+            </td>
+            <td nolConfigurationTableFill class="nol-teamrun-grant-chat">
+              <span class="nol-teamrun-grant-chat-text" [nolTooltip]="chatOf(grant)" [nolTooltipTruncated]="true">{{ chatOf(grant) }}</span>
+            </td>
+            <td class="nol-teamrun-grant-time">{{ grantedAt(grant) }}</td>
+            <td nolConfigurationTableRowActions>
+              <button type="button" nol-icon-button class="nol-teamrun-revoke" [icon]="resources.forgetIcon" [danger]="true"
+                [label]="revokeLabel(grant)" [nolTooltip]="resources.revokeGrantLabel" [disabled]="store.isBusy()" (click)="revoke(grant)"></button>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="4" class="nol-teamrun-muted nol-teamrun-no-grants" role="status">{{ grants() === null ? resources.readingComputerUseGrants : resources.noComputerUseGrants }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </nol-configuration-table>
+</div>

@@ -1,0 +1,262 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-settings-view">
+  @if (error(); as message) {
+    <div class="nol-teamrun-error" role="alert">
+      <span class="nol-teamrun-error-text">{{ message }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss" [variant]="text" (click)="error.set(null)">{{ resources.dismissLabel }}</button>
+    </div>
+  }
+  @if (store.kindsFailed()) {
+    <div class="nol-teamrun-error nol-teamrun-kinds-failed" role="alert">
+      <span class="nol-teamrun-error-text">{{ resources.kindsUnavailableForMcpServers }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss nol-teamrun-retry-kinds" [variant]="text" [attr.aria-disabled]="store.loadingKinds()"
+        (click)="retryKinds()">{{ resources.retryLabel }}</button>
+    </div>
+  }
+  @if (secretsSaved(); as message) {
+    <div class="nol-teamrun-shared-mcp-secrets-saved">
+      <span class="nol-teamrun-muted nol-teamrun-shared-mcp-secrets-saved-text">{{ message }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss" [variant]="text" (click)="secretsSaved.set(null)">{{ resources.dismissLabel }}</button>
+    </div>
+  }
+  <h2 class="nol-teamrun-mcp-title">{{ resources.mcpServersTitle }}</h2>
+  <div class="nol-teamrun-mcp-layout">
+    <div class="nol-teamrun-mcp-head nol-teamrun-shared-mcp-head">
+      <div class="nol-teamrun-mcp-head-text">
+        <h3 class="nol-teamrun-mcp-heading">{{ resources.sharedMcpServersTitle }}</h3>
+        <p class="nol-teamrun-mcp-hint">{{ resources.sharedMcpServersHint }}</p>
+      </div>
+      <div class="nol-teamrun-mcp-actions">
+        @if (offersGitHub()) {
+          <button type="button" nol-button class="nol-teamrun-add-github-mcp" [variant]="text" [disabled]="store.isBusy()" (click)="addGitHub()">{{ resources.addGitHubMcpServerLabel }}</button>
+        }
+        <button type="button" nol-button class="nol-teamrun-add-shared-mcp" (click)="editShared(null)">{{ resources.addSharedMcpServerLabel }}</button>
+      </div>
+    </div>
+    <nol-panel-card class="nol-teamrun-mcp-list nol-teamrun-shared-mcp-list">
+      @for (listing of shared() ?? []; track listing.server.id) {
+        @let ready = isReady(listing);
+        @let canCount = canCountOf(listing);
+        <button type="button" class="nol-teamrun-mcp-row nol-teamrun-shared-mcp-row" [class.nol-teamrun-mcp-row-chosen]="isChosen(listing)"
+          [attr.aria-current]="isChosen(listing)" [attr.aria-controls]="resources.sharedMcpDetailsId" [attr.aria-label]="rowLabelOf(listing)" (click)="choose(listing)">
+          <span class="nol-teamrun-status-dot" [class.nol-teamrun-status-dot-connected]="ready" [class.nol-teamrun-status-dot-warning]="!ready" aria-hidden="true"></span>
+          <span class="nol-teamrun-shared-mcp-server">
+            <span class="nol-teamrun-item-name">{{ listing.server.definition.name }}</span>
+            <span class="nol-teamrun-mcp-sub nol-teamrun-shared-mcp-state">{{ stateLineOf(listing) }}</span>
+          </span>
+          <span class="nol-teamrun-mcp-chips nol-teamrun-shared-mcp-on">
+            @for (provider of onFor(listing); track provider.id) {
+              <nol-chip [kind]="on">{{ groupName(provider) }}</nol-chip>
+            }
+            @if (canCount > 0) {
+              <nol-chip class="nol-teamrun-shared-mcp-can" [kind]="key">{{ resources.formatSharedMcpCanCount(canCount) }}</nol-chip>
+            }
+          </span>
+          <span class="nol-teamrun-mcp-chevron material-symbols-rounded" aria-hidden="true">{{ resources.collapsedIcon }}</span>
+        </button>
+      } @empty {
+        <div class="nol-teamrun-mcp-row nol-teamrun-mcp-row-note">
+          @if (sharedError(); as message) {
+            <span class="nol-teamrun-mcp-note nol-teamrun-mcp-unread" role="status">{{ resources.formatSharedMcpServersUnread(message) }}</span>
+            <button type="button" nol-button class="nol-teamrun-dismiss nol-teamrun-retry-shared" [variant]="text" (click)="retryShared()">{{ resources.retryLabel }}</button>
+          } @else if (shared() === null) {
+            <span class="nol-teamrun-mcp-note nol-teamrun-shared-mcp-reading" role="status">{{ resources.readingSharedMcpServers }}</span>
+          } @else {
+            <span class="nol-teamrun-mcp-note nol-teamrun-shared-mcp-none">{{ resources.noSharedMcpServers }}</span>
+          }
+        </div>
+      }
+    </nol-panel-card>
+    @if (chosen(); as listing) {
+      @let refused = refusers(listing);
+      @let exceptions = exceptionsOf(listing);
+      @let reached = reachOf(listing);
+      <nol-panel-card class="nol-teamrun-mcp-details" role="region" [id]="resources.sharedMcpDetailsId" [attr.aria-label]="listing.server.definition.name">
+        <div class="nol-teamrun-mcp-details-head">
+          <span class="nol-teamrun-item-name nol-teamrun-mcp-details-name">{{ listing.server.definition.name }}</span>
+          <span class="nol-teamrun-mcp-sub nol-teamrun-shared-mcp-command">{{ commandLineOf(listing.server) }}</span>
+          @if (listing.server.definition.signsIn) {
+            <span class="nol-teamrun-shared-mcp-sign-in">
+              <span class="nol-teamrun-status-dot" [class.nol-teamrun-status-dot-connected]="isSignedIn(listing.server)"
+                [class.nol-teamrun-status-dot-warning]="!isSignedIn(listing.server)" aria-hidden="true"></span>
+              <span class="nol-teamrun-shared-mcp-sign-in-state">{{ signInStateOf(listing) }}</span>
+              @if (isSignedIn(listing.server)) {
+                <button type="button" nol-button class="nol-teamrun-mcp-link nol-teamrun-shared-mcp-sign-out" [variant]="text" [disabled]="store.isBusy()"
+                  [attr.aria-label]="resources.formatSharedMcpSignOut(listing.server.definition.name)"
+                  (click)="signOut(listing.server)">{{ resources.sharedMcpSignOutLabel }}</button>
+              } @else {
+                <button type="button" nol-button class="nol-teamrun-mcp-link nol-teamrun-shared-mcp-sign-in-action" [variant]="text" [disabled]="store.isBusy()"
+                  [attr.aria-label]="resources.formatSharedMcpSignIn(listing.server.definition.name)"
+                  (click)="signIn($event, listing.server)" (auxclick)="signIn($event, listing.server)">{{ resources.sharedMcpSignInLabel }}</button>
+              }
+            </span>
+          }
+        </div>
+        <div class="nol-teamrun-mcp-group nol-teamrun-shared-mcp-providers">
+          <h4 class="nol-teamrun-mcp-group-heading">{{ resources.sharedMcpProvidersHeading }}</h4>
+          @for (provider of takers(listing); track provider.id) {
+            <div class="nol-teamrun-mcp-line nol-teamrun-shared-mcp-provider">
+              <span class="nol-teamrun-mcp-line-name">{{ groupName(provider) }}</span>
+              <nol-switch class="nol-teamrun-shared-mcp-switch" [attr.id]="sharedSwitchId(listing, provider)" [checked]="isSharedOn(listing, provider)"
+                [disabled]="store.isBusy()" [label]="resources.formatSharedMcpProviderSwitch(listing.server.definition.name, groupName(provider))"
+                (checkedChange)="switchShared(listing, provider, $event)" />
+            </div>
+          } @empty {
+            @if (shown().length === 0) {
+              <span class="nol-teamrun-mcp-sub">{{ resources.noProvidersForSharedMcp }}</span>
+            }
+          }
+          @if (refused.length > 0) {
+            <div class="nol-teamrun-mcp-fold nol-teamrun-shared-mcp-refused">
+              <div class="nol-teamrun-mcp-line">
+                <span class="nol-teamrun-mcp-line-name">{{ resources.formatSharedMcpCantTake(refused.length) }}</span>
+                <button type="button" nol-button class="nol-teamrun-mcp-link nol-teamrun-shared-mcp-show" [variant]="text" [attr.aria-expanded]="cantShown()"
+                  [attr.aria-controls]="resources.sharedMcpRefusedId" (click)="cantShown.set(!cantShown())">{{ cantShown() ? resources.hideReasonsLabel : resources.showReasonsLabel }}</button>
+              </div>
+              @if (cantShown()) {
+                <ul class="nol-teamrun-mcp-reasons" [id]="resources.sharedMcpRefusedId">
+                  @for (provider of refused; track provider.id) {
+                    <li class="nol-teamrun-shared-mcp-reason">{{ sharedUnavailableReason(listing, provider) }}</li>
+                  }
+                </ul>
+              } @else {
+                <p class="nol-teamrun-mcp-reason-groups" [id]="resources.sharedMcpRefusedId">
+                  @for (group of reasonGroupsOf(listing); track group) {
+                    <span class="nol-teamrun-shared-mcp-reason-group">{{ group }}</span>
+                  }
+                </p>
+              }
+            </div>
+          }
+        </div>
+        <div class="nol-teamrun-mcp-group nol-teamrun-shared-mcp-teammates">
+          <h4 class="nol-teamrun-mcp-group-heading">{{ resources.sharedMcpTeammatesHeading }}</h4>
+          @if (store.teammates().length === 0) {
+            <span class="nol-teamrun-mcp-sub">{{ resources.noTeammatesForSharedMcp }}</span>
+          } @else {
+            <span class="nol-teamrun-mcp-sub">{{ resources.sharedMcpTeammatesFollow }}</span>
+            <div class="nol-teamrun-mcp-reach-line nol-teamrun-shared-mcp-reach">
+              <span class="nol-teamrun-mcp-reach-label">{{ resources.sharedMcpGetsItLabel }}</span>
+              @for (teammate of reached; track teammate.id) {
+                <nol-chip [kind]="on">{{ teammate.name }}</nol-chip>
+              } @empty {
+                <span class="nol-teamrun-mcp-sub">{{ resources.sharedMcpNoneLabel }}</span>
+              }
+            </div>
+            <div class="nol-teamrun-mcp-reach-line nol-teamrun-shared-mcp-exceptions">
+              <span class="nol-teamrun-mcp-reach-label">{{ resources.sharedMcpExceptionsLabel }}</span>
+              @if (exceptions.length === 0) {
+                <span class="nol-teamrun-mcp-sub">{{ resources.sharedMcpNoneLabel }}</span>
+              }
+              @if (followersOf(listing).length > 0) {
+                <button type="button" nol-button class="nol-teamrun-mcp-link nol-teamrun-shared-mcp-add-exception" [variant]="text" [nolMenuTriggerFor]="exceptionMenu"
+                  [disabled]="store.isBusy()">{{ resources.sharedMcpAddExceptionLabel }}</button>
+              }
+            </div>
+            @if (exceptions.length > 0) {
+              <ul class="nol-teamrun-shared-mcp-exception-list">
+                @for (teammate of exceptions; track teammate.id) {
+                  <li class="nol-teamrun-shared-mcp-exception">
+                    <span class="nol-teamrun-shared-mcp-teammate-name">{{ teammate.name }}</span>
+                    <nol-choice-pills [options]="exceptionOptions" [value]="settingOf(listing, teammate)" [label]="settingLabelOf(listing, teammate)"
+                      (valueChange)="setTeammate(listing, teammate, $event)" />
+                    <button type="button" nol-icon-button class="nol-teamrun-shared-mcp-remove-exception" [icon]="resources.closeIcon"
+                      [label]="resources.formatSharedMcpRemoveException(teammate.name)" [nolTooltip]="resources.sharedMcpRemoveExceptionLabel" [disabled]="store.isBusy()"
+                      (click)="setTeammate(listing, teammate, resources.sharedMcpFollowSetting)"></button>
+                  </li>
+                }
+              </ul>
+            }
+            <ng-template #exceptionMenu>
+              <nol-menu [attr.aria-label]="resources.sharedMcpAddExceptionLabel">
+                @for (teammate of followersOf(listing); track teammate.id) {
+                  <button type="button" nol-menu-item class="nol-teamrun-shared-mcp-exception-choice" [label]="teammate.name" (triggered)="addException(listing, teammate)"></button>
+                }
+              </nol-menu>
+            </ng-template>
+          }
+        </div>
+        <div class="nol-teamrun-mcp-actions">
+          <button type="button" nol-button class="nol-teamrun-edit" [variant]="secondary"
+            [attr.aria-label]="resources.formatRowAction(resources.editLabel, listing.server.definition.name)" (click)="editShared(listing)">{{ resources.editLabel }}</button>
+          <button type="button" nol-button class="nol-teamrun-delete" [variant]="secondary"
+            [attr.aria-label]="resources.formatRowAction(resources.deleteSharedMcpServerLabel, listing.server.definition.name)"
+            (click)="removeShared(listing.server)">{{ resources.deleteLabel }}</button>
+        </div>
+      </nol-panel-card>
+    }
+    <div class="nol-teamrun-mcp-head nol-teamrun-own-mcp-head">
+      <div class="nol-teamrun-mcp-head-text">
+        <h3 class="nol-teamrun-mcp-heading">{{ resources.ownMcpServersTitle }}</h3>
+        <p class="nol-teamrun-mcp-hint">{{ resources.ownMcpServersHint }}</p>
+      </div>
+    </div>
+    <nol-panel-card class="nol-teamrun-mcp-list nol-teamrun-own-mcp-list">
+      <ng-template #ownServers let-provider>
+        @let listing = listingOf(provider);
+        <span class="nol-teamrun-own-mcp-servers">
+          @if (isListedByName(provider)) {
+            <span class="nol-teamrun-mcp-chips">
+              @for (server of listing?.servers ?? []; track server.name) {
+                <nol-chip class="nol-teamrun-mcp-server" [kind]="key">{{ server.name }}</nol-chip>
+              }
+            </span>
+          } @else {
+            @let note = noteOf(provider);
+            @if (note !== null && !isPending(provider) && !isUnread(provider)) {
+              <span class="nol-teamrun-mcp-sub nol-teamrun-own-mcp-summary" [nolTooltip]="note">{{ summaryOf(provider) }}</span>
+            } @else {
+              <span class="nol-teamrun-mcp-sub nol-teamrun-own-mcp-summary" [class.nol-teamrun-mcp-unread]="isUnread(provider)"
+                [attr.role]="isPending(provider) || isUnread(provider) ? resources.statusRole : null">{{ summaryOf(provider) }}</span>
+            }
+          }
+        </span>
+      </ng-template>
+      @for (provider of ownShown(); track provider.id) {
+        <div class="nol-teamrun-mcp-row nol-teamrun-own-mcp-row">
+          <span class="nol-teamrun-item-name nol-teamrun-own-mcp-name">{{ groupName(provider) }}</span>
+          <ng-container [ngTemplateOutlet]="ownServers" [ngTemplateOutletContext]="{ $implicit: provider }" />
+          <nol-switch class="nol-teamrun-own-mcp-switch" [attr.id]="switchId(provider)" [checked]="provider.ownMcpServers" [disabled]="store.isBusy()"
+            [label]="resources.formatOwnMcpServersSwitch(groupName(provider))" (checkedChange)="switch(provider, $event)" />
+        </div>
+      }
+      @for (provider of ownListedHeld(); track provider.id) {
+        <div class="nol-teamrun-mcp-row nol-teamrun-own-mcp-row nol-teamrun-own-mcp-listed">
+          <span class="nol-teamrun-item-name nol-teamrun-own-mcp-name">{{ groupName(provider) }}</span>
+          <ng-container [ngTemplateOutlet]="ownServers" [ngTemplateOutletContext]="{ $implicit: provider }" />
+        </div>
+      }
+      @if (ownHeld().length > 0) {
+        <div class="nol-teamrun-mcp-row nol-teamrun-own-mcp-row nol-teamrun-own-mcp-held">
+          <span class="nol-teamrun-mcp-sub nol-teamrun-own-mcp-name">{{ ownHeldNames() }}</span>
+          <span class="nol-teamrun-own-mcp-servers">
+            <span class="nol-teamrun-mcp-sub">{{ resources.ownMcpServersHeld }}
+              <button type="button" nol-button class="nol-teamrun-mcp-link nol-teamrun-own-mcp-why" [variant]="text" [attr.aria-expanded]="whyShown()"
+                [attr.aria-controls]="whyShown() ? resources.ownMcpHeldReasonsId : null" (click)="whyShown.set(!whyShown())">{{ whyShown() ? resources.hideReasonsLabel : resources.whyLabel }}</button>
+            </span>
+            @if (whyShown()) {
+              <ul class="nol-teamrun-mcp-reasons" [id]="resources.ownMcpHeldReasonsId">
+                @for (provider of ownHeld(); track provider.id) {
+                  <li class="nol-teamrun-mcp-reason">{{ unavailableReason(provider) }}</li>
+                }
+              </ul>
+            }
+          </span>
+        </div>
+      }
+      @if (store.providers().length === 0) {
+        <div class="nol-teamrun-mcp-row nol-teamrun-mcp-row-note">
+          <span class="nol-teamrun-mcp-note nol-teamrun-mcp-no-providers">{{ resources.noProvidersForMcpServers }}</span>
+        </div>
+      }
+    </nol-panel-card>
+  </div>
+  <div class="nol-teamrun-muted nol-teamrun-notice">{{ resources.namesNotice }}</div>
+</div>

@@ -1,0 +1,63 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+export enum ChatAction {
+  OpenProject = "OpenProject",
+  ShowProject = "ShowProject",
+  ForgetProject = "ForgetProject",
+  StartChat = "StartChat",
+  AddMember = "AddMember",
+  RemoveMember = "RemoveMember",
+  SetMemberMode = "SetMemberMode",
+  SetMemberSettings = "SetMemberSettings",
+  SetPlanFirst = "SetPlanFirst",
+  MoveChat = "MoveChat",
+  RenameChat = "RenameChat",
+  SetResponder = "SetResponder",
+  DeleteChat = "DeleteChat",
+  SaveDraft = "SaveDraft",
+  DiscardDraft = "DiscardDraft",
+  StopReply = "StopReply",
+  StopReplies = "StopReplies",
+  Answer = "Answer",
+  ApprovePlan = "ApprovePlan",
+  ShowInFolder = "ShowInFolder",
+  OpenAttachment = "OpenAttachment",
+  OpenFile = "OpenFile",
+  CopyImage = "CopyImage",
+  SaveImage = "SaveImage",
+  FinishSetup = "FinishSetup",
+  AddProvider = "AddProvider",
+  ChangeProvider = "ChangeProvider",
+  EnableProvider = "EnableProvider",
+  DisableProvider = "DisableProvider",
+  CheckProvider = "CheckProvider",
+  SignIn = "SignIn",
+  OpenSignInPage = "OpenSignInPage",
+  CancelSignIn = "CancelSignIn",
+  SignOut = "SignOut",
+  InstallKind = "InstallKind",
+  CancelInstall = "CancelInstall",
+  RemoveProvider = "RemoveProvider",
+  InstallTool = "InstallTool",
+  OpenPage = "OpenPage",
+  OpenBrowser = "OpenBrowser",
+  SaveTeammate = "SaveTeammate",
+  SetDefaultTeammate = "SetDefaultTeammate",
+  DeleteTeammate = "DeleteTeammate",
+  Rewind = "Rewind",
+  ShowTerminals = "ShowTerminals",
+  CloseTerminals = "CloseTerminals",
+  RunCode = "RunCode",
+  ShowLatest = "ShowLatest",
+  EditWaiting = "EditWaiting",
+  RemoveWaiting = "RemoveWaiting",
+  SendWaitingNow = "SendWaitingNow",
+  ShowRunOutputs = "ShowRunOutputs",
+  KeepRunOutput = "KeepRunOutput"
+}

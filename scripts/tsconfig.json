@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig-base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "**/*.ts",
+    "../src/*/scripts/**/*.ts"
+  ],
+  "exclude": [
+    "profile"
+  ]
+}

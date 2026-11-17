@@ -1,0 +1,101 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Flake proof
+
+env:
+  DEFAULT_RUNS: &default-runs '10'
+  DEFAULT_PARALLEL_JOBS_PER_TARGET: &default-parallel-jobs-per-target '2'
+  DEFAULT_TARGETS: &default-targets linux-x64 windows-x64
+  DEFAULT_SCRIPT: &default-script test
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The branch, tag or commit to test; empty tests the branch the run starts on
+        type: string
+        default: ''
+      filter:
+        description: The filters the script takes, separated by spaces; empty runs the whole suite
+        type: string
+        default: ''
+      script:
+        description: The npm script each run runs with the filters, such as test:e2e for the end-to-end specs
+        type: string
+        default: *default-script
+      prepare:
+        description: The npm scripts each job runs once after the build and before the runs, separated by spaces, such as install:app build:app for the end-to-end specs
+        type: string
+        default: ''
+      display:
+        description: Runs each run on Linux under a virtual display and a session bus, for a test that opens windows
+        type: boolean
+        default: false
+      runs:
+        description: Runs in total per target, 1 to 200
+        type: string
+        default: *default-runs
+      jobs:
+        description: Parallel jobs per target, 1 to 4
+        type: string
+        default: *default-parallel-jobs-per-target
+      targets:
+        description: The targets to run on, separated by spaces, from linux-x64, linux-arm64, windows-x64, windows-arm64, macos-x64 and macos-arm64
+        type: string
+        default: *default-targets
+
+permissions: {}
+
+jobs:
+  versions:
+    name: Versions
+    uses: noldova-com/.github/.github/workflows/versions.yml@7930c8dcf906cccb753aa7559220ac2b139c89aa # v2.34.0
+    permissions: {}
+
+  group:
+    name: Concurrency group
+    needs: versions
+    runs-on: ${{ fromJSON(needs.versions.outputs.runs-on-linux-x64) }}
+    timeout-minutes: 2
+    permissions: {}
+    outputs:
+      inputs: ${{ steps.inputs.outputs.hash }}
+    steps:
+      - name: Hash the inputs
+        id: inputs
+        shell: bash
+        env:
+          SCRIPT: ${{ inputs.script }}
+          PREPARE: ${{ inputs.prepare }}
+          VIRTUAL_DISPLAY: ${{ inputs.display }}
+          FILTER: ${{ inputs.filter }}
+        run: |
+          hash=$(printf '%s\0' "$SCRIPT" "$PREPARE" "$VIRTUAL_DISPLAY" "$FILTER" | sha256sum | cut -c1-16)
+          if [[ ! "$hash" =~ ^[0-9a-f]{16}$ ]]; then
+            echo "::error::The inputs' hash is \"$hash\", not 16 hex digits."
+            exit 1
+          fi
+          printf 'hash=%s\n' "$hash" >> "$GITHUB_OUTPUT"
+
+  flake-proof:
+    needs: group
+    concurrency:
+      group: ${{ github.workflow }}-${{ inputs.ref || github.ref_name }}-${{ needs.group.outputs.inputs }}
+      cancel-in-progress: false
+    uses: noldova-com/.github/.github/workflows/flake-proof.yml@7930c8dcf906cccb753aa7559220ac2b139c89aa # v2.34.0
+    permissions:
+      contents: read
+      packages: read
+    with:
+      ref: ${{ inputs.ref }}
+      filter: ${{ inputs.filter }}
+      script: ${{ inputs.script }}
+      prepare: ${{ inputs.prepare }}
+      display: ${{ inputs.display }}
+      runs: ${{ inputs.runs }}
+      jobs: ${{ inputs.jobs }}
+      targets: ${{ inputs.targets }}

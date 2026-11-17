@@ -1,0 +1,165 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="title()" (dismissed)="dismiss()">
+  <form id="nol-teamrun-shared-mcp-form" class="nol-teamrun-form" novalidate (submit)="save($event)">
+    <div>
+      <label class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.sharedMcpNameLabel }}</span>
+        <input nol-text-field class="nol-teamrun-shared-mcp-name" name="name" [attr.aria-label]="resources.sharedMcpNameLabel" [value]="name()" [disabled]="saving()"
+          [attr.aria-describedby]="describedBy(nameField, nameHintId, error() ? messageId : null)" [attr.aria-invalid]="refusalOf(nameField) ? true : null"
+          (input)="edit(name, $event)">
+        <span class="nol-teamrun-muted" [id]="nameHintId">{{ resources.sharedMcpNameHint }}</span>
+      </label>
+      @if (refusalOf(nameField); as message) {
+        <nol-field-message class="nol-teamrun-field-refusal" [attr.id]="refusalIdOf(nameField)">{{ message }}</nol-field-message>
+      }
+    </div>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.sharedMcpTransportLabel }}</span>
+      <nol-select class="nol-teamrun-shared-mcp-transport" [label]="resources.sharedMcpTransportLabel" [options]="transportOptions" [value]="transport()"
+        [disabled]="saving()" (valueChange)="changeTransport($event)" />
+    </div>
+    @if (isStdio()) {
+      <label class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.sharedMcpCommandLabel }}</span>
+        <input nol-text-field class="nol-teamrun-shared-mcp-command" name="command" [attr.aria-label]="resources.sharedMcpCommandLabel" [value]="command()"
+          [disabled]="saving()" (input)="edit(command, $event)">
+      </label>
+      <label class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.sharedMcpArgumentsLabel }}</span>
+        <textarea nol-text-field class="nol-teamrun-shared-mcp-arguments" name="arguments" [attr.aria-label]="resources.sharedMcpArgumentsLabel"
+          [attr.aria-describedby]="argumentsHintId" [rows]="resources.teammateRoleRows" [value]="argumentLines()" [disabled]="saving()"
+          (input)="edit(argumentLines, $event)"></textarea>
+        <span class="nol-teamrun-muted" [id]="argumentsHintId">{{ resources.sharedMcpArgumentsHint }}</span>
+      </label>
+      <div>
+        <label class="nol-teamrun-field">
+          <span class="nol-teamrun-field-label">{{ resources.sharedMcpVariablesLabel }}</span>
+          <textarea nol-text-field class="nol-teamrun-shared-mcp-variables" name="variables" [attr.aria-label]="resources.sharedMcpVariablesLabel"
+            [attr.aria-describedby]="describedBy(variablesField, variablesHintId)" [attr.aria-invalid]="refusalOf(variablesField) ? true : null"
+            [rows]="resources.teammateRoleRows" [value]="variableLines()" [disabled]="saving()" (input)="edit(variableLines, $event)"></textarea>
+          <span class="nol-teamrun-muted" [id]="variablesHintId">{{ resources.sharedMcpVariablesHint }}</span>
+        </label>
+        @if (refusalOf(variablesField); as message) {
+          <nol-field-message class="nol-teamrun-field-refusal" [attr.id]="refusalIdOf(variablesField)">{{ message }}</nol-field-message>
+        }
+      </div>
+    } @else {
+      <div>
+        <label class="nol-teamrun-field">
+          <span class="nol-teamrun-field-label">{{ resources.sharedMcpUrlLabel }}</span>
+          <input nol-text-field class="nol-teamrun-shared-mcp-url" name="url" type="url" [attr.aria-label]="resources.sharedMcpUrlLabel" [value]="url()"
+            [attr.aria-describedby]="describedBy(urlField, locked() ? urlHintId : null)" [attr.aria-invalid]="refusalOf(urlField) ? true : null" [disabled]="saving()"
+            [readOnly]="locked() !== null" (input)="edit(url, $event)">
+          @if (locked()) {
+            <span class="nol-teamrun-muted" [id]="urlHintId">{{ resources.sharedMcpAccountUrlHint }}</span>
+          }
+        </label>
+        @if (refusalOf(urlField); as message) {
+          <nol-field-message class="nol-teamrun-field-refusal" [attr.id]="refusalIdOf(urlField)">{{ message }}</nol-field-message>
+        }
+      </div>
+      <div>
+        <label class="nol-teamrun-field">
+          <span class="nol-teamrun-field-label">{{ resources.sharedMcpHeadersLabel }}</span>
+          <textarea nol-text-field class="nol-teamrun-shared-mcp-headers" name="headers" [attr.aria-label]="resources.sharedMcpHeadersLabel"
+            [attr.aria-describedby]="describedBy(headersField, headersHintId)" [attr.aria-invalid]="refusalOf(headersField) ? true : null"
+            [rows]="resources.teammateRoleRows" [value]="headerLines()" [disabled]="saving()" (input)="edit(headerLines, $event)"></textarea>
+          <span class="nol-teamrun-muted" [id]="headersHintId">{{ resources.sharedMcpHeadersHint }}</span>
+        </label>
+        @if (refusalOf(headersField); as message) {
+          <nol-field-message class="nol-teamrun-field-refusal" [attr.id]="refusalIdOf(headersField)">{{ message }}</nol-field-message>
+        }
+      </div>
+      <div class="nol-teamrun-field">
+        <nol-checkbox class="nol-teamrun-shared-mcp-signs-in" [checked]="signsIn()" [disabled]="saving()"
+          (checkedChange)="changeSignsIn($event)">{{ resources.sharedMcpSignsInLabel }}</nol-checkbox>
+        <span class="nol-teamrun-muted" [id]="signsInHintId">{{ resources.sharedMcpSignsInHint }}</span>
+        @if (refusalOf(signsInField); as message) {
+          <nol-field-message class="nol-teamrun-field-refusal" [attr.id]="refusalIdOf(signsInField)">{{ message }}</nol-field-message>
+        }
+      </div>
+      @if (!signsIn()) {
+      <div>
+        <label class="nol-teamrun-field">
+          <span class="nol-teamrun-field-label">{{ resources.sharedMcpBearerLabel }}</span>
+          <input nol-text-field class="nol-teamrun-shared-mcp-bearer" name="bearer" [attr.aria-label]="resources.sharedMcpBearerLabel"
+            [attr.aria-describedby]="describedBy(bearerField, bearerHintId)" [attr.aria-invalid]="refusalOf(bearerField) ? true : null" [value]="bearer()"
+            [disabled]="saving()" (input)="edit(bearer, $event)">
+          <span class="nol-teamrun-muted" [id]="bearerHintId">{{ resources.sharedMcpBearerHint }}</span>
+        </label>
+        @if (refusalOf(bearerField); as message) {
+          <nol-field-message class="nol-teamrun-field-refusal" [attr.id]="refusalIdOf(bearerField)">{{ message }}</nol-field-message>
+        }
+      </div>
+      }
+    }
+    @if (named().length > 0) {
+      <div class="nol-teamrun-field">
+        <span class="nol-teamrun-field-label">{{ resources.sharedMcpValuesLabel }}</span>
+        <span class="nol-teamrun-muted" [id]="valuesHintId">{{ resources.sharedMcpValuesHint }}</span>
+      </div>
+      <div class="nol-teamrun-shared-mcp-values">
+        <div class="nol-teamrun-shared-mcp-values-head">
+          <span class="nol-teamrun-field-label">{{ resources.sharedMcpVariableColumn }}</span>
+          <span class="nol-teamrun-field-label">{{ resources.sharedMcpSourceColumn }}</span>
+        </div>
+        @for (variable of named(); track variable; let index = $index) {
+          <div class="nol-teamrun-shared-mcp-value" role="group" [attr.aria-label]="variable">
+            <span class="nol-teamrun-field-label nol-teamrun-shared-mcp-variable">{{ variable }}</span>
+            <nol-select class="nol-teamrun-shared-mcp-source" [label]="resources.formatSharedMcpVariableSource(variable)" [options]="sourceOptions"
+              [value]="sourceOf(variable)" [disabled]="saving()" (valueChange)="changeSource(variable, $event)" />
+            @if (isSaved(variable)) {
+              <span class="nol-teamrun-field-label nol-teamrun-shared-mcp-value-label">{{ resources.sharedMcpValueColumn }}</span>
+              <div class="nol-teamrun-shared-mcp-value-state">
+                <span class="nol-teamrun-field-row">
+                  <span class="nol-teamrun-muted nol-teamrun-shared-mcp-saved">{{ resources.sharedMcpSecretSavedLabel }}</span>
+                  <button type="button" nol-button class="nol-teamrun-shared-mcp-change" [variant]="text" [disabled]="saving()"
+                    (click)="change(variable)">{{ resources.changeLabel }}</button>
+                  <button type="button" nol-button class="nol-teamrun-shared-mcp-remove" [variant]="text" [disabled]="saving()"
+                    (click)="remove(variable)">{{ resources.removeLabel }}</button>
+                </span>
+                @if (updatedOf(variable); as updated) {
+                  <span class="nol-teamrun-muted nol-teamrun-shared-mcp-updated">{{ updated }}</span>
+                }
+              </div>
+            } @else if (takesValue(variable)) {
+              <label class="nol-teamrun-field-label nol-teamrun-shared-mcp-value-label" [attr.for]="valueIdOf(index, 'input')">{{ resources.sharedMcpValueColumn }}</label>
+              <div class="nol-teamrun-shared-mcp-value-state">
+                <span class="nol-teamrun-field-row">
+                  <input nol-text-field class="nol-teamrun-shared-mcp-secret" [attr.id]="valueIdOf(index, 'input')" [attr.type]="isShown(variable) ? 'text' : 'password'"
+                    autocomplete="off" spellcheck="false" [attr.name]="variable" [attr.aria-label]="resources.formatSharedMcpSecret(variable)"
+                    [attr.aria-describedby]="valueDescribedBy(variable, index)" [attr.aria-invalid]="valueRefusalOf(variable) ? true : null" [value]="entryOf(variable)"
+                    [disabled]="saving()" (input)="editValue(variable, $event)">
+                  <button type="button" nol-button class="nol-teamrun-shared-mcp-reveal" [variant]="text" [disabled]="saving()"
+                    [attr.aria-label]="resources.formatSharedMcpReveal(variable, isShown(variable))"
+                    (click)="toggleShown(variable)">{{ isShown(variable) ? resources.sharedMcpHideValueLabel : resources.sharedMcpShowValueLabel }}</button>
+                </span>
+                @if (isNotSet(variable)) {
+                  <span class="nol-teamrun-muted nol-teamrun-shared-mcp-not-set" [id]="valueIdOf(index, 'state')">{{ resources.sharedMcpVariableNotSetLabel }}</span>
+                }
+              </div>
+            }
+            @if (valueRefusalOf(variable); as message) {
+              <nol-field-message class="nol-teamrun-field-refusal" [attr.id]="valueIdOf(index, 'message')">{{ message }}</nol-field-message>
+            }
+          </div>
+        }
+      </div>
+      @if (moved(); as message) {
+        <p class="nol-teamrun-muted nol-teamrun-shared-mcp-moved">{{ message }}</p>
+      }
+    }
+    @if (error(); as message) {
+      <nol-field-message class="nol-teamrun-dialog-error" [attr.id]="messageId">{{ message }}</nol-field-message>
+    }
+  </form>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" [disabled]="saving()" (click)="dismiss()">{{ resources.closeLabel }}</button>
+  <button type="submit" form="nol-teamrun-shared-mcp-form" nol-button nolDialogAction class="nol-teamrun-save" [disabled]="!canSave()">{{ resources.saveLabel }}</button>
+</nol-dialog>

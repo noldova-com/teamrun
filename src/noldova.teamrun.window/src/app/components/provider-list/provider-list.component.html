@@ -1,0 +1,119 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (groups().length === 0) {
+  <p class="nol-teamrun-muted nol-teamrun-list-empty">{{ empty() }}</p>
+} @else {
+  <div class="nol-teamrun-provider-groups" role="group" [attr.aria-label]="label()">
+    @for (group of groups(); track group.kind) {
+      <div class="nol-teamrun-group-head" [attr.data-kind]="group.kind">
+        <h5 class="nol-teamrun-group-heading">
+          <span class="nol-teamrun-group-name">{{ group.name }}</span>
+          <span class="nol-teamrun-group-count">{{ group.count }}</span>
+          @if (group.note; as note) {
+            <span class="nol-teamrun-group-note">{{ note }}</span>
+          }
+        </h5>
+        @if (kindActions(); as actions) {
+          <span class="nol-teamrun-group-actions">
+            <ng-container [ngTemplateOutlet]="actions" [ngTemplateOutletContext]="{ $implicit: group }" />
+          </span>
+        }
+      </div>
+      <ul class="nol-teamrun-provider-list" [attr.aria-label]="group.name" [attr.data-kind]="group.kind">
+        @for (row of group.rows; track row.provider.id) {
+          @let asked = row.provider.id === asking();
+          <li class="nol-teamrun-item" [class.nol-teamrun-asking]="asked" [class.nol-teamrun-item-failed]="!asked && row.isError"
+            [class.nol-teamrun-item-warning]="!asked && row.warning !== null" [attr.data-provider]="row.provider.id">
+            <span class="nol-teamrun-name-cell">
+              <span [class]="row.dot" role="img" [attr.aria-label]="row.status" [nolTooltip]="row.status"></span>
+              <span class="nol-teamrun-item-text">
+                <span class="nol-teamrun-item-title">
+                  <span class="nol-teamrun-item-name" [class.nol-teamrun-unavailable]="!row.provider.enabled">{{ row.provider.label }}</span>
+                </span>
+                @if (asked) {
+                  <span class="nol-teamrun-item-line nol-teamrun-question" [id]="questionId(row)">{{ question() }}</span>
+                } @else {
+                  @if (row.warning; as warning) {
+                    <span class="nol-teamrun-item-line nol-teamrun-account-warning">{{ warning }}</span>
+                  }
+                  @if (row.account.length > 0) {
+                    <span class="nol-teamrun-item-line">
+                      <span class="nol-teamrun-account" [class.nol-teamrun-account-note]="row.isNote" [class.nol-teamrun-account-failed]="row.isFailed"
+                        [nolTooltip]="row.accountDetail">{{ row.account }}</span>
+                      @if (row.command; as command) {
+                        <span class="nol-teamrun-account-command">{{ command }}</span>
+                      }
+                      @if (row.sameAccountAs; as same) {
+                        <nol-chip class="nol-teamrun-same-account" [kind]="chips.Status">{{ resources.formatSameSignIn(same) }}</nol-chip>
+                      }
+                    </span>
+                  }
+                }
+              </span>
+            </span>
+            <span class="nol-teamrun-plan-cell">
+              @if (!asked && row.plan !== resources.noPlanTag) {
+                <nol-chip class="nol-teamrun-plan-tag" [kind]="chips.Key">{{ row.plan }}</nol-chip>
+              }
+            </span>
+            <span class="nol-teamrun-limits-cell">
+              @for (meter of asked ? [] : row.limits; track meter.label) {
+                <span class="nol-teamrun-limit" [nolTooltip]="meter.description">
+                  <span class="nol-teamrun-limit-label">{{ meter.label }}</span>
+                  @if (meter.percent !== null) {
+                    <span class="nol-teamrun-meter" [class.nol-teamrun-meter-warning]="meter.level === levels.Warning"
+                      [class.nol-teamrun-meter-critical]="meter.level === levels.Critical" aria-hidden="true"
+                      [style.--nol-teamrun-meter-percent]="meter.percent">
+                      <span class="nol-teamrun-meter-bar"></span>
+                    </span>
+                  } @else {
+                    <span class="nol-teamrun-meter-room" aria-hidden="true"></span>
+                  }
+                  <span class="nol-teamrun-meter-text" [class.nol-teamrun-meter-warning]="meter.level === levels.Warning"
+                    [class.nol-teamrun-meter-critical]="meter.level === levels.Critical">{{ meter.text }}</span>
+                </span>
+              } @empty {
+                @if (asked ? null : row.limitsNote; as note) {
+                  <span class="nol-teamrun-muted nol-teamrun-no-limits">{{ note }}</span>
+                }
+              }
+            </span>
+            <span class="nol-teamrun-menu-cell nol-teamrun-row-menu-cell">
+              <span class="nol-teamrun-step-slot">
+                <ng-container [ngTemplateOutlet]="rowStep()" [ngTemplateOutletContext]="{ $implicit: row }" />
+              </span>
+              <span class="nol-teamrun-actions-slot">
+                <ng-container [ngTemplateOutlet]="rowActions()" [ngTemplateOutletContext]="{ $implicit: row }" />
+              </span>
+            </span>
+          </li>
+        }
+        @for (row of group.found; track row.profile.profileDir) {
+          <li class="nol-teamrun-item nol-teamrun-found-item" [attr.data-profile]="row.profile.profileDir">
+            <span class="nol-teamrun-name-cell">
+              <span [class]="row.dot" role="img" [attr.aria-label]="row.status" [nolTooltip]="row.status"></span>
+              <span class="nol-teamrun-item-text">
+                <span class="nol-teamrun-item-title">
+                  <span class="nol-teamrun-item-name">{{ row.profile.label }}</span>
+                </span>
+                <span class="nol-teamrun-item-line nol-teamrun-muted nol-teamrun-found-folder">{{ row.profile.profileDir }}</span>
+              </span>
+            </span>
+            <span class="nol-teamrun-account nol-teamrun-account-note nol-teamrun-found-account"
+              [nolTooltip]="row.accountDetail">{{ row.account }}</span>
+            <span class="nol-teamrun-muted nol-teamrun-found-state">{{ row.plan === null ? row.state : row.state + resources.titleSeparator + row.plan }}</span>
+            <span class="nol-teamrun-menu-cell">
+              <ng-container [ngTemplateOutlet]="foundActions()" [ngTemplateOutletContext]="{ $implicit: row }" />
+            </span>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}

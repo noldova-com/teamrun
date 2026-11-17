@@ -1,0 +1,243 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-message [author]="author()" [time]="time()" [blocks]="blocks()" [status]="status()" [key]="message().id" [labelId]="labelId()" [layout]="column" [flashStart]="ownFlashStart()"
+  [timeFormat]="clockTime" [mentions]="mentions()" [copyText]="copyText()" [fileLinks]="!isPerson()" [math]="!isPerson()" [shellRuns]="runsShell()" [linkSchemes]="chatLinkSchemes" [references]="references()" (linkOpen)="openLink($event)"
+  [folderLinks]="folderLinks()" [authorDescription]="modelLine()" (fileActivate)="openFile($event)" (filePathsChange)="markFolders($event)" (attachmentOpen)="openAttachment($event)" (shellRun)="runShell($event)"
+  [shellRunOutputs]="bodyRunOutputs()" [shellRunStates]="bodyRunStates()">
+  <ng-template nolShellRunOutput let-block>
+    <nol-teamrun-inline-terminal [owner]="terminalOwner()" [messageId]="message().id" [site]="resources.runBodySite" [block]="block" />
+  </ng-template>
+  @if (replyProvider(); as provider) {
+    <span nolMessageHeader class="reply-provider" [nolTooltip]="provider" [nolTooltipTruncated]="true">{{ resources.formatReplyProvider(provider) }}</span>
+  }
+  @if (senderChat(); as chat) {
+    <button type="button" nolMessageHeader class="sender-chat" (click)="openSenderChat(chat)">{{ senderLine() }}</button>
+  } @else if (senderLine(); as line) {
+    <span nolMessageHeader class="sender-chat-gone" [class.sender-outside]="isOutside()">{{ line }}</span>
+  }
+  @if (isOutside()) {
+    <nol-chip nolMessageHeader class="sender-outside-chip" [kind]="taskKind">{{ resources.outsideSenderChip }}</nol-chip>
+  }
+  @if (statusLabel(); as label) {
+    <nol-chip nolMessageHeader [kind]="statusKind()">{{ label }}</nol-chip>
+  }
+  @if (runningTasksLabel(); as label) {
+    <nol-chip nolMessageHeader class="nol-teamrun-running-tasks" [kind]="taskKind">{{ label }}</nol-chip>
+  }
+  @if (statsLabel(); as label) {
+    <button type="button" nol-button nolMessageFooterEnd class="stats-button" [variant]="text" [attr.aria-label]="resources.formatShowStats(label)"
+      [nolPopoverTrigger]="statsPanel" [nolPopoverSide]="below" [nolPopoverAlignment]="start" [nolTooltip]="label" [nolTooltipTruncated]="true">{{ label }}</button>
+  } @else if (stats()) {
+    <button type="button" nol-icon-button nolMessageFooterEnd class="stats-button" [icon]="resources.statsGlyph" [label]="resources.showStatsLabel"
+      [nolTooltip]="resources.showStatsLabel" [nolPopoverTrigger]="statsPanel" [nolPopoverSide]="below" [nolPopoverAlignment]="start"></button>
+  }
+  @if (canStop()) {
+    <button type="button" nol-button nolMessageFooterEnd class="cancel" [nolMessageFooterEndPlacement]="footerEnd" [variant]="secondary" [size]="compact" (click)="cancel()">
+      <span class="material-symbols-rounded" nolButtonIcon aria-hidden="true">{{ resources.stopGlyph }}</span>
+      {{ resources.cancelReplyLabel }}
+    </button>
+  }
+  @if (isPerson()) {
+    <button type="button" nol-icon-button nolMessageAction class="nol-teamrun-rewind" [icon]="resources.rewindGlyph" [label]="resources.rewindLabel"
+      [nolTooltip]="resources.rewindLabel" (click)="rewind()"></button>
+  }
+  <ng-template nolMessageImage let-src="src" let-alt="alt">
+    @if (markdownImageOf(src); as image) {
+      <nol-teamrun-image-preview class="markdown-image" [image]="image" [images]="markdownImages()" [showCaption]="false" [fallback]="alt" />
+    } @else if (isWebAddress(src)) {
+      <a class="nol-markdown-link" [href]="src" draggable="false" (click)="openImageLink($event, src)"
+        (auxclick)="openImageLink($event, src)">{{ alt || src }}</a>
+    } @else {
+      {{ alt }}
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.wakeNoteSlot">
+    @if (areSlotsShown()) {
+      @if (wakeNote(); as parts) {
+        <p class="wake-note">{{ parts[0] }}@if (parts.length > 1) {<code>{{ parts[1] }}</code>{{ parts[2] }}}</p>
+      }
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.resumeNoteSlot">
+    @if (areSlotsShown()) {
+      @if (resumeNote(); as note) {
+        <p class="resume-note">{{ note }}</p>
+      }
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.sustainNoteSlot">
+    @if (areSlotsShown()) {
+      @for (note of sustainNotes(); track note.sequence) {
+        @if (note.handover; as handover) {
+          <div class="sustain-note-fold">
+            <p class="sustain-note nol-teamrun-note-line" role="note">
+              <span class="sustain-note-glyph nol-teamrun-note-line-glyph material-symbols-rounded" aria-hidden="true">{{ note.glyph }}</span>
+              <span class="sustain-note-text nol-teamrun-note-line-text">{{ note.text }} <button type="button" class="sustain-handover-toggle" data-nol-resizes-row [attr.aria-expanded]="isHandoverOpen(note.sequence)" (click)="toggleHandover(note.sequence)">{{ isHandoverOpen(note.sequence) ? resources.sustainHideHandover : resources.sustainShowHandover }}</button></span>
+            </p>
+            @if (isHandoverOpen(note.sequence)) {
+              <div class="sustain-handover" role="region" [attr.aria-label]="resources.sustainHandoverLabel">
+                <span class="sustain-handover-heading">{{ resources.sustainHandoverHeading }}</span>
+                <ul class="sustain-handover-parts">
+                  @for (part of handover.carried; track $index) {
+                    <li class="sustain-handover-part">{{ part }}</li>
+                  }
+                </ul>
+                @if (handover.reads; as reads) {
+                  <span class="sustain-handover-reads">{{ reads }}</span>
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="sustain-note nol-teamrun-note-line" role="note">
+            <span class="sustain-note-glyph nol-teamrun-note-line-glyph material-symbols-rounded" aria-hidden="true">{{ note.glyph }}</span>
+            <span class="sustain-note-text nol-teamrun-note-line-text">{{ note.text }}</span>
+          </p>
+        }
+      }
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.activitySlot">
+    @if (areSlotsShown()) {
+      <div class="activity-line">
+        @if (isActive()) {
+          <nol-spinner class="activity-spinner" />
+        }
+        @if (hasActivity()) {
+          <button type="button" class="activity-toggle" data-nol-resizes-row [attr.aria-expanded]="isActivityOpen()" (click)="toggleActivity()">
+            <span class="activity-text">{{ activityLabel() }}</span>
+            <span class="activity-chevron material-symbols-rounded" aria-hidden="true">{{ isActivityOpen() ? resources.expandedIcon : resources.collapsedIcon }}</span>
+          </button>
+        } @else {
+          <p class="activity-label">{{ activityLabel() }}</p>
+        }
+      </div>
+      @if (latestStep(); as step) {
+        <p class="activity-step">
+          <span class="activity-step-glyph material-symbols-rounded" aria-hidden="true">{{ step.glyph }}</span>
+          <span class="activity-step-title" [nolTooltip]="step.title" [nolTooltipTruncated]="true">{{ stepTitleOf(step) }}</span>
+        </p>
+      }
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.stepsSlot">
+    @if (areSlotsShown()) {
+      <nol-teamrun-activity-block [message]="message()" [entries]="stepEntries()" [rootPath]="rootPath()" [expansion]="state().expansion"
+        [streaming]="isActive()" [entering]="areStepsEntering()" [growing]="areStepsGrowing()" [asking]="isAsking()" [askers]="askers()" [catalog]="catalog()" [asked]="asked()" [mentions]="mentions()"
+        [shellRuns]="runsShell()" [revealStep]="revealsStep()" [revealStart]="flashStart()" (linkOpen)="openLink($event)" (fileActivate)="openFile($event)"
+        (pageActivate)="showChatPage()" [runBlocks]="runBlocks()" [runStates]="runStates()" [terminalOwner]="terminalOwner()" (shellRun)="runStepShell($event)" />
+    }
+  </ng-template>
+  @for (segment of errorSegments(); track segment.key) {
+    <ng-template [nolMessageSlot]="errorSlotOf(segment)">
+      @if (areSlotsShown() && stoppedErrors().has(segment.detail)) {
+        <p class="reply-stopped" role="status">{{ segment.detail?.text }}</p>
+      } @else if (areSlotsShown()) {
+        <div class="reply-error">
+          <span class="reply-error-glyph material-symbols-rounded" aria-hidden="true">{{ resources.replyErrorGlyph }}</span>
+          <div class="reply-error-body">
+            @if (usedUpNote(segment); as note) {
+              <p class="reply-error-text reply-error-used-up">{{ note }}</p>
+            }
+            <p class="reply-error-text">{{ segment.detail?.text }}</p>
+            @if (offersModelChoice(segment)) {
+              <button type="button" nol-button class="choose-model" [variant]="secondary" (click)="chooseModel()">{{ resources.chooseModelLabel }}</button>
+            }
+          </div>
+        </div>
+      }
+    </ng-template>
+  }
+  @for (entry of generatedImageEntries(); track entry[0]) {
+    <ng-template [nolMessageSlot]="imageSlotOf(entry[0])">
+      @if (areSlotsShown()) {
+        <nol-teamrun-image-preview class="reply-image" [image]="entry[1]" [images]="generatedImageList()" />
+      }
+    </ng-template>
+  }
+  @for (entry of missingImages(); track entry[0]) {
+    <ng-template [nolMessageSlot]="imageSlotOf(entry[0])">
+      @if (areSlotsShown()) {
+        <div class="reply-error reply-image-missing">
+          <span class="reply-error-glyph material-symbols-rounded" aria-hidden="true">{{ resources.replyErrorGlyph }}</span>
+          <div class="reply-error-body">
+            <p class="reply-error-text">{{ entry[1].text }}</p>
+            @if (entry[1].reason; as reason) {
+              <p class="reply-error-text">{{ reason }}</p>
+            }
+          </div>
+        </div>
+      }
+    </ng-template>
+  }
+  @if (plan(); as plan) {
+    <ng-template [nolMessageSlot]="planSlotOf(planKey())">
+      @if (areSlotsShown()) {
+        <nol-teamrun-plan-card class="reply-plan" [plan]="plan" [open]="isPlanOpen()" [revealStart]="revealsPlan() ? flashStart() : null" [revealRow]="message().sequence" [mentions]="mentions()"
+          [fileLinks]="true" [shellRuns]="runsShell()" (toggled)="togglePlan()" (linkOpen)="openLink($event)" (fileActivate)="openFile($event)"
+          [shellRunOutputs]="planRunOutputs()" [shellRunStates]="planRunStates()" [terminalOwner]="terminalOwner()" [messageId]="message().id" (shellRun)="runShell($event, resources.runPlanSite)" [approvable]="awaitsPlanApproval()" [approving]="approvingPlan()" (approve)="approvePlan()" />
+      }
+    </ng-template>
+  }
+  <ng-template [nolMessageSlot]="resources.attachedImagesSlot">
+    @if (areSlotsShown()) {
+      <div class="attached-images">
+        @for (image of attachedImages(); track image.key) {
+          <nol-teamrun-image-preview [image]="image" [images]="attachedImages()" [showCaption]="!isPerson()" />
+        }
+      </div>
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.pagesSlot">
+    @if (areSlotsShown()) {
+      <div class="pages">
+        @for (card of pageCards(); track card.pageId) {
+          <nol-teamrun-page-card [chatId]="message().conversationId" [pageId]="card.pageId" [page]="card.page" />
+        }
+      </div>
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.filesSlot">
+    @if (areSlotsShown()) {
+      <nol-teamrun-edited-files [edits]="edits()" [rootPath]="rootPath()" [expansion]="state().expansion" />
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.writtenImagesSlot">
+    @if (areSlotsShown()) {
+      <div class="written-images">
+        @for (image of writtenImages(); track image.key) {
+          <nol-teamrun-image-preview [image]="image" [images]="writtenImages()" />
+        }
+      </div>
+    }
+  </ng-template>
+  @for (group of approvalGroups(); track group[0]) {
+    <ng-template [nolMessageSlot]="approvalsSlotOf(group[0])">
+      @if (areSlotsShown()) {
+        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group[1]" (focused)="approachApproval($event)" />
+      }
+    </ng-template>
+  }
+  @for (steer of steers(); track steer.id) {
+    <ng-template [nolMessageSlot]="resources.formatSteerSlot(steer.id)">
+      @if (areSlotsShown()) {
+        <nol-teamrun-history-message class="steered-message" [message]="steer" [replyRow]="message().sequence"
+          [flashStart]="steer.id === flashedSteerId() ? flashStart() : null" />
+      }
+    </ng-template>
+  }
+</nol-message>
+<ng-template #statsPanel>
+  @if (stats(); as shown) {
+    <nol-teamrun-reply-stats [label]="resources.replyStatsLabel" [stats]="shown" />
+  }
+</ng-template>
+@if (handOffNote(); as note) {
+  <p class="hand-off-note">{{ note }}</p>
+}

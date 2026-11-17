@@ -1,0 +1,86 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-settings-view">
+  @if (error(); as message) {
+    <div class="nol-teamrun-error" role="alert">
+      <span class="nol-teamrun-error-text">{{ message }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss" [variant]="text" (click)="error.set(null)">{{ resources.dismissLabel }}</button>
+    </div>
+  }
+  <nol-configuration-table class="nol-teamrun-outside-connection" [heading]="resources.outsideTableTitle" [explanation]="resources.outsideHint">
+    @if (connection()?.token) {
+      <button type="button" nol-button nolConfigurationTableAction class="nol-teamrun-reset-token" [variant]="secondary" [disabled]="resetting()"
+        (click)="reset()">{{ resources.resetTokenLabel }}</button>
+    }
+    <table nolConfigurationTable>
+      <tbody>
+        @if (connection(); as shownConnection) {
+          <tr class="nol-teamrun-item nol-teamrun-outside-state">
+            <th scope="row">{{ resources.outsideStateColumn }}</th>
+            <td nolConfigurationTableFill>
+              <span [class.nol-teamrun-outside-failed]="shownConnection.enabled && shownConnection.failure !== null">{{ stateOf(shownConnection) }}</span>
+              @if (shownConnection.note; as note) {
+                <p class="nol-teamrun-outside-note">{{ note }}</p>
+              }
+            </td>
+            <td nolConfigurationTableRowActions></td>
+          </tr>
+          <tr class="nol-teamrun-item nol-teamrun-outside-address">
+            <th scope="row">{{ resources.outsideAddressColumn }}</th>
+            <td nolConfigurationTableFill [nolConfigurationTableFillMinWidth]="0"><code class="nol-teamrun-outside-value">{{ shownConnection.url }}</code></td>
+            <td nolConfigurationTableRowActions>
+              @if (clipboard; as writer) {
+                <button type="button" nol-button class="nol-teamrun-copy-address" [variant]="text"
+                  (click)="copy(writer, 'address', shownConnection.url)">{{ copied.shown() === 'address' ? resources.copiedLabel : resources.copyLabel }}</button>
+              }
+            </td>
+          </tr>
+          <tr class="nol-teamrun-item nol-teamrun-outside-token">
+            <th scope="row">{{ resources.outsideTokenColumn }}</th>
+            <td nolConfigurationTableFill [nolConfigurationTableFillMinWidth]="0">
+              @if (shownConnection.token; as token) {
+                <code class="nol-teamrun-outside-value">{{ shown() ? token : resources.outsideHiddenToken }}</code>
+              } @else {
+                <span class="nol-teamrun-muted">{{ resources.outsideNoToken }}</span>
+              }
+            </td>
+            <td nolConfigurationTableRowActions>
+              @if (shownConnection.token; as token) {
+                <button type="button" nol-button class="nol-teamrun-show-token" [variant]="text" [attr.aria-pressed]="shown()"
+                  (click)="shown.set(!shown())">{{ shown() ? resources.hideTokenLabel : resources.showTokenLabel }}</button>
+                @if (clipboard; as writer) {
+                  <button type="button" nol-button class="nol-teamrun-copy-token" [variant]="text"
+                    (click)="copy(writer, 'token', token)">{{ copied.shown() === 'token' ? resources.copiedLabel : resources.copyLabel }}</button>
+                }
+              }
+            </td>
+          </tr>
+        } @else {
+          <tr><td colspan="3" class="nol-teamrun-muted" role="status">{{ resources.readingOutside }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </nol-configuration-table>
+  @if (setups().length > 0) {
+    <nol-configuration-table class="nol-teamrun-outside-setups" [heading]="resources.outsideSetupTitle" [explanation]="resources.outsideSetupHint">
+      @for (setup of setups(); track setup.title) {
+        <div class="nol-teamrun-outside-setup">
+          <div class="nol-teamrun-outside-setup-header">
+            <span class="nol-teamrun-outside-setup-title">{{ setup.title }}</span>
+            @if (clipboard; as writer) {
+              <button type="button" nol-button class="nol-teamrun-copy-setup" [variant]="text"
+                (click)="copy(writer, setup.title, setup.text)">{{ copied.shown() === setup.title ? resources.copiedLabel : resources.copyLabel }}</button>
+            }
+          </div>
+          <pre class="nol-teamrun-outside-setup-text">{{ setup.text }}</pre>
+        </div>
+      }
+    </nol-configuration-table>
+  }
+</div>

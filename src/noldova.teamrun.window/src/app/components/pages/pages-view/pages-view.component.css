@@ -1,0 +1,180 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--nol-view-padding-block) calc(var(--nol-space-3) / 2);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: var(--nol-radius-medium);
+}
+
+.row:is(:hover, :focus-within) {
+  background-color: var(--nol-hover);
+}
+
+.row.open {
+  background-color: var(--nol-selected);
+}
+
+.row-open {
+  display: flex;
+  flex: 1;
+  gap: 0.625rem;
+  align-items: flex-start;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--nol-pointer-target);
+  margin: 0;
+  padding: var(--nol-space-2) calc(var(--nol-icon-button-target) + var(--nol-space-1)) var(--nol-space-2) var(--nol-space-3);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: var(--nol-line-panel);
+  text-align: start;
+  cursor: pointer;
+}
+
+.row-open:is(:focus-visible, [data-nol-state="Focus"]) {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+.glyph {
+  flex: none;
+  width: var(--nol-icon);
+  margin-block-start: 0.0625rem;
+  color: var(--nol-text);
+  font-size: var(--nol-icon);
+  line-height: 1;
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title,
+.meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.meta {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-panel);
+}
+
+.row-more {
+  position: absolute;
+  inset-inline-end: var(--nol-space-1);
+  opacity: 0;
+}
+
+.row:is(:hover, :focus-within) .row-more,
+.row-more[aria-pressed="true"] {
+  opacity: 1;
+}
+
+.error,
+.error-text {
+  margin: 0;
+  color: var(--nol-error);
+  overflow-wrap: anywhere;
+}
+
+.error {
+  padding: var(--nol-space-2);
+}
+
+.load-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  align-items: flex-start;
+  padding: var(--nol-space-2);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: var(--nol-space-6);
+  text-align: center;
+}
+
+.empty-glyph {
+  color: var(--nol-text-muted);
+  font-size: 2.25rem;
+}
+
+.empty-title {
+  margin: 0;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-title);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-panel);
+}
+
+.empty-text {
+  margin: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-panel);
+  line-height: var(--nol-line-panel);
+}
+
+.no-chat {
+  padding: var(--nol-space-2);
+}
+
+@media (forced-colors: active) {
+  .row-open:is(:focus-visible, [data-nol-state="Focus"]) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+
+  .row.open {
+    outline: var(--nol-border-width) solid Highlight;
+  }
+
+  .row-more {
+    opacity: 1;
+  }
+}

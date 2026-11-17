@@ -1,0 +1,40 @@
+{
+  "name": "@noldova/teamrun.cli",
+  "version": "__VERSION__",
+  "private": true,
+  "description": "TeamRun's command-line part: the commands an app's command line runs under teamrun, each through the runtime part's methods.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/noldova-com/teamrun.git",
+    "directory": "src/noldova.teamrun.cli"
+  },
+  "homepage": "https://github.com/noldova-com/teamrun#readme",
+  "bugs": {
+    "url": "https://github.com/noldova-com/teamrun/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./api/index.d.ts",
+      "default": "./api/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "**/*.js",
+    "**/*.js.map",
+    "api/index.d.ts"
+  ],
+  "dependencies": {
+    "@noldova/teamrun.protocol": "__VERSION__"
+  },
+  "peerDependencies": {
+    "@noldova/context.core": ">=0.0.8 <0.1.0",
+    "@noldova/context.exceptions": ">=0.0.8 <0.1.0",
+    "@noldova/context.json": ">=0.0.8 <0.1.0",
+    "@noldova/desktop.cli": ">=0.0.3 <0.1.0",
+    "@noldova/desktop.protocol": ">=0.0.3 <0.1.0",
+    "@noldova/desktop.runtime": ">=0.0.3 <0.1.0"
+  }
+}

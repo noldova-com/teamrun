@@ -1,0 +1,202 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.nol-teamrun-projects {
+  --nol-teamrun-group-indent: calc(var(--nol-space-2) + var(--nol-icon));
+  --nol-teamrun-nested-step: calc(var(--nol-icon) + var(--nol-space-1));
+
+  flex: auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: var(--nol-view-padding-block) var(--nol-content-padding-inline) calc(var(--nol-view-padding-block) + var(--nol-space-2));
+}
+
+.nol-teamrun-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--nol-tree-row-height);
+  margin: 0;
+  padding-inline: var(--nol-space-2);
+  border: none;
+  border-radius: var(--nol-radius-small);
+  background: none;
+  color: var(--nol-text);
+  font: inherit;
+  text-align: start;
+  user-select: none;
+}
+
+.nol-teamrun-row + .nol-teamrun-row,
+.nol-teamrun-row + .nol-teamrun-conversation-list,
+nol-section-header + p.nol-teamrun-row,
+:is(.nol-teamrun-pins, .nol-teamrun-project-list, .nol-teamrun-chat-list) > .nol-teamrun-drag-item:first-child,
+.nol-teamrun-drag-item + :is(.nol-teamrun-drag-item, .nol-teamrun-row) {
+  margin-block-start: var(--nol-row-gap, calc(2 * var(--nol-tab-inset)));
+}
+
+.nol-teamrun-row:hover {
+  background-color: var(--nol-hover);
+}
+
+.nol-teamrun-row[role="treeitem"] {
+  cursor: auto;
+}
+
+.nol-teamrun-twistie,
+.nol-teamrun-project-name,
+.nol-teamrun-conversation-title,
+.nol-teamrun-row.nol-teamrun-show-more {
+  cursor: pointer;
+}
+
+.nol-teamrun-selected,
+.nol-teamrun-selected:hover {
+  background-color: var(--nol-selected);
+}
+
+@media (forced-colors: active) {
+  .nol-teamrun-selected,
+  .nol-teamrun-selected:hover {
+    --nol-text: HighlightText;
+    --nol-text-muted: HighlightText;
+    --nol-icon-color: HighlightText;
+    --nol-spinner-forced-arc: HighlightText;
+    --nol-spinner-forced-ring: HighlightText;
+
+    color: HighlightText;
+    forced-color-adjust: none;
+    background-color: Highlight;
+  }
+}
+
+.nol-teamrun-action {
+  gap: var(--nol-space-2);
+  min-height: var(--nol-section-header-height);
+}
+
+.nol-teamrun-action + .nol-teamrun-action {
+  margin-block-start: var(--nol-space-3);
+}
+
+.nol-teamrun-drop-list .nol-teamrun-row,
+.nol-teamrun-projects > p.nol-teamrun-row {
+  width: auto;
+  margin-inline-start: var(--nol-teamrun-group-indent);
+}
+
+.nol-teamrun-drop-list .nol-teamrun-nested {
+  margin-inline-start: calc(var(--nol-teamrun-group-indent) + var(--nol-teamrun-nested-step));
+}
+
+.nol-teamrun-project-row .nol-teamrun-twistie {
+  margin-inline: calc(-1 * var(--nol-teamrun-group-indent)) calc(var(--nol-space-2) - var(--nol-space-1));
+}
+
+.nol-teamrun-muted {
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-glyph {
+  flex: none;
+  color: var(--nol-icon-color);
+}
+
+.nol-teamrun-label {
+  flex: auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nol-teamrun-label.nol-teamrun-muted {
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-conversation-title {
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-conversation-row:is(:hover, .nol-teamrun-selected) .nol-teamrun-conversation-title {
+  color: var(--nol-text);
+}
+
+.nol-teamrun-twistie {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+.nol-teamrun-working {
+  display: flex;
+  flex: none;
+  color: var(--nol-text);
+}
+
+.nol-teamrun-waiting {
+  flex: none;
+  color: var(--nol-text);
+  font-size: var(--nol-spinner);
+}
+
+.nol-teamrun-row-actions {
+  flex: none;
+  margin-inline-end: calc(var(--nol-pill-padding) + (var(--nol-icon) - var(--nol-tab-action-slot)) / 2 - var(--nol-space-2));
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.nol-teamrun-row:is(:hover, :focus-within) .nol-teamrun-row-actions {
+  opacity: 1;
+}
+
+.cdk-drag-preview {
+  border: var(--nol-border-width) solid var(--nol-card-border);
+  border-radius: var(--nol-radius-small);
+  background: var(--nol-window);
+  box-shadow: var(--nol-shadow-large);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.3;
+}
+
+.cdk-drag-animating,
+.nol-teamrun-drop-list.cdk-drop-list-dragging .nol-teamrun-drag-item:not(.cdk-drag-placeholder) {
+  transition: transform 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nol-teamrun-row-actions,
+  .cdk-drag-animating,
+  .nol-teamrun-drop-list.cdk-drop-list-dragging .nol-teamrun-drag-item:not(.cdk-drag-placeholder) {
+    transition: none;
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "id": "teamrun",
+  "version": "0.0.1",
+  "displayName": "TeamRun",
+  "description": "Holds chats with AI agents from several providers as teammates, and lets people follow and approve their work.",
+  "parts": ["runtime", "window", "cli"],
+  "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.2" },
+  "optionalDependencies": { "browser": "0.0.2", "computer-use": "0.0.2", "git": "0.0.2", "git-github": "0.0.2" },
+  "noldovaDesktop": ">=0.0.3 <0.1.0",
+  "contributes": {
+    "methods": [
+      "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.defaultTeammateRead",
+      "teamrun.defaultTeammateSet", "teamrun.conversationAddMember",
+      "teamrun.conversationRemoveMember", "teamrun.conversationSetMemberMode", "teamrun.conversationSetMemberSettings", "teamrun.conversationSetPlanFirst", "teamrun.conversationListMembers", "teamrun.attachmentPrepare", "teamrun.attachmentDiscard", "teamrun.attachmentRead", "teamrun.attachmentShare", "teamrun.attachmentExists", "teamrun.writtenImageRead", "teamrun.writtenImageShare", "teamrun.linkedFolderList", "teamrun.draftSave", "teamrun.draftRead", "teamrun.draftDiscard", "teamrun.readingPositionList", "teamrun.readingPositionSave", "teamrun.runOutputList", "teamrun.runOutputSave", "teamrun.dataFolderRead", "teamrun.firstLaunchRead", "teamrun.firstLaunchFinish", "teamrun.providerKindList",
+      "teamrun.providerListModels", "teamrun.providerModelCatalog", "teamrun.providerKindInstallationList", "teamrun.providerKindInstall",
+      "teamrun.providerKindInstallCancel", "teamrun.providerToolList", "teamrun.providerList", "teamrun.providerCreate", "teamrun.providerUpdate", "teamrun.providerSetEnabled", "teamrun.providerCheck",
+      "teamrun.providerSignIn", "teamrun.providerSignInCancel", "teamrun.providerSignInList", "teamrun.providerSignInCommand", "teamrun.acpAgentList", "teamrun.acpAgentIcon", "teamrun.acpAgentAdd", "teamrun.acpLocalCommandAdd", "teamrun.acpAgentRemove", "teamrun.providerSignOut", "teamrun.providerProfileDiscover", "teamrun.providerDelete", "teamrun.projectList", "teamrun.projectOpen", "teamrun.projectForget", "teamrun.projectsLayoutRead", "teamrun.projectsLayoutSave", "teamrun.composerDefaultRead", "teamrun.composerDefaultSave", "teamrun.conversationList",
+      "teamrun.conversationListEmpty", "teamrun.conversationCreate", "teamrun.conversationRename", "teamrun.conversationTouch", "teamrun.conversationResponderSet", "teamrun.conversationMove", "teamrun.conversationDelete", "teamrun.conversationFolderCount", "teamrun.conversationRewind",
+      "teamrun.conversationSearch", "teamrun.messageList", "teamrun.messageListOpen", "teamrun.messagePage", "teamrun.messageActivityPage",
+      "teamrun.messageChangesPage", "teamrun.messagePlanPage", "teamrun.messageSubAgentsPage", "teamrun.messageSummary", "teamrun.messageDetails", "teamrun.messageSend", "teamrun.messageCancel", "teamrun.messageApprovePlan",
+      "teamrun.conversationCancel", "teamrun.approvalList", "teamrun.approvalListPending", "teamrun.approvalDecide", "teamrun.planUsageList",
+      "teamrun.planUsageRead", "teamrun.teammateUsageList", "teamrun.backgroundTaskList", "teamrun.backgroundTaskStop", "teamrun.chatFind", "teamrun.messageSearch", "teamrun.subAgentStart", "teamrun.subAgentStop", "teamrun.subAgentWait", "teamrun.commandStart",
+      "teamrun.backgroundTaskClearFinished", "teamrun.backgroundTaskRead", "teamrun.windowFocused", "teamrun.windowClosed", "teamrun.windowReload",
+      "teamrun.panelAnswered", "teamrun.providerOwnMcpServerList", "teamrun.sharedMcpServerList", "teamrun.sharedMcpServerCreate", "teamrun.sharedMcpServerUpdate",
+      "teamrun.sharedMcpServerDelete", "teamrun.sharedMcpProviderSet", "teamrun.sharedMcpTeammateSet", "teamrun.sharedMcpSecretSet",
+      "teamrun.sharedMcpSignInStart", "teamrun.sharedMcpSignOut",
+      "teamrun.messageDetailsAfter", "teamrun.computerUseGrantList", "teamrun.computerUseGrantRevoke", "teamrun.outsideConnectionRead", "teamrun.outsideTokenReset",
+      "teamrun.waitingMessageAdd", "teamrun.waitingMessageList", "teamrun.waitingMessageEdit", "teamrun.waitingMessageRemove",
+      "teamrun.waitingMessageSendNow",
+      "teamrun.pageOpen", "teamrun.pageRead", "teamrun.pageRestore", "teamrun.pageList"
+    ],
+    "events": [
+      "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.messageCreated", "teamrun.messageUpdated",
+      "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.replyThinking", "teamrun.approvalCreated",
+      "teamrun.approvalUpdated", "teamrun.providerUpdated", "teamrun.providerSignInsChanged", "teamrun.providerKindsChanged", "teamrun.providerKindInstallationChanged",
+      "teamrun.conversationRewound", "teamrun.conversationDeleted", "teamrun.signInLink", "teamrun.planUsageUpdated", "teamrun.backgroundTaskUpdated",
+      "teamrun.backgroundTaskOutput", "teamrun.backgroundTasksCleared", "teamrun.projectsLayoutUpdated", "teamrun.projectFolderChanged", "teamrun.composerDefaultUpdated",
+      "teamrun.panelRequested", "teamrun.windowReloadRequested", "teamrun.waitingMessagesChanged",
+      "teamrun.pageShown", "teamrun.pageUpdated", "teamrun.pageStopped"
+    ],
+    "commands": [
+      "teamrun.showTeammates", "teamrun.showProviders", "teamrun.showMcpServers", "teamrun.showComputerUseGrants", "teamrun.showOutsideSessions", "teamrun.newConversation", "teamrun.openProject", "teamrun.openBrowser", "teamrun.searchConversations", "teamrun.focusComposer", "teamrun.openChatPage",
+      "teamrun.stopReply", "teamrun.previousConversation", "teamrun.nextConversation", "teamrun.moveRowUp", "teamrun.moveRowDown",
+      "teamrun.chooseDefaultTeammate", "teamrun.showDataFolder", "teamrun.openChat", "teamrun.enableProvider", "teamrun.reload", "teamrun.newChatTerminal"
+    ],
+    "notifications": ["teamrun.messageNotSent", "teamrun.chatActionFailed", "teamrun.loadFailed", "teamrun.replyFailed"],
+    "views": ["teamrun.projects", "teamrun.changes", "teamrun.backgroundTasks", "teamrun.activity", "teamrun.plan", "teamrun.subAgents", "teamrun.pages"],
+    "statusBarItems": ["teamrun.planUsage"],
+    "topBarActions": ["teamrun.chatPage"],
+    "menus": ["teamrun.chats"],
+    "documents": ["teamrun.conversation", "teamrun.image", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection", "teamrun.page"],
+    "placeholders": ["teamrun.noChat"],
+    "settings": ["teamrun.chainHopLimit", "teamrun.titleModel", "teamrun.sendKey", "teamrun.whileReplying", "teamrun.imageOpenMode", "teamrun.newTerminals", "teamrun.runOpensIn", "teamrun.defaultTeammate", "teamrun.manageTeammates", "teamrun.manageProviders", "teamrun.manageMcpServers", "teamrun.manageComputerUse", "teamrun.idleCompaction", "teamrun.outsideSessions", "teamrun.outsidePort", "teamrun.connectOutsideAgents", "teamrun.dataFolder"],
+    "settingsPages": ["teamrun.abilities"],
+    "tools": [
+      "teamrun_list_projects", "teamrun_list_chats", "teamrun_list_messages", "teamrun_list_approvals", "teamrun_list_providers",
+      "teamrun_check_provider", "teamrun_list_teammates", "teamrun_open_panel", "teamrun_close_panel", "teamrun_open_project",
+      "teamrun_forget_project", "teamrun_create_chat", "teamrun_rename_chat", "teamrun_move_chat", "teamrun_delete_chat", "teamrun_add_teammate_to_chat",
+      "teamrun_remove_teammate_from_chat", "teamrun_send_message", "teamrun_start_sub_agent", "teamrun_wait_sub_agents", "teamrun_stop_sub_agent", "teamrun_run_in_background", "teamrun_cancel_replies", "teamrun_create_teammate", "teamrun_update_teammate",
+      "teamrun_delete_teammate", "teamrun_show_page", "teamrun_list_pages", "teamrun_read_page", "teamrun_edit_page",
+      "teamrun_canvas_create", "teamrun_canvas_read", "teamrun_canvas_add_artboard", "teamrun_canvas_revise_artboard", "teamrun_canvas_arrange"
+    ],
+    "cliCommands": [
+      "teamrun.listProjects", "teamrun.openFolder", "teamrun.forgetProject", "teamrun.listChats", "teamrun.newChat", "teamrun.renameChat",
+      "teamrun.deleteChat", "teamrun.moveChat", "teamrun.search", "teamrun.listMessages", "teamrun.send", "teamrun.cancel", "teamrun.rewind", "teamrun.listApprovals", "teamrun.listProviders", "teamrun.checkProvider",
+      "teamrun.addProvider", "teamrun.removeProvider", "teamrun.listModels", "teamrun.liveCheck", "teamrun.listTeammates"
+    ]
+  }
+}

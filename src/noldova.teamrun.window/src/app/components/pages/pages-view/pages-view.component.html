@@ -1,0 +1,61 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (chatId(); as chatId) {
+  @let pages = store.pagesOf(chatId);
+  @if (store.error(); as error) {
+    <p class="error" role="alert">{{ error }}</p>
+  }
+  @if (store.loadErrorOf(chatId); as error) {
+    <div class="load-error" role="alert">
+      <p class="error-text">{{ error }}</p>
+      <button type="button" nol-button class="retry" [variant]="text" (click)="retry(chatId)">{{ resources.retryLabel }}</button>
+    </div>
+  } @else if (pages.length > 0) {
+    <ul class="rows" role="listbox" [attr.aria-label]="resources.viewTitle">
+      @for (page of pages; track page.id) {
+        <li class="row" role="presentation" [class.open]="store.isOpen(page.id)">
+          <button type="button" class="row-open" role="option" [attr.aria-current]="store.isOpen(page.id) ? 'true' : null" [attr.data-nol-teamrun-page]="page.id"
+            [attr.tabindex]="isStop(page, pages) ? 0 : -1" [attr.aria-label]="labelOf(page)" [nolContextMenuTriggerFor]="rowMenu" nolTeamrunContextMenuState
+            (menuOpened)="openMenu(page.id)" (menuClosed)="closeMenu(page.id)" (focus)="focused.set(page.id)" (keydown)="move($event, page, pages)"
+            (click)="open(page)">
+            <span class="glyph material-symbols-rounded" aria-hidden="true">{{ resources.pageIcon }}</span>
+            <span class="text">
+              <span class="title" data-truncates [nolTooltip]="page.title" [nolTooltipTruncated]="true">{{ page.title }}</span>
+              <span class="meta" data-truncates [nolTooltip]="metaOf(page)" [nolTooltipTruncated]="true">{{ metaOf(page) }}</span>
+            </span>
+          </button>
+          <button type="button" nol-icon-button class="row-more" tabindex="-1" aria-hidden="true" [icon]="resources.moreIcon"
+            [label]="resources.formatRowMenu(page.title)" [nolTooltip]="resources.formatRowMenu(page.title)" [nolMenuTriggerFor]="rowMenu"
+            [pressed]="menusOpen().has(page.id)" (cdkMenuOpened)="openMenu(page.id)" (cdkMenuClosed)="closeMenu(page.id)"></button>
+          <ng-template #rowMenu>
+            <nol-menu [attr.aria-label]="resources.formatRowMenu(page.title)">
+              <button type="button" nol-menu-item class="menu-open" [label]="resources.openLabel" [icon]="resources.openIcon" (triggered)="open(page)"></button>
+              <button type="button" nol-menu-item class="menu-browser" [label]="resources.openInBrowserLabel" [icon]="resources.browserIcon"
+                (triggered)="openInBrowser(page)"></button>
+              <nol-menu-separator />
+              <button type="button" nol-menu-item class="menu-save" [label]="resources.saveLabel" [icon]="resources.saveIcon" (triggered)="save(page)"></button>
+              @if (clipboard; as clipboard) {
+                <button type="button" nol-menu-item class="menu-copy" [label]="resources.copyPathLabel" [icon]="resources.copyIcon"
+                  (triggered)="copyPath(page, clipboard)"></button>
+              }
+            </nol-menu>
+          </ng-template>
+        </li>
+      }
+    </ul>
+  } @else if (store.isLoaded(chatId)) {
+    <div class="empty">
+      <span class="empty-glyph material-symbols-rounded" aria-hidden="true">{{ resources.pageIcon }}</span>
+      <p class="empty-title">{{ resources.emptyTitle }}</p>
+      <p class="empty-text">{{ resources.emptyText }}</p>
+    </div>
+  }
+} @else {
+  <p class="empty-text no-chat">{{ resources.noChatText }}</p>
+}

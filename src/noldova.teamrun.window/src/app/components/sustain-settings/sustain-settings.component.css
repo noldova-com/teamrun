@@ -1,0 +1,58 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.nol-teamrun-sustain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-fallback-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+}
+
+.nol-teamrun-sustain-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-sustain-label {
+  cursor: pointer;
+}
+
+.nol-teamrun-sustain-label-off {
+  color: var(--nol-text-muted);
+  cursor: default;
+}
+
+@media (forced-colors: active) {
+  .nol-teamrun-sustain-label-off {
+    color: GrayText;
+  }
+}
+
+.nol-teamrun-fallback-model-stack {
+  width: calc(7.5rem - 2 * var(--nol-space-2));
+}
+
+.nol-teamrun-fallback-line {
+  white-space: normal;
+}
+
+.nol-teamrun-fallback-stack > nol-select {
+  box-sizing: border-box;
+  width: 0;
+  min-width: 100%;
+}
+
+.nol-teamrun-action-slot {
+  visibility: hidden;
+}

@@ -1,0 +1,341 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.nol-teamrun-composer {
+  margin: 0;
+  padding: var(--nol-space-1) calc(var(--nol-space-4) * 2) var(--nol-space-6);
+}
+
+.nol-teamrun-composer-tight {
+  padding-inline: var(--nol-space-2);
+}
+
+.nol-teamrun-composer-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  box-sizing: border-box;
+  max-width: 55rem;
+  margin-inline: auto;
+  padding: var(--nol-space-3) var(--nol-space-3) var(--nol-space-2);
+  border: var(--nol-border-width) solid var(--nol-border);
+  border-radius: var(--nol-radius-large);
+  background-color: var(--nol-window);
+}
+
+.nol-teamrun-composer-card:focus-within {
+  border-color: var(--nol-accent);
+
+  @media (forced-colors: active) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+}
+
+.nol-teamrun-composer-idle {
+  opacity: 0.6;
+}
+
+.nol-teamrun-composer-dropping {
+  outline: var(--nol-border-width) dashed var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+.nol-teamrun-composer-unavailable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nol-space-2);
+  margin-block-end: var(--nol-space-2);
+  padding-inline: var(--nol-space-1);
+}
+
+.nol-teamrun-composer-unavailable nol-field-message {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.nol-teamrun-composer-loading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.nol-teamrun-composer-note {
+  min-width: 0;
+  margin: var(--nol-space-1) 0 0;
+  color: var(--nol-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-composer-editing {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  margin-block-end: calc(var(--nol-space-3) - var(--nol-space-2));
+  padding-inline-start: var(--nol-space-1);
+}
+
+.nol-teamrun-composer-editing .nol-teamrun-composer-note {
+  margin: 0;
+}
+
+.nol-teamrun-composer-attachments {
+  display: flex;
+  gap: var(--nol-space-2);
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.nol-teamrun-composer-attachment {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--nol-space-2);
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: var(--nol-space-1) var(--nol-space-2);
+  border: var(--nol-border-width) solid var(--nol-border);
+  border-radius: var(--nol-radius-medium);
+  background-color: var(--nol-raised);
+  color: var(--nol-text);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+}
+
+.nol-teamrun-composer-image {
+  position: relative;
+  width: 7rem;
+  height: 7rem;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--nol-radius-large);
+}
+
+.nol-teamrun-composer-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.nol-teamrun-composer-frame:focus-visible {
+  outline: calc(var(--nol-border-width) * 2) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -2);
+
+  @media (forced-colors: active) {
+    outline-color: Highlight;
+  }
+}
+
+.nol-teamrun-composer-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.nol-teamrun-composer-image .nol-teamrun-composer-remove {
+  position: absolute;
+  top: calc(var(--nol-space-1) / 2);
+  right: calc(var(--nol-space-1) / 2);
+  opacity: 0;
+}
+
+.nol-teamrun-composer-image:is(:hover, :focus-within) .nol-teamrun-composer-remove {
+  opacity: 1;
+}
+
+.nol-teamrun-composer-attachment-name {
+  min-width: 0;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nol-teamrun-composer-text {
+  box-sizing: border-box;
+  display: block;
+  width: calc(100% + var(--nol-space-3));
+  min-height: calc(2lh + var(--nol-space-3));
+  max-height: calc(10lh + var(--nol-space-3));
+  margin-block: calc(-1 * var(--nol-space-3)) 0;
+  margin-inline: 0 calc(-1 * var(--nol-space-3));
+  padding-block: var(--nol-space-3) 0;
+  padding-inline: var(--nol-space-1) calc(var(--nol-space-3) + var(--nol-space-1));
+  overflow-y: auto;
+  border: 0;
+  border-start-end-radius: calc(var(--nol-radius-large) - var(--nol-border-width));
+  background-color: transparent;
+  color: var(--nol-text);
+  font: inherit;
+  font-size: var(--nol-text-message);
+  line-height: var(--nol-line-message);
+  field-sizing: content;
+  resize: none;
+  outline: none;
+  cursor: text;
+}
+
+.nol-teamrun-composer-card > :not(input, .nol-mention-backdrop):has(~ .nol-teamrun-composer-text) {
+  position: relative;
+  z-index: 1;
+}
+
+.nol-teamrun-composer-card > :not(input, .nol-mention-backdrop) ~ .nol-teamrun-composer-text {
+  border-start-end-radius: 0;
+}
+
+.nol-teamrun-composer-text::placeholder {
+  color: var(--nol-placeholder);
+  opacity: 1;
+}
+
+.nol-teamrun-composer-text:read-only {
+  cursor: default;
+}
+
+.nol-teamrun-composer-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.nol-teamrun-composer-access {
+  flex: 1000 1 0;
+  min-width: calc(var(--nol-icon) * 2 + var(--nol-space-1) * 2 + var(--nol-button-padding) * 2 + var(--nol-border-width) * 2);
+  max-width: max-content;
+}
+
+.nol-teamrun-composer-access.nol-teamrun-composer-folded {
+  column-gap: 0;
+  min-width: calc(var(--nol-icon) + var(--nol-button-padding) * 2 + var(--nol-border-width) * 2);
+}
+
+.nol-teamrun-composer-access.nol-teamrun-composer-in-menu {
+  display: none;
+}
+
+.nol-teamrun-composer-risky {
+  color: var(--nol-error);
+}
+
+.nol-teamrun-composer-context {
+  flex: none;
+}
+
+.nol-teamrun-composer-provider {
+  flex: none;
+  color: var(--nol-text-muted);
+  white-space: nowrap;
+}
+
+:host .nol-teamrun-composer-picker {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: calc(var(--nol-icon) + var(--nol-button-padding) * 2 + var(--nol-border-width) * 2);
+}
+
+.nol-teamrun-composer-badge {
+  display: none;
+}
+
+.nol-teamrun-composer-in-menu ~ .nol-teamrun-composer-picker .nol-teamrun-composer-badge {
+  position: absolute;
+  inset-block-end: calc(50% - var(--nol-icon) / 2);
+  inset-inline-end: var(--nol-button-padding);
+  display: block;
+  inline-size: calc(var(--nol-icon) / 2);
+  block-size: calc(var(--nol-icon) / 2);
+  overflow: hidden;
+  color: var(--nol-error);
+  font-size: calc(var(--nol-icon) / 2);
+  line-height: 1;
+}
+
+.nol-teamrun-composer-access.nol-teamrun-composer-folded .nol-teamrun-composer-summary,
+.nol-teamrun-composer-provider.nol-teamrun-composer-folded,
+.nol-teamrun-composer-picker:not(.nol-teamrun-composer-folded) .nol-teamrun-composer-short,
+.nol-teamrun-composer-picker.nol-teamrun-composer-folded .nol-teamrun-composer-label {
+  position: absolute;
+  inset-inline-start: 0;
+  visibility: hidden;
+}
+
+.nol-teamrun-composer-columns {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.nol-teamrun-composer-models {
+  grid-row: 1;
+  grid-column: 1 / 3;
+}
+
+.nol-teamrun-composer-column {
+  display: grid;
+  grid-row: 1;
+  grid-column: 3 / 5;
+  grid-template-columns: subgrid;
+  grid-auto-rows: min-content;
+}
+
+.nol-teamrun-composer-scope {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-block: var(--nol-tab-inset);
+  padding-inline: calc(var(--nol-menu-item-inset) + var(--nol-menu-item-padding));
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-composer-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nol-teamrun-composer-glyph {
+  flex-shrink: 0;
+}
+
+.nol-teamrun-composer-label,
+.nol-teamrun-composer-short {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nol-teamrun-composer-space {
+  flex: 1;
+}

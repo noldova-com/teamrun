@@ -1,0 +1,103 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-settings-view">
+  @if (error(); as message) {
+    <div class="nol-teamrun-error" role="alert">
+      <span class="nol-teamrun-error-text">{{ message }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss" [variant]="text" (click)="error.set(null)">{{ resources.dismissLabel }}</button>
+    </div>
+  }
+  <nol-configuration-table class="nol-teamrun-default-teammate" [heading]="resources.defaultTeammateTitle" [explanation]="resources.defaultTeammateHint">
+    <table nolConfigurationTable>
+      <thead>
+        <tr>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.name + resources.teammateColumnShares.connection" nolConfigurationTableFill>
+            {{ resources.connectionColumn }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.model">{{ resources.modelLabel }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.effort">{{ resources.effortLabel }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.actions" [nolConfigurationTableRowActions]="resources.actionsColumn"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="nol-teamrun-default-row">
+          @if (store.defaultTeammate(); as chosen) {
+            <td nolConfigurationTableFill class="nol-teamrun-default-connection">{{ defaultConnection(chosen) }}</td>
+            <td class="nol-teamrun-default-model">{{ defaultModel(chosen) }}</td>
+            <td class="nol-teamrun-default-effort">{{ defaultEffort(chosen) }}</td>
+          } @else {
+            <td nolConfigurationTableFill colspan="3" class="nol-teamrun-muted nol-teamrun-default-connection">{{ resources.lastMessageSentLabel }}</td>
+          }
+          <td nolConfigurationTableRowActions>
+            <button #changeDefaultButton type="button" nol-icon-button class="nol-teamrun-change-default" [icon]="resources.editIcon"
+              [label]="resources.changeDefaultTeammateLabel" [nolTooltip]="resources.changeLabel" (click)="chooseDefault()"></button>
+            @if (store.defaultTeammate()) {
+              <button #clearDefaultButton type="button" nol-icon-button class="nol-teamrun-clear-default" [icon]="resources.closeIcon"
+                [label]="resources.clearDefaultTeammateLabel" [nolTooltip]="resources.clearLabel" (click)="clearDefault()"></button>
+            } @else {
+              <button type="button" nol-icon-button class="nol-teamrun-action-slot" [icon]="resources.closeIcon" [label]="resources.clearLabel" inert
+                aria-hidden="true"></button>
+            }
+            <button type="button" nol-icon-button class="nol-teamrun-action-slot" [icon]="resources.closeIcon" [label]="resources.clearLabel" inert
+              aria-hidden="true"></button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </nol-configuration-table>
+  <nol-configuration-table class="nol-teamrun-teammates" [heading]="resources.teammatesTitle" [explanation]="resources.teammatesHint">
+    <button type="button" nol-button nolConfigurationTableAction class="nol-teamrun-add" (click)="edit(null)">{{ resources.addTeammateLabel }}</button>
+    <table nolConfigurationTable>
+      <thead>
+        <tr>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.name">{{ resources.teammateNameLabel }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.connection" nolConfigurationTableFill>{{ resources.connectionColumn }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.model">{{ resources.modelLabel }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.effort">{{ resources.effortLabel }}</th>
+          <th scope="col" [nolConfigurationTableShare]="resources.teammateColumnShares.actions" [nolConfigurationTableRowActions]="resources.actionsColumn"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (teammate of store.teammates(); track teammate.id) {
+          <tr class="nol-teamrun-item">
+            <td>
+              <span class="nol-teamrun-name">
+                <nol-avatar [name]="teammate.name" [initials]="initials(teammate)" [colorKey]="teammate.id" [size]="small"
+                  [unavailable]="store.isTeammateUnavailable(teammate.id)" [label]="summary(teammate)" />
+                <span class="nol-teamrun-item-name" [class.nol-teamrun-unavailable]="store.isTeammateUnavailable(teammate.id)">{{ store.disabledMarkedName(teammate) }}</span>
+              </span>
+            </td>
+            <td nolConfigurationTableFill class="nol-teamrun-connection">
+              <span class="nol-teamrun-connection-name">{{ connection(teammate) }}</span>
+              @if (usedUpOf(teammate); as usedUp) {
+                <span class="nol-teamrun-model-note nol-teamrun-used-up">{{ usedUp }}</span>
+              }
+            </td>
+            <td class="nol-teamrun-model">
+              <span class="nol-teamrun-model-name">{{ modelName(teammate) }}</span>
+              @if (unlisted(teammate)) {
+                <span class="nol-teamrun-model-note">{{ resources.notInCatalogNote }}</span>
+              }
+            </td>
+            <td class="nol-teamrun-effort">{{ effortName(teammate) }}</td>
+            <td nolConfigurationTableRowActions>
+              <button type="button" nol-icon-button class="nol-teamrun-edit" [icon]="resources.editIcon" [label]="resources.formatRowAction(resources.editLabel, teammate.name)"
+                [nolTooltip]="resources.editLabel" (click)="edit(teammate)"></button>
+              <button type="button" nol-icon-button class="nol-teamrun-new-chat" [icon]="resources.newConversationIcon" [label]="resources.formatNewChatWith(teammate.name)"
+                [nolTooltip]="resources.newConversationLabel" (click)="startChat(teammate)"></button>
+              <button type="button" nol-icon-button class="nol-teamrun-delete" [icon]="resources.forgetIcon" [danger]="true"
+                [label]="resources.formatRowAction(resources.deleteTeammateLabel, teammate.name)" [nolTooltip]="resources.deleteTeammateLabel" (click)="remove(teammate)"></button>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="5" class="nol-teamrun-muted">{{ resources.noTeammates }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </nol-configuration-table>
+</div>

@@ -1,0 +1,21 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (stats().note; as note) {
+  <p class="stats-note">{{ note }}</p>
+}
+@if (stats().rows.length > 0) {
+  <dl class="stats-rows">
+    @for (row of stats().rows; track row.label) {
+      <div class="stats-row" [class.part]="row.isPart">
+        <dt>{{ row.label }}</dt>
+        <dd>{{ row.value }}</dd>
+      </div>
+    }
+  </dl>
+}

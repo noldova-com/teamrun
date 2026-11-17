@@ -1,0 +1,19 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-end: 100%;
+  display: block;
+  inline-size: 100vw;
+  container-type: inline-size;
+  contain: layout paint;
+  visibility: hidden;
+  pointer-events: none;
+}

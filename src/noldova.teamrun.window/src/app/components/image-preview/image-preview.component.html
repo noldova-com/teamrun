@@ -1,0 +1,38 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (size(); as size) {
+  <figure class="nol-teamrun-image-preview" [style.--nol-teamrun-image-width]="size.width + 'px'" [style.--nol-teamrun-image-ratio]="size.ratio">
+    <button #frame type="button" class="nol-teamrun-image-frame" [disabled]="!source()" [attr.aria-label]="image().name" [nolTooltip]="image().name"
+      [nolContextMenuTriggerFor]="source() ? menu : null" (click)="open()">
+      @if (source(); as source) {
+        <img class="nol-teamrun-image" [src]="source" [alt]="image().name" [width]="size.width" [height]="size.height">
+      }
+    </button>
+    @if (showCaption()) {
+      <figcaption class="nol-teamrun-image-caption" data-truncates [nolTooltip]="image().name" [nolTooltipTruncated]="true">{{ image().name }}</figcaption>
+    }
+  </figure>
+} @else if (fallback() !== null) {
+  <span class="nol-teamrun-image-fallback">{{ fallback() }}</span>
+} @else if (failed()) {
+  <p class="nol-teamrun-image-failed" role="status">{{ resources.formatImageLoadFailed(image().name) }}</p>
+}
+
+<ng-template #menu>
+  <nol-menu [attr.aria-label]="resources.imageMenuLabel">
+    <button type="button" nol-menu-item [label]="resources.imageOpenActionLabels[alternative()]" [icon]="resources.imageOpenActionGlyphs[alternative()]"
+      (triggered)="open(alternative())"></button>
+    <nol-menu-separator />
+    @if (canCopy) {
+      <button type="button" nol-menu-item [label]="resources.copyImageLabel" [icon]="resources.copyImageGlyph" [disabled]="copying()"
+        (triggered)="copy()"></button>
+    }
+    <button type="button" nol-menu-item [label]="resources.downloadImageLabel" [icon]="resources.downloadImageGlyph" (triggered)="save()"></button>
+  </nol-menu>
+</ng-template>

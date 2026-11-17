@@ -1,0 +1,31 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.nol-teamrun-note-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nol-space-2);
+  margin: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.nol-teamrun-note-line-glyph {
+  flex: none;
+  width: var(--nol-icon);
+  overflow: hidden;
+  font-size: var(--nol-icon);
+  line-height: var(--nol-line-label);
+}
+
+.nol-teamrun-note-line-text {
+  min-width: 0;
+}

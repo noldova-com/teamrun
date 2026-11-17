@@ -1,0 +1,17 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="nol-teamrun-terminal-head">
+  <span class="nol-teamrun-terminal-title">{{ resources.formatTerminalHeading(title()) }}</span>
+  <button type="button" nol-icon-button class="nol-teamrun-close-terminal" [icon]="resources.closeIcon" [label]="resources.formatCloseTerminal(title())"
+    (click)="closed.emit()"></button>
+</div>
+@if (unavailable()) {
+  <p class="nol-teamrun-muted nol-teamrun-terminal-unavailable">{{ resources.terminalUnavailable }}</p>
+}
+<div #screen class="nol-teamrun-terminal-screen nol-terminal-dark" [hidden]="unavailable()"></div>

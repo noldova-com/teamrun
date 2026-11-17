@@ -1,0 +1,145 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+}
+
+:host(.compact) {
+  padding-block: var(--nol-space-2);
+}
+
+.summary {
+  margin: 0 0 var(--nol-space-1);
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-panel);
+  line-height: var(--nol-line-panel);
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps > li {
+  padding-block: calc(var(--nol-space-1) / 2);
+}
+
+.step {
+  display: flex;
+  gap: var(--nol-space-2);
+  align-items: flex-start;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nol-text-muted);
+  font: inherit;
+  font-size: var(--nol-text-panel);
+  line-height: var(--nol-line-panel);
+  text-align: start;
+  cursor: pointer;
+}
+
+.step:hover {
+  color: var(--nol-text);
+}
+
+.step-glyph {
+  flex-shrink: 0;
+  width: var(--nol-icon);
+  overflow: hidden;
+  font-size: var(--nol-icon);
+  line-height: var(--nol-line-panel);
+}
+
+.step-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-status {
+  flex-shrink: 0;
+  color: var(--nol-text-muted);
+}
+
+.step-title.open {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.step-title.command {
+  font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-code);
+}
+
+.step-thought,
+.step-body {
+  margin: var(--nol-space-1) 0 var(--nol-space-1) calc(var(--nol-icon) + var(--nol-space-2));
+}
+
+.step-more {
+  margin-inline-start: var(--nol-icon);
+}
+
+.step-thought {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-message);
+  line-height: var(--nol-line-message);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.step-body {
+  max-height: 16rem;
+  overflow: auto;
+  padding: var(--nol-space-2);
+  border-radius: var(--nol-radius-medium);
+  background: var(--nol-raised);
+  font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-code);
+  line-height: var(--nol-line-code);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.step-body.failed {
+  color: var(--nol-error);
+}
+
+.calls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step-text {
+  padding-inline-start: var(--nol-space-3);
+  border-inline-start: calc(var(--nol-border-width) * 2) solid var(--nol-border);
+  color: var(--nol-text-muted);
+}
+
+.sub-agent-output {
+  margin: 0;
+}
+
+.step-page {
+  align-self: flex-start;
+  margin-inline-start: calc(-1 * var(--nol-button-padding));
+}
+
+.step-screenshot {
+  max-width: 15rem;
+}

@@ -1,0 +1,47 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (panel() === planPanel) {
+  <nol-message class="nol-teamrun-reply-plan" [selected]="selected()" [selectionLook]="raisedSelection" [author]="replyAuthor()" [time]="createdAt()" [blocks]="planBlocks"
+    [key]="summary().preview.id" [labelId]="labelId()" [layout]="column" [timeFormat]="clockTime" [copyText]="planCopyText()" [header]="false" [footer]="false" [actionsTop]="resources.planActionsInset" [actionsEnd]="resources.planActionsInset" (click)="choose($event)">
+    @if (plan(); as plan) {
+      <ng-template [nolMessageSlot]="resources.planBlockSlot">
+        <nol-teamrun-plan-card class="nol-teamrun-reply-block" [plan]="plan" [collapsible]="false" [selected]="selected()" [fileLinks]="true" [author]="replyAuthor()" [time]="time()"
+          (linkOpen)="openLink($event)" (fileActivate)="openFile($event)" />
+      </ng-template>
+    }
+  </nol-message>
+} @else {
+  <div class="nol-teamrun-reply-header">
+    <span class="nol-teamrun-reply-name" [attr.id]="labelId()">
+      <span>{{ author() }}</span>
+      <span>{{ time() }}</span>
+    </span>
+    @if (stats(); as stats) {
+      <span class="nol-teamrun-reply-stats">{{ stats }}</span>
+    }
+  </div>
+  @if (panel() === activityPanel) {
+    <nol-teamrun-activity-block [message]="message()" [entries]="entries()" [rootPath]="rootPath()" [expansion]="expansion()" [changedFiles]="summary().files" [compact]="true"
+      [beforeExpand]="ensureDetails" />
+  } @else {
+    @for (note of changesNotes(); track $index) {
+      <p class="nol-teamrun-reply-note">{{ note }}</p>
+    }
+    @if (summary().files.length > 0) {
+      <nol-teamrun-edited-files [edits]="summary().files" [fullEdits]="edits()" [rootPath]="rootPath()" [expansion]="expansion()" [beforeExpand]="ensureDetails" />
+    }
+  }
+}
+@if (loading()) {
+  <p class="nol-teamrun-reply-status" role="status">{{ resources.replyHistoryLoading }}</p>
+}
+@if (error(); as error) {
+  <p class="nol-teamrun-reply-error" role="alert">{{ error }}</p>
+  <button type="button" nol-button [variant]="text" (click)="retry()">{{ resources.replyHistoryRetry }}</button>
+}

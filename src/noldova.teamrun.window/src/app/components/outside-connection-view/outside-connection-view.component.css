@@ -1,0 +1,53 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.nol-teamrun-outside-value {
+  font-family: var(--nol-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-outside-failed {
+  color: var(--nol-error);
+}
+
+.nol-teamrun-outside-note {
+  margin: var(--nol-space-1) 0 0;
+}
+
+.nol-teamrun-outside-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  width: 0;
+  min-width: 100%;
+}
+
+.nol-teamrun-outside-setup + .nol-teamrun-outside-setup {
+  margin-block-start: var(--nol-space-3);
+}
+
+.nol-teamrun-outside-setup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-outside-setup-title {
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.nol-teamrun-outside-setup-text {
+  margin: 0;
+  padding: var(--nol-space-2) var(--nol-space-3);
+  overflow-x: auto;
+  border: var(--nol-border-width) solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-small);
+}

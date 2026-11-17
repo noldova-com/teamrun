@@ -1,0 +1,168 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+}
+
+.nol-teamrun-add-panel {
+  display: grid;
+  gap: var(--nol-space-3);
+  padding: var(--nol-space-3);
+  border: var(--nol-border-width) solid var(--nol-accent);
+  border-radius: var(--nol-radius-medium);
+}
+
+.nol-teamrun-add-title {
+  margin: 0;
+  color: var(--nol-text);
+  font: inherit;
+  font-size: var(--nol-text-small);
+  font-weight: var(--nol-weight-strong);
+}
+
+.nol-teamrun-kind-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-kind-card {
+  display: grid;
+  gap: var(--nol-space-1);
+  align-content: start;
+  padding: var(--nol-space-2) var(--nol-space-3);
+  border: var(--nol-border-width) solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background: none;
+  color: var(--nol-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.nol-teamrun-kind-card:hover:not(:disabled) {
+  background-color: var(--nol-hover);
+}
+
+.nol-teamrun-kind-card:focus-visible {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: var(--nol-border-width);
+}
+
+.nol-teamrun-kind-card.nol-teamrun-chosen {
+  border-color: var(--nol-accent);
+  box-shadow: inset 0 0 0 var(--nol-border-width) var(--nol-accent);
+  @media (forced-colors: active) {
+    border-color: Highlight;
+    box-shadow: inset 0 0 0 var(--nol-border-width) Highlight;
+  }
+}
+
+.nol-teamrun-kind-card-name {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.nol-teamrun-kind-taken {
+  cursor: default;
+}
+
+.nol-teamrun-kind-taken .nol-teamrun-kind-card-name {
+  color: var(--nol-text-muted);
+  @media (forced-colors: active) {
+    color: GrayText;
+  }
+}
+
+.nol-teamrun-kind-card-note {
+  color: var(--nol-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-kind-card-warning,
+.nol-teamrun-add-unavailable {
+  color: var(--nol-avatar-amber-text);
+}
+
+.nol-teamrun-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+}
+
+.nol-teamrun-field-label {
+  color: var(--nol-text);
+  font-size: var(--nol-text-small);
+  font-weight: var(--nol-weight-strong);
+}
+
+.nol-teamrun-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-add-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nol-teamrun-shown-as {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-add-progress {
+  display: grid;
+  gap: var(--nol-space-1);
+}
+
+.nol-teamrun-add-progress-row,
+.nol-teamrun-add-step {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+}
+
+.nol-teamrun-add-bar,
+.nol-teamrun-add-step-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nol-teamrun-add-step > button {
+  flex: none;
+}
+
+.nol-teamrun-add-folder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--nol-space-1);
+  margin: 0;
+}
+
+.nol-teamrun-add-folder-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-add-terminal {
+  margin-block-start: var(--nol-space-3);
+  contain: inline-size;
+}
+
+.nol-teamrun-add-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nol-space-2);
+}

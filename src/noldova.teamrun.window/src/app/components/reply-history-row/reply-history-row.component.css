@@ -1,0 +1,82 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  --nol-teamrun-reply-end: var(--nol-space-1);
+  display: block;
+  padding: 0 var(--nol-content-padding-inline) var(--nol-teamrun-reply-end);
+}
+
+:host(.nol-teamrun-reply-first) {
+  padding-block-start: var(--nol-view-padding-block);
+}
+
+:host(.nol-teamrun-reply-last) {
+  --nol-teamrun-reply-end: calc(var(--nol-space-1) + var(--nol-view-padding-block));
+}
+
+.nol-teamrun-reply-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--nol-space-2);
+  margin: var(--nol-space-3) 0 var(--nol-space-1);
+  color: var(--nol-text-muted);
+}
+
+.nol-teamrun-reply-name {
+  display: contents;
+}
+
+.nol-teamrun-reply-note {
+  margin: 0 0 var(--nol-space-1);
+  color: var(--nol-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-reply-status,
+.nol-teamrun-reply-error {
+  margin: 0;
+  padding-block: var(--nol-space-1);
+}
+
+.nol-teamrun-reply-status {
+  position: absolute;
+  inset-block-end: var(--nol-teamrun-reply-end);
+  inset-inline-end: var(--nol-content-padding-inline);
+  padding: var(--nol-space-1);
+  border-radius: var(--nol-radius-medium);
+  background: var(--nol-raised);
+  color: var(--nol-text-muted);
+  pointer-events: none;
+}
+
+.nol-teamrun-reply-error {
+  color: var(--nol-error);
+}
+
+:host(.nol-teamrun-reply-plan-row) {
+  --nol-teamrun-reply-end: 0px;
+  margin-block-end: calc(var(--nol-space-1) * -1);
+  padding: var(--nol-space-2) var(--nol-content-padding-inline) var(--nol-teamrun-reply-end);
+}
+
+:host(.nol-teamrun-reply-plan-row.nol-teamrun-reply-first) {
+  padding-block-start: var(--nol-view-padding-block);
+}
+
+:host(.nol-teamrun-reply-plan-row.nol-teamrun-reply-last) {
+  --nol-teamrun-reply-end: calc(var(--nol-space-2) + var(--nol-view-padding-block));
+}
+
+nol-message.nol-teamrun-reply-plan {
+  padding: var(--nol-space-2);
+  border-radius: var(--nol-radius-large);
+  cursor: pointer;
+}
