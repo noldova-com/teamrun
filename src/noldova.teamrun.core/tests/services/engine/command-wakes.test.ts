@@ -483,8 +483,19 @@ export class CommandWakesTests {
     const stopping = host.tasks.stop(new BackgroundTaskIdParams(first.id));
     await CommandWakesTests.sendAsync(host, conversation.id);
     await host.engine.waitForIdle();
+    const ended = Promise.withResolvers<BackgroundTask>();
+    using _ender = host.events.subscribe({
+      onEvent: event => {
+        if (event.name !== EventName.BackgroundTaskUpdated)
+          return;
+        const task = BackgroundTask.fromJson(event.payload);
+        if (task.id === first.id && !task.isRunning)
+          ended.resolve(task);
+      }
+    });
     command.end(null, "SIGKILL");
-    const stopped = await stopping;
+    await stopping;
+    const stopped = await ended.promise;
     await host.engine.waitForIdle();
     await CommandWakesTests.sendAsync(host, conversation.id);
     await host.engine.waitForIdle();
