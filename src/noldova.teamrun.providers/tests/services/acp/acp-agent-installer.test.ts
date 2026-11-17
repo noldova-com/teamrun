@@ -390,7 +390,7 @@ export class AcpAgentInstallerTests {
 
   @TestMethod
   public async namesAFolderItCantWriteTo(): Promise<void> {
-    if (process.getuid?.() === 0)
+    if (process.getuid?.() === 0 || !FolderRefusal.refusesWrites)
       return;
     using directory = new TemporaryDirectory();
     const installs = directory.resolve("installs");
@@ -590,7 +590,7 @@ export class AcpAgentInstallerTests {
 
   private static allowWrites(folder: string): void {
     if (process.platform === "win32")
-      FolderRefusal.allow(folder);
+      FolderRefusal.allowWrites(folder);
     else
       chmodSync(folder, 0o755);
   }

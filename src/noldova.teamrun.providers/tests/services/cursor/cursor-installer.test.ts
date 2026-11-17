@@ -364,7 +364,7 @@ export class CursorInstallerTests {
 
   @TestMethod
   public async changesNothingWhenItsFolderCantBeWrittenAndNamesTheFolder(): Promise<void> {
-    if (process.getuid?.() === 0)
+    if (process.getuid?.() === 0 || !FolderRefusal.refusesWrites)
       return;
     using directory = new TemporaryDirectory();
     const archive = FakeTar.archive(CursorInstallerTests.posixPackage());
@@ -568,7 +568,7 @@ export class CursorInstallerTests {
 
   private static allowWrites(folder: string): void {
     if (process.platform === "win32")
-      FolderRefusal.allow(folder);
+      FolderRefusal.allowWrites(folder);
     else
       chmodSync(folder, 0o755);
   }
