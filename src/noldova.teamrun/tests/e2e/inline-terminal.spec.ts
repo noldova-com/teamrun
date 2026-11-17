@@ -40,7 +40,6 @@ const PLAIN_PROMPT: string = "PS1='$ '\n";
 const TYPED: string = "typed";
 const LANGUAGES: readonly IBlockLanguage[] = process.platform === "win32" ? [BASH, POWERSHELL] : [BASH];
 const EDGE_TOLERANCE: number = 1;
-const TERMINAL_ECHO_SETTLE_MS: number = 1_000;
 
 interface IBox {
   readonly top: number;
@@ -78,7 +77,6 @@ const shownAtPromptAsync = async (page: Page, text: string): Promise<boolean> =>
 
 const settledAtPromptAsync = async (page: Page, text: string): Promise<void> => {
   await expect.poll(() => shownAtPromptAsync(page, text), TeamRunApp.pollOf(30_000)).toBe(true);
-  await page.waitForTimeout(TERMINAL_ECHO_SETTLE_MS);
 };
 
 const boxOf = async (locator: Locator): Promise<IBox> => {
