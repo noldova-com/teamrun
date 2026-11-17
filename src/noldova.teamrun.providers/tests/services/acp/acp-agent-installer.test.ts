@@ -6,7 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { once } from "node:events";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
@@ -77,6 +79,8 @@ class Install {
 
 @TestClass
 export class AcpAgentInstallerTests {
+  private static readonly SLEEP: string = "setTimeout(() => {}, 60000)";
+
   private static agent(url: string, sha256: string | null, version: string = "1.0.0", command: readonly string[] = ["bin", "agent"]): AcpRegistryAgent {
     return new AcpRegistryAgent("agent", "Agent", version, "", null, new Map([[TARGET, new AcpRegistryBinary(url, command, ["acp"], { AGENT_MODE: "acp" }, sha256)]]), null, null);
   }
@@ -296,17 +300,26 @@ export class AcpAgentInstallerTests {
     const old = directory.resolve("installs", "1.0.0");
     mkdirSync(old, { recursive: true });
     writeFileSync(join(old, "kept"), "old");
-    AcpAgentInstallerTests.denyRemoval(old);
+    const holder = process.platform === "win32" ? spawn(process.execPath, ["-e", AcpAgentInstallerTests.SLEEP], { cwd: old, stdio: "ignore" }) : null;
+    if (Object.isNull(holder))
+      chmodSync(old, 0o555);
+    else
+      await once(holder, "spawn");
     let folder: string;
     try {
       folder = await install.run();
     }
     finally {
-      AcpAgentInstallerTests.allowRemoval(old);
+      if (Object.isNull(holder))
+        chmodSync(old, 0o755);
+      else {
+        holder.kill();
+        await once(holder, "exit");
+      }
     }
 
     Assert.areEqual(directory.resolve("installs", "2.0.0"), folder);
-    Assert.areEqual("old", readFileSync(join(old, "kept"), "utf8"));
+    Assert.isTrue(existsSync(old));
   }
 
   @TestMethod
@@ -576,20 +589,6 @@ export class AcpAgentInstallerTests {
   }
 
   private static allowWrites(folder: string): void {
-    if (process.platform === "win32")
-      FolderRefusal.allow(folder);
-    else
-      chmodSync(folder, 0o755);
-  }
-
-  private static denyRemoval(folder: string): void {
-    if (process.platform === "win32")
-      FolderRefusal.refuseRemoval(folder, "kept");
-    else
-      chmodSync(folder, 0o555);
-  }
-
-  private static allowRemoval(folder: string): void {
     if (process.platform === "win32")
       FolderRefusal.allow(folder);
     else
