@@ -40,7 +40,7 @@ const PLAIN_PROMPT: string = "PS1='$ '\n";
 const TYPED: string = "typed";
 const LANGUAGES: readonly IBlockLanguage[] = process.platform === "win32" ? [BASH, POWERSHELL] : [BASH];
 const EDGE_TOLERANCE: number = 1;
-const MINIMUM_ROWS: number = 5;
+const MINIMUM_ROWS: number = 8;
 const TERMINAL_INSET: number = 12;
 const SHORT_WINDOW: { readonly width: number; readonly height: number } = { width: 640, height: 720 };
 const SHOWN_COMMAND: string = "echo shown-$((6*7))";
@@ -233,8 +233,10 @@ test("on a short history the inline terminal holds more than half of it, showing
     await page.keyboard.press("Enter");
     const shownWithOutput = async (): Promise<readonly string[]> => {
       const shown = await TerminalScreen.rowsAsync(screen);
-      const typed = shown.findIndex(t => t.endsWith(SHOWN_COMMAND));
-      return typed >= 0 && shown.slice(typed + 1, -1).includes(SHOWN_OUTPUT) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "") ? [] : shown;
+      const text = shown.join("").replaceAll(" ", "");
+      const command = SHOWN_COMMAND.replaceAll(" ", "");
+      const typed = text.indexOf(command);
+      return typed >= 0 && text.includes(SHOWN_OUTPUT, typed + command.length) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "") ? [] : shown;
     };
     await expect.poll(shownWithOutput, { ...TeamRunApp.pollOf(30_000), message: "the screen shows the command, its output and the next prompt" }).toEqual([]);
     const inline = page.locator("nol-teamrun-inline-terminal:has(.live > *)");

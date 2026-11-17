@@ -150,17 +150,17 @@ describe("InlineTerminals", () => {
     expect(opened()).toEqual([["s1", 15, ["hidden", "focus", "rows 10", "rows 15", "rows 1", "dispose"]], ["s2", 1, ["hidden", "focus"]]]);
   });
 
-  it("gives the chat's terminal 5 rows on a short history, more than half of it, so a prompt and its output show, " +
+  it("gives the chat's terminal 8 rows on a short history, more than half of it, so a prompt and its output show, " +
     "but never more than the history holds with a row to spare for the terminal's inset", async () => {
     starter.sessions = ["s1"];
     await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
     attach("teamrun.chat/c1", first, 0);
     const terminal = fakes.opened[0];
     terminal?.rowHeight.set(20);
-    for (const height of [160, 100, 40, 300])
+    for (const height of [240, 100, 40, 400])
       inline.fit("teamrun.chat/c1", height);
 
-    expect(opened()).toEqual([["s1", 15, ["hidden", "focus", "rows 5", "rows 4", "rows 1", "rows 7"]]]);
+    expect(opened()).toEqual([["s1", 15, ["hidden", "focus", "rows 8", "rows 4", "rows 1", "rows 10"]]]);
   });
 
   it("counts the chat's terminal's rows without its inset, keeps them as its drawn rows grow in the same history, " +
@@ -174,15 +174,15 @@ describe("InlineTerminals", () => {
       terminal?.element.style.setProperty("height", `${rows * 20 + 12}px`);
       inline.fit("teamrun.chat/c1", 370);
     }
-    terminal?.rowHeight.set(24);
+    terminal?.rowHeight.set(16);
     inline.fit("teamrun.chat/c1", 370);
     inline.fit("teamrun.chat/c1", 400);
     await inline.runAsync("teamrun.chat/c1", "exit", null, [], second);
     attach("teamrun.chat/c1", second, 1);
-    fakes.opened[1]?.rowHeight.set(24);
+    fakes.opened[1]?.rowHeight.set(16);
     inline.fit("teamrun.chat/c1", 400);
 
-    expect(opened()).toEqual([["s1", 15, ["hidden", "focus", "rows 9", "rows 7", "rows 8", "dispose"]], ["s2", 8, ["hidden", "focus"]]]);
+    expect(opened()).toEqual([["s1", 15, ["hidden", "focus", "rows 9", "rows 11", "rows 12", "dispose"]], ["s2", 12, ["hidden", "focus"]]]);
   });
 
   it("keeps a row the half history holds all but a sliver of, as a row height measured a hair taller after a resize gives", async () => {

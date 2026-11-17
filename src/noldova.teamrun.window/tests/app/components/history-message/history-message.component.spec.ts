@@ -3483,10 +3483,10 @@ describe("HistoryMessageComponent", () => {
       await Wait.until(() => expect(fakes.opened).toHaveLength(1));
       fakes.opened[0]?.rowHeight.set(20);
       fakes.opened[0]?.element.style.setProperty("height", "20px");
-      await Wait.until(() => expect(fakes.opened[0]?.events.at(-1)).toBe("rows 5"));
-      view.style.height = "300px";
+      await Wait.until(() => expect(fakes.opened[0]?.events.at(-1)).toBe("rows 8"));
+      view.style.height = "400px";
 
-      await Wait.until(() => expect(fakes.opened[0]?.events.at(-1)).toBe("rows 7"));
+      await Wait.until(() => expect(fakes.opened[0]?.events.at(-1)).toBe("rows 10"));
     }
     finally {
       view.remove();
