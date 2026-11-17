@@ -133,7 +133,7 @@ describe("InlineTerminals", () => {
     expect(opened()).toEqual([["s1", 15, ["shown", "focus", "hidden", "shown", "focus", "hidden", "shown"]]]);
   });
 
-  it("gives the chat's terminal the rows that fill half the history, from Terminal's row height, at most 15, at least 1, and opens the next one at them", async () => {
+  it("gives the chat's terminal the rows that fill half the history, from Terminal's row height, at most 15, at least 1 on a history that holds no more, and opens the next one at them", async () => {
     starter.sessions = ["s1", "s2"];
     inline.fit("teamrun.chat/c1", 400);
     await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
@@ -148,6 +148,19 @@ describe("InlineTerminals", () => {
     attach("teamrun.chat/c1", second, 1);
 
     expect(opened()).toEqual([["s1", 15, ["hidden", "focus", "rows 10", "rows 15", "rows 1", "dispose"]], ["s2", 1, ["hidden", "focus"]]]);
+  });
+
+  it("gives the chat's terminal 5 rows on a short history, more than half of it, so a prompt and its output show, " +
+    "but never more than the history holds with a row to spare for the terminal's inset", async () => {
+    starter.sessions = ["s1"];
+    await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
+    attach("teamrun.chat/c1", first, 0);
+    const terminal = fakes.opened[0];
+    terminal?.rowHeight.set(20);
+    for (const height of [160, 100, 40, 300])
+      inline.fit("teamrun.chat/c1", height);
+
+    expect(opened()).toEqual([["s1", 15, ["hidden", "focus", "rows 5", "rows 4", "rows 1", "rows 7"]]]);
   });
 
   it("counts the chat's terminal's rows without its inset, keeps them as its drawn rows grow in the same history, " +

@@ -40,6 +40,11 @@ const PLAIN_PROMPT: string = "PS1='$ '\n";
 const TYPED: string = "typed";
 const LANGUAGES: readonly IBlockLanguage[] = process.platform === "win32" ? [BASH, POWERSHELL] : [BASH];
 const EDGE_TOLERANCE: number = 1;
+const MINIMUM_ROWS: number = 5;
+const TERMINAL_INSET: number = 12;
+const SHORT_WINDOW: { readonly width: number; readonly height: number } = { width: 640, height: 720 };
+const SHOWN_COMMAND: string = "echo shown-$((6*7))";
+const SHOWN_OUTPUT: string = "shown-42";
 const TERMINAL_ECHO_SETTLE_MS: number = 1_000;
 
 interface IBox {
@@ -110,13 +115,14 @@ for (const { language, write, compute } of LANGUAGES)
       const underSecond = await boxOf(inline);
       const secondBlock = await boxOf(blocks.nth(1));
       const history = await boxOf(page.locator(".nol-virtual-list-viewport").first());
+      const rowHeight = (await boxOf(page.locator("nol-teamrun-inline-terminal .xterm-rows > div").first())).height;
       await testInfo.attach(`${language}-under-second`, { body: await page.screenshot(), contentType: "image/png" });
 
       expect(underSecond.top).toBeGreaterThanOrEqual(secondBlock.bottom - EDGE_TOLERANCE);
       expect(Math.abs(underSecond.left - secondBlock.left)).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(Math.abs(underSecond.right - secondBlock.right)).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(underSecond.height).toBeGreaterThan(0);
-      expect(underSecond.height).toBeLessThanOrEqual(history.height / 2 + EDGE_TOLERANCE);
+      expect(underSecond.height).toBeLessThanOrEqual(Math.min(history.height, Math.max(history.height / 2, MINIMUM_ROWS * rowHeight + TERMINAL_INSET)) + EDGE_TOLERANCE);
 
       const computed = app.pidFile(`${language}-computed`);
       await page.keyboard.type(compute(computed));
@@ -208,6 +214,40 @@ for (const { language, write, type } of LANGUAGES)
     await page.keyboard.press("Enter");
 
     await expect.poll(() => readTyped(typed), TeamRunApp.pollOf(30_000)).toBe(TYPED);
+  });
+
+test("on a short history the inline terminal holds more than half of it, showing the command typed at the prompt and its output above the next prompt, and never runs past the history",
+  async ({ app }, testInfo) => {
+    const page = await app.openChatAsync();
+    await page.setViewportSize(SHORT_WINDOW);
+    const ran = app.pidFile("short-ran");
+    await app.sendAsync(`${CodexDouble.REPLY_PREFIX}Run:\n\n\`\`\`bash\n${BASH.write(ran)}\n\`\`\``);
+    const run = page.getByRole("button", { name: /^Run bash command/u });
+    await expect(run).toHaveCount(1, { timeout: 60_000 });
+    await run.click();
+    await expect.poll(() => TeamRunApp.readPid(ran), TeamRunApp.pollOf(60_000)).not.toBeNull();
+    await expect.poll(() => page.evaluate(focusOf), TeamRunApp.pollOf(30_000)).toEqual(expect.objectContaining({ window: true, input: true }));
+    const screen = page.locator("nol-teamrun-inline-terminal .xterm-rows");
+    await TerminalScreen.expectPromptAsync(screen);
+    await page.keyboard.type(SHOWN_COMMAND);
+    await page.keyboard.press("Enter");
+    const shownWithOutput = async (): Promise<readonly string[]> => {
+      const shown = await TerminalScreen.rowsAsync(screen);
+      const typed = shown.findIndex(t => t.endsWith(SHOWN_COMMAND));
+      return typed >= 0 && shown.slice(typed + 1, -1).includes(SHOWN_OUTPUT) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "") ? [] : shown;
+    };
+    await expect.poll(shownWithOutput, { ...TeamRunApp.pollOf(30_000), message: "the screen shows the command, its output and the next prompt" }).toEqual([]);
+    const inline = page.locator("nol-teamrun-inline-terminal:has(.live > *)");
+    await inline.scrollIntoViewIfNeeded();
+    const box = await boxOf(inline);
+    const history = await boxOf(page.locator(".nol-virtual-list-viewport").first());
+    const rowHeight = (await boxOf(screen.locator(":scope > div").first())).height;
+    await testInfo.attach("short-history", { body: await page.screenshot(), contentType: "image/png" });
+
+    expect(history.height / 2).toBeLessThan(MINIMUM_ROWS * rowHeight);
+    expect(box.height).toBeGreaterThan(history.height / 2);
+    expect(box.top).toBeGreaterThanOrEqual(history.top - EDGE_TOLERANCE);
+    expect(box.bottom).toBeLessThanOrEqual(history.bottom + EDGE_TOLERANCE);
   });
 
 const expectKeptUnderFirstAsync = async (page: Page, name: string): Promise<void> => {

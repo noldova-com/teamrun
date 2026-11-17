@@ -126,7 +126,9 @@ export class InlineTerminals {
     const rowHeight = terminal.rowHeight();
     if (rowHeight === 0)
       return;
-    const rows = Math.max(1, Math.min(Resources.inlineTerminalRows, Math.floor(historyHeight / 2 / rowHeight + Resources.inlineTerminalRowTolerance)));
+    const half = Math.min(Resources.inlineTerminalRows, Math.floor(historyHeight / 2 / rowHeight + Resources.inlineTerminalRowTolerance));
+    const held = Math.floor(historyHeight / rowHeight + Resources.inlineTerminalRowTolerance) - 1;
+    const rows = Math.max(1, Math.min(held, Math.max(Resources.inlineTerminalMinimumRows, half)));
     if (rows === current.rows)
       return;
     current.rows = rows;
