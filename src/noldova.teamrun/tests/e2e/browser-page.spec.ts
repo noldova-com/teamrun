@@ -113,11 +113,11 @@ test("a teammate opens a site on this computer without a card at Low risk, reads
     await expect(page.locator("nol-permission-card")).toHaveCount(1);
     await expect(page.locator(".nol-teamrun-low-risk-text")).toHaveText(new RegExp(`^Low risk, allowed without asking: .+ opened 127\\.0\\.0\\.1:${port}/`, "u"));
     await allowOnce("Type into").click();
-    await expect(allowOnce("Click")).toBeVisible({ timeout: 60_000 });
+    await expect(allowOnce("Submit a form")).toBeVisible({ timeout: 60_000 });
     expect(received).toEqual([]);
-    await expect(async () => testInfo.attach("click-card", { body: await page.locator("nol-permission-card").filter({ hasText: "Click" }).screenshot(), contentType: "image/png" }))
+    await expect(async () => testInfo.attach("click-card", { body: await page.locator("nol-permission-card").filter({ hasText: "Submit a form" }).screenshot(), contentType: "image/png" }))
       .toPass({ timeout: 60_000 });
-    await allowOnce("Click").click();
+    await allowOnce("Submit a form").click();
     await expect.poll(() => received, TeamRunApp.pollOf(60_000)).toEqual([`name=${CodexDouble.FORM_NAME}`]);
     const lines = (): string[] => existsSync(app.codexLog) ? readFileSync(app.codexLog, "utf8").split("\n") : [];
     await expect.poll(() => lines().some(t => t.includes(" browser_snapshot: ") && t.includes("Thanks, Ada")), TeamRunApp.pollOf(60_000)).toBe(true);
@@ -235,10 +235,10 @@ test("a teammate's click, key, typing into a password field and submit of the fo
     await recordKeysAsync(app.electronApp, `${origin}/`);
     const steps: readonly (readonly [string, string, string, string])[] = [
       ["find", "Type into", "Medium risk", "input:q"],
-      ["search", "Press ", "Medium risk", "keydown:Enter"],
+      ["search", "Submit a form", "Medium risk", "keydown:Enter"],
       ["note", "Click", "Medium risk", "click:note"],
       ["secret", "Type into", "High risk", "input:pw"],
-      ["signin", "Click", "High risk", `/sent pw=${CodexDouble.SIGN_IN_SECRET}`],
+      ["signin", "Submit a form", "High risk", `/sent pw=${CodexDouble.SIGN_IN_SECRET}`],
       ["continue", "Click", "Medium risk", "click:continue"]
     ];
     for (const [item, title, risk, event] of steps) {
