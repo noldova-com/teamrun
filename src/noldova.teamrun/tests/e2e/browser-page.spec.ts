@@ -107,6 +107,7 @@ test("a teammate opens a site on this computer without a card at Low risk, reads
     await app.submitAsync(`${CodexDouble.FORM_PREFIX}${origin}/`);
 
     await expect(page.getByRole("tab", { name: "Order", exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Codex is waiting for your answer", { exact: true })).toBeVisible({ timeout: 60_000 });
     await page.getByRole("tree").locator(".nol-teamrun-conversation-row[aria-selected='true'] .nol-teamrun-conversation-title").click();
     const allowOnce = (title: string): Locator => page.locator("nol-permission-card").filter({ hasText: title }).getByRole("button", { name: "Allow once", exact: true });
     await expect(allowOnce("Type into")).toBeVisible({ timeout: 60_000 });
@@ -229,6 +230,7 @@ test("a teammate's click, key, typing into a password field and submit of the fo
     await app.submitAsync(`${CodexDouble.SIGN_IN_PREFIX}${origin}/`);
 
     await expect(page.getByRole("tab", { name: "Sign in", exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Codex is waiting for your answer", { exact: true })).toBeVisible({ timeout: 60_000 });
     await page.getByRole("tree").locator(".nol-teamrun-conversation-row[aria-selected='true'] .nol-teamrun-conversation-title").click();
     const cards = page.locator("nol-permission-card");
     const lines = (): string[] => existsSync(app.codexLog) ? readFileSync(app.codexLog, "utf8").split("\n") : [];
