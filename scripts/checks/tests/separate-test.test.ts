@@ -41,8 +41,8 @@ describe("npm test's Angular tests in a job of their own", () => {
     const separate = await runWith([], { NOLDOVA_SEPARATE_TEST: "angular" });
     const whole = await runWith([], { NOLDOVA_SEPARATE_TEST: "" });
 
-    assert.equal(stoppedOf(separate.text), "Angular cdk copy rules, Packages, Copy list, Package tests and coverage, Script types, Script tests");
-    assert.equal(stoppedOf(whole.text), "Angular cdk copy rules, Packages, Copy list, Package tests and coverage, Angular tests and coverage, Script types, Script tests");
+    assert.equal(stoppedOf(separate.text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Script types, Script tests");
+    assert.equal(stoppedOf(whole.text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Angular tests and coverage, Script types, Script tests");
   });
 
   it("takes the skip options the shared build-and-test workflow passes, and runs the same checks", async () => {
@@ -50,7 +50,7 @@ describe("npm test's Angular tests in a job of their own", () => {
 
     assert.equal(exitCode, 1);
     assert.doesNotMatch(text, /Usage: npm test/u);
-    assert.equal(stoppedOf(text), "Angular cdk copy rules, Packages, Copy list, Package tests and coverage, Script types, Script tests");
+    assert.equal(stoppedOf(text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Script types, Script tests");
   });
 
   it("refuses a NOLDOVA_SEPARATE_TEST other than angular before any check runs", async () => {

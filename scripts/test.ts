@@ -12,6 +12,7 @@ import type { Writable } from "node:stream";
 
 import { AngularProject } from "./angular/angular-project.ts";
 import { AngularTestCheck } from "./checks/angular-test-check.ts";
+import { ArchiveReuseCheck } from "./checks/archive-reuse-check.ts";
 import { CdkCopyRules } from "./checks/cdk-copy-rules.ts";
 import { ChildStage } from "./checks/child-stage.ts";
 import { CommentCheck } from "./checks/comment-check.ts";
@@ -233,6 +234,7 @@ export class Test {
     const building: readonly ICheck[] = [
       new CdkCopyRules(this.runner, this.environment),
       new PackageCheck(build),
+      new ArchiveReuseCheck(async () => await build.hashArchivesAsync(), async (names, output) => await build.rebuildAsync(names, output)),
       new CopyListCheck(this.root, async () => await new NpmCommand(this.runner, this.environment).runAsync(CopyListCheck.LIST_ARGUMENTS, this.root),
         async () => await build.readArchivesAsync()),
       new PackageTestCheck(this.root, build, this.runner, this.environment, flaky, options),
