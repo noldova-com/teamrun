@@ -6,8 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { execFileSync } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { once } from "node:events";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
@@ -32,6 +33,7 @@ import { AnsweringCommandRunner } from "../../fixtures/answering-command-runner.
 import { FakeNpm } from "../../fixtures/fake-npm.fixture.js";
 import { FakeTar } from "../../fixtures/fake-tar.fixture.js";
 import { FakeUnzip } from "../../fixtures/fake-unzip.fixture.js";
+import { FolderRefusal } from "../../fixtures/folder-refusal.fixture.js";
 import { LocalHttpServer } from "../../fixtures/local-http-server.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { ZipArchive } from "../../fixtures/zip-archive.fixture.js";
@@ -77,6 +79,8 @@ class Install {
 
 @TestClass
 export class AcpAgentInstallerTests {
+  private static readonly HOLD: string = "$ErrorActionPreference = 'Stop'; $held = [System.IO.File]::Open($env:TEAMRUN_HELD_FILE, 'Open', 'Read', 'None'); 'held'; Start-Sleep -Seconds 60";
+
   private static agent(url: string, sha256: string | null, version: string = "1.0.0", command: readonly string[] = ["bin", "agent"]): AcpRegistryAgent {
     return new AcpRegistryAgent("agent", "Agent", version, "", null, new Map([[TARGET, new AcpRegistryBinary(url, command, ["acp"], { AGENT_MODE: "acp" }, sha256)]]), null, null);
   }
@@ -296,13 +300,20 @@ export class AcpAgentInstallerTests {
     const old = directory.resolve("installs", "1.0.0");
     mkdirSync(old, { recursive: true });
     writeFileSync(join(old, "kept"), "old");
-    AcpAgentInstallerTests.denyRemoval(old);
+    const holder = process.platform === "win32" ? await AcpAgentInstallerTests.holdAsync(join(old, "kept")) : null;
+    if (Object.isNull(holder))
+      chmodSync(old, 0o555);
     let folder: string;
     try {
       folder = await install.run();
     }
     finally {
-      AcpAgentInstallerTests.allowRemoval(old);
+      if (Object.isNull(holder))
+        chmodSync(old, 0o755);
+      else {
+        holder.kill();
+        await once(holder, "exit");
+      }
     }
 
     Assert.areEqual(directory.resolve("installs", "2.0.0"), folder);
@@ -377,7 +388,7 @@ export class AcpAgentInstallerTests {
 
   @TestMethod
   public async namesAFolderItCantWriteTo(): Promise<void> {
-    if (process.getuid?.() === 0)
+    if (process.getuid?.() === 0 || !FolderRefusal.refusesWrites)
       return;
     using directory = new TemporaryDirectory();
     const installs = directory.resolve("installs");
@@ -568,34 +579,24 @@ export class AcpAgentInstallerTests {
     return `${versions.installed} ${versions.latest}`;
   }
 
+  private static async holdAsync(file: string): Promise<ChildProcess> {
+    const holder = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", AcpAgentInstallerTests.HOLD],
+      { env: { ...process.env, TEAMRUN_HELD_FILE: file }, stdio: ["ignore", "pipe", "ignore"] });
+    const first: unknown[] = await Promise.race([once(holder.stdout, "data"), once(holder, "exit")]);
+    Assert.areEqual("held", String(first[0]).trim());
+    return holder;
+  }
+
   private static denyWrites(folder: string): void {
     if (process.platform === "win32")
-      execFileSync("icacls", [folder, "/deny", "*S-1-1-0:(WD,AD)"]);
+      FolderRefusal.refuseWrites(folder);
     else
       chmodSync(folder, 0o555);
   }
 
   private static allowWrites(folder: string): void {
     if (process.platform === "win32")
-      execFileSync("icacls", [folder, "/remove:d", "*S-1-1-0"]);
-    else
-      chmodSync(folder, 0o755);
-  }
-
-  private static denyRemoval(folder: string): void {
-    if (process.platform === "win32") {
-      execFileSync("icacls", [join(folder, "kept"), "/deny", "*S-1-1-0:(DE)"]);
-      execFileSync("icacls", [folder, "/deny", "*S-1-1-0:(DC)"]);
-    }
-    else
-      chmodSync(folder, 0o555);
-  }
-
-  private static allowRemoval(folder: string): void {
-    if (process.platform === "win32") {
-      execFileSync("icacls", [folder, "/remove:d", "*S-1-1-0"]);
-      execFileSync("icacls", [join(folder, "kept"), "/remove:d", "*S-1-1-0"]);
-    }
+      FolderRefusal.allowWrites(folder);
     else
       chmodSync(folder, 0o755);
   }

@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
@@ -32,6 +32,7 @@ import {
 } from "@noldova/teamrun.providers";
 
 import { FakeTar } from "../../fixtures/fake-tar.fixture.js";
+import { FolderRefusal } from "../../fixtures/folder-refusal.fixture.js";
 import { LocalHttpServer } from "../../fixtures/local-http-server.fixture.js";
 import { RecordedDelayTimer } from "../../fixtures/recorded-delay-timer.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
@@ -363,7 +364,7 @@ export class CursorInstallerTests {
 
   @TestMethod
   public async changesNothingWhenItsFolderCantBeWrittenAndNamesTheFolder(): Promise<void> {
-    if (process.getuid?.() === 0)
+    if (process.getuid?.() === 0 || !FolderRefusal.refusesWrites)
       return;
     using directory = new TemporaryDirectory();
     const archive = FakeTar.archive(CursorInstallerTests.posixPackage());
@@ -560,14 +561,14 @@ export class CursorInstallerTests {
 
   private static denyWrites(folder: string): void {
     if (process.platform === "win32")
-      execFileSync("icacls", [folder, "/deny", "*S-1-1-0:(WD,AD)"]);
+      FolderRefusal.refuseWrites(folder);
     else
       chmodSync(folder, 0o555);
   }
 
   private static allowWrites(folder: string): void {
     if (process.platform === "win32")
-      execFileSync("icacls", [folder, "/remove:d", "*S-1-1-0"]);
+      FolderRefusal.allowWrites(folder);
     else
       chmodSync(folder, 0o755);
   }
