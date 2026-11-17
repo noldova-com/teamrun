@@ -77,7 +77,10 @@ const shownAtPromptAsync = async (page: Page, text: string): Promise<boolean> =>
 };
 
 const settledAtPromptAsync = async (page: Page, text: string): Promise<void> => {
-  await expect.poll(() => shownAtPromptAsync(page, text), TeamRunApp.pollOf(30_000)).toBe(true);
+  await expect.poll(() => shownAtPromptAsync(page, text), TeamRunApp.pollOf(30_000)).toBe(true).catch(async (error: unknown) => {
+    const shown = await TerminalScreen.rowsAsync(page.locator("nol-teamrun-inline-terminal .xterm-rows"));
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nThe inline screen shows ${JSON.stringify(shown)} and waits for ${text}.`, { cause: error });
+  });
   await page.waitForTimeout(TERMINAL_ECHO_SETTLE_MS);
 };
 
