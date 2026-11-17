@@ -11,7 +11,7 @@ import { describe, it } from "node:test";
 
 import { DependencySchedule } from "../dependency-schedule.ts";
 
-interface Item {
+interface IItem {
   readonly name: string;
   readonly dependencies: readonly string[];
 }
@@ -48,7 +48,7 @@ class Tasks {
     }
   }
 
-  public async runAsync(item: Item): Promise<void> {
+  public async runAsync(item: IItem): Promise<void> {
     this.started.push(item.name);
     this.gateOf(this.starts, item.name).open();
     await this.gateOf(this.gates, item.name).promise;
@@ -75,9 +75,9 @@ class Tasks {
   }
 }
 
-const item = (name: string, ...dependencies: string[]): Item => ({ name, dependencies });
+const item = (name: string, ...dependencies: string[]): IItem => ({ name, dependencies });
 const cycle = (names: readonly string[]): Error => new Error(`cycle: ${names.join(", ")}`);
-const scheduleOf = (items: readonly Item[], limit: number): DependencySchedule<Item> => new DependencySchedule(items, t => t.name, t => t.dependencies, limit);
+const scheduleOf = (items: readonly IItem[], limit: number): DependencySchedule<IItem> => new DependencySchedule(items, t => t.name, t => t.dependencies, limit);
 
 describe("DependencySchedule", () => {
   it("runs independent items at the same time and an item only after its dependencies finish", async () => {
