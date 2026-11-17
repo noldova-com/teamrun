@@ -61,10 +61,6 @@ export class PackageBuilder {
     this.npm = npm;
   }
 
-  public async buildSourceAsync(manifest: PackageManifest): Promise<void> {
-    await this.packSourceAsync(manifest);
-  }
-
   public async installAsync(subject: string, folder: string, archives: readonly string[]): Promise<void> {
     const installed = archives.filter(t => existsSync(t));
     if (installed.length === 0)
@@ -120,7 +116,7 @@ export class PackageBuilder {
     return files;
   }
 
-  private async packSourceAsync(manifest: PackageManifest): Promise<void> {
+  public async compileSourceAsync(manifest: PackageManifest): Promise<void> {
     const declarations = this.layout.locateSource(manifest, PackageBuilder.SOURCE_FOLDER, ...PackageBuilder.DECLARATIONS);
     if (!existsSync(declarations))
       throw new PackageException(`${manifest.directory} has no ${PackageBuilder.SOURCE_FOLDER}/${PackageBuilder.DECLARATIONS.join("/")}.`);
@@ -139,9 +135,11 @@ export class PackageBuilder {
       await copyFile(source, path.join(output, name));
     if (!buildsItself)
       await this.copyDeclarationsAsync(path.dirname(declarations), output);
+  }
 
+  public async packSourceAsync(manifest: PackageManifest): Promise<void> {
     await mkdir(this.layout.archivesFolder, { recursive: true });
-    PackageBuilder.require(await this.npm.runAsync([...PackageBuilder.PACK_ARGUMENTS, this.layout.archivesFolder], output), `Packing ${manifest.name}`);
+    PackageBuilder.require(await this.npm.runAsync([...PackageBuilder.PACK_ARGUMENTS, this.layout.archivesFolder], this.layout.locateOutput(manifest)), `Packing ${manifest.name}`);
     const differences = await this.findArchiveDifferencesAsync(manifest, this.layout.locateArchive(manifest, this.versions.version));
     if (differences.length > 0)
       throw new PackageException([...differences, PackageBuilder.INPUTS_RULE].join("\n"));
