@@ -6,12 +6,16 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
+import { availableParallelism } from "node:os";
 import path from "node:path";
 import type { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
+import { DependencySchedule } from "../ordering/dependency-schedule.ts";
+import { SerialQueue } from "../ordering/serial-queue.ts";
 import type { ProcessRunner } from "../processes/process-runner.ts";
 import { ProcessException } from "../processes/process.exception.ts";
 import { Git } from "../repository/git.ts";
@@ -43,6 +47,10 @@ export class PackageBuild {
   private static readonly COMMIT_ARGUMENTS: readonly string[] = ["rev-parse", "--verify", "--quiet", "HEAD"];
   private static readonly COMMIT_EXIT_CODES: readonly number[] = [0, 1];
   private static readonly STATUS_ARGUMENTS: readonly string[] = ["status", "--porcelain"];
+  private static readonly PARALLEL_LIMIT: number = availableParallelism();
+  private static readonly ARCHIVE_HASH: string = "sha512";
+  private static readonly ARCHIVE_HASH_PREFIX: string = "sha512-";
+  private static readonly NO_ARCHIVE: string = "no archive";
 
   private readonly layout: BuildLayout;
   private readonly catalog: PackageCatalog;
@@ -59,9 +67,29 @@ export class PackageBuild {
   }
 
   public async buildAsync(output: Writable): Promise<readonly PackageManifest[]> {
+    return [...(await this.runBuildAsync(output, [])).keys()];
+  }
+
+  public async rebuildAsync(names: readonly string[], output: Writable): Promise<ReadonlyMap<string, boolean>> {
+    return new Map([...await this.runBuildAsync(output, names)].map(([manifest, isBuilt]) => [manifest.name, isBuilt]));
+  }
+
+  public async hashArchivesAsync(): Promise<ReadonlyMap<string, string>> {
     const packages = await this.catalog.listPackagesAsync();
+    const versions = await this.readVersionsAsync();
+    const hashes = new Map<string, string>();
+    for (const manifest of packages) {
+      const archive = this.layout.locateArchive(manifest, versions.version);
+      hashes.set(manifest.name, existsSync(archive) ? `${PackageBuild.ARCHIVE_HASH_PREFIX}${createHash(PackageBuild.ARCHIVE_HASH).update(await readFile(archive)).digest("base64")}` : PackageBuild.NO_ARCHIVE);
+    }
+    return hashes;
+  }
+
+  private async runBuildAsync(output: Writable, forced: readonly string[]): Promise<ReadonlyMap<PackageManifest, boolean>> {
+    const packages = await this.catalog.listPackagesAsync();
+    const built = new Map<PackageManifest, boolean>();
     if (packages.length === 0)
-      return packages;
+      return built;
 
     const versions = await this.readVersionsAsync();
     const archives = packages.map(t => this.layout.locateArchive(t, versions.version));
@@ -69,26 +97,35 @@ export class PackageBuild {
     const builder = this.createBuilder(versions);
     const archiveHashes = new Map<string, string>();
     const uninstalled: (readonly [PackageManifest, string, readonly string[]])[] = [];
-    for (const manifest of packages) {
+    const steps = new SerialQueue();
+    const dependenciesOf = (manifest: PackageManifest): readonly string[] => PackageBuild.collectDependencies(manifest, packages);
+    await new DependencySchedule(packages, t => t.name, dependenciesOf, PackageBuild.PARALLEL_LIMIT).runAsync(async manifest => {
       const inputs = await this.hashSourceInputsAsync(builder, manifest, packages, common, archiveHashes, versions);
       const artifacts = this.listSourceArtifacts(manifest, packages, versions);
-      const isCurrent = await PackageBuild.isCurrentAsync(this.layout.locateRecord(manifest), inputs, artifacts);
-      if (isCurrent)
-        await (await PackageBuild.hashRecordAsync(inputs, artifacts)).writeAsync(this.layout.locateRecord(manifest));
-      else {
-        const dependencies = PackageBuild.collectDependencies(manifest, packages);
-        if (uninstalled.some(([built]) => dependencies.includes(built.name)))
+      const isCurrent = await steps.runAsync(async () => {
+        if (!forced.includes(manifest.name) && await PackageBuild.isCurrentAsync(this.layout.locateRecord(manifest), inputs, artifacts)) {
+          await (await PackageBuild.hashRecordAsync(inputs, artifacts)).writeAsync(this.layout.locateRecord(manifest));
+          return true;
+        }
+        if (uninstalled.some(([built]) => dependenciesOf(manifest).includes(built.name)))
           await this.installBuiltAsync(builder, archives, uninstalled);
-        await builder.buildSourceAsync(manifest);
-        uninstalled.push([manifest, inputs, artifacts]);
+        return false;
+      });
+      if (!isCurrent) {
+        await builder.compileSourceAsync(manifest);
+        await steps.runAsync(async () => {
+          await builder.packSourceAsync(manifest);
+          uninstalled.push([manifest, inputs, artifacts]);
+        });
       }
       archiveHashes.set(manifest.name, await ContentHash.ofFileAsync(this.layout.locateArchive(manifest, versions.version)));
+      built.set(manifest, !isCurrent);
       output.write(`${manifest.name}: ${isCurrent ? "reused" : "built"}\n`);
-    }
+    }, t => new PackageException(`The dependencies of ${t.join(", ")} form a cycle.`));
     await this.installBuiltAsync(builder, archives, uninstalled);
 
     await this.hashCurrentAsync(packages, versions, common, builder);
-    return packages;
+    return new Map(packages.map(t => [t, built.get(t) ?? false]));
   }
 
   public async listCopiesAsync(): Promise<readonly (readonly [string, string, string])[]> {

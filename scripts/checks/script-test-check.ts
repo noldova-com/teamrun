@@ -10,7 +10,7 @@ import type { ProcessRunner } from "../processes/process-runner.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
 
 export class ScriptTestCheck implements ICheck {
-  private static readonly TEST_ARGUMENTS: readonly string[] = ["--test", "scripts/profile/tests/**/*.test.ts", "scripts/angular/tests/**/*.test.ts", "scripts/checks/tests/**/*.test.ts", "scripts/structure/tests/**/*.test.ts", "scripts/packages/tests/**/*.test.ts", "scripts/installs/tests/**/*.test.ts"];
+  private static readonly TEST_ARGUMENTS: readonly string[] = ["--test", "scripts/profile/tests/**/*.test.ts", "scripts/angular/tests/**/*.test.ts", "scripts/checks/tests/**/*.test.ts", "scripts/structure/tests/**/*.test.ts", "scripts/packages/tests/**/*.test.ts", "scripts/installs/tests/**/*.test.ts", "scripts/ordering/tests/**/*.test.ts"];
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
