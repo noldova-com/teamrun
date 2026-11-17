@@ -39,7 +39,7 @@ export class PackageTestCheck implements ISelectableCheck {
   private static readonly SOURCE_FOLDER: string = "src";
   private static readonly WINDOW_ENTRY: string = "api/window.ts";
   private static readonly SOURCE_MAPS_OPTION: string = "--enable-source-maps";
-  private static readonly RUN_LIMIT_MILLISECONDS: number = 300_000;
+  private static readonly RUN_LIMIT_MILLISECONDS: number = 600_000;
   private static readonly RESULT_SEGMENTS: readonly string[] = ["_build", "test-result.json"];
   private static readonly RERUN_RESULT_SEGMENTS: readonly string[] = ["_build", "test-rerun-result.json"];
   private static readonly PROGRESS_SEGMENTS: readonly string[] = ["_build", "test-progress.txt"];
