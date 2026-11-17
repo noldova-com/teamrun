@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -32,6 +31,7 @@ import { AnsweringCommandRunner } from "../../fixtures/answering-command-runner.
 import { FakeNpm } from "../../fixtures/fake-npm.fixture.js";
 import { FakeTar } from "../../fixtures/fake-tar.fixture.js";
 import { FakeUnzip } from "../../fixtures/fake-unzip.fixture.js";
+import { FolderRefusal } from "../../fixtures/folder-refusal.fixture.js";
 import { LocalHttpServer } from "../../fixtures/local-http-server.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { ZipArchive } from "../../fixtures/zip-archive.fixture.js";
@@ -570,32 +570,28 @@ export class AcpAgentInstallerTests {
 
   private static denyWrites(folder: string): void {
     if (process.platform === "win32")
-      execFileSync("icacls", [folder, "/deny", "*S-1-1-0:(WD,AD)"]);
+      FolderRefusal.refuseWrites(folder);
     else
       chmodSync(folder, 0o555);
   }
 
   private static allowWrites(folder: string): void {
     if (process.platform === "win32")
-      execFileSync("icacls", [folder, "/remove:d", "*S-1-1-0"]);
+      FolderRefusal.allow(folder);
     else
       chmodSync(folder, 0o755);
   }
 
   private static denyRemoval(folder: string): void {
-    if (process.platform === "win32") {
-      execFileSync("icacls", [join(folder, "kept"), "/deny", "*S-1-1-0:(DE)"]);
-      execFileSync("icacls", [folder, "/deny", "*S-1-1-0:(DC)"]);
-    }
+    if (process.platform === "win32")
+      FolderRefusal.refuseRemoval(folder, "kept");
     else
       chmodSync(folder, 0o555);
   }
 
   private static allowRemoval(folder: string): void {
-    if (process.platform === "win32") {
-      execFileSync("icacls", [folder, "/remove:d", "*S-1-1-0"]);
-      execFileSync("icacls", [join(folder, "kept"), "/remove:d", "*S-1-1-0"]);
-    }
+    if (process.platform === "win32")
+      FolderRefusal.allow(folder);
     else
       chmodSync(folder, 0o755);
   }
