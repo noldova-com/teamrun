@@ -76,16 +76,8 @@ const shownAtPromptAsync = async (page: Page, text: string): Promise<boolean> =>
   return shown.slice(0, -1).join("").includes(text) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "");
 };
 
-const screenOfAsync = async (page: Page): Promise<string> => JSON.stringify(await page.locator("nol-teamrun-inline-terminal .xterm-rows").evaluate(t => ({
-  rows: [...t.children].map(r => r.textContent),
-  height: t.getBoundingClientRect().height,
-  pane: t.closest("nol-teamrun-inline-terminal")?.getBoundingClientRect().height
-})));
-
 const settledAtPromptAsync = async (page: Page, text: string): Promise<void> => {
-  await expect.poll(() => shownAtPromptAsync(page, text), TeamRunApp.pollOf(30_000)).toBe(true).catch(async (error: unknown) => {
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\nThe inline screen shows ${await screenOfAsync(page)} and waits for ${text}.`, { cause: error });
-  });
+  await expect.poll(() => shownAtPromptAsync(page, text), TeamRunApp.pollOf(30_000)).toBe(true);
   await page.waitForTimeout(TERMINAL_ECHO_SETTLE_MS);
 };
 
@@ -129,9 +121,7 @@ for (const { language, write, compute } of LANGUAGES)
       const computed = app.pidFile(`${language}-computed`);
       await page.keyboard.type(compute(computed));
       await page.keyboard.press("Enter");
-      await expect.poll(() => readTyped(computed), TeamRunApp.pollOf(30_000)).toBe(COMPUTED).catch(async (error: unknown) => {
-        throw new Error(`${error instanceof Error ? error.message : String(error)}\nThe inline screen shows ${await screenOfAsync(page)}.`, { cause: error });
-      });
+      await expect.poll(() => readTyped(computed), TeamRunApp.pollOf(30_000)).toBe(COMPUTED);
       await settledAtPromptAsync(page, path.basename(computed));
       await runs.nth(0).click();
       await expect.poll(() => TeamRunApp.readPid(first), TeamRunApp.pollOf(60_000)).not.toBeNull();
