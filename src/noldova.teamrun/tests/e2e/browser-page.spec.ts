@@ -249,7 +249,7 @@ test("a teammate's click, key, typing into a password field and submit of the fo
         await expect(card.locator(".nol-permission-card-risk")).toContainText(risk);
         await expect(card).not.toContainText(CodexDouble.SIGN_IN_SECRET);
         if (event === "input:pw")
-          await expect(card.locator(".nol-permission-card-code")).toContainText(": hidden");
+          await expect(card.locator(".nol-permission-card-code")).toContainText(`Text: ${CodexDouble.SIGN_IN_SECRET.length} characters, hidden`);
         expect(events).not.toContain(event);
         if (answer === "Allow once")
           await expect(async () => testInfo.attach(`card-${event}`, { body: await card.screenshot(), contentType: "image/png" })).toPass({ timeout: 60_000 });
