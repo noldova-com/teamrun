@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
@@ -79,7 +79,7 @@ class Install {
 
 @TestClass
 export class AcpAgentInstallerTests {
-  private static readonly SLEEP: string = "setTimeout(() => {}, 60000)";
+  private static readonly HOLD: string = "$ErrorActionPreference = 'Stop'; $held = [System.IO.File]::Open($env:TEAMRUN_HELD_FILE, 'Open', 'Read', 'None'); 'held'; Start-Sleep -Seconds 60";
 
   private static agent(url: string, sha256: string | null, version: string = "1.0.0", command: readonly string[] = ["bin", "agent"]): AcpRegistryAgent {
     return new AcpRegistryAgent("agent", "Agent", version, "", null, new Map([[TARGET, new AcpRegistryBinary(url, command, ["acp"], { AGENT_MODE: "acp" }, sha256)]]), null, null);
@@ -300,11 +300,9 @@ export class AcpAgentInstallerTests {
     const old = directory.resolve("installs", "1.0.0");
     mkdirSync(old, { recursive: true });
     writeFileSync(join(old, "kept"), "old");
-    const holder = process.platform === "win32" ? spawn(process.execPath, ["-e", AcpAgentInstallerTests.SLEEP], { cwd: old, stdio: "ignore" }) : null;
+    const holder = process.platform === "win32" ? await AcpAgentInstallerTests.holdAsync(join(old, "kept")) : null;
     if (Object.isNull(holder))
       chmodSync(old, 0o555);
-    else
-      await once(holder, "spawn");
     let folder: string;
     try {
       folder = await install.run();
@@ -319,7 +317,7 @@ export class AcpAgentInstallerTests {
     }
 
     Assert.areEqual(directory.resolve("installs", "2.0.0"), folder);
-    Assert.isTrue(existsSync(old));
+    Assert.areEqual("old", readFileSync(join(old, "kept"), "utf8"));
   }
 
   @TestMethod
@@ -579,6 +577,14 @@ export class AcpAgentInstallerTests {
 
   private static versions(versions: { readonly installed: string | null; readonly latest: string | null }): string {
     return `${versions.installed} ${versions.latest}`;
+  }
+
+  private static async holdAsync(file: string): Promise<ChildProcess> {
+    const holder = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", AcpAgentInstallerTests.HOLD],
+      { env: { ...process.env, TEAMRUN_HELD_FILE: file }, stdio: ["ignore", "pipe", "ignore"] });
+    const first: unknown[] = await Promise.race([once(holder.stdout, "data"), once(holder, "exit")]);
+    Assert.areEqual("held", String(first[0]).trim());
+    return holder;
   }
 
   private static denyWrites(folder: string): void {
