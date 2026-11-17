@@ -21,10 +21,10 @@ The first public version of TeamRun, a desktop app for working with AI agents as
 - **Following the work:** each reply shows its activity, the files it changed, its plan, its sub-agents and its background tasks, and a message sent while a reply runs waits its turn.
   A chat can be rewound to an earlier message, putting back the files the later replies changed where their checkpoints allow.
 - **Tools beside the chat:** a terminal in the chat's folder, a Git view of it, and web pages that agents open in the app, on the sites you allow for the workspace.
-- **Computer use** on Windows and macOS, with a border around every display while an agent controls the screen, and grants you can see and revoke.
+- **Computer use (preview)** on Windows and macOS, off until you turn it on in Settings, with a border around every display while an agent controls the screen, and grants you can see and revoke.
 - **MCP servers:** servers you share with every teammate, or with chosen ones, and TeamRun's own server, which gives teammates its tools.
-- **Usage limits:** each provider's plan usage shows in the app, and a teammate whose account reaches its usage limit can carry on with the next account, model and effort you list for it.
-- **A command line:** `<app command> teamrun` lists and manages projects, chats, providers and teammates, sends messages and stops replies.
+- **Usage limits:** the plan usage of each provider that reports it shows in the app, and a teammate whose account reaches its usage limit can carry on with the next account, model and effort you list for it.
+- **A command line:** `<app command> teamrun` manages projects, chats and providers, lists teammates, sends messages and stops replies.
 - **Packages:** `@noldova/teamrun` and the packages it depends on, `@noldova/teamrun.cli`, `.core`, `.protocol`, `.providers`, `.runtime`, `.services` and `.window`, all at this version and under the MIT License, are built from this repository into the app; none is published to a registry.
 
 ### Where it runs
@@ -37,5 +37,5 @@ The first public version of TeamRun, a desktop app for working with AI agents as
 - What each provider can do differs: Settings › "What each provider can do" shows, for each provider, which abilities work, which it can't offer, and which aren't built or checked yet.
 - Each provider's tool must be signed in with its own account; TeamRun asks the tool whether it is, and for some providers it can't read the account's details.
 - Carrying on after a usage limit works only on providers whose limits TeamRun can read; a teammate's settings show which.
-- Computer use isn't available on Linux.
+- Computer use is a preview, off by default, and isn't available on Linux.
 - A teammate reaches other chats through the app's command in its shell on Windows, macOS and Linux, but not from a Linux shell running inside Windows.
