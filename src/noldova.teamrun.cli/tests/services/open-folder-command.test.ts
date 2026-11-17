@@ -6,8 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
@@ -36,14 +35,27 @@ export class OpenFolderCommandTests {
   @TestMethod
   public async readsALeadingTildeAsTheHomeFolder(): Promise<void> {
     using directory = new TemporaryDataDirectory();
+    const project = join(directory.path, "project");
+    mkdirSync(project);
     const context = await RecordingCliContext.activateAsync();
     context.answer("teamrun.projectOpen", () => SampleData.site.toJson());
-
-    await context.runAsync("teamrun.openFolder", { folder: "~" });
-    await context.runAsync("teamrun.openFolder", { folder: `~/${relative(homedir(), directory.path)}` });
+    const home = { HOME: process.env["HOME"], USERPROFILE: process.env["USERPROFILE"] };
+    process.env["HOME"] = directory.path;
+    process.env["USERPROFILE"] = directory.path;
+    try {
+      await context.runAsync("teamrun.openFolder", { folder: "~" });
+      await context.runAsync("teamrun.openFolder", { folder: "~/project" });
+    }
+    finally {
+      for (const [name, value] of Object.entries(home))
+        if (value === undefined)
+          delete process.env[name];
+        else
+          process.env[name] = value;
+    }
 
     const opened = context.payloadsOf("teamrun.projectOpen").map(t => ProjectOpenParams.fromJson(t).rootPath);
-    Assert.areEqual(`${homedir()}|${directory.path}`, opened.join("|"));
+    Assert.areEqual(`${directory.path}|${project}`, opened.join("|"));
   }
 
   @TestMethod
