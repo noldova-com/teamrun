@@ -45,6 +45,7 @@ import type { ProviderTimings } from "../../models/provider-timings.js";
 import { Resources } from "../../resources.js";
 import { FailureDescriber } from "../failure-describer.js";
 import { ReadOnlyMcpTools } from "../mcp/read-only-mcp-tools.js";
+import { ServedToolNames } from "../mcp/served-tool-names.js";
 import { SharedMcpLaunch } from "../mcp/shared-mcp-launch.js";
 import { CommandRunner } from "../process/command-runner.js";
 import { PowershellSession } from "../process/powershell-session.js";
@@ -358,7 +359,7 @@ export class AcpAdapter implements IProviderAdapter {
         return new TurnResult(TurnOutcome.Completed, request.resumeNativeSessionId, observed, null);
       }
       const titleArguments = request.isolated ? this.agent.titleSessionArguments ?? [] : [];
-      const key = request.isolated ? null : AcpAdapter.keyOf(request, approvedTools);
+      const key = request.isolated ? null : AcpAdapter.keyOf(request, approvedTools, await ServedToolNames.listAsync(request.tools, signal));
       const taken = await this.take(key, request, sender);
       const launched = taken ?? await this.createClient(request.provider, request.requested, false, request.environment, request.workingDirectory, approvedTools, shutdowns,
         titleArguments, !request.isolated, request.isolated);
@@ -1214,10 +1215,10 @@ export class AcpAdapter implements IProviderAdapter {
     void channel.whenIdle().then(closeQuietly, closeQuietly).finally(revoke);
   }
 
-  private static keyOf(request: TurnRequest, approvedTools: readonly string[]): string {
+  private static keyOf(request: TurnRequest, approvedTools: readonly string[], tools: readonly string[] | null): string {
     const environment = Object.entries(request.environment).filter(([name]) => name !== ProtocolResources.senderTokenVariable);
     return JSON.stringify([request.provider?.id ?? null, request.provider?.profileDir ?? null, request.provider?.binaryPath ?? null, request.requested.toJson(),
-      request.workingDirectory, approvedTools, environment]);
+      request.workingDirectory, approvedTools, tools, environment]);
   }
 
   private async take(key: string | null, request: TurnRequest, sender: string | null): Promise<AcpKeptSession | null> {

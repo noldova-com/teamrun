@@ -565,6 +565,7 @@ export class Resources {
     return `The compact summary in ${file} isn't text.`;
   }
 
+  public static readonly codexOwnComputerToolsOff: JsonObject = { browser_use: false, computer_use: false, in_app_browser: false };
   public static readonly codexNoToolsConfig: JsonObject = {
     plugins: {},
     notify: [],

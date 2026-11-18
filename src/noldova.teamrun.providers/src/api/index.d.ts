@@ -3140,6 +3140,10 @@ export declare class Resources {
   /** The ellipsis an agent may end a title with when it cuts the prompt to make one. */
   public static readonly acpTitleCutEnd: RegExp;
   /**
+   * The Codex features every thread turns off, Codex's own computer use and browsers, so the computer and browser tools a teammate has are TeamRun's.
+   */
+  public static readonly codexOwnComputerToolsOff: JsonObject;
+  /**
    * The Codex settings of a thread with no tools.
    */
   public static readonly codexNoToolsConfig: JsonObject;
@@ -10807,6 +10811,19 @@ export declare class ReadOnlyMcpTools {
    * @returns The read-only tools' names.
    */
   public static listAsync(tools: TurnTools, signal: AbortSignal): Promise<readonly string[]>;
+}
+
+/**
+ * Reads the names of the tools a turn serves, so an adapter keeps a provider's session only while it still lists the same tools.
+ */
+export declare class ServedToolNames {
+  /**
+   * The names of the turn's served tools, sorted.
+   * @param tools The turn's TeamRun tools, or `null` for a turn without them.
+   * @param signal Ends the listing.
+   * @returns The names, or `null` when the turn has no tools or the listing failed.
+   */
+  public static listAsync(tools: TurnTools | null, signal: AbortSignal): Promise<readonly string[] | null>;
 }
 
 /**

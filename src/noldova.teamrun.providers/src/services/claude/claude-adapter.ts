@@ -43,6 +43,7 @@ import { TerminalSignIn } from "../terminal-sign-in.js";
 import { UsualFolder } from "../usual-folder.js";
 import { SharedMcpLaunch } from "../mcp/shared-mcp-launch.js";
 import { ReadOnlyMcpTools } from "../mcp/read-only-mcp-tools.js";
+import { ServedToolNames } from "../mcp/served-tool-names.js";
 import type { CommandRunner } from "../process/command-runner.js";
 import { ClaudeEnvironment } from "./claude-environment.js";
 import { ClaudeMcpServers } from "./claude-mcp-servers.js";
@@ -438,7 +439,8 @@ export class ClaudeAdapter implements IProviderAdapter {
 
   private async runQuery(command: ProcessCommand, request: TurnRequest, resume: string | null, text: string, effort: EffortLevel | null,
     profileDir: string | null, listener: ITurnListener, signal: AbortSignal, shutdowns: number): Promise<ClaudeTurn> {
-    const [chat, settle] = await this.openChat(command, request, resume, effort, profileDir, listener, shutdowns);
+    const [chat, settle] = await this.openChat(command, request, resume, effort, profileDir, listener, shutdowns,
+      await ServedToolNames.listAsync(request.tools, signal));
     const turn = new ClaudeTurn(listener, resume, new DeltaStream(listener, this.timings.streamInterval),
       Object.isNull(request.instructions) ? null : RoleApplication.Instructions, chat.tasks, this.timings.requestTimeout, chat.plan, chat.subAgents,
       request.requested.planFirst ? () => chat.setPermissionMode(ClaudeAdapter.modeOf(request.requested.mode)) : null, request.requested.contextWindow);
@@ -506,11 +508,11 @@ export class ClaudeAdapter implements IProviderAdapter {
   }
 
   private async openChat(command: ProcessCommand, request: TurnRequest, resume: string | null, effort: EffortLevel | null,
-    profileDir: string | null, listener: ITurnListener, shutdowns: number): Promise<readonly [ClaudeChat, ((signal: AbortSignal) => Promise<void>) | null]> {
+    profileDir: string | null, listener: ITurnListener, shutdowns: number, tools: readonly string[] | null): Promise<readonly [ClaudeChat, ((signal: AbortSignal) => Promise<void>) | null]> {
     const endpoint = request.tools?.endpoint ?? null;
     if (!Object.isNull(request.tools) && Object.isNull(endpoint))
       throw new ToolsUnavailableException(Resources.formatToolsNotServed(this.descriptor.displayName));
-    const key = ClaudeAdapter.keyOf(command, request, effort, profileDir);
+    const key = ClaudeAdapter.keyOf(command, request, effort, profileDir, tools);
     const continued = Object.isNull(request.resumeAt) ? resume : null;
     await Promise.all([...this.chats].filter(t => !Object.isNull(resume) && t.sessionId === resume).map(t => t.closing));
     const open = Object.isNull(continued) ? undefined : [...this.chats].find(t => t.sessionId === continued && !t.isClosed && !t.isBusy);
@@ -735,11 +737,11 @@ export class ClaudeAdapter implements IProviderAdapter {
     return Object.fromEntries(Object.entries(request.environment).filter(([name]) => name === ProtocolResources.senderTokenVariable));
   }
 
-  private static keyOf(command: ProcessCommand, request: TurnRequest, effort: EffortLevel | null, profileDir: string | null): string {
+  private static keyOf(command: ProcessCommand, request: TurnRequest, effort: EffortLevel | null, profileDir: string | null, tools: readonly string[] | null): string {
     const environment = Object.entries(request.environment).filter(([name]) => name !== ProtocolResources.senderTokenVariable);
     return JSON.stringify([command.executable, request.provider?.id ?? null, profileDir, request.workingDirectory, request.instructions, request.requested.model,
       effort, request.requested.speed, request.requested.mode, request.requested.planFirst, request.requested.contextWindow, environment,
-      request.sharedServers.map(t => t.toJson()), request.provider?.ownMcpServers === true]);
+      request.sharedServers.map(t => t.toJson()), request.provider?.ownMcpServers === true, tools]);
   }
 
   private createOptions(

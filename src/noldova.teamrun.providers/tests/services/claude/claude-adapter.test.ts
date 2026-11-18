@@ -864,6 +864,40 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async opensANewQueryForTheChatsNextTurnWhenTheServedToolsChangedSinceTheOpenQueryListedThem(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const tokens = new SessionTokens();
+    const served = ["terminal_run"];
+    const toolsOf = (session: string): TurnTools => new TurnTools({ listToolsAsync: () => Promise.resolve(served.map(t => ({ name: t }))),
+      callToolAsync: () => Promise.resolve({}) }, [], new RecordingMcpEndpoint(tokens, session));
+    const request = (prompt: string, resume: string | null, session: string): TurnRequest => new TurnRequest(null, host.directory.path, prompt,
+      new RequestedSettings("claude", null, null), resume, [], null, null, {}, false, toolsOf(session));
+    host.factory.next = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-kept", "none", null, []),
+      SdkMessages.taskStarted("s-kept", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-kept", "Started")),
+      new WaitForInputStep(),
+      new StampedStep(SdkMessages.success("s-kept", "Second")),
+      new WaitForCloseStep()
+    ]);
+    host.factory.queued.push(new FakeClaudeQuery([new WaitForInputStep(), SdkMessages.init("s-kept", "none", null, []),
+      new StampedStep(SdkMessages.success("s-kept", "Changed")), new WaitForCloseStep()]));
+
+    await adapter.runTurn(request("Start", null, "turn-1"), new RecordingTurnListener(), new AbortController().signal);
+    tokens.close("turn-1");
+    await adapter.runTurn(request("Next", "s-kept", "turn-2"), new RecordingTurnListener(), new AbortController().signal);
+    const kept = host.factory.queries.length;
+    tokens.close("turn-2");
+    served.push("computer_click");
+    const changed = await adapter.runTurn(request("Changed", "s-kept", "turn-3"), new RecordingTurnListener(), new AbortController().signal);
+    await adapter.shutdown();
+
+    Assert.areEqual(JSON.stringify([TurnOutcome.Completed, 1, 2]), JSON.stringify([changed.outcome, kept, host.factory.queries.length]));
+  }
+
+  @TestMethod
   public async adoptsTheChatsKeptTokenIntoTheToolSessionOfAWakeReply(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();

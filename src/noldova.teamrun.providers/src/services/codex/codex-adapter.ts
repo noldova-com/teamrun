@@ -80,6 +80,7 @@ import type { ExecutableVersionReader } from "../executables/executable-version.
 import { FailureDescriber } from "../failure-describer.js";
 import { SessionFileCarry } from "../session-file-carry.js";
 import { UsualFolder } from "../usual-folder.js";
+import { ServedToolNames } from "../mcp/served-tool-names.js";
 import { SharedMcpLaunch } from "../mcp/shared-mcp-launch.js";
 import { AbortTimer } from "../process/abort-timer.js";
 import { CommandRunner } from "../process/command-runner.js";
@@ -420,12 +421,14 @@ export class CodexAdapter implements IProviderAdapter {
     const requested = new RequestedSettings(wanted.kind, wanted.model, wanted.effort, listed ? wanted.speed : CodexAdapter.keepsThread(request) ? null : model?.defaultSpeed ?? null, wanted.mode,
       wanted.planFirst, wanted.contextWindow);
 
+    const tools = await ServedToolNames.listAsync(request.tools, signal);
+    await this.reloadIfToolsChanged(request.resumeNativeSessionId, tools);
     const release = await this.lockThread(request.resumeNativeSessionId, true);
     const statuses = new CodexSharedServerStatuses(request.provider?.id ?? this.descriptor.id, request.provider?.label ?? this.descriptor.displayName,
       request.sharedServers.map(t => t.name), listener);
     const subscription = client.subscribe(statuses, listener);
     try {
-      return await this.runLockedTurn(client, request, requested, listener, signal, statuses);
+      return await this.runLockedTurn(client, request, requested, listener, signal, statuses, tools);
     }
     finally {
       subscription[Symbol.dispose]();
@@ -434,7 +437,7 @@ export class CodexAdapter implements IProviderAdapter {
   }
 
   private async runLockedTurn(client: AppServerClient, request: TurnRequest, requested: RequestedSettings,
-    listener: ITurnListener, signal: AbortSignal, statuses: CodexSharedServerStatuses): Promise<TurnResult> {
+    listener: ITurnListener, signal: AbortSignal, statuses: CodexSharedServerStatuses, tools: readonly string[] | null): Promise<TurnResult> {
     const endpoint = request.tools?.endpoint ?? null;
     const resumed = this.holdHeld(client, request.resumeNativeSessionId);
     const kept = resumed?.token ?? null;
@@ -496,7 +499,7 @@ export class CodexAdapter implements IProviderAdapter {
     const held = resumes ? resumed : null;
     const changes = Object.isNull(held) || Object.isNull(input) || !Object.isNull(review) ? null : await this.changesFor(client, held, requested, request.workingDirectory);
     return this.runTurnOnThread(client, turn, listener, input, before, signal, grant.revoke, grant.connection?.token ?? null,
-      SenderEnvironment.read(request.environment), held, this.collaborationOf(requested, started),
+      SenderEnvironment.read(request.environment), tools, held, this.collaborationOf(requested, started),
       !resumes && Object.isNull(requested.contextWindow) && !Object.isNull(started.model) ? CodexAdapter.windowKey(request.provider, started.model) : null,
       CodexAdapter.modeOf(requested), requested.model, requested.effort, changes, review);
   }
@@ -633,7 +636,7 @@ export class CodexAdapter implements IProviderAdapter {
   }
 
   private async runTurnOnThread(client: AppServerClient, turn: CodexTurn, listener: ITurnListener, input: readonly JsonObject[] | null,
-    before: TokenTotals | null, signal: AbortSignal, revoke: () => void, token: string | null, sender: string | null,
+    before: TokenTotals | null, signal: AbortSignal, revoke: () => void, token: string | null, sender: string | null, tools: readonly string[] | null,
     resumed: ICodexHold | null, collaboration: JsonObject | null, ownWindow: string | null, mode: string | null, model: string | null,
     effort: string | null, changes: JsonObject | null, review: JsonObject | null): Promise<TurnResult> {
     this.router.register(turn);
@@ -654,6 +657,7 @@ export class CodexAdapter implements IProviderAdapter {
     if (Object.isNull(resumed)) {
       held.token = token;
       held.sender = sender;
+      held.tools = tools;
     }
     const lease = this.lease(client);
     const tasks = new CodexTasks(client, turn.threadId, listener, this.timings.requestTimeout);
@@ -805,6 +809,19 @@ export class CodexAdapter implements IProviderAdapter {
     return Promise.resolve();
   }
 
+  private async reloadIfToolsChanged(threadId: string | null, tools: readonly string[] | null): Promise<void> {
+    if (Object.isNull(threadId) || Object.isNull(tools))
+      return;
+    const changed = [...this.kept].filter(([, t]) => t.threadId === threadId && JSON.stringify(t.held.tools) !== JSON.stringify(tools));
+    if (changed.length === 0)
+      return;
+    for (const [idle, kept] of changed) {
+      kept.held.reload = true;
+      this.endKept(idle);
+    }
+    await Promise.all([...this.releases].filter(t => t.threadId === threadId).map(t => t.done.promise));
+  }
+
   private async releaseKept(threadId: string, release: () => Promise<void>,
     kept: { readonly threadId: string; readonly done: PromiseWithResolvers<void> } | undefined): Promise<void> {
     const unlock = await this.lockThread(threadId, false);
@@ -882,7 +899,7 @@ export class CodexAdapter implements IProviderAdapter {
       await target.onObservedAsync(parent.observed);
       const turn = new CodexTurn(parent.threadId, target, parent.observed, this.itemReader, new DeltaStream(target, this.timings.streamInterval));
       target.end(await this.runTurnOnThread(client, turn, target, [CodexAdapter.textInputOf(Resources.codexWakePrompt)],
-        this.totals.get(parent.threadId) ?? null, signal, () => undefined, null, null, held, null, null, held.mode, held.model, held.effort, null, null));
+        this.totals.get(parent.threadId) ?? null, signal, () => undefined, null, null, null, held, null, null, held.mode, held.model, held.effort, null, null));
     }
     finally {
       release();
@@ -950,7 +967,7 @@ export class CodexAdapter implements IProviderAdapter {
 
   private hold(client: AppServerClient, threadId: string): ICodexHold {
     const threads = this.holds.get(client) ?? new Map<string, ICodexHold>();
-    const held = threads.get(threadId) ?? { count: 0, reload: false, revokes: [], token: null, sender: null, mode: null, model: null, effort: null };
+    const held = threads.get(threadId) ?? { count: 0, reload: false, revokes: [], token: null, sender: null, tools: null, mode: null, model: null, effort: null };
     held.count += 1;
     threads.set(threadId, held);
     this.holds.set(client, threads);
@@ -1229,7 +1246,8 @@ export class CodexAdapter implements IProviderAdapter {
     if (!Object.isNull(teamRun))
       mcpServers[ProtocolResources.mcpServerName] = teamRun;
     const config: { [key: string]: JsonValue } = {
-      mcp_servers: mcpServers, ...Object.isNull(servers) ? {} : { features: { plugins: false, apps: false } }, tools: { update_plan: { enabled: true } },
+      mcp_servers: mcpServers, features: { ...Object.isNull(servers) ? {} : { plugins: false, apps: false }, ...Resources.codexOwnComputerToolsOff },
+      tools: { update_plan: { enabled: true } },
       ...isolated ? Resources.codexNoToolsConfig : {}
     };
     if (!Object.isNull(requested.effort))
