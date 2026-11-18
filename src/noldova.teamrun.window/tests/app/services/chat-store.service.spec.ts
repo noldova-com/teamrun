@@ -12,7 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { CommandRun, NotificationAction, QualifiedName } from "@noldova/desktop.protocol";
-import { WindowPartTokens } from "@noldova/desktop.window";
+import { LinkPlace, WindowPartTokens } from "@noldova/desktop.window";
 import {
   AcpAgentEntry,
   AcpAgentIdParams,
@@ -3955,6 +3955,25 @@ describe("ChatStoreService", () => {
     signIn.resolve(SampleData.provider.toJson());
     await signing;
     expect(store.signInLinks().size).toBe(0);
+  });
+
+  it("opens a sign-in's page in the system's browser, the one it opens itself and the one opened again, while the in-app browser takes every other link", async () => {
+    const signIn = new DeferredResponse();
+    const url = "https://auth.example.com/oauth/authorize?state=1";
+    context.answer(MethodName.ProviderSignIn, () => signIn.promise);
+    const browser = { placeFor: (): LinkPlace => LinkPlace.InApp, openAsync: (): Promise<void> => Promise.resolve() };
+    context.registerInAppBrowser(browser);
+    await store.initialize();
+    const placed = (): LinkPlace[] => context.linkPlaces.map(t => t ?? browser.placeFor());
+
+    const signing = store.signInProvider("a1");
+    context.emit(EventName.SignInLink, new SignInLinkPayload("a1", url).toJson());
+    await store.openSignInLink("a1", LinkGesture.Modified);
+    await store.openPage("https://claude.com/pricing", LinkGesture.Plain);
+
+    expect([context.links, placed()]).toEqual([[url, url, "https://claude.com/pricing"], [LinkPlace.System, LinkPlace.System, LinkPlace.InApp]]);
+    signIn.resolve(SampleData.provider.toJson());
+    await signing;
   });
 
   it("reads each provider's installation with the catalog, follows its changes, and counts a provider TeamRun doesn't install as installed", async () => {
