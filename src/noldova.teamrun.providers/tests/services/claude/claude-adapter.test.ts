@@ -898,6 +898,33 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  @TestData(true)
+  @TestData(false)
+  public async opensANewQueryForTheChatsNextTurnWhenOnlyOneOfItsTurnsServesToolsAndTheirListCannotBeRead(toolsFirst: boolean): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const tools = new TurnTools({ listToolsAsync: () => Promise.reject(new Error("The tools are not listed.")), callToolAsync: () => Promise.resolve({}) },
+      [], new RecordingMcpEndpoint(new SessionTokens(), "turn-1"));
+    const request = (prompt: string, resume: string | null, served: TurnTools | null): TurnRequest => new TurnRequest(null, host.directory.path, prompt,
+      new RequestedSettings("claude", null, null), resume, [], null, null, {}, false, served);
+    host.factory.next = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-kept", "none", null, []),
+      SdkMessages.taskStarted("s-kept", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-kept", "Started")),
+      new WaitForCloseStep()
+    ]);
+    host.factory.queued.push(new FakeClaudeQuery([new WaitForInputStep(), SdkMessages.init("s-kept", "none", null, []),
+      new StampedStep(SdkMessages.success("s-kept", "Next")), new WaitForCloseStep()]));
+
+    await adapter.runTurn(request("Start", null, toolsFirst ? tools : null), new RecordingTurnListener(), new AbortController().signal);
+    const next = await adapter.runTurn(request("Next", "s-kept", toolsFirst ? null : tools), new RecordingTurnListener(), new AbortController().signal);
+    await adapter.shutdown();
+
+    Assert.areEqual(JSON.stringify([TurnOutcome.Completed, 2]), JSON.stringify([next.outcome, host.factory.queries.length]));
+  }
+
+  @TestMethod
   public async adoptsTheChatsKeptTokenIntoTheToolSessionOfAWakeReply(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
