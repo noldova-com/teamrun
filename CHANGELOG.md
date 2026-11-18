@@ -4,6 +4,12 @@
 
 Each version's section is written by the pull request that changes the version, from the pull requests merged since the previous version; other pull requests don't edit this file.
 
+## 0.0.2
+
+### Fixed
+
+- **Signing in to a provider opens your own browser:** the provider's sign-in page, whether it opens by itself when you sign in or from "Open the sign-in page", now opens in your system's browser, where you're already signed in to the provider's site, whatever Settings choose for where links open. In 0.0.1 it could open in TeamRun's own browser instead.
+
 ## 0.0.1
 
 The first public version of TeamRun, a desktop app for working with AI agents as a team.
