@@ -87,11 +87,26 @@ const settledAtPromptAsync = async (page: Page, text: string): Promise<void> => 
   await page.waitForTimeout(TERMINAL_ECHO_SETTLE_MS);
 };
 
+const boxFrom = (box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): IBox =>
+  ({ top: box.y, bottom: box.y + box.height, left: box.x, right: box.x + box.width, height: box.height });
+
+const boxOrNullAsync = async (locator: Locator): Promise<IBox | null> => {
+  if (await locator.count() !== 1)
+    return null;
+  const box = await locator.boundingBox();
+  return box === null ? null : boxFrom(box);
+};
+
+const hostsOf = (): string => JSON.stringify({
+  matched: document.querySelectorAll("nol-teamrun-inline-terminal:has(.live > *)").length,
+  hosts: [...document.querySelectorAll("nol-teamrun-inline-terminal")].map(t => ({ isConnected: t.isConnected, live: t.querySelector(".live")?.childElementCount ?? 0 }))
+});
+
 const boxOf = async (locator: Locator): Promise<IBox> => {
   const box = await locator.boundingBox();
   if (box === null)
     throw new Error("The element has no box.");
-  return { top: box.y, bottom: box.y + box.height, left: box.x, right: box.x + box.width, height: box.height };
+  return boxFrom(box);
 };
 
 for (const { language, write, compute } of LANGUAGES)
@@ -133,7 +148,15 @@ for (const { language, write, compute } of LANGUAGES)
       await settledAtPromptAsync(page, path.basename(computed));
       await runs.nth(0).click();
       await expect.poll(() => TeamRunApp.readPid(first), TeamRunApp.pollOf(60_000)).not.toBeNull();
-      await expect.poll(async () => (await boxOf(inline)).bottom <= (await boxOf(blocks.nth(1))).top + EDGE_TOLERANCE, TeamRunApp.pollOf(30_000)).toBe(true);
+      const isAboveSecondAsync = async (): Promise<boolean> => {
+        const moved = await boxOrNullAsync(inline);
+        const block = await boxOrNullAsync(blocks.nth(1));
+        return moved !== null && block !== null && moved.bottom <= block.top + EDGE_TOLERANCE;
+      };
+      await expect.poll(isAboveSecondAsync, TeamRunApp.pollOf(30_000)).toBe(true).catch(async (error: unknown) => {
+        await testInfo.attach(`${language}-inline-hosts`, { body: await page.evaluate(hostsOf), contentType: "text/plain" });
+        throw error;
+      });
       const underFirst = await boxOf(inline);
       const firstBlock = await boxOf(blocks.nth(0));
       await testInfo.attach(`${language}-under-first`, { body: await page.screenshot(), contentType: "image/png" });
