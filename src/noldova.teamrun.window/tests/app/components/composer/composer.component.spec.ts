@@ -5492,7 +5492,7 @@ describe("ComposerComponent", () => {
       const observed = (element: Element): Promise<void> => new Promise(resolve => {
         const watcher = new ResizeObserver(() => {
           watcher.disconnect();
-          resolve();
+          requestAnimationFrame(() => resolve());
         });
         watcher.observe(element);
       });
