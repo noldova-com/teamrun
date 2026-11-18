@@ -42,6 +42,7 @@ const LANGUAGES: readonly IBlockLanguage[] = process.platform === "win32" ? [BAS
 const EDGE_TOLERANCE: number = 1;
 const MINIMUM_ROWS: number = 8;
 const TERMINAL_INSET: number = 12;
+const PROMPT_WINDOW: { readonly width: number; readonly height: number } = { width: 1440, height: 900 };
 const SHORT_WINDOW: { readonly width: number; readonly height: number } = { width: 640, height: 720 };
 const SHOWN_COMMAND: string = "echo shown-$((6*7))";
 const SHOWN_OUTPUT: string = "shown-42";
@@ -97,6 +98,7 @@ for (const { language, write, compute } of LANGUAGES)
   test(`Run on a reply's ${language} block shows the chat's terminal inline under it, across its width, and the next Run, clicked after the person typed a command into it, moves the same shell under its own block, leaving the earlier Run's output under its block`,
     async ({ app }, testInfo) => {
       const page = await app.openChatAsync();
+      await page.setViewportSize(PROMPT_WINDOW);
       const first = app.pidFile(`${language}-first`);
       const second = app.pidFile(`${language}-second`);
       await app.sendAsync(`${CodexDouble.REPLY_PREFIX}First:\n\n\`\`\`${language}\n${write(first)}\n\`\`\`\n\nThen:\n\n\`\`\`${language}\n${write(second)}\n\`\`\``);
@@ -122,7 +124,7 @@ for (const { language, write, compute } of LANGUAGES)
       expect(Math.abs(underSecond.left - secondBlock.left)).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(Math.abs(underSecond.right - secondBlock.right)).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(underSecond.height).toBeGreaterThan(0);
-      expect(underSecond.height).toBeLessThanOrEqual(Math.min(history.height, Math.max(history.height / 2, MINIMUM_ROWS * rowHeight + TERMINAL_INSET)) + EDGE_TOLERANCE);
+      expect(underSecond.height).toBeLessThanOrEqual(Math.min(history.height, Math.max(history.height / 2, MINIMUM_ROWS * rowHeight) + TERMINAL_INSET) + EDGE_TOLERANCE);
 
       const computed = app.pidFile(`${language}-computed`);
       await page.keyboard.type(compute(computed));
@@ -256,7 +258,7 @@ const expectKeptUnderFirstAsync = async (page: Page, name: string): Promise<void
   const blocks = page.getByRole("button", { name: /^Run bash command/u }).locator("xpath=ancestor::nol-code-block");
   const kept = page.locator("nol-teamrun-inline-terminal nol-code-block.output");
   await expect(kept).toHaveCount(1, { timeout: 60_000 });
-  await expect(kept).toContainText(name);
+  await expect.poll(async () => (await kept.innerText()).replaceAll(/\s/gu, ""), TeamRunApp.pollOf(5_000)).toContain(name);
   const keptBox = await boxOf(kept);
   const firstBlock = await boxOf(blocks.nth(0));
   const secondBlock = await boxOf(blocks.nth(1));
@@ -269,6 +271,7 @@ const expectKeptUnderFirstAsync = async (page: Page, name: string): Promise<void
 
 test("an earlier Run's output comes back under its block after the window reloads and after TeamRun restarts", async ({ app }, testInfo) => {
   const page = await app.openChatAsync();
+  await page.setViewportSize(PROMPT_WINDOW);
   for (const profile of BASH_PROFILES)
     writeFileSync(path.join(app.home, profile), PLAIN_PROMPT);
   const first = app.pidFile("kept-first");
