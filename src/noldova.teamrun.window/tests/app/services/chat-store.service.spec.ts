@@ -2878,9 +2878,9 @@ describe("ChatStoreService", () => {
       expect(await store.finishFirstLaunch()).toBe(true);
       expect(store.welcoming()).toBe(false);
       expect((await store.readFirstLaunch())?.finishedAt).toBe(SampleData.timestamp);
-      await store.openPage("https://claude.com/pricing", LinkGesture.Modified);
+      await store.openPage("https://example.com/droid", LinkGesture.Modified);
 
-      expect([context.links, context.linkGestures]).toEqual([["https://claude.com/pricing"], [LinkGesture.Modified]]);
+      expect([context.links, context.linkGestures]).toEqual([["https://example.com/droid"], [LinkGesture.Modified]]);
       expect(context.noticeText()).toBeNull();
     });
 
@@ -3969,9 +3969,9 @@ describe("ChatStoreService", () => {
     const signing = store.signInProvider("a1");
     context.emit(EventName.SignInLink, new SignInLinkPayload("a1", url).toJson());
     await store.openSignInLink("a1", LinkGesture.Modified);
-    await store.openPage("https://claude.com/pricing", LinkGesture.Plain);
+    await store.openPage("https://example.com/droid", LinkGesture.Plain);
 
-    expect([context.links, placed()]).toEqual([[url, url, "https://claude.com/pricing"], [LinkPlace.System, LinkPlace.System, LinkPlace.InApp]]);
+    expect([context.links, placed()]).toEqual([[url, url, "https://example.com/droid"], [LinkPlace.System, LinkPlace.System, LinkPlace.InApp]]);
     signIn.resolve(SampleData.provider.toJson());
     await signing;
   });
