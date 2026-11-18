@@ -6,7 +6,7 @@
   "parts": ["runtime", "window", "cli"],
   "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.2" },
   "optionalDependencies": { "browser": "0.0.3", "computer-use": "0.0.2", "git": "0.0.2", "git-github": "0.0.2" },
-  "noldovaDesktop": ">=0.0.5 <0.1.0",
+  "noldovaDesktop": ">=0.0.6 <0.1.0",
   "contributes": {
     "methods": [
       "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.defaultTeammateRead",
