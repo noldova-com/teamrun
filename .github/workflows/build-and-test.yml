@@ -120,7 +120,7 @@ jobs:
   package:
     name: Package unsigned
     needs: versions
-    uses: noldova-com/desktop/.github/workflows/package-app.yml@576d8a6e7035959a5dbddacfd5ab187832c06586 # v0.0.4
+    uses: noldova-com/desktop/.github/workflows/package-app.yml@8cae9bc7ee45ccf20d40eb40b216bd2f5b1c2000 # v0.0.5
     with:
       app-folder: app
       prepare: npm run build && npm run install:app && npm run build:app

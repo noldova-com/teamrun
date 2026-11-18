@@ -39,6 +39,7 @@
     "product": {
       "name": "TeamRun",
       "publisher": "Noldova",
+      "installFolder": "Noldova",
       "slug": "teamrun",
       "applicationId": "com.noldova.teamrun",
       "developmentApplicationId": "com.noldova.teamrun.development",
