@@ -76,7 +76,7 @@ const servePageAsync = async (script: string): Promise<[Server, string]> => {
 
 const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: string): Promise<string | undefined> => {
   await app.submitAsync(`${CodexDouble.NAVIGATE_PREFIX}${address}`);
-  await expect(page.getByText("Codex is waiting for your answer", { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Codex is waiting for your answer", { exact: true }).and(page.locator(".nol-browser-agent-bar-message"))).toBeVisible({ timeout: 60_000 });
   await page.getByRole("tree").locator(".nol-teamrun-conversation-row[aria-selected='true'] .nol-teamrun-conversation-title").click();
   const card = page.locator("nol-permission-card").filter({ has: page.getByRole("button", { name: "Allow this site for the workspace", exact: true }) });
   await card.getByRole("button", { name: "Allow this site for the workspace", exact: true }).click({ timeout: 60_000 });
