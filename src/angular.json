@@ -31,6 +31,7 @@
             "setupFiles": [
               "noldova.teamrun.window/tests/resource-timing.setup.ts",
               "noldova.teamrun.window/tests/page-stalls.setup.ts",
+              "noldova.teamrun.window/tests/resize-observer-loops.setup.ts",
               "noldova.teamrun.window/tests/kit-stylesheet.setup.ts"
             ],
             "watch": false,
