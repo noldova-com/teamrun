@@ -27,14 +27,14 @@ defaults:
 jobs:
   versions:
     name: Versions
-    uses: noldova-com/.github/.github/workflows/versions.yml@7930c8dcf906cccb753aa7559220ac2b139c89aa # v2.34.0
+    uses: noldova-com/.github/.github/workflows/versions.yml@55fa60e7fc524fa07e0a1e4f374f3cd14550a0ba # v2.39.0
     permissions: {}
     with:
       targets: linux-x64 windows-x64 macos-x64 macos-arm64
 
   build-and-test:
     name: Build and test
-    uses: noldova-com/.github/.github/workflows/build-and-test.yml@ca4ec084bd2907b4050679523deba3e3cc010fb7 # v2.36.0
+    uses: noldova-com/.github/.github/workflows/build-and-test.yml@55fa60e7fc524fa07e0a1e4f374f3cd14550a0ba # v2.39.0
     permissions:
       contents: read
       packages: read
@@ -69,7 +69,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26.13.1'
           package-manager-cache: false
@@ -97,7 +97,7 @@ jobs:
       - name: Keep the Angular tests' log and pre-bundle
         if: failure() && steps.test.outcome == 'failure'
         timeout-minutes: 5
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: angular-pre-bundle-${{ matrix.target }}-${{ github.run_attempt }}
           path: |
