@@ -1765,6 +1765,10 @@ export class ChatStoreService {
     await this.attempt(() => this.context.openLinkAsync(url, { gesture }), report);
   }
 
+  public async openSystemPage(url: string, gesture: LinkGesture, report: (message: string) => void): Promise<void> {
+    await this.attempt(() => this.context.openLinkAsync(url, { gesture, place: LinkPlace.System }), report);
+  }
+
   public async refreshTools(report: (message: string, error: unknown) => void = this.loadFailed(Resources.toolsLoad, Resources.toolsNotLoaded, null,
     () => this.refreshTools())): Promise<boolean> {
     const isRead = await this.attempt(async () => {
