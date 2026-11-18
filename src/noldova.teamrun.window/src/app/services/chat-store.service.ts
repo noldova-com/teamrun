@@ -11,7 +11,7 @@ import { type FactoryProvider, InjectionToken, type Signal, type WritableSignal,
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { CommandRun, NotificationAction, NotificationSeverity, QualifiedName } from "@noldova/desktop.protocol";
-import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
+import { type IWindowPartContext, LinkPlace, WindowPartTokens } from "@noldova/desktop.window";
 import { type LaunchedTerminal, TerminalLaunch, TerminalLauncher, type TerminalShellKind } from "@noldova/terminal.window";
 import {
   Approval,
@@ -1701,7 +1701,7 @@ export class ChatStoreService {
     report: (message: string) => void = this.actionFailed(ChatAction.OpenSignInPage, providerId)): Promise<void> {
     const url = this.signInLinksSignal().get(providerId);
     if (!Object.isUndefined(url))
-      await this.attempt(() => this.context.openLinkAsync(url, { gesture }), report);
+      await this.attempt(() => this.context.openLinkAsync(url, { gesture, place: LinkPlace.System }), report);
   }
 
   public async cancelSignIn(providerId: string, report: (message: string) => void = this.actionFailed(ChatAction.CancelSignIn, providerId)): Promise<void> {
