@@ -169,7 +169,7 @@ export class DraftsService implements IDraftsService {
       throw new ServiceException(ErrorCode.NotFound, Resources.formatConversationNotFound(conversationId), [conversationId]);
   }
 
-  private static reasonOf(error: unknown): string {
+  public static reasonOf(error: unknown): string {
     return error instanceof Error ? (error as NodeJS.ErrnoException).code ?? error.name : typeof error;
   }
 }

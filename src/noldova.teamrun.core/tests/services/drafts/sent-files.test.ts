@@ -26,7 +26,7 @@ export class SentFilesTests {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
     const chat = await host.createConversationAsync(project);
-    const other = await host.createConversationAsync();
+    const other = await host.createConversationAsync(await host.openProjectAsync("beta"));
     const sent = SentFilesTests.pathOf(await SentFilesTests.sendAsync(host, chat.id, "a.txt"));
     const kept = SentFilesTests.pathOf(await SentFilesTests.sendAsync(host, other.id, "b.txt"));
 
