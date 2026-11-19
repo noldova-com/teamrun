@@ -42,7 +42,7 @@ describe("npm test's Angular tests in a job of their own", () => {
     const whole = await runWith([], { NOLDOVA_SEPARATE_TEST: "" });
 
     assert.equal(stoppedOf(separate.text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Script types, Script tests");
-    assert.equal(stoppedOf(whole.text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Angular tests and coverage, Script types, Script tests");
+    assert.equal(stoppedOf(whole.text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Angular tests and coverage, Failure screenshots, Script types, Script tests");
   });
 
   it("takes the skip options the shared build-and-test workflow passes, and runs the same checks", async () => {
