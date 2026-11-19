@@ -1961,7 +1961,7 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
-  public async movesAHeldThreadToTheTurnsFolderOnTurnStartWhenTheChatsFolderHasChangedSinceItsLastTurn(): Promise<void> {
+  public async reloadsAKeptThreadWhoseFolderInstructionsOrContextWindowChangedSinceItsLastTurnAndKeepsOneWhoseSettingsAreTheSame(): Promise<void> {
     using host = new CodexTestHost();
     const adapter = host.createAdapter();
     const own = join(host.directory.path, "own");
@@ -1971,17 +1971,18 @@ export class CodexAdapterTests {
     const seen: string[] = [];
     let threadId: string | null = null;
     try {
-      for (const folder of [own, attached, attached, own]) {
+      for (const [folder, role, window] of [[own, "A", null], [own, "A", null], [attached, "A", null], [attached, "B", null], [attached, "B", 256_000], [own, "B", 256_000]] as const) {
         const listener = new RecordingTurnListener();
-        const result = await adapter.runTurn(new TurnRequest(null, folder, "where", new RequestedSettings("codex", null, null), threadId), listener,
-          new AbortController().signal);
+        const result = await adapter.runTurn(new TurnRequest(null, folder, "where", new RequestedSettings("codex", null, null, null, null, false, window), threadId, [], role),
+          listener, new AbortController().signal);
         threadId = result.nativeSessionId;
         seen.push(listener.texts.join(""));
       }
     }
     finally { await adapter.shutdown(); }
 
-    Assert.areEqual([own, attached, attached, own].join("|"), seen.join("|"));
+    Assert.areEqual([`${own} A none 0`, `${own} A none 0`, `${attached} A none 1`, `${attached} B none 2`, `${attached} B 256000 3`, `${own} B 256000 4`].join("|"),
+      seen.join("|"));
   }
 
   @TestMethod

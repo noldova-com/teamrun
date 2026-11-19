@@ -466,6 +466,11 @@ export class FakeCodexAppServer {
       ...this.collaborations.has(threadId) && process.env["TEAMRUN_FAKE_CODEX_PLAN"] !== "unreported" ? { collaborationMode: this.collaborations.get(threadId) } : {} });
   }
 
+  private static whereOf(params: Json, archives: number): string {
+    const config = (params["config"] ?? {}) as Json;
+    return [params["cwd"], params["developerInstructions"], config["model_context_window"] ?? "none", archives].join(" ");
+  }
+
   private resumeStored(id: number | string, params: Json): void {
     const threadId = String(params["threadId"]);
     this.stored.delete(threadId);
@@ -786,7 +791,7 @@ export class FakeCodexAppServer {
         this.emitWindowScenario(threadId, turnId);
         break;
       case "where":
-        this.notify("item/completed", { ...turn, item: { id: "echo", type: "agentMessage", text: String(this.loaded.get(threadId)?.params["cwd"] ?? "") } });
+        this.notify("item/completed", { ...turn, item: { id: "echo", type: "agentMessage", text: FakeCodexAppServer.whereOf(this.loaded.get(threadId)?.params ?? {}, this.archives.length) } });
         this.notify("turn/completed", { threadId, turn: { id: turnId, status: "completed" } });
         break;
       case "echo":
