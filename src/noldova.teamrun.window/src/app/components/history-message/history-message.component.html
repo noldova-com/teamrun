@@ -38,7 +38,7 @@ LICENSE file in the root directory of this source tree.
       [nolTooltip]="resources.showStatsLabel" [nolPopoverTrigger]="statsPanel" [nolPopoverSide]="below" [nolPopoverAlignment]="start"></button>
   }
   @if (canStop()) {
-    <button type="button" nol-button nolMessageFooterEnd class="cancel" [nolMessageFooterEndPlacement]="footerEnd" [variant]="secondary" [size]="compact" [disabled]="stopping()" (click)="cancel()">
+    <button type="button" nol-button nolMessageFooterEnd class="cancel" [nolMessageFooterEndPlacement]="footerEnd" [variant]="secondary" [size]="compact" [attr.aria-disabled]="stopping() ? 'true' : null" (click)="cancel()">
       <span class="material-symbols-rounded" nolButtonIcon aria-hidden="true">{{ resources.stopGlyph }}</span>
       {{ resources.cancelReplyLabel }}
     </button>

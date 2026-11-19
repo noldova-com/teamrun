@@ -937,43 +937,6 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(context.parametersOf(MethodName.MessageCancel)).toEqual(new MessageIdParams(running.id).toJson()));
   });
 
-  it("says a reply is stopping from the first click on its Stop, which it disables in place, asks once, and drops the word when the stop fails", async () => {
-    const running = SampleData.withStatus(SampleData.reply, MessageStatus.Running, steps.slice(0, 2));
-    let calls = 0;
-    const held = new DeferredResponse();
-    context.answer(MethodName.MessageListOpen, () => [running.toJson()]);
-    context.answer(MethodName.MessageCancel, () => {
-      calls += 1;
-      return held.promise;
-    });
-    render(running);
-    await Wait.until(() => expect(store().loaded()).toBe(true));
-    fixture.detectChanges();
-    const stop = (): HTMLButtonElement => {
-      const found = element().querySelector(".nol-message-footer .cancel");
-      if (!(found instanceof HTMLButtonElement))
-        throw new Error("Stop is not shown.");
-      return found;
-    };
-    const before = [box(".nol-message-footer .cancel"), box(".activity-line")] as const;
-
-    await click(stop());
-    await Wait.until(() => expect(calls).toBe(1));
-    fixture.detectChanges();
-    stop().click();
-    fixture.detectChanges();
-
-    expect([textOf(".activity-text"), stop().disabled, calls]).toEqual(["Stopping…", true, 1]);
-    expect(textOf(".nol-message-footer .cancel")).toMatch(/Stop$/u);
-    for (const [earlier, after] of [[before[0], box(".nol-message-footer .cancel")], [before[1], box(".activity-line")]] as const)
-      for (const edge of ["left", "top", "width", "height"] as const)
-        AppearanceFixture.expectPixels(after[edge], earlier[edge]);
-    held.reject(new Error("The reply couldn't be stopped."));
-    await Wait.until(() => expect(stop().disabled).toBe(false));
-    fixture.detectChanges();
-    expect(textOf(".activity-text")).toBe("Working for 12s");
-  });
-
   describe.each([
     { look: "light", mode: ThemeMode.Light, forcedColors: "none" },
     { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
@@ -990,6 +953,47 @@ describe("HistoryMessageComponent", () => {
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       return running;
     };
+
+    it("says a reply is stopping from the first Enter on its Stop, which keeps its focus, box and place, asks once, and drops the word when the stop fails", async () => {
+      AppearanceFixture.apply(DefaultTheme.theme, mode);
+      const running = SampleData.withStatus(SampleData.reply, MessageStatus.Running, steps.slice(0, 2));
+      let calls = 0;
+      const held = new DeferredResponse();
+      context.answer(MethodName.MessageListOpen, () => [running.toJson()]);
+      context.answer(MethodName.MessageCancel, () => {
+        calls += 1;
+        return held.promise;
+      });
+      render(running);
+      await Wait.until(() => expect(store().loaded()).toBe(true));
+      fixture.detectChanges();
+      const stop = (): HTMLButtonElement => {
+        const found = element().querySelector(".nol-message-footer .cancel");
+        if (!(found instanceof HTMLButtonElement))
+          throw new Error("Stop is not shown.");
+        return found;
+      };
+      const before = [box(".nol-message-footer .cancel"), box(".activity-line")] as const;
+
+      stop().focus();
+      await userEvent.keyboard("{Enter}");
+      await Wait.until(() => expect(calls).toBe(1));
+      fixture.detectChanges();
+      await userEvent.keyboard("{Enter}");
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect([textOf(".activity-text"), stop().getAttribute("aria-disabled"), stop().disabled, document.activeElement === stop(), calls])
+        .toEqual(["Stopping…", "true", false, true, 1]);
+      expect(textOf(".nol-message-footer .cancel")).toMatch(/Stop$/u);
+      for (const [earlier, after] of [[before[0], box(".nol-message-footer .cancel")], [before[1], box(".activity-line")]] as const)
+        for (const edge of ["left", "top", "width", "height"] as const)
+          AppearanceFixture.expectPixels(after[edge], earlier[edge]);
+      held.reject(new Error("The reply couldn't be stopped."));
+      await Wait.until(() => expect(stop().getAttribute("aria-disabled")).toBeNull());
+      fixture.detectChanges();
+      expect([textOf(".activity-text"), document.activeElement === stop()]).toEqual(["Working for 12s", true]);
+    });
 
     it("keeps a working reply's footer row as tall while its Stop shows as once the reply has finished, with the default theme, and Stop the row's height", async () => {
       AppearanceFixture.apply(DefaultTheme.theme, mode);

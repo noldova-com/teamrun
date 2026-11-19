@@ -1778,24 +1778,35 @@ describe("ChatStoreService", () => {
     expect([...store.thinkingReplies()]).toEqual([]);
   });
 
-  it("marks a running reply as saving a checkpoint until the checkpoint or the reply ends, and ignores replies that are not running", async () => {
+  it("marks a running reply as saving a checkpoint until the checkpoint ends, a detail comes, a resync or the reply ends, and ignores replies that are not running", async () => {
     context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
     await store.initialize();
     const emit = (name: EventName, messageId: string): void => context.emit(name, new MessageIdParams(messageId).toJson());
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const seen: string[][] = [];
 
     emit(EventName.ReplyCheckpointStarted, "unknown");
     emit(EventName.ReplyCheckpointStarted, "m2");
-    const started = [...store.savingCheckpointReplies()];
+    seen.push(saving());
     emit(EventName.ReplyCheckpointEnded, "unknown");
-    const unknownEnded = [...store.savingCheckpointReplies()];
+    seen.push(saving());
     emit(EventName.ReplyCheckpointEnded, "m2");
-    const ended = [...store.savingCheckpointReplies()];
+    seen.push(saving());
+    for (const name of [EventName.DetailAppended, EventName.DetailUpdated]) {
+      emit(EventName.ReplyCheckpointStarted, "m2");
+      context.emit(name, new DetailEventPayload("m2", SampleData.detail(0, DetailKind.Text, "Hello")).toJson());
+      seen.push(saving());
+    }
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    await expect(store.resync()).resolves.toBe(true);
+    seen.push([String(store.isWorking("c1")), ...saving()]);
     emit(EventName.ReplyCheckpointStarted, "m2");
     context.emit(EventName.MessageUpdated, SampleData.withStatus(SampleData.reply, MessageStatus.Cancelled).toJson());
-    const replyEnded = [...store.savingCheckpointReplies()];
+    seen.push(saving());
     emit(EventName.ReplyCheckpointStarted, "m2");
+    seen.push(saving());
 
-    expect([started, unknownEnded, ended, replyEnded, [...store.savingCheckpointReplies()]]).toEqual([["m2"], ["m2"], [], [], []]);
+    expect(seen).toEqual([["m2"], ["m2"], [], [], [], ["true"], [], []]);
   });
 
   it("loads the catalog and selects a project without opening a conversation", async () => {

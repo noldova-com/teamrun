@@ -1989,6 +1989,7 @@ export class ChatStoreService {
         const payload = DetailEventPayload.fromJson(event.payload);
         this.captureEvent(event, JSON.stringify([EventName.DetailUpdated, payload.messageId, payload.detail.sequence]));
         this.stopThinking(payload.messageId);
+        this.stopSavingCheckpoint(payload.messageId);
         this.applyDetail(payload);
         break;
       }
@@ -2272,7 +2273,7 @@ export class ChatStoreService {
       const checks = await Promise.all(dropped.map(t => this.confirmDropped(t.id).catch((u: unknown) => u)));
       this.setWorking(new Map(open.map(t => [t.id, t])));
       this.thinkingSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
-      this.savingCheckpointSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
+      this.savingCheckpointSignal.set(new Set());
       this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending));
       for (const approval of approvals)
         this.upsertApproval(approval);
