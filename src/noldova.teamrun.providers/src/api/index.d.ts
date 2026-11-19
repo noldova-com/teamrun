@@ -3140,7 +3140,7 @@ export declare class Resources {
   /** The ellipsis an agent may end a title with when it cuts the prompt to make one. */
   public static readonly acpTitleCutEnd: RegExp;
   /**
-   * The Codex features every thread turns off, Codex's own computer use and browsers, so the computer and browser tools a teammate has are TeamRun's.
+   * The Codex features every thread turns off, Codex's own computer use and browser use, so the computer and browser-use tools a teammate has are TeamRun's.
    */
   public static readonly codexOwnComputerToolsOff: JsonObject;
   /**
@@ -5648,6 +5648,8 @@ export declare class Resources {
   public static readonly claudeWakeToolsRefused: string;
   /** The note on a Claude turn that stopped the open chat, and its background tasks, because its tools refused the chat's kept token. */
   public static readonly claudeChatEndedForTools: string;
+  /** The note on a Claude turn that stopped the open chat, and its background tasks, because the tools TeamRun serves changed. */
+  public static readonly claudeChatEndedForToolsChange: string;
   /**
    * The `type` of a shared stdio server and a shared HTTP server in Claude's `mcpServers`, and the header that carries a bearer token.
    */

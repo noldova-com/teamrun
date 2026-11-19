@@ -810,7 +810,7 @@ export class CodexAdapter implements IProviderAdapter {
   }
 
   private async reloadIfToolsChanged(threadId: string | null, tools: readonly string[] | null): Promise<void> {
-    if (Object.isNull(threadId) || Object.isNull(tools))
+    if (Object.isNull(threadId) || Object.isNull(tools) || this.silencesOf(threadId).length > 0)
       return;
     const changed = [...this.kept].filter(([, t]) => t.threadId === threadId && JSON.stringify(t.held.tools) !== JSON.stringify(tools));
     if (changed.length === 0)

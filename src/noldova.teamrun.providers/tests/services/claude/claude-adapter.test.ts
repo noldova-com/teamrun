@@ -887,14 +887,18 @@ export class ClaudeAdapterTests {
 
     await adapter.runTurn(request("Start", null, "turn-1"), new RecordingTurnListener(), new AbortController().signal);
     tokens.close("turn-1");
-    await adapter.runTurn(request("Next", "s-kept", "turn-2"), new RecordingTurnListener(), new AbortController().signal);
+    const next = new RecordingTurnListener();
+    await adapter.runTurn(request("Next", "s-kept", "turn-2"), next, new AbortController().signal);
     const kept = host.factory.queries.length;
     tokens.close("turn-2");
     served.push("computer_click");
-    const changed = await adapter.runTurn(request("Changed", "s-kept", "turn-3"), new RecordingTurnListener(), new AbortController().signal);
+    const listener = new RecordingTurnListener();
+    const changed = await adapter.runTurn(request("Changed", "s-kept", "turn-3"), listener, new AbortController().signal);
     await adapter.shutdown();
 
     Assert.areEqual(JSON.stringify([TurnOutcome.Completed, 1, 2]), JSON.stringify([changed.outcome, kept, host.factory.queries.length]));
+    Assert.areEqual(JSON.stringify(["", Resources.claudeChatEndedForToolsChange]),
+      JSON.stringify([next, listener].map(t => t.details.filter(u => u.kind === DetailKind.Note).map(u => u.text).join("|"))));
   }
 
   @TestMethod

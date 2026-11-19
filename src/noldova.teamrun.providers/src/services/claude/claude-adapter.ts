@@ -89,6 +89,7 @@ export class ClaudeAdapter implements IProviderAdapter {
   private readonly signInReader: ClaudeSignInReader = new ClaudeSignInReader();
   private readonly runs: Set<ClaudeRun> = new Set();
   private readonly chats: Set<ClaudeChat> = new Set();
+  private readonly servedTools: WeakMap<ClaudeChat, readonly string[] | null> = new WeakMap();
   private readonly chatProviders: WeakMap<ClaudeChat, string | null> = new WeakMap();
   private readonly reportedEfforts: Map<string, string> = new Map();
   private readonly reportedWindows: Map<string, number> = new Map();
@@ -527,6 +528,8 @@ export class ClaudeAdapter implements IProviderAdapter {
         await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.claudeChatEndedForTools, null, null));
     }
     if (!Object.isUndefined(open)) {
+      if (open.isRunningTasks && JSON.stringify(this.servedTools.get(open)) !== JSON.stringify(tools))
+        await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.claudeChatEndedForToolsChange, null, null));
       this.chats.delete(open);
       void open.stop();
     }
@@ -557,6 +560,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     chat.attach(query, ClaudeAdapter.startModeOf(request));
     this.chats.add(chat);
     this.chatProviders.set(chat, request.provider?.id ?? null);
+    this.servedTools.set(chat, tools);
     const own = await this.ownServersOf(request, environment);
     const others = ClaudeAdapter.serversOf(request, served, environment);
     const servers = { ...own, ...others };

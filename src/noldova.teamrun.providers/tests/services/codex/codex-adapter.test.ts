@@ -183,7 +183,7 @@ export class CodexAdapterTests {
     const usual = (JSON.parse(String(listener.texts[0])) as { thread: { ephemeral: boolean; config: Record<string, unknown> } }).thread;
     Assert.isFalse(usual.ephemeral);
     Assert.areEqual("{}|[]", `${JSON.stringify(thread.config["plugins"])}|${JSON.stringify(thread.config["notify"])}`);
-    Assert.areEqual(JSON.stringify({ plugins: false, apps: false, browser_use: false, computer_use: false, in_app_browser: false }), JSON.stringify(usual.config["features"]));
+    Assert.areEqual(JSON.stringify({ plugins: false, apps: false, browser_use: false, computer_use: false }), JSON.stringify(usual.config["features"]));
     Assert.isUndefined(usual.config["plugins"]);
     Assert.isUndefined(usual.config["notify"]);
     Assert.isUndefined(usual.config["web_search"]);
@@ -1292,7 +1292,7 @@ export class CodexAdapterTests {
     Assert.areEqual(host.directory.path, echoed.thread["cwd"]);
     Assert.areEqual("gpt-x", echoed.thread["model"]);
     Assert.areEqual(host.directory.path, echoed.configRead["cwd"]);
-    Assert.areEqual("{\"mcp_servers\":{},\"features\":{\"plugins\":false,\"apps\":false,\"browser_use\":false,\"computer_use\":false,\"in_app_browser\":false},\"tools\":{\"update_plan\":{\"enabled\":true}},\"model_reasoning_effort\":\"high\"}",
+    Assert.areEqual("{\"mcp_servers\":{},\"features\":{\"plugins\":false,\"apps\":false,\"browser_use\":false,\"computer_use\":false},\"tools\":{\"update_plan\":{\"enabled\":true}},\"model_reasoning_effort\":\"high\"}",
       JSON.stringify(echoed.thread["config"]));
     Assert.areEqual(host.directory.resolve("work-profile"), echoed.codexHome);
     Assert.isNull(echoed.apiKey);
@@ -1323,7 +1323,7 @@ export class CodexAdapterTests {
     Assert.areEqual(JSON.stringify([own, own]), JSON.stringify(turns.map(t => t.codexHome)));
     for (const turn of turns) {
       Assert.areEqual(String.empty, turn.thread.developerInstructions);
-      Assert.areEqual(JSON.stringify({ plugins: false, apps: false, browser_use: false, computer_use: false, in_app_browser: false }),
+      Assert.areEqual(JSON.stringify({ plugins: false, apps: false, browser_use: false, computer_use: false }),
         JSON.stringify(turn.thread.config["features"]));
       Assert.isFalse(["memories", "project_doc_max_bytes", "model_instructions_file", "experimental_instructions_file"].some(t => t in turn.thread.config));
     }
@@ -1822,6 +1822,30 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
+  public async runsATurnOnAThreadWhoseBackgroundTaskStillRunsWithoutReloadingItWhenTheServedToolsChanged(): Promise<void> {
+    using host = new CodexTestHost();
+    const adapter = host.createAdapter();
+    const served = ["terminal_run"];
+    const tools = new TurnTools({ listToolsAsync: () => Promise.resolve(served.map(t => ({ name: t }))), callToolAsync: () => Promise.resolve({}) },
+      [], new RecordingMcpEndpoint());
+    const request = (prompt: string, threadId: string | null): TurnRequest => new TurnRequest(null, host.directory.path, prompt,
+      new RequestedSettings("codex", null, null), threadId, [], null, null, {}, false, tools);
+    const started = new RecordingTurnListener();
+    const next = new RecordingTurnListener();
+    let outcome: TurnOutcome | null = null;
+    try {
+      const threadId = (await adapter.runTurn(request("background", null), started, new AbortController().signal)).nativeSessionId;
+      await Wait.until(() => started.taskStarts.length === 1, "The listener did not see a task start.");
+      served.push("computer_click");
+      outcome = (await adapter.runTurn(request("role-payload", threadId), next, new AbortController().signal)).outcome;
+    }
+    finally { await adapter.shutdown(); }
+
+    Assert.areEqual(TurnOutcome.Completed, outcome);
+    Assert.areEqual("[]", JSON.stringify((JSON.parse(String(next.details.find(t => t.kind === DetailKind.Text)?.text)) as { archives: unknown }).archives));
+  }
+
+  @TestMethod
   public async releasesADeletedChatsKeptThreadNowAndItsRunningThreadOnceItsTurnEnds(): Promise<void> {
     using host = new CodexTestHost();
     const adapter = host.createAdapter();
@@ -2288,7 +2312,7 @@ export class CodexAdapterTests {
     for (const listener of [first, second]) {
       const echoed = JSON.parse(String(listener.texts[0])) as { thread: { config: Record<string, unknown> }; argv: readonly string[] };
       Assert.areEqual("{}", JSON.stringify(echoed.thread.config["mcp_servers"]));
-      Assert.areEqual(JSON.stringify({ browser_use: false, computer_use: false, in_app_browser: false }), JSON.stringify(echoed.thread.config["features"]));
+      Assert.areEqual(JSON.stringify({ browser_use: false, computer_use: false }), JSON.stringify(echoed.thread.config["features"]));
       Assert.areEqual("app-server", echoed.argv.join(" "));
     }
   }
@@ -2383,8 +2407,8 @@ export class CodexAdapterTests {
     const off = await configOfFork(host.createProvider("off", "off"));
     await adapter.shutdown();
 
-    Assert.areEqual("{}|{\"browser_use\":false,\"computer_use\":false,\"in_app_browser\":false}", `${JSON.stringify(on["mcp_servers"])}|${JSON.stringify(on["features"])}`);
-    Assert.areEqual("{\"node_repl\":{\"enabled\":false}}|{\"plugins\":false,\"apps\":false,\"browser_use\":false,\"computer_use\":false,\"in_app_browser\":false}", `${JSON.stringify(off["mcp_servers"])}|${JSON.stringify(off["features"])}`);
+    Assert.areEqual("{}|{\"browser_use\":false,\"computer_use\":false}", `${JSON.stringify(on["mcp_servers"])}|${JSON.stringify(on["features"])}`);
+    Assert.areEqual("{\"node_repl\":{\"enabled\":false}}|{\"plugins\":false,\"apps\":false,\"browser_use\":false,\"computer_use\":false}", `${JSON.stringify(off["mcp_servers"])}|${JSON.stringify(off["features"])}`);
   }
 
   @TestMethod
