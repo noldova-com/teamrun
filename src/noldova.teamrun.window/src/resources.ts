@@ -406,6 +406,13 @@ export class Resources {
   public static readonly moveTitle: string = "Move chat to a project";
   public static readonly moveConfirmLabel: string = "Move";
   public static readonly moveToProjectIcon: string = "drive_file_move";
+  public static readonly attachFolderLabel: string = "Attach a folder…";
+  public static readonly replaceFolderLabel: string = "Replace the folder…";
+  public static readonly detachFolderLabel: string = "Detach the folder";
+  public static readonly attachFolderIcon: string = "folder_open";
+  public static readonly detachFolderIcon: string = "folder_off";
+  public static readonly replaceFolderTitle: string = "Replace the attached folder";
+  public static readonly replaceFolderConfirmLabel: string = "Replace";
   public static readonly forgetTitle: string = "Forget project";
   public static readonly forgetConfirmLabel: string = "Forget";
   public static readonly rewindLabel: string = "Rewind to here";
@@ -1032,6 +1039,8 @@ export class Resources {
     [ChatAction.SetMemberSettings]: "Couldn't change the teammate's model or effort in the chat",
     [ChatAction.SetPlanFirst]: "Couldn't change Plan first in the chat",
     [ChatAction.MoveChat]: "Couldn't move the chat",
+    [ChatAction.AttachFolder]: "Couldn't attach the folder to the chat",
+    [ChatAction.DetachFolder]: "Couldn't detach the folder from the chat",
     [ChatAction.RenameChat]: "Couldn't rename the chat",
     [ChatAction.SetResponder]: "Couldn't change who answers in the chat",
     [ChatAction.DeleteChat]: "Couldn't delete the chat",
@@ -1898,6 +1907,18 @@ export class Resources {
   public static formatDeleteWithFilesText(title: string, count: number): string {
     return `"${title}", its messages and the ${Resources.formatFileCount(count)} it holds are removed. This cannot be undone. `
       + "To keep the chat and its files, move it to a folder instead.";
+  }
+
+  public static formatReplaceFolderText(attached: string, chosen: string): string {
+    return `From the next turn, this chat's teammates work in "${chosen}" instead of "${attached}". No files are copied, moved or changed.`;
+  }
+
+  public static formatAttachedFolderNote(folder: string): string {
+    return `Works in the attached folder ${folder}`;
+  }
+
+  public static formatAttachedFolderKept(folder: string): string {
+    return `The folder attached to it, "${folder}", and its files stay as they are.`;
   }
 
   public static formatMoveText(count: number, project: string): string {

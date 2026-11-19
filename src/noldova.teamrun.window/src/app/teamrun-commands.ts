@@ -84,7 +84,7 @@ export class TeamRunCommands {
       return;
     const conversation = store.conversation(conversationId);
     context.openDocument(Resources.conversationDocumentName, conversationId, conversation?.title ?? Resources.untitledConversation,
-      { breadcrumb: Object.isNull(conversation) ? [] : ConversationActions.breadcrumbOf(store, conversation.projectId) });
+      { breadcrumb: Object.isNull(conversation) ? [] : ConversationActions.breadcrumbOf(store, conversation.projectId, conversation.attachedFolder) });
   }
 
   private static async enableProvider(store: ChatStoreService, providerId: string | null): Promise<void> {

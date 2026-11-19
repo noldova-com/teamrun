@@ -70,7 +70,8 @@ export class HistoryComponent implements IRowReveal {
   protected readonly usageHandOffOf: (item: Message) => MessageDetail | null = (item: Message): MessageDetail | null => FormatterService.usageHandOffOf(item);
   protected readonly isEmpty: Signal<boolean> = computed(() => this.source()?.length() === 0);
   protected readonly isBusy: Signal<boolean> = computed(() => this.store.isWorking(this.chatId()));
-  protected readonly offersFolder: Signal<boolean> = computed(() => this.store.loaded() && this.store.projects().length === 0);
+  protected readonly offersFolder: Signal<boolean> = computed(() => this.store.loaded() && this.store.projects().length === 0
+    && Object.isNull(this.store.conversation(this.chatId())?.attachedFolder ?? null));
 
   public constructor() {
     effect(onCleanup => {

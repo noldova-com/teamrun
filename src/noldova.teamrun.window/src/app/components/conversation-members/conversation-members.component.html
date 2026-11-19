@@ -20,6 +20,12 @@ LICENSE file in the root directory of this source tree.
   }
 </div>
 <button type="button" nol-icon-button class="nol-teamrun-add-member" [icon]="resources.addIcon" [label]="resources.addMemberLabel" [nolTooltip]="resources.addMemberLabel" [nolMenuTriggerFor]="addMenu"></button>
+@if (attachedFolder(); as folder) {
+  <span class="nol-teamrun-attached-folder" role="note" [attr.aria-label]="resources.formatAttachedFolderNote(folder)" [nolTooltip]="folder">
+    <span class="nol-teamrun-attached-folder-glyph material-symbols-rounded" aria-hidden="true">{{ resources.attachFolderIcon }}</span>
+    <span class="nol-teamrun-attached-folder-name" aria-hidden="true">{{ folderNameOf(folder) }}</span>
+  </span>
+}
 <ng-template #addMenu>
   <nol-menu>
     @if (others().length === 0) {

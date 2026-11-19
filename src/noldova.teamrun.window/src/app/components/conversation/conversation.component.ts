@@ -11,12 +11,14 @@ import { Component, computed, createEnvironmentInjector, DestroyRef, effect, Env
   viewChild } from "@angular/core";
 import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
+import type { Conversation } from "@noldova/teamrun.protocol";
 import { Announcer } from "@noldova/ui.components.angular";
 import { provideCodeHighlighting } from "@noldova/ui.components.angular/code-highlighting";
 import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
 
 import { Resources } from "../../../resources";
 import { ChatStoreService } from "../../services/chat-store.service";
+import { ConversationActions } from "../../services/conversation-actions";
 import { FormatterService } from "../../services/formatter.service";
 import { GitHubReferenceSource } from "../../services/github-reference-source";
 import { ReplyAnnouncements } from "../../services/reply-announcements";
@@ -49,6 +51,7 @@ export class ConversationComponent {
   private readonly referenceSource: GitHubReferenceSource | null = GitHubReferenceSource.of(this.context);
   private readonly folder: Signal<string | null> = computed(() => this.store.folderOf(this.instance()));
   private shownTitle: string | null = null;
+  private shownFolder: string | null = null;
   private interactedInTeamRun: boolean = false;
 
   public readonly instance: InputSignal<string> = input.required<string>();
@@ -94,6 +97,11 @@ export class ConversationComponent {
       const title = this.store.conversation(id)?.title ?? null;
       untracked(() => this.follow(id, title));
     });
+    effect(() => {
+      const id = this.instance();
+      const conversation = this.store.conversation(id);
+      untracked(() => this.followFolder(id, conversation));
+    });
   }
 
   protected stopOnPageEscape(event: KeyboardEvent): void {
@@ -126,6 +134,16 @@ export class ConversationComponent {
     this.shownTitle = title ?? shown;
     if (!Object.isNull(title) && title !== shown)
       this.context.updateDocument(Resources.conversationDocumentName, id, { title });
+  }
+
+  private followFolder(id: string, conversation: Conversation | null): void {
+    if (Object.isNull(conversation))
+      return;
+    const shown = this.shownFolder;
+    this.shownFolder = conversation.attachedFolder;
+    if (shown !== conversation.attachedFolder)
+      this.context.updateDocument(Resources.conversationDocumentName, id,
+        { breadcrumb: ConversationActions.breadcrumbOf(this.store, conversation.projectId, conversation.attachedFolder) });
   }
 
   private static isWithin(target: EventTarget | null, selector: string): boolean {

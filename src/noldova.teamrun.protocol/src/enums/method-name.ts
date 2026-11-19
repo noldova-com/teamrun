@@ -78,6 +78,8 @@ export enum MethodName {
   ConversationMove = "ConversationMove",
   ConversationDelete = "ConversationDelete",
   ConversationFolderCount = "ConversationFolderCount",
+  ChatFolderAttach = "ChatFolderAttach",
+  ChatFolderDetach = "ChatFolderDetach",
   ConversationRewind = "ConversationRewind",
   ConversationSearch = "ConversationSearch",
   ChatFind = "ChatFind",
