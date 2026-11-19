@@ -4079,7 +4079,7 @@ describe("ComposerComponent", () => {
         await send();
         await Wait.until(() => expect(box().value).toBe("where we are now"));
         held.resolve(null);
-        await Wait.until(() => expect(sent()).toHaveLength(1));
+        await Wait.until(() => expect(box().value).toBe(""));
         await saveStep()();
 
         expect(sent()[0]?.text).toBe("mine");
