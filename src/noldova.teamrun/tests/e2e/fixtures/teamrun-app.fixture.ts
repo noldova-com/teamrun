@@ -596,7 +596,7 @@ export class TeamRunApp {
       return command.includes(TeamRunApp.RUNTIME_ENTRY) && command.includes(TeamRunApp.DATA_ARGUMENT) && command.includes(this.data.replaceAll("\\", "/").toLowerCase());
     }
     if (process.platform === "darwin")
-      return status.command.includes(TeamRunApp.RUNTIME_ENTRY) && status.command.includes(`${TeamRunApp.DATA_ARGUMENT}=${this.data}`);
+      return status.command.includes(TeamRunApp.RUNTIME_ENTRY) && ["=", " "].some(t => `${status.command} `.includes(` ${TeamRunApp.DATA_ARGUMENT}${t}${this.data} `));
     const args = TeamRunApp.argumentsOf(status.pid);
     return args.some(t => t.endsWith(TeamRunApp.RUNTIME_ENTRY))
       && args.some((t, index) => t === `${TeamRunApp.DATA_ARGUMENT}=${this.data}` || (t === this.data && args[index - 1] === TeamRunApp.DATA_ARGUMENT));
