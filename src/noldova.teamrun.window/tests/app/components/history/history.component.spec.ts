@@ -1656,9 +1656,6 @@ describe("HistoryComponent", () => {
       await open("c3");
       const button = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>(".nol-teamrun-history-open-folder");
       expect(button()).toBeNull();
-      const chat = store().conversation("c3");
-      if (Object.isNull(chat))
-        throw new Error("The chat isn't loaded.");
 
       await store().forgetProject(SampleData.project.id);
       await until(() => expect(button()).not.toBeNull());
@@ -1671,7 +1668,7 @@ describe("HistoryComponent", () => {
       AppearanceFixture.expectPixels(shown.left, text.left);
       AppearanceFixture.expectPixels(shown.top - text.bottom, AppearanceFixture.measureLook("space-4"));
       expect([shown.width > 0, shown.right <= empty.right + 0.5, element().scrollWidth <= element().clientWidth]).toEqual([true, true, true]);
-      const own = chat.withProjectId(null, SampleData.timestamp);
+      const own = new Conversation("c3", null, "Scratch", SampleData.timestamp, SampleData.timestamp, false, null, null, false, "/data/chats/c3");
       context.answer(MethodName.ChatFolderAttach, t => own.withAttachedFolder(ChatFolderAttachParams.fromJson(t).folder, SampleData.timestamp).toJson())
         .answer(MethodName.ChatFolderDetach, () => own.toJson());
       await store().attachFolder("c3", "/work/site");
