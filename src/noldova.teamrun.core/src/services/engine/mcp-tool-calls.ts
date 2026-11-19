@@ -155,13 +155,23 @@ export class McpToolCalls {
     name: string, input: JsonObject, signal: AbortSignal): Promise<JsonObject> {
     if (Object.isNull(open))
       return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.unavailableFailure, Resources.noRunningTurnCode, Resources.mcpNoRunningTurn));
-    if (open.stopped)
-      return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.unavailableFailure, Resources.turnStoppedCode, Resources.mcpTurnStopped));
+    if (this.hasStopped(open))
+      return McpToolCalls.turnStopped();
     const mode = await this.toolModeOfAsync(open);
     if (mode?.readOnly === true && !(await open.session.listToolsAsync(signal))
       .some(t => t["name"] === name && (t["annotations"] as JsonObject | undefined)?.["readOnlyHint"] === true))
       return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.deniedFailure, Resources.readOnlyModeCode, Resources.formatReadOnlyModeRefused(name, mode.name)));
+    if (this.hasStopped(open))
+      return McpToolCalls.turnStopped();
 
     return open.session.callToolAsync(name, input, signal);
+  }
+
+  private hasStopped(open: { readonly session: ITurnToolSession; readonly stopped: boolean }): boolean {
+    return open.stopped || !this.sessions.some(t => t.session === open.session);
+  }
+
+  private static turnStopped(): JsonObject {
+    return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.unavailableFailure, Resources.turnStoppedCode, Resources.mcpTurnStopped));
   }
 }

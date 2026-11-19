@@ -8,7 +8,7 @@
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
-import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { type McpEndpoint, Resources, TeammateCommand, TurnDetail, TurnOutcome, TurnResult, TurnWake, type TurnTools } from "@noldova/teamrun.core";
 import {
   ChatMemberModeParams,
@@ -915,6 +915,40 @@ export class McpToolCallsTests {
     Assert.areEqual(McpToolCallsTests.stopped, JSON.stringify(called));
     Assert.areEqual(McpToolCallsTests.stopped, JSON.stringify(inProcess));
     Assert.areEqual(JSON.stringify([0]), JSON.stringify(McpToolCallsTests.callsOf(tools)));
+  }
+
+  @TestMethod
+  @TestData(true)
+  @TestData(false)
+  public async refusesAToolCallWhoseSessionIsStoppedOrEndsWhileTheCallChecksItsMode(stops: boolean): Promise<void> {
+    const tools = new FakeTurnToolSessions(McpToolCallsTests.url);
+    await using host = await McpToolCallsTests.hostAsync(tools);
+    host.adapter.modeIds = ["ask", "plan"];
+    host.adapter.readOnlyModes = ["plan"];
+    host.adapter.holdUntilAbort = true;
+    const conversation = await host.createConversationAsync();
+    const sent = await host.engine.sendAsync(new MessageSendParams(conversation.id, "Wait", new RequestedSettings("fake", null, null, null, "plan"),
+      (await host.providerOfAsync()).id));
+    await host.adapter.requested(1);
+    const [session] = tools.opened;
+    Assert.isDefined(session);
+    const reached = Promise.withResolvers<void>();
+    const released = Promise.withResolvers<void>();
+    session.listed = [{ name: "teamrun_list_chats", annotations: { readOnlyHint: true } }];
+    session.listHold = { reached: () => reached.resolve(), released: released.promise };
+
+    const calling = host.engine.callMcpToolAsync(new McpToolCallParams(McpToolCallsTests.tokenOf(McpToolCallsTests.toolsOf(host, 0)), "teamrun_list_chats", {}));
+    await reached.promise;
+    if (stops)
+      await host.engine.stopSessionAsync(session.id, "The person took over.");
+    else
+      await host.engine.cancelAsync(McpToolCallsTests.replyOf(sent));
+    await host.engine.waitForIdle();
+    released.resolve();
+
+    Assert.areEqual(McpToolCallsTests.stopped, JSON.stringify(await calling));
+    Assert.areEqual(JSON.stringify([0]), JSON.stringify(McpToolCallsTests.callsOf(tools)));
+    Assert.areEqual(1, session.ends);
   }
 
   @TestMethod
