@@ -11,6 +11,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
+import { cdp } from "vitest/browser";
 import {
   AttachmentContent,
   Conversation,
@@ -1903,7 +1904,7 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
       .toEqual([count, true, true, true]);
   });
 
-  it("keeps the thumb where it is dragged and its size through a drag to the first message and back to the last while earlier pages load, its first message in view moving one way, shows the first and the last message, not a loading row, within 30 frames at each end while the thumb is held, and moves nothing on release", { timeout: 25_000 }, async () => {
+  it("keeps the thumb where it is dragged and its size through a drag to the first message and back to the last while earlier pages load, its first message in view moving one way, shows the first and the last message, not a loading row, within 30 frames at each end while the thumb is held, and moves nothing on release", { timeout: 180_000 }, async () => {
     await settle();
     const view = viewport();
     const height = view.scrollHeight;
@@ -1913,6 +1914,16 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
     const reads = context.count(MethodName.MessagePage);
     let place = room;
 
+    const rate = 1;
+    const session = cdp() as unknown as { send: (m: string, p?: object) => Promise<{ profile: { nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number }; hitCount?: number }[]; startTime: number; endTime: number; samples: number[] } }> };
+    await session.send("Emulation.setCPUThrottlingRate", { rate });
+    await session.send("Profiler.enable");
+    await session.send("Profiler.setSamplingInterval", { interval: 500 });
+    await session.send("Profiler.start");
+    const times: string[] = [];
+    const began = performance.now();
+    let mark = began;
+    const lap = (name: string): void => { const now = performance.now(); times.push(`${name}=${Math.round(now - mark)}`); mark = now; };
     const thumb = grabThumb();
     for (const to of [0, room]) {
       const from = place;
@@ -1921,6 +1932,7 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
         place = Math.round(from + (to - from) * step / 12);
         thumb.moveTo(place);
         await frames(4);
+        lap(`s${step}r${context.count(MethodName.MessagePage)}`);
         leg.push([view.scrollTop - place, view.scrollHeight, slotAtTop()[0]]);
       }
       legs.push(leg);
@@ -1929,6 +1941,21 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
         await frame();
       ends.push(isShown(end));
     }
+    lap("end");
+    const { profile } = await session.send("Profiler.stop");
+    await session.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    const each = (profile.endTime - profile.startTime) / 1000 / profile.samples.length;
+    const self = new Map<string, number>();
+    const byUrl = new Map<string, number>();
+    for (const node of profile.nodes) {
+      const ms = (node.hitCount ?? 0) * each;
+      const file = node.callFrame.url.split("/").at(-1)?.split("?")[0] ?? "";
+      const key = `${node.callFrame.functionName || "(anon)"} ${file}:${node.callFrame.lineNumber}`;
+      self.set(key, (self.get(key) ?? 0) + ms);
+      byUrl.set(file, (byUrl.get(file) ?? 0) + ms);
+    }
+    const top = (map: Map<string, number>, n: number): string => [...map].sort((x, y) => y[1] - x[1]).slice(0, n).map(([k, v]) => `${Math.round(v)} ${k}`).join("\n");
+    console.log(`PROBE rate=${rate} total=${Math.round(performance.now() - began)} ${times.join(" ")}\nPROBE-FILES\n${top(byUrl, 15)}\nPROBE-SELF\n${top(self, 40)}`);
     const last = element().querySelector(`.nol-virtual-list-slot[data-nol-row="${count - 1}"]`)?.getBoundingClientRect().bottom;
     const held = thumb.writes();
     const isRead = context.count(MethodName.MessagePage) > reads;
