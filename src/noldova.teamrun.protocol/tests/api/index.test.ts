@@ -119,6 +119,7 @@ export class ProtocolApiTests {
     Assert.isDefined(api.ChatSearchResult);
     Assert.isDefined(api.ChatFindHit);
     Assert.isDefined(api.ChatFindParams);
+    Assert.isDefined(api.ChatFolderAttachParams);
     Assert.isDefined(api.ChatFindResult);
     Assert.isDefined(api.MessageSearchHit);
     Assert.isDefined(api.MessageSearchResult);

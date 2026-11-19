@@ -1688,6 +1688,30 @@ export class Resources {
     return `The provider "${label}" is disabled. Enable it on the Providers page first.`;
   }
 
+  public static formatAttachedFolderId(hash: string): string {
+    return `folder-${hash}`;
+  }
+
+  public static formatAttachedFolderMissing(path: string): string {
+    return `The folder attached to this chat, "${path}", is missing or can't be read, so the reply didn't start. Restore the folder there, or attach another folder or detach this one in the chat's menu.`;
+  }
+
+  public static formatAttachedFolderUnreachable(path: string): string {
+    return `The folder attached to this chat, "${path}", didn't answer in time, so the reply didn't start. Check that its drive or share is connected, then send again.`;
+  }
+
+  public static formatFolderNotAttached(path: string): string {
+    return `The folder "${path}" is missing, can't be read or didn't answer in time, so it wasn't attached.`;
+  }
+
+  public static formatFolderNotAbsolute(path: string): string {
+    return `The folder "${path}" is not an absolute path.`;
+  }
+
+  public static formatChatInProject(conversationId: string): string {
+    return `The chat "${conversationId}" is in a project, which gives it its folder.`;
+  }
+
   public static formatWorkFolderMissing(path: string): string {
     return `The project's folder "${path}" is missing, so the reply didn't start. Restore the folder there, or move this chat with Move to another project… in its menu.`;
   }

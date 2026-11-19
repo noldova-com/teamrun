@@ -51,6 +51,7 @@ import type {
   ConversationSearchParams,
   ConversationSearchResult,
   ChatFindParams,
+  ChatFolderAttachParams,
   ChatFindResult,
   MessageSearchResult,
   DataFolder,
@@ -1343,6 +1344,27 @@ export interface IConversationsService {
    * @throws ServiceException named `ErrorCode.NotFound` when the conversation does not exist.
    */
   countFolderFilesAsync(params: ConversationIdParams): Promise<number>;
+
+  /**
+   * Attaches an existing folder to a chat without a project, or replaces the one attached, so that its teammates work in it, in place,
+   * from the next turn; nothing is copied, and the chat's own folder stays for a detach.
+   * @param params The chat and the folder's absolute path, kept resolved.
+   * @param check Checks the folder, as the projects service checks a project's folder.
+   * @returns The chat, whose `folder` is the attached folder.
+   * @throws ServiceException named `ErrorCode.InvalidParams` when the path isn't absolute or the folder isn't present,
+   * `ErrorCode.NotFound` for an unknown chat, and `ErrorCode.Conflict` for a chat in a project, while a reply runs in the chat, or while
+   * the folder is held.
+   */
+  attachFolderAsync(params: ChatFolderAttachParams, check: (path: string) => Promise<FolderState>): Promise<Conversation>;
+
+  /**
+   * Detaches a chat's attached folder, leaving its files as they are, so that its teammates work in the chat's own folder again from the
+   * next turn; a chat with none attached comes back as it is.
+   * @param params The chat id.
+   * @returns The chat, whose `folder` is its own folder again.
+   * @throws ServiceException named `ErrorCode.NotFound` for an unknown chat, and `ErrorCode.Conflict` while a reply runs in the chat.
+   */
+  detachFolderAsync(params: ConversationIdParams): Promise<Conversation>;
 
   /**
    * Removes a conversation's messages from a sequence on, with their approvals.
@@ -5027,6 +5049,37 @@ export declare class Resources {
   public static formatProviderDisabled(label: string): string;
 
   /**
+   * Composes the checkpoints id of a folder attached to a chat, from a hash of its path, so every chat attached to one folder shares its
+   * checkpoints as a project's chats do.
+   */
+  public static formatAttachedFolderId(hash: string): string;
+
+  /**
+   * Composes the reply's note when the folder attached to its chat is missing or can't be read, so the provider didn't start.
+   */
+  public static formatAttachedFolderMissing(path: string): string;
+
+  /**
+   * Composes the reply's note when the folder attached to its chat didn't answer in time, so the provider didn't start.
+   */
+  public static formatAttachedFolderUnreachable(path: string): string;
+
+  /**
+   * Composes the refusal of a folder to attach that is missing, can't be read or didn't answer in time.
+   */
+  public static formatFolderNotAttached(path: string): string;
+
+  /**
+   * Composes the refusal of a folder to attach whose path isn't absolute.
+   */
+  public static formatFolderNotAbsolute(path: string): string;
+
+  /**
+   * Composes the refusal to attach a folder to a chat in a project.
+   */
+  public static formatChatInProject(conversationId: string): string;
+
+  /**
    * Composes the reply's note when the project's folder is missing, so the provider didn't start.
    */
   public static formatWorkFolderMissing(path: string): string;
@@ -7078,6 +7131,16 @@ export declare class ConversationsService implements IConversationsService {
   public countFolderFilesAsync(params: ConversationIdParams): Promise<number>;
 
   /**
+   * @inheritdoc
+   */
+  public attachFolderAsync(params: ChatFolderAttachParams, check: (path: string) => Promise<FolderState>): Promise<Conversation>;
+
+  /**
+   * @inheritdoc
+   */
+  public detachFolderAsync(params: ConversationIdParams): Promise<Conversation>;
+
+  /**
    * Removes a conversation's messages from a sequence on, with their approvals, logging every deletion.
    * @param conversationId The conversation id.
    * @param fromSequence The sequence of the first message to remove.
@@ -8152,7 +8215,8 @@ export declare class ReplyEvidence {
 }
 
 /**
- * The folder a reply works in: its project's root, named by the project's id, or a chat's own folder, named by the conversation's id.
+ * The folder a reply works in: its project's root, named by the project's id, a folder attached to its chat, named by its path, or a
+ * chat's own folder, named by the conversation's id.
  */
 export declare class WorkFolder {
   /**
@@ -8169,6 +8233,13 @@ export declare class WorkFolder {
    * @param path The folder's absolute path.
    */
   public constructor(id: string, path: string);
+
+  /**
+   * The work folder of a folder attached to a chat, named by a hash of its path, compared without case on Windows.
+   * @param path The attached folder's absolute path.
+   * @returns The work folder.
+   */
+  public static attached(path: string): WorkFolder;
 }
 
 /**
