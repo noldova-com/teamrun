@@ -310,7 +310,7 @@ export class AcpAdapter implements IProviderAdapter {
     let sessionId: string | null = null;
     let observed = new ObservedSettings(kindId, null, null, null);
     let confirming: Promise<boolean> | null = null;
-    let cancelTimer: NodeJS.Timeout | null = null;
+    const interruptWait = new AbortController();
     const toolsWait = new AbortController();
     const steers: Promise<boolean>[] = [];
     let revoke: () => void = () => undefined;
@@ -347,7 +347,7 @@ export class AcpAdapter implements IProviderAdapter {
     const cancel = (): void => {
       if (!Object.isNull(client) && !Object.isNull(sessionId))
         client.notify(Resources.acpSessionCancel, { sessionId });
-      cancelTimer ??= setTimeout(() => { void client?.stop().catch(() => undefined); }, this.timings.interruptGrace);
+      void this.timer.delayAsync(this.timings.interruptGrace, interruptWait.signal).then(() => client?.stop()).catch(() => undefined);
     };
     signal.addEventListener(Resources.abortEvent, cancel, { once: true });
     try {
@@ -520,8 +520,7 @@ export class AcpAdapter implements IProviderAdapter {
     finally {
       listener.onSteerable?.(null);
       signal.removeEventListener(Resources.abortEvent, cancel);
-      if (!Object.isNull(cancelTimer))
-        clearTimeout(cancelTimer);
+      interruptWait.abort();
       toolsWait.abort();
       if (!Object.isNull(client))
         await client.whenHandledAsync();
