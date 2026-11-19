@@ -140,10 +140,10 @@
     "@noldova/desktop.electron": "0.0.6",
     "@noldova/desktop.protocol": "0.0.6",
     "@noldova/desktop.runtime": "0.0.6",
-    "@noldova/git": "0.0.2",
-    "@noldova/git.github": "0.0.2",
+    "@noldova/git": "0.0.3",
+    "@noldova/git.github": "0.0.3",
     "@noldova/teamrun": "0.0.2",
-    "@noldova/terminal": "0.0.2"
+    "@noldova/terminal": "0.0.3"
   },
   "devDependencies": {
     "@noldova/desktop.build": "0.0.6",
