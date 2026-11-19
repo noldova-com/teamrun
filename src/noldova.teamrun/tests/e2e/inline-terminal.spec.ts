@@ -105,17 +105,27 @@ const hostsOf = (): string => JSON.stringify({
   hosts: [...document.querySelectorAll("nol-teamrun-inline-terminal")].map(t => ({ isConnected: t.isConnected, live: t.querySelector(".live")?.childElementCount ?? 0 }))
 });
 
-const boxPairAsync = async (page: Page, first: Locator, second: Locator): Promise<{ readonly first: IBox; readonly second: IBox }> => {
-  const elements = { first: await first.elementHandle(), second: await second.elementHandle() };
-  const boxes = await page.evaluate(found => {
-    const read = (element: Element): IBox => {
-      const box = element.getBoundingClientRect();
-      return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, height: box.height };
-    };
-    return { first: read(found.first), second: read(found.second) };
-  }, elements);
-  await Promise.all([elements.first.dispose(), elements.second.dispose()]);
+const boxesAsync = async (page: Page, locators: readonly Locator[]): Promise<readonly IBox[]> => {
+  const elements = await Promise.all(locators.map(t => t.elementHandle()));
+  const boxes = await page.evaluate(found => found.map(element => {
+    if (!element.isConnected || element.getClientRects().length === 0)
+      throw new Error("The element has no box.");
+    const box = element.getBoundingClientRect();
+    return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, height: box.height };
+  }), elements).finally(() => Promise.all(elements.map(t => t.dispose())));
   return boxes;
+};
+
+const boxAt = (boxes: readonly IBox[], index: number): IBox => {
+  const box = boxes[index];
+  if (box === undefined)
+    throw new Error("The element has no box.");
+  return box;
+};
+
+const boxPairAsync = async (page: Page, first: Locator, second: Locator): Promise<{ readonly first: IBox; readonly second: IBox }> => {
+  const boxes = await boxesAsync(page, [first, second]);
+  return { first: boxAt(boxes, 0), second: boxAt(boxes, 1) };
 };
 
 const boxOf = async (locator: Locator): Promise<IBox> => {
@@ -172,7 +182,8 @@ for (const { language, write, compute } of LANGUAGES)
         await testInfo.attach(`${language}-inline-hosts`, { body: await page.evaluate(hostsOf), contentType: "text/plain" });
         throw error;
       });
-      const { first: underFirst, second: firstBlock } = await boxPairAsync(page, inline, blocks.nth(0));
+      const moved = await boxesAsync(page, [inline, blocks.nth(0), blocks.nth(1)]);
+      const [underFirst, firstBlock, secondBlockMoved] = [boxAt(moved, 0), boxAt(moved, 1), boxAt(moved, 2)];
       await testInfo.attach(`${language}-under-first`, { body: await page.screenshot(), contentType: "image/png" });
 
       await expect(kept).toHaveCount(1, { timeout: 30_000 });
@@ -182,6 +193,7 @@ for (const { language, write, compute } of LANGUAGES)
       expect(keptBox.top).toBeGreaterThanOrEqual(secondBlockAfter.bottom - EDGE_TOLERANCE);
       expect(Math.abs(keptBox.left - secondBlockAfter.left)).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(Math.abs(keptBox.right - secondBlockAfter.right)).toBeLessThanOrEqual(EDGE_TOLERANCE);
+      expect(underFirst.bottom).toBeLessThanOrEqual(secondBlockMoved.top + EDGE_TOLERANCE);
       expect(underFirst.top).toBeGreaterThanOrEqual(firstBlock.bottom - EDGE_TOLERANCE);
       expect(Math.abs(underFirst.left - firstBlock.left)).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(Math.abs(underFirst.right - firstBlock.right)).toBeLessThanOrEqual(EDGE_TOLERANCE);
