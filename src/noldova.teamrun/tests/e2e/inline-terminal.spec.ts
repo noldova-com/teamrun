@@ -77,13 +77,16 @@ const readTyped = (file: string): string => {
   }
 };
 
-const shownAtPromptAsync = async (page: Page, text: string): Promise<boolean> => {
+const shownUnlessWrittenAsync = async (page: Page, file: string, expected: string): Promise<readonly string[]> =>
+  readTyped(file) === expected ? [] : [`${path.basename(file)}: "${readTyped(file)}"`, ...await TerminalScreen.rowsAsync(page.locator("nol-teamrun-inline-terminal .xterm-rows"))];
+
+const shownUnlessAtPromptAsync = async (page: Page, text: string): Promise<readonly string[]> => {
   const shown = await TerminalScreen.rowsAsync(page.locator("nol-teamrun-inline-terminal .xterm-rows"));
-  return shown.slice(0, -1).join("").includes(text) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "");
+  return shown.slice(0, -1).join("").includes(text) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "") ? [] : shown;
 };
 
 const settledAtPromptAsync = async (page: Page, text: string): Promise<void> => {
-  await expect.poll(() => shownAtPromptAsync(page, text), TeamRunApp.pollOf(30_000)).toBe(true);
+  await expect.poll(() => shownUnlessAtPromptAsync(page, text), { ...TeamRunApp.pollOf(30_000), message: `the screen shows ${text} above the next prompt` }).toEqual([]);
   await page.waitForTimeout(TERMINAL_ECHO_SETTLE_MS);
 };
 
@@ -156,7 +159,7 @@ for (const { language, write, compute } of LANGUAGES)
       const computed = app.pidFile(`${language}-computed`);
       await page.keyboard.type(compute(computed));
       await page.keyboard.press("Enter");
-      await expect.poll(() => readTyped(computed), TeamRunApp.pollOf(30_000)).toBe(COMPUTED);
+      await expect.poll(() => shownUnlessWrittenAsync(page, computed, COMPUTED), { ...TeamRunApp.pollOf(30_000), message: "the typed command writes its file" }).toEqual([]);
       await settledAtPromptAsync(page, path.basename(computed));
       await runs.nth(0).click();
       await expect.poll(() => TeamRunApp.readPid(first), TeamRunApp.pollOf(60_000)).not.toBeNull();
@@ -206,7 +209,7 @@ for (const { language, write, type } of LANGUAGES)
     await page.keyboard.type(type(typed));
     await page.keyboard.press("Enter");
 
-    await expect.poll(() => readTyped(typed), TeamRunApp.pollOf(30_000)).toBe(TYPED);
+    await expect.poll(() => shownUnlessWrittenAsync(page, typed, TYPED), { ...TeamRunApp.pollOf(30_000), message: "the typed command writes its file" }).toEqual([]);
   });
 
 for (const { language, write, type } of LANGUAGES)
@@ -248,7 +251,7 @@ for (const { language, write, type } of LANGUAGES)
     await page.keyboard.type(type(typed));
     await page.keyboard.press("Enter");
 
-    await expect.poll(() => readTyped(typed), TeamRunApp.pollOf(30_000)).toBe(TYPED);
+    await expect.poll(() => shownUnlessWrittenAsync(page, typed, TYPED), { ...TeamRunApp.pollOf(30_000), message: "the typed command writes its file" }).toEqual([]);
   });
 
 test("on a short history the inline terminal holds more than half of it, showing the command typed at the prompt and its output above the next prompt, and never runs past the history",
@@ -277,11 +280,15 @@ test("on a short history the inline terminal holds more than half of it, showing
     const inline = page.locator("nol-teamrun-inline-terminal:has(.live > *)");
     await inline.scrollIntoViewIfNeeded();
     const box = await boxOf(inline);
-    const history = await boxOf(page.locator(".nol-virtual-list-viewport").first());
+    const viewport = page.locator(".nol-virtual-list-viewport").first();
+    const history = await boxOf(viewport);
+    const historyHeight = await viewport.evaluate(t => t.clientHeight);
     const rowHeight = (await boxOf(screen.locator(":scope > div").first())).height;
     await testInfo.attach("short-history", { body: await page.screenshot(), contentType: "image/png" });
 
+    expect(historyHeight).toBeGreaterThanOrEqual((MINIMUM_ROWS + 1) * rowHeight);
     expect(history.height / 2).toBeLessThan(MINIMUM_ROWS * rowHeight);
+    await expect(screen.locator(":scope > div")).toHaveCount(MINIMUM_ROWS);
     expect(box.height).toBeGreaterThan(history.height / 2);
     expect(box.top).toBeGreaterThanOrEqual(history.top - EDGE_TOLERANCE);
     expect(box.bottom).toBeLessThanOrEqual(history.bottom + EDGE_TOLERANCE);
