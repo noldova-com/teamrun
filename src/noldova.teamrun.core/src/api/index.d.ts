@@ -1523,12 +1523,20 @@ export interface IMessagesService {
    */
   findAttachmentAsync(conversationId: string, path: string, transaction?: SqlTransaction): Promise<MessageAttachment | null>;
   /**
-   * Reads the id of the checkpoint taken of the project's folder before a reply.
+   * Reads the id of the checkpoint taken of the reply's folder before a reply.
    * @param messageId The reply's id.
    * @param transaction The transaction to read in, or none.
    * @returns The checkpoint's id, or `null` when none was taken or the reply is gone.
    */
   findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
+
+  /**
+   * Reads the id of the folder a reply's checkpoint was taken of, as `WorkFolder.id` named it.
+   * @param messageId The reply's id.
+   * @param transaction The transaction to read in, or none.
+   * @returns The folder's id, or `null` when no checkpoint was taken, it was taken before the folder was kept, or the reply is gone.
+   */
+  findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
 
   /**
    * Lists, for each teammate in each conversation, its latest reply that reports usage, while that reply is in the teammate's current session there.
@@ -1567,12 +1575,13 @@ export interface IMessagesService {
    */
   updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   /**
-   * Records the id of the checkpoint taken of the project's folder before a reply.
+   * Records the id of the checkpoint taken before a reply, and the id of the folder it was taken of.
    * @param messageId The reply's id.
    * @param checkpointId The checkpoint's id.
+   * @param folderId The folder's `WorkFolder.id`.
    * @param transaction The transaction to work in, or none.
    */
-  setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+  setCheckpointAsync(messageId: string, checkpointId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }
 
 /**
@@ -2920,6 +2929,9 @@ export declare class Resources {
    * Adds the provider kind that wrote each handover summary, empty for one written before it.
    */
   public static readonly addHandoverSummaryKind: string;
+  public static readonly checkpointFoldersMigrationId: string;
+  public static readonly addMessageCheckpointFolder: string;
+  public static readonly checkpointFolderIdColumn: string;
   public static readonly selectHandoverSummary: string;
   public static readonly upsertHandoverSummary: string;
   public static readonly deleteHandoverSummaries: string;
@@ -3922,6 +3934,10 @@ export declare class Resources {
    */
   public static readonly noCheckpointRefusal: string;
   /**
+   * Why a rewind restored no files when the reply's checkpoint was taken of a folder the chat no longer works in.
+   */
+  public static readonly checkpointFolderChangedRefusal: string;
+  /**
    * Why a rewind restored no files, in plain words, by the checkpoints module's outcome.
    */
   public static readonly restoreRefusals: ReadonlyMap<string, string>;
@@ -3971,9 +3987,9 @@ export declare class Resources {
   public static readonly updateMessageCheckpoint: string;
   public static readonly selectMessageCheckpoint: string;
   /**
-   * Forgets the checkpoints of a chat's replies, as its folder changes, so a rewind past the change restores nothing from another folder.
+   * Reads the id of the folder a reply's checkpoint was taken of, `null` for a checkpoint taken before the folder was kept.
    */
-  public static readonly clearChatCheckpoints: string;
+  public static readonly selectMessageCheckpointFolder: string;
   /**
    * Bytes above which an added file gets no diff.
    */
@@ -7284,6 +7300,7 @@ export declare class MessagesService implements IMessagesService {
    */
   public findAttachmentAsync(conversationId: string, path: string, transaction?: SqlTransaction): Promise<MessageAttachment | null>;
   public findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
+  public findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
 
   /**
    * Lists, for each teammate in each conversation, its latest reply that reports usage, by conversation and then oldest first.
@@ -7321,7 +7338,7 @@ export declare class MessagesService implements IMessagesService {
    * @inheritdoc
    */
   public updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
-  public setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+  public setCheckpointAsync(messageId: string, checkpointId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }
 
 /**
@@ -10746,6 +10763,21 @@ export declare class HandoverSummaryKindsMigration extends SqlMigration {
 
   /**
    * Adds the column with `Resources.addHandoverSummaryKind`.
+   */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/**
+ * Keeps the id of the folder each reply's checkpoint was taken of, so a rewind restores from that folder's own checkpoints after the chat's folder changes and back.
+ */
+export declare class CheckpointFoldersMigration extends SqlMigration {
+  /**
+   * Uses the fixed checkpoint folders migration id.
+   */
+  public constructor();
+
+  /**
+   * Adds the column with `Resources.addMessageCheckpointFolder`; an earlier checkpoint's folder stays empty.
    */
   public override apply(builder: MigrationBuilder): void;
 }

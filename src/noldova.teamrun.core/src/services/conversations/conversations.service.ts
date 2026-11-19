@@ -231,12 +231,17 @@ export class ConversationsService implements IConversationsService {
     if (!Object.isNull(conversation.projectId))
       throw new ServiceException(ErrorCode.Conflict, Resources.formatChatInProject(conversation.id), [conversation.id]);
     await this.requireIdleAsync(conversation);
-    this.context.projectActivity.requireIdle(folder);
-    if (await check(folder) !== FolderState.Present)
-      throw new ServiceException(ErrorCode.InvalidParams, Resources.formatFolderNotAttached(folder), [folder]);
-    this.context.projectActivity.requireIdle(folder);
-    return (await this.changeFolderAsync(conversation.id, t => ConversationsService.requireProjectless(t).withAttachedFolder(folder, new Date().toISOString())))
-      .withFolder(folder);
+    const activity = this.context.projectActivity;
+    const hold = activity.enter(folder);
+    try {
+      if (await check(folder) !== FolderState.Present)
+        throw new ServiceException(ErrorCode.InvalidParams, Resources.formatFolderNotAttached(folder), [folder]);
+      return (await this.changeFolderAsync(conversation.id, t => ConversationsService.requireProjectless(t).withAttachedFolder(folder, new Date().toISOString())))
+        .withFolder(folder);
+    }
+    finally {
+      activity.leave(hold);
+    }
   }
 
   public async detachFolderAsync(params: ConversationIdParams): Promise<Conversation> {
@@ -251,7 +256,6 @@ export class ConversationsService implements IConversationsService {
   private changeFolderAsync(conversationId: string, change: (conversation: Conversation) => Conversation): Promise<Conversation> {
     return this.context.database.connection.runInTransactionAsync(async transaction => {
       await this.requireNoOpenReplyAsync(conversationId, transaction);
-      await transaction.executeAsync(new SqlQuery(Resources.clearChatCheckpoints, [conversationId]));
       return this.updateSessionAsync(conversationId, t => change(t).asEdited(), transaction);
     });
   }

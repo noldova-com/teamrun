@@ -83,6 +83,7 @@ export { SustainAttemptsMigration } from "../models/migrations/sustain-attempts-
 export { SustainAttemptReasonsMigration } from "../models/migrations/sustain-attempt-reasons-migration.js";
 export { HandoverSummariesMigration } from "../models/migrations/handover-summaries-migration.js";
 export { HandoverSummaryKindsMigration } from "../models/migrations/handover-summary-kinds-migration.js";
+export { CheckpointFoldersMigration } from "../models/migrations/checkpoint-folders-migration.js";
 export { AcpAgentOffer } from "../models/acp-agent-offer.js";
 export { AcpStoredAgent } from "../models/acp-stored-agent.js";
 export { SharedMcpFailure } from "../models/shared-mcp-failure.js";

@@ -387,9 +387,9 @@ export class Resources {
     "DROP INDEX IX_messages_conversationId_status", "DROP INDEX IX_conversationTeammates_teammateId"];
   public static readonly renameChatEntities: readonly string[] = ["UPDATE __changes SET entity = 'Chat' WHERE entity = 'Conversation'",
     "UPDATE __changes SET entity = 'ChatMember' WHERE entity = 'ConversationMember'"];
-  public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ? WHERE id = ?";
+  public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ?, checkpointFolderId = ? WHERE id = ?";
   public static readonly selectMessageCheckpoint: string = "SELECT checkpointId FROM messages WHERE id = ?";
-  public static readonly clearChatCheckpoints: string = "UPDATE messages SET checkpointId = NULL WHERE chatId = ?";
+  public static readonly selectMessageCheckpointFolder: string = "SELECT checkpointFolderId FROM messages WHERE id = ?";
   public static readonly selectCommandReply: string =
     `SELECT 1 FROM messages m WHERE chatId = ? AND json_extract(m.json, '$.author') = '${MessageAuthor.Provider}' AND json_extract(m.json, '$.endedAt') IS NOT NULL `
     + `AND EXISTS (SELECT 1 FROM json_each(m.json, '$.details') d WHERE json_extract(d.value, '$.kind') = '${DetailKind.Command}') LIMIT 1`;
@@ -464,6 +464,9 @@ export class Resources {
   public static readonly handoverSummariesTable: string = "handoverSummaries";
   public static readonly handoverSummaryKindsMigrationId: string = "20261112040000_HandoverSummaryKinds";
   public static readonly addHandoverSummaryKind: string = "ALTER TABLE handoverSummaries ADD COLUMN kind TEXT";
+  public static readonly checkpointFoldersMigrationId: string = "20261119120000_CheckpointFolders";
+  public static readonly addMessageCheckpointFolder: string = "ALTER TABLE messages ADD COLUMN checkpointFolderId TEXT";
+  public static readonly checkpointFolderIdColumn: string = "checkpointFolderId";
   public static readonly selectHandoverSummary: string = "SELECT text, kind FROM handoverSummaries WHERE chatId = ? AND teammateId = ? AND through = ?";
   public static readonly upsertHandoverSummary: string = "INSERT INTO handoverSummaries (chatId, teammateId, through, text, kind) VALUES (?, ?, ?, ?, ?) "
     + "ON CONFLICT (chatId, teammateId) DO UPDATE SET through = excluded.through, text = excluded.text, kind = excluded.kind";
@@ -770,7 +773,8 @@ export class Resources {
   public static readonly existsErrorCode: string = "EEXIST";
   public static readonly maximumDiffLines: number = ProtocolResources.maximumDiffLines;
   public static readonly checkpointPathSeparator: string = "/";
-  public static readonly noCheckpointRefusal: string = "No checkpoint was taken of the project's folder before that reply, so no files were restored.";
+  public static readonly noCheckpointRefusal: string = "No checkpoint was taken before that reply, so no files were restored.";
+  public static readonly checkpointFolderChangedRefusal: string = "The chat's folder has changed since that reply, so no files were restored.";
   public static readonly restoreRefusals: ReadonlyMap<string, string> = new Map([
     ["CheckpointMissing", "The checkpoint taken before that reply is gone, so no files were restored."],
     ["FolderMissing", "The project's folder is missing, so no files were restored."],

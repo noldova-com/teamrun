@@ -464,7 +464,7 @@ export class ReplyRun implements ITurnListener {
         this.log?.write(Resources.formatCheckpointNotTaken(this.message.id, captured.outcome.value));
         return null;
       }
-      await this.messages.setCheckpointAsync(this.message.id, captured.checkpoint.id);
+      await this.messages.setCheckpointAsync(this.message.id, captured.checkpoint.id, this.folder.id);
       return captured.checkpoint.id;
     }
     catch (error) {
