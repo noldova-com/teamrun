@@ -18,6 +18,7 @@ import { Resources } from "../../resources";
 import type { IBusyRun } from "../interfaces/i-busy-run";
 import type { IInlineTerminal } from "../interfaces/i-inline-terminal";
 import type { IKeptRuns } from "../interfaces/i-kept-runs";
+import type { ILeftPlace } from "../interfaces/i-left-place";
 import type { IRunPlace } from "../interfaces/i-run-place";
 import type { IRunState } from "../interfaces/i-run-state";
 import type { IRunStarter } from "../interfaces/i-run-starter";
@@ -29,7 +30,7 @@ export class InlineTerminals {
   private readonly terminals: Map<string, { readonly sessionId: string; terminal: IInlineTerminal | null; focuses: boolean; rows: number }> = new Map();
   private readonly latest: Map<string, { readonly run: TerminalRun; readonly place: IRunPlace | null }> = new Map();
   private readonly placed: WritableSignal<ReadonlyMap<string, IRunPlace>> = signal(new Map());
-  private readonly leaving: WritableSignal<ReadonlyMap<string, IRunPlace>> = signal(new Map());
+  private readonly leaving: WritableSignal<ReadonlyMap<string, readonly ILeftPlace[]>> = signal(new Map());
   private readonly busy: WritableSignal<ReadonlyMap<string, IBusyRun>> = signal(new Map());
   private readonly stored: WritableSignal<ReadonlyMap<string, readonly IStoredRun[]>> = signal(new Map());
   private readonly states: WritableSignal<ReadonlyMap<string, readonly IRunState[]>> = signal(new Map());
@@ -64,7 +65,8 @@ export class InlineTerminals {
   }
 
   public blocksOf(owner: string, messageId: string): ReadonlyMap<string, ReadonlySet<number>> {
-    const places = [this.placed().get(owner), this.busy().get(owner)?.place, this.leaving().get(owner), ...(this.stored().get(owner) ?? []).map(t => t.place)];
+    const places = [this.placed().get(owner), this.busy().get(owner)?.place, ...(this.leaving().get(owner) ?? []).map(t => t.place),
+      ...(this.stored().get(owner) ?? []).map(t => t.place)];
     const blocks = new Map<string, Set<number>>();
     for (const place of places)
       if (place?.messageId === messageId)
@@ -171,11 +173,20 @@ export class InlineTerminals {
 
   private async startAsync(owner: string, command: string, folder: string | null, shellKinds: readonly TerminalShellKind[], place: IRunPlace | null,
     whenBusy: TerminalRunBusy | null): Promise<void> {
-    await this.leaveAsync(owner, place, () => this.moveAsync(owner, command, folder, shellKinds, place, whenBusy));
+    const left: ILeftPlace[] = [];
+    try {
+      await this.moveAsync(owner, command, folder, shellKinds, place, whenBusy, left);
+    }
+    finally {
+      if (left.length > 0) {
+        const others = (this.leaving().get(owner) ?? []).filter(t => !left.includes(t));
+        this.leaving.set(others.length === 0 ? InlineTerminals.without(this.leaving(), owner) : new Map([...this.leaving(), [owner, others]]));
+      }
+    }
   }
 
   private async moveAsync(owner: string, command: string, folder: string | null, shellKinds: readonly TerminalShellKind[], place: IRunPlace | null,
-    whenBusy: TerminalRunBusy | null): Promise<void> {
+    whenBusy: TerminalRunBusy | null, left: ILeftPlace[]): Promise<void> {
     const current = this.terminals.get(owner);
     const target = current === undefined || Object.isNull(whenBusy) ? null : new TerminalRunTarget(current.sessionId, whenBusy);
     const before = this.placed().get(owner) ?? null;
@@ -183,7 +194,7 @@ export class InlineTerminals {
     this.unbusy(owner);
     let run: TerminalRun;
     try {
-      run = await this.starter.startRunAsync(owner, command, folder, shellKinds, target, t => this.adopt(owner, t, place, opened));
+      run = await this.starter.startRunAsync(owner, command, folder, shellKinds, target, t => this.adopt(owner, t, place, opened, left));
     }
     catch (error) {
       if (Object.isNull(target) || !(error instanceof TerminalRunNotTypedException))
@@ -200,7 +211,7 @@ export class InlineTerminals {
           this.busy.set(new Map([...this.busy(), [owner, { place, command, folder, shellKinds }]]));
         return;
       }
-      run = await this.starter.startRunAsync(owner, command, folder, shellKinds, null, t => this.adopt(owner, t, place, opened));
+      run = await this.starter.startRunAsync(owner, command, folder, shellKinds, null, t => this.adopt(owner, t, place, opened, left));
     }
     if (this.isClosedSince(owner, opened))
       return;
@@ -212,21 +223,7 @@ export class InlineTerminals {
       await this.storeAsync(owner, earlier.place, earlier.run);
   }
 
-  private async leaveAsync(owner: string, place: IRunPlace | null, start: () => Promise<void>): Promise<void> {
-    const leaving = this.latest.get(owner)?.place ?? null;
-    if (Object.isNull(leaving) || InlineTerminals.isSame(leaving, place))
-      return start();
-    this.leaving.set(new Map([...this.leaving(), [owner, leaving]]));
-    try {
-      await start();
-    }
-    finally {
-      if (this.leaving().get(owner) === leaving)
-        this.leaving.set(InlineTerminals.without(this.leaving(), owner));
-    }
-  }
-
-  private adopt(owner: string, sessionId: string, place: IRunPlace | null, opened: number): void {
+  private adopt(owner: string, sessionId: string, place: IRunPlace | null, opened: number, left: ILeftPlace[]): void {
     if (this.isClosedSince(owner, opened))
       return;
     const current = this.terminals.get(owner);
@@ -240,6 +237,12 @@ export class InlineTerminals {
     else {
       current?.terminal?.dispose();
       this.terminals.set(owner, { sessionId, terminal: null, focuses: true, rows: current?.rows ?? Resources.inlineTerminalRows });
+    }
+    const before = this.placed().get(owner);
+    if (before !== undefined && !InlineTerminals.isSame(before, place)) {
+      const leaving: ILeftPlace = { place: before };
+      left.push(leaving);
+      this.leaving.set(new Map([...this.leaving(), [owner, [...this.leaving().get(owner) ?? [], leaving]]]));
     }
     this.place(owner, place);
   }
