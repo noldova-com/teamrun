@@ -11,6 +11,7 @@ Each version's section is written by the pull request that changes the version, 
 - **Attach a folder to a chat:** a chat without a project can attach an existing folder from its menu, Attach a folder…, and work there in place, with nothing copied; Replace the folder… and Detach the folder change it later, and the chat's breadcrumb and its row's tooltip name the folder.
   A rewind restores your files there from the checkpoint of the folder each reply ran in, and when the chat has moved to another folder since, it restores no files and says so.
   Deleting or moving such a chat leaves the folder and its files where they are.
+  Known: a teammate that already answered in the chat keeps working in the chat's own folder until a fix (#137).
 - **A reply saving its checkpoint:** a working reply reads "Saving a checkpoint…" while TeamRun takes its checkpoint, and Stop reads "Stopping…" from the first click until the reply stops.
 
 ### Fixed
