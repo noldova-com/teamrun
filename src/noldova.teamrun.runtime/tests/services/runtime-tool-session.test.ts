@@ -305,6 +305,25 @@ export class RuntimeToolSessionTests {
   }
 
   @TestMethod
+  public async answersTheClosedPageAndCallsNoMoreWhenTheCallIsWithdrawnWhileThePageOpens(): Promise<void> {
+    const windows = new PageWindows();
+    const withdrawn = new AbortController();
+    const request = windows.requestAsync.bind(windows);
+    windows.requestAsync = (...args): Promise<string> => {
+      withdrawn.abort(new Error("Stopped."));
+      return request(...args);
+    };
+    const session = new RuntimeToolSessions(RuntimeToolSessionTests.tools([], ["browser.viewClosed"]), [], null, windows)
+      .open("c1/t1", "c1", "/work/project", "p1", "Ada", () => undefined);
+
+    const answer = await session.callToolAsync("browser_snapshot", {}, withdrawn.signal);
+
+    Assert.areEqual(JSON.stringify({ content: [{ type: "text", text: "Unavailable (browser.viewClosed): The page is closed." }], isError: true }), JSON.stringify(answer));
+    Assert.areEqual(1, windows.requests.length);
+    session.end();
+  }
+
+  @TestMethod
   public async answersTheClosedPageWithWhyItCouldntOpenItOrAsItIsWithNoOpener(): Promise<void> {
     const refused = new Error("The person is typing in TeamRun, so the panel was left as it is; ask again when they stop.");
     const failing = new RuntimeToolSessions(RuntimeToolSessionTests.tools([], ["browser.viewClosed"]), [], null, new PageWindows(refused))

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { connect } from "node:net";
+
 import "@noldova/context.core";
 import type { IModuleSecrets } from "@noldova/desktop.runtime";
 import type { SharedMcpAccess } from "@noldova/teamrun.core";
@@ -265,6 +267,24 @@ export class SharedMcpOauthTests {
   }
 
   @TestMethod
+  public async answersARequestWhoseTargetIsNoAddressWithNotFoundAndKeepsWaitingForTheAnswer(): Promise<void> {
+    await using server = await OauthTestServer.startAsync();
+    const [secrets] = SharedMcpOauthTests.secrets();
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const finished = Promise.withResolvers<SharedMcpAccess>();
+    const started = await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t));
+    const callback = new URL(await server.callbackOfAsync(started));
+
+    const line = await SharedMcpOauthTests.statusLineAsync(callback, "//");
+    const answer = await fetch(callback);
+    const access = await finished.promise;
+
+    Assert.areEqual("HTTP/1.1 404 Not Found", line);
+    Assert.areEqual(200, answer.status);
+    Assert.areEqual("access-1", access.token);
+  }
+
+  @TestMethod
   public async endsAnEarlierSignInOfTheSameServerWithoutAnAnswerWhenALaterOneStarts(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
@@ -425,6 +445,18 @@ export class SharedMcpOauthTests {
     const finished = Promise.withResolvers<SharedMcpAccess>();
     await server.signInInTheBrowserAsync(await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t)));
     return finished.promise;
+  }
+
+  private static statusLineAsync(address: URL, target: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const socket = connect(Number(address.port), address.hostname);
+      let text = String.empty;
+      socket.setEncoding("utf8");
+      socket.on("data", (chunk: string) => text += chunk);
+      socket.on("error", reject);
+      socket.on("close", () => resolve(text.split("\r\n")[0] ?? String.empty));
+      socket.write(`GET ${target} HTTP/1.1\r\nHost: ${address.host}\r\nConnection: close\r\n\r\n`);
+    });
   }
 
   private static secrets(): [IModuleSecrets, Map<string, string>] {
