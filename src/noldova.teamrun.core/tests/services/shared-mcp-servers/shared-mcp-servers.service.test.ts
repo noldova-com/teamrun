@@ -700,6 +700,40 @@ export class SharedMcpServersServiceTests {
   }
 
   @TestMethod
+  public async removesTheTokensOfASignInThatEndsAfterItsServersAddressChangedAndKeepsTheServerSignedOut(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("wiki"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    const [moving] = host.signIns.started;
+
+    await host.sharedServers.updateAsync(new SharedMcpServerUpdateParams(server.id,
+      new SharedMcpServerDefinition("wiki", SharedMcpTransport.Http, null, [], [], "https://wiki.example.org/mcp", [], null, true)));
+    moving?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
+    await SharedMcpServersServiceTests.settleAsync();
+    const [listed] = await host.sharedServers.listAsync();
+
+    Assert.areEqual(JSON.stringify([moving?.reference]), JSON.stringify(host.signIns.signedOut));
+    Assert.areEqual(JSON.stringify(["https://wiki.example.org/mcp", null, false]),
+      JSON.stringify([listed?.server.definition.url, listed?.server.signIn, listed?.signingIn]));
+  }
+
+  @TestMethod
+  public async removesTheTokensOfASignInThatEndsWhileItsServersDeleteIsStillSaving(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    const [late] = host.signIns.started;
+
+    const deleting = host.sharedServers.deleteAsync(new SharedMcpServerIdParams(server.id));
+    late?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
+    await deleting;
+    await SharedMcpServersServiceTests.settleAsync();
+
+    Assert.areEqual(JSON.stringify([late?.reference, late?.reference]), JSON.stringify(host.signIns.signedOut));
+    Assert.areEqual("[]", JSON.stringify(await host.sharedServers.listAsync()));
+  }
+
+  @TestMethod
   public async addsGitHubsServerOffForEveryProviderAndOnceTurnedOnPassesTheAccountsTokenAsATurnsBearerTokenOnly(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const [, taking] = await SharedMcpServersServiceTests.takingAsync(host);
