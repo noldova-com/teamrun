@@ -118,9 +118,14 @@ export class McpToolCallsTests {
     const listedInProcessOnly = endpointListed;
     const listed = await host.engine.listMcpToolsAsync(new McpToolListParams(token));
     await Promise.resolve();
-    const called = await host.engine.callMcpToolAsync(new McpToolCallParams(token, "teamrun_list_chats", { project_id: "p1" }), signal);
+    const caller = new AbortController();
+    const called = await host.engine.callMcpToolAsync(new McpToolCallParams(token, "teamrun_list_chats", { project_id: "p1" }), caller.signal);
     const inProcess = await turnHost.callToolAsync("teamrun_list_projects", {}, signal);
     const inProcessListed = await turnHost.listToolsAsync(signal);
+    const passed = tools.opened[0]?.calls[0]?.signal;
+    const beforeAbort = passed?.aborted;
+    caller.abort();
+    const followed = [beforeAbort, passed?.aborted];
     await host.engine.cancelAsync(new MessageIdParams(sent.replies[0]!.id));
     await host.engine.waitForIdle();
 
@@ -129,7 +134,7 @@ export class McpToolCallsTests {
     Assert.isTrue(endpointListed);
     Assert.areEqual(JSON.stringify({ content: [{ type: "text", text: `${conversation.id}/default teamrun_list_chats` }], isError: false }), JSON.stringify(called));
     Assert.areEqual(JSON.stringify({ project_id: "p1" }), JSON.stringify(tools.opened[0]!.calls[0]!.input));
-    Assert.areEqual(signal, tools.opened[0]!.calls[0]!.signal);
+    Assert.areEqual(JSON.stringify([false, true]), JSON.stringify(followed));
     Assert.areEqual(`${conversation.id}/default teamrun_list_projects`, (inProcess["content"] as Record<string, unknown>[])[0]!["text"]);
     Assert.areEqual(JSON.stringify(listed), JSON.stringify(inProcessListed));
     Assert.areEqual(1, tools.opened[0]!.ends);
