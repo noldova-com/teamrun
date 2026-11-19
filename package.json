@@ -28,6 +28,7 @@
     "profile": "node scripts/profile/profile.ts",
     "profile:read": "node scripts/profile/profile-read.ts",
     "seed:stress": "node scripts/app.ts seed-stress",
+    "set-version": "node scripts/set-version.ts",
     "start": "node scripts/app.ts start",
     "test": "node scripts/test.ts",
     "test:angular": "node scripts/test.ts angular",
