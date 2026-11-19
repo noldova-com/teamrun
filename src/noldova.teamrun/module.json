@@ -1,12 +1,12 @@
 {
   "id": "teamrun",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "displayName": "TeamRun",
   "description": "Holds chats with AI agents from several providers as teammates, and lets people follow and approve their work.",
   "parts": ["runtime", "window", "cli"],
-  "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.2" },
-  "optionalDependencies": { "browser": "0.0.3", "computer-use": "0.0.2", "git": "0.0.2", "git-github": "0.0.2" },
-  "noldovaDesktop": ">=0.0.3 <0.1.0",
+  "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.3" },
+  "optionalDependencies": { "browser": "0.0.3", "computer-use": "0.0.2", "git": "0.0.3", "git-github": "0.0.3" },
+  "noldovaDesktop": ">=0.0.7 <0.1.0",
   "contributes": {
     "methods": [
       "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.defaultTeammateRead",
@@ -31,7 +31,7 @@
     ],
     "events": [
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.messageCreated", "teamrun.messageUpdated",
-      "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.replyThinking", "teamrun.approvalCreated",
+      "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.replyThinking", "teamrun.replyCheckpointStarted", "teamrun.replyCheckpointEnded", "teamrun.approvalCreated",
       "teamrun.approvalUpdated", "teamrun.providerUpdated", "teamrun.providerSignInsChanged", "teamrun.providerKindsChanged", "teamrun.providerKindInstallationChanged",
       "teamrun.conversationRewound", "teamrun.conversationDeleted", "teamrun.signInLink", "teamrun.planUsageUpdated", "teamrun.backgroundTaskUpdated",
       "teamrun.backgroundTaskOutput", "teamrun.backgroundTasksCleared", "teamrun.projectsLayoutUpdated", "teamrun.projectFolderChanged", "teamrun.composerDefaultUpdated",

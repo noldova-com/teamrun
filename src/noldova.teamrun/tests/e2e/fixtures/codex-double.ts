@@ -97,6 +97,7 @@ export class CodexDouble {
   public static readonly BROWSER_DENIED: string = "The person didn't allow it.";
   private static readonly VERSION: string = "0.140.0";
   private readonly threads: Map<string, JsonReader> = new Map();
+  private readonly listed: Map<string, readonly string[]> = new Map();
   private threadCounter: number = 0;
   private turnCounter: number = 0;
 
@@ -167,6 +168,9 @@ export class CodexDouble {
         break;
       case "thread/unsubscribe":
       case "thread/archive":
+        this.listed.delete(params.readString("threadId"));
+        this.respond(id, {});
+        break;
       case "thread/unarchive":
       case "turn/interrupt":
         this.respond(id, {});
@@ -431,18 +435,22 @@ export class CodexDouble {
   }
 
   private async listToolsAsync(turn: { threadId: string; turnId: string }): Promise<void> {
-    const client = this.connect(turn.threadId);
-    let names: string[];
+    const names = this.listed.get(turn.threadId) ?? await this.listServedToolsAsync(turn.threadId);
+    this.listed.set(turn.threadId, names);
+    CodexDouble.log(`${CodexDouble.TOOLS_PREFIX}${names.join(" ")}`);
+    this.answer(turn, `${CodexDouble.TOOLS_PREFIX}${names.join(" ")}`);
+  }
+
+  private async listServedToolsAsync(threadId: string): Promise<readonly string[]> {
+    const client = this.connect(threadId);
     try {
       await client.startAsync();
       const answer = await client.requestAsync("tools/list", {});
-      names = answer.readObject("result").readObjectArray("tools").map(t => t.readString("name")).sort();
+      return answer.readObject("result").readObjectArray("tools").map(t => t.readString("name")).sort();
     }
     finally {
       client.stop();
     }
-    CodexDouble.log(`${CodexDouble.TOOLS_PREFIX}${names.join(" ")}`);
-    this.answer(turn, `${CodexDouble.TOOLS_PREFIX}${names.join(" ")}`);
   }
 
   private connect(threadId: string): IMcpClient {

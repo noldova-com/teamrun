@@ -11,7 +11,7 @@ import { type FactoryProvider, InjectionToken, type Signal, type WritableSignal,
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { CommandRun, NotificationAction, NotificationSeverity, QualifiedName } from "@noldova/desktop.protocol";
-import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
+import { type IWindowPartContext, LinkPlace, WindowPartTokens } from "@noldova/desktop.window";
 import { type LaunchedTerminal, TerminalLaunch, TerminalLauncher, type TerminalShellKind } from "@noldova/terminal.window";
 import {
   Approval,
@@ -264,6 +264,7 @@ export class ChatStoreService {
   });
   private readonly workingTabs: Map<string, () => void> = new Map();
   private readonly thinkingSignal: WritableSignal<ReadonlySet<string>> = signal(new Set());
+  private readonly savingCheckpointSignal: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly busySignal: WritableSignal<number> = signal(0);
   private readonly loadedSignal: WritableSignal<boolean> = signal(false);
   private readonly resyncsSignal: WritableSignal<number> = signal(0);
@@ -360,6 +361,7 @@ export class ChatStoreService {
   public readonly pendingApprovals: Signal<readonly Approval[]> = computed(() => this.approvalsSignal().filter(t => t.status === ApprovalStatus.Pending));
   public readonly workingReplies: Signal<readonly Message[]> = computed(() => [...this.workingSignal().values()]);
   public readonly thinkingReplies: Signal<ReadonlySet<string>> = this.thinkingSignal.asReadonly();
+  public readonly savingCheckpointReplies: Signal<ReadonlySet<string>> = this.savingCheckpointSignal.asReadonly();
   public readonly runningReply: Signal<Message | null> = computed(() => this.runningReplyOf(this.screenConversationId()));
 
   public constructor(context: IWindowPartContext, terminals: ITerminalLauncher = TerminalLauncher) {
@@ -1554,7 +1556,7 @@ export class ChatStoreService {
   public async startSharedMcpSignIn(serverId: string, gesture: LinkGesture, report: (message: string) => void): Promise<boolean> {
     return this.perform(async () => {
       const started = SharedMcpSignInStarted.fromJson(await this.request(MethodName.SharedMcpSignInStart, new SharedMcpServerIdParams(serverId).toJson()));
-      await this.context.openLinkAsync(started.url, { gesture });
+      await this.context.openLinkAsync(started.url, { gesture, place: LinkPlace.System });
     }, report);
   }
 
@@ -1701,7 +1703,7 @@ export class ChatStoreService {
     report: (message: string) => void = this.actionFailed(ChatAction.OpenSignInPage, providerId)): Promise<void> {
     const url = this.signInLinksSignal().get(providerId);
     if (!Object.isUndefined(url))
-      await this.attempt(() => this.context.openLinkAsync(url, { gesture }), report);
+      await this.attempt(() => this.context.openLinkAsync(url, { gesture, place: LinkPlace.System }), report);
   }
 
   public async cancelSignIn(providerId: string, report: (message: string) => void = this.actionFailed(ChatAction.CancelSignIn, providerId)): Promise<void> {
@@ -1763,6 +1765,10 @@ export class ChatStoreService {
 
   public async openPage(url: string, gesture: LinkGesture, report: (message: string) => void = this.actionFailed(ChatAction.OpenPage, url)): Promise<void> {
     await this.attempt(() => this.context.openLinkAsync(url, { gesture }), report);
+  }
+
+  public async openSystemPage(url: string, gesture: LinkGesture, report: (message: string) => void): Promise<void> {
+    await this.attempt(() => this.context.openLinkAsync(url, { gesture, place: LinkPlace.System }), report);
   }
 
   public async refreshTools(report: (message: string, error: unknown) => void = this.loadFailed(Resources.toolsLoad, Resources.toolsNotLoaded, null,
@@ -1983,6 +1989,7 @@ export class ChatStoreService {
         const payload = DetailEventPayload.fromJson(event.payload);
         this.captureEvent(event, JSON.stringify([EventName.DetailUpdated, payload.messageId, payload.detail.sequence]));
         this.stopThinking(payload.messageId);
+        this.stopSavingCheckpoint(payload.messageId);
         this.applyDetail(payload);
         break;
       }
@@ -1992,6 +1999,15 @@ export class ChatStoreService {
           this.thinkingSignal.update(t => new Set(t).add(messageId));
         break;
       }
+      case EventName.ReplyCheckpointStarted: {
+        const messageId = MessageIdParams.fromJson(event.payload).messageId;
+        if (this.workingSignal().has(messageId))
+          this.savingCheckpointSignal.update(t => new Set(t).add(messageId));
+        break;
+      }
+      case EventName.ReplyCheckpointEnded:
+        this.stopSavingCheckpoint(MessageIdParams.fromJson(event.payload).messageId);
+        break;
       case EventName.WaitingMessagesChanged:
         this.setWaiting(WaitingMessagesPayload.fromJson(event.payload));
         break;
@@ -2257,6 +2273,7 @@ export class ChatStoreService {
       const checks = await Promise.all(dropped.map(t => this.confirmDropped(t.id).catch((u: unknown) => u)));
       this.setWorking(new Map(open.map(t => [t.id, t])));
       this.thinkingSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
+      this.savingCheckpointSignal.set(new Set());
       this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending));
       for (const approval of approvals)
         this.upsertApproval(approval);
@@ -2344,10 +2361,22 @@ export class ChatStoreService {
     });
   }
 
+  private stopSavingCheckpoint(messageId: string): void {
+    if (!this.savingCheckpointSignal().has(messageId))
+      return;
+    this.savingCheckpointSignal.update(t => {
+      const next = new Set(t);
+      next.delete(messageId);
+      return next;
+    });
+  }
+
   private trackWorking(message: Message): void {
     const active = ChatStoreService.ACTIVE_STATUSES.includes(message.status);
-    if (!active)
+    if (!active) {
       this.stopThinking(message.id);
+      this.stopSavingCheckpoint(message.id);
+    }
     if (!active && !this.workingSignal().has(message.id))
       return;
     const next = new Map(this.workingSignal());

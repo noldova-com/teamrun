@@ -1,6 +1,6 @@
 {
   "name": "teamrun-app",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "workspaces": [
     "src/noldova.teamrun.window.app"
   ],
@@ -39,6 +39,7 @@
     "product": {
       "name": "TeamRun",
       "publisher": "Noldova",
+      "installFolder": "Noldova",
       "slug": "teamrun",
       "applicationId": "com.noldova.teamrun",
       "developmentApplicationId": "com.noldova.teamrun.development",
@@ -135,17 +136,17 @@
     "@noldova/context.exceptions": "0.0.8",
     "@noldova/context.json": "0.0.8",
     "@noldova/context.text": "0.0.8",
-    "@noldova/desktop.cli": "0.0.3",
-    "@noldova/desktop.electron": "0.0.3",
-    "@noldova/desktop.protocol": "0.0.3",
-    "@noldova/desktop.runtime": "0.0.3",
-    "@noldova/git": "0.0.2",
-    "@noldova/git.github": "0.0.2",
-    "@noldova/teamrun": "0.0.1",
-    "@noldova/terminal": "0.0.2"
+    "@noldova/desktop.cli": "0.0.7",
+    "@noldova/desktop.electron": "0.0.7",
+    "@noldova/desktop.protocol": "0.0.7",
+    "@noldova/desktop.runtime": "0.0.7",
+    "@noldova/git": "0.0.3",
+    "@noldova/git.github": "0.0.3",
+    "@noldova/teamrun": "0.0.4",
+    "@noldova/terminal": "0.0.3"
   },
   "devDependencies": {
-    "@noldova/desktop.build": "0.0.3",
+    "@noldova/desktop.build": "0.0.7",
     "electron": "44.9.1"
   },
   "overrides": {

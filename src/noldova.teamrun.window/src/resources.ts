@@ -585,6 +585,8 @@ export class Resources {
   public static readonly youLabel: string = "You";
   public static readonly senderChatGone: string = "from a deleted chat";
   public static readonly thinkingLabel: string = "Thinking…";
+  public static readonly savingCheckpointLabel: string = "Saving a checkpoint…";
+  public static readonly stoppingLabel: string = "Stopping…";
   public static readonly waitingForTurnLabel: string = "Waiting for its turn";
   public static readonly didNotStartLabel: string = "Did not start";
   public static readonly stepLabel: string = "Step";
@@ -2080,6 +2082,10 @@ export class Resources {
 
   public static formatThinkingFor(duration: string): string {
     return `${Resources.thinkingLabel} ${duration}`;
+  }
+
+  public static formatSavingCheckpointFor(duration: string): string {
+    return `${Resources.savingCheckpointLabel} ${duration}`;
   }
 
   public static formatCommandCount(count: number): string {

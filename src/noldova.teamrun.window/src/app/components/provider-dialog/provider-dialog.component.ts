@@ -192,7 +192,7 @@ export class ProviderDialogComponent {
       return;
     this.error.set(null);
     const opened = new LinkOpenEvent(url, event);
-    void this.store().openPage(opened.url, opened.gesture, t => this.error.set(t));
+    void this.store().openSystemPage(opened.url, opened.gesture, t => this.error.set(t));
   }
 
   protected editLabel(event: globalThis.Event): void {

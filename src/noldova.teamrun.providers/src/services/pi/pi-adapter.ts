@@ -36,6 +36,7 @@ import { Deadline } from "../deadline.js";
 import { DeltaStream } from "../delta-stream.js";
 import type { ExecutableVersionReader } from "../executables/executable-version.reader.js";
 import { FailureDescriber } from "../failure-describer.js";
+import { ServedToolNames } from "../mcp/served-tool-names.js";
 import { SharedMcpLaunch } from "../mcp/shared-mcp-launch.js";
 import { OwnMcpServersFile } from "../own-mcp-servers-file.js";
 import type { CommandRunner } from "../process/command-runner.js";
@@ -174,7 +175,7 @@ export class PiAdapter implements IProviderAdapter {
     let running = true;
     let sender: string | null = null;
     const shared = PiAdapter.sharedVariablesOf(request.sharedServers);
-    const key = JSON.stringify([request.provider?.id ?? null, request.requested.mode,
+    const key = JSON.stringify([request.provider?.id ?? null, request.requested.mode, await ServedToolNames.listAsync(request.tools, signal),
       Object.entries(request.environment).filter(([name]) => name !== ProtocolResources.senderTokenVariable), request.workingDirectory, shared]);
     const turn = new PiTurn(listener, stream, message => client!.send(message), request.tools?.approvedTools ?? []);
     const abort = (): void => {
