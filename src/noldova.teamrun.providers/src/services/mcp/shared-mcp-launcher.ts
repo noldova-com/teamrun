@@ -152,41 +152,47 @@ export class SharedMcpLauncher {
     const script = [SharedMcpLauncher.HOLD_SCRIPT, ...SharedMcpLauncher.HOLD_SHELL_VARIABLES.filter(t => environment[t] === undefined)
       .flatMap(t => [SharedMcpLauncher.HOLD_UNSET, t]), SharedMcpLauncher.HOLD_COMMAND].join(" ");
     const held = this.isWindows ? target : { command: SharedMcpLauncher.HOLD_SHELL, args: ["-c", script, target.command, ...target.args], verbatim: false };
-    const started = Date.now();
-    const server = this.start(held.command, held.args, { env: environment, stdio: this.isWindows ? "inherit" : ["inherit", "inherit", "inherit", "pipe"],
-      windowsHide: true, windowsVerbatimArguments: held.verbatim, detached: !this.isWindows });
-    const startedBy = Date.now() + 1;
-    const processId = server.pid;
-    if (processId === undefined)
-      watch.stdin?.end();
-    else
-      watch.stdin?.write(`${[processId, started, startedBy].join(SharedMcpLauncher.FIELD_SEPARATOR)}${SharedMcpLauncher.LINE_END}`);
-    const ended = new Promise<number>(resolve => {
-      server.once("error", error => resolve(this.refuse(error.message, SharedMcpLauncher.FAILED_EXIT)));
-      server.once("exit", (code, signal) => resolve(code ?? SharedMcpLauncher.SIGNAL_EXIT_BASE + Number(SharedMcpLauncher.SIGNAL_NUMBERS[String(signal)])));
-    });
-    if (processId === undefined)
-      return ended;
-
+    let processId: number | undefined;
     const forward = (signal: NodeJS.Signals): void => {
-      this.signalQuietly(this.isWindows ? processId : -processId, signal);
+      if (processId !== undefined)
+        this.signalQuietly(this.isWindows ? processId : -processId, signal);
     };
     for (const signal of SharedMcpLauncher.forwardedSignals)
       this.host.on(signal, forward);
-    const release = server.stdio[3];
-    let said = "";
-    if (release instanceof Writable)
-      release.on("error", () => undefined).on("data", (chunk: Buffer) => {
-        said += chunk.toString();
-      }).end(SharedMcpLauncher.HOLD_RELEASE);
-    const code = await ended;
-    for (const signal of SharedMcpLauncher.forwardedSignals)
-      this.host.off(signal, forward);
-    if (![...SharedMcpLauncher.HOLD_REFUSALS.values()].some(t => t.exit === code) || !(release instanceof Writable))
-      return code;
-    await finished(release).catch(() => undefined);
-    const refusal = SharedMcpLauncher.HOLD_REFUSALS.get(said.trim());
-    return refusal?.exit === code ? this.refuse([SharedMcpLauncher.SPAWN_VERB, target.command, refusal.reason].join(" "), SharedMcpLauncher.FAILED_EXIT) : code;
+    try {
+      const started = Date.now();
+      const server = this.start(held.command, held.args, { env: environment, stdio: this.isWindows ? "inherit" : ["inherit", "inherit", "inherit", "pipe"],
+        windowsHide: true, windowsVerbatimArguments: held.verbatim, detached: !this.isWindows });
+      const startedBy = Date.now() + 1;
+      processId = server.pid;
+      if (processId === undefined)
+        watch.stdin?.end();
+      else
+        watch.stdin?.write(`${[processId, started, startedBy].join(SharedMcpLauncher.FIELD_SEPARATOR)}${SharedMcpLauncher.LINE_END}`);
+      const ended = new Promise<number>(resolve => {
+        server.once("error", error => resolve(this.refuse(error.message, SharedMcpLauncher.FAILED_EXIT)));
+        server.once("exit", (code, signal) => resolve(code ?? SharedMcpLauncher.SIGNAL_EXIT_BASE + Number(SharedMcpLauncher.SIGNAL_NUMBERS[String(signal)])));
+      });
+      if (processId === undefined)
+        return ended;
+
+      const release = server.stdio[3];
+      let said = "";
+      if (release instanceof Writable)
+        release.on("error", () => undefined).on("data", (chunk: Buffer) => {
+          said += chunk.toString();
+        }).end(SharedMcpLauncher.HOLD_RELEASE);
+      const code = await ended;
+      if (![...SharedMcpLauncher.HOLD_REFUSALS.values()].some(t => t.exit === code) || !(release instanceof Writable))
+        return code;
+      await finished(release).catch(() => undefined);
+      const refusal = SharedMcpLauncher.HOLD_REFUSALS.get(said.trim());
+      return refusal?.exit === code ? this.refuse([SharedMcpLauncher.SPAWN_VERB, target.command, refusal.reason].join(" "), SharedMcpLauncher.FAILED_EXIT) : code;
+    }
+    finally {
+      for (const signal of SharedMcpLauncher.forwardedSignals)
+        this.host.off(signal, forward);
+    }
   }
 
   private async watchAsync(args: readonly string[]): Promise<void> {
