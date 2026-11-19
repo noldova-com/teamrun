@@ -163,6 +163,7 @@ export class Resources {
   public static readonly runOpensInSetting: string = "teamrun.runOpensIn";
   public static readonly runOpensInPanel: string = "Panel";
   public static readonly inlineTerminalRows: number = 15;
+  public static readonly inlineTerminalMinimumRows: number = 8;
   public static readonly inlineTerminalRowTolerance: number = 1e-3;
   public static readonly runBodySite: string = "body";
   public static readonly runPlanSite: string = "plan";
