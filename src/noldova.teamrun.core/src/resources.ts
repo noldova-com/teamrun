@@ -272,6 +272,9 @@ export class Resources {
   public static readonly sharedImageHash: string = "sha256";
   public static readonly hexEncoding: "hex" = "hex";
   public static readonly partialFileSuffix: string = ".partial";
+  public static readonly selectChatAttachmentPaths: string =
+    "SELECT json_extract(a.value, '$.path') AS path FROM messages m, json_each(m.json, '$.attachments') a WHERE m.chatId = ?";
+  public static readonly selectAttachmentPaths: string = "SELECT json_extract(a.value, '$.path') AS path FROM messages m, json_each(m.json, '$.attachments') a";
   public static readonly selectMessageAttachment: string =
     "SELECT a.value AS json FROM messages m, json_each(m.json, '$.attachments') a "
     + "WHERE m.chatId = ? AND json_extract(a.value, '$.path') = ? LIMIT 1";
@@ -551,6 +554,7 @@ export class Resources {
   public static readonly endedAtColumn: string = "endedAt";
   public static readonly idColumn: string = "id";
   public static readonly jsonColumn: string = "json";
+  public static readonly pathColumn: string = "path";
   public static readonly outputColumn: string = "output";
   public static readonly revisionColumn: string = "revision";
   public static readonly sequenceColumn: string = "sequence";
@@ -1115,6 +1119,14 @@ export class Resources {
 
   public static formatDraftFilesNotRemoved(conversationId: string, reason: string): string {
     return `The draft files of the chat ending in "${conversationId.slice(-Resources.loggedIdLength)}" were not removed: ${reason}.`;
+  }
+
+  public static formatSentFilesNotRemoved(conversationId: string, reason: string): string {
+    return `The sent files of the chat ending in "${conversationId.slice(-Resources.loggedIdLength)}" were not removed: ${reason}.`;
+  }
+
+  public static formatSentFilesNotSwept(reason: string): string {
+    return `The sent files no message names were not removed: ${reason}.`;
   }
 
   public static formatDraftNotRead(conversationId: string, reason: string): string {

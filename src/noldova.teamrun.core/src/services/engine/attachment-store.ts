@@ -75,6 +75,20 @@ export class AttachmentStore {
     }
   }
 
+  public removeSent(paths: readonly string[]): void {
+    if (this.leadsAway(this.directory))
+      return;
+    for (const path of paths)
+      if (isAbsolute(path) && dirname(resolve(path)) === resolve(this.directory))
+        rmSync(join(this.directory, basename(path)), { force: true });
+  }
+
+  public listSent(): readonly string[] {
+    if (this.leadsAway(this.directory) || !existsSync(this.directory))
+      return [];
+    return readdirSync(this.directory, { withFileTypes: true }).filter(t => t.isFile()).map(t => join(this.directory, t.name));
+  }
+
   public discard(attachments: readonly MessageAttachment[]): void {
     for (const attachment of attachments)
       rmSync(attachment.path, { force: true });

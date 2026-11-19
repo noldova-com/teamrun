@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { basename } from "node:path";
+
 import "@noldova/context.core";
 import { type DataRecord } from "@noldova/context.data";
 import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
@@ -99,6 +101,15 @@ export class DraftsService implements IDraftsService {
     }
   }
 
+  public removeSentFiles(conversationId: string, paths: readonly string[]): void {
+    try {
+      this.attachments.removeSent(paths);
+    }
+    catch (error) {
+      this.log.write(Resources.formatSentFilesNotRemoved(conversationId, DraftsService.reasonOf(error)));
+    }
+  }
+
   public async sweepAsync(): Promise<void> {
     for (const conversationId of this.attachments.listDraftFolders())
       await this.context.database.connection.runInTransactionAsync(async transaction => {
@@ -106,6 +117,15 @@ export class DraftsService implements IDraftsService {
         if (!Object.isNull(held))
           this.removeFilesExcept(conversationId, held);
       });
+    try {
+      const files = this.attachments.listSent();
+      const named = new Set((await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectAttachmentPaths)))
+        .map(t => basename(t.readString(Resources.pathColumn))));
+      this.attachments.removeSent(files.filter(t => !named.has(basename(t))));
+    }
+    catch (error) {
+      this.log.write(Resources.formatSentFilesNotSwept(DraftsService.reasonOf(error)));
+    }
   }
 
   private removeFilesExcept(conversationId: string, keep: readonly MessageAttachment[]): boolean {
