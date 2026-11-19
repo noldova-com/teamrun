@@ -4021,6 +4021,26 @@ describe("ComposerComponent", () => {
       expect(box().value).toBe("");
     });
 
+    it("reads its chat's unsent message again, with no error, when another window saved a newer one, and bases its next save on that one", async () => {
+      const more = new MessageAttachment("more.txt", "text/plain", 1, "D:/data/attachments/drafts/c1/more.txt");
+      context.answer(MethodName.DraftRead, () => drafted("c1", "where were we", [notes]));
+      await prepare();
+      await render();
+      context.refuse(MethodName.DraftSave, ErrorCode.Conflict, "The draft changed.", "c1")
+        .answer(MethodName.DraftRead, () => drafted("c1", "where we are now", [notes, more], [], 4));
+
+      await type("where were we?");
+      await saveStep()();
+      await Wait.until(() => expect(box().value).toBe("where we are now"));
+
+      expect([...rows()].map(t => t.textContent)).toEqual([expect.stringContaining("notes.txt"), expect.stringContaining("more.txt")]);
+      expect(context.noticeText()).toBeNull();
+      context.answer(MethodName.DraftSave, t => SampleData.savedDraft(DraftSaveParams.fromJson(t), 5).toJson());
+      await type("where we are now!");
+      await saveStep()();
+      expect(saves().map(t => [t.text, t.revision])).toEqual([["where were we?", 2], ["where we are now!", 4]]);
+    });
+
     describe("sent while it saves", () => {
       const prepares = (): [boolean, string | null][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.AttachmentPrepare))
         .map(t => AttachmentInput.fromJson(t.parameters)).map(t => [!Object.isNull(t.grant), t.path]);

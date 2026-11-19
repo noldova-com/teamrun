@@ -133,6 +133,7 @@ export class Resources {
   public static readonly attachmentSourceRequired: string = "An attachment requires exactly one of its bytes, a saved attachment path or a file grant.";
   public static readonly draftAttachmentsTooMany: string = "A draft holds at most 10 attachments.";
   public static readonly draftRevisionInvalid: string = "A draft's revision is a positive whole number.";
+  public static readonly draftBaseRevisionInvalid: string = "A draft save's revision is a whole number, 0 when it is based on no draft.";
   public static readonly readingPositionRepeated: string = "A save names each chat's reading position at most once.";
   public static readonly maximumAttachments: number = 10;
   public static readonly effortLevelOrder: readonly string[] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];

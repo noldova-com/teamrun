@@ -1113,6 +1113,10 @@ export class Resources {
     return `The draft's file "${name}" does not exist.`;
   }
 
+  public static formatDraftStale(conversationId: string): string {
+    return `The draft of the chat "${conversationId}" changed since this save read it.`;
+  }
+
   public static formatDraftFilesNotRemoved(conversationId: string, reason: string): string {
     return `The draft files of the chat ending in "${conversationId.slice(-Resources.loggedIdLength)}" were not removed: ${reason}.`;
   }

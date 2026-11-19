@@ -4956,6 +4956,11 @@ export declare class Resources {
   public static formatDraftFileNotFound(name: string): string;
 
   /**
+   * Composes the refusal of a draft save whose revision is no longer the draft's.
+   */
+  public static formatDraftStale(conversationId: string): string;
+
+  /**
    * Composes the log line for a draft's files that could not be removed, naming the conversation by its id's last
    * `loggedIdLength` characters.
    */

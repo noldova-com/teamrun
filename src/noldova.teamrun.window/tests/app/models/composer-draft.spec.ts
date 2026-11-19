@@ -29,7 +29,7 @@ describe("ComposerDraft", () => {
     expect(draft.attachments).toEqual([saved]);
   });
 
-  it("becomes the save parameters of its conversation, text and files, taking each file's input after the one before", async () => {
+  it("becomes the save parameters of its conversation, text, files and the revision it replaces, taking each file's input after the one before", async () => {
     const other = new ComposerAttachment(new MessageAttachment("other.txt", "text/plain", 1, "D:/data/attachments/drafts/c1/other.txt"));
     const asked: string[] = [];
     let open = 0;
@@ -41,11 +41,12 @@ describe("ComposerDraft", () => {
       await Promise.resolve();
       open--;
       return new AttachmentInput(attachment.name, attachment.mediaType, null, `D:/prepared/${attachment.name}`);
-    });
+    }, 4);
 
     expect(asked).toEqual(["notes.txt", "other.txt"]);
     expect(params.conversationId).toBe("c1");
     expect(params.text).toBe("hello");
+    expect(params.revision).toBe(4);
     expect(params.attachments.map(t => t.path)).toEqual(["D:/prepared/notes.txt", "D:/prepared/other.txt"]);
   });
 });
