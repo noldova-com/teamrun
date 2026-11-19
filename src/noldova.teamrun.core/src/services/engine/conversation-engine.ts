@@ -696,9 +696,11 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       throw new ServiceException(ErrorCode.Conflict, Resources.formatNoReplyInProgress(params.conversationId), [params.conversationId]);
 
     const open = group.filter(t => !t.isEnded && !t.run.isCancelled);
+    const known = new Set(group);
     await Promise.all(group.map(t => this.stopAsync(t)));
     await completion;
-    return (await Promise.all(open.map(t => this.requireMessageAsync(t.message.id)))).filter(t => t.status === MessageStatus.Cancelled);
+    const added = group.filter(t => !known.has(t));
+    return (await Promise.all([...open, ...added].map(t => this.requireMessageAsync(t.message.id)))).filter(t => t.status === MessageStatus.Cancelled);
   }
 
   public async setResponderAsync(params: ConversationResponderParams): Promise<Conversation> {
@@ -1186,6 +1188,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     for (const next of pending) {
       work.push(next);
       this.state.runs.set(next.message.id, next.run);
+      if (item.run.isCancelled)
+        next.run.cancel();
     }
     this.events.publish(new Event(EventName.MessageUpdated, stored.toJson()));
     for (const next of pending)
