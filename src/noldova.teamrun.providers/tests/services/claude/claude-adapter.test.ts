@@ -122,6 +122,37 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async endsAWakeTurnOnTheUsageLimitWithItsResetWhenClaudeRejectsTheAccountWhileItRuns(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const tokens = new SessionTokens();
+    host.factory.next = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-woken", "none", null, []),
+      SdkMessages.taskStarted("s-woken", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-woken", "Started")),
+      SdkMessages.taskNotification("s-woken", "server", "completed", host.directory.resolve("missing.output")),
+      SdkMessages.rateLimit("s-woken", "rejected", 1_800_000_000, "rejected"),
+      SdkMessages.limited("44444444-4444-4444-4444-444444444444", "You've hit your limit"),
+      SdkMessages.success("s-woken", "You've hit your limit"),
+      new WaitForCloseStep()
+    ]);
+    const listener = new RecordingTurnListener();
+    listener.wakeTurn = new WakeTurn({ TEAMRUN_SENDER_TOKEN: "wake-token" });
+    await listener.wakeTurn.useToolsAsync(ClaudeAdapterTests.toolsOf(new RecordingMcpEndpoint(tokens, "wake")));
+    const woken = listener.wakeTurn.follow(new RecordingTurnListener(), new AbortController().signal);
+
+    await adapter.runTurn(ClaudeAdapterTests.senderRequest(host, "Start", null, new RecordingMcpEndpoint(tokens, "turn"), "turn-token"), listener,
+      new AbortController().signal);
+    tokens.close("turn");
+    const reply = await woken;
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Failed, reply.outcome);
+    Assert.areEqual(new Date(1_800_000_000_000).toISOString(), reply.limit?.resetsAt);
+  }
+
+  @TestMethod
   public async withTheSwitchOnNotesTheTurnWhenClaudeRefusesTheFirstTurnsSenderToken(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
