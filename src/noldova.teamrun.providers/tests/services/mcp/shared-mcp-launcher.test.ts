@@ -124,6 +124,30 @@ export class SharedMcpLauncherTests {
   }
 
   @TestMethod
+  public async listensForItsForwardedSignalsBeforeItStartsTheServer(): Promise<void> {
+    const outside = await SharedMcpLauncherTests.listeningAtStartAsync("linux", {}, "node", "launch.js", () => false, "server");
+    const windows = await SharedMcpLauncherTests.listeningAtStartAsync("win32", { Path: "C:\\Windows", SystemRoot: "C:\\Windows" }, "C:\\TeamRun\\TeamRun.exe",
+      "C:\\TeamRun\\launch.js", t => t === path.join("C:\\tools\\server.exe"), "C:\\tools\\server.exe");
+
+    const all = SharedMcpLauncher.forwardedSignals.map(() => 1);
+    Assert.areEqual(JSON.stringify([all, all]), JSON.stringify([outside, windows]));
+  }
+
+  @TestMethod
+  public async forwardsNoSignalThatComesWhileTheServerStarts(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const server = SharedMcpLauncherTests.exiting(0);
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0), () => {
+      host.emit("SIGTERM", "SIGTERM");
+      return server();
+    });
+
+    await new SharedMcpLauncher("linux", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--variables", "", "--", "server"]);
+
+    Assert.areEqual(JSON.stringify([[], [0]]), JSON.stringify([host.signals, host.codes]));
+  }
+
+  @TestMethod
   public async leavesTheHoldingShellsOwnVariablesOutOfTheServersEnvironmentButKeepsOnesTheServerNames(): Promise<void> {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0), SharedMcpLauncherTests.exiting(0));
@@ -382,8 +406,8 @@ export class SharedMcpLauncherTests {
 
     await new SharedMcpLauncher("linux", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--variables", "", "--", SharedMcpLauncherTests.NO_SUCH_PROGRAM]);
 
-    Assert.areEqual(JSON.stringify([[1], 2, true, true, null]), JSON.stringify([host.codes, recorder.starts.length, host.errors.includes("ENOENT"),
-      input.writableEnded, input.read()]));
+    Assert.areEqual(JSON.stringify([[1], 2, true, true, null, 0]), JSON.stringify([host.codes, recorder.starts.length, host.errors.includes("ENOENT"),
+      input.writableEnded, input.read(), SharedMcpLauncher.forwardedSignals.reduce((total, t) => total + host.listenerCount(t), 0)]));
   }
 
   @TestMethod
@@ -580,6 +604,19 @@ export class SharedMcpLauncherTests {
     const command = launcher.commandOf("tool", [], { PATH: directory.path, PATHEXT: ".EXE;.cmd" });
 
     Assert.areEqual(JSON.stringify(["cmd.exe", true, true]), JSON.stringify([command.command, command.verbatim, String(command.args[3]).includes("tool.cmd")]));
+  }
+
+  private static async listeningAtStartAsync(platform: string, environment: Readonly<Record<string, string>>, program: string, script: string,
+    isFile: (file: string) => boolean, command: string): Promise<number[]> {
+    const host = new FakeLauncherHost();
+    const server = SharedMcpLauncherTests.exiting(0);
+    let listening: number[] = [];
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0), () => {
+      listening = SharedMcpLauncher.forwardedSignals.map(t => host.listenerCount(t));
+      return server();
+    });
+    await new SharedMcpLauncher(platform, environment, program, script, host, recorder.start, isFile).runAsync(true, ["--variables", "", "--", command]);
+    return listening;
   }
 
   private static recorder(...makers: (() => ChildProcess)[]): { starts: { command: string; args: readonly string[]; options: SpawnOptions }[]; children: ChildProcess[];
