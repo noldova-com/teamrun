@@ -718,18 +718,17 @@ export class SharedMcpServersServiceTests {
   }
 
   @TestMethod
-  public async removesTheTokensOfASignInThatEndsWhileItsServersDeleteIsStillSaving(): Promise<void> {
+  public async removesTheTokensOfASignInThatEndsAfterItsServersRowIsGoneButBeforeItsDeleteEndedIt(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
     await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
     const [late] = host.signIns.started;
 
-    const deleting = host.sharedServers.deleteAsync(new SharedMcpServerIdParams(server.id));
+    await host.context.database.connection.executeAsync(new SqlQuery("DELETE FROM sharedMcpServers"));
     late?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
-    await deleting;
     await SharedMcpServersServiceTests.settleAsync();
 
-    Assert.areEqual(JSON.stringify([late?.reference, late?.reference]), JSON.stringify(host.signIns.signedOut));
+    Assert.areEqual(JSON.stringify([late?.reference]), JSON.stringify(host.signIns.signedOut));
     Assert.areEqual("[]", JSON.stringify(await host.sharedServers.listAsync()));
   }
 
