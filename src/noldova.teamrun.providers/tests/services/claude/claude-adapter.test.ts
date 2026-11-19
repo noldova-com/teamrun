@@ -124,6 +124,34 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async givesTheNextTurnNoUsageLimitFromARejectionThatCameAfterTheLastTurnEnded(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const provider = host.createProvider();
+    host.factory.next = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-stale", "none", null, []),
+      new StampedStep(SdkMessages.success("s-stale", "First")),
+      SdkMessages.rateLimit("s-stale", "rejected", 1_800_000_000, "rejected"),
+      new WaitForInputStep(),
+      new StampedStep(SdkMessages.limited("88888888-8888-8888-8888-888888888888", "You've hit your limit")),
+      new StampedStep(SdkMessages.success("s-stale", "Second")),
+      new WaitForCloseStep()
+    ]);
+    const request = (prompt: string, resume: string | null): TurnRequest => new TurnRequest(provider, host.directory.path, prompt,
+      new RequestedSettings("claude", null, null), resume);
+
+    try {
+      await adapter.runTurn(request("First", null), new RecordingTurnListener(), new AbortController().signal);
+      const second = await adapter.runTurn(request("Second", "s-stale"), new RecordingTurnListener(), new AbortController().signal);
+
+      Assert.areEqual(1, host.factory.queries.length);
+      Assert.isNull(second.limit);
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
   @TestData(true)
   @TestData(false)
   public async endsAWakeClaudeStartsItselfOnTheUsageLimitWhenTheRejectionComesBeforeOrAfterTheWakesFirstMessage(early: boolean): Promise<void> {

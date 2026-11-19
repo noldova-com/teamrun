@@ -145,6 +145,7 @@ export class ClaudeChat {
   public attach(query: IClaudeQuery, mode: PermissionMode): void {
     this.query = query;
     this.mode = mode;
+    this.rateLimit = null;
   }
 
   public async setPermissionMode(mode: PermissionMode): Promise<void> {
@@ -396,6 +397,7 @@ export class ClaudeChat {
     this.replying = null;
     this.waking = false;
     this.ended = [];
+    this.rateLimit = null;
     if (!Object.isNullOrUndefined(this.pending?.held))
       await this.release(query);
     this.closeWhenIdle();
@@ -580,6 +582,7 @@ export class ClaudeChat {
     if (Object.isNull(waker))
       return;
     this.waker = null;
+    this.rateLimit = null;
     if (!Object.isNull(failure))
       waker.turn.fail(failure);
     try {
