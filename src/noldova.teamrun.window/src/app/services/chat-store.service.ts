@@ -2798,8 +2798,11 @@ export class ChatStoreService {
       ? t : ChatStoreService.upsert(t, approval));
     if (approval.status === ApprovalStatus.Pending)
       this.resolveChat(approval.messageId);
-    else
+    else {
       this.setAnswer(approval.id, null);
+      for (const index of this.messageIndexes.values())
+        index.find(approval.messageId)?.controls?.dropDraft(approval.id);
+    }
   }
 
   private applySendKey(value: JsonValue | undefined): void {

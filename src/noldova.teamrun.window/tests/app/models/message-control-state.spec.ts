@@ -40,4 +40,16 @@ describe("MessageControlState", () => {
     typed.draftFor("q1").texts.set(new Map([["name", "Atlas"]]));
     expect(typed.hasChanges).toBe(true);
   });
+
+  it("drops one approval's draft and keeps the others, and drops nothing for an approval without one", () => {
+    const state = new MessageControlState();
+    state.draftFor("q1").picks.set(new Map([["platform", ["Web"]]]));
+    const other = state.draftFor("q2");
+    state.dropDraft("q3");
+    expect([state.draftOf("q1")?.picks().get("platform"), state.draftOf("q2")]).toEqual([["Web"], other]);
+
+    state.dropDraft("q1");
+    expect([state.draftOf("q1"), state.draftOf("q2")]).toEqual([null, other]);
+    expect(state.hasChanges).toBe(false);
+  });
 });

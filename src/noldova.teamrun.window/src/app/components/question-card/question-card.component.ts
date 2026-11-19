@@ -78,7 +78,7 @@ export class QuestionCardComponent {
   public constructor() {
     effect(() => {
       if (!this.isOpen())
-        untracked(() => this.controls().draftOf(this.approval().id)?.texts.set(new Map()));
+        untracked(() => this.controls().dropDraft(this.approval().id));
     });
     effect(() => {
       const answer = this.answer();

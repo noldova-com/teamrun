@@ -44,6 +44,15 @@ export class MessageControlState {
     return draft;
   }
 
+  public dropDraft(approvalId: string): void {
+    if (untracked(() => this.drafts().has(approvalId)))
+      this.drafts.update(t => {
+        const kept = new Map(t);
+        kept.delete(approvalId);
+        return kept;
+      });
+  }
+
   public wrappingFor(sequence: number): Set<number> {
     let wrapped = this.wrapping.get(sequence);
     if (Object.isUndefined(wrapped)) {
