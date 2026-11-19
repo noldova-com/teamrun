@@ -23,6 +23,7 @@ import {
   AttachmentReadParams,
   AttachmentShare,
   AuthStatus,
+  ChatFolderAttachParams,
   ChatIdParams,
   ChatMemberModeParams,
   ChatMemberSettings,
@@ -1187,6 +1188,20 @@ export class ChatStoreService {
       const conversation = Conversation.fromJson(await this.request(MethodName.ConversationMove, params.toJson()));
       this.storeConversation(conversation);
     }, this.actionFailed(ChatAction.MoveChat, conversationId, conversationId));
+  }
+
+  public attachFolder(conversationId: string, folder: string): Promise<boolean> {
+    return this.perform(async () => {
+      const conversation = Conversation.fromJson(await this.request(MethodName.ChatFolderAttach, new ChatFolderAttachParams(conversationId, folder).toJson()));
+      this.storeConversation(conversation);
+    }, this.actionFailed(ChatAction.AttachFolder, conversationId, conversationId));
+  }
+
+  public detachFolder(conversationId: string): Promise<boolean> {
+    return this.perform(async () => {
+      const conversation = Conversation.fromJson(await this.request(MethodName.ChatFolderDetach, new ConversationIdParams(conversationId).toJson()));
+      this.storeConversation(conversation);
+    }, this.actionFailed(ChatAction.DetachFolder, conversationId, conversationId));
   }
 
   public async renameConversation(conversationId: string, title: string): Promise<void> {

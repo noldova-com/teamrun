@@ -17,6 +17,8 @@ export enum ChatAction {
   SetMemberSettings = "SetMemberSettings",
   SetPlanFirst = "SetPlanFirst",
   MoveChat = "MoveChat",
+  AttachFolder = "AttachFolder",
+  DetachFolder = "DetachFolder",
   RenameChat = "RenameChat",
   SetResponder = "SetResponder",
   DeleteChat = "DeleteChat",
