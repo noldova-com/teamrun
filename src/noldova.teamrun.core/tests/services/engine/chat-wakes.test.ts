@@ -216,6 +216,30 @@ export class ChatWakesTests {
   }
 
   @TestMethod
+  @TestData(true)
+  @TestData(false)
+  public async leavesTheProjectWhenAWakesReplyCannotBeStored(command: boolean): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const woken = await host.createConversationAsync(project, "Release plan");
+    const fixes = await host.createConversationAsync(project, "Fixes");
+    const asked = await ChatWakesTests.askDefault(host, woken.id);
+    const listener = host.adapter.lastListener;
+    Assert.isNotNull(listener);
+    await ChatWakesTests.insertAsync(host, "w1", "Reply", woken.id, asked.id, fixes.id, ["r1"], "Ready", "Bob finished.", 1);
+    await host.context.database.connection.executeAsync(new SqlQuery("CREATE TRIGGER failInsert BEFORE INSERT ON messages BEGIN SELECT RAISE(ABORT, 'boom'); END"));
+
+    if (command)
+      await Assert.throwsAsync(() => listener.onWakeAsync(new TurnWake("task-1", "npm test")), Error);
+    else
+      await host.engine.reconcileAsync();
+    await host.engine.waitForIdle();
+
+    host.context.projectActivity.requireIdle(project.rootPath);
+    Assert.areEqual(JSON.stringify([2, 1]), JSON.stringify([(await ChatWakesTests.chatAsync(host, woken.id)).length, host.adapter.requests.length]));
+  }
+
+  @TestMethod
   public async stopsAChainOfSendsAndWakesBetweenTwoChatsAtTheHandOffLimit(): Promise<void> {
     await using host = await CoreHost.createAsync(false, false, undefined, () => 3);
     const project = await host.openProjectAsync();
