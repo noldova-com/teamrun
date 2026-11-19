@@ -77,6 +77,9 @@ const readTyped = (file: string): string => {
   }
 };
 
+const shownUnlessWrittenAsync = async (page: Page, file: string, expected: string): Promise<readonly string[]> =>
+  readTyped(file) === expected ? [] : [`${path.basename(file)}: "${readTyped(file)}"`, ...await TerminalScreen.rowsAsync(page.locator("nol-teamrun-inline-terminal .xterm-rows"))];
+
 const shownUnlessAtPromptAsync = async (page: Page, text: string): Promise<readonly string[]> => {
   const shown = await TerminalScreen.rowsAsync(page.locator("nol-teamrun-inline-terminal .xterm-rows"));
   return shown.slice(0, -1).join("").includes(text) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "") ? [] : shown;
@@ -144,7 +147,7 @@ for (const { language, write, compute } of LANGUAGES)
       const computed = app.pidFile(`${language}-computed`);
       await page.keyboard.type(compute(computed));
       await page.keyboard.press("Enter");
-      await expect.poll(() => readTyped(computed), TeamRunApp.pollOf(30_000)).toBe(COMPUTED);
+      await expect.poll(() => shownUnlessWrittenAsync(page, computed, COMPUTED), { ...TeamRunApp.pollOf(30_000), message: "the typed command writes its file" }).toEqual([]);
       await settledAtPromptAsync(page, path.basename(computed));
       await runs.nth(0).click();
       await expect.poll(() => TeamRunApp.readPid(first), TeamRunApp.pollOf(60_000)).not.toBeNull();
@@ -196,7 +199,7 @@ for (const { language, write, type } of LANGUAGES)
     await page.keyboard.type(type(typed));
     await page.keyboard.press("Enter");
 
-    await expect.poll(() => readTyped(typed), TeamRunApp.pollOf(30_000)).toBe(TYPED);
+    await expect.poll(() => shownUnlessWrittenAsync(page, typed, TYPED), { ...TeamRunApp.pollOf(30_000), message: "the typed command writes its file" }).toEqual([]);
   });
 
 for (const { language, write, type } of LANGUAGES)
@@ -238,7 +241,7 @@ for (const { language, write, type } of LANGUAGES)
     await page.keyboard.type(type(typed));
     await page.keyboard.press("Enter");
 
-    await expect.poll(() => readTyped(typed), TeamRunApp.pollOf(30_000)).toBe(TYPED);
+    await expect.poll(() => shownUnlessWrittenAsync(page, typed, TYPED), { ...TeamRunApp.pollOf(30_000), message: "the typed command writes its file" }).toEqual([]);
   });
 
 test("on a short history the inline terminal holds more than half of it, showing the command typed at the prompt and its output above the next prompt, and never runs past the history",
