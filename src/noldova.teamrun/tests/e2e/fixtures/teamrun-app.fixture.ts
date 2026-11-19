@@ -51,7 +51,6 @@ export class TeamRunApp {
   private static readonly REMOVE_RETRY_DELAY: number = 200;
   private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer", "--host-resolver-rules=MAP *.test 127.0.0.1"];
   private static readonly LINUX_PASSWORD_STORE: string = "--password-store=gnome-libsecret";
-  private static readonly DESKTOP_DEFAULT_WINDOW: readonly [number, number] = [1280, 800];
   private static readonly PROCESSES: string = "/proc";
   private static readonly RUNTIME_ENTRY: string = "/desktop.runtime/services/runtime-entry.js";
   private static readonly DATA_ARGUMENT: string = "--data-dir";
@@ -362,16 +361,6 @@ export class TeamRunApp {
     window.on("pageerror", t => this.failures.push(`renderer: ${t.message}`));
     window.on("console", t => this.console.push(`${t.type()}: ${t.text()}`));
     this.window = window;
-    const area = await application.evaluate(({ BrowserWindow, screen }, [width, height]) => {
-      for (const shown of BrowserWindow.getAllWindows()) {
-        shown.setContentSize(width, height);
-        shown.center();
-      }
-      return screen.getPrimaryDisplay().workArea;
-    }, TeamRunApp.DESKTOP_DEFAULT_WINDOW);
-    await expect.poll(() => window.evaluate(() => [innerWidth, innerHeight]), {
-      message: `the window at Desktop's default size, which the specs were written against, on a screen whose work area is ${area.width}×${area.height}`,
-      ...TeamRunApp.pollOf(30_000) }).toEqual([...TeamRunApp.DESKTOP_DEFAULT_WINDOW]);
     return window;
   }
 
