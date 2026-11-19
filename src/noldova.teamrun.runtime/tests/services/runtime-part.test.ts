@@ -547,6 +547,37 @@ export class RuntimePartTests {
   }
 
   @TestMethod
+  public async refusesARewindOrMoveStartedWhileQuittingWaitsForAnotherRewindAndStillWaitsForThatOne(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    await part.activateAsync(context);
+    const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
+    const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const now = new Date().toISOString();
+    {
+      await using seeding = DatabaseContext.attach(new DbContextOptionsBuilder().use(new ModuleDatabaseProvider(database), new DataSource("seeding", directory.path)), directory.path);
+      await new MessagesService(seeding).insertAsync(new Message("m1", chat.id, 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, now, null, now));
+    }
+
+    const rewinding = RuntimePartTests.callAsync(context, "teamrun.conversationRewind", { chatId: chat.id, messageId: "m1", restoreFiles: true });
+    const quitting = part.deactivateAsync();
+    const refused = await Promise.all([
+      RuntimePartTests.callAsync(context, "teamrun.conversationRewind", { chatId: chat.id, messageId: "m1", restoreFiles: true }),
+      RuntimePartTests.callAsync(context, "teamrun.conversationMove", { chatId: chat.id, projectId: null })
+    ].map(t => t.then(() => null, (error: unknown) => error)));
+    const rewound = await rewinding as { removedMessageIds: readonly string[] };
+    await quitting;
+
+    Assert.areEqual(`${FailureCode.Unavailable},${FailureCode.Unavailable}`,
+      refused.map(t => t instanceof MethodFailureException ? t.failure.code : String(t)).join(","));
+    Assert.areEqual("m1", rewound.removedMessageIds.join(","));
+    Assert.areEqual(0, context.openWork.size);
+  }
+
+  @TestMethod
   public async holdsWorkWhileAMoveCopiesAChatsFilesAndWaitsForItBeforeClosingTheDatabaseOnQuit(): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);

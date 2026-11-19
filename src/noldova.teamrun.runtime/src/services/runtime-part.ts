@@ -162,6 +162,8 @@ export class RuntimePart implements IRuntimePart {
   }
 
   public async deactivateAsync(): Promise<void> {
+    for (const method of this.awaited)
+      method.close();
     this.answerer?.[Symbol.dispose]();
     this.answerer = null;
     this.sessionStops?.[Symbol.dispose]();
