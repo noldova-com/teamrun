@@ -66,7 +66,7 @@ export class RuntimeToolSession implements ITurnToolSession {
 
   private async callAgainOnOpenPageAsync(name: string, input: JsonObject, signal: AbortSignal, callId: string): Promise<ToolResult | ToolFailure> {
     const result = await this.session.callAsync(name, input, RuntimeToolSession.optionsOf(signal, callId));
-    if (!RuntimeToolSession.isPageClosed(result) || Object.isNull(this.openPage))
+    if (!RuntimeToolSession.isPageClosed(result) || Object.isNull(this.openPage) || signal.aborted)
       return result;
     const ends = this.timer.now() + Math.max(0, ...this.session.listTools().filter(t => t.name === name).map(t => t.deadline.default));
     try {
@@ -76,10 +76,13 @@ export class RuntimeToolSession implements ITurnToolSession {
       return new ToolFailure(result.code, Resources.formatPageNotOpened(result.message, error instanceof Error ? error.message : String(error)),
         result.moduleCode, result.content);
     }
-    return this.callOnceThePageShowsAsync(name, input, signal, callId, ends);
+    return this.callOnceThePageShowsAsync(name, input, signal, callId, ends, result);
   }
 
-  private async callOnceThePageShowsAsync(name: string, input: JsonObject, signal: AbortSignal, callId: string, ends: number): Promise<ToolResult | ToolFailure> {
+  private async callOnceThePageShowsAsync(name: string, input: JsonObject, signal: AbortSignal, callId: string, ends: number,
+    closed: ToolFailure): Promise<ToolResult | ToolFailure> {
+    if (signal.aborted)
+      return closed;
     const result = await this.session.callAsync(name, input, RuntimeToolSession.optionsOf(signal, callId));
     if (!RuntimeToolSession.isPageClosed(result) || this.timer.now() + Resources.pageShowStep > ends)
       return result;
@@ -89,7 +92,7 @@ export class RuntimeToolSession implements ITurnToolSession {
     catch {
       return result;
     }
-    return this.callOnceThePageShowsAsync(name, input, signal, callId, ends);
+    return this.callOnceThePageShowsAsync(name, input, signal, callId, ends, result);
   }
 
   private static optionsOf(signal: AbortSignal, callId: string): IToolCallOptions {
