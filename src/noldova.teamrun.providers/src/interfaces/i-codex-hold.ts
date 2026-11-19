@@ -16,4 +16,6 @@ export interface ICodexHold {
   mode: string | null;
   model: string | null;
   effort: string | null;
+  cwd: string | null;
+  params: string | null;
 }

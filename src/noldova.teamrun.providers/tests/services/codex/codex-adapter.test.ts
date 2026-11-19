@@ -1961,6 +1961,56 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
+  public async reloadsAKeptThreadWhoseFolderInstructionsOrContextWindowChangedSinceItsLastTurnAndKeepsOneWhoseSettingsAreTheSame(): Promise<void> {
+    using host = new CodexTestHost();
+    const adapter = host.createAdapter();
+    const own = join(host.directory.path, "own");
+    const attached = join(host.directory.path, "attached");
+    mkdirSync(own);
+    mkdirSync(attached);
+    const seen: string[] = [];
+    let threadId: string | null = null;
+    try {
+      for (const [folder, role, window] of [[own, "A", null], [own, "A", null], [attached, "A", null], [attached, "B", null], [attached, "B", 256_000], [own, "B", 256_000]] as const) {
+        const listener = new RecordingTurnListener();
+        const result = await adapter.runTurn(new TurnRequest(null, folder, "where", new RequestedSettings("codex", null, null, null, null, false, window), threadId, [], role),
+          listener, new AbortController().signal);
+        threadId = result.nativeSessionId;
+        seen.push(listener.texts.join(""));
+      }
+    }
+    finally { await adapter.shutdown(); }
+
+    Assert.areEqual([`${own} A none 0`, `${own} A none 0`, `${attached} A none 1`, `${attached} B none 2`, `${attached} B 256000 3`, `${own} B 256000 4`].join("|"),
+      seen.join("|"));
+  }
+
+  @TestMethod
+  public async movesAThreadItsBackgroundWorkKeepsLoadedToTheTurnsFolderOnTurnStart(): Promise<void> {
+    using host = new CodexTestHost();
+    const adapter = host.createAdapter();
+    const attached = join(host.directory.path, "attached");
+    mkdirSync(attached);
+    const background = new RecordingTurnListener();
+    const request = (folder: string, prompt: string, threadId: string | null): TurnRequest =>
+      new TurnRequest(null, folder, prompt, new RequestedSettings("codex", null, null), threadId, [], "A");
+    const seen: string[] = [];
+    try {
+      const held = await adapter.runTurn(request(host.directory.path, "background", null), background, new AbortController().signal);
+      await Wait.until(() => background.taskStarts.length === 1, "The listener did not see a task start.");
+      for (const folder of [attached, attached, host.directory.path]) {
+        const listener = new RecordingTurnListener();
+        await adapter.runTurn(request(folder, "where", held.nativeSessionId), listener, new AbortController().signal);
+        seen.push(listener.texts.join(""));
+      }
+      await background.taskStarts[0]?.stop();
+    }
+    finally { await adapter.shutdown(); }
+
+    Assert.areEqual([attached, attached, host.directory.path].map(t => `${t} A none 0`).join("|"), seen.join("|"));
+  }
+
+  @TestMethod
   public async setsTheTurnsSandboxAndApprovalOnTurnStartOnlyWhenAHeldThreadRunsInAnotherMode(): Promise<void> {
     using host = new CodexTestHost();
     const adapter = host.createAdapter();
