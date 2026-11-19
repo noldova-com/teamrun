@@ -7,7 +7,7 @@
  */
 
 import "@noldova/context.core";
-import { SqlQuery } from "@noldova/context.data.sql";
+import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources, TurnOutcome, type TurnRequest, TurnResult, TurnWake } from "@noldova/teamrun.core";
 import {
@@ -253,6 +253,39 @@ export class ChatWakesTests {
     Assert.areEqual(JSON.stringify([2, "Ready", 1]), JSON.stringify(held));
     Assert.areEqual(MessageStatus.Completed, (await ChatWakesTests.chatAsync(host, woken.id)).at(-1)?.status);
     Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));
+  }
+
+  @TestMethod
+  @TestData(true)
+  @TestData(false)
+  public async interruptsAWakesReplyAndStartsNoTurnWhenShutdownBeginsDuringTheWakesTransaction(command: boolean): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const woken = await host.createConversationAsync(project, "Release plan");
+    const fixes = await host.createConversationAsync(project, "Fixes");
+    const asked = await ChatWakesTests.askDefault(host, woken.id);
+    const listener = host.adapter.lastListener;
+    Assert.isNotNull(listener);
+    await ChatWakesTests.insertAsync(host, "w1", "Reply", woken.id, asked.id, fixes.id, ["r1"], "Ready", "Bob finished.", 1);
+    const requests = host.adapter.requests.length;
+    const shutdowns: Promise<void>[] = [];
+    const insert = host.messages.insertAsync.bind(host.messages);
+    host.messages.insertAsync = (message: Message, transaction?: SqlTransaction): Promise<void> => {
+      if (message.author === MessageAuthor.Provider && shutdowns.length === 0)
+        shutdowns.push(host.engine.shutdown());
+      return insert(message, transaction);
+    };
+
+    const wake = command ? await listener.onWakeAsync(new TurnWake("task-1", "npm test")) : null;
+    if (!command)
+      await host.engine.reconcileAsync();
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await Promise.all(shutdowns);
+
+    const reply = (await ChatWakesTests.chatAsync(host, woken.id)).at(-1);
+    Assert.areEqual(JSON.stringify([1, MessageAuthor.Provider, MessageStatus.Interrupted, requests]),
+      JSON.stringify([shutdowns.length, reply?.author, reply?.status, host.adapter.requests.length]));
+    Assert.isNull(wake);
   }
 
   @TestMethod
