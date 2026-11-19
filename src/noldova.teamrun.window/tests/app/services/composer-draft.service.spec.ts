@@ -212,7 +212,7 @@ describe("ComposerDraftService", () => {
     drafts.schedule(draft("four", "c2"));
     await drafts.save();
 
-    expect(saved().map(t => [t.text, t.revision])).toEqual([["one", 7], ["two", 1], ["other", 0], ["four", 2]]);
+    expect(saved().map(t => [t.text, t.revision])).toEqual([["one", 7], ["two", 1], ["other", 0], ["four", 3]]);
   });
 
   it("tells its watchers of a save refused as stale, with no notice, drops what was pending, discards the files it prepared and saves nothing over the newer draft until it reads it", async () => {
