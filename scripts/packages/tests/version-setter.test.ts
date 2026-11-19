@@ -104,12 +104,13 @@ describe("VersionSetter", () => {
     assert.equal(all, `${PREFACE}\n## Unreleased\n\n## 0.0.3\n\n### Fixed\n\n- **First fix:** it works.\n  In 0.0.2 it didn't.\n- **Second fix:** it works too.\n\n### Added\n\n- **A feature:** new.\n\n${OLDER}`);
   });
 
-  it("refuses a changelog without an unreleased section, or whose section the release holds nothing of, and writes nothing", async () => {
+  it("refuses a changelog without an unreleased section, or whose section holds no entry beyond headings or none the release held, and writes nothing", async () => {
     const root = createRoot(`${PREFACE}\n${OLDER}`);
 
     await assert.rejects(new VersionSetter(root).setAsync("0.0.3", null), new SetVersionException("CHANGELOG.md has no \"## Unreleased\" section, so 0.0.3 would release nothing it names."));
     assert.throws(() => VersionSetter.release(CHANGELOG, "0.0.3", `${PREFACE}\n${OLDER}`), new SetVersionException("The \"## Unreleased\" section of CHANGELOG.md names nothing 0.0.3 releases."));
-    assert.throws(() => VersionSetter.release(`${PREFACE}\n## Unreleased\n\n\n${OLDER}`, "0.0.3", null), new SetVersionException("The \"## Unreleased\" section of CHANGELOG.md names nothing 0.0.3 releases."));
+    for (const section of ["\n", "\n### Fixed\n\n### Added\n"])
+      assert.throws(() => VersionSetter.release(`${PREFACE}\n## Unreleased\n${section}\n${OLDER}`, "0.0.3", null), new SetVersionException("The \"## Unreleased\" section of CHANGELOG.md names nothing 0.0.3 releases."));
     assert.equal(read(root, "version.json"), "{ \"version\": \"0.0.2\" }\n");
   });
 

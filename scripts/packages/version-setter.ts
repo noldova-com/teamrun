@@ -62,7 +62,7 @@ export class VersionSetter {
     const end = VersionSetter.findSectionEnd(lines, start);
     const section = lines.slice(start + 1, end);
     const nothing = new SetVersionException(`The "${VersionSetter.UNRELEASED}" section of ${VersionSetter.CHANGELOG_FILE} names nothing ${version} releases.`);
-    if (!section.some(t => t.trim().length > 0))
+    if (!section.some(t => t.trim().length > 0 && !t.startsWith(VersionSetter.GROUP_START)))
       throw nothing;
     const heading = `${VersionSetter.SECTION_START}${version}`;
     if (released === null)
