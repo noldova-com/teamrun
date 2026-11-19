@@ -164,7 +164,7 @@ Product names and trademarks, such as the providers' names above, belong to thei
   With no level chosen, they show the level the provider's configuration sets, as `ProviderModel.configuredEffort` carries it, else the provider's default level for the model, or "Model default" when the provider names neither, and TeamRun sends no level; choosing another model starts it at no level.
   A configured level the model doesn't list shows as that level, marked not in the current catalog, since the provider runs it as it is.
   Choosing another provider keeps the chosen level only when the new provider lists it for the model; otherwise, as when the new provider names no levels for it, it starts at no level, so a provider is never sent a level it didn't offer.
-  The provider's default level, `ProviderModel.defaultEffort`, carries the kit's "Recommended" tag in both, as in Codex's own picker, even while a configured level is the one shown.
+  The provider's default level, `ProviderModel.defaultEffort`, carries the kit's "Recommended" tag in both, even while a configured level is the one shown.
   A model that lists no levels has Effort off, and the teammate dialog notes below it that effort levels are unavailable and the model's default is used.
   Claude Code lists no default level, so its default is the level its session reported for the model, through the same provider, in a turn sent with no level, kept while the runtime runs.
   The session reports it in its init message on some hosts only, so when that names none the turn reads it from the session's applied settings.
