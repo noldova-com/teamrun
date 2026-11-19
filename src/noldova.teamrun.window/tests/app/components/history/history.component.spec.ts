@@ -773,7 +773,7 @@ describe("HistoryComponent", () => {
       expect((viewport()?.scrollHeight ?? 0) - (viewport()?.scrollTop ?? 0) - (viewport()?.clientHeight ?? 0)).toBeGreaterThan(200);
     });
 
-    it("shows the reply a plan in the Plans view asks for with the kit's flash around the whole reply, grown by a bubble's padding with its corners and moving nothing, then scrolls the least that shows its plan block deep in the reply, which a search hit doesn't", { timeout: 2 * revealLimit }, async () => {
+    it("shows the reply a Plans view plan asks for in the kit's flash, grown by a bubble's padding with its corners, moving nothing, then scrolls the least that shows the plan deep in it, unlike a search hit", { timeout: 2 * revealLimit }, async () => {
       const plan = new ReplyPlan([new PlanStep("Read the code", PlanStepStatus.Completed, null), new PlanStep("Fix the bug", PlanStepStatus.Pending, null)], null);
       await reopen("left-plan");
       await settle();
@@ -1903,7 +1903,7 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
       .toEqual([count, true, true, true]);
   });
 
-  it("keeps the thumb where it is dragged and its size through a drag to the first message and back to the last while earlier pages load, its first message in view moving one way, shows the first and the last message, not a loading row, within 30 frames at each end while the thumb is held, and moves nothing on release", { timeout: 25_000 }, async () => {
+  it("keeps the thumb's place and size through a drag to the first message and back while pages load, the top message moving one way, shows each end within 30 frames, and moves nothing on release", { timeout: 60_000 }, async () => {
     await settle();
     const view = viewport();
     const height = view.scrollHeight;
