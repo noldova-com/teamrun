@@ -12,6 +12,10 @@ import { By } from "@angular/platform-browser";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
+  Approval,
+  ApprovalKind,
+  ApprovalQuestion,
+  ApprovalStatus,
   AttachmentContent,
   ChatFolderAttachParams,
   Conversation,
@@ -29,6 +33,7 @@ import {
   MethodName,
   PlanStep,
   PlanStepStatus,
+  QuestionOption,
   ReadingPositionSaveParams,
   ReplyPlan,
   SubAgent,
@@ -1581,6 +1586,52 @@ describe("HistoryComponent", () => {
     await settle();
     expect(rowOf(4_000)).toBeDefined();
     expect(flashing()).toEqual([]);
+  });
+
+  it("keeps a pending question's pick and typed text while its row is off the screen, and forgets them once the question closes while it's away", { timeout: 3 * revealLimit }, async () => {
+    const asking = new Approval("q1", "m5000", ApprovalKind.Question, "AskUserQuestion", "Which platform?", null, SampleData.approval.options, ApprovalStatus.Pending, null,
+      SampleData.timestamp, null, [new ApprovalQuestion("platform", "Platform", "Which platform?", [new QuestionOption("Web", "A browser")], false, false, false),
+        new ApprovalQuestion("name", "Name", "Which name?", [], false, true, false)]);
+    const reply = new Message("m5000", "c1", 5_000, MessageAuthor.Provider, "m4999", MessageStatus.AwaitingApproval, [SampleData.detail(0, DetailKind.Text, "Message 5000")],
+      SampleData.provenance, SampleData.timestamp, SampleData.timestamp, null);
+    const card = (): Element | null => rowOf(5_000)?.querySelector("nol-teamrun-question-card") ?? null;
+    const field = (selector: string): HTMLInputElement => {
+      const found = card()?.querySelector<HTMLInputElement>(selector);
+      if (Object.isNullOrUndefined(found))
+        throw new Error(`The question card has no ${selector}.`);
+      return found;
+    };
+    const draft = (): unknown => store().messageIndex().find(t => t.id === "m5000")?.controls?.draftOf("q1") ?? null;
+    const away = async (): Promise<void> => {
+      list().reveal(4_920, VirtualListAlign.Start);
+      await until(() => expect(rowOf(5_000)).toBeUndefined(), { timeout: revealLimit });
+      expect(rowOf(4_920)).toBeDefined();
+      expect(element().querySelectorAll("nol-teamrun-question-card")).toHaveLength(0);
+    };
+    await open("c1");
+    await until(() => expect(rowOf(4_999)).toBeDefined());
+    arrived.push(reply);
+    context.emit(EventName.MessageCreated, reply.toJson());
+    await until(() => expect(rowOf(5_000)).toBeDefined());
+    context.emit(EventName.ApprovalCreated, asking.toJson());
+    await until(() => expect(card()).not.toBeNull());
+
+    field(".nol-choice-row input").click();
+    Object.assign(field(".nol-teamrun-question-other"), { value: "Atlas" }).dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    expect([field(".nol-choice-row input").checked, field(".nol-teamrun-question-other").value]).toEqual([true, "Atlas"]);
+    await away();
+    expect(draft()).not.toBeNull();
+    list().reveal(5_000, VirtualListAlign.Start);
+    await until(() => expect(card()).not.toBeNull(), { timeout: revealLimit });
+    await settle();
+    expect([field(".nol-choice-row input").checked, field(".nol-teamrun-question-other").value]).toEqual([true, "Atlas"]);
+
+    await away();
+    expect(draft()).not.toBeNull();
+    context.emit(EventName.ApprovalUpdated, asking.withCancellation(SampleData.timestamp).toJson());
+    await fixture.whenStable();
+    expect(draft()).toBeNull();
   });
 
   it("asks for the first message in the messages' column, its first 18px line 2rem down, while its conversation has none, and shows the first that comes", async () => {

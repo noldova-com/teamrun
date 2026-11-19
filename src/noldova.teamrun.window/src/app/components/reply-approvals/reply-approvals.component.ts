@@ -13,6 +13,7 @@ import { ApprovalKind, ApprovalStatus, type Message, type QuestionAnswer } from 
 import { PermissionCardComponent } from "@noldova/ui.components.angular";
 
 import { ApprovalPermission } from "../../models/approval-permission";
+import { MessageControlState } from "../../models/message-control-state";
 import { ReplyApproval } from "../../models/reply-approval";
 import { Resources } from "../../../resources";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -57,6 +58,7 @@ export class ReplyApprovalsComponent {
 
   public readonly reply: InputSignal<Message> = input.required<Message>();
   public readonly ids: InputSignal<readonly string[] | null> = input<readonly string[] | null>(null);
+  public readonly controls: InputSignal<MessageControlState> = input<MessageControlState>(new MessageControlState());
   public readonly focused: OutputEmitterRef<string> = output<string>();
 
   protected decide(approvalId: string, optionId: string): void {

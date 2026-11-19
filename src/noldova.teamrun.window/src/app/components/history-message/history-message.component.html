@@ -220,7 +220,7 @@ LICENSE file in the root directory of this source tree.
   @for (group of approvalGroups(); track group[0]) {
     <ng-template [nolMessageSlot]="approvalsSlotOf(group[0])">
       @if (areSlotsShown()) {
-        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group[1]" (focused)="approachApproval($event)" />
+        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group[1]" [controls]="state()" (focused)="approachApproval($event)" />
       }
     </ng-template>
   }

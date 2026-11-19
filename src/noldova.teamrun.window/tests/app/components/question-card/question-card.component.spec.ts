@@ -303,18 +303,22 @@ describe("QuestionCardComponent", () => {
     expect(root().querySelector(".nol-teamrun-question-card-summary")).toBeNull();
   });
 
-  it("forgets the typed text, a secret's too, once the questions are no longer open", async () => {
-    await render(asking([platform, token]));
+  it("forgets the picks and the typed text, a secret's too, once the questions are no longer open", async () => {
+    await render(asking([parts, platform, token]));
+    const shown: QuestionCardComponent = fixture.debugElement.query(By.directive(QuestionCardComponent)).componentInstance;
     const typed = (): ReadonlyMap<string, string> =>
       (fixture.debugElement.query(By.directive(QuestionCardComponent)).componentInstance as unknown as { texts: () => ReadonlyMap<string, string> }).texts();
 
-    await type(others()[0]!, "Tablet");
-    await type(others()[1]!, "s3cret");
+    await click(choice("Attachments"));
+    await type(others()[1]!, "Tablet");
+    await type(others()[2]!, "s3cret");
     expect([...typed().values()]).toEqual(["Tablet", "s3cret"]);
-    context.emit(EventName.ApprovalUpdated, asking([platform, token]).withCancellation(decidedAt).toJson());
+    expect(shown.controls().draftOf("q1")?.picks().get("parts")).toEqual(["Attachments"]);
+    context.emit(EventName.ApprovalUpdated, asking([parts, platform, token]).withCancellation(decidedAt).toJson());
 
     await Wait.until(() => expect(textOf(".nol-teamrun-question-card-heading")).toBe("Alice's questions were withdrawn"));
     expect([...typed().values()]).toEqual([]);
+    expect(shown.controls().draftOf("q1")).toBeNull();
   });
 
   it("names the sub-agent that asks under the heading, as its approvals do", async () => {
