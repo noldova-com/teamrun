@@ -3246,6 +3246,32 @@ describe("HistoryMessageComponent", () => {
     expect(element().querySelector(".activity-toggle")?.getAttribute("aria-expanded")).toBe("true");
   });
 
+  it("keeps a question card's picks and typed text in the store's message index, so a row made again shows them", async () => {
+    const reply = awaiting();
+    const asking = new Approval("q1", "m2", ApprovalKind.Question, "AskUserQuestion", "Which platform?", null, SampleData.approval.options, ApprovalStatus.Pending, null,
+      SampleData.timestamp, null, [new ApprovalQuestion("platform", "Platform", "Which platform?", [new QuestionOption("Web", "A browser")], false, false, false),
+        new ApprovalQuestion("name", "Name", "Which name?", [], false, true, false)]);
+    context.answer(MethodName.MessagePage, () => SampleData.page([SampleData.userMessage, reply], false, false).toJson());
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    await store().selectConversation("c1");
+    await Wait.until(() => expect(store().history()?.held).toHaveLength(2));
+    render(reply);
+    context.emit(EventName.ApprovalCreated, asking.toJson());
+    await Wait.until(() => expect(element().querySelector("nol-teamrun-question-card")).not.toBeNull());
+    const choice = (): HTMLInputElement | null => element().querySelector<HTMLInputElement>("nol-teamrun-question-card .nol-choice-row input");
+    const typed = (): HTMLInputElement | null => element().querySelector<HTMLInputElement>(".nol-teamrun-question-other");
+
+    await click(choice());
+    Object.assign(one(".nol-teamrun-question-other"), { value: "Atlas" }).dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    fixture.destroy();
+    render(reply);
+    await Wait.until(() => expect(element().querySelector("nol-teamrun-question-card")).not.toBeNull());
+
+    expect([choice()?.checked, typed()?.value]).toEqual([true, "Atlas"]);
+    expect(store().messageIndex().find(t => t.id === reply.id)?.controls?.draftOf("q1")?.texts().get("name")).toBe("Atlas");
+  });
+
   it("offers no Run on a reply's shell code block in a window without chat terminals, and ignores a Run that comes anyway", async () => {
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "```bash\nls\n```")]));
     await Wait.until(() => expect(element().querySelector(".nol-code-block-copy")).not.toBeNull(), MarkdownWait.coldImport);
