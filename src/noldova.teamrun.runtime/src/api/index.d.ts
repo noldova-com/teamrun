@@ -2497,9 +2497,15 @@ export declare class WorkingMethod implements IMethodHandler {
    * Answers a request through the method, holding a work item until it ends.
    * @param request The request.
    * @returns The method's payload.
+   * @throws MethodFailureException `Unavailable` once the method is closed, starting no work.
    * @throws Whatever the method throws, once the work item has ended.
    */
   public handleAsync(request: RequestContext): Promise<JsonValue>;
+
+  /**
+   * Closes the method, so it refuses every later request as `Unavailable`; the requests already running go on.
+   */
+  public close(): void;
 
   /**
    * Waits for the requests still running to end.
