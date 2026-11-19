@@ -31,6 +31,7 @@ export class GrokTestHost implements AsyncDisposable {
   public readonly stayOpenTimings = new ProviderTimings(2000, 2000, 10_000, 2000, 100, 1, 1, 4000, 100, 1, 10);
   public readonly ignoredCancelTimings = new ProviderTimings(2000, 2000, 10_000, 2000, 100, 1, 100, 4000, 100, 1, 10);
   public readonly closingTimings = new ProviderTimings(2000, 2000, 10_000, 2000, 100, 100, 10_000, 4000, 100, 1, 10);
+  public readonly slowAgentTimings = new ProviderTimings(2000, 2000, 10_000, 2000, 100, 10_000, 10_000, 4000, 100, 1, 10);
   public readonly hangingSignInTimings = new ProviderTimings(2000, 500, 10_000, 2000, 100, 100, 100, 4000, 100, 1, 10);
   public readonly stoppingTimings = new ProviderTimings(2000, 2000, 10_000, 2000, 10_000, 100, 100, 4000, 100, 1, 10);
   public readonly timer = new HeldDelayTimer(this.timings.killWait);

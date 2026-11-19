@@ -631,7 +631,8 @@ export class AcpSubAgentsTests {
     listener.wakeTurn = new WakeTurn({});
     const stop = new AbortController();
 
-    const running = host.createAdapter().runTurn(host.request("background-sub-agent-held"), listener, stop.signal);
+    const adapter = host.createAdapter(host.environment, host.command, host.terminator, host.slowAgentTimings);
+    const running = adapter.runTurn(host.request("background-sub-agent-held"), listener, stop.signal);
     await Wait.until(() => listener.taskStarts.length === 1, "The listener did not see a task start.");
     stop.abort();
     await running;
