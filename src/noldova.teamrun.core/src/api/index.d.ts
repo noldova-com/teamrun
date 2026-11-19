@@ -6856,6 +6856,25 @@ export declare class ProjectActivity {
   public enterTurn(rootPath: string): string;
 
   /**
+   * Registers a provider turn as `enterTurn` does, unless an overlapping root is being rewound.
+   * @param rootPath The project's filesystem path.
+   * @returns A unique activity key to pass to `leave`, or null while an overlapping root is being rewound.
+   * @throws Error when resolving an existing filesystem path fails.
+   */
+  public tryEnterTurn(rootPath: string): string | null;
+
+  /**
+   * Waits for the next rewind to end, on any root, or for `releaseWaiting`.
+   * @returns A promise that resolves once it has.
+   */
+  public whenReleasedAsync(): Promise<void>;
+
+  /**
+   * Ends every current wait of `whenReleasedAsync`, such as at shutdown.
+   */
+  public releaseWaiting(): void;
+
+  /**
    * Claims an idle root exclusively for a rewind.
    * @param rootPath The project's filesystem path.
    * @returns A unique activity key to pass to `leave`.

@@ -37,6 +37,33 @@ export class ProjectActivityTests {
   }
 
   @TestMethod
+  public async triesATurnWithoutThrowingAndReleasesItsWaitsWhenARewindEndsOrAtShutdownButNotWhenATurnEnds(): Promise<void> {
+    using directory = new TemporaryDataDirectory();
+    const activity = new ProjectActivity();
+    const seen: string[] = [];
+    const rewind = activity.enter(directory.path);
+    const first = activity.whenReleasedAsync().then(() => seen.push("first"));
+    const refused = activity.tryEnterTurn(join(directory.path, "child"));
+    const elsewhere = activity.tryEnterTurn(join(directory.path, "..", "elsewhere"));
+    Assert.isNotNull(elsewhere);
+    activity.leave(elsewhere);
+    await Promise.resolve();
+    const unreleased = seen.length;
+    activity.leave(rewind);
+    await first;
+    const turn = activity.tryEnterTurn(directory.path);
+    Assert.isNotNull(turn);
+    const second = activity.whenReleasedAsync().then(() => seen.push("second"));
+    activity.releaseWaiting();
+    await second;
+
+    Assert.isNull(refused);
+    Assert.areEqual(0, unreleased);
+    Assert.areEqual("first,second", seen.join());
+    Assert.throws(() => activity.enter(directory.path), ServiceException);
+  }
+
+  @TestMethod
   public permitsConcurrentTurnsAndProtectsTheRootUntilEveryTurnEnds(): void {
     using directory = new TemporaryDataDirectory();
     const activity = new ProjectActivity();

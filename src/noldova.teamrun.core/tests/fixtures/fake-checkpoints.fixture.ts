@@ -62,6 +62,7 @@ export class FakeCheckpoints implements ICheckpointsService {
   public captureOutcome: CaptureOutcome | null = null;
   public compareOutcome: CompareOutcome | null = null;
   public holds: "capture" | "compare" | null = null;
+  public previewGate: (() => Promise<void>) | null = null;
   public readonly signals: (AbortSignal | undefined)[] = [];
   public readBytes: number = 0;
   public previewOutcome: PreviewOutcome | null = null;
@@ -142,6 +143,8 @@ export class FakeCheckpoints implements ICheckpointsService {
   public previewRestoreAsync(request: PreviewRequest): Promise<PreviewResult> {
     this.previews.push(request);
     ChangeSignal.notify();
+    if (!Object.isNull(this.previewGate))
+      return this.previewGate().then(() => new PreviewResult(PreviewOutcome.CheckpointMissing, null));
     if (!Object.isNull(this.previewError))
       return Promise.reject(this.previewError);
     if (!Object.isNull(this.previewOutcome))
