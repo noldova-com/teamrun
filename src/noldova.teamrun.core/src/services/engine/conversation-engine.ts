@@ -1868,6 +1868,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       resume();
     await wake.useToolsAsync(tools);
     try {
+      await this.messages.setCheckpointFolderAsync(item.message.id, folder.id);
       await run.followAsync(wake);
     }
     finally {

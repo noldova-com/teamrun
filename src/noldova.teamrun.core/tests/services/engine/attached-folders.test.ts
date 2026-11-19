@@ -13,7 +13,7 @@ import { JsonReader } from "@noldova/context.json";
 import { CaptureOutcome, CompareOutcome } from "@noldova/checkpoints.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ProjectActivity, Resources, WorkFolder } from "@noldova/teamrun.core";
+import { ProjectActivity, Resources, TurnOutcome, TurnResult, TurnWake, WorkFolder } from "@noldova/teamrun.core";
 import {
   ChatFolderAttachParams,
   Conversation,
@@ -29,7 +29,9 @@ import {
   MessageSendParams,
   type MessageSendResult,
   MessageStatus,
+  MessageAuthor,
   MethodName,
+  ObservedSettings,
   Request,
   RequestedSettings
 } from "@noldova/teamrun.protocol";
@@ -358,14 +360,37 @@ export class AttachedFoldersTests {
   }
 
   @TestMethod
-  public async restoresOnlyTheFilesOfTheLaterRepliesThatRanInTheRestoredFolderEvenWhenOneElsewhereIsPartialHasNoCheckpointOrNeverStarted(): Promise<void> {
-    const elsewhere: readonly ((host: CoreHost) => void)[] = [
-      (): void => undefined,
-      (host: CoreHost): void => { host.checkpoints.compareOutcome = CompareOutcome.CheckpointMissing; },
-      (host: CoreHost): void => { host.checkpoints.captureOutcome = CaptureOutcome.FolderMissing; },
-      (host: CoreHost): void => { host.folderStat.failNext(join(host.directory.path, "docs"), "EACCES"); }];
+  public async restoresOnlyTheFilesOfTheLaterRepliesThatRanInTheRestoredFolderEvenWhenOneElsewhereIsPartialHasNoCheckpointOrRanAheadOfItsReply(): Promise<void> {
+    const sent = async (host: CoreHost, send: () => Promise<MessageSendResult>): Promise<void> => {
+      await send();
+      await host.engine.waitForIdle();
+    };
+    const elsewhere: readonly ((host: CoreHost, send: () => Promise<MessageSendResult>) => Promise<void>)[] = [
+      sent,
+      async (host, send): Promise<void> => {
+        host.checkpoints.compareOutcome = CompareOutcome.CheckpointMissing;
+        await sent(host, send);
+      },
+      async (host, send): Promise<void> => {
+        host.checkpoints.captureOutcome = CaptureOutcome.FolderMissing;
+        await sent(host, send);
+      },
+      async (host, send): Promise<void> => {
+        host.folderStat.failNext(join(host.directory.path, "docs"), "EACCES");
+        await sent(host, send);
+      },
+      async (host, send): Promise<void> => {
+        host.adapter.holdUntilAbort = true;
+        const running = await send();
+        await host.adapter.requested(2);
+        const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm test"));
+        wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+        await host.engine.cancelAsync(new MessageIdParams(running.replies[0]?.id ?? String.empty));
+        await host.engine.waitForIdle();
+        host.adapter.holdUntilAbort = false;
+      }];
     const results: string[] = [];
-    for (const arrange of elsewhere) {
+    for (const during of elsewhere) {
       await using host = await CoreHost.createAsync();
       const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
       const site = AttachedFoldersTests.folder(join(host.directory.path, "site"), { "base.txt": "one" });
@@ -375,10 +400,9 @@ export class AttachedFoldersTests {
       const first = await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "First"));
       await host.engine.waitForIdle();
       await AttachedFoldersTests.attachAsync(host, chat.id, docs);
-      arrange(host);
       host.adapter.writeFiles = { "other.txt": "docs" };
-      await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "Elsewhere"));
-      await host.engine.waitForIdle();
+      await during(host, async () => await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "Elsewhere")));
+      const replies = (await host.messages.listOutlinesAsync(chat.id, null)).filter(t => t.author === MessageAuthor.Provider).length;
       host.checkpoints.compareOutcome = null;
       host.checkpoints.captureOutcome = null;
       await AttachedFoldersTests.attachAsync(host, chat.id, site);
@@ -387,11 +411,11 @@ export class AttachedFoldersTests {
       const result = await host.engine.rewindAsync(new ConversationRewindParams(chat.id, first.sent.id, true));
 
       results.push(`${result.restoredFiles} ${result.restoreRefusal} ${[join(site, "base.txt"), join(site, "other.txt"), join(docs, "other.txt")]
-        .map(t => existsSync(t) ? readFileSync(t, "utf8") : "none").join(",")} ${host.checkpoints.previews[0]?.paths?.join(",") ?? "whole"}`);
+        .map(t => existsSync(t) ? readFileSync(t, "utf8") : "none").join(",")} ${host.checkpoints.previews[0]?.paths?.join(",") ?? "whole"} ${replies}`);
     }
 
-    Assert.areEqual(["1 null one,mine,docs base.txt", "1 null one,mine,docs base.txt", "1 null one,mine,docs base.txt", "1 null one,mine,none base.txt"].join("|"),
-      results.join("|"));
+    Assert.areEqual(["1 null one,mine,docs base.txt 2", "1 null one,mine,docs base.txt 2", "1 null one,mine,docs base.txt 2", "1 null one,mine,none base.txt 2",
+      "1 null one,mine,docs base.txt 3"].join("|"), results.join("|"));
   }
 
   @TestMethod
