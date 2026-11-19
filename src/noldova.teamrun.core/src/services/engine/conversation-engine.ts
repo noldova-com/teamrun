@@ -1119,6 +1119,14 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     await stopping;
   }
 
+  private async interruptUnstartedAsync(reply: Message): Promise<void> {
+    const now = new Date().toISOString();
+    const interrupted = reply.withDetail(new MessageDetail(reply.details.length, DetailKind.Note, Resources.replyInterruptedByStop, null, now))
+      .withStatus(MessageStatus.Interrupted, now);
+    await this.messages.updateAsync(interrupted);
+    this.events.publish(new Event(EventName.MessageCreated, interrupted.toJson()));
+  }
+
   private async cancelPendingAsync(item: ReplyWork): Promise<void> {
     try {
       const cancelled = item.message.withStatus(MessageStatus.Cancelled, new Date().toISOString());
@@ -1786,8 +1794,10 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       activity.leave(lease);
       throw error;
     });
-    if (Object.isNull(reply)) {
+    if (Object.isNull(reply) || this.state.closing) {
       activity.leave(lease);
+      if (!Object.isNull(reply))
+        await this.interruptUnstartedAsync(reply);
       return null;
     }
     const item = new ReplyWork(reply, provider, teammate?.role ?? null, source, hop, turn);
@@ -2162,6 +2172,11 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     if (Object.isNull(item) || Object.isNull(lease)) {
       leave();
       return false;
+    }
+    if (this.state.closing) {
+      leave();
+      await this.interruptUnstartedAsync(item.message);
+      return true;
     }
     this.state.runs.set(item.message.id, item.run);
     this.events.publish(new Event(EventName.MessageCreated, item.message.toJson()));
