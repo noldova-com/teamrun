@@ -457,6 +457,7 @@ export class ReplyRun implements ITurnListener {
   private async captureAsync(): Promise<string | null> {
     if (Object.isNull(this.checkpoints) || Object.isNull(this.folder))
       return null;
+    this.events.publish(new Event(EventName.ReplyCheckpointStarted, new MessageIdParams(this.message.id).toJson()));
     try {
       const captured = await this.checkpoints.captureAsync(this.folder, this.message.id, this.run.signal);
       if (Object.isNull(captured.checkpoint)) {
@@ -471,6 +472,9 @@ export class ReplyRun implements ITurnListener {
         throw error;
       this.log?.write(Resources.formatCheckpointNotTaken(this.message.id, Resources.formatFailureKind(error)));
       return null;
+    }
+    finally {
+      this.events.publish(new Event(EventName.ReplyCheckpointEnded, new MessageIdParams(this.message.id).toJson()));
     }
   }
 

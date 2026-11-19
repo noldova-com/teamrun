@@ -36,6 +36,7 @@ import { ToolCall, ToolCallKind, ToolCallOutputState, ToolCallStatus } from "@no
 
 import { SampleData } from "../../fixtures/sample-data.fixture";
 import { SamplePages } from "../../fixtures/sample-pages.fixture";
+import { ReplyActivity } from "../../../src/app/enums/reply-activity";
 import { SegmentKind } from "../../../src/app/enums/segment-kind";
 import { StepCategory } from "../../../src/app/enums/step-category";
 import { ActivityEntry } from "../../../src/app/models/activity-entry";
@@ -864,19 +865,34 @@ describe("FormatterService", () => {
 
   it("says a working reply is thinking, timed from its start, until its first thought, step or text, and again while its provider says it thinks", () => {
     const at = Date.parse(SampleData.timestamp) + 12_000;
-    const label = (details: readonly MessageDetail[], status: MessageStatus, isThinking: boolean = false): string =>
-      formatter().activityLabel(reply(details, status), at, isThinking);
+    const label = (details: readonly MessageDetail[], status: MessageStatus, activity: ReplyActivity | null = null): string =>
+      formatter().activityLabel(reply(details, status), at, activity);
 
     expect([
       label([], MessageStatus.Running),
       label([detail(0, DetailKind.Reasoning, "Weighing it.")], MessageStatus.Running),
       label([detail(0, DetailKind.Command, "> ls", { tool: "Bash", toolUseId: "t1" })], MessageStatus.Running),
       label([detail(0, DetailKind.Text, "Hello")], MessageStatus.Running),
-      label([detail(0, DetailKind.Text, "Hello")], MessageStatus.Running, true),
+      label([detail(0, DetailKind.Text, "Hello")], MessageStatus.Running, ReplyActivity.Thinking),
       label([], MessageStatus.AwaitingApproval),
-      label([], MessageStatus.Pending, true),
-      label([], MessageStatus.Completed, true)
+      label([], MessageStatus.Pending, ReplyActivity.Thinking),
+      label([], MessageStatus.Completed, ReplyActivity.Thinking)
     ]).toEqual(["Thinking… 12s", "Working for 12s", "Working for 12s", "Working for 12s", "Thinking… 12s", "Working for 12s", "Waiting for its turn", "Worked for 0s"]);
+  });
+
+  it("says a working reply is saving a checkpoint, timed from its start, or stopping, and a reply that isn't working what it did", () => {
+    const at = Date.parse(SampleData.timestamp) + 12_000;
+    const label = (status: MessageStatus, activity: ReplyActivity): string =>
+      formatter().activityLabel(reply([detail(0, DetailKind.Text, "Hello")], status), at, activity);
+
+    expect([
+      label(MessageStatus.Running, ReplyActivity.SavingCheckpoint),
+      label(MessageStatus.Running, ReplyActivity.Stopping),
+      label(MessageStatus.AwaitingApproval, ReplyActivity.Stopping),
+      label(MessageStatus.Pending, ReplyActivity.SavingCheckpoint),
+      label(MessageStatus.Completed, ReplyActivity.Stopping),
+      label(MessageStatus.Cancelled, ReplyActivity.SavingCheckpoint)
+    ]).toEqual(["Saving a checkpoint… 12s", "Stopping…", "Stopping…", "Waiting for its turn", "Worked for 0s", "Worked for 0s"]);
   });
 
   it("reads a thought's latest line as the first sentence of its last paragraph, without Markdown marks", () => {

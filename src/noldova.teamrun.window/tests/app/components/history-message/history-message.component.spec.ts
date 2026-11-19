@@ -937,6 +937,42 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(context.parametersOf(MethodName.MessageCancel)).toEqual(new MessageIdParams(running.id).toJson()));
   });
 
+  it("says a reply is stopping from the first click on its Stop, which it disables in place, asks once, and drops the word when the stop fails", async () => {
+    const running = SampleData.withStatus(SampleData.reply, MessageStatus.Running, steps.slice(0, 2));
+    let calls = 0;
+    const held = new DeferredResponse();
+    context.answer(MethodName.MessageListOpen, () => [running.toJson()]);
+    context.answer(MethodName.MessageCancel, () => {
+      calls += 1;
+      return held.promise;
+    });
+    render(running);
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    fixture.detectChanges();
+    const stop = (): HTMLButtonElement => {
+      const found = element().querySelector(".nol-message-footer .cancel");
+      if (!(found instanceof HTMLButtonElement))
+        throw new Error("Stop is not shown.");
+      return found;
+    };
+    const before = [box(".nol-message-footer .cancel"), box(".activity-line")] as const;
+
+    await click(stop());
+    await Wait.until(() => expect(calls).toBe(1));
+    fixture.detectChanges();
+    stop().click();
+    fixture.detectChanges();
+
+    expect([textOf(".activity-text"), stop().disabled, textOf(".nol-message-footer .cancel"), calls]).toEqual(["Stopping…", true, "Stop", 1]);
+    for (const [earlier, after] of [[before[0], box(".nol-message-footer .cancel")], [before[1], box(".activity-line")]] as const)
+      for (const edge of ["left", "top", "width", "height"] as const)
+        AppearanceFixture.expectPixels(after[edge], earlier[edge]);
+    held.reject(new Error("The reply couldn't be stopped."));
+    await Wait.until(() => expect(stop().disabled).toBe(false));
+    fixture.detectChanges();
+    expect(textOf(".activity-text")).toBe("Working for 12s");
+  });
+
   describe.each([
     { look: "light", mode: ThemeMode.Light, forcedColors: "none" },
     { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
@@ -1241,6 +1277,28 @@ describe("HistoryMessageComponent", () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(textOf(".activity-text")).toBe("Thinking… 14s");
+  });
+
+  it("says a working reply is saving a checkpoint, timed from its start, in its activity's place, until the checkpoint ends", async () => {
+    const running = SampleData.withStatus(SampleData.reply, MessageStatus.Running, steps.slice(0, 1));
+    context.answer(MethodName.MessageListOpen, () => [running.toJson()]);
+    render(running);
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    fixture.detectChanges();
+    const before = box(".activity-text");
+
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams(running.id).toJson());
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const saving = [textOf(".activity-text"), box(".activity-text")] as const;
+    clock.advance(2_000);
+    context.emit(EventName.ReplyCheckpointEnded, new MessageIdParams(running.id).toJson());
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect([saving[0], textOf(".activity-text")]).toEqual(["Saving a checkpoint… 12s", "Working for 14s"]);
+    AppearanceFixture.expectPixels(saving[1].left, before.left);
+    AppearanceFixture.expectPixels(saving[1].top, before.top);
   });
 
   it("shows a working reply's newest thought as its latest line, and its step title once a step or text follows it", async () => {

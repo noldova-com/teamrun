@@ -1738,6 +1738,7 @@ describe("ChatStoreService", () => {
     await store.initialize();
     await store.selectConversation("c1");
     context.emit(EventName.ReplyThinking, new MessageIdParams("m2").toJson());
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
     expect(store.pendingApprovals()).toHaveLength(1);
     context.answer(MethodName.MessageListOpen, () => []);
     context.answer(MethodName.ApprovalList, () => []);
@@ -1751,6 +1752,7 @@ describe("ChatStoreService", () => {
     expect(store.resyncs()).toBe(resyncs + 1);
     expect(store.isWorking("c1")).toBe(false);
     expect([...store.thinkingReplies()]).toEqual([]);
+    expect([...store.savingCheckpointReplies()]).toEqual([]);
     expect(store.pendingApprovals()).toEqual([]);
     expect(messages()[1]?.status).toBe(MessageStatus.Completed);
     context.fail(MethodName.ProviderList, "The runtime part is away.");
@@ -1774,6 +1776,26 @@ describe("ChatStoreService", () => {
     expect([...store.thinkingReplies()]).toEqual([]);
     thinking("m2");
     expect([...store.thinkingReplies()]).toEqual([]);
+  });
+
+  it("marks a running reply as saving a checkpoint until the checkpoint or the reply ends, and ignores replies that are not running", async () => {
+    context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
+    await store.initialize();
+    const emit = (name: EventName, messageId: string): void => context.emit(name, new MessageIdParams(messageId).toJson());
+
+    emit(EventName.ReplyCheckpointStarted, "unknown");
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    const started = [...store.savingCheckpointReplies()];
+    emit(EventName.ReplyCheckpointEnded, "unknown");
+    const unknownEnded = [...store.savingCheckpointReplies()];
+    emit(EventName.ReplyCheckpointEnded, "m2");
+    const ended = [...store.savingCheckpointReplies()];
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    context.emit(EventName.MessageUpdated, SampleData.withStatus(SampleData.reply, MessageStatus.Cancelled).toJson());
+    const replyEnded = [...store.savingCheckpointReplies()];
+    emit(EventName.ReplyCheckpointStarted, "m2");
+
+    expect([started, unknownEnded, ended, replyEnded, [...store.savingCheckpointReplies()]]).toEqual([["m2"], ["m2"], [], [], []]);
   });
 
   it("loads the catalog and selects a project without opening a conversation", async () => {
