@@ -4,6 +4,15 @@
 
 Each version's section is written by the pull request that changes the version, from the pull requests merged since the previous version; other pull requests don't edit this file.
 
+## 0.0.6
+
+### Fixed
+
+- **A teammate after a folder is attached:** a Codex teammate that already answered in a chat works in the chat's folder after a folder is attached, replaced or detached, rather than in the folder it started in (#137).
+- **A wake during a rewind, a move or an attach:** a wake that arrives while a rewind, a move or an attach is under way waits until it ends and then starts, rather than leaving a reply that stays Pending until TeamRun restarts.
+- **Take over and the end of a turn:** a teammate's tool call that arrives just before you press Take over, or before its turn ends, is refused rather than run.
+- **Signing in to an MCP server:** a malformed request to the sign-in's callback gets a not-found answer, and the sign-in keeps waiting for the real one.
+
 ## 0.0.5
 
 ### New
