@@ -888,11 +888,11 @@ describe("FormatterService", () => {
     expect([
       label(MessageStatus.Running, ReplyActivity.SavingCheckpoint),
       label(MessageStatus.Running, ReplyActivity.Stopping),
-      label(MessageStatus.AwaitingApproval, ReplyActivity.Stopping),
-      label(MessageStatus.Pending, ReplyActivity.SavingCheckpoint),
-      label(MessageStatus.Completed, ReplyActivity.Stopping),
-      label(MessageStatus.Cancelled, ReplyActivity.SavingCheckpoint)
-    ]).toEqual(["Saving a checkpoint… 12s", "Stopping…", "Stopping…", "Waiting for its turn", "Worked for 0s", "Worked for 0s"]);
+      label(MessageStatus.AwaitingApproval, ReplyActivity.Stopping)
+    ]).toEqual(["Saving a checkpoint… 12s", "Stopping…", "Stopping…"]);
+    expect(Object.values(ReplyActivity).map(t => [label(MessageStatus.Pending, t), label(MessageStatus.Completed, t), label(MessageStatus.Cancelled, t)]))
+      .toEqual([["Waiting for its turn", "Worked for 0s", "Worked for 0s"], ["Waiting for its turn", "Worked for 0s", "Worked for 0s"],
+        ["Waiting for its turn", "Worked for 0s", "Worked for 0s"]]);
   });
 
   it("reads a thought's latest line as the first sentence of its last paragraph, without Markdown marks", () => {
