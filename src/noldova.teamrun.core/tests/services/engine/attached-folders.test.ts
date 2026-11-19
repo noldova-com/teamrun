@@ -358,11 +358,12 @@ export class AttachedFoldersTests {
   }
 
   @TestMethod
-  public async restoresOnlyTheFilesOfTheLaterRepliesThatRanInTheRestoredFolderEvenWhenOneElsewhereIsPartialOrHasNoCheckpoint(): Promise<void> {
+  public async restoresOnlyTheFilesOfTheLaterRepliesThatRanInTheRestoredFolderEvenWhenOneElsewhereIsPartialHasNoCheckpointOrNeverStarted(): Promise<void> {
     const elsewhere: readonly ((host: CoreHost) => void)[] = [
       (): void => undefined,
       (host: CoreHost): void => { host.checkpoints.compareOutcome = CompareOutcome.CheckpointMissing; },
-      (host: CoreHost): void => { host.checkpoints.captureOutcome = CaptureOutcome.FolderMissing; }];
+      (host: CoreHost): void => { host.checkpoints.captureOutcome = CaptureOutcome.FolderMissing; },
+      (host: CoreHost): void => { host.folderStat.failNext(join(host.directory.path, "docs"), "EACCES"); }];
     const results: string[] = [];
     for (const arrange of elsewhere) {
       await using host = await CoreHost.createAsync();
@@ -386,10 +387,11 @@ export class AttachedFoldersTests {
       const result = await host.engine.rewindAsync(new ConversationRewindParams(chat.id, first.sent.id, true));
 
       results.push(`${result.restoredFiles} ${result.restoreRefusal} ${[join(site, "base.txt"), join(site, "other.txt"), join(docs, "other.txt")]
-        .map(t => readFileSync(t, "utf8")).join(",")} ${host.checkpoints.previews[0]?.paths?.join(",") ?? "whole"}`);
+        .map(t => existsSync(t) ? readFileSync(t, "utf8") : "none").join(",")} ${host.checkpoints.previews[0]?.paths?.join(",") ?? "whole"}`);
     }
 
-    Assert.areEqual(["1 null one,mine,docs base.txt", "1 null one,mine,docs base.txt", "1 null one,mine,docs base.txt"].join("|"), results.join("|"));
+    Assert.areEqual(["1 null one,mine,docs base.txt", "1 null one,mine,docs base.txt", "1 null one,mine,docs base.txt", "1 null one,mine,none base.txt"].join("|"),
+      results.join("|"));
   }
 
   @TestMethod

@@ -165,9 +165,9 @@ export class KeptSessions {
     const replies: Message[] = [];
     let isPartial = false;
     for (const t of going.filter(u => u.author === MessageAuthor.Provider)) {
-      if (!KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(t.id)))
-        continue;
       const message = await this.requireMessageAsync(t.id);
+      if (Object.isNull(message.startedAt) || !KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(t.id)))
+        continue;
       if (Object.isNull(await this.messages.findCheckpointAsync(t.id)) || ReplyRun.hasPartialEvidence(message.details))
         isPartial = true;
       replies.push(message);
