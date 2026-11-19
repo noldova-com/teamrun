@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import "@noldova/context.core";
 import { JsonReader } from "@noldova/context.json";
+import { CaptureOutcome, CompareOutcome } from "@noldova/checkpoints.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ProjectActivity, Resources, WorkFolder } from "@noldova/teamrun.core";
@@ -357,26 +358,59 @@ export class AttachedFoldersTests {
   }
 
   @TestMethod
-  public async restoresOnlyTheFilesOfTheLaterRepliesThatRanInTheRestoredFolder(): Promise<void> {
+  public async restoresOnlyTheFilesOfTheLaterRepliesThatRanInTheRestoredFolderEvenWhenOneElsewhereIsPartialOrHasNoCheckpoint(): Promise<void> {
+    const elsewhere: readonly ((host: CoreHost) => void)[] = [
+      (): void => undefined,
+      (host: CoreHost): void => { host.checkpoints.compareOutcome = CompareOutcome.CheckpointMissing; },
+      (host: CoreHost): void => { host.checkpoints.captureOutcome = CaptureOutcome.FolderMissing; }];
+    const results: string[] = [];
+    for (const arrange of elsewhere) {
+      await using host = await CoreHost.createAsync();
+      const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
+      const site = AttachedFoldersTests.folder(join(host.directory.path, "site"), { "base.txt": "one" });
+      const docs = AttachedFoldersTests.folder(join(host.directory.path, "docs"), {});
+      await AttachedFoldersTests.attachAsync(host, chat.id, site);
+      host.adapter.writeFiles = { "base.txt": "two" };
+      const first = await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "First"));
+      await host.engine.waitForIdle();
+      await AttachedFoldersTests.attachAsync(host, chat.id, docs);
+      arrange(host);
+      host.adapter.writeFiles = { "other.txt": "docs" };
+      await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "Elsewhere"));
+      await host.engine.waitForIdle();
+      host.checkpoints.compareOutcome = null;
+      host.checkpoints.captureOutcome = null;
+      await AttachedFoldersTests.attachAsync(host, chat.id, site);
+      writeFileSync(join(site, "other.txt"), "mine");
+
+      const result = await host.engine.rewindAsync(new ConversationRewindParams(chat.id, first.sent.id, true));
+
+      results.push(`${result.restoredFiles} ${result.restoreRefusal} ${[join(site, "base.txt"), join(site, "other.txt"), join(docs, "other.txt")]
+        .map(t => readFileSync(t, "utf8")).join(",")} ${host.checkpoints.previews[0]?.paths?.join(",") ?? "whole"}`);
+    }
+
+    Assert.areEqual(["1 null one,mine,docs base.txt", "1 null one,mine,docs base.txt", "1 null one,mine,docs base.txt"].join("|"), results.join("|"));
+  }
+
+  @TestMethod
+  public async saysTheFolderHasChangedRatherThanThatNoCheckpointWasTakenForAReplyWhoseCheckpointFailedInAnotherFolder(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
     const site = AttachedFoldersTests.folder(join(host.directory.path, "site"), { "base.txt": "one" });
     const docs = AttachedFoldersTests.folder(join(host.directory.path, "docs"), {});
     await AttachedFoldersTests.attachAsync(host, chat.id, site);
-    host.adapter.writeFiles = { "base.txt": "two" };
+    host.checkpoints.captureOutcome = CaptureOutcome.FolderMissing;
     const first = await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "First"));
     await host.engine.waitForIdle();
+    host.checkpoints.captureOutcome = null;
     await AttachedFoldersTests.attachAsync(host, chat.id, docs);
-    host.adapter.writeFiles = { "other.txt": "docs" };
-    await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "Elsewhere"));
-    await host.engine.waitForIdle();
-    await AttachedFoldersTests.attachAsync(host, chat.id, site);
-    writeFileSync(join(site, "other.txt"), "mine");
+    const reply = first.replies[0]?.id ?? String.empty;
+    const stored = `${await host.messages.findCheckpointAsync(reply)} ${await host.messages.findCheckpointFolderAsync(reply)}`;
 
     const result = await host.engine.rewindAsync(new ConversationRewindParams(chat.id, first.sent.id, true));
 
-    Assert.areEqual("1 null", `${result.restoredFiles} ${result.restoreRefusal}`);
-    Assert.areEqual("one,mine,docs", [join(site, "base.txt"), join(site, "other.txt"), join(docs, "other.txt")].map(t => readFileSync(t, "utf8")).join(","));
+    Assert.areEqual(`null ${WorkFolder.attached(site).id}`, stored);
+    Assert.areEqual(`null ${Resources.checkpointFolderChangedRefusal}`, `${result.restoredFiles} ${result.restoreRefusal}`);
   }
 
   @TestMethod

@@ -159,8 +159,12 @@ export class MessagesService implements IMessagesService {
       await this.context.database.changeFeed.appendAsync(ChangeEntity.Message, message.id, ChangeOperation.Update, json, transaction);
   }
 
-  public async setCheckpointAsync(messageId: string, checkpointId: string, folderId: string, transaction?: SqlTransaction): Promise<void> {
-    await (transaction ?? this.context.database.connection).executeAsync(new SqlQuery(Resources.updateMessageCheckpoint, [checkpointId, folderId, messageId]));
+  public async setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void> {
+    await (transaction ?? this.context.database.connection).executeAsync(new SqlQuery(Resources.updateMessageCheckpoint, [checkpointId, messageId]));
+  }
+
+  public async setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void> {
+    await (transaction ?? this.context.database.connection).executeAsync(new SqlQuery(Resources.updateMessageCheckpointFolder, [folderId, messageId]));
   }
 
   private async findOneAsync(statement: string, parameter: string, transaction?: SqlTransaction): Promise<Message | null> {

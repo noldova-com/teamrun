@@ -173,7 +173,7 @@ export class ReplyRun implements ITurnListener {
   public async executeAsync(adapter: IProviderAdapter, request: TurnRequest, notes: readonly string[] = [], moved: string | null = null,
     handover: HandoverNote | null = null, posted: boolean = false): Promise<void> {
     try {
-      await this.updateAsync(this.message.withStart(ReplyRun.now()));
+      await this.startAsync();
       this.writes = this.startWrites();
       if (!Object.isNull(moved))
         await this.noteMovedAsync(moved, Object.isNull(handover) ? { source: Resources.sustainSource }
@@ -205,7 +205,7 @@ export class ReplyRun implements ITurnListener {
 
   public async followAsync(wake: WakeTurn): Promise<void> {
     try {
-      await this.updateAsync(this.message.withStart(ReplyRun.now()));
+      await this.startAsync();
       this.writes = this.startWrites();
       const result = await wake.follow(this, this.run.signal);
       await this.toolCalls;
@@ -224,7 +224,7 @@ export class ReplyRun implements ITurnListener {
 
   public async answerAsync(note: string): Promise<void> {
     await this.toolCalls;
-    await this.updateAsync(this.message.withStart(ReplyRun.now()));
+    await this.startAsync();
     await this.appendDetailAsync(DetailKind.Note, note, null);
     await this.updateAsync(this.message.withStatus(MessageStatus.Completed, ReplyRun.now()));
     this.finished = true;
@@ -454,6 +454,12 @@ export class ReplyRun implements ITurnListener {
     return ReplyRun.isJsonObject(payload) && record.isCallOf(payload[ProtocolResources.servedToolField], payload[ProtocolResources.servedInputField]);
   }
 
+  private async startAsync(): Promise<void> {
+    if (!Object.isNull(this.folder))
+      await this.messages.setCheckpointFolderAsync(this.message.id, this.folder.id);
+    await this.updateAsync(this.message.withStart(ReplyRun.now()));
+  }
+
   private async captureAsync(): Promise<string | null> {
     if (Object.isNull(this.checkpoints) || Object.isNull(this.folder))
       return null;
@@ -464,7 +470,7 @@ export class ReplyRun implements ITurnListener {
         this.log?.write(Resources.formatCheckpointNotTaken(this.message.id, captured.outcome.value));
         return null;
       }
-      await this.messages.setCheckpointAsync(this.message.id, captured.checkpoint.id, this.folder.id);
+      await this.messages.setCheckpointAsync(this.message.id, captured.checkpoint.id);
       return captured.checkpoint.id;
     }
     catch (error) {

@@ -29,7 +29,7 @@ export class ReplyCheckpointsMigrationTests {
     const conversation = await host.createConversationAsync();
     for (const id of ["m1", "m2"])
       await host.messages.insertAsync(new Message(id, conversation.id, id === "m1" ? 0 : 1, MessageAuthor.User, null, MessageStatus.Completed, [], null, "t", null, "t"));
-    await host.messages.setCheckpointAsync("m2", "00000000-0000-7000-8000-000000000001", conversation.id);
+    await host.messages.setCheckpointAsync("m2", "00000000-0000-7000-8000-000000000001");
 
     Assert.isNull(await host.messages.findCheckpointAsync("m1"));
     Assert.areEqual("00000000-0000-7000-8000-000000000001", await host.messages.findCheckpointAsync("m2"));

@@ -157,19 +157,19 @@ export class KeptSessions {
   }
 
   private async restoreAsync(folder: WorkFolder, reply: Message, going: readonly Message[]): Promise<CheckpointRestore> {
+    if (!KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(reply.id)))
+      return CheckpointRestore.refused(Resources.checkpointFolderChangedRefusal);
     const checkpoint = await this.messages.findCheckpointAsync(reply.id);
     if (Object.isNull(checkpoint) || Object.isNull(this.checkpoints))
       return CheckpointRestore.refused(Resources.noCheckpointRefusal);
-    if (!KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(reply.id)))
-      return CheckpointRestore.refused(Resources.checkpointFolderChangedRefusal);
     const replies: Message[] = [];
     let isPartial = false;
     for (const t of going.filter(u => u.author === MessageAuthor.Provider)) {
+      if (!KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(t.id)))
+        continue;
       const message = await this.requireMessageAsync(t.id);
       if (Object.isNull(await this.messages.findCheckpointAsync(t.id)) || ReplyRun.hasPartialEvidence(message.details))
         isPartial = true;
-      else if (!KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(t.id)))
-        continue;
       replies.push(message);
     }
     return await this.checkpoints.restoreAsync(folder, checkpoint, isPartial ? null : replies.flatMap(t => ReplyRun.reportedFiles(t.details)));

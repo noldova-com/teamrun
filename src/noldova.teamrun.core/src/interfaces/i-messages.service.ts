@@ -28,5 +28,6 @@ export interface IMessagesService {
   nextSequenceAsync(conversationId: string, transaction?: SqlTransaction): Promise<number>;
   insertAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
-  setCheckpointAsync(messageId: string, checkpointId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
+  setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+  setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }

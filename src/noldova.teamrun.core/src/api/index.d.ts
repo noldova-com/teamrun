@@ -1531,10 +1531,10 @@ export interface IMessagesService {
   findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
 
   /**
-   * Reads the id of the folder a reply's checkpoint was taken of, as `WorkFolder.id` named it.
+   * Reads the id of the folder a reply's turn ran in, as `WorkFolder.id` named it.
    * @param messageId The reply's id.
    * @param transaction The transaction to read in, or none.
-   * @returns The folder's id, or `null` when no checkpoint was taken, it was taken before the folder was kept, or the reply is gone.
+   * @returns The folder's id, or `null` when the turn never started, ran before the folder was kept, or the reply is gone.
    */
   findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
 
@@ -1575,13 +1575,20 @@ export interface IMessagesService {
    */
   updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   /**
-   * Records the id of the checkpoint taken before a reply, and the id of the folder it was taken of.
+   * Records the id of the checkpoint taken of the reply's folder before a reply.
    * @param messageId The reply's id.
    * @param checkpointId The checkpoint's id.
+   * @param transaction The transaction to work in, or none.
+   */
+  setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+
+  /**
+   * Records the id of the folder a reply's turn runs in, at the turn's start, whether or not its checkpoint is then taken.
+   * @param messageId The reply's id.
    * @param folderId The folder's `WorkFolder.id`.
    * @param transaction The transaction to work in, or none.
    */
-  setCheckpointAsync(messageId: string, checkpointId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
+  setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }
 
 /**
@@ -3987,9 +3994,10 @@ export declare class Resources {
   public static readonly updateMessageCheckpoint: string;
   public static readonly selectMessageCheckpoint: string;
   /**
-   * Reads the id of the folder a reply's checkpoint was taken of, `null` for a checkpoint taken before the folder was kept.
+   * Reads the id of the folder a reply's turn ran in, `null` for a turn from before the folder was kept.
    */
   public static readonly selectMessageCheckpointFolder: string;
+  public static readonly updateMessageCheckpointFolder: string;
   /**
    * Bytes above which an added file gets no diff.
    */
@@ -7338,7 +7346,8 @@ export declare class MessagesService implements IMessagesService {
    * @inheritdoc
    */
   public updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
-  public setCheckpointAsync(messageId: string, checkpointId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
+  public setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+  public setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }
 
 /**
@@ -10768,7 +10777,7 @@ export declare class HandoverSummaryKindsMigration extends SqlMigration {
 }
 
 /**
- * Keeps the id of the folder each reply's checkpoint was taken of, so a rewind restores from that folder's own checkpoints after the chat's folder changes and back.
+ * Keeps the id of the folder each reply's turn ran in, so a rewind restores from that folder's own checkpoints after the chat's folder changes and back.
  */
 export declare class CheckpointFoldersMigration extends SqlMigration {
   /**

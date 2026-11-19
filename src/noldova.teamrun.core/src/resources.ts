@@ -387,7 +387,8 @@ export class Resources {
     "DROP INDEX IX_messages_conversationId_status", "DROP INDEX IX_conversationTeammates_teammateId"];
   public static readonly renameChatEntities: readonly string[] = ["UPDATE __changes SET entity = 'Chat' WHERE entity = 'Conversation'",
     "UPDATE __changes SET entity = 'ChatMember' WHERE entity = 'ConversationMember'"];
-  public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ?, checkpointFolderId = ? WHERE id = ?";
+  public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ? WHERE id = ?";
+  public static readonly updateMessageCheckpointFolder: string = "UPDATE messages SET checkpointFolderId = ? WHERE id = ?";
   public static readonly selectMessageCheckpoint: string = "SELECT checkpointId FROM messages WHERE id = ?";
   public static readonly selectMessageCheckpointFolder: string = "SELECT checkpointFolderId FROM messages WHERE id = ?";
   public static readonly selectCommandReply: string =
