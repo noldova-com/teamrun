@@ -4021,6 +4021,26 @@ describe("ComposerComponent", () => {
       expect(box().value).toBe("");
     });
 
+    it("reads its chat's unsent message again, with no error, when another window saved a newer one, and bases its next save on that one", async () => {
+      const more = new MessageAttachment("more.txt", "text/plain", 1, "D:/data/attachments/drafts/c1/more.txt");
+      context.answer(MethodName.DraftRead, () => drafted("c1", "where were we", [notes]));
+      await prepare();
+      await render();
+      context.refuse(MethodName.DraftSave, ErrorCode.Conflict, "The draft changed.", "c1")
+        .answer(MethodName.DraftRead, () => drafted("c1", "where we are now", [notes, more], [], 4));
+
+      await type("where were we?");
+      await saveStep()();
+      await Wait.until(() => expect(box().value).toBe("where we are now"));
+
+      expect([...rows()].map(t => t.textContent)).toEqual([expect.stringContaining("notes.txt"), expect.stringContaining("more.txt")]);
+      expect(context.noticeText()).toBeNull();
+      context.answer(MethodName.DraftSave, t => SampleData.savedDraft(DraftSaveParams.fromJson(t), 5).toJson());
+      await type("where we are now!");
+      await saveStep()();
+      expect(saves().map(t => [t.text, t.revision])).toEqual([["where were we?", 2], ["where we are now!", 4]]);
+    });
+
     describe("sent while it saves", () => {
       const prepares = (): [boolean, string | null][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.AttachmentPrepare))
         .map(t => AttachmentInput.fromJson(t.parameters)).map(t => [!Object.isNull(t.grant), t.path]);
@@ -4043,6 +4063,27 @@ describe("ComposerComponent", () => {
 
         expect(prepares()).toEqual([[true, null], [false, "D:/data/attachments/drafts/c1/notes.txt"]]);
         expect(sent()[0]?.attachments.map(t => t.name)).toEqual(["notes.txt"]);
+      });
+
+      it("sends its own text but discards no draft when the save it waits for is refused as stale, so the other window's newer draft stays", async () => {
+        const held = new DeferredResponse();
+        context.answer(MethodName.DraftRead, () => drafted("c1", "where were we", [], [], 3));
+        await prepare();
+        await render();
+        context.refuse(MethodName.DraftSave, ErrorCode.Conflict, "The draft changed.", "c1")
+          .answer(MethodName.DraftRead, () => drafted("c1", "where we are now", [], [], 4))
+          .answer(MethodName.MessageSend, () => held.promise.then(() => answered()));
+        await pick([new File(["a"], "notes.txt", { type: "text/plain" })]);
+        await type("mine");
+
+        await send();
+        await Wait.until(() => expect(box().value).toBe("where we are now"));
+        held.resolve(null);
+        await Wait.until(() => expect(box().value).toBe(""));
+        await saveStep()();
+
+        expect(sent()[0]?.text).toBe("mine");
+        expect(context.count(MethodName.DraftDiscard)).toBe(0);
       });
 
       it("still sends a new file from its data when the save it waits for fails, and says the save failed", async () => {
@@ -4539,6 +4580,23 @@ describe("ComposerComponent", () => {
       expect(saves().map(t => [t.conversationId, t.text, t.attachments.map(u => u.name)])).toEqual([["c1", "mine", ["notes.txt"]]]);
       expect(box().value).toBe("other");
       expect(rows()).toHaveLength(0);
+    });
+
+    it("keeps the chat it moved to when the save of the chat it left is refused as stale, and reads the one it left no more", async () => {
+      context.answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c2" ? drafted("c2", "other") : null)
+        .refuse(MethodName.DraftSave, ErrorCode.Conflict, "The draft changed.", "c1");
+      await prepare();
+      await render();
+
+      await type("mine");
+      fixture.componentRef.setInput("conversationId", "c2");
+      await fixture.whenStable();
+
+      expect(saves().map(t => t.conversationId)).toEqual(["c1"]);
+      expect(box().value).toBe("other");
+      expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftRead))
+        .map(t => ConversationIdParams.fromJson(t.parameters).conversationId)).toEqual(["c1", "c2"]);
+      expect(context.noticeText()).toBeNull();
     });
 
     it("shows the open conversation's unsent message when an earlier one's answers late", async () => {

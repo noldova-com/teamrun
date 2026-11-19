@@ -83,6 +83,7 @@ export class Resources {
   public static readonly attachmentLimitExceeded: string = "Attach up to 10 files: 10 MiB per image and 100 MiB per file.";
   public static readonly attachmentReadFailed: string = "The attachment could not be read. Try adding it again.";
   public static readonly draftNotSaved: string = "The unsent message could not be saved.";
+  public static readonly draftStale: string = "Another window changed the unsent message since this one read it.";
   public static readonly draftUnreadable: string = "The unsent message could not be read, so what is written here is not kept.";
   public static readonly modelImagesUnsupported: string = "No one in this chat takes images.";
   public static readonly chatPermissionsLabel: string = "Permissions in this chat";

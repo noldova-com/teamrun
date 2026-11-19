@@ -9,7 +9,7 @@
 import { TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
-import { AttachmentInput, Draft, DraftSaveParams, MessageAttachment, MethodName } from "@noldova/teamrun.protocol";
+import { AttachmentInput, Draft, DraftSaveParams, ErrorCode, MessageAttachment, MethodName } from "@noldova/teamrun.protocol";
 
 import { DraftNotSavedException } from "../../../src/app/exceptions/draft-not-saved.exception";
 import { ComposerAttachment } from "../../../src/app/models/composer-attachment";
@@ -195,6 +195,71 @@ describe("ComposerDraftService", () => {
 
     expect(context.count(MethodName.DraftDiscard)).toBe(1);
     expect(context.parametersOf(MethodName.DraftDiscard)).toEqual({ chatId: "c1", revision: 7 });
+  });
+
+  it("bases each save on the revision it read or saved last, and on none once its read finds no draft", async () => {
+    answerSaves();
+    context.answer(MethodName.DraftRead, () => stored(7).toJson());
+    await drafts.restore("c1");
+    drafts.schedule(draft("one"));
+    await drafts.save();
+    drafts.schedule(draft("two"));
+    await drafts.save();
+    context.answer(MethodName.DraftRead, () => null);
+    await drafts.restore("c1");
+    drafts.schedule(draft("other", "c2"));
+    await drafts.save();
+    drafts.schedule(draft("four", "c2"));
+    await drafts.save();
+
+    expect(saved().map(t => [t.text, t.revision])).toEqual([["one", 7], ["two", 1], ["other", 0], ["four", 3]]);
+  });
+
+  it("tells its watchers of a save refused as stale, with no notice, drops what was pending, discards the files it prepared and saves nothing over the newer draft until it reads it", async () => {
+    const refusedOver: string[] = [];
+    const unwatch = drafts.onStale(t => refusedOver.push(t));
+    context.answer(MethodName.DraftRead, () => stored(3).toJson())
+      .refuse(MethodName.DraftSave, ErrorCode.Conflict, "The draft changed.", "c1");
+    await drafts.restore("c1");
+
+    drafts.schedule(draft("mine", "c1", [new ComposerAttachment(new File(["a"], "notes.txt", { type: "text/plain" }))]));
+    await drafts.save();
+    await drafts.discard("c1");
+    unwatch();
+    drafts.schedule(draft("again"));
+    await drafts.save();
+
+    expect(refusedOver).toEqual(["c1"]);
+    expect(context.noticeText()).toBeNull();
+    expect(saved().map(t => [t.text, t.revision])).toEqual([["mine", 3], ["again", 0]]);
+    expect(context.count(MethodName.AttachmentDiscard)).toBe(1);
+    expect(context.count(MethodName.DraftDiscard)).toBe(0);
+  });
+
+  it("discards no draft that reached it after the count it is given, and the draft it read when given none", async () => {
+    context.answer(MethodName.DraftRead, () => stored(3).toJson());
+    await drafts.restore("c1");
+    const arrivals = drafts.arrivalsOf("c1");
+    context.answer(MethodName.DraftRead, () => stored(4).toJson());
+    await drafts.restore("c1");
+
+    await drafts.discard("c1", arrivals);
+    const skipped = context.count(MethodName.DraftDiscard);
+    await drafts.discard("c1");
+
+    expect(skipped).toBe(0);
+    expect(context.parametersOf(MethodName.DraftDiscard)).toEqual({ chatId: "c1", revision: 4 });
+  });
+
+  it("passes on a save's failure that is no stale refusal, and tells its watchers nothing", async () => {
+    const refusedOver: string[] = [];
+    drafts.onStale(t => refusedOver.push(t));
+    vi.spyOn(store, "saveDraft").mockRejectedValue(new Error("lost"));
+    drafts.schedule(draft("mine"));
+
+    await expect(drafts.save()).rejects.toThrow("lost");
+
+    expect(refusedOver).toEqual([]);
   });
 
   it("discards nothing it has neither read nor saved, so another window's draft stays", async () => {

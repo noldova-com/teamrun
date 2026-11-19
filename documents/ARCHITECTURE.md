@@ -294,6 +294,8 @@ Product names and trademarks, such as the providers' names above, belong to thei
   A Send with a file the draft hasn't saved yet first waits for the draft save under way, or writes the pending one, then sends each file by the path that save stored, so a file's bytes go to the runtime once; if that save fails, Send sends the file from its data.
   The window drops a chat's unsaved draft before its tab closes, so the draft isn't saved to a chat that is gone.
   A draft save that Core refuses because the chat is gone drops the chat, with no error and no second save.
+  Each draft save names the revision it replaces, the one the window read or saved last, or 0 when it read no draft; Core refuses a save whose revision is no longer the draft's with `Conflict`, before it writes a file, so another window's newer draft and its files stay, and the window drops what it had pending and reads the draft again, with no error.
+  A message sent from a window discards its draft only when no other window's draft reached that window while it sent, by a refused save or a read, so a send never removes a newer draft it didn't show.
   A window that missed the event drops the chat the same way: a resync keeps each chat it no longer lists, in a project it still lists, until Core answers about it, and drops the ones Core no longer has, and a tab whose chat the window doesn't list, such as one restored when the window opens, asks Core, which answers `NotFound` for a deleted chat.
   When Core can't answer about a chat, the chat stays listed, and the resync finishes before it shows why.
 - The window's one search, Noldova Desktop's `desktop.search`, gets two sources from `TeamRunSearchSources`: Chats, `teamrun.chats`, and Messages, `teamrun.messages`.

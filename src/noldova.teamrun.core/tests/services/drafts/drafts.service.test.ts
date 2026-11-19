@@ -72,6 +72,33 @@ export class DraftsServiceTests {
   }
 
   @TestMethod
+  public async refusesASaveBasedOnAnOlderRevisionAndKeepsTheNewerDraftAndItsFiles(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const id = new ConversationIdParams(conversation.id);
+    const folder = join(host.directory.path, "attachments", "draft-files", conversation.id);
+    const refusal = async (params: DraftSaveParams): Promise<string> => (await Assert.throwsAsync(() => host.drafts.saveAsync(params), ServiceException)).info.name;
+    const opened = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Hi", [], 0));
+    const attached = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Hi, see the file", [DraftsServiceTests.upload("a.txt", "a")], opened.revision));
+    const files = JSON.stringify(attached.attachments.map(t => basename(t.path)));
+
+    for (const revision of [0, opened.revision])
+      Assert.areEqual(ErrorCode.Conflict, await refusal(new DraftSaveParams(conversation.id, "Hi!", [DraftsServiceTests.upload("b.txt", "b")], revision)));
+    Assert.areEqual(JSON.stringify(attached.toJson()), JSON.stringify((await host.drafts.readAsync(id))?.toJson()));
+    Assert.areEqual(files, JSON.stringify(readdirSync(folder)));
+
+    const typed = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Hi, see the file!",
+      attached.attachments.map(t => new AttachmentInput(t.name, t.mediaType, null, t.path)), attached.revision));
+    Assert.areEqual(attached.revision + 1, typed.revision);
+    Assert.areEqual(files, JSON.stringify(readdirSync(folder)));
+
+    await host.drafts.discardAsync(new DraftDiscardParams(conversation.id, typed.revision));
+    Assert.areEqual(ErrorCode.Conflict, await refusal(new DraftSaveParams(conversation.id, "Late", [], typed.revision)));
+    Assert.isNull(await host.drafts.readAsync(id));
+    Assert.areEqual("Again", (await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Again", [], 0))).text);
+  }
+
+  @TestMethod
   public async forgetsAChatsDraftOnItsOwnConnectionWhenGivenNoTransaction(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();

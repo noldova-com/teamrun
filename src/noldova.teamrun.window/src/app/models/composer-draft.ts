@@ -26,10 +26,10 @@ export class ComposerDraft {
     return String.isNullOrWhitespace(this.text) && this.attachments.length === 0;
   }
 
-  public async toParams(input: (attachment: ComposerAttachment) => Promise<AttachmentInput>): Promise<DraftSaveParams> {
+  public async toParams(input: (attachment: ComposerAttachment) => Promise<AttachmentInput>, revision: number): Promise<DraftSaveParams> {
     const inputs: AttachmentInput[] = [];
     for (const attachment of this.attachments)
       inputs.push(await input(attachment));
-    return new DraftSaveParams(this.conversationId, this.text, inputs);
+    return new DraftSaveParams(this.conversationId, this.text, inputs, revision);
   }
 }
