@@ -1774,7 +1774,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     }
     const reply = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const current = await this.conversations.findAsync(source.conversationId, transaction);
-      if (Object.isNull(current) || current.projectId !== conversation.projectId)
+      if (Object.isNull(current) || current.projectId !== conversation.projectId || Object.isNull(await this.messages.findAsync(source.id, transaction)))
         return null;
       const created = new Message(Guid.createVersion7().toString(), source.conversationId, await this.messages.nextSequenceAsync(source.conversationId, transaction),
         MessageAuthor.Provider, source.id, MessageStatus.Pending, [note],

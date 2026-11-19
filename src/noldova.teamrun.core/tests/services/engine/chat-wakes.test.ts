@@ -14,6 +14,7 @@ import {
   type Conversation,
   ConversationIdParams,
   ConversationMemberParams,
+  ConversationRewindParams,
   DetailKind,
   EventName,
   Harness,
@@ -168,6 +169,46 @@ export class ChatWakesTests {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
     const chat = await host.createConversationAsync(project);
+    const other = await host.createConversationAsync(project);
+    await ChatWakesTests.askDefault(host, other.id);
+    await ChatWakesTests.askDefault(host, chat.id);
+    const activity = host.context.projectActivity;
+    const previewing = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    host.checkpoints.previewGate = (): Promise<void> => {
+      previewing.resolve();
+      return release.promise;
+    };
+    const rewind = host.engine.rewindAsync(new ConversationRewindParams(other.id, (await ChatWakesTests.chatAsync(host, other.id))[0]?.id ?? String.empty, true));
+    await previewing.promise;
+    const waiting = Promise.withResolvers<void>();
+    const whenReleased = activity.whenReleasedAsync.bind(activity);
+    activity.whenReleasedAsync = (): Promise<void> => {
+      waiting.resolve();
+      return whenReleased();
+    };
+
+    const listener = host.adapter.lastListener;
+    Assert.isNotNull(listener);
+    const waking = listener.onWakeAsync(new TurnWake("task-1", "npm test"));
+    await Promise.race([waiting.promise, waking]);
+    const held = (await ChatWakesTests.chatAsync(host, chat.id)).length;
+    release.resolve();
+    await rewind;
+    const wake = await waking;
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+
+    const messages = await ChatWakesTests.chatAsync(host, chat.id);
+    Assert.areEqual(2, held);
+    Assert.areEqual(JSON.stringify([3, MessageStatus.Completed]), JSON.stringify([messages.length, messages.at(-1)?.status]));
+  }
+
+  @TestMethod
+  public async startsNoWakeWhoseSourceLeftTheChatWhileTheProjectWasHeld(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const chat = await host.createConversationAsync(project);
     await ChatWakesTests.askDefault(host, chat.id);
     const activity = host.context.projectActivity;
     const hold = activity.enter(project.rootPath);
@@ -182,15 +223,14 @@ export class ChatWakesTests {
     Assert.isNotNull(listener);
     const waking = listener.onWakeAsync(new TurnWake("task-1", "npm test"));
     await Promise.race([waiting.promise, waking]);
-    const held = (await ChatWakesTests.chatAsync(host, chat.id)).length;
+    await host.conversations.removeFromAsync(chat.id, 0);
     activity.leave(hold);
     const wake = await waking;
-    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
     await host.engine.waitForIdle();
 
-    const messages = await ChatWakesTests.chatAsync(host, chat.id);
-    Assert.areEqual(2, held);
-    Assert.areEqual(JSON.stringify([3, MessageStatus.Completed]), JSON.stringify([messages.length, messages.at(-1)?.status]));
+    Assert.isNull(wake);
+    Assert.areEqual(0, (await ChatWakesTests.chatAsync(host, chat.id)).length);
+    activity.requireIdle(project.rootPath);
   }
 
   @TestMethod
