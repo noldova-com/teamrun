@@ -21,6 +21,6 @@ export class TurnState {
   public readonly replyRuns: Map<ReplyWork, ReplyRun> = new Map();
   public readonly runWaits: Map<ReplyWork, Set<() => void>> = new Map();
   public readonly sessions: { scope: string; member: string; session: ITurnToolSession; tools: TurnTools; run: ReplyRun; sender: string; reply: Message; mode: ProviderMode | null;
-    stopped: boolean }[] = [];
+    stopped: boolean; stops: AbortController }[] = [];
   public closing: boolean = false;
 }
