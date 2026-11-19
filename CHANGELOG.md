@@ -2,7 +2,9 @@
 
 **Scope:** What each released version of TeamRun holds, newest first.
 
-Each version's section is written by the pull request that changes the version, from the pull requests merged since the previous version; other pull requests don't edit this file.
+A pull request that changes what a person gets adds its entry under `## Unreleased`, and the release names its version over the entries it ships, with `npm run set-version`, as the [README](README.md#releases) says.
+
+## Unreleased
 
 ## 0.0.6
 
