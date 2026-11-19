@@ -14,6 +14,8 @@ export enum EventName {
   DetailAppended = "DetailAppended",
   DetailUpdated = "DetailUpdated",
   ReplyThinking = "ReplyThinking",
+  ReplyCheckpointStarted = "ReplyCheckpointStarted",
+  ReplyCheckpointEnded = "ReplyCheckpointEnded",
   ApprovalCreated = "ApprovalCreated",
   ApprovalUpdated = "ApprovalUpdated",
   ProviderUpdated = "ProviderUpdated",

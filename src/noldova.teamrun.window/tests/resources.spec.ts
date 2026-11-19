@@ -167,6 +167,7 @@ describe("Resources", () => {
     expect(Resources.formatWorkedFor("3s")).toBe("Worked for 3s");
     expect(Resources.formatWorkingFor("3s")).toBe("Working for 3s");
     expect(Resources.formatThinkingFor("3s")).toBe("Thinking… 3s");
+    expect(Resources.formatSavingCheckpointFor("3s")).toBe("Saving a checkpoint… 3s");
   });
 
   it("words a reply's running tasks for one and for many", () => {

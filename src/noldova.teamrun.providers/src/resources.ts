@@ -565,6 +565,7 @@ export class Resources {
     return `The compact summary in ${file} isn't text.`;
   }
 
+  public static readonly codexOwnComputerToolsOff: JsonObject = { browser_use: false, computer_use: false };
   public static readonly codexNoToolsConfig: JsonObject = {
     plugins: {},
     notify: [],
@@ -2204,6 +2205,8 @@ export class Resources {
     + "teammate was added again. The next message resumes the chat on a new one.";
   public static readonly claudeChatEndedForTools: string = "Claude's open chat ended, and any background tasks with it, because TeamRun refused its token for "
     + "TeamRun's tools: it expired or the teammate was added again. This turn resumes the chat on a new one.";
+  public static readonly claudeChatEndedForToolsChange: string = "Claude's open chat ended, and its background tasks with it, because the tools TeamRun serves "
+    + "changed, such as when computer use turned on. This turn resumes the chat on a new one.";
   public static readonly terminalRunTool: string = "terminal_run";
   public static readonly terminalWriteTool: string = "terminal_write";
   public static readonly terminalStepTools: readonly string[] = [Resources.terminalRunTool, Resources.terminalWriteTool];

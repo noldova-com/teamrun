@@ -32,7 +32,7 @@ const GITHUB_PAGE: string = "GitHub";
 const BROWSER_PAGE: string = "Browser";
 const LINK_CLICK_ROW: string = "Open a link you click";
 const IN_YOUR_BROWSER: string = "In your browser";
-const IN_APP_VERIFICATION_URI: string = "https://teamrun-e2e.invalid/login/device";
+const OTHER_VERIFICATION_URI: string = "https://teamrun-e2e.invalid/login/device";
 const OTHER_PAGE: string = "Appearance";
 const PAGES: string = "Settings pages";
 const TOLERANCE_REM: number = 0.05;
@@ -143,9 +143,9 @@ test("Settings' GitHub page lines up with Settings' other pages, opens a device 
   expect(app.unexpectedFailures).toEqual([]);
 });
 
-test("with the default Links setting, Settings' GitHub page opens a device code's page in the app's Browser and not in the person's browser", async ({ app }) => {
+test("with the default Links setting, Settings' GitHub page opens a device code's page in the person's browser and not in the app's Browser", async ({ app }) => {
   const log = path.join(app.work, "github.log");
-  const page = await app.openChatAsync({ TEAMRUN_GITHUB_DOUBLE_CODE: USER_CODE, TEAMRUN_GITHUB_DOUBLE_LOG: log, TEAMRUN_GITHUB_DOUBLE_VERIFICATION: IN_APP_VERIFICATION_URI }, [DOUBLE]);
+  const page = await app.openChatAsync({ TEAMRUN_GITHUB_DOUBLE_CODE: USER_CODE, TEAMRUN_GITHUB_DOUBLE_LOG: log, TEAMRUN_GITHUB_DOUBLE_VERIFICATION: OTHER_VERIFICATION_URI }, [DOUBLE]);
   await app.electronApp.evaluate(({ shell }) => {
     const opened: string[] = [];
     Reflect.set(globalThis, "openedLinks", opened);
@@ -162,8 +162,8 @@ test("with the default Links setting, Settings' GitHub page opens a device code'
 
   await signIn.click();
 
-  await expect(page.getByRole("tab", { name: /teamrun-e2e[.]invalid/u })).toBeVisible({ timeout: 30_000 });
-  expect(await app.electronApp.evaluate(() => Reflect.get(globalThis, "openedLinks"))).toEqual([]);
+  await expect.poll(() => app.electronApp.evaluate(() => Reflect.get(globalThis, "openedLinks")), TeamRunApp.pollOf()).toEqual([OTHER_VERIFICATION_URI]);
+  await expect(page.getByRole("tab", { name: /teamrun-e2e[.]invalid/u })).toHaveCount(0);
   const lines = linesOf(log);
   expect(lines.filter(t => t.startsWith("answered "))[0]).toBe(DEVICE_CODE_ANSWERED);
   expect(lines.filter(t => t.startsWith("refused "))).toEqual([]);

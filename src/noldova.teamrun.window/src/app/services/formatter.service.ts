@@ -15,6 +15,7 @@ import { DetailKind, FileChangeReader, type FileChangeSummary, type Message, Mes
 import { MessageAuthor as Author, MessageAuthorKind, Plan, PlanStep, ToolCall, ToolCallKind, ToolCallOutputState, ToolCallStatus } from "@noldova/ui.components.angular";
 
 import { PageCardComponent } from "../components/pages/page-card/page-card.component";
+import { ReplyActivity } from "../enums/reply-activity";
 import { SegmentKind } from "../enums/segment-kind";
 import { StepCategory } from "../enums/step-category";
 import { ActivityEntry } from "../models/activity-entry";
@@ -530,7 +531,7 @@ export class FormatterService {
     return String.isNullOrWhitespace(line) ? null : line;
   }
 
-  public activityLabel(message: Message, now: number, isThinking: boolean = false): string {
+  public activityLabel(message: Message, now: number, activity: ReplyActivity | null = null): string {
     if (this.isWaitingForTurn(message))
       return Resources.waitingForTurnLabel;
     if (Object.isNull(message.startedAt))
@@ -539,8 +540,12 @@ export class FormatterService {
     const duration = Resources.formatDuration(ended - Date.parse(message.startedAt));
     if (!this.isActive(message))
       return Resources.formatWorkedFor(duration);
+    if (activity === ReplyActivity.Stopping)
+      return Resources.stoppingLabel;
+    if (activity === ReplyActivity.SavingCheckpoint)
+      return Resources.formatSavingCheckpointFor(duration);
     const isWaitingForFirst = message.status === MessageStatus.Running && this.segments(message).length === 0;
-    return isThinking || isWaitingForFirst ? Resources.formatThinkingFor(duration) : Resources.formatWorkingFor(duration);
+    return activity === ReplyActivity.Thinking || isWaitingForFirst ? Resources.formatThinkingFor(duration) : Resources.formatWorkingFor(duration);
   }
 
   public latestThought(detail: MessageDetail): string {

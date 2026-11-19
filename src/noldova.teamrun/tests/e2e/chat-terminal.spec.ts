@@ -160,7 +160,6 @@ test("an agent's command runs in a terminal tied to its chat, shows in the panel
   await page.getByRole("button", { name: /^Worked for / }).first().click();
   const step = page.getByRole("button", { name: /^Run in / }).first();
   await expect(step).toBeVisible({ timeout: 60_000 });
-  const title = (await step.locator(".nol-tool-call-title").innerText()).trim();
   await expect.poll(() => TeamRunApp.readPid(programFile), TeamRunApp.pollOf(30_000)).not.toBeNull();
   await step.click();
   await expect(page.getByText(command, { exact: false }).first()).toBeVisible();
@@ -171,8 +170,9 @@ test("an agent's command runs in a terminal tied to its chat, shows in the panel
   await expect.soft(dockTabs).toHaveCount(2, { timeout: 30_000 });
   const tab = dockTabs.filter({ hasNotText: "Activity" }).first();
   if (await tab.isVisible()) {
-    const shellName = shellNameOf(/"shell":"([^"]+)"/.exec(readFileSync(app.codexLog, "utf8"))?.[1]);
-    expect.soft((await tab.locator(".nol-tab-label").innerText()).trim()).toBe(title === "Run in a terminal" ? shellName : title.slice("Run in ".length));
+    const shellName = shellNameOf(/"shell":"([^"]+)"/.exec(readFileSync(app.codexLog, "utf8"))?.[1]) ?? "";
+    expect.soft(shellName).not.toBe("");
+    await expect.soft(tab.locator(".nol-tab-label")).toHaveText(shellName);
     expect(Math.abs(await topOf(tab) - await topOf(activity))).toBeLessThan(2);
   }
   expect(readFileSync(app.codexLog, "utf8")).toContain("transport: http");

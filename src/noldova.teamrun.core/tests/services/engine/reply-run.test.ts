@@ -9,6 +9,7 @@
 import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { CaptureOutcome } from "@noldova/checkpoints.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
@@ -328,6 +329,67 @@ export class ReplyRunTests {
     Assert.areEqual("null,null,set", (await Promise.all(ids.map(t => host.messages.findCheckpointAsync(t)))).map(t => Object.isNull(t) ? "null" : "set").join(","));
     Assert.areEqual(1, host.checkpoints.compares.length);
     Assert.areEqual(MessageStatus.Completed, (await host.messages.findAsync(ids[2]!))?.status);
+  }
+
+  @TestMethod
+  public async announcesItsCheckpointAndItsEndOnlyWhenItTakesOne(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    mkdirSync(project.rootPath, { recursive: true });
+    const conversation = await host.createConversationAsync(project);
+    const work = new WorkFolder(project.id, project.rootPath);
+    const without = await ReplyRunTests.checkpointRunAsync(host, conversation.id, "without", 0, null, work);
+    await without.run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+    const before = ReplyRunTests.checkpointEvents(host);
+
+    const taking = await ReplyRunTests.checkpointRunAsync(host, conversation.id, "taking", 1, new ReplyCheckpoints(host.checkpoints), work);
+    await taking.run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+
+    Assert.areEqual("", before.join(","));
+    Assert.areEqual([`${EventName.ReplyCheckpointStarted}:taking`, `${EventName.ReplyCheckpointEnded}:taking`].join(","), ReplyRunTests.checkpointEvents(host).join(","));
+    Assert.areEqual([2, 1].join(","), [host.adapter.requests.length, host.checkpoints.captures.length].join(","));
+  }
+
+  @TestMethod
+  public async announcesItsCheckpointsEndWhenTheCheckpointFailsOrIsNotTaken(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    mkdirSync(project.rootPath, { recursive: true });
+    const conversation = await host.createConversationAsync(project);
+    const work = new WorkFolder(project.id, project.rootPath);
+    host.checkpoints.captureError = new Error("The store is locked.");
+    const failing = await ReplyRunTests.checkpointRunAsync(host, conversation.id, "failing", 0, new ReplyCheckpoints(host.checkpoints), work);
+    await failing.run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+    host.checkpoints.captureError = null;
+    host.checkpoints.captureOutcome = CaptureOutcome.LowDiskSpace;
+    const untaken = await ReplyRunTests.checkpointRunAsync(host, conversation.id, "untaken", 1, new ReplyCheckpoints(host.checkpoints), work);
+    await untaken.run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+
+    Assert.areEqual([`${EventName.ReplyCheckpointStarted}:failing`, `${EventName.ReplyCheckpointEnded}:failing`, `${EventName.ReplyCheckpointStarted}:untaken`,
+      `${EventName.ReplyCheckpointEnded}:untaken`].join(","), ReplyRunTests.checkpointEvents(host).join(","));
+    Assert.areEqual([MessageStatus.Completed, MessageStatus.Completed].join(","),
+      (await Promise.all(["failing", "untaken"].map(t => host.messages.findAsync(t)))).map(t => t?.status).join(","));
+  }
+
+  @TestMethod
+  public async announcesItsCheckpointsEndWhenItIsStoppedDuringTheCheckpoint(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    mkdirSync(project.rootPath, { recursive: true });
+    const conversation = await host.createConversationAsync(project);
+    host.checkpoints.holds = "capture";
+    const stopped = await ReplyRunTests.checkpointRunAsync(host, conversation.id, "stopped", 0, new ReplyCheckpoints(host.checkpoints),
+      new WorkFolder(project.id, project.rootPath));
+    const executed = stopped.run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+    await host.until("the checkpoint", () => host.checkpoints.captures.length === 1);
+    const during = ReplyRunTests.checkpointEvents(host);
+
+    stopped.active.cancel();
+    await executed;
+
+    Assert.areEqual(`${EventName.ReplyCheckpointStarted}:stopped`, during.join(","));
+    Assert.areEqual([`${EventName.ReplyCheckpointStarted}:stopped`, `${EventName.ReplyCheckpointEnded}:stopped`].join(","), ReplyRunTests.checkpointEvents(host).join(","));
+    Assert.areEqual(0, host.adapter.requests.length);
   }
 
   @TestMethod
@@ -1252,6 +1314,21 @@ export class ReplyRunTests {
 
     Assert.areEqual(1, host.adapter.requests.length);
     Assert.areEqual(0, host.adapter.requests[0]?.sharedServers.length);
+  }
+
+  private static async checkpointRunAsync(host: CoreHost, conversationId: string, id: string, sequence: number, module: ReplyCheckpoints | null,
+    folder: WorkFolder | null): Promise<{ run: ReplyRun; active: ActiveRun }> {
+    const reply = new Message(id, conversationId, sequence, MessageAuthor.Provider, null, MessageStatus.Pending, [], ReplyRunTests.provenance, "t", null, null, [],
+      "alice", "Alice");
+    await host.messages.insertAsync(reply);
+    const active = new ActiveRun(reply.id);
+    return { run: new ReplyRun(reply, ReplyRunTests.provenance, active, host.messages, host.approvals, host.events, host.directory.path, null, null, null, null,
+      null, module, folder), active };
+  }
+
+  private static checkpointEvents(host: CoreHost): readonly string[] {
+    return host.listener.events.filter(t => t.name === EventName.ReplyCheckpointStarted || t.name === EventName.ReplyCheckpointEnded)
+      .map(t => `${t.name}:${MessageIdParams.fromJson(t.payload).messageId}`);
   }
 
   private static subAgentStatus(message: Message): SubAgentStatus {

@@ -12,7 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { CommandRun, NotificationAction, QualifiedName } from "@noldova/desktop.protocol";
-import { WindowPartTokens } from "@noldova/desktop.window";
+import { LinkPlace, WindowPartTokens } from "@noldova/desktop.window";
 import {
   AcpAgentEntry,
   AcpAgentIdParams,
@@ -249,7 +249,7 @@ describe("ChatStoreService", () => {
       "teamrun.approvalCreated", "teamrun.approvalUpdated", "teamrun.backgroundTaskOutput", "teamrun.backgroundTaskUpdated", "teamrun.backgroundTasksCleared",
       "teamrun.composerDefaultUpdated", "teamrun.conversationDeleted", "teamrun.conversationRewound", "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.messageCreated", "teamrun.messageUpdated",
       "teamrun.panelRequested", "teamrun.planUsageUpdated", "teamrun.projectFolderChanged", "teamrun.projectsLayoutUpdated", "teamrun.providerKindInstallationChanged", "teamrun.providerKindsChanged",
-      "teamrun.providerSignInsChanged", "teamrun.providerUpdated", "teamrun.replyThinking", "teamrun.signInLink",
+      "teamrun.providerSignInsChanged", "teamrun.providerUpdated", "teamrun.replyCheckpointEnded", "teamrun.replyCheckpointStarted", "teamrun.replyThinking", "teamrun.signInLink",
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.waitingMessagesChanged", "teamrun.windowReloadRequested"
     ]);
     expect(context.watchedSettings).toEqual(["teamrun.sendKey", "teamrun.whileReplying"]);
@@ -1738,6 +1738,7 @@ describe("ChatStoreService", () => {
     await store.initialize();
     await store.selectConversation("c1");
     context.emit(EventName.ReplyThinking, new MessageIdParams("m2").toJson());
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
     expect(store.pendingApprovals()).toHaveLength(1);
     context.answer(MethodName.MessageListOpen, () => []);
     context.answer(MethodName.ApprovalList, () => []);
@@ -1751,6 +1752,7 @@ describe("ChatStoreService", () => {
     expect(store.resyncs()).toBe(resyncs + 1);
     expect(store.isWorking("c1")).toBe(false);
     expect([...store.thinkingReplies()]).toEqual([]);
+    expect([...store.savingCheckpointReplies()]).toEqual([]);
     expect(store.pendingApprovals()).toEqual([]);
     expect(messages()[1]?.status).toBe(MessageStatus.Completed);
     context.fail(MethodName.ProviderList, "The runtime part is away.");
@@ -1774,6 +1776,37 @@ describe("ChatStoreService", () => {
     expect([...store.thinkingReplies()]).toEqual([]);
     thinking("m2");
     expect([...store.thinkingReplies()]).toEqual([]);
+  });
+
+  it("marks a running reply as saving a checkpoint until the checkpoint ends, a detail comes, a resync or the reply ends, and ignores replies that are not running", async () => {
+    context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
+    await store.initialize();
+    const emit = (name: EventName, messageId: string): void => context.emit(name, new MessageIdParams(messageId).toJson());
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const seen: string[][] = [];
+
+    emit(EventName.ReplyCheckpointStarted, "unknown");
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointEnded, "unknown");
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointEnded, "m2");
+    seen.push(saving());
+    for (const name of [EventName.DetailAppended, EventName.DetailUpdated]) {
+      emit(EventName.ReplyCheckpointStarted, "m2");
+      context.emit(name, new DetailEventPayload("m2", SampleData.detail(0, DetailKind.Text, "Hello")).toJson());
+      seen.push(saving());
+    }
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    await expect(store.resync()).resolves.toBe(true);
+    seen.push([String(store.isWorking("c1")), ...saving()]);
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    context.emit(EventName.MessageUpdated, SampleData.withStatus(SampleData.reply, MessageStatus.Cancelled).toJson());
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    seen.push(saving());
+
+    expect(seen).toEqual([["m2"], ["m2"], [], [], [], ["true"], [], []]);
   });
 
   it("loads the catalog and selects a project without opening a conversation", async () => {
@@ -2878,9 +2911,9 @@ describe("ChatStoreService", () => {
       expect(await store.finishFirstLaunch()).toBe(true);
       expect(store.welcoming()).toBe(false);
       expect((await store.readFirstLaunch())?.finishedAt).toBe(SampleData.timestamp);
-      await store.openPage("https://claude.com/pricing", LinkGesture.Modified);
+      await store.openPage("https://example.com/droid", LinkGesture.Modified);
 
-      expect([context.links, context.linkGestures]).toEqual([["https://claude.com/pricing"], [LinkGesture.Modified]]);
+      expect([context.links, context.linkGestures]).toEqual([["https://example.com/droid"], [LinkGesture.Modified]]);
       expect(context.noticeText()).toBeNull();
     });
 
@@ -3955,6 +3988,25 @@ describe("ChatStoreService", () => {
     signIn.resolve(SampleData.provider.toJson());
     await signing;
     expect(store.signInLinks().size).toBe(0);
+  });
+
+  it("opens a sign-in's page in the system's browser, the one it opens itself and the one opened again, while the in-app browser takes every other link", async () => {
+    const signIn = new DeferredResponse();
+    const url = "https://auth.example.com/oauth/authorize?state=1";
+    context.answer(MethodName.ProviderSignIn, () => signIn.promise);
+    const browser = { placeFor: (): LinkPlace => LinkPlace.InApp, openAsync: (): Promise<void> => Promise.resolve() };
+    context.registerInAppBrowser(browser);
+    await store.initialize();
+    const placed = (): LinkPlace[] => context.linkPlaces.map(t => t ?? browser.placeFor());
+
+    const signing = store.signInProvider("a1");
+    context.emit(EventName.SignInLink, new SignInLinkPayload("a1", url).toJson());
+    await store.openSignInLink("a1", LinkGesture.Modified);
+    await store.openPage("https://example.com/droid", LinkGesture.Plain);
+
+    expect([context.links, placed()]).toEqual([[url, url, "https://example.com/droid"], [LinkPlace.System, LinkPlace.System, LinkPlace.InApp]]);
+    signIn.resolve(SampleData.provider.toJson());
+    await signing;
   });
 
   it("reads each provider's installation with the catalog, follows its changes, and counts a provider TeamRun doesn't install as installed", async () => {

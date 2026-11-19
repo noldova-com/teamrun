@@ -75,4 +75,28 @@ export class AcpTerminalsTests {
     Assert.areEqual(1, settled);
     Assert.isTrue(terminals.isIdle);
   }
+
+  @TestMethod
+  public async killsATerminalByEndingTheTreeItStartedFromItsSpawnAndNeitherSweepsNorStopsItAfter(): Promise<void> {
+    const timer = new ManualTimer();
+    const started = new StartedProcess();
+    const asked: (readonly [number, number])[] = [];
+    const after: string[] = [];
+    const tree: IProcessTree = { endTree: () => Promise.resolve(true), endDescendants: () => Promise.resolve(),
+      endOwnTree: (processId, startedBy) => { asked.push([processId, startedBy]); return Promise.resolve(true); },
+      endLeftovers: () => { after.push("leftovers"); return Promise.resolve(); } };
+    const terminals = new AcpTerminals(new RecordingTurnListener(), "Agent", { start: () => started, readEnvironmentAsync: own => Promise.resolve(own) }, timer, process.cwd(),
+      () => ({}), null, tree);
+    terminals.begin("s", () => undefined, () => undefined);
+    const created = await terminals.request("terminal/create", JsonReader.fromValue({ sessionId: "s", command: "node" }));
+    const terminalId = JsonReader.fromValue(created).readNonBlankString("terminalId");
+    timer.advance(5);
+    const spawned = timer.now();
+    started.attach(7, new PassThrough(), new PassThrough(), new PassThrough(), () => { after.push("stop"); return Promise.resolve(); });
+    timer.advance(5);
+
+    const killed = await terminals.request("terminal/kill", JsonReader.fromValue({ sessionId: "s", terminalId }));
+
+    Assert.areEqual(JSON.stringify([{}, [[7, spawned]], []]), JSON.stringify([killed, asked, after]));
+  }
 }
