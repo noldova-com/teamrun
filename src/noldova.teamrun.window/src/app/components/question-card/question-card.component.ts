@@ -6,8 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, type InputSignal, type OutputEmitterRef, type Signal, type WritableSignal, computed, effect, inject, input, output, signal,
-  untracked } from "@angular/core";
+import { Component, type InputSignal, type OutputEmitterRef, type Signal, computed, effect, inject, input, output, untracked } from "@angular/core";
 
 import "@noldova/context.core";
 import { type Approval, type ApprovalQuestion, ApprovalStatus, QuestionAnswer } from "@noldova/teamrun.protocol";
@@ -16,6 +15,8 @@ import { AnnouncementPoliteness, Announcer, ButtonComponent, ButtonVariant, Chip
 
 import type { ApprovalAnswer } from "../../models/approval-answer";
 import { ApprovalPermission } from "../../models/approval-permission";
+import { MessageControlState } from "../../models/message-control-state";
+import type { QuestionDraft } from "../../models/question-draft";
 import { QuestionSummary } from "../../models/question-summary";
 import { Resources } from "../../../resources";
 
@@ -35,12 +36,13 @@ export class QuestionCardComponent {
   private static count: number = 0;
 
   private readonly announcer: Announcer = inject(Announcer);
-  private readonly picks: WritableSignal<ReadonlyMap<string, readonly string[]>> = signal(new Map());
-  private readonly texts: WritableSignal<ReadonlyMap<string, string>> = signal(new Map());
+  private readonly picks: Signal<ReadonlyMap<string, readonly string[]>> = computed(() => this.controls().draftOf(this.approval().id)?.picks() ?? new Map());
+  private readonly texts: Signal<ReadonlyMap<string, string>> = computed(() => this.controls().draftOf(this.approval().id)?.texts() ?? new Map());
 
   public readonly approval: InputSignal<Approval> = input.required<Approval>();
   public readonly requester: InputSignal<string> = input.required<string>();
   public readonly answer: InputSignal<ApprovalAnswer | null> = input<ApprovalAnswer | null>(null);
+  public readonly controls: InputSignal<MessageControlState> = input<MessageControlState>(new MessageControlState());
   public readonly answered: OutputEmitterRef<readonly QuestionAnswer[]> = output<readonly QuestionAnswer[]>();
   public readonly skipped: OutputEmitterRef<void> = output<void>();
 
@@ -76,7 +78,7 @@ export class QuestionCardComponent {
   public constructor() {
     effect(() => {
       if (!this.isOpen())
-        this.texts.set(new Map());
+        untracked(() => this.controls().draftOf(this.approval().id)?.texts.set(new Map()));
     });
     effect(() => {
       const answer = this.answer();
@@ -107,16 +109,18 @@ export class QuestionCardComponent {
   protected pick(question: ApprovalQuestion, label: string, checked: boolean): void {
     const picked = (this.picks().get(question.id) ?? []).filter(t => question.multiple && t !== label);
     const next = checked ? [...picked, label] : picked;
-    this.picks.update(t => new Map(t).set(question.id, question.options.map(u => u.label).filter(u => next.includes(u))));
+    const draft = this.draft();
+    draft.picks.update(t => new Map(t).set(question.id, question.options.map(u => u.label).filter(u => next.includes(u))));
     if (!question.multiple && checked)
-      this.texts.update(t => new Map(t).set(question.id, String.empty));
+      draft.texts.update(t => new Map(t).set(question.id, String.empty));
   }
 
   protected type(question: ApprovalQuestion, event: Event): void {
     const text = (event.target as HTMLInputElement).value;
-    this.texts.update(t => new Map(t).set(question.id, text));
+    const draft = this.draft();
+    draft.texts.update(t => new Map(t).set(question.id, text));
     if (!question.multiple && !String.isNullOrWhitespace(text))
-      this.picks.update(t => new Map(t).set(question.id, []));
+      draft.picks.update(t => new Map(t).set(question.id, []));
   }
 
   protected submit(): void {
@@ -128,6 +132,10 @@ export class QuestionCardComponent {
   protected skip(): void {
     if (!this.isSending())
       this.skipped.emit();
+  }
+
+  private draft(): QuestionDraft {
+    return this.controls().draftFor(this.approval().id);
   }
 
   private answerTo(question: ApprovalQuestion): QuestionAnswer | null {

@@ -14,6 +14,6 @@ LICENSE file in the root directory of this source tree.
     <nol-permission-card [request]="request" [detailLines]="resources.permissionDetailLines" [attr.data-nol-teamrun-approval]="request.id" (decide)="decide(request.id, $event)" (focusin)="focused.emit(request.id)" />
   } @else {
     <nol-teamrun-question-card [approval]="item.approval" [attr.data-nol-teamrun-approval]="item.approval.id" [requester]="requester()"
-      [answer]="item.answer" (answered)="answer(item.approval.id, $event)" (skipped)="skip(item.approval.id)" (focusin)="focused.emit(item.approval.id)" />
+      [answer]="item.answer" [controls]="controls()" (answered)="answer(item.approval.id, $event)" (skipped)="skip(item.approval.id)" (focusin)="focused.emit(item.approval.id)" />
   }
 }
