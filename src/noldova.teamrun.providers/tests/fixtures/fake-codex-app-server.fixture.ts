@@ -667,7 +667,10 @@ export class FakeCodexAppServer {
     }
     this.lastCollaboration = params["collaborationMode"] ?? null;
     this.lastTurnPolicy = [params["approvalPolicy"] ?? null, params["sandboxPolicy"] ?? null];
-    this.lastTurnSettings = Object.fromEntries(["model", "effort"].filter(t => t in params).map(t => [t, params[t]]));
+    this.lastTurnSettings = Object.fromEntries(["model", "effort", "cwd"].filter(t => t in params).map(t => [t, params[t]]));
+    const started = this.loaded.get(threadId);
+    if (started !== undefined && typeof params["cwd"] === "string")
+      started.params = { ...started.params, cwd: params["cwd"] };
     if (params["collaborationMode"] !== undefined && process.env["TEAMRUN_FAKE_CODEX_PLAN"] === "refuse") {
       this.fail(id, -32600, "turn/start.collaborationMode requires experimentalApi capability");
       return;
@@ -781,6 +784,10 @@ export class FakeCodexAppServer {
         break;
       case "window":
         this.emitWindowScenario(threadId, turnId);
+        break;
+      case "where":
+        this.notify("item/completed", { ...turn, item: { id: "echo", type: "agentMessage", text: String(this.loaded.get(threadId)?.params["cwd"] ?? "") } });
+        this.notify("turn/completed", { threadId, turn: { id: turnId, status: "completed" } });
         break;
       case "echo":
         this.notify("item/completed", { ...turn, item: { id: "echo", type: "agentMessage", text: JSON.stringify({ thread: this.lastThreadParams, resume: this.lastResumeParams, fork: this.lastForkParams, configRead: this.lastConfigReadParams, argv: process.argv.slice(2), codexHome: process.env["CODEX_HOME"] ?? null, apiKey: process.env["OPENAI_API_KEY"] ?? null }) } });

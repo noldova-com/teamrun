@@ -501,18 +501,18 @@ export class CodexAdapter implements IProviderAdapter {
     return this.runTurnOnThread(client, turn, listener, input, before, signal, grant.revoke, grant.connection?.token ?? null,
       SenderEnvironment.read(request.environment), tools, held, this.collaborationOf(requested, started),
       !resumes && Object.isNull(requested.contextWindow) && !Object.isNull(started.model) ? CodexAdapter.windowKey(request.provider, started.model) : null,
-      CodexAdapter.modeOf(requested), requested.model, requested.effort, changes, review);
+      CodexAdapter.modeOf(requested), requested.model, requested.effort, request.workingDirectory, changes, review);
   }
 
   private async changesFor(client: AppServerClient, held: ICodexHold, requested: RequestedSettings, workingDirectory: string): Promise<JsonObject | null> {
     const model = requested.model;
     const effort = requested.effort;
     if (!(Object.isNull(model) && !Object.isNull(held.model) || Object.isNull(effort) && !Object.isNull(held.effort)))
-      return CodexAdapter.changesOf(held, model, effort);
+      return CodexAdapter.changesOf(held, model, effort, workingDirectory);
     const [models] = await this.readCatalog(client, workingDirectory);
     const resolved = model ?? models.find(t => t.isDefault)?.id;
     const chosen = models.find(t => t.id === resolved);
-    return CodexAdapter.changesOf(held, resolved, effort ?? chosen?.configuredEffort ?? chosen?.defaultEffort);
+    return CodexAdapter.changesOf(held, resolved, effort ?? chosen?.configuredEffort ?? chosen?.defaultEffort, workingDirectory);
   }
 
   public listOwnMcpServers(provider: Provider | null): Promise<readonly OwnMcpServer[]> {
@@ -638,7 +638,7 @@ export class CodexAdapter implements IProviderAdapter {
   private async runTurnOnThread(client: AppServerClient, turn: CodexTurn, listener: ITurnListener, input: readonly JsonObject[] | null,
     before: TokenTotals | null, signal: AbortSignal, revoke: () => void, token: string | null, sender: string | null, tools: readonly string[] | null,
     resumed: ICodexHold | null, collaboration: JsonObject | null, ownWindow: string | null, mode: string | null, model: string | null,
-    effort: string | null, changes: JsonObject | null, review: JsonObject | null): Promise<TurnResult> {
+    effort: string | null, cwd: string | null, changes: JsonObject | null, review: JsonObject | null): Promise<TurnResult> {
     this.router.register(turn);
     this.silencesOf(turn.threadId).forEach(t => t.stop());
     const usage = new CodexUsage(turn.threadId, listener, before, this.rateLimitsOf(client));
@@ -650,6 +650,7 @@ export class CodexAdapter implements IProviderAdapter {
     if (Object.isNull(resumed)) {
       held.model = model;
       held.effort = effort;
+      held.cwd = cwd;
     }
     else if (!Object.isNull(changes))
       Object.assign(held, changes);
@@ -899,7 +900,7 @@ export class CodexAdapter implements IProviderAdapter {
       await target.onObservedAsync(parent.observed);
       const turn = new CodexTurn(parent.threadId, target, parent.observed, this.itemReader, new DeltaStream(target, this.timings.streamInterval));
       target.end(await this.runTurnOnThread(client, turn, target, [CodexAdapter.textInputOf(Resources.codexWakePrompt)],
-        this.totals.get(parent.threadId) ?? null, signal, () => undefined, null, null, null, held, null, null, held.mode, held.model, held.effort, null, null));
+        this.totals.get(parent.threadId) ?? null, signal, () => undefined, null, null, null, held, null, null, held.mode, held.model, held.effort, held.cwd, null, null));
     }
     finally {
       release();
@@ -967,7 +968,7 @@ export class CodexAdapter implements IProviderAdapter {
 
   private hold(client: AppServerClient, threadId: string): ICodexHold {
     const threads = this.holds.get(client) ?? new Map<string, ICodexHold>();
-    const held = threads.get(threadId) ?? { count: 0, reload: false, revokes: [], token: null, sender: null, tools: null, mode: null, model: null, effort: null };
+    const held = threads.get(threadId) ?? { count: 0, reload: false, revokes: [], token: null, sender: null, tools: null, mode: null, model: null, effort: null, cwd: null };
     held.count += 1;
     threads.set(threadId, held);
     this.holds.set(client, threads);
@@ -1405,9 +1406,10 @@ export class CodexAdapter implements IProviderAdapter {
     return CodexAdapter.sandboxes[CodexAdapter.modes.find(t => t.id === requested)?.id ?? Resources.codexDefaultMode]!;
   }
 
-  private static changesOf(held: ICodexHold, model: string | null | undefined, effort: string | null | undefined): JsonObject | null {
+  private static changesOf(held: ICodexHold, model: string | null | undefined, effort: string | null | undefined, cwd: string): JsonObject | null {
     const changes = { ...Object.isNullOrUndefined(model) || held.model === model ? {} : { [Resources.modelField]: model },
-      ...Object.isNullOrUndefined(effort) || held.effort === effort ? {} : { [Resources.effortField]: effort } };
+      ...Object.isNullOrUndefined(effort) || held.effort === effort ? {} : { [Resources.effortField]: effort },
+      ...held.cwd === cwd ? {} : { [Resources.cwdField]: cwd } };
     return Object.keys(changes).length === 0 ? null : changes;
   }
 

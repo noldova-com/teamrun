@@ -1961,6 +1961,30 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
+  public async movesAHeldThreadToTheTurnsFolderOnTurnStartWhenTheChatsFolderHasChangedSinceItsLastTurn(): Promise<void> {
+    using host = new CodexTestHost();
+    const adapter = host.createAdapter();
+    const own = join(host.directory.path, "own");
+    const attached = join(host.directory.path, "attached");
+    mkdirSync(own);
+    mkdirSync(attached);
+    const seen: string[] = [];
+    let threadId: string | null = null;
+    try {
+      for (const folder of [own, attached, attached, own]) {
+        const listener = new RecordingTurnListener();
+        const result = await adapter.runTurn(new TurnRequest(null, folder, "where", new RequestedSettings("codex", null, null), threadId), listener,
+          new AbortController().signal);
+        threadId = result.nativeSessionId;
+        seen.push(listener.texts.join(""));
+      }
+    }
+    finally { await adapter.shutdown(); }
+
+    Assert.areEqual([own, attached, attached, own].join("|"), seen.join("|"));
+  }
+
+  @TestMethod
   public async setsTheTurnsSandboxAndApprovalOnTurnStartOnlyWhenAHeldThreadRunsInAnotherMode(): Promise<void> {
     using host = new CodexTestHost();
     const adapter = host.createAdapter();
