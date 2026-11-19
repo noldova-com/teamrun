@@ -22,7 +22,6 @@ import { ForkRequest } from "../../models/fork-request.js";
 import { WorkFolder } from "../../models/work-folder.js";
 import { Resources } from "../../resources.js";
 import type { DatabaseContext } from "../database-context.js";
-import { DraftsService } from "../drafts/drafts.service.js";
 import type { ProviderKindRegistry } from "../provider-kinds/provider-kind-registry.js";
 import type { AttachmentStore } from "./attachment-store.js";
 import type { EngineServices } from "./engine-services.js";
@@ -210,7 +209,7 @@ export class KeptSessions {
       this.attachments.removeSent(removed.flatMap(t => t.attachments.map(u => u.path)));
     }
     catch (error) {
-      this.log?.write(Resources.formatSentFilesNotRemoved(conversationId, DraftsService.reasonOf(error)));
+      this.log?.write(Resources.formatSentFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
     }
   }
 }

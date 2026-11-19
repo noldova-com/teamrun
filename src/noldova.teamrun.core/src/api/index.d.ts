@@ -4974,6 +4974,11 @@ export declare class Resources {
   public static formatFailureKind(error: unknown): string;
 
   /**
+   * Names a file removal's failure for a log line: the error's code when it has one, else its name, or the thrown value's type.
+   */
+  public static formatFailureReason(error: unknown): string;
+
+  /**
    * Names a provider for a log line by its id's last `loggedIdLength` characters, or `noLoggedProvider` without
    * one.
    */

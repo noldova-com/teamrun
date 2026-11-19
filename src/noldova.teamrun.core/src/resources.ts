@@ -1140,6 +1140,10 @@ export class Resources {
     return Object.isString(code) ? `${error.name} ${code}` : error.name;
   }
 
+  public static formatFailureReason(error: unknown): string {
+    return error instanceof Error ? (error as NodeJS.ErrnoException).code ?? error.name : typeof error;
+  }
+
   public static formatLoggedProvider(providerId: string | null): string {
     return Object.isNull(providerId) ? Resources.noLoggedProvider : `the provider ending in "${providerId.slice(-Resources.loggedIdLength)}"`;
   }
