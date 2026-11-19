@@ -124,6 +124,23 @@ export class SharedMcpLauncherTests {
   }
 
   @TestMethod
+  public async forwardsSignalsBeforeItReleasesTheHeldServer(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const listening: number[][] = [];
+    const release = new Writable({
+      write: (_chunk: Buffer, _encoding, done) => {
+        listening.push(SharedMcpLauncher.forwardedSignals.map(t => host.listenerCount(t)));
+        done();
+      }
+    });
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0), SharedMcpLauncherTests.holding(release));
+
+    await new SharedMcpLauncher("linux", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--variables", "", "--", "server"]);
+
+    Assert.areEqual(JSON.stringify([SharedMcpLauncher.forwardedSignals.map(() => 1)]), JSON.stringify(listening));
+  }
+
+  @TestMethod
   public async leavesTheHoldingShellsOwnVariablesOutOfTheServersEnvironmentButKeepsOnesTheServerNames(): Promise<void> {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0), SharedMcpLauncherTests.exiting(0));

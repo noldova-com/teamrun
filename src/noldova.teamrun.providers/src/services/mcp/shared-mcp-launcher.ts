@@ -161,12 +161,6 @@ export class SharedMcpLauncher {
       watch.stdin?.end();
     else
       watch.stdin?.write(`${[processId, started, startedBy].join(SharedMcpLauncher.FIELD_SEPARATOR)}${SharedMcpLauncher.LINE_END}`);
-    const release = server.stdio[3];
-    let said = "";
-    if (release instanceof Writable)
-      release.on("error", () => undefined).on("data", (chunk: Buffer) => {
-        said += chunk.toString();
-      }).end(SharedMcpLauncher.HOLD_RELEASE);
     const ended = new Promise<number>(resolve => {
       server.once("error", error => resolve(this.refuse(error.message, SharedMcpLauncher.FAILED_EXIT)));
       server.once("exit", (code, signal) => resolve(code ?? SharedMcpLauncher.SIGNAL_EXIT_BASE + Number(SharedMcpLauncher.SIGNAL_NUMBERS[String(signal)])));
@@ -179,6 +173,12 @@ export class SharedMcpLauncher {
     };
     for (const signal of SharedMcpLauncher.forwardedSignals)
       this.host.on(signal, forward);
+    const release = server.stdio[3];
+    let said = "";
+    if (release instanceof Writable)
+      release.on("error", () => undefined).on("data", (chunk: Buffer) => {
+        said += chunk.toString();
+      }).end(SharedMcpLauncher.HOLD_RELEASE);
     const code = await ended;
     for (const signal of SharedMcpLauncher.forwardedSignals)
       this.host.off(signal, forward);
