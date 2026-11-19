@@ -267,6 +267,7 @@ export { ProcessTerminator } from "../services/process/process-terminator.js";
 export { ProcessTree } from "../services/process/process-tree.js";
 export { StartedProcess } from "../services/process/started-process.js";
 export { ReadOnlyMcpTools } from "../services/mcp/read-only-mcp-tools.js";
+export { ServedToolNames } from "../services/mcp/served-tool-names.js";
 export { SharedMcpLaunch } from "../services/mcp/shared-mcp-launch.js";
 export { SharedMcpLauncher } from "../services/mcp/shared-mcp-launcher.js";
 export { CommandTitleReader } from "../services/command-title.reader.js";

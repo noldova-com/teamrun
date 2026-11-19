@@ -266,6 +266,28 @@ export class AcpAdapterTests {
   }
 
   @TestMethod
+  public async startsANewProcessForTheChatsNextTurnWhenTheServedToolsChangedSinceTheKeptSessionListedThem(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = AcpAdapterTests.adapter(host, [], { agentCapabilities: { loadSession: true, mcpCapabilities: { http: true } } }, {}, host.idleTimer);
+    const tokens = new SessionTokens();
+    tokens.open("session-1", "c1/t1");
+    const served = ["terminal_run"];
+    const tools = new TurnTools({ listToolsAsync: () => Promise.resolve(served.map(t => ({ name: t }))), callToolAsync: () => Promise.resolve({}) }, [],
+      new McpEndpoint("http://127.0.0.1:4711/mcp", tokens, "session-1"));
+    const request = (resume: string | null): TurnRequest => new TurnRequest(null, host.directory.path, "methods", new RequestedSettings("grok", null, null), resume,
+      [], null, null, {}, false, tools);
+    const first = await AcpAdapterTests.run(adapter, request(null));
+    const opened = host.programs.started.length;
+    await AcpAdapterTests.run(adapter, request(first.nativeSessionId));
+    const kept = host.programs.started.length - opened;
+    served.push("computer_click");
+    const changed = await AcpAdapterTests.run(adapter, request(first.nativeSessionId));
+
+    Assert.areEqual(TurnOutcome.Completed, changed.outcome);
+    Assert.areEqual(JSON.stringify([0, 1]), JSON.stringify([kept, host.programs.started.length - opened]));
+  }
+
+  @TestMethod
   public async takesTheKeptSessionOnlyWhileItsProviderRunsTheSameChosenServer(): Promise<void> {
     await using host = new GrokTestHost();
     const adapter = AcpAdapterTests.adapter(host, [], { agentCapabilities: { loadSession: true } }, {}, host.idleTimer);

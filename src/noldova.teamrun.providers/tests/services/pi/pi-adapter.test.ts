@@ -579,6 +579,29 @@ export class PiAdapterTests {
   }
 
   @TestMethod
+  public async startsAnotherPiForTheChatsNextTurnWhenTheServedToolsChangedSinceTheKeptPiListedThem(): Promise<void> {
+    await using host = new PiTestHost();
+    const adapter = host.createAdapter();
+    const tokens = new SessionTokens();
+    tokens.open("session-1", "c1/t1");
+    const served = ["terminal_run"];
+    const tools = new TurnTools({ listToolsAsync: () => Promise.resolve(served.map(t => ({ name: t }))), callToolAsync: () => Promise.resolve({}) }, [],
+      new McpEndpoint("http://127.0.0.1:4711/mcp", tokens, "session-1"));
+    const turn = (resume: string | null): Promise<TurnResult> => adapter.runTurn(new TurnRequest(null, host.directory.path, "Hi",
+      new RequestedSettings("pi", null, null), resume, [], null, null, {}, false, tools), new RecordingTurnListener(), new AbortController().signal);
+    const launches = (): number => host.records.filter(t => Array.isArray(t["argv"])).length;
+
+    const first = await turn(null);
+    await turn(first.nativeSessionId);
+    const kept = launches();
+    served.push("computer_click");
+    const changed = await turn(first.nativeSessionId);
+
+    Assert.areEqual(TurnOutcome.Completed, changed.outcome);
+    Assert.areEqual(JSON.stringify([1, 2]), JSON.stringify([kept, launches()]));
+  }
+
+  @TestMethod
   public async notesInEachCompletedTurnOfAPiThatNeverListedTeamRunsToolsThatTheyArentInTheChatAndNotOnceItListedThem(): Promise<void> {
     await using host = new PiTestHost();
     const adapter = host.createAdapter();
