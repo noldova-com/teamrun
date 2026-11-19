@@ -106,10 +106,12 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
-  public async endsAChatTurnOnTheUsageLimitWithItsResetWhenClaudeRejectsTheAccount(): Promise<void> {
+  public async endsAChatTurnOnTheUsageLimitWithItsResetWhenClaudeRejectsTheAccountWhileItReplies(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
-    host.factory.next = new FakeClaudeQuery([SdkMessages.init("s-limit", "none", null, []), SdkMessages.rateLimit("s-limit", "rejected", 1_800_000_000, "rejected"),
+    host.factory.next = new FakeClaudeQuery([SdkMessages.init("s-limit", "none", null, []),
+      SdkMessages.assistant("66666666-6666-6666-6666-666666666666", [SdkMessages.text("Working")], "claude-opus-5"),
+      SdkMessages.rateLimit("s-limit", "rejected", 1_800_000_000, "rejected"),
       SdkMessages.limited("77777777-7777-7777-7777-777777777777", "You've hit your limit"), SdkMessages.success("s-limit", "You've hit your limit")]);
 
     const result = await adapter.runTurn(new TurnRequest(host.createProvider(), host.directory.path, "Hi", new RequestedSettings("claude", null, null), null),
@@ -122,7 +124,7 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
-  public async endsAWakeTurnOnTheUsageLimitWithItsResetWhenClaudeRejectsTheAccountWhileItRuns(): Promise<void> {
+  public async endsAWakeClaudeStartsItselfOnTheUsageLimitWhenTheRejectionComesBeforeTheWakesFirstMessage(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
     const tokens = new SessionTokens();

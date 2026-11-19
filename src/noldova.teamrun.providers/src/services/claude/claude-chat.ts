@@ -50,6 +50,7 @@ export class ClaudeChat {
   private applied: ClaudeTurn | null = null;
   private waking: boolean = false;
   private waker: { turn: ClaudeTurn; wake: WakeTurn } | null = null;
+  private rateLimit: Extract<SDKMessage, { type: "rate_limit_event" }> | null = null;
   private ended: TurnWake[] = [];
   private notified: boolean = false;
   private stamped: boolean = false;
@@ -354,7 +355,11 @@ export class ClaudeChat {
       return;
     }
     if (message.type === Resources.rateLimitEventType) {
-      await (this.waking ? this.waker?.turn : this.replying ?? this.pending?.turn)?.handle(message, query);
+      const bound = this.waking ? this.waker?.turn : this.replying;
+      if (Object.isNullOrUndefined(bound))
+        this.rateLimit = message;
+      else
+        await bound.handle(message, query);
       return;
     }
     if (message.type !== Resources.streamEventType && message.type !== Resources.assistantMessageType && message.type !== Resources.userMessageType
@@ -373,6 +378,10 @@ export class ClaudeChat {
     else if (!Object.isNull(this.replying) && this.applied !== this.replying)
       await this.resume(query);
     const turn = this.replying ?? this.waker?.turn ?? null;
+    const rateLimit = this.rateLimit;
+    this.rateLimit = null;
+    if (!Object.isNull(turn) && !Object.isNull(rateLimit))
+      await turn.handle(rateLimit, query);
     if (!Object.isNull(turn))
       await turn.handle(message, query);
     if (message.type !== Resources.resultMessageType)
