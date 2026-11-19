@@ -105,6 +105,29 @@ const hostsOf = (): string => JSON.stringify({
   hosts: [...document.querySelectorAll("nol-teamrun-inline-terminal")].map(t => ({ isConnected: t.isConnected, live: t.querySelector(".live")?.childElementCount ?? 0 }))
 });
 
+const boxesAsync = async (page: Page, locators: readonly Locator[]): Promise<readonly IBox[]> => {
+  const elements = await Promise.all(locators.map(t => t.elementHandle()));
+  const boxes = await page.evaluate(found => found.map(element => {
+    if (!element.isConnected || element.getClientRects().length === 0)
+      throw new Error("The element has no box.");
+    const box = element.getBoundingClientRect();
+    return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, height: box.height };
+  }), elements).finally(() => Promise.all(elements.map(t => t.dispose())));
+  return boxes;
+};
+
+const boxAt = (boxes: readonly IBox[], index: number): IBox => {
+  const box = boxes[index];
+  if (box === undefined)
+    throw new Error("The element has no box.");
+  return box;
+};
+
+const boxPairAsync = async (page: Page, first: Locator, second: Locator): Promise<{ readonly first: IBox; readonly second: IBox }> => {
+  const boxes = await boxesAsync(page, [first, second]);
+  return { first: boxAt(boxes, 0), second: boxAt(boxes, 1) };
+};
+
 const boxOf = async (locator: Locator): Promise<IBox> => {
   const box = await locator.boundingBox();
   if (box === null)
@@ -132,8 +155,7 @@ for (const { language, write, compute } of LANGUAGES)
       await expect(runs.nth(1)).toHaveAccessibleName(`Run ${language} command again`, { timeout: 30_000 });
       await expect(runs.nth(0)).toHaveAccessibleName(`Run ${language} command`);
       await expect.poll(() => page.evaluate(focusOf), TeamRunApp.pollOf(30_000)).toEqual(expect.objectContaining({ window: true, input: true }));
-      const underSecond = await boxOf(inline);
-      const secondBlock = await boxOf(blocks.nth(1));
+      const { first: underSecond, second: secondBlock } = await boxPairAsync(page, inline, blocks.nth(1));
       const history = await boxOf(page.locator(".nol-virtual-list-viewport").first());
       const rowHeight = (await boxOf(page.locator("nol-teamrun-inline-terminal .xterm-rows > div").first())).height;
       await testInfo.attach(`${language}-under-second`, { body: await page.screenshot(), contentType: "image/png" });
@@ -160,18 +182,18 @@ for (const { language, write, compute } of LANGUAGES)
         await testInfo.attach(`${language}-inline-hosts`, { body: await page.evaluate(hostsOf), contentType: "text/plain" });
         throw error;
       });
-      const underFirst = await boxOf(inline);
-      const firstBlock = await boxOf(blocks.nth(0));
+      const moved = await boxesAsync(page, [inline, blocks.nth(0), blocks.nth(1)]);
+      const [underFirst, firstBlock, secondBlockMoved] = [boxAt(moved, 0), boxAt(moved, 1), boxAt(moved, 2)];
       await testInfo.attach(`${language}-under-first`, { body: await page.screenshot(), contentType: "image/png" });
 
       await expect(kept).toHaveCount(1, { timeout: 30_000 });
-      const keptBox = await boxOf(kept);
-      const secondBlockAfter = await boxOf(blocks.nth(1));
+      const { first: keptBox, second: secondBlockAfter } = await boxPairAsync(page, kept, blocks.nth(1));
 
       expect([await inline.count(), TeamRunApp.readPid(first)]).toEqual([1, TeamRunApp.readPid(second)]);
       expect(keptBox.top).toBeGreaterThanOrEqual(secondBlockAfter.bottom - EDGE_TOLERANCE);
       expect(Math.abs(keptBox.left - secondBlockAfter.left)).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(Math.abs(keptBox.right - secondBlockAfter.right)).toBeLessThanOrEqual(EDGE_TOLERANCE);
+      expect(underFirst.bottom).toBeLessThanOrEqual(secondBlockMoved.top + EDGE_TOLERANCE);
       expect(underFirst.top).toBeGreaterThanOrEqual(firstBlock.bottom - EDGE_TOLERANCE);
       expect(Math.abs(underFirst.left - firstBlock.left)).toBeLessThanOrEqual(EDGE_TOLERANCE);
       expect(Math.abs(underFirst.right - firstBlock.right)).toBeLessThanOrEqual(EDGE_TOLERANCE);
@@ -289,12 +311,11 @@ const expectKeptUnderFirstAsync = async (page: Page, name: string): Promise<void
   const kept = page.locator("nol-teamrun-inline-terminal nol-code-block.output");
   await expect(kept).toHaveCount(1, { timeout: 60_000 });
   await expect.poll(async () => (await kept.innerText()).replaceAll(/\s/gu, ""), TeamRunApp.pollOf(5_000)).toContain(name);
-  const keptBox = await boxOf(kept);
-  const firstBlock = await boxOf(blocks.nth(0));
-  const secondBlock = await boxOf(blocks.nth(1));
+  const { first: keptBox, second: firstBlock } = await boxPairAsync(page, kept, blocks.nth(0));
+  const { first: keptAbove, second: secondBlock } = await boxPairAsync(page, kept, blocks.nth(1));
 
   expect(keptBox.top).toBeGreaterThanOrEqual(firstBlock.bottom - EDGE_TOLERANCE);
-  expect(keptBox.bottom).toBeLessThanOrEqual(secondBlock.top + EDGE_TOLERANCE);
+  expect(keptAbove.bottom).toBeLessThanOrEqual(secondBlock.top + EDGE_TOLERANCE);
   expect(Math.abs(keptBox.left - firstBlock.left)).toBeLessThanOrEqual(EDGE_TOLERANCE);
   expect(Math.abs(keptBox.right - firstBlock.right)).toBeLessThanOrEqual(EDGE_TOLERANCE);
 };
