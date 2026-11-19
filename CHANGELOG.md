@@ -12,12 +12,16 @@ Each version's section is written by the pull request that changes the version, 
 - **Signing in to GitHub opens your own browser:** GitHub's sign-in page, from Settings → GitHub and from the Git view's GitHub row, and Manage access on GitHub open in your system's browser, where you're signed in to GitHub, whatever Settings choose for where links open.
 - **Links in the terminal open in your own browser:** a link you Ctrl+click in a terminal, Cmd+click on macOS, opens in your system's browser by default, so the sign-in links that tools print reach the browser where you're signed in.
   The setting Open clicked links can open them in TeamRun's browser instead.
-- **Computer use for Codex teammates:** a Codex teammate gets TeamRun's computer tools once computer use is turned on, also in a chat whose session started before.
+- **Computer use for Codex teammates:** a Codex teammate gets TeamRun's computer tools once computer use is turned on, also in a chat whose session started before, and no longer reaches Codex's own computer use, which needs Codex's desktop app.
 
 ### Fixed
 
 - **More sign-in pages open in your own browser:** a shared MCP server's sign-in page and a provider's subscribe page now open in your system's browser, as a provider's sign-in page does since 0.0.2.
 - **Terminal:** on Windows, a key typed right after a resize is no longer lost, and an agent's run no longer types into a line you've half typed.
+- **Terminal in the bottom dock:** a terminal tab moved into the bottom dock grows the dock to the fewest rows a run needs.
+- **A run in a new terminal:** it waits for the terminal's pane to take its size, so the shell starts at the size it shows.
+- **Completing a command's options:** the first completion of a command's options waits for the shell's answer.
+- **PowerShell on Windows:** on a machine with many PowerShell modules, finding PowerShell is fast after the first time.
 - **Inline terminals:** when a Run starts at another code block, the earlier block's terminal is no longer removed and drawn again while TeamRun keeps its output.
 - **Explorer:** New chat, Open folder and Open browser are spaced as the chat rows are.
 
