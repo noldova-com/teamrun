@@ -19,8 +19,8 @@ export class WorkFolder {
     this.path = path;
   }
 
-  public static attached(path: string): WorkFolder {
-    const key = process.platform === "win32" ? path.toLowerCase() : path;
+  public static attached(path: string, platform: string = process.platform): WorkFolder {
+    const key = platform === Resources.windowsPlatform ? path.toLowerCase() : path;
     return new WorkFolder(Resources.formatAttachedFolderId(createHash("sha256").update(key).digest("hex").slice(0, 32)), path);
   }
 }

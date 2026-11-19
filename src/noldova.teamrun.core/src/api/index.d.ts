@@ -8237,9 +8237,10 @@ export declare class WorkFolder {
   /**
    * The work folder of a folder attached to a chat, named by a hash of its path, compared without case on Windows.
    * @param path The attached folder's absolute path.
+   * @param platform The platform the folder is on, as `process.platform` names it, which it is by default.
    * @returns The work folder.
    */
-  public static attached(path: string): WorkFolder;
+  public static attached(path: string, platform?: string): WorkFolder;
 }
 
 /**

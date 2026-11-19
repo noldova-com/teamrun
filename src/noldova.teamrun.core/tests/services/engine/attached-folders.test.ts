@@ -143,6 +143,28 @@ export class AttachedFoldersTests {
   }
 
   @TestMethod
+  public async refusesTheAttachWhenTheChatMovesIntoAProjectWhileItsFolderIsChecked(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    mkdirSync(project.rootPath, { recursive: true });
+    const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
+    const site = AttachedFoldersTests.folder(join(host.directory.path, "site"), {});
+    host.folderStat.hold(site);
+    const before = host.folderStat.paths.length;
+
+    const attaching = Assert.throwsAsync(() => host.conversations.attachFolderAsync(new ChatFolderAttachParams(chat.id, site), t => host.projects.checkFolderAsync(t, null)),
+      ServiceException);
+    await host.until("the held folder check", () => host.folderStat.paths.length > before);
+    await AttachedFoldersTests.succeedAsync(host, MethodName.ConversationMove, new ConversationMoveParams(chat.id, project.id).toJson());
+    host.folderStat.release(site, true);
+    const refused = await attaching;
+
+    Assert.areEqual(`${ErrorCode.Conflict} ${Resources.formatChatInProject(chat.id)}`, `${refused.info.name} ${refused.message}`);
+    const found = await host.conversations.findAsync(chat.id);
+    Assert.areEqual(`${project.id} null`, `${found?.projectId} ${found?.attachedFolder}`);
+  }
+
+  @TestMethod
   public async failsATurnWithoutStartingItsProviderWhenTheAttachedFolderIsGoneCantBeReadOrDoesntAnswer(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
@@ -232,7 +254,9 @@ export class AttachedFoldersTests {
     Assert.isTrue(/^folder-[0-9a-f]{32}$/u.test(folder.id));
     Assert.areEqual(folder.id, WorkFolder.attached("/Site").id);
     Assert.areNotEqual(folder.id, WorkFolder.attached("/Other").id);
-    Assert.areEqual(process.platform === "win32", folder.id === WorkFolder.attached("/site").id);
+    Assert.areEqual(WorkFolder.attached("C:/Site", "win32").id, WorkFolder.attached("c:/site", "win32").id);
+    Assert.areNotEqual(WorkFolder.attached("/Site", "linux").id, WorkFolder.attached("/site", "linux").id);
+    Assert.areEqual(WorkFolder.attached("/Site", process.platform).id, folder.id);
   }
 
   private static folder(path: string, files: Readonly<Record<string, string>>): string {
