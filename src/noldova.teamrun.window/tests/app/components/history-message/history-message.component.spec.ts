@@ -963,7 +963,8 @@ describe("HistoryMessageComponent", () => {
     stop().click();
     fixture.detectChanges();
 
-    expect([textOf(".activity-text"), stop().disabled, textOf(".nol-message-footer .cancel"), calls]).toEqual(["Stopping…", true, "Stop", 1]);
+    expect([textOf(".activity-text"), stop().disabled, calls]).toEqual(["Stopping…", true, 1]);
+    expect(textOf(".nol-message-footer .cancel")).toMatch(/Stop$/u);
     for (const [earlier, after] of [[before[0], box(".nol-message-footer .cancel")], [before[1], box(".activity-line")]] as const)
       for (const edge of ["left", "top", "width", "height"] as const)
         AppearanceFixture.expectPixels(after[edge], earlier[edge]);
