@@ -424,7 +424,14 @@ export class TeamRunApp {
     const runtime = statuses.filter(t => this.isRuntime(t));
     const sessions = runtime.filter(t => t.session === t.pid).map(t => t.session);
     const found = TeamRunApp.withChildren([...runtime, ...statuses.filter(t => sessions.includes(t.session) && !runtime.includes(t))], statuses);
-    return found.map(t => ({ pid: t.pid, name: t.name, start: t.start }));
+    return (process.platform === "darwin" ? TeamRunApp.withGroups(found, statuses) : found).map(t => ({ pid: t.pid, name: t.name, start: t.start }));
+  }
+
+  private static withGroups(found: readonly IProcessStatus[], statuses: readonly IProcessStatus[]): readonly IProcessStatus[] {
+    const all = [...found];
+    for (const member of all)
+      all.push(...statuses.filter(t => (t.session === member.session || t.parent === member.pid && BigInt(t.start) >= BigInt(member.start)) && !all.includes(t)));
+    return all;
   }
 
   public static withChildren(found: readonly IProcessStatus[], statuses: readonly IProcessStatus[]): readonly IProcessStatus[] {
