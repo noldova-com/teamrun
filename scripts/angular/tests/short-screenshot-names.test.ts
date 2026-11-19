@@ -46,7 +46,7 @@ describe("ShortScreenshotNames", () => {
   });
 
   it("cuts a file name of about 200 bytes, which fits a file system but makes a path too long to unpack on Windows", () => {
-    const named = `${"fails-with-a-title-past-what-a-path-may-hold-".repeat(4)}1.png`;
+    const named = `${"fails-with-a-title-past-what-a-path-may-hold-".repeat(5)}1.png`;
     const name = path.basename(ShortScreenshotNames.shorten(path.join(folder, named)));
 
     assert.equal(Buffer.byteLength(named) > 200 && Buffer.byteLength(named) < ShortScreenshotNames.NAME_LIMIT, true);
