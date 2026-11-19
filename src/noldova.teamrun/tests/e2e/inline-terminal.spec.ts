@@ -77,13 +77,13 @@ const readTyped = (file: string): string => {
   }
 };
 
-const shownAtPromptAsync = async (page: Page, text: string): Promise<boolean> => {
+const shownUnlessAtPromptAsync = async (page: Page, text: string): Promise<readonly string[]> => {
   const shown = await TerminalScreen.rowsAsync(page.locator("nol-teamrun-inline-terminal .xterm-rows"));
-  return shown.slice(0, -1).join("").includes(text) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "");
+  return shown.slice(0, -1).join("").includes(text) && TerminalScreen.PROMPT_END.test(shown.at(-1) ?? "") ? [] : shown;
 };
 
 const settledAtPromptAsync = async (page: Page, text: string): Promise<void> => {
-  await expect.poll(() => shownAtPromptAsync(page, text), TeamRunApp.pollOf(30_000)).toBe(true);
+  await expect.poll(() => shownUnlessAtPromptAsync(page, text), { ...TeamRunApp.pollOf(30_000), message: `the screen shows ${text} above the next prompt` }).toEqual([]);
   await page.waitForTimeout(TERMINAL_ECHO_SETTLE_MS);
 };
 
@@ -267,11 +267,15 @@ test("on a short history the inline terminal holds more than half of it, showing
     const inline = page.locator("nol-teamrun-inline-terminal:has(.live > *)");
     await inline.scrollIntoViewIfNeeded();
     const box = await boxOf(inline);
-    const history = await boxOf(page.locator(".nol-virtual-list-viewport").first());
+    const viewport = page.locator(".nol-virtual-list-viewport").first();
+    const history = await boxOf(viewport);
+    const historyHeight = await viewport.evaluate(t => t.clientHeight);
     const rowHeight = (await boxOf(screen.locator(":scope > div").first())).height;
     await testInfo.attach("short-history", { body: await page.screenshot(), contentType: "image/png" });
 
+    expect(historyHeight).toBeGreaterThanOrEqual((MINIMUM_ROWS + 1) * rowHeight);
     expect(history.height / 2).toBeLessThan(MINIMUM_ROWS * rowHeight);
+    await expect(screen.locator(":scope > div")).toHaveCount(MINIMUM_ROWS);
     expect(box.height).toBeGreaterThan(history.height / 2);
     expect(box.top).toBeGreaterThanOrEqual(history.top - EDGE_TOLERANCE);
     expect(box.bottom).toBeLessThanOrEqual(history.bottom + EDGE_TOLERANCE);
