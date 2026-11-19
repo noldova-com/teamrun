@@ -106,6 +106,87 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async endsAChatTurnOnTheUsageLimitWithItsResetWhenClaudeRejectsTheAccountWhileItReplies(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    host.factory.next = new FakeClaudeQuery([SdkMessages.init("s-limit", "none", null, []),
+      SdkMessages.assistant("66666666-6666-6666-6666-666666666666", [SdkMessages.text("Working")], "claude-opus-5"),
+      SdkMessages.rateLimit("s-limit", "rejected", 1_800_000_000, "rejected"),
+      SdkMessages.limited("77777777-7777-7777-7777-777777777777", "You've hit your limit"), SdkMessages.success("s-limit", "You've hit your limit")]);
+
+    const result = await adapter.runTurn(new TurnRequest(host.createProvider(), host.directory.path, "Hi", new RequestedSettings("claude", null, null), null),
+      new RecordingTurnListener(), new AbortController().signal);
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Failed, result.outcome);
+    Assert.areEqual(Resources.formatUsageLimitReached(Resources.claudeDisplayName), result.error);
+    Assert.areEqual(new Date(1_800_000_000_000).toISOString(), result.limit?.resetsAt);
+  }
+
+  @TestMethod
+  public async givesTheNextTurnNoUsageLimitFromARejectionThatCameAfterTheLastTurnEnded(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const provider = host.createProvider();
+    host.factory.next = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-stale", "none", null, []),
+      new StampedStep(SdkMessages.success("s-stale", "First")),
+      SdkMessages.rateLimit("s-stale", "rejected", 1_800_000_000, "rejected"),
+      new WaitForInputStep(),
+      new StampedStep(SdkMessages.limited("88888888-8888-8888-8888-888888888888", "You've hit your limit")),
+      new StampedStep(SdkMessages.success("s-stale", "Second")),
+      new WaitForCloseStep()
+    ]);
+    const request = (prompt: string, resume: string | null): TurnRequest => new TurnRequest(provider, host.directory.path, prompt,
+      new RequestedSettings("claude", null, null), resume);
+
+    try {
+      await adapter.runTurn(request("First", null), new RecordingTurnListener(), new AbortController().signal);
+      const second = await adapter.runTurn(request("Second", "s-stale"), new RecordingTurnListener(), new AbortController().signal);
+
+      Assert.areEqual(1, host.factory.queries.length);
+      Assert.isNull(second.limit);
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
+  @TestData(true)
+  @TestData(false)
+  public async endsAWakeClaudeStartsItselfOnTheUsageLimitWhenTheRejectionComesBeforeOrAfterTheWakesFirstMessage(early: boolean): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const tokens = new SessionTokens();
+    const rejected = SdkMessages.rateLimit("s-woken", "rejected", 1_800_000_000, "rejected");
+    const first = SdkMessages.assistant("55555555-5555-5555-5555-555555555555", [SdkMessages.text("Checking")], "claude-opus-5");
+    host.factory.next = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-woken", "none", null, []),
+      SdkMessages.taskStarted("s-woken", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-woken", "Started")),
+      SdkMessages.taskNotification("s-woken", "server", "completed", host.directory.resolve("missing.output")),
+      ...early ? [rejected, first] : [first, rejected],
+      SdkMessages.limited("44444444-4444-4444-4444-444444444444", "You've hit your limit"),
+      SdkMessages.success("s-woken", "You've hit your limit"),
+      new WaitForCloseStep()
+    ]);
+    const listener = new RecordingTurnListener();
+    listener.wakeTurn = new WakeTurn({ TEAMRUN_SENDER_TOKEN: "wake-token" });
+    await listener.wakeTurn.useToolsAsync(ClaudeAdapterTests.toolsOf(new RecordingMcpEndpoint(tokens, "wake")));
+    const woken = listener.wakeTurn.follow(new RecordingTurnListener(), new AbortController().signal);
+
+    await adapter.runTurn(ClaudeAdapterTests.senderRequest(host, "Start", null, new RecordingMcpEndpoint(tokens, "turn"), "turn-token"), listener,
+      new AbortController().signal);
+    tokens.close("turn");
+    const reply = await woken;
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Failed, reply.outcome);
+    Assert.areEqual(new Date(1_800_000_000_000).toISOString(), reply.limit?.resetsAt);
+  }
+
+  @TestMethod
   public async withTheSwitchOnNotesTheTurnWhenClaudeRefusesTheFirstTurnsSenderToken(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
