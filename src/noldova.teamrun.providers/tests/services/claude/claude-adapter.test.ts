@@ -124,17 +124,21 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
-  public async endsAWakeClaudeStartsItselfOnTheUsageLimitWhenTheRejectionComesBeforeTheWakesFirstMessage(): Promise<void> {
+  @TestData(true)
+  @TestData(false)
+  public async endsAWakeClaudeStartsItselfOnTheUsageLimitWhenTheRejectionComesBeforeOrAfterTheWakesFirstMessage(early: boolean): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
     const tokens = new SessionTokens();
+    const rejected = SdkMessages.rateLimit("s-woken", "rejected", 1_800_000_000, "rejected");
+    const first = SdkMessages.assistant("55555555-5555-5555-5555-555555555555", [SdkMessages.text("Checking")], "claude-opus-5");
     host.factory.next = new FakeClaudeQuery([
       new WaitForInputStep(),
       SdkMessages.init("s-woken", "none", null, []),
       SdkMessages.taskStarted("s-woken", "server", undefined, true, "npm start"),
       new StampedStep(SdkMessages.success("s-woken", "Started")),
       SdkMessages.taskNotification("s-woken", "server", "completed", host.directory.resolve("missing.output")),
-      SdkMessages.rateLimit("s-woken", "rejected", 1_800_000_000, "rejected"),
+      ...early ? [rejected, first] : [first, rejected],
       SdkMessages.limited("44444444-4444-4444-4444-444444444444", "You've hit your limit"),
       SdkMessages.success("s-woken", "You've hit your limit"),
       new WaitForCloseStep()
