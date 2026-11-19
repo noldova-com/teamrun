@@ -19,6 +19,7 @@ import {
   ApprovalKind,
   ApprovalQuestion,
   ApprovalStatus,
+  ChatFolderAttachParams,
   Conversation,
   ConversationCreateParams,
   ConversationIdParams,
@@ -54,7 +55,7 @@ import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
-import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
@@ -603,6 +604,78 @@ describe("ProjectsViewComponent", () => {
     expect(ConversationIdParams.fromJson(requestOf(MethodName.ConversationDelete)).conversationId).toBe("c2");
     await Wait.until(() => expect(nested()).not.toContain(second.title));
     expect(document.querySelector("nol-teamrun-confirm-dialog")).toBeNull();
+  });
+
+  it("attaches the folder the person chooses to a chat without a project, then offers to replace it after a confirm or detach it, and offers neither in a project", async () => {
+    const attachedTo = (folder: string): Conversation => scratch.withAttachedFolder(folder, SampleData.timestamp).withFolder(folder);
+    conversations = [SampleData.conversation, scratch];
+    await create(t => t.answer(MethodName.ChatFolderAttach, u => attachedTo(ChatFolderAttachParams.fromJson(u).folder).toJson())
+      .answer(MethodName.ChatFolderDetach, () => scratch.toJson()));
+    const rowMenu = async (title: string): Promise<string[]> => {
+      conversationRow(title).querySelector<HTMLButtonElement>(".nol-teamrun-row-actions")?.click();
+      await settle();
+      const labels = texts("button[nol-menu-item] .nol-menu-item-label", itemAt([...document.querySelectorAll("nol-menu")], 0));
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      return labels;
+    };
+    const chatTooltip = (): string => {
+      const found = fixture.debugElement.queryAll(By.css(".nol-teamrun-conversation-row")).find(t => t.nativeElement === conversationRow(scratch.title));
+      if (Object.isUndefined(found))
+        throw new Error("The chat's row is not shown.");
+      return found.injector.get(TooltipDirective).text();
+    };
+    const attached = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ChatFolderAttach))
+      .map(t => ChatFolderAttachParams.fromJson(t.parameters).folder);
+    const inProject = await rowMenu(SampleData.conversation.title);
+    const own = await rowMenu(scratch.title);
+
+    await choose(conversationRow(scratch.title), Resources.attachFolderLabel);
+    const unchosen = [context.folderChoices, attached().length];
+    context.chosenFolder = "D:/site";
+    await choose(conversationRow(scratch.title), Resources.attachFolderLabel);
+    await Wait.until(() => expect(store.conversation("c5")?.attachedFolder).toBe("D:/site"));
+    const withFolder = await rowMenu(scratch.title);
+    const tooltip = chatTooltip();
+    context.chosenFolder = "E:/other";
+    await choose(conversationRow(scratch.title), Resources.replaceFolderLabel);
+    const asked = dialogText();
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
+    const afterCancel = attached().length;
+    await choose(conversationRow(scratch.title), Resources.replaceFolderLabel);
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+    await Wait.until(() => expect(store.conversation("c5")?.attachedFolder).toBe("E:/other"));
+    await choose(conversationRow(scratch.title), Resources.detachFolderLabel);
+    await Wait.until(() => expect(store.conversation("c5")?.attachedFolder).toBeNull());
+
+    expect(inProject.filter(t => [Resources.attachFolderLabel, Resources.replaceFolderLabel, Resources.detachFolderLabel].includes(t))).toEqual([]);
+    expect(own.slice(-3)).toEqual([Resources.moveToProjectLabel, Resources.attachFolderLabel, Resources.deleteConversationLabel]);
+    expect(unchosen).toEqual([1, 0]);
+    expect(withFolder.slice(-4)).toEqual([Resources.moveToProjectLabel, Resources.replaceFolderLabel, Resources.detachFolderLabel, Resources.deleteConversationLabel]);
+    expect(tooltip).toMatch(new RegExp(`^${Resources.chatsTitle}${Resources.titleSeparator}D:/site${Resources.titleSeparator}\\S`, "u"));
+    expect([asked, afterCancel]).toEqual([Resources.formatReplaceFolderText("D:/site", "E:/other"), 1]);
+    expect(attached()).toEqual(["D:/site", "E:/other"]);
+    expect(ConversationIdParams.fromJson(requestOf(MethodName.ChatFolderDetach)).conversationId).toBe("c5");
+    expect(await rowMenu(scratch.title)).toEqual(own);
+  });
+
+  it("says that the attached folder and its files stay when deleting a chat with one, with or without files of its own", async () => {
+    let files = 0;
+    const site = scratch.withAttachedFolder("D:\\work\\site",SampleData.timestamp);
+    conversations = [site];
+    await create(t => t.answer(MethodName.ConversationFolderCount, () => files));
+
+    await choose(conversationRow(scratch.title), Resources.deleteConversationLabel);
+    const empty = dialogText();
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
+    files = 2;
+    await choose(conversationRow(scratch.title), Resources.deleteConversationLabel);
+    const holding = dialogText();
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
+
+    expect([empty, holding]).toEqual([`${Resources.formatDeleteText(scratch.title)} ${Resources.formatAttachedFolderKept("site")}`,
+      `${Resources.formatDeleteWithFilesText(scratch.title, 2)} ${Resources.formatAttachedFolderKept("site")}`]);
+    expect(context.count(MethodName.ConversationDelete)).toBe(0);
   });
 
   it("names the files a chat without a project holds when deleting it, offers Move to a folder… instead, and asks plainly when it holds none", async () => {
@@ -1944,12 +2017,12 @@ describe("ProjectsViewComponent", () => {
       expect(Math.abs(panel.bottom - end() - block - space(2))).toBeLessThanOrEqual(1);
     });
 
-    it("spaces an action row's glyph and label half a rem apart, inside the row's inset, at a heading's height", async () => {
+    it("spaces an action row's glyph and label half a rem apart, inside the row's inset, at a tree row's height", async () => {
       await create();
       const row = action(Resources.newConversationLabel);
 
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
-      AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("section-header-height"));
+      AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("tree-row-height"));
       AppearanceFixture.expectPixels(box(part(row, ".nol-teamrun-glyph")).left - box(row).left, space(2));
       AppearanceFixture.expectPixels(box(part(row, ".nol-teamrun-label")).left - box(part(row, ".nol-teamrun-glyph")).right, space(2));
     });
@@ -2022,28 +2095,28 @@ describe("ProjectsViewComponent", () => {
       AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(part(element(), ".nol-teamrun-pins")).bottom, space(3));
     });
 
-    it("stands New chat, Open folder, Projects and Chats one step apart, each at a heading's height and three quarters of a rem under the one above", async () => {
+    it("stands Open folder the rows' gap under New chat at a tree row's height, and Projects and Chats, at a heading's height, three quarters of a rem under the one above", async () => {
       conversations = [SampleData.conversation, scratch];
       await create();
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
       part(header(Resources.projectsViewTitle), ".nol-section-header-toggle").click();
       await settle();
-      const rows = [action(Resources.newConversationLabel), action(Resources.openProjectLabel), header(Resources.projectsViewTitle), header(Resources.chatsTitle)];
+      const [newChat, openFolder] = [action(Resources.newConversationLabel), action(Resources.openProjectLabel)];
+      const [projects, chats] = [header(Resources.projectsViewTitle), header(Resources.chatsTitle)];
       const height = AppearanceFixture.measureLook("section-header-height");
 
       expect(element().querySelector(".nol-teamrun-project-row")).toBeNull();
       expect(height).toBeGreaterThan(AppearanceFixture.measureLook("tree-row-height"));
-      for (const row of rows)
+      for (const row of [newChat, openFolder])
+        AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("tree-row-height"));
+      for (const row of [projects, chats])
         AppearanceFixture.expectPixels(box(row).height, height);
-      const steps: readonly (readonly [HTMLElement, HTMLElement])[] = [[itemAt(rows, 0), itemAt(rows, 1)], [itemAt(rows, 1), itemAt(rows, 2)],
-        [itemAt(rows, 2), itemAt(rows, 3)]];
-      for (const [above, below] of steps) {
-        AppearanceFixture.expectPixels(box(below).top - box(above).top, height + space(3));
-        AppearanceFixture.expectPixels(box(below).top - box(above).bottom, space(3));
-      }
+      AppearanceFixture.expectPixels(box(openFolder).top - box(newChat).bottom, rowGap());
+      AppearanceFixture.expectPixels(box(projects).top - box(openFolder).bottom, space(3));
+      AppearanceFixture.expectPixels(box(chats).top - box(projects).bottom, space(3));
     });
 
-    it("draws Open browser as Open folder is drawn, a step under it, with its glyph and label at Open folder's insets and colours, and Projects a step under it", async () => {
+    it("draws Open browser as Open folder is drawn, the rows' gap under it, with its glyph and label at Open folder's insets and colours, and Projects a step under it", async () => {
       await create(withBrowser);
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
       const [openFolder, openBrowser] = [action(Resources.openProjectLabel), action(Resources.openBrowserLabel)];
@@ -2055,7 +2128,7 @@ describe("ProjectsViewComponent", () => {
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       expect([box(openBrowser).left, box(openBrowser).width]).toEqual([box(openFolder).left, box(openFolder).width]);
       AppearanceFixture.expectPixels(box(openBrowser).height, box(openFolder).height);
-      AppearanceFixture.expectPixels(box(openBrowser).top - box(openFolder).bottom, space(3));
+      AppearanceFixture.expectPixels(box(openBrowser).top - box(openFolder).bottom, rowGap());
       AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(openBrowser).bottom, space(3));
       expect(inset(openBrowser, ".nol-teamrun-glyph")).toEqual(inset(openFolder, ".nol-teamrun-glyph"));
       expect(inset(openBrowser, ".nol-teamrun-label")[0]).toBe(inset(openFolder, ".nol-teamrun-label")[0]);

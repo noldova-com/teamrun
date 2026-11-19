@@ -66,6 +66,7 @@ export { ChatSearchParams, ChatSearchParams as ConversationSearchParams } from "
 export { ChatSearchResult, ChatSearchResult as ConversationSearchResult } from "../models/methods/chat-search-result.js";
 export { ChatFindHit } from "../models/methods/chat-find-hit.js";
 export { ChatFindParams } from "../models/methods/chat-find-params.js";
+export { ChatFolderAttachParams } from "../models/methods/chat-folder-attach-params.js";
 export { ChatFindResult } from "../models/methods/chat-find-result.js";
 export { MessageSearchHit } from "../models/methods/message-search-hit.js";
 export { MessageSearchResult } from "../models/methods/message-search-result.js";

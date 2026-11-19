@@ -19,12 +19,12 @@ export class ConversationActions {
   public static open(context: IWindowPartContext, store: ChatStoreService, conversation: Conversation, preview: boolean = true): void {
     store.conversationOpening(conversation.id);
     context.openDocument(Resources.conversationDocumentName, conversation.id, conversation.title,
-      { preview, breadcrumb: ConversationActions.breadcrumbOf(store, conversation.projectId) });
+      { preview, breadcrumb: ConversationActions.breadcrumbOf(store, conversation.projectId, conversation.attachedFolder) });
   }
 
   public static async show(context: IWindowPartContext, store: ChatStoreService, hit: ConversationSearchHit): Promise<void> {
     store.conversationOpening(hit.conversationId);
-    context.openDocument(Resources.conversationDocumentName, hit.conversationId, hit.title, { breadcrumb: ConversationActions.breadcrumbOf(store, hit.projectId) });
+    context.openDocument(Resources.conversationDocumentName, hit.conversationId, hit.title, { breadcrumb: ConversationActions.breadcrumbOf(store, hit.projectId, null) });
     await store.showMessage(hit);
   }
 
@@ -45,11 +45,16 @@ export class ConversationActions {
       ConversationActions.open(context, store, target);
   }
 
-  public static breadcrumbOf(store: ChatStoreService, projectId: string | null): readonly string[] {
+  public static breadcrumbOf(store: ChatStoreService, projectId: string | null, attachedFolder: string | null): readonly string[] {
     if (Object.isNull(projectId))
-      return [Resources.chatsTitle];
+      return Object.isNull(attachedFolder) ? [Resources.chatsTitle] : [Resources.chatsTitle, ConversationActions.folderNameOf(attachedFolder)];
     const project = store.projects().find(t => t.id === projectId);
     return Object.isUndefined(project) ? [] : [project.name];
+  }
+
+  public static folderNameOf(folder: string): string {
+    const name = folder.slice(Math.max(folder.lastIndexOf(Resources.slash), folder.lastIndexOf(Resources.backslash)) + 1);
+    return String.isNullOrWhitespace(name) ? folder : name;
   }
 
   private static async startNext(context: IWindowPartContext, store: ChatStoreService, projectId: string | null,

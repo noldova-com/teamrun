@@ -188,7 +188,9 @@ export class ProjectsViewComponent {
   }
 
   protected tooltipOf(conversation: Conversation): string {
-    return [...ConversationActions.breadcrumbOf(this.store, conversation.projectId), this.times.dateTime(conversation.updatedAt)].join(Resources.titleSeparator);
+    const place = Object.isNull(conversation.attachedFolder) ? ConversationActions.breadcrumbOf(this.store, conversation.projectId, null)
+      : [Resources.chatsTitle, conversation.attachedFolder];
+    return [...place, this.times.dateTime(conversation.updatedAt)].join(Resources.titleSeparator);
   }
 
   protected dropPin(event: CdkDragDrop<unknown, unknown, string>): void {
@@ -248,8 +250,11 @@ export class ProjectsViewComponent {
     const count = Object.isNull(conversation.projectId) ? await this.store.countFolderFilesAsync(conversation.id, ChatAction.DeleteChat) : 0;
     if (Object.isNull(count))
       return;
-    const request = count === 0 ? new ConfirmRequest(Resources.deleteTitle, Resources.formatDeleteText(conversation.title), Resources.deleteConversationLabel, null, true)
-      : new ConfirmRequest(Resources.deleteTitle, Resources.formatDeleteWithFilesText(conversation.title, count), Resources.deleteConversationLabel,
+    const kept = Object.isNull(conversation.attachedFolder) ? String.empty
+      : ` ${Resources.formatAttachedFolderKept(ConversationActions.folderNameOf(conversation.attachedFolder))}`;
+    const request = count === 0
+      ? new ConfirmRequest(Resources.deleteTitle, `${Resources.formatDeleteText(conversation.title)}${kept}`, Resources.deleteConversationLabel, null, true)
+      : new ConfirmRequest(Resources.deleteTitle, `${Resources.formatDeleteWithFilesText(conversation.title, count)}${kept}`, Resources.deleteConversationLabel,
         Resources.moveToFolderLabel, true);
     const dialog = this.confirm(request, () => this.store.deleteConversation(conversation.id));
     dialog.componentInstance?.other.subscribe(() => {
@@ -269,17 +274,30 @@ export class ProjectsViewComponent {
   protected async moveToFolder(conversation: Conversation): Promise<void> {
     const folder = await this.context.chooseFolderAsync();
     if (!Object.isNull(folder))
-      await this.moveInto(conversation, ProjectsViewComponent.nameOf(folder), () => this.store.openProject(folder));
+      await this.moveInto(conversation, ConversationActions.folderNameOf(folder), () => this.store.openProject(folder));
+  }
+
+  protected async attachFolder(conversation: Conversation): Promise<void> {
+    const folder = await this.context.chooseFolderAsync();
+    if (Object.isNull(folder))
+      return;
+    const attach = async (): Promise<void> => {
+      await this.store.attachFolder(conversation.id, folder);
+    };
+    if (Object.isNull(conversation.attachedFolder))
+      await attach();
+    else
+      this.confirm(new ConfirmRequest(Resources.replaceFolderTitle, Resources.formatReplaceFolderText(conversation.attachedFolder, folder),
+        Resources.replaceFolderConfirmLabel), attach);
+  }
+
+  protected async detachFolder(conversation: Conversation): Promise<void> {
+    await this.store.detachFolder(conversation.id);
   }
 
   protected forget(project: Project): void {
     const request = new ConfirmRequest(Resources.forgetTitle, Resources.formatForgetText(project.name), Resources.forgetConfirmLabel, null, true);
     this.confirm(request, () => this.store.forgetProject(project.id));
-  }
-
-  private static nameOf(folder: string): string {
-    const name = folder.slice(Math.max(folder.lastIndexOf(Resources.slash), folder.lastIndexOf(Resources.backslash)) + 1);
-    return String.isNullOrWhitespace(name) ? folder : name;
   }
 
   private async moveInto(conversation: Conversation, name: string, open: () => Promise<Project | null>): Promise<void> {

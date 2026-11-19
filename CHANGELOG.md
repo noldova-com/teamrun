@@ -6,6 +6,54 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ## Unreleased
 
+## 0.0.6
+
+### Fixed
+
+- **A teammate after a folder is attached:** a Codex teammate that already answered in a chat works in the chat's folder after a folder is attached, replaced or detached, rather than in the folder it started in (#137).
+- **A wake during a rewind, a move or an attach:** a wake that arrives while a rewind, a move or an attach is under way waits until it ends and then starts, rather than leaving a reply that stays Pending until TeamRun restarts.
+- **Take over and the end of a turn:** a teammate's tool call that arrives just before you press Take over, or before its turn ends, is refused rather than run.
+- **Signing in to an MCP server:** a malformed request to the sign-in's callback gets a not-found answer, and the sign-in keeps waiting for the real one.
+
+## 0.0.5
+
+### New
+
+- **Attach a folder to a chat:** a chat without a project can attach an existing folder from its menu, Attach a folder…, and work there in place, with nothing copied; Replace the folder… and Detach the folder change it later, and the chat's breadcrumb and its row's tooltip name the folder.
+  A rewind restores your files there from the checkpoint of the folder each reply ran in, and when the chat has moved to another folder since, it restores no files and says so.
+  Deleting or moving such a chat leaves the folder and its files where they are.
+  Known: a teammate that already answered in the chat keeps working in the chat's own folder until a fix (#137).
+- **A reply saving its checkpoint:** a working reply reads "Saving a checkpoint…" while TeamRun takes its checkpoint, and Stop reads "Stopping…" from the first click until the reply stops.
+
+### Fixed
+
+- **Inline terminals on a short history:** an inline terminal gets at least 8 rows, within the history, so a command and its output show below the prompt rather than the prompt alone.
+
+## 0.0.4
+
+This version holds the same app as 0.0.3, released right after it so that updating can be tried across more than one version, such as from 0.0.2 straight to 0.0.4.
+
+## 0.0.3
+
+### New
+
+- **Restart to update on macOS:** Restart to update installs the update and restarts TeamRun into it, also for a copy you can't write to, such as one a `.pkg` installed in Applications.
+- **Signing in to GitHub opens your own browser:** GitHub's sign-in page, from Settings → GitHub and from the Git view's GitHub row, and Manage access on GitHub open in your system's browser, where you're signed in to GitHub, whatever Settings choose for where links open.
+- **Links in the terminal open in your own browser:** a link you Ctrl+click in a terminal, Cmd+click on macOS, opens in your system's browser by default, so the sign-in links that tools print reach the browser where you're signed in.
+  The setting Open clicked links can open them in TeamRun's browser instead.
+- **Computer use for Codex teammates:** a Codex teammate gets TeamRun's computer tools once computer use is turned on, also in a chat whose session started before, and no longer reaches Codex's own computer use, which needs Codex's desktop app.
+
+### Fixed
+
+- **More sign-in pages open in your own browser:** a shared MCP server's sign-in page and a provider's subscribe page now open in your system's browser, as a provider's sign-in page does since 0.0.2.
+- **Terminal:** on Windows, a key typed right after a resize is no longer lost, and an agent's run no longer types into a line you've half typed.
+- **Terminal in the bottom dock:** a terminal tab moved into the bottom dock grows the dock to the fewest rows a run needs.
+- **A run in a new terminal:** it waits for the terminal's pane to take its size, so the shell starts at the size it shows.
+- **Completing a command's options:** the first completion of a command's options waits for the shell's answer.
+- **PowerShell on Windows:** on a machine with many PowerShell modules, finding PowerShell is fast after the first time.
+- **Inline terminals:** when a Run starts at another code block, the earlier block's terminal is no longer removed and drawn again while TeamRun keeps its output.
+- **Explorer:** New chat, Open folder and Open browser are spaced as the chat rows are.
+
 ## 0.0.2
 
 ### Fixed

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { isAbsolute, resolve } from "node:path";
 import "@noldova/context.core";
 import { ChangeOperation, type DataRecord } from "@noldova/context.data";
 import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
@@ -16,6 +17,7 @@ import {
   ChatFindHit,
   type ChatFindParams,
   ChatFindResult,
+  type ChatFolderAttachParams,
   type ChatMemberModeParams,
   type ChatMemberSettingsParams,
   type ChatPlanFirstParams,
@@ -44,6 +46,7 @@ import {
 } from "@noldova/teamrun.protocol";
 
 import { ChangeEntity } from "../../enums/change-entity.js";
+import { FolderState } from "../../enums/folder-state.js";
 import type { IConversationsService } from "../../interfaces/i-conversations.service.js";
 import type { IDraftsService } from "../../interfaces/i-drafts.service.js";
 import type { ILog } from "../../interfaces/i-log.js";
@@ -218,6 +221,49 @@ export class ConversationsService implements IConversationsService {
       for (const hold of holds)
         activity.leave(hold);
     }
+  }
+
+  public async attachFolderAsync(params: ChatFolderAttachParams, check: (path: string) => Promise<FolderState>): Promise<Conversation> {
+    if (!isAbsolute(params.folder))
+      throw new ServiceException(ErrorCode.InvalidParams, Resources.formatFolderNotAbsolute(params.folder), [params.folder]);
+    const folder = resolve(params.folder);
+    const conversation = await this.requireAsync(params.chatId);
+    if (!Object.isNull(conversation.projectId))
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatChatInProject(conversation.id), [conversation.id]);
+    await this.requireIdleAsync(conversation);
+    const activity = this.context.projectActivity;
+    const hold = activity.enter(folder);
+    try {
+      if (await check(folder) !== FolderState.Present)
+        throw new ServiceException(ErrorCode.InvalidParams, Resources.formatFolderNotAttached(folder), [folder]);
+      return (await this.changeFolderAsync(conversation.id, t => ConversationsService.requireProjectless(t).withAttachedFolder(folder, new Date().toISOString())))
+        .withFolder(folder);
+    }
+    finally {
+      activity.leave(hold);
+    }
+  }
+
+  public async detachFolderAsync(params: ConversationIdParams): Promise<Conversation> {
+    const conversation = await this.requireAsync(params.conversationId);
+    if (Object.isNull(conversation.attachedFolder))
+      return conversation;
+    await this.requireIdleAsync(conversation);
+    return (await this.changeFolderAsync(conversation.id, t => t.withAttachedFolder(null, new Date().toISOString())))
+      .withFolder(this.context.chatFolders.pathOf(conversation.id));
+  }
+
+  private changeFolderAsync(conversationId: string, change: (conversation: Conversation) => Conversation): Promise<Conversation> {
+    return this.context.database.connection.runInTransactionAsync(async transaction => {
+      await this.requireNoOpenReplyAsync(conversationId, transaction);
+      return this.updateSessionAsync(conversationId, t => change(t).asEdited(), transaction);
+    });
+  }
+
+  private static requireProjectless(conversation: Conversation): Conversation {
+    if (!Object.isNull(conversation.projectId))
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatChatInProject(conversation.id), [conversation.id]);
+    return conversation;
   }
 
   private async moveRecordAsync(params: ConversationMoveParams): Promise<Conversation> {
@@ -571,7 +617,7 @@ export class ConversationsService implements IConversationsService {
   }
 
   private async requireIdleAsync(conversation: Conversation, transaction?: SqlTransaction): Promise<void> {
-    const root = Object.isNull(conversation.projectId) ? this.context.chatFolders.pathOf(conversation.id)
+    const root = Object.isNull(conversation.projectId) ? conversation.attachedFolder ?? this.context.chatFolders.pathOf(conversation.id)
       : (await this.requireProjectAsync(conversation.projectId, transaction)).rootPath;
     if (!Object.isNull(root))
       this.context.projectActivity.requireIdle(root);
@@ -594,6 +640,7 @@ export class ConversationsService implements IConversationsService {
 
   private read(record: DataRecord): Conversation {
     const conversation = Conversation.fromJson(ConversationsService.parse(record));
-    return Object.isNull(conversation.projectId) ? conversation.withFolder(this.context.chatFolders.pathOf(conversation.id)) : conversation;
+    return Object.isNull(conversation.projectId)
+      ? conversation.withFolder(conversation.attachedFolder ?? this.context.chatFolders.pathOf(conversation.id)) : conversation;
   }
 }

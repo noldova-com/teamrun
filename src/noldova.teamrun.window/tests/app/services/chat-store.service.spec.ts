@@ -249,7 +249,7 @@ describe("ChatStoreService", () => {
       "teamrun.approvalCreated", "teamrun.approvalUpdated", "teamrun.backgroundTaskOutput", "teamrun.backgroundTaskUpdated", "teamrun.backgroundTasksCleared",
       "teamrun.composerDefaultUpdated", "teamrun.conversationDeleted", "teamrun.conversationRewound", "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.messageCreated", "teamrun.messageUpdated",
       "teamrun.panelRequested", "teamrun.planUsageUpdated", "teamrun.projectFolderChanged", "teamrun.projectsLayoutUpdated", "teamrun.providerKindInstallationChanged", "teamrun.providerKindsChanged",
-      "teamrun.providerSignInsChanged", "teamrun.providerUpdated", "teamrun.replyThinking", "teamrun.signInLink",
+      "teamrun.providerSignInsChanged", "teamrun.providerUpdated", "teamrun.replyCheckpointEnded", "teamrun.replyCheckpointStarted", "teamrun.replyThinking", "teamrun.signInLink",
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.waitingMessagesChanged", "teamrun.windowReloadRequested"
     ]);
     expect(context.watchedSettings).toEqual(["teamrun.sendKey", "teamrun.whileReplying"]);
@@ -1738,6 +1738,7 @@ describe("ChatStoreService", () => {
     await store.initialize();
     await store.selectConversation("c1");
     context.emit(EventName.ReplyThinking, new MessageIdParams("m2").toJson());
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
     expect(store.pendingApprovals()).toHaveLength(1);
     context.answer(MethodName.MessageListOpen, () => []);
     context.answer(MethodName.ApprovalList, () => []);
@@ -1751,6 +1752,7 @@ describe("ChatStoreService", () => {
     expect(store.resyncs()).toBe(resyncs + 1);
     expect(store.isWorking("c1")).toBe(false);
     expect([...store.thinkingReplies()]).toEqual([]);
+    expect([...store.savingCheckpointReplies()]).toEqual([]);
     expect(store.pendingApprovals()).toEqual([]);
     expect(messages()[1]?.status).toBe(MessageStatus.Completed);
     context.fail(MethodName.ProviderList, "The runtime part is away.");
@@ -1774,6 +1776,37 @@ describe("ChatStoreService", () => {
     expect([...store.thinkingReplies()]).toEqual([]);
     thinking("m2");
     expect([...store.thinkingReplies()]).toEqual([]);
+  });
+
+  it("marks a running reply as saving a checkpoint until the checkpoint ends, a detail comes, a resync or the reply ends, and ignores replies that are not running", async () => {
+    context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
+    await store.initialize();
+    const emit = (name: EventName, messageId: string): void => context.emit(name, new MessageIdParams(messageId).toJson());
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const seen: string[][] = [];
+
+    emit(EventName.ReplyCheckpointStarted, "unknown");
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointEnded, "unknown");
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointEnded, "m2");
+    seen.push(saving());
+    for (const name of [EventName.DetailAppended, EventName.DetailUpdated]) {
+      emit(EventName.ReplyCheckpointStarted, "m2");
+      context.emit(name, new DetailEventPayload("m2", SampleData.detail(0, DetailKind.Text, "Hello")).toJson());
+      seen.push(saving());
+    }
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    await expect(store.resync()).resolves.toBe(true);
+    seen.push([String(store.isWorking("c1")), ...saving()]);
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    context.emit(EventName.MessageUpdated, SampleData.withStatus(SampleData.reply, MessageStatus.Cancelled).toJson());
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    seen.push(saving());
+
+    expect(seen).toEqual([["m2"], ["m2"], [], [], [], ["true"], [], []]);
   });
 
   it("loads the catalog and selects a project without opening a conversation", async () => {
@@ -4892,6 +4925,9 @@ describe("ChatStoreService", () => {
       { method: MethodName.ConversationCreate, act: t => t.createConversation("x"), unchanged: t => expect(t.conversations()).toHaveLength(1) },
       { method: MethodName.ConversationRename, act: t => t.renameConversation("c1", "x"), unchanged: t => expect(t.selectedConversation()?.title).toBe("First") },
       { method: MethodName.ConversationMove, act: async t => expect(await t.moveConversation("c1", "p2")).toBe(false), unchanged: t => expect(t.conversation("c1")?.projectId).toBe("p1") },
+      { method: MethodName.ChatFolderAttach, act: async t => expect(await t.attachFolder("c1", "D:/site")).toBe(false),
+        unchanged: t => expect(t.conversation("c1")?.attachedFolder).toBeNull() },
+      { method: MethodName.ChatFolderDetach, act: async t => expect(await t.detachFolder("c1")).toBe(false), unchanged: t => expect(t.conversation("c1")?.folder).toBeNull() },
       { method: MethodName.ConversationResponderSet, act: t => t.setResponder("c1", new ConversationResponder("bob")), unchanged: t => expect(t.conversation("c1")?.responder).toBeNull() },
       { method: MethodName.ConversationDelete, act: t => t.deleteConversation("c1"), unchanged: t => expect(t.selectedConversationId()).toBe("c1") },
       { method: MethodName.ConversationAddMember, act: t => t.addMember("c1", "bob"), unchanged: t => expect(t.membersOf("c1")).toEqual([]) },

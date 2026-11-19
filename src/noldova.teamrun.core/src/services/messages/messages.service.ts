@@ -112,6 +112,11 @@ export class MessagesService implements IMessagesService {
     return Object.isUndefined(record) ? null : record.readNullableString(Resources.checkpointIdColumn);
   }
 
+  public async findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null> {
+    const [record] = await (transaction ?? this.context.database.connection).queryAsync(new SqlQuery(Resources.selectMessageCheckpointFolder, [messageId]));
+    return Object.isUndefined(record) ? null : record.readNullableString(Resources.checkpointFolderIdColumn);
+  }
+
   public async listTeammateUsageAsync(): Promise<readonly TeammateUsage[]> {
     return (await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectTeammateUsage, []))).map(t => new TeammateUsage(
       t.readString(Resources.teammateIdColumn), t.readString(Resources.conversationIdColumn), t.readString(Resources.idColumn),
@@ -156,6 +161,10 @@ export class MessagesService implements IMessagesService {
 
   public async setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void> {
     await (transaction ?? this.context.database.connection).executeAsync(new SqlQuery(Resources.updateMessageCheckpoint, [checkpointId, messageId]));
+  }
+
+  public async setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void> {
+    await (transaction ?? this.context.database.connection).executeAsync(new SqlQuery(Resources.updateMessageCheckpointFolder, [folderId, messageId]));
   }
 
   private async findOneAsync(statement: string, parameter: string, transaction?: SqlTransaction): Promise<Message | null> {

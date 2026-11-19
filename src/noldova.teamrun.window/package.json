@@ -30,20 +30,20 @@
     "@noldova/teamrun.protocol": "__VERSION__"
   },
   "peerDependencies": {
-    "@angular/cdk": "22.2.7",
-    "@angular/common": "22.2.6",
-    "@angular/core": "22.2.6",
+    "@angular/cdk": "22.3.0",
+    "@angular/common": "22.3.0",
+    "@angular/core": "22.3.0",
     "@noldova/context.core": ">=0.0.8 <0.1.0",
     "@noldova/context.exceptions": ">=0.0.8 <0.1.0",
     "@noldova/context.json": ">=0.0.8 <0.1.0",
-    "@noldova/desktop.window": ">=0.0.6 <0.1.0",
-    "@noldova/git.github.protocol": "0.0.2",
-    "@noldova/git.github.window": "0.0.2",
-    "@noldova/git.hosting.protocol": "0.0.2",
-    "@noldova/git.protocol": "0.0.2",
-    "@noldova/git.window": "0.0.2",
-    "@noldova/terminal.window": "0.0.2",
-    "@noldova/ui.components.angular": ">=0.0.11 <0.1.0"
+    "@noldova/desktop.window": ">=0.0.7 <0.1.0",
+    "@noldova/git.github.protocol": "0.0.3",
+    "@noldova/git.github.window": "0.0.3",
+    "@noldova/git.hosting.protocol": "0.0.3",
+    "@noldova/git.protocol": "0.0.3",
+    "@noldova/git.window": "0.0.3",
+    "@noldova/terminal.window": "0.0.3",
+    "@noldova/ui.components.angular": ">=0.0.15 <0.1.0"
   },
   "peerDependenciesMeta": {
     "@angular/cdk": {

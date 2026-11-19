@@ -388,7 +388,9 @@ export class Resources {
   public static readonly renameChatEntities: readonly string[] = ["UPDATE __changes SET entity = 'Chat' WHERE entity = 'Conversation'",
     "UPDATE __changes SET entity = 'ChatMember' WHERE entity = 'ConversationMember'"];
   public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ? WHERE id = ?";
+  public static readonly updateMessageCheckpointFolder: string = "UPDATE messages SET checkpointFolderId = ? WHERE id = ?";
   public static readonly selectMessageCheckpoint: string = "SELECT checkpointId FROM messages WHERE id = ?";
+  public static readonly selectMessageCheckpointFolder: string = "SELECT checkpointFolderId FROM messages WHERE id = ?";
   public static readonly selectCommandReply: string =
     `SELECT 1 FROM messages m WHERE chatId = ? AND json_extract(m.json, '$.author') = '${MessageAuthor.Provider}' AND json_extract(m.json, '$.endedAt') IS NOT NULL `
     + `AND EXISTS (SELECT 1 FROM json_each(m.json, '$.details') d WHERE json_extract(d.value, '$.kind') = '${DetailKind.Command}') LIMIT 1`;
@@ -463,6 +465,9 @@ export class Resources {
   public static readonly handoverSummariesTable: string = "handoverSummaries";
   public static readonly handoverSummaryKindsMigrationId: string = "20261112040000_HandoverSummaryKinds";
   public static readonly addHandoverSummaryKind: string = "ALTER TABLE handoverSummaries ADD COLUMN kind TEXT";
+  public static readonly checkpointFoldersMigrationId: string = "20261119120000_CheckpointFolders";
+  public static readonly addMessageCheckpointFolder: string = "ALTER TABLE messages ADD COLUMN checkpointFolderId TEXT";
+  public static readonly checkpointFolderIdColumn: string = "checkpointFolderId";
   public static readonly selectHandoverSummary: string = "SELECT text, kind FROM handoverSummaries WHERE chatId = ? AND teammateId = ? AND through = ?";
   public static readonly upsertHandoverSummary: string = "INSERT INTO handoverSummaries (chatId, teammateId, through, text, kind) VALUES (?, ?, ?, ?, ?) "
     + "ON CONFLICT (chatId, teammateId) DO UPDATE SET through = excluded.through, text = excluded.text, kind = excluded.kind";
@@ -769,7 +774,8 @@ export class Resources {
   public static readonly existsErrorCode: string = "EEXIST";
   public static readonly maximumDiffLines: number = ProtocolResources.maximumDiffLines;
   public static readonly checkpointPathSeparator: string = "/";
-  public static readonly noCheckpointRefusal: string = "No checkpoint was taken of the project's folder before that reply, so no files were restored.";
+  public static readonly noCheckpointRefusal: string = "No checkpoint was taken before that reply, so no files were restored.";
+  public static readonly checkpointFolderChangedRefusal: string = "The chat's folder has changed since that reply, so no files were restored.";
   public static readonly restoreRefusals: ReadonlyMap<string, string> = new Map([
     ["CheckpointMissing", "The checkpoint taken before that reply is gone, so no files were restored."],
     ["FolderMissing", "The project's folder is missing, so no files were restored."],
@@ -1686,6 +1692,30 @@ export class Resources {
 
   public static formatProviderDisabled(label: string): string {
     return `The provider "${label}" is disabled. Enable it on the Providers page first.`;
+  }
+
+  public static formatAttachedFolderId(hash: string): string {
+    return `folder-${hash}`;
+  }
+
+  public static formatAttachedFolderMissing(path: string): string {
+    return `The folder attached to this chat, "${path}", is missing or can't be read, so the reply didn't start. Restore the folder there, or attach another folder or detach this one in the chat's menu.`;
+  }
+
+  public static formatAttachedFolderUnreachable(path: string): string {
+    return `The folder attached to this chat, "${path}", didn't answer in time, so the reply didn't start. Check that its drive or share is connected, then send again.`;
+  }
+
+  public static formatFolderNotAttached(path: string): string {
+    return `The folder "${path}" is missing, can't be read or didn't answer in time, so it wasn't attached.`;
+  }
+
+  public static formatFolderNotAbsolute(path: string): string {
+    return `The folder "${path}" is not an absolute path.`;
+  }
+
+  public static formatChatInProject(conversationId: string): string {
+    return `The chat "${conversationId}" is in a project, which gives it its folder.`;
   }
 
   public static formatWorkFolderMissing(path: string): string {

@@ -17,6 +17,7 @@ import { Resources } from "../../../resources";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ModelCatalog } from "../../models/model-catalog";
 import { ChatStoreService } from "../../services/chat-store.service";
+import { ConversationActions } from "../../services/conversation-actions";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
 import { ComposerDefaultService } from "../../services/composer-default.service";
 import { FormatterService } from "../../services/formatter.service";
@@ -46,6 +47,7 @@ export class ConversationMembersComponent {
 
   protected readonly members: Signal<readonly Teammate[]> = computed(() => NameOrder.sort(this.store.membersOf(this.conversationId())
     .map(t => this.store.teammate(t.teammateId)).filter((t): t is Teammate => !Object.isNull(t)), t => t.name));
+  protected readonly attachedFolder: Signal<string | null> = computed(() => this.store.conversation(this.conversationId())?.attachedFolder ?? null);
   protected readonly others: Signal<readonly Teammate[]> = computed(() => this.store.teammates().filter(t => !this.members().includes(t)));
   private readonly catalogs: WritableSignal<ReadonlyMap<string, ModelCatalog>> = signal(new Map());
   private readonly defaultSettings: Signal<ComposerSettings | null> = computed(() => this.choices.choiceOf(this.conversationId())
@@ -75,6 +77,10 @@ export class ConversationMembersComponent {
             .then(t => this.catalogs.update(u => new Map(u).set(ConversationMembersComponent.catalogKey(wantedKind, provider), t)));
       });
     });
+  }
+
+  protected folderNameOf(folder: string): string {
+    return ConversationActions.folderNameOf(folder);
   }
 
   protected description(teammate: Teammate): string {

@@ -57,6 +57,8 @@ export class MethodNameTests {
     Assert.areEqual("ConversationRewind", MethodName.ConversationRewind);
     Assert.areEqual("ConversationSearch", MethodName.ConversationSearch);
     Assert.areEqual("ChatFind", MethodName.ChatFind);
+    Assert.areEqual("ChatFolderAttach", MethodName.ChatFolderAttach);
+    Assert.areEqual("ChatFolderDetach", MethodName.ChatFolderDetach);
     Assert.areEqual("MessageSearch", MethodName.MessageSearch);
     Assert.areEqual("MessageList", MethodName.MessageList);
     Assert.areEqual("MessageSend", MethodName.MessageSend);

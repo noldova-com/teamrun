@@ -120,8 +120,10 @@ describe("PagesViewComponent", () => {
     const first = stops();
     rows()[0]?.focus();
     await userEvent.keyboard("{ArrowDown}");
+    await fixture.whenStable();
     const second = [document.activeElement === row("p2"), stops()];
     await userEvent.keyboard("{End}{ArrowDown}");
+    await fixture.whenStable();
     const last = [document.activeElement === row("p3"), stops()];
     await userEvent.keyboard("{Home}{ArrowUp}");
     const home = document.activeElement === row("p1");

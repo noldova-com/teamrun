@@ -51,6 +51,7 @@ import type {
   ConversationSearchParams,
   ConversationSearchResult,
   ChatFindParams,
+  ChatFolderAttachParams,
   ChatFindResult,
   MessageSearchResult,
   DataFolder,
@@ -1345,6 +1346,28 @@ export interface IConversationsService {
   countFolderFilesAsync(params: ConversationIdParams): Promise<number>;
 
   /**
+   * Attaches an existing folder to a chat without a project, or replaces the one attached, so that its teammates work in it, in place,
+   * from the next turn; nothing is copied, and the chat's own folder stays for a detach. The chat's replies keep no checkpoint, since
+   * theirs were taken of the folder before, so a rewind to one of them restores no files.
+   * @param params The chat and the folder's absolute path, kept resolved.
+   * @param check Checks the folder, as the projects service checks a project's folder.
+   * @returns The chat, whose `folder` is the attached folder.
+   * @throws ServiceException named `ErrorCode.InvalidParams` when the path isn't absolute or the folder isn't present,
+   * `ErrorCode.NotFound` for an unknown chat, and `ErrorCode.Conflict` for a chat in a project, while a reply runs in the chat, or while
+   * the folder is held.
+   */
+  attachFolderAsync(params: ChatFolderAttachParams, check: (path: string) => Promise<FolderState>): Promise<Conversation>;
+
+  /**
+   * Detaches a chat's attached folder, leaving its files as they are, so that its teammates work in the chat's own folder again from the
+   * next turn, and its replies keep no checkpoint, as with an attach; a chat with none attached comes back as it is.
+   * @param params The chat id.
+   * @returns The chat, whose `folder` is its own folder again.
+   * @throws ServiceException named `ErrorCode.NotFound` for an unknown chat, and `ErrorCode.Conflict` while a reply runs in the chat.
+   */
+  detachFolderAsync(params: ConversationIdParams): Promise<Conversation>;
+
+  /**
    * Removes a conversation's messages from a sequence on, with their approvals.
    * @param conversationId The conversation id.
    * @param fromSequence The sequence of the first message to remove.
@@ -1500,12 +1523,20 @@ export interface IMessagesService {
    */
   findAttachmentAsync(conversationId: string, path: string, transaction?: SqlTransaction): Promise<MessageAttachment | null>;
   /**
-   * Reads the id of the checkpoint taken of the project's folder before a reply.
+   * Reads the id of the checkpoint taken of the reply's folder before a reply.
    * @param messageId The reply's id.
    * @param transaction The transaction to read in, or none.
    * @returns The checkpoint's id, or `null` when none was taken or the reply is gone.
    */
   findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
+
+  /**
+   * Reads the id of the folder a reply's turn ran in, as `WorkFolder.id` named it.
+   * @param messageId The reply's id.
+   * @param transaction The transaction to read in, or none.
+   * @returns The folder's id, or `null` when the turn never started, ran before the folder was kept, or the reply is gone.
+   */
+  findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
 
   /**
    * Lists, for each teammate in each conversation, its latest reply that reports usage, while that reply is in the teammate's current session there.
@@ -1544,12 +1575,20 @@ export interface IMessagesService {
    */
   updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   /**
-   * Records the id of the checkpoint taken of the project's folder before a reply.
+   * Records the id of the checkpoint taken of the reply's folder before a reply.
    * @param messageId The reply's id.
    * @param checkpointId The checkpoint's id.
    * @param transaction The transaction to work in, or none.
    */
   setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+
+  /**
+   * Records the id of the folder a reply's turn runs in, at the turn's start, whether or not its checkpoint is then taken.
+   * @param messageId The reply's id.
+   * @param folderId The folder's `WorkFolder.id`.
+   * @param transaction The transaction to work in, or none.
+   */
+  setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }
 
 /**
@@ -2897,6 +2936,9 @@ export declare class Resources {
    * Adds the provider kind that wrote each handover summary, empty for one written before it.
    */
   public static readonly addHandoverSummaryKind: string;
+  public static readonly checkpointFoldersMigrationId: string;
+  public static readonly addMessageCheckpointFolder: string;
+  public static readonly checkpointFolderIdColumn: string;
   public static readonly selectHandoverSummary: string;
   public static readonly upsertHandoverSummary: string;
   public static readonly deleteHandoverSummaries: string;
@@ -3899,6 +3941,10 @@ export declare class Resources {
    */
   public static readonly noCheckpointRefusal: string;
   /**
+   * Why a rewind restored no files when the reply's checkpoint was taken of a folder the chat no longer works in.
+   */
+  public static readonly checkpointFolderChangedRefusal: string;
+  /**
    * Why a rewind restored no files, in plain words, by the checkpoints module's outcome.
    */
   public static readonly restoreRefusals: ReadonlyMap<string, string>;
@@ -3947,6 +3993,11 @@ export declare class Resources {
   public static readonly chatIdRowTables: readonly string[];
   public static readonly updateMessageCheckpoint: string;
   public static readonly selectMessageCheckpoint: string;
+  /**
+   * Reads the id of the folder a reply's turn ran in, `null` for a turn from before the folder was kept.
+   */
+  public static readonly selectMessageCheckpointFolder: string;
+  public static readonly updateMessageCheckpointFolder: string;
   /**
    * Bytes above which an added file gets no diff.
    */
@@ -5025,6 +5076,37 @@ export declare class Resources {
    * Composes the message refusing a sign-in check, a sign-in or a send on a disabled provider.
    */
   public static formatProviderDisabled(label: string): string;
+
+  /**
+   * Composes the checkpoints id of a folder attached to a chat, from a hash of its path, so every chat attached to one folder shares its
+   * checkpoints as a project's chats do.
+   */
+  public static formatAttachedFolderId(hash: string): string;
+
+  /**
+   * Composes the reply's note when the folder attached to its chat is missing or can't be read, so the provider didn't start.
+   */
+  public static formatAttachedFolderMissing(path: string): string;
+
+  /**
+   * Composes the reply's note when the folder attached to its chat didn't answer in time, so the provider didn't start.
+   */
+  public static formatAttachedFolderUnreachable(path: string): string;
+
+  /**
+   * Composes the refusal of a folder to attach that is missing, can't be read or didn't answer in time.
+   */
+  public static formatFolderNotAttached(path: string): string;
+
+  /**
+   * Composes the refusal of a folder to attach whose path isn't absolute.
+   */
+  public static formatFolderNotAbsolute(path: string): string;
+
+  /**
+   * Composes the refusal to attach a folder to a chat in a project.
+   */
+  public static formatChatInProject(conversationId: string): string;
 
   /**
    * Composes the reply's note when the project's folder is missing, so the provider didn't start.
@@ -6774,6 +6856,25 @@ export declare class ProjectActivity {
   public enterTurn(rootPath: string): string;
 
   /**
+   * Registers a provider turn as `enterTurn` does, unless an overlapping root is being rewound.
+   * @param rootPath The project's filesystem path.
+   * @returns A unique activity key to pass to `leave`, or null while an overlapping root is being rewound.
+   * @throws Error when resolving an existing filesystem path fails.
+   */
+  public tryEnterTurn(rootPath: string): string | null;
+
+  /**
+   * Waits for the next rewind to end, on any root, or for `releaseWaiting`.
+   * @returns A promise that resolves once it has.
+   */
+  public whenReleasedAsync(): Promise<void>;
+
+  /**
+   * Ends every current wait of `whenReleasedAsync`, such as at shutdown.
+   */
+  public releaseWaiting(): void;
+
+  /**
    * Claims an idle root exclusively for a rewind.
    * @param rootPath The project's filesystem path.
    * @returns A unique activity key to pass to `leave`.
@@ -7078,6 +7179,16 @@ export declare class ConversationsService implements IConversationsService {
   public countFolderFilesAsync(params: ConversationIdParams): Promise<number>;
 
   /**
+   * @inheritdoc
+   */
+  public attachFolderAsync(params: ChatFolderAttachParams, check: (path: string) => Promise<FolderState>): Promise<Conversation>;
+
+  /**
+   * @inheritdoc
+   */
+  public detachFolderAsync(params: ConversationIdParams): Promise<Conversation>;
+
+  /**
    * Removes a conversation's messages from a sequence on, with their approvals, logging every deletion.
    * @param conversationId The conversation id.
    * @param fromSequence The sequence of the first message to remove.
@@ -7216,6 +7327,7 @@ export declare class MessagesService implements IMessagesService {
    */
   public findAttachmentAsync(conversationId: string, path: string, transaction?: SqlTransaction): Promise<MessageAttachment | null>;
   public findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
+  public findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
 
   /**
    * Lists, for each teammate in each conversation, its latest reply that reports usage, by conversation and then oldest first.
@@ -7254,6 +7366,7 @@ export declare class MessagesService implements IMessagesService {
    */
   public updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   public setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+  public setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }
 
 /**
@@ -8152,7 +8265,8 @@ export declare class ReplyEvidence {
 }
 
 /**
- * The folder a reply works in: its project's root, named by the project's id, or a chat's own folder, named by the conversation's id.
+ * The folder a reply works in: its project's root, named by the project's id, a folder attached to its chat, named by its path, or a
+ * chat's own folder, named by the conversation's id.
  */
 export declare class WorkFolder {
   /**
@@ -8169,6 +8283,14 @@ export declare class WorkFolder {
    * @param path The folder's absolute path.
    */
   public constructor(id: string, path: string);
+
+  /**
+   * The work folder of a folder attached to a chat, named by a hash of its path, compared without case on Windows.
+   * @param path The attached folder's absolute path.
+   * @param platform The platform the folder is on, as `process.platform` names it, which it is by default.
+   * @returns The work folder.
+   */
+  public static attached(path: string, platform?: string): WorkFolder;
 }
 
 /**
@@ -10669,6 +10791,21 @@ export declare class HandoverSummaryKindsMigration extends SqlMigration {
 
   /**
    * Adds the column with `Resources.addHandoverSummaryKind`.
+   */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/**
+ * Keeps the id of the folder each reply's turn ran in, so a rewind restores from that folder's own checkpoints after the chat's folder changes and back.
+ */
+export declare class CheckpointFoldersMigration extends SqlMigration {
+  /**
+   * Uses the fixed checkpoint folders migration id.
+   */
+  public constructor();
+
+  /**
+   * Adds the column with `Resources.addMessageCheckpointFolder`; an earlier checkpoint's folder stays empty.
    */
   public override apply(builder: MigrationBuilder): void;
 }

@@ -907,6 +907,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   public async shutdown(): Promise<void> {
     this.state.closing = true;
+    this.context.projectActivity.releaseWaiting();
     for (const run of this.state.runs.values())
       run.cancel();
     await this.titles.shutdown();
@@ -1335,8 +1336,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         const item = work[index]!;
         const reply = item.message;
         if (!item.run.isCancelled && !item.isEnded && Object.isNull(item.wake)) {
-          checked ??= this.projects.checkFolderAsync(folder.path, (await this.conversations.findAsync(reply.conversationId))?.projectId ?? null);
-          await this.failIfUnableAsync(item, folder, await checked);
+          const conversation = await this.conversations.findAsync(reply.conversationId);
+          checked ??= this.projects.checkFolderAsync(folder.path, conversation?.projectId ?? null);
+          await this.failIfUnableAsync(item, folder, await checked, !Object.isNullOrUndefined(conversation?.attachedFolder));
         }
         if (item.run.isCancelled)
           await this.stopAsync(item);
@@ -1764,9 +1766,15 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const hop = this.replyHops.get(source.conversationId)?.get(source.id);
     if (Object.isUndefined(hop) || this.state.closing)
       return null;
+    const activity = this.context.projectActivity;
+    const lease = activity.tryEnterTurn(folder.path);
+    if (Object.isNull(lease)) {
+      await activity.whenReleasedAsync();
+      return this.startWakeAsync(source, wake, ahead);
+    }
     const reply = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const current = await this.conversations.findAsync(source.conversationId, transaction);
-      if (Object.isNull(current) || current.projectId !== conversation.projectId)
+      if (Object.isNull(current) || current.projectId !== conversation.projectId || Object.isNull(await this.messages.findAsync(source.id, transaction)))
         return null;
       const created = new Message(Guid.createVersion7().toString(), source.conversationId, await this.messages.nextSequenceAsync(source.conversationId, transaction),
         MessageAuthor.Provider, source.id, MessageStatus.Pending, [note],
@@ -1774,9 +1782,14 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         now, null, null, [], teammate?.id ?? null, teammate?.name ?? null);
       await this.messages.insertAsync(created, transaction);
       return created;
+    }).catch((error: unknown) => {
+      activity.leave(lease);
+      throw error;
     });
-    if (Object.isNull(reply))
+    if (Object.isNull(reply)) {
+      activity.leave(lease);
       return null;
+    }
     const item = new ReplyWork(reply, provider, teammate?.role ?? null, source, hop, turn);
     this.state.runs.set(reply.id, item.run);
     this.state.turns.set(token, item);
@@ -1784,12 +1797,13 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const group = this.findGroup(source.conversationId);
     if (!Object.isNull(group)) {
       group.push(item);
+      activity.leave(lease);
       if (ahead)
         this.followAhead(item, turn, folder);
       return turn;
     }
 
-    this.runGroup(reply.id, [item], folder);
+    this.runGroup(reply.id, [item], folder, lease);
     return turn;
   }
 
@@ -1800,10 +1814,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return !listed.some(t => t.status === BackgroundTaskStatus.Running);
   }
 
-  private runGroup(key: string, work: ReplyWork[], folder: WorkFolder): void {
+  private runGroup(key: string, work: ReplyWork[], folder: WorkFolder, lease: string): void {
     const conversationId = work[0]!.message.conversationId;
     this.state.groups.set(key, work);
-    const lease = this.context.projectActivity.enterTurn(folder.path);
     const execution = this.executeRepliesAsync(work, folder).catch(ConversationEngine.ignore).finally(async () => {
       for (const done of work) {
         done.end();
@@ -1843,6 +1856,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   private async findWorkFolderAsync(conversation: Conversation, prepare: boolean, transaction?: SqlTransaction): Promise<WorkFolder | null> {
     const folders = this.context.chatFolders;
+    if (!Object.isNull(conversation.attachedFolder))
+      return WorkFolder.attached(conversation.attachedFolder);
     if (Object.isNull(conversation.projectId))
       return new WorkFolder(conversation.id, prepare ? folders.prepare(conversation.id) : folders.pathOf(conversation.id));
     const project = await this.projects.findAsync(conversation.projectId, transaction);
@@ -1865,6 +1880,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       resume();
     await wake.useToolsAsync(tools);
     try {
+      await this.messages.setCheckpointFolderAsync(item.message.id, folder.id);
       await run.followAsync(wake);
     }
     finally {
@@ -1916,7 +1932,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     }
   }
 
-  private async failIfUnableAsync(item: ReplyWork, folder: WorkFolder, state: FolderState): Promise<void> {
+  private async failIfUnableAsync(item: ReplyWork, folder: WorkFolder, state: FolderState, isAttached: boolean): Promise<void> {
     if (item.isEnded)
       return;
     const provenance = item.message.provenance!;
@@ -1924,7 +1940,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       : await this.providers.findAsync(provenance.providerId);
     const reason = provider?.enabled === false ? Resources.formatProviderDisabled(provider.label)
       : state === FolderState.Present ? null
-        : state === FolderState.Missing ? Resources.formatWorkFolderMissing(folder.path) : Resources.formatWorkFolderUnreachable(folder.path);
+        : state === FolderState.Missing
+          ? isAttached ? Resources.formatAttachedFolderMissing(folder.path) : Resources.formatWorkFolderMissing(folder.path)
+          : isAttached ? Resources.formatAttachedFolderUnreachable(folder.path) : Resources.formatWorkFolderUnreachable(folder.path);
     if (Object.isNull(reason) || item.isEnded)
       return;
     const now = new Date().toISOString();
@@ -2096,6 +2114,16 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const conversation = await this.requireConversationAsync(wake.chatId);
     const folder = await this.requireWorkFolderAsync(conversation, true);
     const text = wake.text!;
+    const activity = this.context.projectActivity;
+    const lease = startsTurn ? activity.tryEnterTurn(folder.path) : null;
+    if (startsTurn && Object.isNull(lease)) {
+      void activity.whenReleasedAsync().then(() => this.settleSafelyAsync(conversation.id, () => this.sendWakesAsync(conversation.id)));
+      return true;
+    }
+    const leave = (): void => {
+      if (!Object.isNull(lease))
+        activity.leave(lease);
+    };
     const delivered = await this.context.database.connection.runInTransactionAsync(async transaction => {
       await this.requireUnmovedAsync(conversation, transaction);
       const open = [...await this.wakes.listAsync(ChatWakeState.Waiting, transaction), ...await this.wakes.listAsync(ChatWakeState.Ready, transaction)];
@@ -2121,16 +2149,23 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         await this.messages.insertAsync(item.message, transaction);
       await this.wakes.updateAsync(wake.settled(Object.isNull(item) ? ChatWakeState.Undeliverable : ChatWakeState.Delivered, text, hop), transaction);
       return { stored, item };
+    }).catch((error: unknown) => {
+      leave();
+      throw error;
     });
-    if (Object.isNull(delivered))
+    if (Object.isNull(delivered)) {
+      leave();
       return false;
+    }
     const { stored, item } = delivered;
     this.events.publish(new Event(EventName.MessageCreated, stored.toJson()));
-    if (Object.isNull(item))
+    if (Object.isNull(item) || Object.isNull(lease)) {
+      leave();
       return false;
+    }
     this.state.runs.set(item.message.id, item.run);
     this.events.publish(new Event(EventName.MessageCreated, item.message.toJson()));
-    this.runGroup(stored.id, [item], folder);
+    this.runGroup(stored.id, [item], folder, lease);
     return true;
   }
 

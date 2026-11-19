@@ -889,6 +889,19 @@ export declare enum MethodName {
    */
   ConversationFolderCount = "ConversationFolderCount",
   /**
+   * Attaches an existing folder to a chat without a project, or replaces the one attached: its teammates work in it, in place, from the
+   * next turn, and nothing is copied; the chat's own folder stays for a detach. Refused with `Conflict` while a reply runs in the chat or
+   * for a chat in a project, `NotFound` for an unknown chat, and `InvalidParameters` when the folder isn't an absolute path to a folder
+   * TeamRun can read. Parameters: `ChatFolderAttachParams`. Result: the `Chat`.
+   */
+  ChatFolderAttach = "ChatFolderAttach",
+  /**
+   * Detaches a chat's attached folder, leaving its files as they are, so that its teammates work in the chat's own folder again from
+   * the next turn. Refused with `Conflict` while a reply runs in the chat, `NotFound` for an unknown chat. Parameters: `ChatIdParams`.
+   * Result: the `Chat`.
+   */
+  ChatFolderDetach = "ChatFolderDetach",
+  /**
    * Removes a message and everything after it, marks the chat so that its next reply starts a fresh provider
    * session fed with the kept transcript, and optionally restores the project's files to the snapshot taken before the
    * removed reply started (git projects). Parameters: `ChatRewindParams`. Result:
@@ -1169,6 +1182,15 @@ export declare enum EventName {
    * `MessageIdParams`.
    */
   ReplyThinking = "ReplyThinking",
+  /**
+   * A running reply started taking its folder's checkpoint, before its provider starts. Sent before the checkpoint and never stored, so a
+   * reloaded window does not see it. Payload: `MessageIdParams`.
+   */
+  ReplyCheckpointStarted = "ReplyCheckpointStarted",
+  /**
+   * A running reply's checkpoint ended, taken, not taken, failed or stopped. Never stored. Payload: `MessageIdParams`.
+   */
+  ReplyCheckpointEnded = "ReplyCheckpointEnded",
   /**
    * A provider asked for permission. Payload: `Approval`.
    */
@@ -1518,6 +1540,8 @@ export declare class Resources {
   public static readonly approvedResponderPlanField: string;
   /** Name of a chat's field saying a person chose its title. */
   public static readonly titleChosenField: string;
+  /** Name of a chat's field for the existing folder a person attached to it: `attachedFolder`. */
+  public static readonly attachedFolderField: string;
   /** Name of a teammate update's field for the provider its sender read: `expectedProviderId`. */
   public static readonly expectedProviderIdField: string;
   /** Name of a provider mode's field saying it lifts the provider's restrictions: `unrestricted`. */
@@ -4257,7 +4281,7 @@ export declare class Chat {
    */
   public readonly edited: boolean;
   /**
-   * The chat's own folder, for a chat without a project; `null` in a project. The runtime sets it from its data folder
+   * The folder a chat without a project works in, its attached folder or else its own folder; `null` in a project. The runtime sets it
    * each time it reads the chat, so a stored value never counts.
    */
   public readonly folder: string | null;
@@ -4283,6 +4307,12 @@ export declare class Chat {
   public readonly titleChosen: boolean;
 
   /**
+   * The existing folder a person attached to a chat without a project, which its teammates work in, in place, instead of its own
+   * folder; `null` when none is attached, and always in a project. Written only when set.
+   */
+  public readonly attachedFolder: string | null;
+
+  /**
    * Initializes the chat.
    * @param id Unique identifier.
    * @param projectId The `Project` id, or `null` for a chat without a project.
@@ -4299,7 +4329,9 @@ export declare class Chat {
    * @param approvedPlanTeammates The teammates whose plan was approved since Plan first turned on; none by default.
    * @param approvedResponderPlan Whether the chat's own provider's plan was approved since Plan first turned on; `false` by default.
    * @param titleChosen Whether a person chose the title; `false` by default.
-   * @throws ArgumentException when the id, a given project id, the title, a timestamp, a given folder or an approved teammate is blank.
+   * @param attachedFolder The folder a person attached, or `null` (the default).
+   * @throws ArgumentException when the id, a given project id, the title, a timestamp, a given folder, a given attached folder or an
+   * approved teammate is blank.
    */
   public constructor(
     id: string,
@@ -4315,7 +4347,8 @@ export declare class Chat {
     planFirst?: boolean,
     approvedPlanTeammates?: readonly string[],
     approvedResponderPlan?: boolean,
-    titleChosen?: boolean);
+    titleChosen?: boolean,
+    attachedFolder?: string | null);
 
   /**
    * Reads a chat from untrusted JSON.
@@ -4411,6 +4444,15 @@ export declare class Chat {
    * @throws ArgumentException when the folder is blank.
    */
   public withFolder(folder: string | null): Chat;
+
+  /**
+   * A copy with an attached folder set or cleared, keeping everything else.
+   * @param attachedFolder The folder a person attached, or `null` to detach it.
+   * @param updatedAt ISO 8601 timestamp of the change.
+   * @returns The copy.
+   * @throws ArgumentException when the attached folder or the timestamp is blank.
+   */
+  public withAttachedFolder(attachedFolder: string | null, updatedAt: string): Chat;
 
   /**
    * Returns a copy with the session-reset mark changed.
@@ -8290,6 +8332,46 @@ export declare class ChatMoveParams {
   /**
    * Renders the wire shape.
    * @returns An object with `conversationId`, `projectId`.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * Parameters of `ChatFolderAttach`: the chat and the existing folder it works in from then on.
+ * @remarks
+ * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
+ * path; `toJson` renders the canonical wire shape.
+ */
+export declare class ChatFolderAttachParams {
+  /**
+   * The `Chat` id.
+   */
+  public readonly chatId: string;
+  /**
+   * The folder's absolute path; must not be blank.
+   */
+  public readonly folder: string;
+
+  /**
+   * Initializes the parameters.
+   * @param chatId The `Chat` id.
+   * @param folder The folder's absolute path.
+   * @throws ArgumentException when `chatId`, `folder` are blank.
+   */
+  public constructor(chatId: string, folder: string);
+
+  /**
+   * Reads the parameters from untrusted JSON.
+   * @param value The untrusted value, expected to carry `chatId`, `folder`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The parameters.
+   * @throws JsonException when a field is missing or blank, naming its path.
+   */
+  public static fromJson(value: unknown, path?: string): ChatFolderAttachParams;
+
+  /**
+   * Renders the wire shape.
+   * @returns An object with `chatId`, `folder`.
    */
   public toJson(): JsonObject;
 }

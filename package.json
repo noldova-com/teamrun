@@ -1,6 +1,6 @@
 {
   "name": "@noldova/teamrun",
-  "version": "0.0.2",
+  "version": "0.0.6",
   "teamrun": {
     "protocolVersion": "0.2"
   },
@@ -46,10 +46,10 @@
     "@noldova/context.data.sql.sqlite": "0.0.8",
     "@noldova/context.exceptions": "0.0.8",
     "@noldova/context.json": "0.0.8",
-    "@noldova/desktop.cli": "0.0.6",
-    "@noldova/desktop.protocol": "0.0.6",
-    "@noldova/desktop.runtime": "0.0.6",
-    "@noldova/terminal.protocol": "0.0.2"
+    "@noldova/desktop.cli": "0.0.7",
+    "@noldova/desktop.protocol": "0.0.7",
+    "@noldova/desktop.runtime": "0.0.7",
+    "@noldova/terminal.protocol": "0.0.3"
   },
   "devDependencies": {
     "@noldova/computer-use": "0.0.2",

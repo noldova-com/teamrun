@@ -140,6 +140,13 @@ LICENSE file in the root directory of this source tree.
         <button nol-menu-item [icon]="resources.editIcon" [label]="resources.renameConversationLabel" (triggered)="rename(conversation, tree)"></button>
         <button nol-menu-item [icon]="resources.moveToProjectIcon"
           [label]="conversation.projectId === null ? resources.moveToProjectLabel : resources.moveToAnotherProjectLabel" [nolMenuTriggerFor]="moveMenu"></button>
+        @if (conversation.projectId === null) {
+          <button nol-menu-item [icon]="resources.attachFolderIcon"
+            [label]="conversation.attachedFolder === null ? resources.attachFolderLabel : resources.replaceFolderLabel" (triggered)="attachFolder(conversation)"></button>
+          @if (conversation.attachedFolder !== null) {
+            <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.detachFolderLabel" (triggered)="detachFolder(conversation)"></button>
+          }
+        }
         <button nol-menu-item [icon]="resources.forgetIcon" [label]="resources.deleteConversationLabel" (triggered)="remove(conversation)"></button>
       </nol-menu>
     </ng-template>

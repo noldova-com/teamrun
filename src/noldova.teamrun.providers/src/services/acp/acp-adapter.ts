@@ -45,6 +45,7 @@ import type { ProviderTimings } from "../../models/provider-timings.js";
 import { Resources } from "../../resources.js";
 import { FailureDescriber } from "../failure-describer.js";
 import { ReadOnlyMcpTools } from "../mcp/read-only-mcp-tools.js";
+import { ServedToolNames } from "../mcp/served-tool-names.js";
 import { SharedMcpLaunch } from "../mcp/shared-mcp-launch.js";
 import { CommandRunner } from "../process/command-runner.js";
 import { PowershellSession } from "../process/powershell-session.js";
@@ -309,7 +310,7 @@ export class AcpAdapter implements IProviderAdapter {
     let sessionId: string | null = null;
     let observed = new ObservedSettings(kindId, null, null, null);
     let confirming: Promise<boolean> | null = null;
-    let cancelTimer: NodeJS.Timeout | null = null;
+    const interruptWait = new AbortController();
     const toolsWait = new AbortController();
     const steers: Promise<boolean>[] = [];
     let revoke: () => void = () => undefined;
@@ -346,7 +347,7 @@ export class AcpAdapter implements IProviderAdapter {
     const cancel = (): void => {
       if (!Object.isNull(client) && !Object.isNull(sessionId))
         client.notify(Resources.acpSessionCancel, { sessionId });
-      cancelTimer ??= setTimeout(() => { void client?.stop().catch(() => undefined); }, this.timings.interruptGrace);
+      void this.timer.delayAsync(this.timings.interruptGrace, interruptWait.signal).then(() => client?.stop()).catch(() => undefined);
     };
     signal.addEventListener(Resources.abortEvent, cancel, { once: true });
     try {
@@ -358,7 +359,7 @@ export class AcpAdapter implements IProviderAdapter {
         return new TurnResult(TurnOutcome.Completed, request.resumeNativeSessionId, observed, null);
       }
       const titleArguments = request.isolated ? this.agent.titleSessionArguments ?? [] : [];
-      const key = request.isolated ? null : AcpAdapter.keyOf(request, approvedTools);
+      const key = request.isolated ? null : AcpAdapter.keyOf(request, approvedTools, await ServedToolNames.listAsync(request.tools, signal));
       const taken = await this.take(key, request, sender);
       const launched = taken ?? await this.createClient(request.provider, request.requested, false, request.environment, request.workingDirectory, approvedTools, shutdowns,
         titleArguments, !request.isolated, request.isolated);
@@ -519,8 +520,7 @@ export class AcpAdapter implements IProviderAdapter {
     finally {
       listener.onSteerable?.(null);
       signal.removeEventListener(Resources.abortEvent, cancel);
-      if (!Object.isNull(cancelTimer))
-        clearTimeout(cancelTimer);
+      interruptWait.abort();
       toolsWait.abort();
       if (!Object.isNull(client))
         await client.whenHandledAsync();
@@ -1214,10 +1214,10 @@ export class AcpAdapter implements IProviderAdapter {
     void channel.whenIdle().then(closeQuietly, closeQuietly).finally(revoke);
   }
 
-  private static keyOf(request: TurnRequest, approvedTools: readonly string[]): string {
+  private static keyOf(request: TurnRequest, approvedTools: readonly string[], tools: readonly string[] | null): string {
     const environment = Object.entries(request.environment).filter(([name]) => name !== ProtocolResources.senderTokenVariable);
     return JSON.stringify([request.provider?.id ?? null, request.provider?.profileDir ?? null, request.provider?.binaryPath ?? null, request.requested.toJson(),
-      request.workingDirectory, approvedTools, environment]);
+      request.workingDirectory, approvedTools, tools, environment]);
   }
 
   private async take(key: string | null, request: TurnRequest, sender: string | null): Promise<AcpKeptSession | null> {
