@@ -43,7 +43,9 @@ export class AttachedFoldersTests {
     const site = AttachedFoldersTests.folder(join(host.directory.path, "site"), { "index.html": "<p>home</p>" });
     host.adapter.writeFiles = { "index.html": "<p>new</p>" };
 
+    const before = host.listener.count(EventName.StateInvalidated);
     const attached = await AttachedFoldersTests.attachAsync(host, chat.id, site);
+    const invalidated = host.listener.count(EventName.StateInvalidated) - before;
     const read = await host.conversations.findAsync(chat.id);
     await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "Edit the page"));
     await host.engine.waitForIdle();
@@ -55,7 +57,7 @@ export class AttachedFoldersTests {
     Assert.areEqual("index.html", readdirSync(site).join(","));
     Assert.areEqual(0, await host.conversations.countFolderFilesAsync(new ConversationIdParams(chat.id)));
     Assert.areEqual(`${WorkFolder.attached(site).id} ${site}`, `${host.checkpoints.captures[0]?.folder.identity} ${host.checkpoints.captures[0]?.folder.path}`);
-    Assert.areEqual(1, host.listener.count(EventName.StateInvalidated));
+    Assert.areEqual(1, invalidated);
   }
 
   @TestMethod

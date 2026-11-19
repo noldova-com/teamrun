@@ -124,6 +124,8 @@ describe("Resources", () => {
 
   it("words the Projects view's questions and its Show more", () => {
     expect(Resources.formatDeleteText("First")).toBe("\"First\" and its messages are removed. This cannot be undone.");
+    expect(Resources.formatReplaceFolderText("/work/site", "/work/docs")).toBe("From the next turn, this chat's teammates work in \"/work/docs\" instead of \"/work/site\". No files are copied, moved or changed.");
+    expect(Resources.formatAttachedFolderKept("site")).toBe("The folder attached to it, \"site\", and its files stay as they are.");
     expect(Resources.formatForgetText("repo")).toBe("\"repo\" and every chat under it are removed from TeamRun. The folder itself stays.");
     expect(Resources.formatShowMore(2)).toBe("Show 2 more");
   });
