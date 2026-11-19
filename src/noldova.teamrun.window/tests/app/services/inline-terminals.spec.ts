@@ -455,27 +455,35 @@ describe("InlineTerminals", () => {
     starter.outputs.set("run-1", FakeRunStarter.outputOf("$ ls", "a.txt"));
     starter.outputs.set("run-2", FakeRunStarter.outputOf("$ pwd", "/work"));
     await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
-    let release = (): void => undefined;
+    let releaseFirst = (): void => undefined;
     starter.readHeld = new Promise<void>(resolve => {
-      release = resolve;
+      releaseFirst = resolve;
     });
     const firstRead = new Promise<void>(resolve => {
       starter.onRead = resolve;
     });
-
     const moving = inline.runAsync("teamrun.chat/c1", "pwd", null, [], second);
     await firstRead;
+    let releaseSecond = (): void => undefined;
+    starter.readHeld = new Promise<void>(resolve => {
+      releaseSecond = resolve;
+    });
     const secondRead = new Promise<void>(resolve => {
       starter.onRead = resolve;
     });
     const movingOn = inline.runAsync("teamrun.chat/c1", "id", null, [], third);
     await secondRead;
     const reading = [inline.places().get("teamrun.chat/c1"), inline.blocksOf("teamrun.chat/c1", "m1")];
-    release();
-    await Promise.all([moving, movingOn]);
 
-    expect([reading, inline.blocksOf("teamrun.chat/c1", "m1"), shownOutput("teamrun.chat/c1", first), shownOutput("teamrun.chat/c1", second)]).toEqual([
-      [third, new Map([["body", new Set([4, 0, 2])]])], new Map([["body", new Set([4, 0, 2])]]), ["$ ls", "a.txt"], ["$ pwd", "/work"]]);
+    releaseFirst();
+    await moving;
+    const firstEnded = [inline.blocksOf("teamrun.chat/c1", "m1"), shownOutput("teamrun.chat/c1", first), shownOutput("teamrun.chat/c1", second)];
+    releaseSecond();
+    await movingOn;
+
+    expect([reading, firstEnded, inline.blocksOf("teamrun.chat/c1", "m1"), shownOutput("teamrun.chat/c1", first), shownOutput("teamrun.chat/c1", second)]).toEqual([
+      [third, new Map([["body", new Set([4, 0, 2])]])], [new Map([["body", new Set([4, 0, 2])]]), ["$ ls", "a.txt"], null],
+      new Map([["body", new Set([4, 0, 2])]]), ["$ ls", "a.txt"], ["$ pwd", "/work"]]);
   });
 
   it("drops an earlier Run's block once the read finds no output to keep, or fails, or its chat closed during the read", async () => {
