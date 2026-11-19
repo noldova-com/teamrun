@@ -4,6 +4,20 @@
 
 Each version's section is written by the pull request that changes the version, from the pull requests merged since the previous version; other pull requests don't edit this file.
 
+## 0.0.5
+
+### New
+
+- **Attach a folder to a chat:** a chat without a project can attach an existing folder from its menu, Attach a folder…, and work there in place, with nothing copied; Replace the folder… and Detach the folder change it later, and the chat's breadcrumb and its row's tooltip name the folder.
+  A rewind restores your files there from the checkpoint of the folder each reply ran in, and when the chat has moved to another folder since, it restores no files and says so.
+  Deleting or moving such a chat leaves the folder and its files where they are.
+  Known: a teammate that already answered in the chat keeps working in the chat's own folder until a fix (#137).
+- **A reply saving its checkpoint:** a working reply reads "Saving a checkpoint…" while TeamRun takes its checkpoint, and Stop reads "Stopping…" from the first click until the reply stops.
+
+### Fixed
+
+- **Inline terminals on a short history:** an inline terminal gets at least 8 rows, within the history, so a command and its output show below the prompt rather than the prompt alone.
+
 ## 0.0.4
 
 This version holds the same app as 0.0.3, released right after it so that updating can be tried across more than one version, such as from 0.0.2 straight to 0.0.4.

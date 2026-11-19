@@ -1,6 +1,6 @@
 {
   "name": "teamrun-app",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "workspaces": [
     "src/noldova.teamrun.window.app"
   ],
@@ -142,7 +142,7 @@
     "@noldova/desktop.runtime": "0.0.7",
     "@noldova/git": "0.0.3",
     "@noldova/git.github": "0.0.3",
-    "@noldova/teamrun": "0.0.4",
+    "@noldova/teamrun": "0.0.5",
     "@noldova/terminal": "0.0.3"
   },
   "devDependencies": {
