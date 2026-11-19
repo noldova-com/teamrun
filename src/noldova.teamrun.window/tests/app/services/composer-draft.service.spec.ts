@@ -236,6 +236,21 @@ describe("ComposerDraftService", () => {
     expect(context.count(MethodName.DraftDiscard)).toBe(0);
   });
 
+  it("discards no draft that reached it after the count it is given, and the draft it read when given none", async () => {
+    context.answer(MethodName.DraftRead, () => stored(3).toJson());
+    await drafts.restore("c1");
+    const arrivals = drafts.arrivalsOf("c1");
+    context.answer(MethodName.DraftRead, () => stored(4).toJson());
+    await drafts.restore("c1");
+
+    await drafts.discard("c1", arrivals);
+    const skipped = context.count(MethodName.DraftDiscard);
+    await drafts.discard("c1");
+
+    expect(skipped).toBe(0);
+    expect(context.parametersOf(MethodName.DraftDiscard)).toEqual({ chatId: "c1", revision: 4 });
+  });
+
   it("passes on a save's failure that is no stale refusal, and tells its watchers nothing", async () => {
     const refusedOver: string[] = [];
     drafts.onStale(t => refusedOver.push(t));

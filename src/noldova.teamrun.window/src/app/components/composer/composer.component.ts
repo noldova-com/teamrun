@@ -1219,6 +1219,7 @@ export class ComposerComponent {
     const settings = new ComposerSettings(kind, this.model(), this.effort(), this.ownProvider(), this.responderId(), this.speed(), this.mode());
     const mentions = MentionResolver.resolve(text, this.teammateMentions());
     const prepared: MessageAttachment[] = [];
+    const arrivals = this.drafts.arrivalsOf(conversationId);
     this.preparing.set(true);
     try {
       if (drafted.some(t => !t.isSaved))
@@ -1244,7 +1245,7 @@ export class ComposerComponent {
         for (const attachment of drafted)
           attachment.dispose();
         this.attachments.set([]);
-        void this.drafts.discard(conversationId);
+        void this.drafts.discard(conversationId, arrivals);
       }
     }
     catch {

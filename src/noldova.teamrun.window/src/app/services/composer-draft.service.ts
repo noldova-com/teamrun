@@ -28,6 +28,7 @@ export class ComposerDraftService {
   private readonly saveInterval: number = inject(ComposerDraftService.interval);
   private readonly revisions: Map<string, number> = new Map();
   private readonly unread: Set<string> = new Set();
+  private readonly arrivals: Map<string, number> = new Map();
   private readonly staleWatchers: Set<(conversationId: string) => void> = new Set();
   private latest: ComposerDraft | null = null;
   private cancelSave: (() => void) | null = null;
@@ -38,6 +39,7 @@ export class ComposerDraftService {
     await this.flush();
     const draft = await this.store.readDraft(conversationId);
     this.unread.delete(conversationId);
+    this.arrive(conversationId);
     if (Object.isNull(draft))
       this.revisions.delete(conversationId);
     else
@@ -76,12 +78,16 @@ export class ComposerDraftService {
       this.latest = null;
   }
 
-  public async discard(conversationId: string): Promise<void> {
+  public arrivalsOf(conversationId: string): number {
+    return this.arrivals.get(conversationId) ?? 0;
+  }
+
+  public async discard(conversationId: string, arrivals: number = this.arrivalsOf(conversationId)): Promise<void> {
     if (this.latest?.conversationId === conversationId)
       this.latest = null;
     await this.writing;
     const revision = this.revisions.get(conversationId);
-    if (!Object.isUndefined(revision) && await this.store.discardDraft(conversationId, revision))
+    if (!Object.isUndefined(revision) && arrivals === this.arrivalsOf(conversationId) && await this.store.discardDraft(conversationId, revision))
       this.revisions.delete(conversationId);
   }
 
@@ -102,6 +108,7 @@ export class ComposerDraftService {
       if (!(error instanceof DraftStaleException))
         throw error;
       this.revisions.delete(draft.conversationId);
+      this.arrive(draft.conversationId);
       this.drop(draft.conversationId);
       for (const watcher of this.staleWatchers)
         watcher(draft.conversationId);
@@ -120,5 +127,9 @@ export class ComposerDraftService {
     this.revisions.set(draft.conversationId, saved.revision);
     draft.attachments.forEach((t, index) => t.markSaved(saved.attachments[index]!));
     return true;
+  }
+
+  private arrive(conversationId: string): void {
+    this.arrivals.set(conversationId, this.arrivalsOf(conversationId) + 1);
   }
 }

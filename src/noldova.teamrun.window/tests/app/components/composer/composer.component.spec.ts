@@ -4065,6 +4065,27 @@ describe("ComposerComponent", () => {
         expect(sent()[0]?.attachments.map(t => t.name)).toEqual(["notes.txt"]);
       });
 
+      it("sends its own text but discards no draft when the save it waits for is refused as stale, so the other window's newer draft stays", async () => {
+        const held = new DeferredResponse();
+        context.answer(MethodName.DraftRead, () => drafted("c1", "where were we", [], [], 3));
+        await prepare();
+        await render();
+        context.refuse(MethodName.DraftSave, ErrorCode.Conflict, "The draft changed.", "c1")
+          .answer(MethodName.DraftRead, () => drafted("c1", "where we are now", [], [], 4))
+          .answer(MethodName.MessageSend, () => held.promise.then(() => answered()));
+        await pick([new File(["a"], "notes.txt", { type: "text/plain" })]);
+        await type("mine");
+
+        await send();
+        await Wait.until(() => expect(box().value).toBe("where we are now"));
+        held.resolve(null);
+        await Wait.until(() => expect(sent()).toHaveLength(1));
+        await saveStep()();
+
+        expect(sent()[0]?.text).toBe("mine");
+        expect(context.count(MethodName.DraftDiscard)).toBe(0);
+      });
+
       it("still sends a new file from its data when the save it waits for fails, and says the save failed", async () => {
         context.fail(MethodName.DraftSave, "disk full");
         await prepare();
