@@ -167,8 +167,29 @@ for (const { language, write, compute } of LANGUAGES)
       expect(underSecond.height).toBeLessThanOrEqual(Math.min(history.height, Math.max(history.height / 2, MINIMUM_ROWS * rowHeight) + TERMINAL_INSET) + EDGE_TOLERANCE);
 
       const computed = app.pidFile(`${language}-computed`);
+      await page.evaluate(() => {
+        const log: string[] = [];
+        Reflect.set(window, "probeLog", log);
+        const started = performance.now();
+        const at = (): string => (performance.now() - started).toFixed(1);
+        const screen = document.querySelector("nol-teamrun-inline-terminal .xterm-screen");
+        const sizeOf = (): string => {
+          const box = screen?.getBoundingClientRect();
+          return `${innerWidth}x${innerHeight} screen ${Math.round(box?.width ?? 0)}x${Math.round(box?.height ?? 0)} rows ${document.querySelectorAll("nol-teamrun-inline-terminal .xterm-rows > div").length}`;
+        };
+        log.push(`${at()} start ${sizeOf()}`);
+        const observer = new ResizeObserver(() => log.push(`${at()} resize ${sizeOf()}`));
+        if (screen !== null)
+          observer.observe(screen);
+        observer.observe(document.documentElement);
+        addEventListener("resize", () => log.push(`${at()} window ${sizeOf()}`));
+        document.addEventListener("keydown", event => log.push(`${at()} key ${event.key}`), true);
+      });
       await page.keyboard.type(compute(computed));
       await page.keyboard.press("Enter");
+      await page.waitForTimeout(3_000);
+      const probeLog = await page.evaluate(() => (Reflect.get(window, "probeLog") as string[]).join("\n"));
+      console.log(`PROBE126 ${language} file="${readTyped(computed)}"\n${probeLog}\nPROBE126-END`);
       await expect.poll(() => shownUnlessWrittenAsync(page, computed, COMPUTED), { ...TeamRunApp.pollOf(30_000), message: "the typed command writes its file" }).toEqual([]);
       await settledAtPromptAsync(page, path.basename(computed));
       await runs.nth(0).click();
