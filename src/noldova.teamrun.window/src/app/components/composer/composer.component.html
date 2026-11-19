@@ -114,8 +114,9 @@ LICENSE file in the root directory of this source tree.
         </span>
       </button>
       @if (runningReply(); as reply) {
-        <button type="button" nol-icon-button class="nol-teamrun-composer-stop" [icon]="resources.stopGlyph" [label]="resources.stopLabel"
-          [nolTooltip]="resources.stopLabel" [disabled]="stopping()" (click)="stop()"></button>
+        <button type="button" nol-icon-button class="nol-teamrun-composer-stop" [icon]="resources.stopGlyph"
+          [label]="stopping() ? resources.stoppingLabel : resources.stopLabel" [nolTooltip]="stopping() ? resources.stoppingLabel : resources.stopLabel"
+          [disabled]="stopping()" (click)="stop()"></button>
         @let chosen = editing() !== null ? null : store.whileReplying();
         <nol-split-button #end class="nol-teamrun-composer-deliver" [icon]="chosen === null ? resources.sendGlyph : resources.deliveryGlyphs[chosen]"
           [label]="chosen === null ? resources.saveWaitingLabel : resources.deliveryLabels[chosen]" [menuLabel]="resources.deliveryMenuLabel" [menu]="deliveryMenu"

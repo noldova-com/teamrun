@@ -5115,6 +5115,40 @@ describe("ComposerComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
+    it("names Stop Stopping… in its label and tooltip while its cancel runs, without changing its size or moving the composer", async () => {
+      const cancel = new DeferredResponse();
+      context.answer(MethodName.MessageSend, () => new MessageSendResult(SampleData.userMessage, [SampleData.reply]).toJson())
+        .answer(MethodName.ConversationCancel, async () => {
+          await cancel.promise;
+          return null;
+        });
+      await show();
+      await type("ship it");
+      await send();
+      const stop = (): HTMLButtonElement => {
+        const found = root().querySelector(".nol-teamrun-composer-stop");
+        if (!(found instanceof HTMLButtonElement))
+          throw new Error("Stop is not shown.");
+        return found;
+      };
+      await Wait.until(() => expect(root().querySelector(".nol-teamrun-composer-stop")).not.toBeNull());
+      const tooltip = (): string => fixture.debugElement.query(By.css(".nol-teamrun-composer-stop")).injector.get(TooltipDirective).text();
+      const before = [box(stop()), box(card())] as const;
+      const idle = [stop().getAttribute("aria-label"), tooltip()];
+
+      await click(stop());
+      fixture.detectChanges();
+
+      expect([idle, [stop().getAttribute("aria-label"), tooltip(), stop().disabled]])
+        .toEqual([[Resources.stopLabel, Resources.stopLabel], [Resources.stoppingLabel, Resources.stoppingLabel, true]]);
+      for (const [earlier, after] of [[before[0], box(stop())], [before[1], box(card())]] as const)
+        for (const edge of ["left", "top", "width", "height"] as const)
+          AppearanceFixture.expectPixels(after[edge], earlier[edge]);
+      cancel.resolve(null);
+      await Wait.until(() => expect(stop().disabled).toBe(false));
+      expect(stop().getAttribute("aria-label")).toBe(Resources.stopLabel);
+    });
+
     it.each([
       { hint: "Providers", action: ".nol-teamrun-composer-manage", method: MethodName.ProviderModelCatalog },
       { hint: "Retry", action: ".nol-teamrun-composer-retry", method: MethodName.ProviderKindList }
