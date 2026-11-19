@@ -15,7 +15,7 @@ describe("Screenshot names", () => {
   const bytesOf = (text: string): number => new TextEncoder().encode(text).length;
   const longStem = (): string => `${"A-test-title-past-what-a-file-name-may-hold-".repeat(6)}${crypto.randomUUID()}`;
 
-  it("saves a screenshot whose file name is past the 255 bytes a file name may take under the name cut to fit with a 16-character hash of it, keeping its extension",
+  it("saves a screenshot whose file name is past the 255 bytes a file name may take under its first 100 bytes and a 16-character hash of it, keeping its extension",
     async () => {
       const stem = longStem();
       expect(bytesOf(`${stem}.png`)).toBeGreaterThan(255);
@@ -26,7 +26,7 @@ describe("Screenshot names", () => {
 
       expect(saved).toMatch(/^A-test-title-past-what-a-file-name-may-hold-[\w-]*-[\da-f]{16}\.png$/u);
       expect(stem.startsWith(saved.slice(0, -"-0123456789abcdef.png".length))).toBe(true);
-      expect(bytesOf(saved)).toBe(255);
+      expect(bytesOf(saved)).toBe(100 + "-0123456789abcdef.png".length);
       expect(await commands.readFile(path, "base64")).not.toBe("");
     });
 

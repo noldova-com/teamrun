@@ -39,14 +39,14 @@ describe("ShortScreenshotNames", () => {
     assert.equal(ShortScreenshotNames.shorten(fits), fits);
   });
 
-  it("cuts a longer file name to the start that fits beside a hyphen, 16 digits of its hash and its extension, 255 bytes in all", () => {
+  it("cuts a longer file name to its first 100 bytes, a hyphen, 16 digits of its hash and its extension", () => {
     const short = ShortScreenshotNames.shorten(path.join(folder, longName));
     const name = path.basename(short);
 
     assert.equal(path.dirname(short), folder);
     assert.match(name, /^fails-with-a-title-past-what-a-file-name-may-hold-[\w-]*-[\da-f]{16}\.png$/u);
     assert.equal(longName.startsWith(name.slice(0, -"-0123456789abcdef.png".length)), true);
-    assert.equal(Buffer.byteLength(name), ShortScreenshotNames.NAME_LIMIT);
+    assert.equal(Buffer.byteLength(name), ShortScreenshotNames.KEPT + "-0123456789abcdef.png".length);
   });
 
   it("gives two long names that share their start names of their own", () => {
@@ -58,11 +58,11 @@ describe("ShortScreenshotNames", () => {
   });
 
   it("never splits a character that takes more than one byte", () => {
-    const name = ShortScreenshotNames.shorten(`a${"€".repeat(100)}.png`);
+    const name = ShortScreenshotNames.shorten(`ab${"€".repeat(100)}.png`);
 
     assert.equal(Buffer.from(name).toString(), name);
-    assert.match(name, /^a€{77}-[\da-f]{16}\.png$/u);
-    assert.equal(Buffer.byteLength(name), 253);
+    assert.match(name, /^ab€{32}-[\da-f]{16}\.png$/u);
+    assert.equal(Buffer.byteLength(name), 98 + "-0123456789abcdef.png".length);
   });
 
   it("sends Vitest's failure screenshot, which has no path, to the provider under the cut name and logs the long one beside the saved path", async () => {

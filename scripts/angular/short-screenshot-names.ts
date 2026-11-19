@@ -15,6 +15,7 @@ import type { ISavedScreenshot } from "./interfaces/i-saved-screenshot.ts";
 
 export class ShortScreenshotNames {
   public static readonly NAME_LIMIT: number = 255;
+  public static readonly KEPT: number = 100;
   private static readonly TAKE: string = "__vitest_takeScreenshot";
   private static readonly HASH: string = "sha256";
   private static readonly HASH_LENGTH: number = 16;
@@ -30,10 +31,9 @@ export class ShortScreenshotNames {
       return path;
     const extension = extname(name);
     const hash = createHash(ShortScreenshotNames.HASH).update(name).digest("hex").slice(0, ShortScreenshotNames.HASH_LENGTH);
-    const room = ShortScreenshotNames.NAME_LIMIT - Buffer.byteLength(`${ShortScreenshotNames.SEPARATOR}${hash}${extension}`);
     let cut = "";
     for (const character of name.slice(0, name.length - extension.length)) {
-      if (Buffer.byteLength(cut + character) > room)
+      if (Buffer.byteLength(cut + character) > ShortScreenshotNames.KEPT)
         break;
       cut += character;
     }
