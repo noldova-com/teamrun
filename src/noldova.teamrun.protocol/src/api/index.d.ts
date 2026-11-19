@@ -1170,6 +1170,15 @@ export declare enum EventName {
    */
   ReplyThinking = "ReplyThinking",
   /**
+   * A running reply started taking its folder's checkpoint, before its provider starts. Sent before the checkpoint and never stored, so a
+   * reloaded window does not see it. Payload: `MessageIdParams`.
+   */
+  ReplyCheckpointStarted = "ReplyCheckpointStarted",
+  /**
+   * A running reply's checkpoint ended, taken, not taken, failed or stopped. Never stored. Payload: `MessageIdParams`.
+   */
+  ReplyCheckpointEnded = "ReplyCheckpointEnded",
+  /**
    * A provider asked for permission. Payload: `Approval`.
    */
   ApprovalCreated = "ApprovalCreated",

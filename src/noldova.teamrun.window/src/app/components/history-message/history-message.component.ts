@@ -69,6 +69,7 @@ import {
 } from "@noldova/ui.components.angular";
 
 import { ChatAction } from "../../enums/chat-action";
+import { ReplyActivity } from "../../enums/reply-activity";
 import { SegmentKind } from "../../enums/segment-kind";
 import { ActivityEntry } from "../../models/activity-entry";
 import type { IRowReveal } from "../../interfaces/i-row-reveal";
@@ -194,6 +195,7 @@ export class HistoryMessageComponent implements OnInit {
   protected readonly planRunStates: Signal<ReadonlyMap<number, ShellRunState>> = computed(() => this.runStates().get(Resources.runPlanSite) ?? new Map());
   protected readonly isActive: Signal<boolean> = computed(() => this.formatter.isActive(this.message()));
   protected readonly canStop: Signal<boolean> = computed(() => this.formatter.canStop(this.message()));
+  protected readonly stopping: Signal<boolean> = computed(() => this.store.isCancelling(this.message().id));
   protected readonly isAsking: Signal<boolean> = computed(() => this.formatter.waitsOn(this.message(), this.askers()) && this.store.isAsking(this.message().id));
   protected readonly askers: Signal<ReadonlySet<string | null> | null> = computed(() => {
     const pending = this.store.pendingApprovalsOf(this.message().id);
@@ -321,7 +323,9 @@ export class HistoryMessageComponent implements OnInit {
   protected readonly status: Signal<Status> = computed(() => HistoryMessageComponent.statusOf(this.message().status));
   protected readonly activityLabel: Signal<string> = computed(() => {
     const message = this.message();
-    return this.formatter.activityLabel(message, this.now(), this.store.thinkingReplies().has(message.id));
+    const activity = this.stopping() ? ReplyActivity.Stopping : this.store.savingCheckpointReplies().has(message.id) ? ReplyActivity.SavingCheckpoint
+      : this.store.thinkingReplies().has(message.id) ? ReplyActivity.Thinking : null;
+    return this.formatter.activityLabel(message, this.now(), activity);
   });
   protected readonly wakeNote: Signal<readonly string[] | null> = computed(() => this.formatter.wakeNoteOf(this.message()));
   protected readonly resumeNote: Signal<string | null> = computed(() => this.message().details.find(t => this.formatter.isResumeNote(t))?.text ?? null);
