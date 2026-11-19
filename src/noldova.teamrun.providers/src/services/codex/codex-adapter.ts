@@ -422,8 +422,14 @@ export class CodexAdapter implements IProviderAdapter {
       wanted.planFirst, wanted.contextWindow);
 
     const tools = await ServedToolNames.listAsync(request.tools, signal);
-    const servers = request.isolated ? await this.readMcpServers(client, request.workingDirectory)
-      : await this.readServersToTurnOff(client, request.provider, request.workingDirectory);
+    let servers: readonly string[] | null;
+    try {
+      servers = request.isolated ? await this.readMcpServers(client, request.workingDirectory)
+        : await this.readServersToTurnOff(client, request.provider, request.workingDirectory);
+    }
+    catch (error) {
+      return CodexAdapter.fail(FailureDescriber.describe(error), client.version);
+    }
     const params = CodexAdapter.threadKeyOf(request, requested, servers);
     await this.reloadIfChanged(request.resumeNativeSessionId, tools, params);
     const release = await this.lockThread(request.resumeNativeSessionId, true);
