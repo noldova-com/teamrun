@@ -1741,7 +1741,6 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
   const count = 10_000;
   const scrolled = 150;
   const pageReadFrames = 2;
-  const steps = 6;
   const paragraph = "A paragraph of the conversation that wraps across the width of the history, as a real reply does when it explains a change.";
   const messageAt = (sequence: number): Message => {
     const text = [`Message ${sequence}`, ...Array.from({ length: sequence % 5 }, () => paragraph)].join("\n\n");
@@ -1904,7 +1903,7 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
       .toEqual([count, true, true, true]);
   });
 
-  it("keeps the thumb's place and size through a drag to the first message and back while pages load, the top message moving one way, shows each end within 30 frames, and moves nothing on release", { timeout: 25_000 }, async () => {
+  it("keeps the thumb's place and size through a drag to the first message and back while pages load, the top message moving one way, shows each end within 30 frames, and moves nothing on release", { timeout: 60_000 }, async () => {
     await settle();
     const view = viewport();
     const height = view.scrollHeight;
@@ -1918,8 +1917,8 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
     for (const to of [0, room]) {
       const from = place;
       const leg: (readonly [number, number, number])[] = [];
-      for (let step = 1; step <= steps; step += 1) {
-        place = Math.round(from + (to - from) * step / steps);
+      for (let step = 1; step <= 12; step += 1) {
+        place = Math.round(from + (to - from) * step / 12);
         thumb.moveTo(place);
         await frames(4);
         leg.push([view.scrollTop - place, view.scrollHeight, slotAtTop()[0]]);
