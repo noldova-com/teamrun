@@ -241,6 +241,7 @@ export class ClaudeChat {
     else {
       this.listener = turn.turnListener;
       this.applied = turn;
+      this.rateLimit = null;
       this.input.push(message);
       if (turn.isInterrupted)
         this.stopPending();
@@ -534,6 +535,7 @@ export class ClaudeChat {
     this.listener = pending.turn.turnListener;
     this.applied = pending.turn;
     await this.applySender(query, pending.environment, pending.turn.turnListener);
+    this.rateLimit = null;
     if (!this.closed)
       this.input.push(message);
   }
