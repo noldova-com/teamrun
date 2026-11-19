@@ -12,6 +12,7 @@ import { By } from "@angular/platform-browser";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
   Approval,
+  ChatFolderAttachParams,
   Conversation,
   ConversationListParams,
   DetailKind,
@@ -416,6 +417,26 @@ describe("ConversationComponent", () => {
     fixture.componentRef.setInput("title", "Renamed");
     await settle();
     expect(context.updates).toHaveLength(1);
+  });
+
+  it("follows its chat's attached folder in the tab's breadcrumb, once one is attached, replaced or detached", async () => {
+    const own = new Conversation("c1", null, SampleData.conversation.title, SampleData.timestamp, SampleData.timestamp);
+    context.answer(MethodName.ChatFolderAttach, t => own.withAttachedFolder(ChatFolderAttachParams.fromJson(t).folder, SampleData.timestamp).toJson())
+      .answer(MethodName.ChatFolderDetach, () => own.toJson());
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    await settle();
+
+    await store().attachFolder("c1", "D:/work/site");
+    await settle();
+    await store().attachFolder("c1", "/home/ada/notes/");
+    await settle();
+    await store().detachFolder("c1");
+    await settle();
+    await store().renameConversation("c1", "Renamed");
+    await settle();
+
+    expect(context.updates.map(t => t.update)).toEqual([{ breadcrumb: [Resources.chatsTitle, "site"] }, { breadcrumb: [Resources.chatsTitle, "/home/ada/notes/"] },
+      { breadcrumb: [Resources.chatsTitle] }, { title: "Renamed" }]);
   });
 
   it("selects whichever of two tabs side by side the person moves into, while each keeps its own messages in view", async () => {

@@ -21,6 +21,7 @@ export interface IMessagesService {
   findWindowTokensAsync(providerId: string, model: string | null, transaction?: SqlTransaction): Promise<number | null>;
   findAttachmentAsync(conversationId: string, path: string, transaction?: SqlTransaction): Promise<MessageAttachment | null>;
   findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
+  findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
   listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
   listOpenAsync(transaction?: SqlTransaction): Promise<readonly Message[]>;
   listWithRunningSubAgentsAsync(transaction?: SqlTransaction): Promise<readonly Message[]>;
@@ -28,4 +29,5 @@ export interface IMessagesService {
   insertAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+  setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }

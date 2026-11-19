@@ -16,6 +16,7 @@ import {
   WrittenImageReadParams,
   ConversationMemberParams,
   ChatFindParams,
+  ChatFolderAttachParams,
   ChatMemberModeParams,
   ChatMemberSettingsParams,
   ChatPlanFirstParams,
@@ -117,7 +118,8 @@ export class RequestDispatcher {
     MethodName.ConversationRemoveMember, MethodName.ConversationSetMemberMode, MethodName.ConversationSetMemberSettings,
     MethodName.ConversationSetPlanFirst,
     MethodName.ProjectOpen, MethodName.ProjectForget, MethodName.ConversationCreate, MethodName.ConversationRename, MethodName.ConversationTouch,
-    MethodName.ConversationResponderSet, MethodName.ConversationMove, MethodName.ConversationDelete, MethodName.ProviderCreate, MethodName.ProviderUpdate,
+    MethodName.ConversationResponderSet, MethodName.ConversationMove, MethodName.ConversationDelete, MethodName.ChatFolderAttach, MethodName.ChatFolderDetach,
+    MethodName.ProviderCreate, MethodName.ProviderUpdate,
     MethodName.ProviderSetEnabled, MethodName.ProviderDelete, MethodName.SharedMcpServerCreate, MethodName.SharedMcpServerUpdate,
     MethodName.SharedMcpServerDelete, MethodName.SharedMcpProviderSet, MethodName.SharedMcpTeammateSet, MethodName.SharedMcpSecretSet,
     MethodName.SharedMcpSignOut
@@ -428,6 +430,10 @@ export class RequestDispatcher {
       }
       case MethodName.ConversationFolderCount:
         return await this.conversations.countFolderFilesAsync(ConversationIdParams.fromJson(payload));
+      case MethodName.ChatFolderAttach:
+        return (await this.conversations.attachFolderAsync(ChatFolderAttachParams.fromJson(payload), t => this.projects.checkFolderAsync(t, null))).toJson();
+      case MethodName.ChatFolderDetach:
+        return (await this.conversations.detachFolderAsync(ConversationIdParams.fromJson(payload))).toJson();
       case MethodName.ConversationRewind:
         return (await this.engine.rewindAsync(ConversationRewindParams.fromJson(payload))).toJson();
       case MethodName.ConversationSearch:

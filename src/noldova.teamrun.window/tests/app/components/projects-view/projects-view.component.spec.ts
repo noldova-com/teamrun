@@ -19,6 +19,7 @@ import {
   ApprovalKind,
   ApprovalQuestion,
   ApprovalStatus,
+  ChatFolderAttachParams,
   Conversation,
   ConversationCreateParams,
   ConversationIdParams,
@@ -54,7 +55,7 @@ import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
-import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
@@ -603,6 +604,78 @@ describe("ProjectsViewComponent", () => {
     expect(ConversationIdParams.fromJson(requestOf(MethodName.ConversationDelete)).conversationId).toBe("c2");
     await Wait.until(() => expect(nested()).not.toContain(second.title));
     expect(document.querySelector("nol-teamrun-confirm-dialog")).toBeNull();
+  });
+
+  it("attaches the folder the person chooses to a chat without a project, then offers to replace it after a confirm or detach it, and offers neither in a project", async () => {
+    const attachedTo = (folder: string): Conversation => scratch.withAttachedFolder(folder, SampleData.timestamp).withFolder(folder);
+    conversations = [SampleData.conversation, scratch];
+    await create(t => t.answer(MethodName.ChatFolderAttach, u => attachedTo(ChatFolderAttachParams.fromJson(u).folder).toJson())
+      .answer(MethodName.ChatFolderDetach, () => scratch.toJson()));
+    const rowMenu = async (title: string): Promise<string[]> => {
+      conversationRow(title).querySelector<HTMLButtonElement>(".nol-teamrun-row-actions")?.click();
+      await settle();
+      const labels = texts("button[nol-menu-item] .nol-menu-item-label", itemAt([...document.querySelectorAll("nol-menu")], 0));
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      return labels;
+    };
+    const chatTooltip = (): string => {
+      const found = fixture.debugElement.queryAll(By.css(".nol-teamrun-conversation-row")).find(t => t.nativeElement === conversationRow(scratch.title));
+      if (Object.isUndefined(found))
+        throw new Error("The chat's row is not shown.");
+      return found.injector.get(TooltipDirective).text();
+    };
+    const attached = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ChatFolderAttach))
+      .map(t => ChatFolderAttachParams.fromJson(t.parameters).folder);
+    const inProject = await rowMenu(SampleData.conversation.title);
+    const own = await rowMenu(scratch.title);
+
+    await choose(conversationRow(scratch.title), Resources.attachFolderLabel);
+    const unchosen = [context.folderChoices, attached().length];
+    context.chosenFolder = "D:/site";
+    await choose(conversationRow(scratch.title), Resources.attachFolderLabel);
+    await Wait.until(() => expect(store.conversation("c5")?.attachedFolder).toBe("D:/site"));
+    const withFolder = await rowMenu(scratch.title);
+    const tooltip = chatTooltip();
+    context.chosenFolder = "E:/other";
+    await choose(conversationRow(scratch.title), Resources.replaceFolderLabel);
+    const asked = dialogText();
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
+    const afterCancel = attached().length;
+    await choose(conversationRow(scratch.title), Resources.replaceFolderLabel);
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+    await Wait.until(() => expect(store.conversation("c5")?.attachedFolder).toBe("E:/other"));
+    await choose(conversationRow(scratch.title), Resources.detachFolderLabel);
+    await Wait.until(() => expect(store.conversation("c5")?.attachedFolder).toBeNull());
+
+    expect(inProject.filter(t => [Resources.attachFolderLabel, Resources.replaceFolderLabel, Resources.detachFolderLabel].includes(t))).toEqual([]);
+    expect(own.slice(-3)).toEqual([Resources.moveToProjectLabel, Resources.attachFolderLabel, Resources.deleteConversationLabel]);
+    expect(unchosen).toEqual([1, 0]);
+    expect(withFolder.slice(-4)).toEqual([Resources.moveToProjectLabel, Resources.replaceFolderLabel, Resources.detachFolderLabel, Resources.deleteConversationLabel]);
+    expect(tooltip).toMatch(new RegExp(`^${Resources.chatsTitle}${Resources.titleSeparator}D:/site${Resources.titleSeparator}\\S`, "u"));
+    expect([asked, afterCancel]).toEqual([Resources.formatReplaceFolderText("D:/site", "E:/other"), 1]);
+    expect(attached()).toEqual(["D:/site", "E:/other"]);
+    expect(ConversationIdParams.fromJson(requestOf(MethodName.ChatFolderDetach)).conversationId).toBe("c5");
+    expect(await rowMenu(scratch.title)).toEqual(own);
+  });
+
+  it("says that the attached folder and its files stay when deleting a chat with one, with or without files of its own", async () => {
+    let files = 0;
+    const site = scratch.withAttachedFolder("D:\\work\\site",SampleData.timestamp);
+    conversations = [site];
+    await create(t => t.answer(MethodName.ConversationFolderCount, () => files));
+
+    await choose(conversationRow(scratch.title), Resources.deleteConversationLabel);
+    const empty = dialogText();
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
+    files = 2;
+    await choose(conversationRow(scratch.title), Resources.deleteConversationLabel);
+    const holding = dialogText();
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
+
+    expect([empty, holding]).toEqual([`${Resources.formatDeleteText(scratch.title)} ${Resources.formatAttachedFolderKept("site")}`,
+      `${Resources.formatDeleteWithFilesText(scratch.title, 2)} ${Resources.formatAttachedFolderKept("site")}`]);
+    expect(context.count(MethodName.ConversationDelete)).toBe(0);
   });
 
   it("names the files a chat without a project holds when deleting it, offers Move to a folder… instead, and asks plainly when it holds none", async () => {

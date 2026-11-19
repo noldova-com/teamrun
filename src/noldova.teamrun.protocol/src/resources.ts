@@ -122,6 +122,7 @@ export class Resources {
   public static readonly approvedPlanTeammatesField: string = "approvedPlanTeammates";
   public static readonly approvedResponderPlanField: string = "approvedResponderPlan";
   public static readonly titleChosenField: string = "titleChosen";
+  public static readonly attachedFolderField: string = "attachedFolder";
   public static readonly expectedProviderIdField: string = "expectedProviderId";
   public static readonly unrestrictedField: string = "unrestricted";
   public static readonly attachmentsField: string = "attachments";

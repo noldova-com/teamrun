@@ -47,6 +47,27 @@ export class ChatTests {
   }
 
   @TestMethod
+  public keepsAnAttachedFolderThroughEveryCopyAndJsonUntilItIsDetachedOrTheChatMovesIntoAProject(): void {
+    const own = Chat.fromJson({ ...ChatTests.json, projectId: null, folder: "D:/data/chats/conv-1" });
+    const attached = own.withAttachedFolder("E:/site", "t3").withPlanFirst(true);
+    const copies = [attached.withTitle("Renamed", "t4"), attached.withFolder("E:/site"), attached.withSessionReset(true, "t4"), attached.withForkedSession(null, "t4"),
+      attached.withResponder(new ChatResponder("bob")), attached.asEdited(), attached.withChosenTitle("Chosen", "t4"), attached.withPlanApproved("bob"),
+      attached.withPlanApproved(null).withPlanReopened(null), attached.withPlanFirst(false)];
+
+    Assert.isNull(own.attachedFolder);
+    Assert.isFalse(Object.hasOwn(own.toJson(), "attachedFolder"));
+    Assert.areEqual("t3", own.withAttachedFolder("E:/site", "t3").updatedAt);
+    Assert.areEqual("E:/site", attached.toJson()["attachedFolder"]);
+    Assert.areEqual("E:/site", Chat.fromJson(attached.toJson()).attachedFolder);
+    Assert.areEqual(JSON.stringify(copies.map(() => "E:/site")), JSON.stringify(copies.map(t => t.attachedFolder)));
+    Assert.isNull(attached.withAttachedFolder(null, "t5").attachedFolder);
+    Assert.isNull(attached.withProjectId("prj-2", "t5").attachedFolder);
+    Assert.isNull(Chat.fromJson({ ...ChatTests.json, attachedFolder: null }).attachedFolder);
+    Assert.throws(() => own.withAttachedFolder(" ", "t3"), ArgumentException);
+    Assert.areEqual("$.attachedFolder", Assert.throws(() => Chat.fromJson({ ...ChatTests.json, attachedFolder: " " }), JsonException).path);
+  }
+
+  @TestMethod
   public movesToAnotherProject(): void {
     const chat = Chat.fromJson(ChatTests.json);
 

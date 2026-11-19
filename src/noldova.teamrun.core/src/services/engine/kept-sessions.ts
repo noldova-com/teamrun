@@ -157,19 +157,26 @@ export class KeptSessions {
   }
 
   private async restoreAsync(folder: WorkFolder, reply: Message, going: readonly Message[]): Promise<CheckpointRestore> {
+    if (!KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(reply.id)))
+      return CheckpointRestore.refused(Resources.checkpointFolderChangedRefusal);
     const checkpoint = await this.messages.findCheckpointAsync(reply.id);
     if (Object.isNull(checkpoint) || Object.isNull(this.checkpoints))
       return CheckpointRestore.refused(Resources.noCheckpointRefusal);
     const replies: Message[] = [];
-    for (const t of going.filter(u => u.author === MessageAuthor.Provider))
-      replies.push(await this.requireMessageAsync(t.id));
     let isPartial = false;
-    for (const t of replies)
-      if (Object.isNull(await this.messages.findCheckpointAsync(t.id)) || ReplyRun.hasPartialEvidence(t.details)) {
+    for (const t of going.filter(u => u.author === MessageAuthor.Provider)) {
+      const message = await this.requireMessageAsync(t.id);
+      if (Object.isNull(message.startedAt) || !KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(t.id)))
+        continue;
+      if (Object.isNull(await this.messages.findCheckpointAsync(t.id)) || ReplyRun.hasPartialEvidence(message.details))
         isPartial = true;
-        break;
-      }
+      replies.push(message);
+    }
     return await this.checkpoints.restoreAsync(folder, checkpoint, isPartial ? null : replies.flatMap(t => ReplyRun.reportedFiles(t.details)));
+  }
+
+  private static ranIn(folder: WorkFolder, folderId: string | null): boolean {
+    return Object.isNull(folderId) || folderId === folder.id;
   }
 
   private async tryForkAsync(workingDirectory: string, kept: Message | undefined, removed: readonly Message[]): Promise<ForkedSession | null> {

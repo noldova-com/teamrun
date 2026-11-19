@@ -143,6 +143,14 @@ export class ResourcesTests {
       Resources.formatWorkFolderMissing("/repo"));
     Assert.areEqual("The project's folder \"/repo\" didn't answer in time, so the reply didn't start. Check that its drive or share is connected, then send again.",
       Resources.formatWorkFolderUnreachable("/repo"));
+    Assert.areEqual("The folder attached to this chat, \"/site\", is missing or can't be read, so the reply didn't start. Restore the folder there, or attach another folder or detach this one in the chat's menu.",
+      Resources.formatAttachedFolderMissing("/site"));
+    Assert.areEqual("The folder attached to this chat, \"/site\", didn't answer in time, so the reply didn't start. Check that its drive or share is connected, then send again.",
+      Resources.formatAttachedFolderUnreachable("/site"));
+    Assert.areEqual("The folder \"/site\" is missing, can't be read or didn't answer in time, so it wasn't attached.", Resources.formatFolderNotAttached("/site"));
+    Assert.areEqual("The folder \"site\" is not an absolute path.", Resources.formatFolderNotAbsolute("site"));
+    Assert.areEqual("The chat \"c\" is in a project, which gives it its folder.", Resources.formatChatInProject("c"));
+    Assert.areEqual("folder-abc", Resources.formatAttachedFolderId("abc"));
     Assert.areEqual("The provider \"a\" is not of the kind \"codex\".", Resources.formatProviderMismatch("a", "codex"));
     Assert.areEqual("The provider \"a\" does not exist.", Resources.formatProviderNotFound("a"));
     Assert.areEqual("The provider \"codex\" is already registered.", Resources.formatKindAlreadyRegistered("codex"));

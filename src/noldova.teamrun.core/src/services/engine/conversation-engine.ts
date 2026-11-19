@@ -1335,8 +1335,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         const item = work[index]!;
         const reply = item.message;
         if (!item.run.isCancelled && !item.isEnded && Object.isNull(item.wake)) {
-          checked ??= this.projects.checkFolderAsync(folder.path, (await this.conversations.findAsync(reply.conversationId))?.projectId ?? null);
-          await this.failIfUnableAsync(item, folder, await checked);
+          const conversation = await this.conversations.findAsync(reply.conversationId);
+          checked ??= this.projects.checkFolderAsync(folder.path, conversation?.projectId ?? null);
+          await this.failIfUnableAsync(item, folder, await checked, !Object.isNullOrUndefined(conversation?.attachedFolder));
         }
         if (item.run.isCancelled)
           await this.stopAsync(item);
@@ -1843,6 +1844,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   private async findWorkFolderAsync(conversation: Conversation, prepare: boolean, transaction?: SqlTransaction): Promise<WorkFolder | null> {
     const folders = this.context.chatFolders;
+    if (!Object.isNull(conversation.attachedFolder))
+      return WorkFolder.attached(conversation.attachedFolder);
     if (Object.isNull(conversation.projectId))
       return new WorkFolder(conversation.id, prepare ? folders.prepare(conversation.id) : folders.pathOf(conversation.id));
     const project = await this.projects.findAsync(conversation.projectId, transaction);
@@ -1865,6 +1868,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       resume();
     await wake.useToolsAsync(tools);
     try {
+      await this.messages.setCheckpointFolderAsync(item.message.id, folder.id);
       await run.followAsync(wake);
     }
     finally {
@@ -1916,7 +1920,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     }
   }
 
-  private async failIfUnableAsync(item: ReplyWork, folder: WorkFolder, state: FolderState): Promise<void> {
+  private async failIfUnableAsync(item: ReplyWork, folder: WorkFolder, state: FolderState, isAttached: boolean): Promise<void> {
     if (item.isEnded)
       return;
     const provenance = item.message.provenance!;
@@ -1924,7 +1928,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       : await this.providers.findAsync(provenance.providerId);
     const reason = provider?.enabled === false ? Resources.formatProviderDisabled(provider.label)
       : state === FolderState.Present ? null
-        : state === FolderState.Missing ? Resources.formatWorkFolderMissing(folder.path) : Resources.formatWorkFolderUnreachable(folder.path);
+        : state === FolderState.Missing
+          ? isAttached ? Resources.formatAttachedFolderMissing(folder.path) : Resources.formatWorkFolderMissing(folder.path)
+          : isAttached ? Resources.formatAttachedFolderUnreachable(folder.path) : Resources.formatWorkFolderUnreachable(folder.path);
     if (Object.isNull(reason) || item.isEnded)
       return;
     const now = new Date().toISOString();
