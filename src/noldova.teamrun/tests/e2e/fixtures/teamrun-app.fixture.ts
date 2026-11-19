@@ -58,6 +58,11 @@ export class TeamRunApp {
   private static readonly NO_SESSION: number = -1;
   private static readonly WINDOWS_PROCESSES_QUERY: string = "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process | ForEach-Object { " +
     "[pscustomobject]@{ pid = $_.ProcessId; parent = $_.ParentProcessId; name = $_.Name; start = [string]$_.CreationDate.ToUniversalTime().Ticks; command = [string]$_.CommandLine } })";
+  private static readonly MAC_PROCESS_STATUS: string = "/bin/ps";
+  private static readonly MAC_STATUS_ARGUMENTS: readonly string[] = ["-axww", "-o", "pid=,ppid=,pgid=,stat=,lstart=,ucomm="];
+  private static readonly MAC_COMMAND_ARGUMENTS: readonly string[] = ["-axww", "-o", "pid=,args="];
+  private static readonly MAC_STATUS_LINE: RegExp = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+([A-Z][a-z]{2} [A-Z][a-z]{2} +\d{1,2} \d{2}:\d{2}:\d{2} \d{4})\s+(.*?)\s*$/;
+  private static readonly MAC_COMMAND_LINE: RegExp = /^\s*(\d+) (.*)$/;
   private static readonly WORK_VARIABLE: string = "TEAMRUN_E2E_WORK";
   private static readonly HOLDERS_WAIT_SECONDS: number = 10;
   private static readonly HOLDERS_EXIT_MILLISECONDS: number = 5_000;
@@ -249,8 +254,8 @@ export class TeamRunApp {
   }
 
   private static statusesOf(pids: readonly number[] | null): readonly IProcessStatus[] {
-    if (process.platform === "win32") {
-      const listed = TeamRunApp.windowsProcesses();
+    if (process.platform === "win32" || process.platform === "darwin") {
+      const listed = process.platform === "win32" ? TeamRunApp.windowsProcesses() : TeamRunApp.macProcesses();
       return pids === null ? listed : listed.filter(t => pids.includes(t.pid));
     }
     const all = pids ?? readdirSync(TeamRunApp.PROCESSES).filter(t => /^\d+$/.test(t)).map(Number);
@@ -268,6 +273,24 @@ export class TeamRunApp {
     const listed: readonly unknown[] = parsed;
     return listed.filter(TeamRunApp.isRecord).map(t => ({ pid: Number(t["pid"]), parent: Number(t["parent"]), name: String(t["name"]), start: String(t["start"]),
       command: String(t["command"]), session: TeamRunApp.NO_SESSION, state: "" }));
+  }
+
+  private static macProcesses(): readonly IProcessStatus[] {
+    const commands = new Map(TeamRunApp.macList(TeamRunApp.MAC_COMMAND_ARGUMENTS).map(t => TeamRunApp.MAC_COMMAND_LINE.exec(t))
+      .filter(t => t !== null).map((t): [number, string] => [Number(t[1]), t[2] ?? ""]));
+    return TeamRunApp.macList(TeamRunApp.MAC_STATUS_ARGUMENTS).map(t => TeamRunApp.MAC_STATUS_LINE.exec(t)).filter(t => t !== null).map(t => {
+      const pid = Number(t[1]);
+      return { pid, parent: Number(t[2]), session: Number(t[3]), state: (t[4] ?? "").charAt(0), start: String(Date.parse(t[5] ?? "") / 1_000), name: t[6] ?? "",
+        command: commands.get(pid) ?? "" };
+    });
+  }
+
+  private static macList(args: readonly string[]): readonly string[] {
+    const result = spawnSync(TeamRunApp.MAC_PROCESS_STATUS, args, { encoding: "utf8", env: { ...process.env, LC_ALL: "C" }, timeout: TeamRunApp.HOLDERS_TIMEOUT,
+      killSignal: "SIGKILL", maxBuffer: TeamRunApp.PROCESSES_BUFFER });
+    if (result.status !== 0)
+      throw new Error(`Listing the processes failed with ${result.status}: ${result.error?.message ?? (result.stderr ?? "").trim()}`);
+    return result.stdout.split("\n");
   }
 
   public static isUnwritten(error: unknown): boolean {
@@ -395,13 +418,20 @@ export class TeamRunApp {
   }
 
   public runtimeProcesses(): readonly IStartedProcess[] {
-    if (process.platform !== "linux" && process.platform !== "win32")
-      throw new Error("The quit check reads /proc on Linux and the process list on Windows, so it runs there only.");
+    if (process.platform !== "linux" && process.platform !== "win32" && process.platform !== "darwin")
+      throw new Error("The quit check reads /proc on Linux and the process list on macOS and Windows, so it runs there only.");
     const statuses = TeamRunApp.statusesOf(null);
     const runtime = statuses.filter(t => this.isRuntime(t));
     const sessions = runtime.filter(t => t.session === t.pid).map(t => t.session);
     const found = TeamRunApp.withChildren([...runtime, ...statuses.filter(t => sessions.includes(t.session) && !runtime.includes(t))], statuses);
-    return found.map(t => ({ pid: t.pid, name: t.name, start: t.start }));
+    return (process.platform === "darwin" ? TeamRunApp.withGroups(found, statuses) : found).map(t => ({ pid: t.pid, name: t.name, start: t.start }));
+  }
+
+  private static withGroups(found: readonly IProcessStatus[], statuses: readonly IProcessStatus[]): readonly IProcessStatus[] {
+    const all = [...found];
+    for (const member of all)
+      all.push(...statuses.filter(t => (t.session === member.session || t.parent === member.pid && BigInt(t.start) >= BigInt(member.start)) && !all.includes(t)));
+    return all;
   }
 
   public static withChildren(found: readonly IProcessStatus[], statuses: readonly IProcessStatus[]): readonly IProcessStatus[] {
@@ -572,6 +602,8 @@ export class TeamRunApp {
       const command = status.command.replaceAll("\\", "/").toLowerCase();
       return command.includes(TeamRunApp.RUNTIME_ENTRY) && command.includes(TeamRunApp.DATA_ARGUMENT) && command.includes(this.data.replaceAll("\\", "/").toLowerCase());
     }
+    if (process.platform === "darwin")
+      return status.command.includes(TeamRunApp.RUNTIME_ENTRY) && ["=", " "].some(t => `${status.command} `.includes(` ${TeamRunApp.DATA_ARGUMENT}${t}${this.data} `));
     const args = TeamRunApp.argumentsOf(status.pid);
     return args.some(t => t.endsWith(TeamRunApp.RUNTIME_ENTRY))
       && args.some((t, index) => t === `${TeamRunApp.DATA_ARGUMENT}=${this.data}` || (t === this.data && args[index - 1] === TeamRunApp.DATA_ARGUMENT));
