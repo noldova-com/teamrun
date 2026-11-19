@@ -85,10 +85,11 @@ export class AttachedFoldersTests {
   }
 
   @TestMethod
-  public async refusesAFolderThatIsntAnAbsolutePathToAFolderAChatInAProjectAnUnknownChatAndAnyChangeWhileAReplyRuns(): Promise<void> {
+  public async refusesAFolderThatIsntAnAbsolutePathToAFolderAChatInAProjectAnUnknownChatAndAnyChangeWhileAReplyRunsInTheChatOrTheFolder(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
     const site = AttachedFoldersTests.folder(join(host.directory.path, "site"), { "a.txt": "a" });
+    const other = await host.conversations.createAsync(new ConversationCreateParams(null, null));
     const inProject = await host.createConversationAsync();
     const refusal = async (method: MethodName, payload: unknown): Promise<string> =>
       (await host.dispatcher.dispatch(new Request("r", method, JsonReader.toJsonValue(payload)))).info?.name ?? "none";
@@ -107,7 +108,8 @@ export class AttachedFoldersTests {
     await host.adapter.requested(1);
     try {
       refused.push(await refusal(MethodName.ChatFolderAttach, new ChatFolderAttachParams(chat.id, join(host.directory.path, "chats")).toJson()),
-        await refusal(MethodName.ChatFolderDetach, new ConversationIdParams(chat.id).toJson()));
+        await refusal(MethodName.ChatFolderDetach, new ConversationIdParams(chat.id).toJson()),
+        await refusal(MethodName.ChatFolderAttach, new ChatFolderAttachParams(other.id, site).toJson()));
     }
     finally {
       await host.engine.cancelAsync(new MessageIdParams(sent.replies[0]?.id ?? String.empty));
@@ -115,8 +117,9 @@ export class AttachedFoldersTests {
     }
 
     Assert.areEqual([ErrorCode.InvalidParams, ErrorCode.InvalidParams, ErrorCode.InvalidParams, ErrorCode.Conflict, ErrorCode.NotFound, ErrorCode.NotFound,
-      ErrorCode.Conflict, ErrorCode.Conflict].join(","), refused.join(","));
+      ErrorCode.Conflict, ErrorCode.Conflict, ErrorCode.Conflict].join(","), refused.join(","));
     Assert.areEqual(site, (await host.conversations.findAsync(chat.id))?.attachedFolder);
+    Assert.isNull((await host.conversations.findAsync(other.id))?.attachedFolder ?? null);
     Assert.isNull((await host.conversations.findAsync(inProject.id))?.attachedFolder ?? null);
   }
 
