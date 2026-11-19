@@ -1579,6 +1579,10 @@ export declare class Resources {
    */
   public static readonly draftRevisionInvalid: string;
   /**
+   * Invalid draft save revision diagnostic.
+   */
+  public static readonly draftBaseRevisionInvalid: string;
+  /**
    * A reading position save that names a chat twice diagnostic.
    */
   public static readonly readingPositionRepeated: string;
@@ -6821,13 +6825,19 @@ export declare class DraftSaveParams {
    */
   public readonly attachments: readonly AttachmentInput[];
   /**
+   * The revision of the draft this one replaces, 0 when it replaces none, or `null` to replace whatever the draft holds;
+   * a save whose revision is no longer the draft's is refused with `Conflict`, and the draft and its files stay.
+   */
+  public readonly revision: number | null;
+  /**
    * Initializes the parameters.
    * @param chatId Nonblank chat id.
    * @param text The text.
    * @param attachments The files; none by default.
-   * @throws ArgumentException when the id is blank or there are more than 10 files.
+   * @param revision Non-negative safe integer revision, or `null`, the default.
+   * @throws ArgumentException when the id is blank, there are more than 10 files or the revision is not a non-negative safe integer.
    */
-  public constructor(chatId: string, text: string, attachments?: readonly AttachmentInput[]);
+  public constructor(chatId: string, text: string, attachments?: readonly AttachmentInput[], revision?: number | null);
 
   /**
    * The chat's id, by its earlier name.
@@ -6836,7 +6846,7 @@ export declare class DraftSaveParams {
   public get conversationId(): string;
   /**
    * Decodes the parameters.
-   * @param value Object with conversationId, text and attachments.
+   * @param value Object with conversationId, text, attachments and an optional nullable revision.
    * @param path Diagnostic field path; defaults to the JSON root.
    * @returns The parameters.
    * @throws JsonException for missing or incorrectly typed fields.
@@ -6845,7 +6855,7 @@ export declare class DraftSaveParams {
   public static fromJson(value: unknown, path?: string): DraftSaveParams;
   /**
    * Encodes the parameters.
-   * @returns The conversationId, text and attachments wire fields.
+   * @returns The conversationId, text, attachments and revision wire fields.
    */
   public toJson(): JsonObject;
 }

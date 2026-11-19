@@ -20,7 +20,8 @@ export class DraftSaveParamsTests {
     attachments: [
       { name: "new.txt", mediaType: "text/plain", data: "aGk=", path: null },
       { name: "kept.txt", mediaType: "text/plain", data: null, path: "/kept.txt" }
-    ]
+    ],
+    revision: 2
   };
 
   @TestMethod
@@ -31,12 +32,21 @@ export class DraftSaveParamsTests {
   }
 
   @TestMethod
+  public readsAPayloadWithNoRevisionAsReplacingWhateverTheDraftHolds(): void {
+    Assert.isNull(DraftSaveParams.fromJson({ chatId: "conv-1", text: "", attachments: [] }).revision);
+    Assert.isNull(new DraftSaveParams("conv-1", "").revision);
+  }
+
+  @TestMethod
   public rejectsInvalidArguments(): void {
     const file = new AttachmentInput("a.txt", "text/plain", "", null);
 
     Assert.throws(() => new DraftSaveParams(String.empty, ""), ArgumentException);
     Assert.throws(() => new DraftSaveParams("conv-1", "", Array.from({ length: 11 }, () => file)), ArgumentException);
     Assert.areEqual(10, new DraftSaveParams("conv-1", "", Array.from({ length: 10 }, () => file)).attachments.length);
+    for (const revision of [-1, 1.5])
+      Assert.throws(() => new DraftSaveParams("conv-1", "", [], revision), ArgumentException);
+    Assert.areEqual(0, new DraftSaveParams("conv-1", "", [], 0).revision);
   }
 
   @TestMethod

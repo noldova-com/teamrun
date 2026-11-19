@@ -142,6 +142,7 @@ import { Resources } from "../../resources";
 import { ChatAction } from "../enums/chat-action";
 import { SendKey } from "../enums/send-key";
 import { TerminalStep } from "../enums/terminal-step";
+import { DraftStaleException } from "../exceptions/draft-stale.exception";
 import { FileGrantException } from "../exceptions/file-grant.exception";
 import { ListNotArrayException } from "../exceptions/list-not-array.exception";
 import { ModelCatalogUnavailableException } from "../exceptions/model-catalog-unavailable.exception";
@@ -542,17 +543,23 @@ export class ChatStoreService {
 
   public async saveDraft(conversationId: string, params: () => Promise<DraftSaveParams>): Promise<Draft | null> {
     let draft: Draft | null = null;
+    let stale = false;
     await this.attempt(async () => {
       const saving = await params();
       try {
         draft = Draft.fromJson(await this.request(MethodName.DraftSave, saving.toJson()));
       }
       catch (error) {
+        stale = ChatStoreService.isRefusalOver(error, ErrorCode.Conflict, saving.conversationId);
+        if (stale)
+          return;
         if (!ChatStoreService.isRefusalOver(error, ErrorCode.NotFound, saving.conversationId))
           throw error;
         this.applyDeleted(saving.conversationId);
       }
     }, t => this.actionFailed(ChatAction.SaveDraft, conversationId, conversationId)(Resources.formatDraftNotSaved(t)));
+    if (stale)
+      throw new DraftStaleException();
     return draft;
   }
 

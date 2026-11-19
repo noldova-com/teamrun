@@ -39,6 +39,8 @@ export class DraftsService implements IDraftsService {
       draft = await this.context.database.connection.runInTransactionAsync(async transaction => {
         await this.requireConversationAsync(params.conversationId, transaction);
         const current = await this.findAsync(params.conversationId, transaction);
+        if (!Object.isNull(params.revision) && params.revision !== (current?.revision ?? 0))
+          throw new ServiceException(ErrorCode.Conflict, Resources.formatDraftStale(params.conversationId), [params.conversationId]);
         const revision = await this.revisionOfAsync(params.conversationId, transaction) + 1;
         const files = this.attachments.saveDraft(params.conversationId, params.attachments);
         restore = current?.attachments ?? [];
