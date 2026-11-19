@@ -1986,6 +1986,31 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
+  public async movesAThreadItsBackgroundWorkKeepsLoadedToTheTurnsFolderOnTurnStart(): Promise<void> {
+    using host = new CodexTestHost();
+    const adapter = host.createAdapter();
+    const attached = join(host.directory.path, "attached");
+    mkdirSync(attached);
+    const background = new RecordingTurnListener();
+    const request = (folder: string, prompt: string, threadId: string | null): TurnRequest =>
+      new TurnRequest(null, folder, prompt, new RequestedSettings("codex", null, null), threadId, [], "A");
+    const seen: string[] = [];
+    try {
+      const held = await adapter.runTurn(request(host.directory.path, "background", null), background, new AbortController().signal);
+      await Wait.until(() => background.taskStarts.length === 1, "The listener did not see a task start.");
+      for (const folder of [attached, attached, host.directory.path]) {
+        const listener = new RecordingTurnListener();
+        await adapter.runTurn(request(folder, "where", held.nativeSessionId), listener, new AbortController().signal);
+        seen.push(listener.texts.join(""));
+      }
+      await background.taskStarts[0]?.stop();
+    }
+    finally { await adapter.shutdown(); }
+
+    Assert.areEqual([attached, attached, host.directory.path].map(t => `${t} A none 0`).join("|"), seen.join("|"));
+  }
+
+  @TestMethod
   public async setsTheTurnsSandboxAndApprovalOnTurnStartOnlyWhenAHeldThreadRunsInAnotherMode(): Promise<void> {
     using host = new CodexTestHost();
     const adapter = host.createAdapter();
