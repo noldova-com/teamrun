@@ -61,6 +61,8 @@ export class FakeRunStarter implements IRunStarter {
   public readonly ends: Map<string, Promise<TerminalRunEnd>> = new Map();
   public sessions: (string | Error)[] = [];
   public held: Promise<void> | null = null;
+  public readHeld: Promise<void> | null = null;
+  public onRead: (() => void) | null = null;
 
   public static outputOf(...texts: string[]): TerminalRunOutput {
     return new TerminalRunOutput(texts.map(t => new TerminalLine(t, false,
@@ -82,7 +84,9 @@ export class FakeRunStarter implements IRunStarter {
 
   public readRunOutputAsync(run: TerminalRun): Promise<TerminalRunOutput> {
     this.reads.push(run.runId);
+    this.onRead?.();
     const output = this.outputs.get(run.runId) ?? new TerminalRunOutput([], 0);
-    return output instanceof Error ? Promise.reject(output) : Promise.resolve(output);
+    const read = (): Promise<TerminalRunOutput> => output instanceof Error ? Promise.reject(output) : Promise.resolve(output);
+    return Object.isNull(this.readHeld) ? read() : this.readHeld.then(read);
   }
 }

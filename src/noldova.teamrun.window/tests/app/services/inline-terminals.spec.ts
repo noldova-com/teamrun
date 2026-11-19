@@ -427,6 +427,88 @@ describe("InlineTerminals", () => {
       .toEqual([["$ ls", "a.txt"], ["$ pwd", "/repo"], new Map([["body", new Set([0, 2])]])]);
   });
 
+  it("keeps an earlier Run's block among its message's blocks while the next Run reads its output, so the block's slot stays until the output shows", async () => {
+    starter.sessions = ["s1", "s1"];
+    starter.outputs.set("run-1", FakeRunStarter.outputOf("$ ls", "a.txt"));
+    await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
+    let release = (): void => undefined;
+    starter.readHeld = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const read = new Promise<void>(resolve => {
+      starter.onRead = resolve;
+    });
+
+    const moving = inline.runAsync("teamrun.chat/c1", "pwd", null, [], second);
+    await read;
+    const reading = [inline.places().get("teamrun.chat/c1"), inline.blocksOf("teamrun.chat/c1", "m1"), shownOutput("teamrun.chat/c1", first)];
+    release();
+    await moving;
+
+    expect([reading, inline.blocksOf("teamrun.chat/c1", "m1"), shownOutput("teamrun.chat/c1", first)]).toEqual([
+      [second, new Map([["body", new Set([2, 0])]]), null], new Map([["body", new Set([2, 0])]]), ["$ ls", "a.txt"]]);
+  });
+
+  it("keeps each block a Run left among its message's blocks while a later Run starts during the read, until each Run's own read ends", async () => {
+    const third: IRunPlace = { messageId: "m1", site: "body", block: 4 };
+    starter.sessions = ["s1", "s1", "s1"];
+    starter.outputs.set("run-1", FakeRunStarter.outputOf("$ ls", "a.txt"));
+    starter.outputs.set("run-2", FakeRunStarter.outputOf("$ pwd", "/work"));
+    await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
+    let releaseFirst = (): void => undefined;
+    starter.readHeld = new Promise<void>(resolve => {
+      releaseFirst = resolve;
+    });
+    const firstRead = new Promise<void>(resolve => {
+      starter.onRead = resolve;
+    });
+    const moving = inline.runAsync("teamrun.chat/c1", "pwd", null, [], second);
+    await firstRead;
+    let releaseSecond = (): void => undefined;
+    starter.readHeld = new Promise<void>(resolve => {
+      releaseSecond = resolve;
+    });
+    const secondRead = new Promise<void>(resolve => {
+      starter.onRead = resolve;
+    });
+    const movingOn = inline.runAsync("teamrun.chat/c1", "id", null, [], third);
+    await secondRead;
+    const reading = [inline.places().get("teamrun.chat/c1"), inline.blocksOf("teamrun.chat/c1", "m1")];
+
+    releaseFirst();
+    await moving;
+    const firstEnded = [inline.blocksOf("teamrun.chat/c1", "m1"), shownOutput("teamrun.chat/c1", first), shownOutput("teamrun.chat/c1", second)];
+    releaseSecond();
+    await movingOn;
+
+    expect([reading, firstEnded, inline.blocksOf("teamrun.chat/c1", "m1"), shownOutput("teamrun.chat/c1", first), shownOutput("teamrun.chat/c1", second)]).toEqual([
+      [third, new Map([["body", new Set([4, 0, 2])]])], [new Map([["body", new Set([4, 0, 2])]]), ["$ ls", "a.txt"], null],
+      new Map([["body", new Set([4, 0, 2])]]), ["$ ls", "a.txt"], ["$ pwd", "/work"]]);
+  });
+
+  it("drops an earlier Run's block once the read finds no output to keep, or fails, or its chat closed during the read", async () => {
+    const failure = new TypeError("The runtime stopped.");
+    starter.sessions = ["s1", "s1", "s2", "s2", "s3", "s3"];
+    starter.outputs.set("run-3", failure);
+    starter.outputs.set("run-5", FakeRunStarter.outputOf("$ ls", "a.txt"));
+    await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
+    await inline.runAsync("teamrun.chat/c1", "pwd", null, [], second);
+    const empty = inline.blocksOf("teamrun.chat/c1", "m1");
+    await inline.runAsync("teamrun.chat/c2", "ls", null, [], first);
+    await expect(inline.runAsync("teamrun.chat/c2", "pwd", null, [], second)).rejects.toBe(failure);
+    const failed = inline.blocksOf("teamrun.chat/c2", "m1");
+    await inline.runAsync("teamrun.chat/c3", "ls", null, [], first);
+    let closed: ReadonlyMap<string, ReadonlySet<number>> | null = null;
+    starter.onRead = () => {
+      inline.close("teamrun.chat/c3");
+      closed = inline.blocksOf("teamrun.chat/c3", "m1");
+    };
+    await inline.runAsync("teamrun.chat/c3", "pwd", null, [], second);
+
+    expect([empty, failed, closed, inline.blocksOf("teamrun.chat/c3", "m1")]).toEqual([new Map([["body", new Set([2])]]), new Map([["body", new Set([2])]]),
+      new Map(), new Map()]);
+  });
+
   it("hands on a failure to read an earlier Run's output other than the runtime no longer having it, keeping the new Run's place", async () => {
     const failure = new TypeError("The runtime stopped.");
     starter.sessions = ["s1", "s1"];
