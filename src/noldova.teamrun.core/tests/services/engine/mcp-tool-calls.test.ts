@@ -939,16 +939,44 @@ export class McpToolCallsTests {
 
     const calling = host.engine.callMcpToolAsync(new McpToolCallParams(McpToolCallsTests.tokenOf(McpToolCallsTests.toolsOf(host, 0)), "teamrun_list_chats", {}));
     await reached.promise;
+    const stopping = stops ? host.engine.stopSessionAsync(session.id, "The person took over.") : host.engine.cancelAsync(McpToolCallsTests.replyOf(sent));
+    if (!stops)
+      await host.engine.waitForIdle();
+    released.resolve();
+    const answer = await calling;
+    const ends = session.ends;
+    await stopping;
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(McpToolCallsTests.stopped, JSON.stringify(answer));
+    Assert.areEqual(JSON.stringify([0]), JSON.stringify(McpToolCallsTests.callsOf(tools)));
+    Assert.areEqual(JSON.stringify([stops ? 0 : 1, 1]), JSON.stringify([ends, session.ends]));
+  }
+
+  @TestMethod
+  @TestData(true)
+  @TestData(false)
+  public async withdrawsAToolCallsSignalWhenItsSessionIsStoppedOrItsTurnEnds(stops: boolean): Promise<void> {
+    const tools = new FakeTurnToolSessions(McpToolCallsTests.url);
+    await using host = await McpToolCallsTests.hostAsync(tools);
+    host.adapter.holdUntilAbort = true;
+    const conversation = await host.createConversationAsync();
+    const sent = await host.engine.sendAsync(new MessageSendParams(conversation.id, "Wait", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.adapter.requested(1);
+    const [session] = tools.opened;
+    Assert.isDefined(session);
+    await host.engine.callMcpToolAsync(new McpToolCallParams(McpToolCallsTests.tokenOf(McpToolCallsTests.toolsOf(host, 0)), "teamrun_list_chats", {}));
+    const [call] = session.calls;
+    Assert.isDefined(call);
+    const before = call.signal.aborted;
+
     if (stops)
       await host.engine.stopSessionAsync(session.id, "The person took over.");
     else
       await host.engine.cancelAsync(McpToolCallsTests.replyOf(sent));
     await host.engine.waitForIdle();
-    released.resolve();
 
-    Assert.areEqual(McpToolCallsTests.stopped, JSON.stringify(await calling));
-    Assert.areEqual(JSON.stringify([0]), JSON.stringify(McpToolCallsTests.callsOf(tools)));
-    Assert.areEqual(1, session.ends);
+    Assert.areEqual(JSON.stringify([false, true]), JSON.stringify([before, call.signal.aborted]));
   }
 
   @TestMethod

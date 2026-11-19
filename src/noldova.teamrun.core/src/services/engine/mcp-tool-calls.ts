@@ -54,6 +54,7 @@ export class McpToolCalls {
     if (Object.isUndefined(open))
       return;
     open.stopped = true;
+    open.stops.abort(new Error(reason));
     open.run.noteStop(reason);
     await this.cancelAsync(new MessageIdParams(open.reply.id));
   }
@@ -108,7 +109,8 @@ export class McpToolCalls {
     const endpoint = Object.isNull(this.tools.endpoint) ? null : new McpEndpoint(this.tools.endpoint, this.sessionTokens, session.id);
     const tools = new TurnTools(host, this.tools.approvedTools, endpoint);
     this.sessionTokens.open(session.id, token);
-    this.sessions.push({ scope, member: token, session, tools, run, sender, reply, mode: this.modeIn(requested), stopped: false });
+    this.sessions.push({ scope, member: token, session, tools, run, sender, reply, mode: this.modeIn(requested), stopped: false,
+      stops: new AbortController() });
     return tools;
   }
 
@@ -118,17 +120,18 @@ export class McpToolCalls {
       return;
     this.sessions.splice(this.sessions.indexOf(closed), 1);
     this.sessionTokens.close(closed.session.id);
+    closed.stops.abort(new Error(Resources.mcpTurnStopped));
     closed.session.end();
   }
 
   private latestOpenOf(scope: string): { readonly session: ITurnToolSession; readonly tools: TurnTools; readonly reply: Message; readonly mode: ProviderMode | null;
-    readonly stopped: boolean } | null {
+    readonly stopped: boolean; readonly stops: AbortController } | null {
     return this.sessions.findLast(t => t.scope === scope) ?? null;
   }
 
   private async reachOfAsync(token: string): Promise<{ readonly member: MemberToken | null;
     readonly open: { readonly session: ITurnToolSession; readonly tools: TurnTools; readonly reply: Message; readonly mode: ProviderMode | null;
-    readonly stopped: boolean } | null }> {
+    readonly stopped: boolean; readonly stops: AbortController } | null }> {
     const owner = await this.memberOfSessionAsync(token);
     const session = Object.isNull(owner) ? null : this.sessionTokens.find(token);
     return { member: owner, open: this.sessions.find(t => t.session.id === session) ?? null };
@@ -151,7 +154,8 @@ export class McpToolCalls {
     return this.callToolIn(this.latestOpenOf(scope), name, input, signal);
   }
 
-  private async callToolIn(open: { readonly session: ITurnToolSession; readonly reply: Message; readonly mode: ProviderMode | null; readonly stopped: boolean } | null,
+  private async callToolIn(open: { readonly session: ITurnToolSession; readonly reply: Message; readonly mode: ProviderMode | null; readonly stopped: boolean;
+    readonly stops: AbortController } | null,
     name: string, input: JsonObject, signal: AbortSignal): Promise<JsonObject> {
     if (Object.isNull(open))
       return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.unavailableFailure, Resources.noRunningTurnCode, Resources.mcpNoRunningTurn));
@@ -164,7 +168,7 @@ export class McpToolCalls {
     if (this.hasStopped(open))
       return McpToolCalls.turnStopped();
 
-    return open.session.callToolAsync(name, input, signal);
+    return open.session.callToolAsync(name, input, AbortSignal.any([signal, open.stops.signal]));
   }
 
   private hasStopped(open: { readonly session: ITurnToolSession; readonly stopped: boolean }): boolean {
