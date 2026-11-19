@@ -19,13 +19,28 @@ import { Resources } from "../../resources.js";
 export class ProjectActivity {
   private readonly turns: Map<string, string> = new Map();
   private readonly rewinds: Map<string, string> = new Map();
+  private readonly waiting: Set<() => void> = new Set();
 
   public enterTurn(rootPath: string): string {
     const root = ProjectActivity.rootOf(rootPath);
     this.check(root, this.rewinds.values());
-    const id = Guid.createVersion7().toString();
-    this.turns.set(id, root);
-    return id;
+    return this.addTurn(root);
+  }
+
+  public tryEnterTurn(rootPath: string): string | null {
+    const root = ProjectActivity.rootOf(rootPath);
+    return ProjectActivity.holds(root, this.rewinds.values()) ? null : this.addTurn(root);
+  }
+
+  public whenReleasedAsync(): Promise<void> {
+    return new Promise(resolve => this.waiting.add(resolve));
+  }
+
+  public releaseWaiting(): void {
+    const waiting = [...this.waiting];
+    this.waiting.clear();
+    for (const release of waiting)
+      release();
   }
 
   public enter(rootPath: string): string {
@@ -47,7 +62,8 @@ export class ProjectActivity {
 
   public leave(id: string): void {
     this.turns.delete(id);
-    this.rewinds.delete(id);
+    if (this.rewinds.delete(id))
+      this.releaseWaiting();
   }
 
   public requireIdle(rootPath: string): void {
@@ -73,10 +89,19 @@ export class ProjectActivity {
     }
   }
 
+  private addTurn(root: string): string {
+    const id = Guid.createVersion7().toString();
+    this.turns.set(id, root);
+    return id;
+  }
+
   private check(root: string, roots: Iterable<string>): void {
-    for (const active of roots)
-      if (ProjectActivity.contains(active, root) || ProjectActivity.contains(root, active))
-        throw new ServiceException(ErrorCode.Conflict, Resources.formatProjectBusy(root), [root]);
+    if (ProjectActivity.holds(root, roots))
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatProjectBusy(root), [root]);
+  }
+
+  private static holds(root: string, roots: Iterable<string>): boolean {
+    return [...roots].some(t => ProjectActivity.contains(t, root) || ProjectActivity.contains(root, t));
   }
 
   private static contains(root: string, target: string): boolean {

@@ -14,6 +14,7 @@ import {
   type Conversation,
   ConversationIdParams,
   ConversationMemberParams,
+  ConversationRewindParams,
   DetailKind,
   EventName,
   Harness,
@@ -161,6 +162,121 @@ export class ChatWakesTests {
     Assert.isTrue(wake!.sequence > asked!.sequence);
     Assert.areEqual(JSON.stringify([alice!.id, wake!.id]), JSON.stringify([woken!.teammateId, woken!.inReplyTo]));
     Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));
+  }
+
+  @TestMethod
+  public async startsACommandsWakeThatMeetsAHeldProjectOnlyOnceTheHoldEndsAndLeavesNoReplyMeanwhile(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const chat = await host.createConversationAsync(project);
+    const other = await host.createConversationAsync(project);
+    await ChatWakesTests.askDefault(host, other.id);
+    await ChatWakesTests.askDefault(host, chat.id);
+    const activity = host.context.projectActivity;
+    const previewing = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    host.checkpoints.previewGate = (): Promise<void> => {
+      previewing.resolve();
+      return release.promise;
+    };
+    const rewind = host.engine.rewindAsync(new ConversationRewindParams(other.id, (await ChatWakesTests.chatAsync(host, other.id))[0]?.id ?? String.empty, true));
+    await previewing.promise;
+    const waiting = Promise.withResolvers<void>();
+    const whenReleased = activity.whenReleasedAsync.bind(activity);
+    activity.whenReleasedAsync = (): Promise<void> => {
+      waiting.resolve();
+      return whenReleased();
+    };
+
+    const listener = host.adapter.lastListener;
+    Assert.isNotNull(listener);
+    const waking = listener.onWakeAsync(new TurnWake("task-1", "npm test"));
+    await Promise.race([waiting.promise, waking]);
+    const held = (await ChatWakesTests.chatAsync(host, chat.id)).length;
+    release.resolve();
+    await rewind;
+    const wake = await waking;
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+
+    const messages = await ChatWakesTests.chatAsync(host, chat.id);
+    Assert.areEqual(2, held);
+    Assert.areEqual(JSON.stringify([3, MessageStatus.Completed]), JSON.stringify([messages.length, messages.at(-1)?.status]));
+  }
+
+  @TestMethod
+  public async startsNoWakeWhoseSourceLeftTheChatWhileTheProjectWasHeld(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const chat = await host.createConversationAsync(project);
+    await ChatWakesTests.askDefault(host, chat.id);
+    const activity = host.context.projectActivity;
+    const hold = activity.enter(project.rootPath);
+    const waiting = Promise.withResolvers<void>();
+    const whenReleased = activity.whenReleasedAsync.bind(activity);
+    activity.whenReleasedAsync = (): Promise<void> => {
+      waiting.resolve();
+      return whenReleased();
+    };
+
+    const listener = host.adapter.lastListener;
+    Assert.isNotNull(listener);
+    const waking = listener.onWakeAsync(new TurnWake("task-1", "npm test"));
+    await Promise.race([waiting.promise, waking]);
+    await host.conversations.removeFromAsync(chat.id, 0);
+    activity.leave(hold);
+    const wake = await waking;
+    await host.engine.waitForIdle();
+
+    Assert.isNull(wake);
+    Assert.areEqual(0, (await ChatWakesTests.chatAsync(host, chat.id)).length);
+    activity.requireIdle(project.rootPath);
+  }
+
+  @TestMethod
+  public async deliversAReadyWakeThatMeetsAHeldProjectOnlyOnceTheHoldEnds(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const woken = await host.createConversationAsync(project, "Release plan");
+    const fixes = await host.createConversationAsync(project, "Fixes");
+    const asked = await ChatWakesTests.askDefault(host, woken.id);
+    await ChatWakesTests.insertAsync(host, "w1", "Reply", woken.id, asked.id, fixes.id, ["r1"], "Ready", "Bob finished.", 1);
+    const hold = host.context.projectActivity.enter(project.rootPath);
+
+    await host.engine.reconcileAsync();
+    await host.engine.waitForIdle();
+    const held = [(await ChatWakesTests.chatAsync(host, woken.id)).length, await ChatWakesTests.statesAsync(host), host.adapter.requests.length];
+    host.context.projectActivity.leave(hold);
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(JSON.stringify([2, "Ready", 1]), JSON.stringify(held));
+    Assert.areEqual(MessageStatus.Completed, (await ChatWakesTests.chatAsync(host, woken.id)).at(-1)?.status);
+    Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));
+  }
+
+  @TestMethod
+  @TestData(true)
+  @TestData(false)
+  public async leavesTheProjectWhenAWakesReplyCannotBeStored(command: boolean): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const woken = await host.createConversationAsync(project, "Release plan");
+    const fixes = await host.createConversationAsync(project, "Fixes");
+    const asked = await ChatWakesTests.askDefault(host, woken.id);
+    const listener = host.adapter.lastListener;
+    Assert.isNotNull(listener);
+    await ChatWakesTests.insertAsync(host, "w1", "Reply", woken.id, asked.id, fixes.id, ["r1"], "Ready", "Bob finished.", 1);
+    await host.context.database.connection.executeAsync(new SqlQuery("CREATE TRIGGER failInsert BEFORE INSERT ON messages BEGIN SELECT RAISE(ABORT, 'boom'); END"));
+
+    if (command)
+      await Assert.throwsAsync(() => listener.onWakeAsync(new TurnWake("task-1", "npm test")), Error);
+    else
+      await host.engine.reconcileAsync();
+    await host.engine.waitForIdle();
+
+    host.context.projectActivity.requireIdle(project.rootPath);
+    Assert.areEqual(JSON.stringify([2, 1]), JSON.stringify([(await ChatWakesTests.chatAsync(host, woken.id)).length, host.adapter.requests.length]));
   }
 
   @TestMethod
