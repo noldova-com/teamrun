@@ -528,6 +528,22 @@ export class SharedMcpServersServiceTests {
   }
 
   @TestMethod
+  public async keepsAServerSignedOutWhoseSignInFinishesAfterItsSignOutAndRemovesTheTokensItGot(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
+    host.signIns.started[0]?.finished(SharedMcpAccess.granted("access-token-5b2e8d", "2026-11-02T11:00:00.000Z"));
+    await SharedMcpServersServiceTests.settleAsync();
+    const listed = (await host.sharedServers.listAsync())[0];
+
+    const reference = host.signIns.started[0]?.reference;
+    Assert.areEqual(JSON.stringify([null, false]), JSON.stringify([listed?.server.signIn, listed?.signingIn]));
+    Assert.areEqual(JSON.stringify([reference, reference]), JSON.stringify(host.signIns.signedOut));
+  }
+
+  @TestMethod
   public async refusesToStartASignInForAServerThatDoesntSignInOrIsUnknown(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.http("docs"));

@@ -47,7 +47,7 @@ export class SharedMcpServersService implements ISharedMcpServersService {
   private readonly accounts: ISharedMcpAccounts;
   private readonly events: IEventSink | null;
   private readonly log: ILog | null;
-  private readonly signingIn: Map<string, { reference: string; starts: number }> = new Map();
+  private readonly signingIn: Map<string, { reference: string; starts: number; ended: boolean }> = new Map();
 
   public constructor(context: DatabaseContext, providers: IProvidersService, teammates: ITeammatesService, registry: ProviderKindRegistry,
     readEnvironment: () => Promise<Readonly<Record<string, string | undefined>>>, secrets: ISharedMcpSecrets, signIns: ISharedMcpSignIn,
@@ -164,13 +164,13 @@ export class SharedMcpServersService implements ISharedMcpServersService {
     if (!server.definition.signsIn || Object.isNull(url))
       throw new ServiceException(ErrorCode.InvalidParams, Resources.formatSharedMcpServerDoesntSignIn(server.definition.name), [server.id]);
     const pending = this.signingIn.get(server.id) ?? { reference: server.signIn?.reference
-      ?? `${Resources.sharedMcpSignInReferencePrefix}${Guid.newGuid().toString().replaceAll(Resources.guidGroupSeparator, String.empty)}`, starts: 0 };
+      ?? `${Resources.sharedMcpSignInReferencePrefix}${Guid.newGuid().toString().replaceAll(Resources.guidGroupSeparator, String.empty)}`, starts: 0, ended: false };
     const reference = pending.reference;
     pending.starts += 1;
     this.signingIn.set(server.id, pending);
-    let address: string;
+    let address: string | null;
     try {
-      address = await this.signIns.startAsync(url, reference, access => void this.finishAsync(server, url, reference, access));
+      address = await this.signIns.startAsync(url, reference, access => void this.finishAsync(server, url, pending, access));
     }
     catch (error) {
       pending.starts -= 1;
@@ -354,8 +354,15 @@ export class SharedMcpServersService implements ISharedMcpServersService {
     });
   }
 
-  private async finishAsync(started: SharedMcpServer, url: string, reference: string, access: SharedMcpAccess): Promise<void> {
-    this.signingIn.delete(started.id);
+  private async finishAsync(started: SharedMcpServer, url: string, pending: { reference: string; ended: boolean }, access: SharedMcpAccess): Promise<void> {
+    const reference = pending.reference;
+    if (pending.ended) {
+      this.signOut(SharedMcpServersService.signedIn(started, reference, access), pending);
+      this.events?.publish(new Event(EventName.StateInvalidated, null));
+      return;
+    }
+    if (this.signingIn.get(started.id) === pending)
+      this.signingIn.delete(started.id);
     try {
       const kept = await this.context.database.connection.runInTransactionAsync(async transaction => {
         const server = await this.findAsync(started.id, transaction);
@@ -366,7 +373,7 @@ export class SharedMcpServersService implements ISharedMcpServersService {
         return true;
       });
       if (!kept)
-        this.signOut(SharedMcpServersService.signedIn(started, reference, access));
+        this.signOut(SharedMcpServersService.signedIn(started, reference, access), pending);
     }
     catch (error) {
       this.log?.write(Resources.formatSharedMcpSignInUnsaved(started.definition.name, SharedMcpServersService.describe(error)));
@@ -374,9 +381,13 @@ export class SharedMcpServersService implements ISharedMcpServersService {
     this.events?.publish(new Event(EventName.StateInvalidated, null));
   }
 
-  private signOut(server: SharedMcpServer): void {
-    const reference = server.signIn?.reference ?? this.signingIn.get(server.id)?.reference;
-    this.signingIn.delete(server.id);
+  private signOut(server: SharedMcpServer, pending: { reference: string; ended: boolean } | undefined = this.signingIn.get(server.id)): void {
+    if (!Object.isUndefined(pending)) {
+      pending.ended = true;
+      if (this.signingIn.get(server.id) === pending)
+        this.signingIn.delete(server.id);
+    }
+    const reference = server.signIn?.reference ?? pending?.reference;
     if (Object.isUndefined(reference))
       return;
     void this.signIns.signOutAsync(reference)

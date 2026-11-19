@@ -10171,11 +10171,12 @@ export interface ISharedMcpAccounts {
  */
 export interface ISharedMcpSignIn {
   /**
-   * Starts a sign-in in the browser and returns the address to open; `finished` is called once, when the sign-in ends, fails or times out.
+   * Starts a sign-in in the browser and returns the address to open, or `null` when a Sign out or a later start of the same reference ended it before it
+   * had one; `finished` is called once, when the sign-in ends, fails or times out, and never for one that ended without an answer.
    * @param url The server's address, where discovery starts from its refusal.
    * @param reference Where the tokens are saved.
    */
-  startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string>;
+  startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null>;
   /**
    * Reads the access token, refreshed first when it expires soon; refused when there is none or the refresh fails.
    * @throws Error with the store's reason when it can't read the tokens.

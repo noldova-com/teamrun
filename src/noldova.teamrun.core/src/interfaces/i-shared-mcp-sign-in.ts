@@ -9,7 +9,7 @@
 import type { SharedMcpAccess } from "../models/shared-mcp-access.js";
 
 export interface ISharedMcpSignIn {
-  startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string>;
+  startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null>;
   accessAsync(url: string, reference: string): Promise<SharedMcpAccess>;
   signOutAsync(reference: string): Promise<void>;
 }

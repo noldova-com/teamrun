@@ -1084,8 +1084,8 @@ export declare enum MethodName {
   SharedMcpSecretSet = "SharedMcpSecretSet",
   /**
    * Starts the OAuth sign-in of a shared HTTP MCP server that signs in: TeamRun finds the server's authorization server from its `401`, registers
-   * itself there when it has no client yet, and answers the address the person opens in the browser, with PKCE and a one-use local redirect; the
-   * server's `signIn` changes once the browser comes back. Parameters: `SharedMcpServerIdParams`. Result: `SharedMcpSignInStarted`; an unknown
+   * itself there when it has no client yet, and answers the address the person opens in the browser, with PKCE and a one-use local redirect, or no address
+   * when a Sign out or a later start ended it first; the server's `signIn` changes once the browser comes back. Parameters: `SharedMcpServerIdParams`. Result: `SharedMcpSignInStarted`; an unknown
    * server is `NotFound`, and one that doesn't sign in is `InvalidArgument`.
    */
   SharedMcpSignInStart = "SharedMcpSignInStart",
@@ -12118,10 +12118,10 @@ export declare class SharedMcpSignIn {
 
 /** Where the person goes to sign a shared MCP server in: the authorization server's address, with TeamRun's client, PKCE challenge and redirect. */
 export declare class SharedMcpSignInStarted {
-  /** The http or https address to open in the browser. */
-  public readonly url: string;
+  /** The http or https address to open in the browser, or `null` when a Sign out or a later start ended the sign-in before it had one. */
+  public readonly url: string | null;
   /** Creates a validated immutable value; throws `ArgumentException` for an address that isn't http or https. */
-  public constructor(url: string);
+  public constructor(url: string | null);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): SharedMcpSignInStarted;
   /** Returns the wire representation, with `url`. */

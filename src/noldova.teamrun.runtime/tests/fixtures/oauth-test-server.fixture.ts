@@ -25,6 +25,7 @@ export class OauthTestServer implements AsyncDisposable {
   private readonly server: Server;
   private readonly challenges: Map<string, string> = new Map();
   private readonly hangs: Map<string, PromiseWithResolvers<void>> = new Map();
+  private readonly holds: Map<string, { asked: PromiseWithResolvers<void>; released: PromiseWithResolvers<void> }> = new Map();
   private issued: number = 0;
   private held: { asked: PromiseWithResolvers<void>; released: PromiseWithResolvers<void> } | null = null;
   private origin: string = String();
@@ -47,12 +48,14 @@ export class OauthTestServer implements AsyncDisposable {
     return started;
   }
 
-  public async signInInTheBrowserAsync(authorizationUrl: string): Promise<{ status: number; page: string }> {
+  public async signInInTheBrowserAsync(authorizationUrl: string | null): Promise<{ status: number; page: string }> {
     const callback = await fetch(await this.callbackOfAsync(authorizationUrl));
     return { status: callback.status, page: await callback.text() };
   }
 
-  public async callbackOfAsync(authorizationUrl: string): Promise<string> {
+  public async callbackOfAsync(authorizationUrl: string | null): Promise<string> {
+    if (Object.isNull(authorizationUrl))
+      throw new Error("The sign-in started with no address.");
     const answer = await fetch(authorizationUrl, { redirect: "manual" });
     return answer.headers.get("location") ?? authorizationUrl;
   }
@@ -61,6 +64,12 @@ export class OauthTestServer implements AsyncDisposable {
     const asked = Promise.withResolvers<void>();
     this.hangs.set(path, asked);
     return asked.promise;
+  }
+
+  public holdAt(path: string): { asked: Promise<void>; release: () => void } {
+    const held = { asked: Promise.withResolvers<void>(), released: Promise.withResolvers<void>() };
+    this.holds.set(path, held);
+    return { asked: held.asked.promise, release: () => held.released.resolve() };
   }
 
   public holdTokens(): { asked: Promise<void>; release: () => void } {
@@ -85,6 +94,12 @@ export class OauthTestServer implements AsyncDisposable {
     if (!Object.isUndefined(hang)) {
       hang.resolve();
       return;
+    }
+    const held = this.holds.get(address.pathname);
+    if (!Object.isUndefined(held)) {
+      this.holds.delete(address.pathname);
+      held.asked.resolve();
+      await held.released.promise;
     }
     switch (address.pathname) {
       case "/mcp":
