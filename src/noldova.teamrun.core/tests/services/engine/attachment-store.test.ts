@@ -302,6 +302,26 @@ export class AttachmentStoreTests {
   }
 
   @TestMethod
+  public neitherListsNorRemovesSentFilesWhenTheAttachmentsFolderLeadsOutOfTheDataFolder(): void {
+    using directory = new TemporaryDataDirectory();
+    using outside = new TemporaryDataDirectory();
+    const store = new AttachmentStore(directory.path);
+    const [sent] = store.save([new AttachmentInput("a.txt", "text/plain", "YQ==", null)]);
+    if (Object.isUndefined(sent))
+      throw new Error("The store saved no file.");
+    const root = dirname(sent.path);
+    renameSync(root, join(outside.path, "attachments"));
+    symlinkSync(join(outside.path, "attachments"), root, "junction");
+
+    const listed = store.listSent();
+    store.removeSent([sent.path]);
+
+    Assert.areEqual(0, listed.length);
+    Assert.isTrue(existsSync(join(outside.path, "attachments", basename(sent.path))));
+    rmSync(root);
+  }
+
+  @TestMethod
   public findsAFileReachedThroughALocalLinkFromTheAttachmentsFolderDown(): void {
     using directory = new TemporaryDataDirectory();
     using outside = new TemporaryDataDirectory();
