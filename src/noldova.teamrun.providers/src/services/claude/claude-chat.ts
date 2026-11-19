@@ -353,6 +353,10 @@ export class ClaudeChat {
       this.closeWhenIdle();
       return;
     }
+    if (message.type === Resources.rateLimitEventType) {
+      await (this.waking ? this.waker?.turn : this.replying ?? this.pending?.turn)?.handle(message, query);
+      return;
+    }
     if (message.type !== Resources.streamEventType && message.type !== Resources.assistantMessageType && message.type !== Resources.userMessageType
       && message.type !== Resources.resultMessageType)
       return;

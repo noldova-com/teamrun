@@ -106,6 +106,22 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async endsAChatTurnOnTheUsageLimitWithItsResetWhenClaudeRejectsTheAccount(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    host.factory.next = new FakeClaudeQuery([SdkMessages.init("s-limit", "none", null, []), SdkMessages.rateLimit("s-limit", "rejected", 1_800_000_000, "rejected"),
+      SdkMessages.limited("77777777-7777-7777-7777-777777777777", "You've hit your limit"), SdkMessages.success("s-limit", "You've hit your limit")]);
+
+    const result = await adapter.runTurn(new TurnRequest(host.createProvider(), host.directory.path, "Hi", new RequestedSettings("claude", null, null), null),
+      new RecordingTurnListener(), new AbortController().signal);
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Failed, result.outcome);
+    Assert.areEqual(Resources.formatUsageLimitReached(Resources.claudeDisplayName), result.error);
+    Assert.areEqual(new Date(1_800_000_000_000).toISOString(), result.limit?.resetsAt);
+  }
+
+  @TestMethod
   public async withTheSwitchOnNotesTheTurnWhenClaudeRefusesTheFirstTurnsSenderToken(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
