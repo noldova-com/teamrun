@@ -13,6 +13,7 @@ import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
   AttachmentContent,
+  ChatFolderAttachParams,
   Conversation,
   ConversationSearchHit,
   DetailEventPayload,
@@ -1667,6 +1668,16 @@ describe("HistoryComponent", () => {
       AppearanceFixture.expectPixels(shown.left, text.left);
       AppearanceFixture.expectPixels(shown.top - text.bottom, AppearanceFixture.measureLook("space-4"));
       expect([shown.width > 0, shown.right <= empty.right + 0.5, element().scrollWidth <= element().clientWidth]).toEqual([true, true, true]);
+      const chat = store().conversation("c3");
+      if (Object.isNull(chat))
+        throw new Error("The chat isn't loaded.");
+      context.answer(MethodName.ChatFolderAttach, t => chat.withAttachedFolder(ChatFolderAttachParams.fromJson(t).folder, SampleData.timestamp).toJson())
+        .answer(MethodName.ChatFolderDetach, () => chat.toJson());
+      await store().attachFolder("c3", "/work/site");
+      await until(() => expect(button()).toBeNull());
+      expect(element().querySelector(".nol-teamrun-history-empty-text")?.textContent?.trim()).toBe(Resources.emptyHistoryText);
+      await store().detachFolder("c3");
+      await until(() => expect(button()).not.toBeNull());
 
       button()!.click();
       await until(() => expect(context.parametersOf(MethodName.ProjectOpen)).toEqual({ rootPath: SampleData.project.rootPath }));

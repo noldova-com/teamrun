@@ -389,6 +389,7 @@ export class Resources {
     "UPDATE __changes SET entity = 'ChatMember' WHERE entity = 'ConversationMember'"];
   public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ? WHERE id = ?";
   public static readonly selectMessageCheckpoint: string = "SELECT checkpointId FROM messages WHERE id = ?";
+  public static readonly clearChatCheckpoints: string = "UPDATE messages SET checkpointId = NULL WHERE chatId = ?";
   public static readonly selectCommandReply: string =
     `SELECT 1 FROM messages m WHERE chatId = ? AND json_extract(m.json, '$.author') = '${MessageAuthor.Provider}' AND json_extract(m.json, '$.endedAt') IS NOT NULL `
     + `AND EXISTS (SELECT 1 FROM json_each(m.json, '$.details') d WHERE json_extract(d.value, '$.kind') = '${DetailKind.Command}') LIMIT 1`;

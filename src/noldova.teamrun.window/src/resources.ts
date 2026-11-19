@@ -1912,6 +1912,10 @@ export class Resources {
     return `From the next turn, this chat's teammates work in "${chosen}" instead of "${attached}". No files are copied, moved or changed.`;
   }
 
+  public static formatAttachedFolderNote(folder: string): string {
+    return `Works in the attached folder ${folder}`;
+  }
+
   public static formatAttachedFolderKept(folder: string): string {
     return `The folder attached to it, "${folder}", and its files stay as they are.`;
   }

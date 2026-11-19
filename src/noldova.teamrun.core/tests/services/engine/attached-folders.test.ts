@@ -165,6 +165,30 @@ export class AttachedFoldersTests {
   }
 
   @TestMethod
+  public async refusesTheAttachWhenAReplyStartsInTheChatWhileItsFolderIsChecked(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
+    const site = AttachedFoldersTests.folder(join(host.directory.path, "site"), {});
+    host.folderStat.hold(site);
+    const before = host.folderStat.paths.length;
+    host.adapter.holdUntilAbort = true;
+
+    const attaching = Assert.throwsAsync(() => host.conversations.attachFolderAsync(new ChatFolderAttachParams(chat.id, site), t => host.projects.checkFolderAsync(t, null)),
+      ServiceException);
+    await host.until("the held folder check", () => host.folderStat.paths.length > before);
+    const sent = await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, chat.id, "Meanwhile"));
+    await host.adapter.requested(1);
+    host.folderStat.release(site, true);
+    const refused = await attaching;
+    await host.engine.cancelAsync(new MessageIdParams(sent.replies[0]?.id ?? String.empty));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(`${ErrorCode.Conflict} ${Resources.formatReplyInProgress(chat.id)}`, `${refused.info.name} ${refused.message}`);
+    Assert.isNull((await host.conversations.findAsync(chat.id))?.attachedFolder ?? null);
+    Assert.areEqual(chat.folder, host.adapter.requests[0]?.workingDirectory);
+  }
+
+  @TestMethod
   public async failsATurnWithoutStartingItsProviderWhenTheAttachedFolderIsGoneCantBeReadOrDoesntAnswer(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
@@ -244,6 +268,34 @@ export class AttachedFoldersTests {
     Assert.isFalse(existsSync(join(site, ".git")));
     Assert.areEqual(`${WorkFolder.attached(site).id} ${site}`, `${host.checkpoints.restores[0]?.folder.identity} ${host.checkpoints.restores[0]?.folder.path}`);
     Assert.isTrue(existsSync(chat.folder ?? String.empty));
+  }
+
+  @TestMethod
+  public async restoresNoFilesWhenRewindingToAReplyCheckpointedBeforeTheFolderWasReplacedOrDetached(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const replaced = await host.conversations.createAsync(new ConversationCreateParams(null, null));
+    const detached = await host.conversations.createAsync(new ConversationCreateParams(null, null));
+    const site = AttachedFoldersTests.folder(join(host.directory.path, "site"), { "base.txt": "one" });
+    const docs = AttachedFoldersTests.folder(join(host.directory.path, "docs"), { "base.txt": "docs" });
+    const notes = AttachedFoldersTests.folder(join(host.directory.path, "notes"), { "base.txt": "notes" });
+    await AttachedFoldersTests.attachAsync(host, replaced.id, site);
+    await AttachedFoldersTests.attachAsync(host, detached.id, notes);
+    host.adapter.writeFiles = { "base.txt": "two" };
+    const first = await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, replaced.id, "First"));
+    await host.engine.waitForIdle();
+    const other = await host.engine.sendAsync(await AttachedFoldersTests.paramsAsync(host, detached.id, "Other"));
+    await host.engine.waitForIdle();
+    await AttachedFoldersTests.attachAsync(host, replaced.id, docs);
+    await AttachedFoldersTests.succeedAsync(host, MethodName.ChatFolderDetach, new ConversationIdParams(detached.id).toJson());
+
+    const afterReplace = await host.engine.rewindAsync(new ConversationRewindParams(replaced.id, first.sent.id, true));
+    const afterDetach = await host.engine.rewindAsync(new ConversationRewindParams(detached.id, other.sent.id, true));
+
+    Assert.areEqual(2, host.checkpoints.captures.length);
+    Assert.areEqual(`null ${Resources.noCheckpointRefusal}`, `${afterReplace.restoredFiles} ${afterReplace.restoreRefusal}`);
+    Assert.areEqual(`null ${Resources.noCheckpointRefusal}`, `${afterDetach.restoredFiles} ${afterDetach.restoreRefusal}`);
+    Assert.areEqual(0, host.checkpoints.restores.length);
+    Assert.areEqual("two,docs,two", [site, docs, notes].map(t => readFileSync(join(t, "base.txt"), "utf8")).join(","));
   }
 
   @TestMethod

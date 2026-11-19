@@ -1347,7 +1347,8 @@ export interface IConversationsService {
 
   /**
    * Attaches an existing folder to a chat without a project, or replaces the one attached, so that its teammates work in it, in place,
-   * from the next turn; nothing is copied, and the chat's own folder stays for a detach.
+   * from the next turn; nothing is copied, and the chat's own folder stays for a detach. The chat's replies keep no checkpoint, since
+   * theirs were taken of the folder before, so a rewind to one of them restores no files.
    * @param params The chat and the folder's absolute path, kept resolved.
    * @param check Checks the folder, as the projects service checks a project's folder.
    * @returns The chat, whose `folder` is the attached folder.
@@ -1359,7 +1360,7 @@ export interface IConversationsService {
 
   /**
    * Detaches a chat's attached folder, leaving its files as they are, so that its teammates work in the chat's own folder again from the
-   * next turn; a chat with none attached comes back as it is.
+   * next turn, and its replies keep no checkpoint, as with an attach; a chat with none attached comes back as it is.
    * @param params The chat id.
    * @returns The chat, whose `folder` is its own folder again.
    * @throws ServiceException named `ErrorCode.NotFound` for an unknown chat, and `ErrorCode.Conflict` while a reply runs in the chat.
@@ -3969,6 +3970,10 @@ export declare class Resources {
   public static readonly chatIdRowTables: readonly string[];
   public static readonly updateMessageCheckpoint: string;
   public static readonly selectMessageCheckpoint: string;
+  /**
+   * Forgets the checkpoints of a chat's replies, as its folder changes, so a rewind past the change restores nothing from another folder.
+   */
+  public static readonly clearChatCheckpoints: string;
   /**
    * Bytes above which an added file gets no diff.
    */
