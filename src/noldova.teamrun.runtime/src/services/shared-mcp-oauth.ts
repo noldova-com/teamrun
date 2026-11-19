@@ -69,8 +69,8 @@ export class SharedMcpOauth implements ISharedMcpSignIn {
     });
     let answered = false;
     server.on(Resources.requestEvent, (request: IncomingMessage, response: ServerResponse) => {
-      const address = new URL(String(request.url), flow.redirectUrl);
-      if (address.pathname !== Resources.sharedMcpCallbackPath || answered) {
+      const address = URL.parse(String(request.url), flow.redirectUrl);
+      if (Object.isNull(address) || address.pathname !== Resources.sharedMcpCallbackPath || answered) {
         response.writeHead(Resources.notFoundStatus).end();
         return;
       }
