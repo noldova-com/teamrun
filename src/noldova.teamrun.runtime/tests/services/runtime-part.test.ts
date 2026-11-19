@@ -415,7 +415,7 @@ export class RuntimePartTests {
       await sweep.call(this);
       steps.push("swept");
     };
-    ConversationEngine.prototype.reconcileAsync = function (this: ConversationEngine): Promise<void> {
+    ConversationEngine.prototype.reconcileAsync = function (this: ConversationEngine): Promise<readonly Message[]> {
       steps.push("resuming");
       return reconcile.call(this);
     };
