@@ -4561,6 +4561,23 @@ describe("ComposerComponent", () => {
       expect(rows()).toHaveLength(0);
     });
 
+    it("keeps the chat it moved to when the save of the chat it left is refused as stale, and reads the one it left no more", async () => {
+      context.answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c2" ? drafted("c2", "other") : null)
+        .refuse(MethodName.DraftSave, ErrorCode.Conflict, "The draft changed.", "c1");
+      await prepare();
+      await render();
+
+      await type("mine");
+      fixture.componentRef.setInput("conversationId", "c2");
+      await fixture.whenStable();
+
+      expect(saves().map(t => t.conversationId)).toEqual(["c1"]);
+      expect(box().value).toBe("other");
+      expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftRead))
+        .map(t => ConversationIdParams.fromJson(t.parameters).conversationId)).toEqual(["c1", "c2"]);
+      expect(context.noticeText()).toBeNull();
+    });
+
     it("shows the open conversation's unsent message when an earlier one's answers late", async () => {
       const late = new DeferredResponse();
       context.answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c1" ? late.promise : drafted("c2", "other"));
