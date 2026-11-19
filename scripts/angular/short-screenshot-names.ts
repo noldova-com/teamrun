@@ -27,9 +27,9 @@ export class ShortScreenshotNames {
 
   public static shorten(path: string): string {
     const name = basename(path);
-    if (Buffer.byteLength(name) <= ShortScreenshotNames.NAME_LIMIT)
-      return path;
     const extension = extname(name);
+    if (Buffer.byteLength(name) <= ShortScreenshotNames.KEPT + ShortScreenshotNames.SEPARATOR.length + ShortScreenshotNames.HASH_LENGTH + Buffer.byteLength(extension))
+      return path;
     const hash = createHash(ShortScreenshotNames.HASH).update(name).digest("hex").slice(0, ShortScreenshotNames.HASH_LENGTH);
     let cut = "";
     for (const character of name.slice(0, name.length - extension.length)) {

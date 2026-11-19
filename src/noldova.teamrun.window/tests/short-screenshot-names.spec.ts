@@ -13,12 +13,16 @@ describe("Screenshot names", () => {
   const folder = `${server.config.attachmentsDir}/screenshot-names`;
   const fileName = (path: string): string => path.replace(/^.*[\\/]/u, "");
   const bytesOf = (text: string): number => new TextEncoder().encode(text).length;
-  const longStem = (): string => `${"A-test-title-past-what-a-file-name-may-hold-".repeat(6)}${crypto.randomUUID()}`;
+  const longStem = (repeats: number): string => `${"A-test-title-past-what-a-file-name-may-hold-".repeat(repeats)}${crypto.randomUUID()}`;
 
-  it("saves a screenshot whose file name is past the 255 bytes a file name may take under its first 100 bytes and a 16-character hash of it, keeping its extension",
-    async () => {
-      const stem = longStem();
-      expect(bytesOf(`${stem}.png`)).toBeGreaterThan(255);
+  it.each([
+    { length: "past the 255 bytes a file name may take", repeats: 6, least: 256, most: Number.MAX_SAFE_INTEGER },
+    { length: "of about 200 bytes, too long a path to unpack on Windows", repeats: 4, least: 200, most: 255 }
+  ])("saves a screenshot whose file name is $length under its first 100 bytes and a 16-character hash of it, keeping its extension",
+    async ({ repeats, least, most }) => {
+      const stem = longStem(repeats);
+      expect(bytesOf(`${stem}.png`)).toBeGreaterThanOrEqual(least);
+      expect(bytesOf(`${stem}.png`)).toBeLessThanOrEqual(most);
 
       const path = await page.screenshot({ path: `${folder}/${stem}.png` });
       onTestFinished(() => commands.removeFile(path));
@@ -40,7 +44,7 @@ describe("Screenshot names", () => {
   });
 
   it("gives the image back beside the shortened path when asked for base64, and alone when not saving, as Vitest's own command does", async () => {
-    const saved = await page.screenshot({ path: `${folder}/${longStem()}.png`, base64: true });
+    const saved = await page.screenshot({ path: `${folder}/${longStem(6)}.png`, base64: true });
     onTestFinished(() => commands.removeFile(saved.path));
     const image = await page.screenshot({ save: false });
 

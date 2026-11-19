@@ -33,10 +33,25 @@ const fakeContext = (): IScreenshotCommandContext & { readonly sent: (readonly [
 };
 
 describe("ShortScreenshotNames", () => {
-  it("keeps a path whose file name fits in 255 bytes", () => {
-    const fits = path.join(folder, `${"a".repeat(251)}.png`);
+  it("keeps a path whose file name is no longer than its cut form, 121 bytes for a .png", () => {
+    const fits = path.join(folder, `${"a".repeat(117)}.png`);
 
     assert.equal(ShortScreenshotNames.shorten(fits), fits);
+  });
+
+  it("cuts a file name one byte longer than its cut form", () => {
+    const name = path.basename(ShortScreenshotNames.shorten(path.join(folder, `${"a".repeat(118)}.png`)));
+
+    assert.match(name, /^a{100}-[\da-f]{16}\.png$/u);
+  });
+
+  it("cuts a file name of about 200 bytes, which fits a file system but makes a path too long to unpack on Windows", () => {
+    const named = `${"fails-with-a-title-past-what-a-path-may-hold-".repeat(4)}1.png`;
+    const name = path.basename(ShortScreenshotNames.shorten(path.join(folder, named)));
+
+    assert.equal(Buffer.byteLength(named) > 200 && Buffer.byteLength(named) < ShortScreenshotNames.NAME_LIMIT, true);
+    assert.equal(named.startsWith(name.slice(0, -"-0123456789abcdef.png".length)), true);
+    assert.equal(Buffer.byteLength(name), ShortScreenshotNames.KEPT + "-0123456789abcdef.png".length);
   });
 
   it("cuts a longer file name to its first 100 bytes, a hyphen, 16 digits of its hash and its extension", () => {
