@@ -4,6 +4,10 @@
 
 Each version's section is written by the pull request that changes the version, from the pull requests merged since the previous version; other pull requests don't edit this file.
 
+## 0.0.4
+
+This version holds the same app as 0.0.3, released right after it so that updating can be tried across more than one version, such as from 0.0.2 straight to 0.0.4.
+
 ## 0.0.3
 
 ### New
