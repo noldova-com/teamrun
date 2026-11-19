@@ -17,7 +17,7 @@ import type { ProcessRunner } from "../processes/process-runner.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
 
 export class FailureScreenshotCheck implements ICheck {
-  private static readonly CLI: string = "src/node_modules/vitest/vitest.mjs";
+  private static readonly CLI: string = "node_modules/vitest/vitest.mjs";
   private static readonly FIXTURE: string = "src/noldova.teamrun.window/tests/fixtures/failure-screenshot";
   private static readonly RUN_ARGUMENTS: readonly string[] = ["run", "--config", "vitest.config.mts"];
   private static readonly ATTACHMENTS_VARIABLE: string = "NOLDOVA_FAILURE_SCREENSHOT_ATTACHMENTS";
