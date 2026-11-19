@@ -236,6 +236,17 @@ describe("ComposerDraftService", () => {
     expect(context.count(MethodName.DraftDiscard)).toBe(0);
   });
 
+  it("passes on a save's failure that is no stale refusal, and tells its watchers nothing", async () => {
+    const refusedOver: string[] = [];
+    drafts.onStale(t => refusedOver.push(t));
+    vi.spyOn(store, "saveDraft").mockRejectedValue(new Error("lost"));
+    drafts.schedule(draft("mine"));
+
+    await expect(drafts.save()).rejects.toThrow("lost");
+
+    expect(refusedOver).toEqual([]);
+  });
+
   it("discards nothing it has neither read nor saved, so another window's draft stays", async () => {
     expect(await drafts.restore("c1")).toBeNull();
 
