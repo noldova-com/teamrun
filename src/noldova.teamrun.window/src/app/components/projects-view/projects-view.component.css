@@ -88,11 +88,6 @@ nol-section-header + p.nol-teamrun-row,
 
 .nol-teamrun-action {
   gap: var(--nol-space-2);
-  min-height: var(--nol-section-header-height);
-}
-
-.nol-teamrun-action + .nol-teamrun-action {
-  margin-block-start: var(--nol-space-3);
 }
 
 .nol-teamrun-drop-list .nol-teamrun-row,
