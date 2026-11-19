@@ -9609,7 +9609,7 @@ export declare class AttachmentStore {
 
   /**
    * Lists the files directly in the store's folder, where sent messages' files are saved.
-   * @returns Their paths, or none when the folder is missing or reached through a link.
+   * @returns Their paths, or none when the folder is missing.
    * @throws Error on filesystem failure.
    */
   public listSent(): readonly string[];
