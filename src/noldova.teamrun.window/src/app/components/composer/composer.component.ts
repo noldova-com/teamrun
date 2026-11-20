@@ -799,7 +799,7 @@ export class ComposerComponent {
 
   protected paste(event: ClipboardEvent): void {
     const files = Array.from(event.clipboardData?.files ?? []);
-    if (files.length === 0)
+    if (files.length === 0 || !this.canCompose())
       return;
     event.preventDefault();
     this.addFiles(files);
