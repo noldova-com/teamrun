@@ -16,4 +16,5 @@ export interface IDraftsService {
   forgetAsync(conversationId: string, transaction?: SqlTransaction): Promise<void>;
   removeFiles(conversationId: string): void;
   removeChatFiles(conversationId: string): void;
+  removeSentFiles(conversationId: string, paths: readonly string[]): void;
 }
