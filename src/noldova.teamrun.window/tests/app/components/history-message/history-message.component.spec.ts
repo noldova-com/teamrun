@@ -4316,6 +4316,7 @@ describe("HistoryMessageComponent", () => {
       expect(rect(".wake-chevron").left).toBeGreaterThanOrEqual(rect(".wake-chat").right);
       for (const part of [".wake-chat", ".wake-chevron"])
         AppearanceFixture.expectPixels(middle(part), middle(".wake-toggle"));
+      expect(getComputedStyle(one(".wake-chevron")).fontFamily).toBe(getComputedStyle(one(".activity-chevron")).fontFamily);
 
       await click(one(".wake-toggle"));
       await Wait.until(() => expect(element().querySelector(".wake-replies")).not.toBeNull());
