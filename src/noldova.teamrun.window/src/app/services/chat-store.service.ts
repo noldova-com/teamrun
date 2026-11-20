@@ -2023,6 +2023,8 @@ export class ChatStoreService {
       case EventName.DetailUpdated: {
         const payload = DetailEventPayload.fromJson(event.payload);
         this.captureEvent(event, JSON.stringify([EventName.DetailUpdated, payload.messageId, payload.detail.sequence]));
+        this.captureEvent(new Event(EventName.ReplyCheckpointEnded, new MessageIdParams(payload.messageId).toJson()),
+          JSON.stringify([EventName.ReplyCheckpointStarted, payload.messageId]));
         this.stopThinking(payload.messageId);
         this.stopSavingCheckpoint(payload.messageId);
         this.applyDetail(payload);
@@ -2381,7 +2383,8 @@ export class ChatStoreService {
 
   private replaySnapshot(events: Map<string, Event>): void {
     this.snapshots.delete(events);
-    for (const event of events.values())
+    const checkpoint = (event: Event): boolean => event.name === EventName.ReplyCheckpointStarted || event.name === EventName.ReplyCheckpointEnded;
+    for (const event of [...events.values()].sort((left, right) => Number(checkpoint(left)) - Number(checkpoint(right))))
       this.apply(event);
   }
 

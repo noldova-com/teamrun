@@ -1855,6 +1855,38 @@ describe("ChatStoreService", () => {
     expect([loaded, resynced, ended]).toEqual([["m2"], ["m2"], []]);
   });
 
+  it("applies a reply's checkpoint after a read's other events, so an update that lands after the start keeps it and a detail after the start ends it", async () => {
+    let held: DeferredResponse | null = null;
+    let open: readonly Message[] = [];
+    context.answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()));
+    context.answer(MethodName.ApprovalListPending, () => Object.isNull(held) ? [] : held.promise);
+    const started = (): void => context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
+    const hold = async (read: () => Promise<unknown>, during: () => void): Promise<string[]> => {
+      held = new DeferredResponse();
+      const asked = context.count(MethodName.ApprovalListPending);
+      const reading = read();
+      await Wait.until(() => expect(context.count(MethodName.ApprovalListPending)).toBe(asked + 1));
+      during();
+      held.resolve([]);
+      await reading;
+      held = null;
+      return [...store.savingCheckpointReplies()];
+    };
+
+    const updated = await hold(() => store.initialize(), () => {
+      context.emit(EventName.MessageCreated, SampleData.reply.toJson());
+      started();
+      context.emit(EventName.MessageUpdated, SampleData.reply.toJson());
+    });
+    open = [SampleData.reply];
+    const detailed = await hold(() => store.resync(), () => {
+      started();
+      context.emit(EventName.DetailAppended, new DetailEventPayload("m2", SampleData.detail(0, DetailKind.Text, "Hello")).toJson());
+    });
+
+    expect([updated, detailed]).toEqual([["m2"], []]);
+  });
+
   it("loads the catalog and selects a project without opening a conversation", async () => {
     context.answer(MethodName.ApprovalListPending, () => [SampleData.approval.toJson()]);
     context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
