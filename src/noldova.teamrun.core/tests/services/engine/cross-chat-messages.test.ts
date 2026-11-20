@@ -13,6 +13,7 @@ import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { Resources, TeammateCommand, TurnOutcome } from "@noldova/teamrun.core";
 import {
+  ConversationIdParams,
   ConversationMemberParams,
   ConversationResponder,
   ConversationResponderParams,
@@ -331,6 +332,40 @@ export class CrossChatMessagesTests {
 
     Assert.areEqual(`Alice's role\n\n${Resources.planToolInstructions}`, host.adapter.requests[0]!.instructions);
     Assert.areEqual("TEAMRUN_SENDER_TOKEN", Object.keys(host.adapter.requests[0]!.environment).join(","));
+  }
+
+  @TestMethod
+  public async listsAReplyAnotherChatsTeammateSendsBetweenTwoStopsInOnlyOneOfThem(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const first = await host.createConversationAsync(project, "Plans");
+    const second = await host.createConversationAsync(project, "Fixes");
+    const [bob, carol, dana] = await CrossChatMessagesTests.teamAsync(host, "Bob", "Carol", "Dana");
+    const bobHeld = Promise.withResolvers<void>();
+    host.adapter.holdTurn = request => request === host.adapter.requests[0] ? bobHeld.promise : Promise.resolve();
+    const stops: Promise<readonly Message[]>[] = [];
+    const crossed: Promise<MessageSendResult>[] = [];
+    host.adapter.afterDetails = () => {
+      if (host.adapter.requests.length === 2 && crossed.length === 0)
+        crossed.push(host.engine.sendAsync(CrossChatMessagesTests.from(host, second.id, "@Carol help Bob", [carol!])).then(t => {
+          stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(second.id)));
+          return t;
+        }));
+      return crossed[0];
+    };
+
+    const started = await host.engine.sendAsync(new MessageSendParams(second.id, "@Bob start", null, null, [], [bob!.id]));
+    await host.adapter.requested(1);
+    stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(second.id)));
+    await host.engine.sendAsync(new MessageSendParams(first.id, "@Dana ask Carol", null, null, [], [dana!.id]));
+    await host.until("the second Stop", () => stops.length === 2, host.runs());
+    const carolReply = (await crossed[0]!).replies[0]!;
+    bobHeld.resolve();
+    const [before, after] = await Promise.all(stops);
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(carolReply.id))!.status);
+    Assert.areEqual(`${started.replies[0]!.id},${carolReply.id}|`, `${before!.map(t => t.id).join(",")}|${after!.map(t => t.id).join(",")}`);
   }
 
   @TestMethod
