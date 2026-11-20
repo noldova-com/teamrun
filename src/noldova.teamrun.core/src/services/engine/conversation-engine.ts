@@ -519,8 +519,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         this.completions.delete(message.id);
         this.titles.end(message.conversationId);
         this.context.projectActivity.leave(projectLease);
-        await this.permissions.sendAnswersAsync(message.conversationId);
-        await this.waitingSends.sendWaitingAsync(message.conversationId);
+        await this.sendQueuedAsync(message.conversationId);
         await this.settleWakesAsync(message.conversationId, pending);
       });
       void execution.then(() => completion.resolve(), error => completion.reject(error));
@@ -548,7 +547,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         this.context.projectActivity.leave(projectLease);
         completion.resolve();
         if (!Object.isNull(chatId)) {
-          await this.waitingSends.sendWaitingAsync(chatId);
+          await this.sendQueuedAsync(chatId);
           await this.settleWakesAsync(chatId, work);
         }
       }
@@ -1237,13 +1236,21 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   }
 
   private async resumeSendingAsync(chatId: string): Promise<void> {
+    await this.sendQueuedAsync(chatId);
+    await this.settleSafelyAsync(chatId, () => this.sendWakesAsync(chatId));
+  }
+
+  private async sendQueuedAsync(chatId: string): Promise<void> {
     await this.permissions.sendAnswersAsync(chatId).catch((error: unknown) => {
       this.log?.write(Resources.formatQuestionReplyNotSent(chatId, Resources.formatFailureKind(error)));
     });
+    await this.sendWaitingSafelyAsync(chatId);
+  }
+
+  private async sendWaitingSafelyAsync(chatId: string): Promise<void> {
     await this.waitingSends.sendWaitingAsync(chatId).catch((error: unknown) => {
       this.log?.write(Resources.formatWaitingMessageNotSent(chatId, Resources.formatFailureKind(error)));
     });
-    await this.settleSafelyAsync(chatId, () => this.sendWakesAsync(chatId));
   }
 
   private findGroup(conversationId: string): ReplyWork[] | null {
@@ -1844,8 +1851,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       this.state.groups.delete(key);
       this.completions.delete(key);
       this.context.projectActivity.leave(lease);
-      await this.permissions.sendAnswersAsync(conversationId);
-      await this.waitingSends.sendWaitingAsync(conversationId);
+      await this.sendQueuedAsync(conversationId);
       await this.settleWakesAsync(conversationId, work);
     });
     this.completions.set(key, execution);
