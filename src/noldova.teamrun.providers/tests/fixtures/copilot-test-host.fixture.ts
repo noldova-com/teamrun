@@ -16,6 +16,7 @@ import { ElapsedDelayTimer } from "./elapsed-delay-timer.fixture.js";
 import { HeldDelayTimer } from "./held-delay-timer.fixture.js";
 import { IsolatedPath } from "./isolated-path.fixture.js";
 import { ProgramRecorder } from "./program-recorder.fixture.js";
+import { SettledProcessTree } from "./settled-process-tree.fixture.js";
 import { TemporaryDirectory } from "./temporary-directory.fixture.js";
 
 export class CopilotTestHost implements AsyncDisposable {
@@ -36,7 +37,7 @@ export class CopilotTestHost implements AsyncDisposable {
   public createAdapter(environment: NodeJS.ProcessEnv = {}, command: ProcessCommand | null = this.command, log: ILog | null = null,
     timings: ProviderTimings = this.timings, terminator: ProcessTerminator = this.terminator, timer: ITimer = this.timer): CopilotAdapter {
     const adapter = new CopilotAdapter(command, { ...this.environment, ...environment }, this.directory.resolve("work"), this.info,
-      this.programs.wrap(new NodeProcessStarter(terminator)), timings, timer, log, undefined, null, this.elapsedIdleTimer);
+      this.programs.wrap(new NodeProcessStarter(terminator)), timings, timer, log, undefined, null, this.elapsedIdleTimer, new SettledProcessTree());
     this.adapters.push(adapter);
     return adapter;
   }

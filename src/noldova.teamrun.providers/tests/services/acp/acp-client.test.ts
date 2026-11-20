@@ -17,6 +17,7 @@ import { AcpClient, AcpConnectionException, AcpRequestException, type IAcpClient
 import { CopilotTestHost } from "../../fixtures/copilot-test-host.fixture.js";
 import { GrokTestHost } from "../../fixtures/grok-test-host.fixture.js";
 import { ControlledProcessTerminator } from "../../fixtures/controlled-process-terminator.fixture.js";
+import { ElapsedDelayTimer } from "../../fixtures/elapsed-delay-timer.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 
 @TestClass
@@ -180,6 +181,31 @@ export class AcpClientTests {
     Assert.isDefined(bound);
     Assert.areEqual(1, bounds.length);
     Assert.isTrue(bound <= exited);
+  }
+
+  @TestMethod
+  public async endsItsStopAtKillWaitWhenTheListingOfWhatTheAgentLeftNeverSettles(): Promise<void> {
+    await using host = new CopilotTestHost();
+    const started = new StartedProcess();
+    const output = new PassThrough();
+    const errors = new PassThrough();
+    const swept: number[] = [];
+    const tree: IProcessTree = { endTree: () => Promise.resolve(true), endOwnTree: () => Promise.resolve(true), endDescendants: () => Promise.resolve(),
+      endLeftovers: processId => { swept.push(processId); return new Promise<void>(() => undefined); } };
+    const timer = new ElapsedDelayTimer(AcpClientTests.TIMINGS.killWait);
+    const client = new AcpClient(host.command, host.environment, host.directory.path, host.programs.wrap({ start: () => started }), AcpClientTests.TIMINGS, timer,
+      MessageFraming.Lines, tree);
+    client.start();
+    started.attach(7, new PassThrough(), output, errors, () => Promise.resolve());
+    const prompt = client.request(Resources.acpSessionPrompt, {}, null).catch(() => undefined);
+    started.end(0, null);
+    output.end();
+    errors.end();
+    await prompt;
+    await client.stop();
+
+    Assert.areEqual(JSON.stringify([7]), JSON.stringify(swept));
+    Assert.areEqual(JSON.stringify([AcpClientTests.TIMINGS.killWait]), JSON.stringify(timer.requested.filter(t => t === AcpClientTests.TIMINGS.killWait)));
   }
 
   @TestMethod

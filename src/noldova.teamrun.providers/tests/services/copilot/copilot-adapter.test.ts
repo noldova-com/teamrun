@@ -25,6 +25,7 @@ import { RecordedMcpServers } from "../../fixtures/recorded-mcp-servers.fixture.
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
 import { RunningProgramsStarter } from "../../fixtures/running-programs-starter.fixture.js";
+import { SettledProcessTree } from "../../fixtures/settled-process-tree.fixture.js";
 import { TitleAsks } from "../../fixtures/title-asks.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 
@@ -1191,7 +1192,8 @@ export class CopilotAdapterTests {
   public async showsCopilotAmongTheRunningProgramsWhileATurnRunsAndNotAfter(): Promise<void> {
     await using host = new CopilotTestHost();
     const starter = new RunningProgramsStarter();
-    const adapter = new CopilotAdapter(host.command, host.environment, host.directory.resolve("work"), host.info, host.programs.wrap(starter), host.timings, host.timer);
+    const adapter = new CopilotAdapter(host.command, host.environment, host.directory.resolve("work"), host.info, host.programs.wrap(starter), host.timings, host.timer,
+      null, undefined, null, host.elapsedIdleTimer, new SettledProcessTree());
     const listener = new RecordingTurnListener();
     const controller = new AbortController();
     try {
