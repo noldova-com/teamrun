@@ -4439,6 +4439,16 @@ export declare class Resources {
   public static formatSubAgentNotFound(subAgentId: string): string;
 
   /**
+   * Composes the log line for a sub-agent whose end couldn't be saved.
+   */
+  public static formatSubAgentNotSaved(subAgentId: string, reason: string): string;
+
+  /**
+   * Composes the log line for a sub-agent whose stop failed, logged so the other stops go on.
+   */
+  public static formatSubAgentNotStopped(subAgentId: string, reason: string): string;
+
+  /**
    * The note after a sub-agent's result that was cut, with how many characters were left out.
    * @param left How many characters were cut.
    */
