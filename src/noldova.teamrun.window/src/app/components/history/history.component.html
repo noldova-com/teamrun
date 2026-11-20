@@ -21,8 +21,8 @@ LICENSE file in the root directory of this source tree.
     <ng-template [nolVirtualRow]="source" [nolVirtualRowHidden]="isHidden" let-item let-labelId="labelId">
       @if (usageHandOffOf(item); as note) {
         <nol-teamrun-usage-hand-off-line [note]="note" [labelId]="labelId" />
-      } @else if (isWake(item)) {
-        <nol-teamrun-wake-line [message]="item" [alone]="true" [labelId]="labelId" />
+      } @else if (wakeOf(item); as received) {
+        <nol-teamrun-wake-line [message]="item" [received]="received" [alone]="true" [labelId]="labelId" />
       } @else {
         <nol-teamrun-history-message [message]="item" [labelId]="labelId" [flashStart]="item.id === flashRowId() ? flashStart() : null"
           [revealsPlan]="item.id === flashRowId() && flashesPlan()" [revealsStep]="item.id === flashRowId() ? flashStep() : null"

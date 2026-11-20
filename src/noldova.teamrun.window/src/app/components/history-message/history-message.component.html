@@ -58,7 +58,9 @@ LICENSE file in the root directory of this source tree.
     }
   </ng-template>
   <ng-template [nolMessageSlot]="resources.wakeReceivedSlot">
-    <nol-teamrun-wake-line [message]="message()" [state]="state()" />
+    @if (wakeReceived(); as received) {
+      <nol-teamrun-wake-line [message]="message()" [received]="received" [state]="state()" />
+    }
   </ng-template>
   <ng-template [nolMessageSlot]="resources.wakeNoteSlot">
     @if (areSlotsShown()) {

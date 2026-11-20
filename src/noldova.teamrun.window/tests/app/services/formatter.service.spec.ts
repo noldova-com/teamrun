@@ -56,6 +56,21 @@ describe("FormatterService", () => {
     new Message("m3", "c1", 2, MessageAuthor.Provider, null, MessageStatus.Completed, [], provenance, SampleData.timestamp, null, SampleData.timestamp, [],
       teammateId, teammateName);
 
+  it("reads a chat's wake from its payload, a reply's missing text as none, and leaves out a reply without a name or a status it knows", () => {
+    const received = (replies: JsonValue): Message =>
+      reply([detail(0, DetailKind.Note, "Received a message.", { source: "wakeReceived", wakeChatId: "c2", wakeReplies: replies })]);
+    const read = FormatterService.wakeReceivedOf(received([
+      { name: "Bob", status: MessageStatus.Completed, text: null },
+      { name: 7, status: MessageStatus.Completed, text: "Done." },
+      { name: "Carol", status: "Asleep", text: "Done." },
+      "Dave"
+    ]));
+
+    expect(read?.chatId).toBe("c2");
+    expect(read?.replies.map(t => [t.name, t.status, t.text])).toEqual([["Bob", MessageStatus.Completed, null]]);
+    expect(FormatterService.wakeReceivedOf(received("Bob"))).toBeNull();
+  });
+
   it("sorts steps into commands, edits, reads, searches, thoughts and other steps, the order a summary counts them in", () => {
     expect(Object.values(StepCategory)).toEqual(["Command", "Edit", "Read", "Search", "Thought", "Other"]);
   });

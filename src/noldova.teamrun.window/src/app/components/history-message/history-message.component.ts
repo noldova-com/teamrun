@@ -330,7 +330,7 @@ export class HistoryMessageComponent implements OnInit {
     return this.formatter.activityLabel(message, this.now(), activity);
   });
   protected readonly wakeNote: Signal<readonly string[] | null> = computed(() => this.formatter.wakeNoteOf(this.message()));
-  protected readonly wakeReceived: Signal<WakeReceived | null> = computed(() => this.isPerson() ? null : FormatterService.wakeReceivedOf(this.message()));
+  protected readonly wakeReceived: Signal<WakeReceived | null> = computed(() => FormatterService.wakeReceivedOf(this.message()));
   protected readonly resumeNote: Signal<string | null> = computed(() => this.message().details.find(t => this.formatter.isResumeNote(t))?.text ?? null);
   protected readonly sustainNotes: Signal<readonly { readonly sequence: number; readonly glyph: string; readonly text: string; readonly handover: SustainHandover | null }[]> =
     computed(() => this.message().details

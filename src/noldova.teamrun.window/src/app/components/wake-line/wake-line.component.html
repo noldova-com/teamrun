@@ -15,9 +15,9 @@ LICENSE file in the root directory of this source tree.
   }
   <button type="button" class="wake-chevron material-symbols-rounded" tabindex="-1" aria-hidden="true" data-nol-resizes-row (click)="toggle()">{{ isOpen() ? resources.expandedIcon : resources.collapsedIcon }}</button>
 </p>
-@if (isOpen() && received(); as shown) {
+@if (isOpen()) {
   <div class="wake-replies" role="region" [attr.aria-label]="resources.wakeRepliesLabel">
-    @for (reply of shown.replies; track $index) {
+    @for (reply of received().replies; track $index) {
       <p class="wake-reply-heading">{{ headingOf(reply) }}</p>
       @if (reply.text; as text) {
         <p class="wake-reply-text">{{ text }}</p>

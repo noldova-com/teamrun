@@ -22,6 +22,7 @@ import type { ConversationHistorySource } from "../../models/conversation-histor
 import type { MessageFocus } from "../../models/message-focus";
 import { ReadingPosition } from "../../models/reading-position";
 import { ScrollReveal } from "../../models/scroll-reveal";
+import type { WakeReceived } from "../../models/wake-received";
 import { Resources } from "../../../resources";
 import { BackgroundTaskStoreService } from "../../services/background-task-store.service";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -69,8 +70,8 @@ export class HistoryComponent implements IRowReveal {
   });
   protected readonly isHidden: (item: Message) => boolean = (item: Message): boolean => !Object.isNull(FormatterService.steeredIntoOf(item))
     || FormatterService.startsTurn(item);
-  protected readonly isWake: (item: Message) => boolean = (item: Message): boolean => item.author === MessageAuthor.User
-    && !Object.isNull(FormatterService.wakeReceivedOf(item));
+  protected readonly wakeOf: (item: Message) => WakeReceived | null = (item: Message): WakeReceived | null =>
+    item.author === MessageAuthor.User ? FormatterService.wakeReceivedOf(item) : null;
   protected readonly usageHandOffOf: (item: Message) => MessageDetail | null = (item: Message): MessageDetail | null => FormatterService.usageHandOffOf(item);
   protected readonly isEmpty: Signal<boolean> = computed(() => this.source()?.length() === 0);
   protected readonly isBusy: Signal<boolean> = computed(() => this.store.isWorking(this.chatId()));
