@@ -181,7 +181,7 @@ export class HistoryMessageComponent implements OnInit {
     const source = this.referenceSource;
     return Object.isNull(source) ? null : source.readerFor(source.homeOf(this.store.folderOf(this.message().conversationId))());
   });
-  protected readonly state: Signal<MessageControlState> = computed(() => this.store.messageIndexOf(this.message().conversationId).find(t => t.id === this.message().id)?.controls ?? this.local);
+  protected readonly state: Signal<MessageControlState> = computed(() => this.store.messageControlsOf(this.message().conversationId, this.message().id) ?? this.local);
   protected readonly isPerson: Signal<boolean> = computed(() => this.message().author === MessageAuthor.User);
   protected readonly runsShell: Signal<boolean> = computed(() => !this.isPerson() && !Object.isNull(this.terminals));
   protected readonly terminalOwner: Signal<string> = computed(() => ChatTerminals.ownerFor(this.message().conversationId));

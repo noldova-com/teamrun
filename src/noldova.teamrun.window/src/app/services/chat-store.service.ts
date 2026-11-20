@@ -729,10 +729,22 @@ export class ChatStoreService {
     };
   }
 
+  public messageControlsOf(conversationId: string, messageId: string): MessageControlState | null {
+    this.windowOf(conversationId)?.index();
+    return this.messageIndexes.get(conversationId)?.find(messageId)?.controls ?? null;
+  }
+
   public rememberMessageControls(messageId: string, controls: MessageControlState, conversationId: string | null = this.selectedConversationId()): void {
-    const entry = Object.isNull(conversationId) ? null : this.messageIndexes.get(conversationId)?.find(messageId) ?? null;
-    if (!Object.isNull(entry))
+    if (Object.isNull(conversationId))
+      return;
+    const entry = this.messageIndexes.get(conversationId)?.find(messageId) ?? null;
+    if (!Object.isNull(entry)) {
       entry.controls = controls.hasChanges ? controls : null;
+      return;
+    }
+    const message = this.windowOf(conversationId)?.history()?.find(messageId) ?? null;
+    if (!Object.isNull(message) && controls.hasChanges)
+      this.indexFor(conversationId).keep(message, controls);
   }
 
   public async showMessage(hit: ConversationSearchHit): Promise<void> {
