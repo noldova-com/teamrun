@@ -1809,6 +1809,84 @@ describe("ChatStoreService", () => {
     expect(seen).toEqual([["m2"], ["m2"], [], [], [], ["true"], [], []]);
   });
 
+  it("keeps a running reply saving its checkpoint through a catalog read that isn't a resync, and drops it once a read finds the reply ended", async () => {
+    let open = [SampleData.reply];
+    context.answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()));
+    await store.initialize();
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const read = async (): Promise<void> => {
+      const reads = context.count(MethodName.PlanUsageList);
+      context.emit(EventName.StateInvalidated, null);
+      await Wait.until(() => expect(context.count(MethodName.PlanUsageList)).toBe(reads + 1));
+    };
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
+
+    await read();
+    const kept = saving();
+    open = [];
+    await read();
+
+    expect([kept, saving()]).toEqual([["m2"], []]);
+  });
+
+  it("keeps a checkpoint that starts while a first load or a resync reads, and applies the reply's latest checkpoint event after the read", async () => {
+    let held: DeferredResponse | null = null;
+    context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
+    context.answer(MethodName.ApprovalListPending, () => Object.isNull(held) ? [] : held.promise);
+    const emit = (name: EventName): void => context.emit(name, new MessageIdParams("m2").toJson());
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const hold = async (read: () => Promise<unknown>, ...names: readonly EventName[]): Promise<string[]> => {
+      held = new DeferredResponse();
+      const asked = context.count(MethodName.ApprovalListPending);
+      const reading = read();
+      await Wait.until(() => expect(context.count(MethodName.ApprovalListPending)).toBe(asked + 1));
+      for (const name of names)
+        emit(name);
+      held.resolve([]);
+      await reading;
+      held = null;
+      return saving();
+    };
+
+    const loaded = await hold(() => store.initialize(), EventName.ReplyCheckpointStarted);
+    const resynced = await hold(() => store.resync(), EventName.ReplyCheckpointStarted);
+    const ended = await hold(() => store.resync(), EventName.ReplyCheckpointStarted, EventName.ReplyCheckpointEnded);
+
+    expect([loaded, resynced, ended]).toEqual([["m2"], ["m2"], []]);
+  });
+
+  it("applies a reply's checkpoint after a read's other events, so an update that lands after the start keeps it and a detail after the start ends it", async () => {
+    let held: DeferredResponse | null = null;
+    let open: readonly Message[] = [];
+    context.answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()));
+    context.answer(MethodName.ApprovalListPending, () => Object.isNull(held) ? [] : held.promise);
+    const started = (): void => context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
+    const hold = async (read: () => Promise<unknown>, during: () => void): Promise<string[]> => {
+      held = new DeferredResponse();
+      const asked = context.count(MethodName.ApprovalListPending);
+      const reading = read();
+      await Wait.until(() => expect(context.count(MethodName.ApprovalListPending)).toBe(asked + 1));
+      during();
+      held.resolve([]);
+      await reading;
+      held = null;
+      return [...store.savingCheckpointReplies()];
+    };
+
+    const updated = await hold(() => store.initialize(), () => {
+      context.emit(EventName.MessageCreated, SampleData.reply.toJson());
+      started();
+      context.emit(EventName.MessageUpdated, SampleData.reply.toJson());
+    });
+    open = [SampleData.reply];
+    const detailed = await hold(() => store.resync(), () => {
+      started();
+      context.emit(EventName.DetailAppended, new DetailEventPayload("m2", SampleData.detail(0, DetailKind.Text, "Hello")).toJson());
+    });
+
+    expect([updated, detailed]).toEqual([["m2"], []]);
+  });
+
   it("loads the catalog and selects a project without opening a conversation", async () => {
     context.answer(MethodName.ApprovalListPending, () => [SampleData.approval.toJson()]);
     context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
