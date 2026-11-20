@@ -189,16 +189,15 @@
     },
     {
       "name": "teamrun.addProvider",
-      "summary": "Adds a provider with a profile folder of its own.",
-      "description": "Adds a provider of the kind, with the label, signed in as its profile folder is, and prints its id, label and kind. A folder given as a relative path is read from the current folder, a leading ~ is the home folder, and a folder that isn't there is refused. Some kinds take one provider at most, and no two providers share a folder.",
+      "summary": "Adds a provider with a new profile folder of its own.",
+      "description": "Adds a provider of the kind, with the label and a new profile folder in TeamRun's data folder, and prints its id, label and kind; it signs in from TeamRun's window. Some kinds take one provider at most.",
       "arguments": [
         { "name": "kind", "description": "The kind of provider, such as codex or claude." },
-        { "name": "label", "description": "The provider's label." },
-        { "name": "profileFolder", "description": "The folder the provider keeps its sign-in and settings in." }
+        { "name": "label", "description": "The provider's label." }
       ],
       "options": [],
       "examples": [
-        { "arguments": "codex Work ~/.codex", "description": "Adds the Codex provider Work, signed in as ~/.codex is." }
+        { "arguments": "codex Work", "description": "Adds the Codex provider Work." }
       ]
     },
     {

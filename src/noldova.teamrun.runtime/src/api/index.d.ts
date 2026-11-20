@@ -2050,6 +2050,54 @@ export declare class MainProcessMethod implements IMethodHandler {
 }
 
 /**
+ * The `teamrun.providerCreate` method, which takes a new provider's profile folder only from the app's main process, since a
+ * provider such as Codex runs hooks and commands its profile folder names: another client may add a provider, which then gets a
+ * folder of its own in TeamRun's data folder, but not name its folder.
+ */
+export declare class ProviderCreateMethod implements IMethodHandler {
+  /**
+   * Initializes the method.
+   * @param method The method that creates the provider.
+   */
+  public constructor(method: IMethodHandler);
+
+  /**
+   * Answers the main process through the method; answers any other client through it too unless its request gives a profile folder.
+   * A payload it can't read goes on to the method, which refuses it.
+   * @param request The request.
+   * @returns The created provider.
+   * @throws MethodFailureException `Unauthorized`, with `Resources.mainProcessOnly` and the details `{ error: "Unauthorized", arguments: [] }`,
+   * for a profile folder from another client, which the method never sees; otherwise whatever the method throws.
+   */
+  public handleAsync(request: RequestContext): Promise<JsonValue>;
+}
+
+/**
+ * The `teamrun.providerUpdate` method, which takes a provider's profile folder and own MCP servers' switch only from the app's main
+ * process, since a provider such as Codex runs hooks and commands its profile folder names: another client may rename a provider, but
+ * not move it to another folder or switch its own servers.
+ */
+export declare class ProviderUpdateMethod implements IMethodHandler {
+  /**
+   * Initializes the method.
+   * @param method The method that updates the provider.
+   * @param providers Finds the stored provider the request names.
+   */
+  public constructor(method: IMethodHandler, providers: Pick<IProvidersService, "findAsync">);
+
+  /**
+   * Answers the main process through the method; answers any other client through it too unless its request names a stored provider
+   * and gives a profile folder that, resolved, differs from the stored one, or an own servers' switch that differs from the stored one.
+   * A payload it can't read goes on to the method, which refuses it.
+   * @param request The request.
+   * @returns The updated provider.
+   * @throws MethodFailureException `Unauthorized`, with `Resources.mainProcessOnly` and the details `{ error: "Unauthorized", arguments: [] }`,
+   * for such a change from another client, which the method never sees, or the failure of reading the stored provider.
+   */
+  public handleAsync(request: RequestContext): Promise<JsonValue>;
+}
+
+/**
  * The chat engine's SQL connection over the module's database.
  * It turns on foreign keys, which the chat engine's schema relies on, and runs its work through a `ModuleDatabaseSession`.
  */
@@ -2396,8 +2444,12 @@ export declare class RuntimePart implements IRuntimePart {
    * finishes the replies a stopped runtime left running, and registers its methods and events, and `TeamRunTools`' tools in
    * Noldova Desktop's tool registry, each running its command-line command in this process. Each teammate's turn opens its own agent
    * session of the registry, which every provider reaches through TeamRun's MCP endpoint.
-   * `teamrun.approvalDecide` answers only the app's main process, through `MainProcessMethod`, and so does `teamrun.providerUpdate` when it
-   * sets `binaryPath`, an empty one included, so only the person names the server a provider runs. It registers `PermissionAnswerer` as the
+   * `teamrun.approvalDecide` answers only the app's main process, through `MainProcessMethod`, and so do
+   * `teamrun.acpLocalCommandAdd`, `teamrun.sharedMcpServerCreate`, `teamrun.sharedMcpServerUpdate`, `teamrun.sharedMcpProviderSet`,
+   * `teamrun.sharedMcpTeammateSet` and `teamrun.sharedMcpSecretSet`, while `teamrun.providerCreate` takes a profile folder only from it,
+   * through `ProviderCreateMethod`, and `teamrun.providerUpdate` takes a changed profile folder or own servers' switch only from it,
+   * through `ProviderUpdateMethod`, and a `binaryPath`, an empty one included, only from it, through `MainProcessMethod`, so only the
+   * person chooses what TeamRun runs. It registers `PermissionAnswerer` as the
    * app's answerer of permission requests, and answers `ComputerUseGrantList` and `ComputerUseGrantRevoke` through
    * `RuntimeRememberedAppGrants`; when Noldova Desktop refuses it, because the app names another permissions module, the part logs
    * `Resources.answererNotRegistered`, answers none and fails those two methods as `UnknownMethod`.
