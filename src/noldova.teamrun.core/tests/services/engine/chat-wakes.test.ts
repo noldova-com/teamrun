@@ -444,6 +444,12 @@ export class ChatWakesTests {
     Assert.areEqual(JSON.stringify([conversation.id, null, "TeamRun", text, "chatWake"]), JSON.stringify([wake!.sender?.conversationId, wake!.sender?.teammateId,
       wake!.sender?.name, wake!.details[0]?.text, (wake!.details[0]?.payload as Record<string, unknown>)["source"]]));
     Assert.areEqual(JSON.stringify([wake!.id, null, MessageStatus.Completed]), JSON.stringify([woken!.inReplyTo, woken!.teammateId, woken!.status]));
+    const [row] = await host.context.database.connection.queryAsync(new SqlQuery("SELECT id FROM chatWakes"));
+    const view = { wakeTask: { kind: "subAgent", name: "Slow", ending: "ended as completed", text: "All 12 pass." } };
+    Assert.areEqual(JSON.stringify({ source: "chatWake", wakeId: row?.readString("id"), wakeSourceMessageId: reply!.id, ...view, wakeReplyId: woken!.id }),
+      JSON.stringify(wake!.details[0]?.payload));
+    Assert.areEqual(JSON.stringify([DetailKind.Note, "Woken when a sub-agent or background command of this chat ended.", { source: "wakeReceived", ...view }]),
+      JSON.stringify([woken!.details[0]?.kind, woken!.details[0]?.text, woken!.details[0]?.payload]));
     Assert.isTrue(host.adapter.requests[3]!.prompt.includes(`From TeamRun: ${text}`), host.adapter.requests[3]!.prompt);
     Assert.areEqual(4, host.adapter.requests.length);
     Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));
@@ -728,6 +734,25 @@ export class ChatWakesTests {
     Assert.areEqual(1, host.log.lines.filter(t => t.startsWith("The chat wake w5 couldn't be read, so it was skipped: ")).length, host.log.lines.join("\n"));
     Assert.areEqual(3, host.adapter.requests.length);
     Assert.areEqual("Delivered,Undeliverable,Undeliverable,Undeliverable,Waiting", await ChatWakesTests.statesAsync(host));
+  }
+
+  @TestMethod
+  public async startsTheTurnOfAReadySubAgentWakeStoredWithoutAViewWithNoViewOrReceivedNote(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const woken = await host.createConversationAsync(project, "Release plan");
+    const asked = await ChatWakesTests.askDefault(host, woken.id);
+    await ChatWakesTests.insertAsync(host, "w1", "SubAgent", woken.id, asked.id, woken.id, ["agent-1"], "Ready", "Your sub-agent \"Search\" (agent-1) ended as completed.", 1);
+
+    await host.engine.reconcileAsync();
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+
+    const [, , wake, reply] = (await ChatWakesTests.chatAsync(host, woken.id));
+    Assert.areEqual(JSON.stringify({ source: "chatWake", wakeId: "w1", wakeSourceMessageId: asked.id }), JSON.stringify(wake?.details[0]?.payload));
+    Assert.areEqual(JSON.stringify([wake?.id, MessageStatus.Completed, false]),
+      JSON.stringify([reply?.inReplyTo, reply?.status, JSON.stringify(reply?.details.map(t => t.payload) ?? null).includes("wakeReceived")]));
+    Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));
   }
 
   @TestMethod
