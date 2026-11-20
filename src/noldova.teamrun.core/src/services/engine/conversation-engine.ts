@@ -811,7 +811,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     this.subAgents.set(child.id, child);
     turn.run.signal.addEventListener(Resources.abortEvent, () => {
       if (turn.run.isCancelled)
-        void child.stopAsync();
+        void this.stopSubAgentAsync(child);
     }, { once: true });
     await child.beginAsync();
     const ahead = isExplorer ? Promise.resolve() : this.writers.get(root) ?? Promise.resolve();
@@ -828,7 +828,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         void this.wakeForSubAgentAsync(turn, child);
       }
     };
-    void done.then(settle, settle);
+    void done.catch((error: unknown) => this.log?.write(Resources.formatSubAgentNotSaved(child.id, Resources.formatFailureKind(error)))).then(settle);
     return child.current;
   }
 
@@ -915,7 +915,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     for (const run of this.state.runs.values())
       run.cancel();
     await this.titles.shutdown();
-    await Promise.all([...this.subAgents.values()].map(t => t.stopAsync()));
+    await Promise.all([...this.subAgents.values()].map(t => this.stopSubAgentAsync(t)));
     await Promise.all([...this.commands.values()].map(t => t.stopAsync()));
     await this.waitForIdle();
   }
@@ -1289,6 +1289,15 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     if (!Object.isUndefined(missing))
       throw new ServiceException(ErrorCode.NotFound, Resources.formatSubAgentNotFound(missing), [missing]);
     return ids.length === 0 ? own : own.filter(t => ids.includes(t.id));
+  }
+
+  private async stopSubAgentAsync(run: SubAgentRun): Promise<void> {
+    try {
+      await run.stopAsync();
+    }
+    catch (error) {
+      this.log?.write(Resources.formatSubAgentNotStopped(run.id, Resources.formatFailureKind(error)));
+    }
   }
 
   private stopCommand(run: CommandRun): Promise<void> {
