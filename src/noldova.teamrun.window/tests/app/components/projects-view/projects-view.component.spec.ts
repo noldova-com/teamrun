@@ -1962,6 +1962,7 @@ describe("ProjectsViewComponent", () => {
     { look: "forced colors", mode: ThemeMode.Light, forcedColors: "active" }
   ])("in $look", ({ mode, forcedColors }) => {
     const space = (step: number): number => AppearanceFixture.measureLook(`space-${step}`);
+    const headerSpace = (): number => AppearanceFixture.measureLook("section-header-space-above");
     const box = (target: Element): DOMRect => target.getBoundingClientRect();
     const closeInset = (): number => AppearanceFixture.measureLook("pill-padding") + (AppearanceFixture.measureLook("icon") - AppearanceFixture.measureLook("tab-action-slot")) / 2;
 
@@ -2081,21 +2082,21 @@ describe("ProjectsViewComponent", () => {
       AppearanceFixture.expectPixels(box(showMore).height, AppearanceFixture.measureLook("tree-row-height"));
     });
 
-    it("sets Projects' top three quarters of a rem under Open folder, and under the pins, as Pinned's top is under Open folder", async () => {
+    it("sets Projects' top a section header's space under Open folder, and under the pins, as Pinned's top is under Open folder", async () => {
       await create();
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
       const openFolder = action(Resources.openProjectLabel);
 
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
-      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(openFolder).bottom, space(3));
+      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(openFolder).bottom, headerSpace());
 
       await choose(conversationRow(second.title), Resources.pinLabel);
 
-      AppearanceFixture.expectPixels(box(header(Resources.pinnedTitle)).top - box(openFolder).bottom, space(3));
-      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(part(element(), ".nol-teamrun-pins")).bottom, space(3));
+      AppearanceFixture.expectPixels(box(header(Resources.pinnedTitle)).top - box(openFolder).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(part(element(), ".nol-teamrun-pins")).bottom, headerSpace());
     });
 
-    it("stands Open folder the rows' gap under New chat at a tree row's height, and Projects and Chats, at a heading's height, three quarters of a rem under the one above", async () => {
+    it("stands Open folder the rows' gap under New chat at a tree row's height, and Projects and Chats, at a heading's height, a section header's space under the one above", async () => {
       conversations = [SampleData.conversation, scratch];
       await create();
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
@@ -2112,8 +2113,8 @@ describe("ProjectsViewComponent", () => {
       for (const row of [projects, chats])
         AppearanceFixture.expectPixels(box(row).height, height);
       AppearanceFixture.expectPixels(box(openFolder).top - box(newChat).bottom, rowGap());
-      AppearanceFixture.expectPixels(box(projects).top - box(openFolder).bottom, space(3));
-      AppearanceFixture.expectPixels(box(chats).top - box(projects).bottom, space(3));
+      AppearanceFixture.expectPixels(box(projects).top - box(openFolder).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(chats).top - box(projects).bottom, headerSpace());
     });
 
     it("draws Open browser as Open folder is drawn, the rows' gap under it, with its glyph and label at Open folder's insets and colours, and Projects a step under it", async () => {
@@ -2129,19 +2130,19 @@ describe("ProjectsViewComponent", () => {
       expect([box(openBrowser).left, box(openBrowser).width]).toEqual([box(openFolder).left, box(openFolder).width]);
       AppearanceFixture.expectPixels(box(openBrowser).height, box(openFolder).height);
       AppearanceFixture.expectPixels(box(openBrowser).top - box(openFolder).bottom, rowGap());
-      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(openBrowser).bottom, space(3));
+      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(openBrowser).bottom, headerSpace());
       expect(inset(openBrowser, ".nol-teamrun-glyph")).toEqual(inset(openFolder, ".nol-teamrun-glyph"));
       expect(inset(openBrowser, ".nol-teamrun-label")[0]).toBe(inset(openFolder, ".nol-teamrun-label")[0]);
       expect(colors(openBrowser)).toEqual(colors(openFolder));
     });
 
-    it("sets Chats three quarters of a rem under the projects, with its rows at the pins' inset and height and their actions at a tab close's inset", async () => {
+    it("sets Chats a section header's space under the projects, with its rows at the pins' inset and height and their actions at a tab close's inset", async () => {
       conversations = [SampleData.conversation, scratch];
       await create();
       const row = conversationRow(scratch.title);
 
       AppearanceFixture.expectPixels(box(find<HTMLElement>("nol-section-header", Resources.chatsTitle)).top - box(part(element(), ".nol-teamrun-project-list")).bottom,
-        space(3));
+        headerSpace());
       AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("tree-row-height"));
       AppearanceFixture.expectPixels(box(part(row, ".nol-teamrun-conversation-title")).left - box(row).left, space(2));
       AppearanceFixture.expectPixels(box(row).right - box(part(row, ".nol-teamrun-row-actions")).right, closeInset());
@@ -2330,7 +2331,7 @@ describe("ProjectsViewComponent", () => {
 
       expect(getComputedStyle(part(projects, ".nol-section-header-caret")).rotate).toBe("-90deg");
       AppearanceFixture.expectPixels(box(projects).height, height);
-      AppearanceFixture.expectPixels(box(header(Resources.chatsTitle)).top - box(projects).bottom, space(3));
+      AppearanceFixture.expectPixels(box(header(Resources.chatsTitle)).top - box(projects).bottom, headerSpace());
     });
 
     it("starts a project's name as typed, with its twistie in the gutter centred on the headings' icons", async () => {

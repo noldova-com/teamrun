@@ -2437,6 +2437,18 @@ describe("ChatStoreService", () => {
     expect(store.pendingApprovals()).toEqual([]);
   });
 
+  it("empties the shown rows of a chat whose index was forgotten once a rewind from elsewhere comes", async () => {
+    await store.initialize();
+    await store.selectConversation("c1");
+    const shown = store.messageIndex().map(t => t.id);
+    store.forgetPosition("c1");
+    const forgotten = store.messageIndex().map(t => t.id);
+
+    context.emit(EventName.ConversationRewound, new ConversationRewoundPayload("c1", 0).toJson());
+
+    expect([shown, forgotten, store.messageIndex()]).toEqual([["m1", "m2"], ["m1", "m2"], []]);
+  });
+
   it("offers the person's rewound message back, its text and files, and nothing for a failure, a reply or a rewind from elsewhere", async () => {
     const file = new MessageAttachment("notes.txt", "text/plain", 1, "D:/data/attachments/c1/notes.txt");
     const asked = new Message("m1", "c1", 0, MessageAuthor.User, null, MessageStatus.Completed,
@@ -4196,6 +4208,21 @@ describe("ChatStoreService", () => {
       context.emit(EventName.StateResyncRequested, null);
       await Wait.until(() => expect(store.waitingOf("c1")).toEqual([]));
       expect(context.count(MethodName.WaitingMessageList)).toBe(lists + 1);
+    });
+
+    it("keeps the list a change gives while the chat's read is pending over the older list the read answers", async () => {
+      const read = new DeferredResponse();
+      await store.initialize();
+      const lists = context.count(MethodName.WaitingMessageList);
+      context.answer(MethodName.WaitingMessageList, () => read.promise);
+      const opening = store.selectConversation("c1");
+      await Wait.until(() => expect(context.count(MethodName.WaitingMessageList)).toBe(lists + 1));
+
+      context.emit(EventName.WaitingMessagesChanged, listed());
+      read.resolve(listed(waiting("w1", "First")));
+      await opening;
+
+      expect(store.waitingOf("c1")).toEqual([]);
     });
 
     it("adds one with the send it would make and how it goes, says why when it can't, and clears that once one is added", async () => {

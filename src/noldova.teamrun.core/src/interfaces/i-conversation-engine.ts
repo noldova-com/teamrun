@@ -71,7 +71,7 @@ export interface IConversationEngine {
   decideAsync(params: ApprovalDecideParams): Promise<Approval>;
   rewindAsync(params: ConversationRewindParams): Promise<ConversationRewindResult>;
   releaseFolderAsync(conversationId: string): Promise<void>;
-  sweepFoldersAsync(): Promise<void>;
+  sweepFoldersAsync(signal: AbortSignal): Promise<void>;
   listMcpToolsAsync(params: McpToolListParams, signal?: AbortSignal): Promise<readonly JsonObject[]>;
   callMcpToolAsync(params: McpToolCallParams, signal?: AbortSignal): Promise<JsonObject>;
   startSubAgentAsync(params: SubAgentStartParams): Promise<SubAgent>;

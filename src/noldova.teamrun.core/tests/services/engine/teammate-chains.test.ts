@@ -7,6 +7,7 @@
  */
 
 import "@noldova/context.core";
+import type { SqlTransaction } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { ApprovalAsk, Resources, SignInCheck, TurnOutcome } from "@noldova/teamrun.core";
@@ -443,6 +444,60 @@ export class TeammateChainsTests {
     await host.engine.sendAsync(new MessageSendParams(conversation.id, "after", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
     await host.engine.waitForIdle();
     Assert.areEqual(3, host.adapter.requests.length);
+  }
+
+  @TestMethod
+  public async cancelsAndListsTheRepliesAHandOffStoresWhenStopLandsDuringItsTransaction(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const [alice, bob] = await TeammateChainsTests.teamAsync(host, "Alice", "Bob");
+    host.adapter.turnTexts = [["@Bob please review"], ["Bob working"]];
+    const stops: Promise<readonly Message[]>[] = [];
+    const insert = host.messages.insertAsync.bind(host.messages);
+    host.messages.insertAsync = (message: Message, transaction?: SqlTransaction): Promise<void> => {
+      if (message.teammateId === bob!.id && stops.length === 0)
+        stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id)));
+      return insert(message, transaction);
+    };
+
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice go", null, null, [], [alice!.id]));
+    await host.until("the hand-off's Stop", () => stops.length === 1, host.runs());
+    const stopped = await stops[0]!;
+    await host.engine.waitForIdle();
+
+    const [, aliceReply, bobReply] = await TeammateChainsTests.chatAsync(host, conversation.id);
+    Assert.areEqual(1, host.adapter.requests.length);
+    Assert.areEqual(MessageStatus.Completed, aliceReply!.status);
+    Assert.areEqual(bob!.id, bobReply!.teammateId);
+    Assert.areEqual(MessageStatus.Cancelled, bobReply!.status);
+    Assert.isNull(bobReply!.startedAt);
+    Assert.areEqual(bobReply!.id, stopped.map(t => t.id).join(","));
+    Assert.areEqual(0, host.engine.activeRunCount);
+  }
+
+  @TestMethod
+  public async listsAReplyAHandOffStoresOnlyInTheFirstOfTwoStopsThatLandDuringItsTransaction(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const [alice, bob] = await TeammateChainsTests.teamAsync(host, "Alice", "Bob");
+    host.adapter.turnTexts = [["@Bob please review"], ["Bob working"]];
+    const stops: Promise<readonly Message[]>[] = [];
+    const insert = host.messages.insertAsync.bind(host.messages);
+    host.messages.insertAsync = (message: Message, transaction?: SqlTransaction): Promise<void> => {
+      if (message.teammateId === bob!.id && stops.length === 0)
+        stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id)),
+          host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id)));
+      return insert(message, transaction);
+    };
+
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice go", null, null, [], [alice!.id]));
+    await host.until("the hand-off's Stops", () => stops.length === 2, host.runs());
+    const [first, second] = await Promise.all(stops);
+    await host.engine.waitForIdle();
+
+    const [, , bobReply] = await TeammateChainsTests.chatAsync(host, conversation.id);
+    Assert.areEqual(MessageStatus.Cancelled, bobReply!.status);
+    Assert.areEqual(`${bobReply!.id}|`, `${first!.map(t => t.id).join(",")}|${second!.map(t => t.id).join(",")}`);
   }
 
   @TestMethod

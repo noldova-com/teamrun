@@ -163,6 +163,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   private readonly writers: Map<string, Promise<void>> = new Map();
   private readonly replyHops: Map<string, Map<string, number>> = new Map();
   private readonly stopping: Map<ReplyWork, Promise<void>> = new Map();
+  private readonly listedByStop: WeakSet<ReplyWork> = new WeakSet();
   private readonly wakes: ChatWakes;
   private readonly context: DatabaseContext;
   private readonly projects: IProjectsService;
@@ -518,8 +519,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         this.completions.delete(message.id);
         this.titles.end(message.conversationId);
         this.context.projectActivity.leave(projectLease);
-        await this.permissions.sendAnswersAsync(message.conversationId);
-        await this.waitingSends.sendWaitingAsync(message.conversationId);
+        await this.sendQueuedAsync(message.conversationId);
         await this.settleWakesAsync(message.conversationId, pending);
       });
       void execution.then(() => completion.resolve(), error => completion.reject(error));
@@ -547,7 +547,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         this.context.projectActivity.leave(projectLease);
         completion.resolve();
         if (!Object.isNull(chatId)) {
-          await this.waitingSends.sendWaitingAsync(chatId);
+          await this.sendQueuedAsync(chatId);
           await this.settleWakesAsync(chatId, work);
         }
       }
@@ -630,8 +630,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return this.keptSessions.releaseFolderAsync(conversationId);
   }
 
-  public sweepFoldersAsync(): Promise<void> {
-    return this.keptSessions.sweepFoldersAsync();
+  public sweepFoldersAsync(signal: AbortSignal): Promise<void> {
+    return this.keptSessions.sweepFoldersAsync(signal);
   }
 
   private async attachmentOfAsync(params: AttachmentReadParams, draft: Draft | null): Promise<MessageAttachment> {
@@ -696,9 +696,13 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       throw new ServiceException(ErrorCode.Conflict, Resources.formatNoReplyInProgress(params.conversationId), [params.conversationId]);
 
     const open = group.filter(t => !t.isEnded && !t.run.isCancelled);
+    const known = new Set(group);
     await Promise.all(group.map(t => this.stopAsync(t)));
     await completion;
-    return (await Promise.all(open.map(t => this.requireMessageAsync(t.message.id)))).filter(t => t.status === MessageStatus.Cancelled);
+    const listed = [...open, ...group.filter(t => !known.has(t))].filter(t => !this.listedByStop.has(t));
+    for (const item of listed)
+      this.listedByStop.add(item);
+    return (await Promise.all(listed.map(t => this.requireMessageAsync(t.message.id)))).filter(t => t.status === MessageStatus.Cancelled);
   }
 
   public async setResponderAsync(params: ConversationResponderParams): Promise<Conversation> {
@@ -1194,6 +1198,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     for (const next of pending) {
       work.push(next);
       this.state.runs.set(next.message.id, next.run);
+      if (item.run.isCancelled)
+        next.run.cancel();
     }
     this.events.publish(new Event(EventName.MessageUpdated, stored.toJson()));
     for (const next of pending)
@@ -1230,13 +1236,21 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   }
 
   private async resumeSendingAsync(chatId: string): Promise<void> {
+    await this.sendQueuedAsync(chatId);
+    await this.settleSafelyAsync(chatId, () => this.sendWakesAsync(chatId));
+  }
+
+  private async sendQueuedAsync(chatId: string): Promise<void> {
     await this.permissions.sendAnswersAsync(chatId).catch((error: unknown) => {
       this.log?.write(Resources.formatQuestionReplyNotSent(chatId, Resources.formatFailureKind(error)));
     });
+    await this.sendWaitingSafelyAsync(chatId);
+  }
+
+  private async sendWaitingSafelyAsync(chatId: string): Promise<void> {
     await this.waitingSends.sendWaitingAsync(chatId).catch((error: unknown) => {
       this.log?.write(Resources.formatWaitingMessageNotSent(chatId, Resources.formatFailureKind(error)));
     });
-    await this.settleSafelyAsync(chatId, () => this.sendWakesAsync(chatId));
   }
 
   private findGroup(conversationId: string): ReplyWork[] | null {
@@ -1837,8 +1851,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       this.state.groups.delete(key);
       this.completions.delete(key);
       this.context.projectActivity.leave(lease);
-      await this.permissions.sendAnswersAsync(conversationId);
-      await this.waitingSends.sendWaitingAsync(conversationId);
+      await this.sendQueuedAsync(conversationId);
       await this.settleWakesAsync(conversationId, work);
     });
     this.completions.set(key, execution);

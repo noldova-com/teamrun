@@ -379,6 +379,7 @@ export class Resources {
   public static readonly saveWaitingLabel: string = "Save the waiting message";
   public static readonly cancelEditingLabel: string = "Cancel";
   public static readonly editingWaitingNote: string = "Editing a waiting message. Its files stay as they are.";
+  public static readonly editingFilesRefused: string = "Files can't be added to a waiting message. Send them in a new message once the edit is saved.";
   public static readonly deliveryGlyphs: Readonly<Record<MessageDelivery, string>> = {
     [MessageDelivery.Steer]: "subdirectory_arrow_right",
     [MessageDelivery.Queue]: "queue",

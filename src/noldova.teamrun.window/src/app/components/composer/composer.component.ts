@@ -204,6 +204,7 @@ export class ComposerComponent {
   protected readonly text: Signal<string> = computed(() => MentionValue.parse(this.value()).text);
   protected readonly attachments: WritableSignal<readonly ComposerAttachment[]> = signal([]);
   protected readonly attachmentError: WritableSignal<string | null> = signal(null);
+  protected readonly filesRefused: WritableSignal<boolean> = signal(false);
   protected readonly signOutNote: WritableSignal<string | null> = signal(null);
   protected readonly signOutFailure: WritableSignal<string | null> = signal(null);
   protected readonly preparing: WritableSignal<boolean> = signal(false);
@@ -726,6 +727,7 @@ export class ComposerComponent {
   }
 
   protected editWaiting(waiting: WaitingMessage): void {
+    this.filesRefused.set(false);
     this.editingSignal.set(waiting);
     this.value.set(waiting.message.text);
     this.box().nativeElement.focus();
@@ -807,7 +809,7 @@ export class ComposerComponent {
     if (!this.canCompose() || !Array.from(event.dataTransfer?.types ?? []).includes(Resources.filesTransferType))
       return;
     event.preventDefault();
-    this.dropping.set(true);
+    this.dropping.set(this.editingSignal() === null);
   }
 
   protected dragLeave(): void {
@@ -1030,6 +1032,10 @@ export class ComposerComponent {
   private addFiles(files: readonly File[]): void {
     if (!this.canCompose())
       return;
+    if (!Object.isNull(this.editing())) {
+      this.filesRefused.set(true);
+      return;
+    }
     const existing = this.attachments();
     if (existing.length + files.length > ProtocolResources.maximumAttachments
       || files.some(t => t.size > ProtocolResources.maximumAttachmentBytes
@@ -1131,6 +1137,7 @@ export class ComposerComponent {
 
   private show(conversationId: string, draft: Draft | null): void {
     this.shownConversationId = conversationId;
+    this.editingSignal.set(null);
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(draft?.text ?? String.empty);
@@ -1157,6 +1164,7 @@ export class ComposerComponent {
   }
 
   private take(offer: RewoundDraft): void {
+    this.editingSignal.set(null);
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(offer.text);
@@ -1243,10 +1251,12 @@ export class ComposerComponent {
         }
         else if (conversationId === this.conversationId() && !settings.equals(this.currentSettings()))
           this.choices.remember(conversationId, this.currentSettings()!);
-        this.value.set(String.empty);
         for (const attachment of drafted)
           attachment.dispose();
-        this.attachments.set([]);
+        if (conversationId === this.shownConversationId) {
+          this.value.set(String.empty);
+          this.attachments.set([]);
+        }
         void this.drafts.discard(conversationId, arrivals);
       }
     }
@@ -1263,13 +1273,26 @@ export class ComposerComponent {
   private deliver(text: string, settings: ComposerSettings, conversationId: string, attachments: readonly AttachmentInput[],
     mentioned: readonly string[], delivery: MessageDelivery | null): Promise<boolean> {
     const editing = this.editing();
-    if (!Object.isNull(editing)) {
-      this.editingSignal.set(null);
-      return this.store.editWaiting(editing, text, editing.message.attachments);
-    }
+    if (!Object.isNull(editing))
+      return this.saveEdit(editing, text, conversationId);
     if (Object.isNull(this.runningReply()))
       return this.store.send(text, settings, conversationId, attachments, mentioned, this.activeResponderId());
     return this.store.addWaiting(text, settings, conversationId, delivery ?? this.store.whileReplying(), attachments, mentioned, this.activeResponderId());
+  }
+
+  private async saveEdit(editing: WaitingMessage, text: string, conversationId: string): Promise<boolean> {
+    const saved = await this.store.editWaiting(editing, text, editing.message.attachments);
+    if (saved && this.editingSignal() === editing)
+      this.editingSignal.set(null);
+    if (!saved && conversationId !== this.conversationId())
+      this.keepHiddenDraft(new ComposerDraft(conversationId, text, []));
+    return saved;
+  }
+
+  private keepHiddenDraft(draft: ComposerDraft): void {
+    void this.drafts.flush();
+    this.drafts.schedule(draft);
+    void this.drafts.flush();
   }
 
   private signOutProviderOf(): string | null | undefined {

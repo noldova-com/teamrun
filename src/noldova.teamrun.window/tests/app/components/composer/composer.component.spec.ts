@@ -2933,6 +2933,162 @@ describe("ComposerComponent", () => {
       expect([context.count(MethodName.ConversationCancel), document.activeElement === box()]).toEqual([1, true]);
     });
 
+    it("refuses a file pasted during an edit with a note, keeps Add files off, and saves the edit with the message's own files", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      const add = present(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-add"));
+      const paste = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+
+      box().dispatchEvent(paste);
+      await fixture.whenStable();
+      const note = present(root().querySelector(".nol-teamrun-composer-files-refused"));
+      const row = present(root().querySelector(".nol-teamrun-composer-editing")).getBoundingClientRect();
+      const message = note.getBoundingClientRect();
+      const field = box().getBoundingClientRect();
+      const refused = [add.disabled, note.textContent?.trim()];
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["a"], "notes.txt", { type: "text/plain" }));
+      const over = new DragEvent("dragover", { dataTransfer: transfer, bubbles: true, cancelable: true });
+      present(root().querySelector("form")).dispatchEvent(over);
+      await fixture.whenStable();
+      const highlighted = root().querySelector(".nol-teamrun-composer-card")?.classList.contains("nol-teamrun-composer-dropping");
+      await write("first, changed");
+
+      expect([message.top >= row.bottom, message.bottom <= field.top]).toEqual([true, true]);
+      expect([...refused, rows().length, paste.defaultPrevented]).toEqual([true, Resources.editingFilesRefused, 0, true]);
+      expect([over.defaultPrevented, highlighted]).toEqual([true, false]);
+      expect([edited(), added()]).toEqual([["w1:first, changed:0"], []]);
+    });
+
+    describe.each([
+      { look: "the fixture theme", theme: FixtureTheme.theme, mode: ThemeMode.Light },
+      { look: "the fixture theme", theme: FixtureTheme.theme, mode: ThemeMode.Dark },
+      { look: "the default theme", theme: DefaultTheme.theme, mode: ThemeMode.Light },
+      { look: "the default theme", theme: DefaultTheme.theme, mode: ThemeMode.Dark }
+    ])("in $look's $mode mode", ({ theme, mode }) => {
+      beforeEach(() => AppearanceFixture.apply(theme, mode));
+
+      afterEach(() => AppearanceFixture.reset());
+
+      it("starts a file refusal's text where the edit note's text starts", async () => {
+        await running();
+        await listed(waiting("w1", "first"));
+        await key("ArrowUp");
+        const paste = new Event("paste", { bubbles: true, cancelable: true });
+        Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+
+        box().dispatchEvent(paste);
+        await fixture.whenStable();
+        const textStart = (element: Element): number => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          return range.getBoundingClientRect().left;
+        };
+        const note = present(root().querySelector(".nol-teamrun-composer-files-refused"));
+        const editing = present(root().querySelector(".nol-teamrun-composer-editing .nol-teamrun-composer-note"));
+
+        AppearanceFixture.expectPixels(textStart(note), textStart(editing));
+      });
+    });
+
+    it("clears a file refusal when the next edit starts", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      const paste = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+      box().dispatchEvent(paste);
+      await fixture.whenStable();
+      const refused = root().querySelector(".nol-teamrun-composer-files-refused") !== null;
+
+      await click(present(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-cancel-edit")));
+      await key("ArrowUp");
+
+      expect([refused, editingNote(), root().querySelector(".nol-teamrun-composer-files-refused")]).toEqual([true, Resources.editingWaitingNote, null]);
+    });
+
+    it("keeps the other chat's text and files when an edit's save answers after a switch to it", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      const saving = new DeferredResponse();
+      const other = new MessageAttachment("other.txt", "text/plain", 1, "D:/data/attachments/drafts/c2/other.txt");
+      context.answer(MethodName.WaitingMessageEdit, () => saving.promise)
+        .answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c2"
+          ? new Draft("c2", "for the other chat", [other], [], 2, SampleData.timestamp).toJson() : null);
+      await key("ArrowUp");
+      await write("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect([box().value, fileNames()]).toEqual(["for the other chat", ["other.txt"]]));
+      const kept = context.keptDocuments.length;
+      saving.resolve(null);
+      await Wait.until(() => expect(context.keptDocuments).toHaveLength(kept + 1));
+      await fixture.whenStable();
+
+      expect([edited(), editingNote(), box().value, fileNames()]).toEqual([["w1:first, changed:0"], undefined, "for the other chat", ["other.txt"]]);
+    });
+
+    it("keeps an edit's text as its chat's unsent message when its save fails after a switch to another chat", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      const saving = new DeferredResponse();
+      context.answer(MethodName.WaitingMessageEdit, () => saving.promise);
+      const saves = (): string[][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftSave))
+        .map(t => DraftSaveParams.fromJson(t.parameters)).map(t => [t.chatId, t.text]);
+      await key("ArrowUp");
+      await write("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect(editingNote()).toBeUndefined());
+      saving.reject(new Error("Disconnected"));
+      await Wait.until(() => expect(saves()).toEqual([["c1", "first, changed"]]));
+
+      expect([edited(), box().value]).toEqual([["w1:first, changed:0"], ""]);
+    });
+
+    it("keeps an edit's text as its chat's unsent message when its save fails while the next chat's unsent message is still being read", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      const saving = new DeferredResponse();
+      const reading = new DeferredResponse();
+      context.answer(MethodName.WaitingMessageEdit, () => saving.promise)
+        .answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c2" ? reading.promise : null);
+      const reads = (): number => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftRead)
+        && ConversationIdParams.fromJson(t.parameters).conversationId === "c2").length;
+      const saves = (): string[][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftSave))
+        .map(t => DraftSaveParams.fromJson(t.parameters)).map(t => [t.chatId, t.text]);
+      await key("ArrowUp");
+      await write("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect(reads()).toBe(1));
+      saving.reject(new Error("Disconnected"));
+      await Wait.until(() => expect(saves()).toEqual([["c1", "first, changed"]]));
+      reading.resolve(null);
+      await Wait.until(() => expect(box().value).toBe(""));
+
+      expect([edited(), editingNote()]).toEqual([["w1:first, changed:0"], undefined]);
+    });
+
+    it("keeps an edit open when its save fails, so the next Enter tries the edit again and sends no new message", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      context.fail(MethodName.WaitingMessageEdit, "Disconnected");
+      await key("ArrowUp");
+
+      await write("first, changed");
+      await Wait.until(() => expect(context.noticeText()).not.toBeNull());
+      const failed = [editingNote(), box().value];
+      context.answer(MethodName.WaitingMessageEdit, () => null);
+      await key("Enter");
+
+      expect(failed).toEqual([Resources.editingWaitingNote, "first, changed"]);
+      await Wait.until(() => expect(editingNote()).toBeUndefined());
+      expect([edited(), added(), box().value]).toEqual([["w1:first, changed:0", "w1:first, changed:0"], [], ""]);
+    });
+
     it("ends editing once its message no longer waits, and keeps the text to send as a new message", async () => {
       await running();
       await listed(waiting("w1", "first"));
@@ -2944,6 +3100,67 @@ describe("ComposerComponent", () => {
       expect([editingNote(), box().value, main().getAttribute("aria-label")]).toEqual([undefined, "first, changed", Resources.deliveryLabels[MessageDelivery.Steer]]);
       await key("Enter");
       expect([edited(), added()]).toEqual([[], ["Steer:c1:first, changed"]]);
+    });
+
+    it("ends an edit when the composer shows another chat, so a message typed back in its chat goes as a new one and the waiting one keeps its text", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      await type("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect(box().value).toBe(""));
+      fixture.componentRef.setInput("conversationId", "c1");
+      await fixture.whenStable();
+      const back = [editingNote(), box().value];
+      await write("then the docs");
+
+      expect(back).toEqual([undefined, ""]);
+      expect([edited(), added()]).toEqual([[], ["Steer:c1:then the docs"]]);
+    });
+
+    it("ends an edit when a draft save refused as stale shows the other window's draft, and leaves the waiting message's text as it was", async () => {
+      const held = new DeferredResponse();
+      await running();
+      await listed(waiting("w1", "first"));
+      context.answer(MethodName.DraftSave, () => held.promise.then(() => {
+        throw Object.assign(new Error("The draft changed."), { code: ErrorCode.Conflict, details: { error: ErrorCode.Conflict, arguments: ["c1"] } });
+      })).answer(MethodName.DraftRead, () => new Draft("c1", "from the other window", [], [], 4, SampleData.timestamp).toJson());
+      await type("an aside");
+      const saving = [...context.saves].at(-1)?.();
+      await Wait.until(() => expect(context.count(MethodName.DraftSave)).toBe(1));
+      await type("");
+      await key("ArrowUp");
+      await type("first, changed");
+      const edit = editingNote();
+
+      held.resolve(null);
+      await saving;
+      await Wait.until(() => expect(box().value).toBe("from the other window"));
+      await key("Enter");
+
+      expect([edit, editingNote(), edited()]).toEqual([Resources.editingWaitingNote, undefined, []]);
+      expect(added()).toEqual(["Steer:c1:from the other window"]);
+    });
+
+    it("ends an edit when the composer takes a rewound message, so Enter sends the rewound text as a new message", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      context.answer(MethodName.ConversationRewind, () => new ConversationRewindResult(SampleData.conversation, [], null).toJson());
+      await key("ArrowUp");
+      await type("first, changed");
+
+      await ChatStoreService.of(context).rewind(SampleData.userMessage, false);
+      await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
+      document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
+      await fixture.whenStable();
+      const rewound = box().value;
+      const taken = editingNote();
+      await key("Enter");
+
+      expect([taken, rewound === "first, changed", rewound.length > 0]).toEqual([undefined, false, true]);
+      expect(edited()).toEqual([]);
+      expect([...added().map(t => t.split(":").slice(2).join(":")), ...sent().slice(1).map(t => t.text)]).toEqual([rewound]);
     });
 
     it("keeps the text of an edit out of the chat's unsent message, saving nothing for it on a save, after Escape or as the tab closes", async () => {

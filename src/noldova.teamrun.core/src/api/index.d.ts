@@ -2187,11 +2187,11 @@ export interface IConversationEngine {
    * Cancels every open reply of the conversation's active send: the working reply stops and the
    * waiting ones are cancelled before they start.
    * @param params The conversation.
-   * @returns The replies this cancel stopped, after the send has settled: those still open when it
-   * started, a hand-off's among them, that ended cancelled. A reply that had already ended, that a
-   * Stop is still ending, its own or an earlier chat Stop, or that completed before the stop reached
-   * it, is left out; so of two chat Stops that overlap, such as the window's and `teamrun cancel`, the
-   * second answers with none of the replies the first is ending.
+   * @returns After the send has settled, the replies still open when this Stop began, or that joined the send after it began, such as
+   * a hand-off's or another chat's teammate's, that ended cancelled and that no Stop which settled earlier has listed. A reply that
+   * had already ended, that an earlier Stop is still ending, or that completed before the Stop reached it is left out, so each
+   * reply is listed by one Stop at most; of two chat Stops that overlap, such as the window's and `teamrun cancel`, the second
+   * answers with none of the replies the first is ending.
    * @throws ServiceException named `ErrorCode.Conflict` when the conversation has no active send.
    */
   cancelConversationAsync(params: ConversationIdParams): Promise<readonly Message[]>;
@@ -2312,9 +2312,10 @@ export interface IConversationEngine {
 
   /**
    * Releases, as `releaseFolderAsync` does, every own folder in the data folder whose conversation is gone or now has a project; the
-   * runtime runs it at its start. Never rejects.
+   * runtime runs it at its start. It releases no further folder once the signal aborts. Never rejects.
+   * @param signal Aborts when the sweep should stop, such as when the runtime part deactivates.
    */
-  sweepFoldersAsync(): Promise<void>;
+  sweepFoldersAsync(signal: AbortSignal): Promise<void>;
 
   /**
    * Lists the tools of a running turn, for TeamRun's MCP endpoint: a provider session's token reaches only the turn it was issued for.
@@ -8569,10 +8570,11 @@ export declare class ReplyCheckpoints {
   /**
    * Deletes all of the work folder's checkpoints.
    * @param folder The work folder.
+   * @param signal Ends the delete when it aborts, as the checkpoints module's `DeleteFolder` does.
    * @returns Whether they are deleted; `false` while an interrupted restore of the folder holds them up.
-   * @throws {Error} When the system refuses to move the folder's store aside.
+   * @throws {Error} When the system refuses to move the folder's store aside, or the signal aborts the delete.
    */
-  public deleteAsync(folder: WorkFolder): Promise<boolean>;
+  public deleteAsync(folder: WorkFolder, signal?: AbortSignal): Promise<boolean>;
 }
 
 /**
@@ -9332,7 +9334,7 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * See {@link IConversationEngine.sweepFoldersAsync}.
    */
-  public sweepFoldersAsync(): Promise<void>;
+  public sweepFoldersAsync(signal: AbortSignal): Promise<void>;
 
   /**
    * See {@link IConversationEngine.listMcpToolsAsync}.
@@ -10206,11 +10208,12 @@ export interface ISharedMcpAccounts {
  */
 export interface ISharedMcpSignIn {
   /**
-   * Starts a sign-in in the browser and returns the address to open; `finished` is called once, when the sign-in ends, fails or times out.
+   * Starts a sign-in in the browser and returns the address to open, or `null` when a Sign out or a later start of the same reference ended it before it
+   * had one; `finished` is called once, when the sign-in ends, fails or times out, and never for one that ended without an answer.
    * @param url The server's address, where discovery starts from its refusal.
    * @param reference Where the tokens are saved.
    */
-  startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string>;
+  startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null>;
   /**
    * Reads the access token, refreshed first when it expires soon; refused when there is none or the refresh fails.
    * @throws Error with the store's reason when it can't read the tokens.
