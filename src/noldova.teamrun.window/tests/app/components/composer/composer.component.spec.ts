@@ -2940,6 +2940,30 @@ describe("ComposerComponent", () => {
       expect([edited(), added()]).toEqual([[], ["Steer:c1:then the docs"]]);
     });
 
+    it("ends an edit when a draft save refused as stale shows the other window's draft, and leaves the waiting message's text as it was", async () => {
+      const held = new DeferredResponse();
+      await running();
+      await listed(waiting("w1", "first"));
+      context.answer(MethodName.DraftSave, () => held.promise.then(() => {
+        throw Object.assign(new Error("The draft changed."), { code: ErrorCode.Conflict, details: { error: ErrorCode.Conflict, arguments: ["c1"] } });
+      })).answer(MethodName.DraftRead, () => new Draft("c1", "from the other window", [], [], 4, SampleData.timestamp).toJson());
+      await type("an aside");
+      const saving = [...context.saves].at(-1)?.();
+      await Wait.until(() => expect(context.count(MethodName.DraftSave)).toBe(1));
+      await type("");
+      await key("ArrowUp");
+      await type("first, changed");
+      const edit = editingNote();
+
+      held.resolve(null);
+      await saving;
+      await Wait.until(() => expect(box().value).toBe("from the other window"));
+      await key("Enter");
+
+      expect([edit, editingNote(), edited()]).toEqual([Resources.editingWaitingNote, undefined, []]);
+      expect(added()).toEqual(["Steer:c1:from the other window"]);
+    });
+
     it("ends an edit when the composer takes a rewound message, so Enter sends the rewound text as a new message", async () => {
       await running();
       await listed(waiting("w1", "first"));
