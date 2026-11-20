@@ -22,6 +22,12 @@ export class SharedMcpSignInStartedTests {
   }
 
   @TestMethod
+  public carriesNoAddressForASignInEndedBeforeItHadOne(): void {
+    Assert.areEqual(JSON.stringify({ url: null }), JSON.stringify(SharedMcpSignInStarted.fromJson({ url: null }).toJson()));
+    Assert.isNull(new SharedMcpSignInStarted(null).url);
+  }
+
+  @TestMethod
   public refusesAnAddressThatIsntHttpOrHttps(): void {
     for (const url of ["not an address", "file:///etc/passwd", "javascript:alert(1)"])
       Assert.areEqual("url", Assert.throws(() => new SharedMcpSignInStarted(url), ArgumentException).parameterName, url);

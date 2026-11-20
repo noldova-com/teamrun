@@ -1578,7 +1578,8 @@ export class ChatStoreService {
   public async startSharedMcpSignIn(serverId: string, gesture: LinkGesture, report: (message: string) => void): Promise<boolean> {
     return this.perform(async () => {
       const started = SharedMcpSignInStarted.fromJson(await this.request(MethodName.SharedMcpSignInStart, new SharedMcpServerIdParams(serverId).toJson()));
-      await this.context.openLinkAsync(started.url, { gesture, place: LinkPlace.System });
+      if (!Object.isNull(started.url))
+        await this.context.openLinkAsync(started.url, { gesture, place: LinkPlace.System });
     }, report);
   }
 
