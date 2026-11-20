@@ -114,11 +114,13 @@ export class DraftsService implements IDraftsService {
 
   public async sweepAsync(): Promise<void> {
     for (const conversationId of this.attachments.listDraftFolders())
-      await this.context.database.connection.runInTransactionAsync(async transaction => {
-        const held = await this.heldFilesAsync(conversationId, transaction);
-        if (!Object.isNull(held))
-          this.removeFilesExcept(conversationId, held);
-      });
+      try {
+        await this.context.database.connection.runInTransactionAsync(async transaction =>
+          this.removeFilesExcept(conversationId, (await this.findAsync(conversationId, transaction))?.attachments ?? []));
+      }
+      catch (error) {
+        this.log.write(Resources.formatDraftNotRead(conversationId, Resources.formatFailureReason(error)));
+      }
     try {
       const files = this.attachments.listSent();
       const named = new Set((await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectAttachmentPaths)))
@@ -138,16 +140,6 @@ export class DraftsService implements IDraftsService {
     catch (error) {
       this.log.write(Resources.formatDraftFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
       return false;
-    }
-  }
-
-  private async heldFilesAsync(conversationId: string, transaction: SqlTransaction): Promise<readonly MessageAttachment[] | null> {
-    try {
-      return (await this.findAsync(conversationId, transaction))?.attachments ?? [];
-    }
-    catch (error) {
-      this.log.write(Resources.formatDraftNotRead(conversationId, Resources.formatFailureReason(error)));
-      return null;
     }
   }
 
