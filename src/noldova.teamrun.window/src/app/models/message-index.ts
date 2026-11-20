@@ -9,6 +9,7 @@
 import "@noldova/context.core";
 import type { Message, MessagePage } from "@noldova/teamrun.protocol";
 
+import type { MessageControlState } from "./message-control-state";
 import { MessageIndexEntry } from "./message-index-entry";
 
 export class MessageIndex {
@@ -35,7 +36,7 @@ export class MessageIndex {
     if (Object.isUndefined(first) || Object.isUndefined(last)
       || (!Object.isUndefined(start) && last + 1 < start) || (!Object.isUndefined(end) && first > end + 1)) {
       for (const entry of this.byId.values())
-        if (!Object.isNull(entry.controls))
+        if (entry.controls?.hasChanges ?? false)
           this.kept.set(entry.id, entry);
       this.byId.clear();
     }
@@ -57,6 +58,12 @@ export class MessageIndex {
       return;
     this.add(message);
     this.publish();
+  }
+
+  public keep(message: Message, controls: MessageControlState): void {
+    const entry = new MessageIndexEntry(message.id, message.sequence);
+    entry.controls = controls;
+    this.kept.set(message.id, entry);
   }
 
   public removeFrom(sequence: number): void {

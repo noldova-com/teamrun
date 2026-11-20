@@ -14,6 +14,11 @@ import { MessageIndex } from "../../../src/app/models/message-index";
 import { SampleData } from "../../fixtures/sample-data.fixture";
 
 describe("MessageIndex", () => {
+  const changed = (): MessageControlState => {
+    const controls = new MessageControlState();
+    controls.wrappingFor(0).add(1);
+    return controls;
+  };
   const message = (sequence: number): Message => new Message(`m${sequence}`, "c1", sequence, MessageAuthor.User, null,
     MessageStatus.Completed, [], null, SampleData.timestamp, null, SampleData.timestamp);
 
@@ -58,9 +63,11 @@ describe("MessageIndex", () => {
     const index = new MessageIndex();
     index.rememberPage(SampleData.page([message(10), message(11)], true, true));
     const kept = index.find("m10");
-    if (Object.isNull(kept))
+    const unchanged = index.find("m11");
+    if (Object.isNull(kept) || Object.isNull(unchanged))
       throw new Error("Missing index entry");
-    kept.controls = new MessageControlState();
+    kept.controls = changed();
+    unchanged.controls = new MessageControlState();
     index.rememberPage(SampleData.page([message(100), message(101)], true, true));
     expect(index.entries.map(t => t.sequence)).toEqual([100, 101]);
     expect(index.find("m10")).toBe(kept);
@@ -80,7 +87,7 @@ describe("MessageIndex", () => {
       const entry = index.find(`m${sequence}`);
       if (Object.isNull(entry))
         throw new Error("Missing index entry");
-      entry.controls = new MessageControlState();
+      entry.controls = changed();
       index.rememberPage(SampleData.page([message(500)], true, true));
     };
     keepFar(10);
@@ -98,5 +105,18 @@ describe("MessageIndex", () => {
     keepFar(50);
     index.rememberPage(SampleData.page([], false, false));
     expect(index.find("m50")).toBeNull();
+  });
+
+  it("keeps controls for a message it holds no entry for and hands the entry back with the message's page", () => {
+    const index = new MessageIndex();
+    const controls = changed();
+    index.rememberPage(SampleData.page([message(100), message(101)], true, true));
+
+    index.keep(message(10), controls);
+
+    expect([index.find("m10")?.controls, index.entries.map(t => t.sequence)]).toEqual([controls, [100, 101]]);
+    index.rememberPage(SampleData.page([message(10), message(11)], true, true));
+    expect(index.find("m10")?.controls).toBe(controls);
+    expect(index.entries.map(t => t.sequence)).toEqual([10, 11]);
   });
 });
