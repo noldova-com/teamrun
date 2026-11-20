@@ -181,9 +181,17 @@ export class SubAgentRun implements ITurnListener {
 
   private async endAsync(status: SubAgentStatus, summary: string | null): Promise<void> {
     this.row = this.row.with({ status, summary, toolUses: this.tools.size, tokens: this.tokens, durationMs: Date.now() - this.startedAt });
-    await this.parent.onDetailAsync(new TurnDetail(DetailKind.SubAgent, this.row.description, this.row.toJson(), this.id));
-    await this.parent.onTaskEndedAsync(new TaskEnd(this.id, SubAgentRun.taskStatusOf(status)));
-    this.ending.resolve(this.row);
+    try {
+      try {
+        await this.parent.onDetailAsync(new TurnDetail(DetailKind.SubAgent, this.row.description, this.row.toJson(), this.id));
+      }
+      finally {
+        await this.parent.onTaskEndedAsync(new TaskEnd(this.id, SubAgentRun.taskStatusOf(status)));
+      }
+    }
+    finally {
+      this.ending.resolve(this.row);
+    }
   }
 
   private async denyAsync(ask: ApprovalAsk): Promise<string> {

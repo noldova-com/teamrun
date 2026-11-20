@@ -276,6 +276,43 @@ export class SubAgentsTests {
   }
 
   @TestMethod
+  public async settlesAHelperWhoseEndRowFailsToWriteSoItsParentsStopAndShutdownReturnAndItsTaskEnds(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const update = host.messages.updateAsync.bind(host.messages);
+    let failures = 0;
+    host.messages.updateAsync = async (message, transaction) => {
+      if (failures > 0 && message.details.some(t => t.kind === DetailKind.SubAgent && SubAgent.fromJson(t.payload).status !== SubAgentStatus.Running)) {
+        failures -= 1;
+        throw new Error("The disk is full.");
+      }
+      await update(message, transaction);
+    };
+    host.adapter.holdTurn = async (request, signal) => {
+      const token = SenderEnvironment.read(request.environment);
+      if (!Object.isNull(token))
+        await host.engine.startSubAgentAsync(new SubAgentStartParams(token, "helper", "Check the tests", "Run the tests."));
+      return SubAgentsTests.abortOf(signal);
+    };
+    const statusesAsync = async (conversation: Conversation): Promise<readonly BackgroundTaskStatus[]> =>
+      (await host.tasks.listAsync(new ConversationIdParams(conversation.id))).map(t => t.status);
+
+    const stopped = await host.createConversationAsync();
+    const reply = await SubAgentsTests.sendAsync(host, stopped);
+    await host.adapter.requested(2);
+    failures = 2;
+    await host.engine.cancelAsync(new MessageIdParams(reply.id));
+    const left = failures;
+    const shut = await host.createConversationAsync();
+    await SubAgentsTests.sendAsync(host, shut);
+    await host.adapter.requested(4);
+    failures = 2;
+    await host.engine.shutdown();
+
+    Assert.areEqual(JSON.stringify([0, 0, [BackgroundTaskStatus.Stopped], [BackgroundTaskStatus.Stopped]]),
+      JSON.stringify([left, failures, await statusesAsync(stopped), await statusesAsync(shut)]));
+  }
+
+  @TestMethod
   public async endsTheTaskOfAHelperStoppedWhileItsRowIsStillBeingWrittenOnlyAfterItsStart(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
