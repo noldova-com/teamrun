@@ -3923,11 +3923,6 @@ export declare class Resources {
    * The note at the top of the reply that compacts an idle chat before its prompt cache expires.
    */
   public static readonly idleCompactionNote: string;
-  /**
-   * The `source` of a chat wake's message, with its `wakeId`: the message that tells a turn the work it sent to another chat, or its
-   * sub-agent, has ended.
-   */
-  public static readonly chatWakeSource: string;
   public static readonly addKind: string;
   public static readonly updateKind: string;
   public static readonly deleteKind: string;
@@ -4376,6 +4371,12 @@ export declare class Resources {
    * @param command The task's command, or `null` when the provider named none.
    */
   public static formatWakeNote(command: string | null): string;
+
+  /**
+   * The note at the top of a reply that a chat's wake started: the chat the work went to, with no ID.
+   * @param title The chat's title, or `null` when the chat is gone.
+   */
+  public static formatWakeReceived(title: string | null): string;
 
   /**
    * The text of the message that wakes a chat whose sub-agent ended after the turn that started it: the sub-agent, how it ended, and its summary cut

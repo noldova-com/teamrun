@@ -1684,6 +1684,41 @@ describe("HistoryMessageComponent", () => {
     expect(element().querySelector(".wake-note")).toBeNull();
   });
 
+  it("opens a reply that a chat's wake started with a closed row that names the chat and opens it, shows its replies opened, and shows no ID", async () => {
+    const replies = [{ name: "Bob", status: MessageStatus.Completed, text: "The login fix is in." }, { name: "Carol", status: MessageStatus.Failed, text: null }];
+    const woken = (chatId: string): Message => SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
+      detail(0, DetailKind.Note, `Received a message from "First".`, { source: "wakeReceived", wakeChatId: chatId, wakeReplies: replies }),
+      detail(1, DetailKind.Command, "> npm test\nok", { tool: "Bash" }),
+      detail(2, DetailKind.Text, "Thanks.")
+    ]);
+    const line = (): HTMLElement => one("nol-teamrun-wake-line");
+    const shown = (): string => [line().textContent ?? "", ...[line(), ...line().querySelectorAll("*")].flatMap(t => [...t.attributes].map(u => u.value))].join(" ");
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    render(woken("c1"));
+
+    expect([textOf(".wake-toggle"), textOf(".wake-chat"), one(".wake-toggle").getAttribute("aria-expanded")]).toEqual(["Received a message from", "First", "false"]);
+    expect(element().querySelector(".wake-replies")).toBeNull();
+    await click(one(".wake-toggle"));
+    expect(one(".wake-toggle").getAttribute("aria-expanded")).toBe("true");
+    expect([...element().querySelectorAll(".wake-reply-heading, .wake-reply-text")].map(t => t.textContent?.trim()))
+      .toEqual(["Bob replied:", "The login fix is in.", "Carol's reply failed."]);
+    expect(shown()).not.toMatch(/\bc1\b|teamrun_list_messages/);
+    await click(one(".wake-chevron"));
+    expect(element().querySelector(".wake-replies")).toBeNull();
+    await click(one(".activity-toggle"));
+    await Wait.until(() => expect(element().querySelector("nol-teamrun-activity-block")).not.toBeNull());
+    expect(element().querySelector("nol-teamrun-activity-block")?.textContent).not.toContain("Received");
+    await click(one(".wake-chat"));
+    expect(context.openedDocuments.at(-1)).toMatchObject({ name: Resources.conversationDocumentName, instance: "c1", title: "First" });
+
+    await show(woken("c-gone"));
+    expect([textOf(".wake-toggle"), textOf(".wake-chat-gone"), element().querySelector(".wake-chat")]).toEqual(["Received a message from", "a deleted chat", null]);
+    expect(shown()).not.toContain("c-gone");
+
+    await show(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "No wake")]));
+    expect(element().querySelector("nol-teamrun-wake-line")).toBeNull();
+  });
+
   it("says a session that couldn't be resumed as a note about the chat, above the reply, and keeps it out of its Activity", async () => {
     const note = "The native session could not be resumed, so a fresh one was started: Invalid params";
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
@@ -4255,6 +4290,42 @@ describe("HistoryMessageComponent", () => {
         .toEqual([tone("text-strong"), tone("text-muted"), tone("text")]);
       expect(Number.parseInt(getComputedStyle(heading).fontWeight, 10)).toBeGreaterThan(Number.parseInt(getComputedStyle(reads).fontWeight, 10));
       probe.remove();
+    });
+
+    it("shows a chat's wake as a closed row of one pointer target's height below the reply's header and above its Activity, from the answer's start edge, and its replies below it once opened", async () => {
+      await Wait.until(() => expect(store().loaded()).toBe(true));
+      render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
+        detail(0, DetailKind.Note, `Received a message from "First".`,
+          { source: "wakeReceived", wakeChatId: "c1", wakeReplies: [{ name: "Bob", status: MessageStatus.Completed, text: "The login fix is in." }] }),
+        detail(1, DetailKind.Command, "> npm test\nok", { tool: "Bash" }),
+        detail(2, DetailKind.Text, "The tests passed.")
+      ]));
+      await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view")).toHaveLength(1));
+      const rect = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      const middle = (selector: string): number => rect(selector).top + rect(selector).height / 2;
+      const target = AppearanceFixture.measureLook("pointer-target");
+      const closed = rect(".wake-line");
+
+      expect(one("nol-message").contains(one(".wake-line"))).toBe(true);
+      AppearanceFixture.expectPixels(closed.height, target);
+      expect(closed.top).toBeGreaterThanOrEqual(rect(".nol-message-header").bottom - 0.5);
+      expect(rect(".activity-toggle").top).toBeGreaterThanOrEqual(closed.bottom - 0.5);
+      AppearanceFixture.expectPixels(closed.left, rect(".nol-markdown-view").left);
+      AppearanceFixture.expectPixels(rect(".wake-toggle").left, closed.left);
+      expect(rect(".wake-chat").left).toBeGreaterThanOrEqual(rect(".wake-toggle").right);
+      expect(rect(".wake-chevron").left).toBeGreaterThanOrEqual(rect(".wake-chat").right);
+      for (const part of [".wake-chat", ".wake-chevron"])
+        AppearanceFixture.expectPixels(middle(part), middle(".wake-toggle"));
+      expect(getComputedStyle(one(".wake-chevron")).fontFamily).toBe(getComputedStyle(one(".activity-chevron")).fontFamily);
+      AppearanceFixture.expectPixels(rect(".wake-chevron").width, rect(".activity-chevron").width);
+
+      await click(one(".wake-toggle"));
+      await Wait.until(() => expect(element().querySelector(".wake-replies")).not.toBeNull());
+      AppearanceFixture.expectPixels(rect(".wake-line").height, target);
+      expect(rect(".wake-replies").top).toBeGreaterThanOrEqual(rect(".wake-line").bottom - 0.5);
+      AppearanceFixture.expectPixels(rect(".wake-replies").left, closed.left);
+      expect(rect(".wake-replies").height).toBeGreaterThan(0);
+      expect(rect(".activity-toggle").top).toBeGreaterThanOrEqual(rect(".wake-replies").bottom - 0.5);
     });
 
     it("shows a woken reply's mark as its first muted line, below its header and above its Activity and answer, in the answer's size, from its start edge, with the command in the code font", async () => {

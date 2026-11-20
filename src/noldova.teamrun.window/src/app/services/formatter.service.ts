@@ -26,6 +26,8 @@ import { MissingImage } from "../models/missing-image";
 import { ModelCatalog } from "../models/model-catalog";
 import { ReplySegment } from "../models/reply-segment";
 import { SustainHandover } from "../models/sustain-handover";
+import { WakeReceived } from "../models/wake-received";
+import { WakeReply } from "../models/wake-reply";
 import { TeammateColor } from "../models/teammate-color";
 import { ViewedImage } from "../models/viewed-image";
 import { Resources } from "../../resources";
@@ -128,6 +130,35 @@ export class FormatterService {
       : message.details.find(t => FormatterService.payloadOf(t)?.[Resources.sourceField] === ProtocolResources.usageHandOffSource) ?? null;
   }
 
+  public static wakeReceivedOf(message: Message): WakeReceived | null {
+    const source = message.author === MessageAuthor.User ? ProtocolResources.chatWakeSource : ProtocolResources.wakeReceivedSource;
+    const detail = message.details.find(t => FormatterService.payloadOf(t)?.[Resources.sourceField] === source) ?? null;
+    const payload = Object.isNull(detail) ? null : FormatterService.payloadOf(detail);
+    if (Object.isNull(detail) || Object.isNull(payload))
+      return null;
+    const chatId = payload[ProtocolResources.wakeChatField];
+    const replies = payload[ProtocolResources.wakeRepliesField];
+    if (!Object.isString(chatId) || !Array.isArray(replies)) {
+      const sender = message.sender;
+      return message.author === MessageAuthor.User && !Object.isNull(sender) && sender.chatId !== message.conversationId
+        ? new WakeReceived(sender.chatId, [], FormatterService.oldWakeEndOf(detail.text)) : null;
+    }
+    const end = payload[ProtocolResources.wakeEndField];
+    return new WakeReceived(chatId, replies.filter(t => FormatterService.isJsonObject(t)).flatMap(t => {
+        const name = t[ProtocolResources.nameField];
+        const status = t[ProtocolResources.statusField];
+        const text = t[ProtocolResources.textField];
+        return Object.isString(name) && FormatterService.isMessageStatus(status) ? [new WakeReply(name, status, Object.isString(text) ? text : null)] : [];
+      }), Object.isString(end) ? end : null);
+  }
+
+  public static startsTurn(message: Message): boolean {
+    return message.author === MessageAuthor.User && message.details.some(t => {
+      const payload = FormatterService.payloadOf(t);
+      return payload?.[Resources.sourceField] === ProtocolResources.chatWakeSource && Object.isString(payload[ProtocolResources.wakeReplyField]);
+    });
+  }
+
   public static handoverOf(detail: MessageDetail): SustainHandover | null {
     const payload = FormatterService.payloadOf(detail);
     const carried = payload?.[Resources.sustainCarriedField];
@@ -148,6 +179,10 @@ export class FormatterService {
   public static steeredIntoOf(message: Message): string | null {
     return message.author !== MessageAuthor.User ? null : message.details.filter(t => t.kind === DetailKind.Text)
       .map(t => FormatterService.payloadOf(t)?.[Resources.steeredIntoField]).find(t => Object.isString(t)) ?? null;
+  }
+
+  public isWakeReceivedNote(detail: MessageDetail): boolean {
+    return FormatterService.payloadOf(detail)?.[Resources.sourceField] === ProtocolResources.wakeReceivedSource;
   }
 
   public isWakeNote(detail: MessageDetail): boolean {
@@ -210,7 +245,7 @@ export class FormatterService {
       steps = [];
     };
     for (const detail of message.details) {
-      if (detail.isNested || this.isWorkingTreeEvidence(detail) || this.isWakeNote(detail) || this.isResumeNote(detail) || this.isSustainNote(detail)
+      if (detail.isNested || this.isWorkingTreeEvidence(detail) || this.isWakeNote(detail) || this.isWakeReceivedNote(detail) || this.isResumeNote(detail) || this.isSustainNote(detail)
         || this.isCancellationNote(message, detail)
         || (detail.kind === DetailKind.Text && (String.isNullOrWhitespace(detail.text) || detail.text.trim() === planText)))
         continue;
@@ -740,11 +775,21 @@ export class FormatterService {
     return FormatterService.payloadOf(detail)?.[Resources.deniedField] === true;
   }
 
+  private static oldWakeEndOf(text: string): string | null {
+    if (text.startsWith(ProtocolResources.wakeLostOpening))
+      return ProtocolResources.wakeLostEnd;
+    return text.startsWith(ProtocolResources.wakeChatDeletedOpening) ? ProtocolResources.wakeChatDeletedEnd : null;
+  }
+
   private static payloadOf(detail: MessageDetail): JsonObject | null {
     return FormatterService.isJsonObject(detail.payload) ? detail.payload : null;
   }
 
   private static isJsonObject(value: JsonValue): value is JsonObject {
     return Object.isObject(value) && !Array.isArray(value);
+  }
+
+  private static isMessageStatus(value: JsonValue | undefined): value is MessageStatus {
+    return Object.values<JsonValue | undefined>(MessageStatus).includes(value);
   }
 }

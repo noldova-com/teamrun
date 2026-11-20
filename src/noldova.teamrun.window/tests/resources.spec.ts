@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
+import { MessageStatus, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
 
 import { ChatAction } from "../src/app/enums/chat-action";
 import { Resources } from "../src/resources";
@@ -141,6 +141,12 @@ describe("Resources", () => {
   it("names an effort level by its id with a capital, and no level as the model's default", () => {
     expect([Resources.formatEffort("xhigh"), Resources.formatEffort("low"), Resources.formatEffort(null)]).toEqual(["Xhigh", "Low", "Model default"]);
     expect(Resources.noEffortLevels).toBe("Effort levels unavailable. The model's default is used.");
+  });
+
+  it("heads each reply a chat's wake names by how it ended, and one that ended without text", () => {
+    expect([MessageStatus.Cancelled, MessageStatus.Failed, MessageStatus.Interrupted].map(t => Resources.formatWakeReplyHeading("Bob", t, "Done.")))
+      .toEqual(["Bob's reply was cancelled.", "Bob's reply failed.", "Bob's reply was interrupted."]);
+    expect([null, "Done."].map(t => Resources.formatWakeReplyHeading("Bob", MessageStatus.Completed, t))).toEqual(["Bob replied without text.", "Bob replied:"]);
   });
 
   it("words a reply's activity for one and for many", () => {

@@ -12,7 +12,7 @@ import {
 } from "@angular/core";
 import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
-import type { Message, MessageDetail } from "@noldova/teamrun.protocol";
+import { type Message, MessageAuthor, type MessageDetail } from "@noldova/teamrun.protocol";
 import {
   ButtonComponent, ButtonVariant, VirtualListAlign, VirtualListComponent, type VirtualListJump, VirtualListKind, VirtualListPosition, VirtualRowDirective
 } from "@noldova/ui.components.angular";
@@ -22,6 +22,7 @@ import type { ConversationHistorySource } from "../../models/conversation-histor
 import type { MessageFocus } from "../../models/message-focus";
 import { ReadingPosition } from "../../models/reading-position";
 import { ScrollReveal } from "../../models/scroll-reveal";
+import type { WakeReceived } from "../../models/wake-received";
 import { Resources } from "../../../resources";
 import { BackgroundTaskStoreService } from "../../services/background-task-store.service";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -31,10 +32,11 @@ import { FormatterService } from "../../services/formatter.service";
 import { HistoryWarmUpService } from "../../services/history-warm-up.service";
 import { HistoryMessageComponent } from "../history-message/history-message.component";
 import { UsageHandOffLineComponent } from "../usage-hand-off-line/usage-hand-off-line.component";
+import { WakeLineComponent } from "../wake-line/wake-line.component";
 
 @Component({
   selector: "nol-teamrun-history",
-  imports: [ButtonComponent, HistoryMessageComponent, UsageHandOffLineComponent, VirtualListComponent, VirtualRowDirective],
+  imports: [ButtonComponent, HistoryMessageComponent, UsageHandOffLineComponent, VirtualListComponent, VirtualRowDirective, WakeLineComponent],
   providers: [BackgroundTaskStoreService.provider, { provide: ScrollReveal.rows, useExisting: forwardRef(() => HistoryComponent) }],
   templateUrl: "./history.component.html",
   styleUrl: "./history.component.css"
@@ -66,7 +68,10 @@ export class HistoryComponent implements IRowReveal {
     const id = this.flashId();
     return Object.isNull(id) ? null : this.store.steeredIntoOf(id) ?? id;
   });
-  protected readonly isSteered: (item: Message) => boolean = (item: Message): boolean => !Object.isNull(FormatterService.steeredIntoOf(item));
+  protected readonly isHidden: (item: Message) => boolean = (item: Message): boolean => !Object.isNull(FormatterService.steeredIntoOf(item))
+    || FormatterService.startsTurn(item);
+  protected readonly wakeOf: (item: Message) => WakeReceived | null = (item: Message): WakeReceived | null =>
+    item.author === MessageAuthor.User ? FormatterService.wakeReceivedOf(item) : null;
   protected readonly usageHandOffOf: (item: Message) => MessageDetail | null = (item: Message): MessageDetail | null => FormatterService.usageHandOffOf(item);
   protected readonly isEmpty: Signal<boolean> = computed(() => this.source()?.length() === 0);
   protected readonly isBusy: Signal<boolean> = computed(() => this.store.isWorking(this.chatId()));
