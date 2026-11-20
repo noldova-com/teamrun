@@ -1,0 +1,22 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import type { SqlTransaction } from "@noldova/context.data.sql";
+import type {
+  Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization
+} from "@noldova/teamrun.protocol";
+
+export interface IOrganizationService {
+  listAsync(transaction?: SqlTransaction): Promise<Organization>;
+  createAsync(params: DepartmentCreateParams): Promise<Department>;
+  updateAsync(params: DepartmentUpdateParams): Promise<Department>;
+  moveAsync(params: DepartmentMoveParams): Promise<Department>;
+  deleteAsync(params: DepartmentIdParams): Promise<void>;
+  setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+  removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
+}

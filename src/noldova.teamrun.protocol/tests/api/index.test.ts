@@ -24,6 +24,14 @@ export class ProtocolApiTests {
     Assert.isDefined(api.TeammateCreateParams);
     Assert.isDefined(api.TeammateUpdateParams);
     Assert.isDefined(api.TeammateIdParams);
+    Assert.isDefined(api.Department);
+    Assert.isDefined(api.DepartmentMember);
+    Assert.isDefined(api.Organization);
+    Assert.isDefined(api.DepartmentCreateParams);
+    Assert.isDefined(api.DepartmentUpdateParams);
+    Assert.isDefined(api.DepartmentMoveParams);
+    Assert.isDefined(api.DepartmentIdParams);
+    Assert.isDefined(api.DepartmentMemberSetParams);
     Assert.isDefined(api.ChatMemberParams);
     Assert.isDefined(api.ChatMember);
     Assert.isDefined(api.TeammateMention);

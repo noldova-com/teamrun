@@ -18,6 +18,7 @@ import {
 
 import { ChangeEntity } from "../../enums/change-entity.js";
 import type { IConversationsService } from "../../interfaces/i-conversations.service.js";
+import type { IOrganizationService } from "../../interfaces/i-organization.service.js";
 import type { IProvidersService } from "../../interfaces/i-providers.service.js";
 import type { ITeammatesService } from "../../interfaces/i-teammates.service.js";
 import { Guid } from "../../models/guid.js";
@@ -28,11 +29,13 @@ export class TeammatesService implements ITeammatesService {
   private readonly context: DatabaseContext;
   private readonly providers: IProvidersService;
   private readonly conversations: IConversationsService;
+  private readonly organization: IOrganizationService;
 
-  public constructor(context: DatabaseContext, providers: IProvidersService, conversations: IConversationsService) {
+  public constructor(context: DatabaseContext, providers: IProvidersService, conversations: IConversationsService, organization: IOrganizationService) {
     this.context = context;
     this.providers = providers;
     this.conversations = conversations;
+    this.organization = organization;
   }
 
   public async listAsync(transaction?: SqlTransaction): Promise<readonly Teammate[]> {
@@ -110,15 +113,17 @@ export class TeammatesService implements ITeammatesService {
     return teammate;
   }
 
-  public async deleteAsync(params: TeammateIdParams): Promise<void> {
-    await this.context.database.connection.runInTransactionAsync(async transaction => {
+  public async deleteAsync(params: TeammateIdParams): Promise<boolean> {
+    return await this.context.database.connection.runInTransactionAsync(async transaction => {
       const teammate = await this.requireAsync(params.teammateId, transaction);
       await this.conversations.removeTeammateMembersAsync(teammate.id, transaction);
+      const departed = await this.organization.removeTeammateAsync(teammate.id, transaction);
       await transaction.executeAsync(new SqlQuery(Resources.deleteTeammate, [teammate.id]));
       await this.context.database.changeFeed.appendAsync(ChangeEntity.Teammate, teammate.id, ChangeOperation.Delete, JSON.stringify(teammate.toJson()), transaction);
       const updatedAt = new Date().toISOString();
       for (const other of (await this.listAsync(transaction)).filter(t => t.usageHandOffs.includes(teammate.id)))
         await this.saveAsync(TeammateUpdateParams.of(other.id, { usageHandOffs: other.usageHandOffs.filter(t => t !== teammate.id) }).applyTo(other, updatedAt), transaction);
+      return departed;
     });
   }
 

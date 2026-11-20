@@ -52,6 +52,7 @@ import {
   ComputerUseGrantTimings,
   NodeTimer,
   TeammatesService,
+  OrganizationService,
   WindowsService
 } from "@noldova/teamrun.core";
 import { CliPart } from "@noldova/teamrun.cli";
@@ -241,7 +242,8 @@ export class RuntimePart implements IRuntimePart {
     const tasks = new BackgroundTasksService(events, undefined, undefined, context.log, database);
     this.tasks = tasks;
     const providers = new ProvidersService(database, registry, conversations, events, undefined, context.log);
-    const teammates = new TeammatesService(database, providers, conversations);
+    const organization = new OrganizationService(database);
+    const teammates = new TeammatesService(database, providers, conversations, organization);
     const planUsage = new PlanUsageService(events);
     this.planUsage = planUsage;
     const kinds = new ProviderKindsService(registry, providers, events, planUsage, teammates);
@@ -294,7 +296,7 @@ export class RuntimePart implements IRuntimePart {
       : new ComputerUseGrantsService(new RuntimeRememberedAppGrants(context.permissions), conversations, teammates, apps,
         ComputerUseGrantTimings.createDefault(), new NodeTimer());
     const dispatcher = new RequestDispatcher(kinds, providers, projects, conversations, messages, approvals, engine, teammates, events, drafts, folder,
-      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents);
+      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents, organization);
     const methods = new Map<string, IMethodHandler>();
     const clients = new WindowClients(new DispatchedMethod(MethodName.WindowFocused, dispatcher), windows);
     context.onClientClosed(t => clients.close(t));

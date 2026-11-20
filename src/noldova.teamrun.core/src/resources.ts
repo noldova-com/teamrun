@@ -472,6 +472,17 @@ export class Resources {
   public static readonly checkpointFoldersMigrationId: string = "20261119120000_CheckpointFolders";
   public static readonly addMessageCheckpointFolder: string = "ALTER TABLE messages ADD COLUMN checkpointFolderId TEXT";
   public static readonly checkpointFolderIdColumn: string = "checkpointFolderId";
+  public static readonly departmentsMigrationId: string = "20261120120000_Departments";
+  public static readonly departmentsTable: string = "departments";
+  public static readonly departmentMembersTable: string = "departmentMembers";
+  public static readonly departmentIdColumn: string = "departmentId";
+  public static readonly selectDepartments: string = "SELECT json FROM departments ORDER BY createdAt, rowid";
+  public static readonly selectDepartmentMembers: string = "SELECT teammateId, departmentId FROM departmentMembers ORDER BY rowid";
+  public static readonly insertDepartment: string = "INSERT INTO departments (id, parentId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)";
+  public static readonly updateDepartment: string = "UPDATE departments SET parentId = ?, json = ?, updatedAt = ? WHERE id = ?";
+  public static readonly deleteDepartment: string = "DELETE FROM departments WHERE id = ?";
+  public static readonly insertDepartmentMember: string = "INSERT INTO departmentMembers (teammateId, departmentId) VALUES (?, ?)";
+  public static readonly deleteDepartmentMember: string = "DELETE FROM departmentMembers WHERE teammateId = ?";
   public static readonly selectHandoverSummary: string = "SELECT text, kind FROM handoverSummaries WHERE chatId = ? AND teammateId = ? AND through = ?";
   public static readonly upsertHandoverSummary: string = "INSERT INTO handoverSummaries (chatId, teammateId, through, text, kind) VALUES (?, ?, ?, ?, ?) "
     + "ON CONFLICT (chatId, teammateId) DO UPDATE SET through = excluded.through, text = excluded.text, kind = excluded.kind";
@@ -1880,6 +1891,18 @@ export class Resources {
 
   public static formatTeammateNotFound(id: string): string {
     return `Teammate not found: ${id}.`;
+  }
+
+  public static formatDepartmentNotFound(id: string): string {
+    return `Department not found: ${id}.`;
+  }
+
+  public static formatDepartmentLeaderNotMember(teammate: string, department: string): string {
+    return `${teammate} can't lead ${department} without being one of its members.`;
+  }
+
+  public static formatDepartmentUnderItself(department: string): string {
+    return `${department} can't move under itself or one of its own departments.`;
   }
 
   public static formatSharedMcpServerNotFound(id: string): string {

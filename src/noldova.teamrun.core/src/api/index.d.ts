@@ -147,7 +147,14 @@ import type {
   WindowFocusedParams,
   WindowIdParams,
   WrittenImageReadParams,
-  LinkedPaths
+  LinkedPaths,
+  Department,
+  DepartmentCreateParams,
+  DepartmentIdParams,
+  DepartmentMemberSetParams,
+  DepartmentMoveParams,
+  DepartmentUpdateParams,
+  Organization
 } from "@noldova/teamrun.protocol";
 
 /**
@@ -192,7 +199,11 @@ export declare enum ChangeEntity {
   SharedMcpServer = "SharedMcpServer",
 
   /** An added ACP agent or a local ACP command. */
-  AcpAgent = "AcpAgent"
+  AcpAgent = "AcpAgent",
+  /** A `Department`. */
+  Department = "Department",
+  /** A `DepartmentMember`: a teammate in a department, keyed by the teammate's id. */
+  DepartmentMember = "DepartmentMember"
 }
 
 /**
@@ -2960,6 +2971,28 @@ export declare class Resources {
   public static readonly checkpointFoldersMigrationId: string;
   public static readonly addMessageCheckpointFolder: string;
   public static readonly checkpointFolderIdColumn: string;
+  /** The departments migration's fixed id: `20261120120000_Departments`. */
+  public static readonly departmentsMigrationId: string;
+  /** The departments table. */
+  public static readonly departmentsTable: string;
+  /** The table of which teammate is in which department; a teammate has at most one row. */
+  public static readonly departmentMembersTable: string;
+  /** The department id column of `departmentMembers`. */
+  public static readonly departmentIdColumn: string;
+  /** Selects every department's JSON. */
+  public static readonly selectDepartments: string;
+  /** Selects every teammate's department. */
+  public static readonly selectDepartmentMembers: string;
+  /** Inserts a department. */
+  public static readonly insertDepartment: string;
+  /** Updates a department's parent and JSON. */
+  public static readonly updateDepartment: string;
+  /** Deletes a department. */
+  public static readonly deleteDepartment: string;
+  /** Puts a teammate in a department. */
+  public static readonly insertDepartmentMember: string;
+  /** Takes a teammate out of its department. */
+  public static readonly deleteDepartmentMember: string;
   public static readonly selectHandoverSummary: string;
   public static readonly upsertHandoverSummary: string;
   public static readonly deleteHandoverSummaries: string;
@@ -4504,6 +4537,15 @@ export declare class Resources {
    * Missing teammate diagnostic.
    */
   public static formatTeammateNotFound(id: string): string;
+
+  /** Missing department diagnostic. */
+  public static formatDepartmentNotFound(id: string): string;
+
+  /** Why a teammate outside a department can't lead it. */
+  public static formatDepartmentLeaderNotMember(teammate: string, department: string): string;
+
+  /** Why a department can't move under itself or one of its own departments. */
+  public static formatDepartmentUnderItself(department: string): string;
 
   /**
    * Unknown shared MCP server diagnostic.
@@ -9479,6 +9521,7 @@ export declare class RequestDispatcher {
    * @param windows The open windows; without them `WindowFocused`, `WindowClosed` and `PanelAnswered` are unknown.
    * @param sharedServers The shared MCP server methods; without them the `SharedMcp` methods are unknown.
    * @param acpAgents The added ACP agents' methods; without them the `AcpAgent` and `AcpLocalCommand` methods are unknown.
+   * @param organization The organization's methods; without them `OrganizationList` and the `Department` methods are unknown.
    */
   public constructor(
     kinds: IProviderKindsService,
@@ -9498,7 +9541,8 @@ export declare class RequestDispatcher {
     windows?: IWindowsService | null,
     sharedServers?: ISharedMcpServersService | null,
     computerUseGrants?: IComputerUseGrantsService | null,
-    acpAgents?: IAcpAgentsService | null);
+    acpAgents?: IAcpAgentsService | null,
+    organization?: IOrganizationService | null);
 
   /**
    * Answers one request; never throws.
@@ -9796,6 +9840,107 @@ export declare class AttachmentStore {
 /**
  * Catalog operations for named participants.
  */
+/** The organization under the person: departments, their leaders and their members. */
+export interface IOrganizationService {
+  /**
+   * Returns the organization: every department, and which teammate is in which.
+   * @param transaction The transaction to read in, or none.
+   */
+  listAsync(transaction?: SqlTransaction): Promise<Organization>;
+
+  /**
+   * Creates a department last among its siblings and records it in the change feed.
+   * @throws ServiceException `NotFound` when the parent isn't a department.
+   */
+  createAsync(params: DepartmentCreateParams): Promise<Department>;
+
+  /**
+   * Renames a department or sets or clears its leader, and records it in the change feed.
+   * @throws ServiceException `NotFound` for an unknown department or leader, `InvalidParams` when the leader isn't one of its members.
+   */
+  updateAsync(params: DepartmentUpdateParams): Promise<Department>;
+
+  /**
+   * Moves a department under another parent or to another place among its siblings, numbering the siblings it left and joined
+   * from 0 again, and records each change in the change feed; a place past the last puts it last.
+   * @throws ServiceException `NotFound` for an unknown department or parent, `InvalidParams` when the parent is the department or under it.
+   */
+  moveAsync(params: DepartmentMoveParams): Promise<Department>;
+
+  /**
+   * Deletes a department in one transaction: its departments take its place under its parent, and its members move to its parent,
+   * or to no department when it sits under the person; its leadership goes with it.
+   * @throws ServiceException `NotFound` for an unknown department.
+   */
+  deleteAsync(params: DepartmentIdParams): Promise<void>;
+
+  /**
+   * Puts a teammate in a department or in none; a teammate who leads its department stops leading it.
+   * @throws ServiceException `NotFound` for an unknown teammate or department.
+   */
+  setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+
+  /**
+   * Takes a teammate being deleted out of its department and clears its leadership, in the deleting transaction.
+   * @param teammateId The teammate's id.
+   * @param transaction The deleting transaction.
+   * @returns Whether the teammate was in a department.
+   */
+  removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
+}
+
+/** Keeps the organization in the `departments` and `departmentMembers` tables, recording each change in the change feed. */
+export declare class OrganizationService implements IOrganizationService {
+  /** Creates the service over the database. */
+  public constructor(context: DatabaseContext);
+
+  /**
+   * Returns the organization: every department, and which teammate is in which.
+   * @param transaction The transaction to read in, or none.
+   */
+  public listAsync(transaction?: SqlTransaction): Promise<Organization>;
+
+  /**
+   * Creates a department last among its siblings and records it in the change feed.
+   * @throws ServiceException `NotFound` when the parent isn't a department.
+   */
+  public createAsync(params: DepartmentCreateParams): Promise<Department>;
+
+  /**
+   * Renames a department or sets or clears its leader, and records it in the change feed.
+   * @throws ServiceException `NotFound` for an unknown department or leader, `InvalidParams` when the leader isn't one of its members.
+   */
+  public updateAsync(params: DepartmentUpdateParams): Promise<Department>;
+
+  /**
+   * Moves a department under another parent or to another place among its siblings, numbering the siblings it left and joined
+   * from 0 again, and records each change in the change feed; a place past the last puts it last.
+   * @throws ServiceException `NotFound` for an unknown department or parent, `InvalidParams` when the parent is the department or under it.
+   */
+  public moveAsync(params: DepartmentMoveParams): Promise<Department>;
+
+  /**
+   * Deletes a department in one transaction: its departments take its place under its parent, and its members move to its parent,
+   * or to no department when it sits under the person; its leadership goes with it.
+   * @throws ServiceException `NotFound` for an unknown department.
+   */
+  public deleteAsync(params: DepartmentIdParams): Promise<void>;
+
+  /**
+   * Puts a teammate in a department or in none; a teammate who leads its department stops leading it.
+   * @throws ServiceException `NotFound` for an unknown teammate or department.
+   */
+  public setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+
+  /**
+   * Takes a teammate being deleted out of its department and clears its leadership, in the deleting transaction.
+   * @param teammateId The teammate's id.
+   * @param transaction The deleting transaction.
+   * @returns Whether the teammate was in a department.
+   */
+  public removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
+}
+
 export interface ITeammatesService {
   /**
    * Lists participants by name, in `NameOrder`; ties keep creation order.
@@ -9834,9 +9979,9 @@ export interface ITeammatesService {
   clearUnlistedAsync(providerId: string, list: ProviderModelList): Promise<readonly Teammate[]>;
 
   /**
-   * Deletes memberships while retaining historical messages and mentions.
+   * Deletes memberships while retaining historical messages and mentions, and answers whether the teammate left a department.
    */
-  deleteAsync(params: TeammateIdParams): Promise<void>;
+  deleteAsync(params: TeammateIdParams): Promise<boolean>;
 
   /**
    * Reads the default teammate set in Settings, or `null` when none is set.
@@ -9875,9 +10020,9 @@ export interface ITeammatesService {
  */
 export declare class TeammatesService implements ITeammatesService {
   /**
-   * Creates the service with its database, provider and membership owners.
+   * Creates the service with its database, provider and membership owners, and the organization a deleted teammate leaves.
    */
-  public constructor(context: DatabaseContext, providers: IProvidersService, conversations: IConversationsService);
+  public constructor(context: DatabaseContext, providers: IProvidersService, conversations: IConversationsService, organization: IOrganizationService);
 
   /**
    * Lists participants by name, in `NameOrder`; ties keep creation order.
@@ -9905,9 +10050,10 @@ export declare class TeammatesService implements ITeammatesService {
   public clearUnlistedAsync(providerId: string, list: ProviderModelList): Promise<readonly Teammate[]>;
 
   /**
-   * Deletes memberships while retaining historical messages and mentions.
+   * Deletes memberships while retaining historical messages and mentions; the teammate leaves its department, and a department
+   * it led has no leader, in the same transaction; it answers whether the teammate left a department.
    */
-  public deleteAsync(params: TeammateIdParams): Promise<void>;
+  public deleteAsync(params: TeammateIdParams): Promise<boolean>;
 
   /**
    * Reads the default teammate from the `preferences` table, or `null` when none is set.
@@ -10884,6 +11030,15 @@ export declare class HandoverSummaryKindsMigration extends SqlMigration {
   /**
    * Adds the column with `Resources.addHandoverSummaryKind`.
    */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/** Adds the `departments` and `departmentMembers` tables; a teammate has at most one membership row. */
+export declare class DepartmentsMigration extends SqlMigration {
+  /** Uses the fixed departments migration id. */
+  public constructor();
+
+  /** Creates both tables, keyed to `teammates` and to each other, with an index on each parent column. */
   public override apply(builder: MigrationBuilder): void;
 }
 
