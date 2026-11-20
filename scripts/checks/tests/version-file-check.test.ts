@@ -7,20 +7,29 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Writable } from "node:stream";
 import { afterEach, describe, it } from "node:test";
 
+import { VersionSetter } from "../../packages/version-setter.ts";
 import { VersionFileCheck } from "../version-file-check.ts";
 
 const folders: string[] = [];
 
-const rootWith = (versionFile: string | null, manifest: string = JSON.stringify({ name: "sample", version: "0.0.2" })): string => {
+const manifest = (version: unknown): string => JSON.stringify({ name: "sample", version });
+
+const rootWith = (versionFile: string | null, manifests: Readonly<Record<string, string | null>> = {}): string => {
   const root = mkdtempSync(path.join(tmpdir(), "version-file-"));
   folders.push(root);
-  writeFileSync(path.join(root, "package.json"), manifest);
+  for (const file of VersionSetter.MANIFESTS) {
+    const text = Object.hasOwn(manifests, file) ? manifests[file] : manifest("0.0.2");
+    if (text === null || text === undefined)
+      continue;
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), text);
+  }
   if (versionFile !== null)
     writeFileSync(path.join(root, "version.json"), versionFile);
   return root;
@@ -39,45 +48,65 @@ describe("VersionFileCheck", () => {
       rmSync(folder, { recursive: true, force: true });
   });
 
-  it("passes when version.json holds the root package.json's version", async () => {
+  it("reads every package.json that set-version writes", () => {
+    assert.deepEqual(VersionSetter.MANIFESTS, ["package.json", "src/package.json", "app/package.json", "app/src/noldova.teamrun.window.app/package.json"]);
+  });
+
+  it("passes when version.json and every package.json hold the same version", async () => {
     const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.2" })));
 
     assert.equal(passed, true);
-    assert.match(text, /both hold 0\.0\.2/);
+    assert.match(text, /all hold 0\.0\.2/);
   });
 
-  it("fails when the versions differ", async () => {
+  for (const file of ["package.json", "src/package.json", "app/package.json", "app/src/noldova.teamrun.window.app/package.json"]) {
+    it(`fails, naming the file, when ${file} holds another version`, async () => {
+      const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.2" }), { [file]: manifest("0.0.1") }));
+
+      assert.equal(passed, false);
+      assert.equal(text, `${file} holds the version 0.0.1, but version.json holds 0.0.2; npm run set-version moves only the files that hold version.json's version, and the release compares app/package.json's with the version it builds, so each holds it.\n`);
+    });
+  }
+
+  it("names every package.json that differs", async () => {
     const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.1" })));
 
     assert.equal(passed, false);
-    assert.match(text, /version\.json holds the version 0\.0\.1, but the root package\.json.* holds 0\.0\.2/);
+    assert.equal(text.split("\n").filter(line => line.includes("but version.json holds 0.0.1")).length, 4);
   });
 
   it("fails, naming the file, when version.json is missing", async () => {
     const { passed, text } = await runIn(rootWith(null));
 
     assert.equal(passed, false);
-    assert.match(text, /The root version\.json can't be read/);
+    assert.match(text, /^version\.json can't be read/);
+  });
+
+  it("fails, naming the file, when app/package.json is missing", async () => {
+    const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.2" }), { "app/package.json": null }));
+
+    assert.equal(passed, false);
+    assert.match(text, /^app\/package\.json can't be read/);
   });
 
   it("fails, naming the file, when version.json isn't JSON", async () => {
     const { passed, text } = await runIn(rootWith("{ version: 0.0.2"));
 
     assert.equal(passed, false);
-    assert.match(text, /The root version\.json isn't valid JSON/);
+    assert.match(text, /^version\.json isn't valid JSON/);
   });
 
   it("fails, naming the file, when version.json has no version", async () => {
     const { passed, text } = await runIn(rootWith(JSON.stringify({ name: "sample" })));
 
     assert.equal(passed, false);
-    assert.match(text, /The root version\.json holds no version string in its "version" field, but null/);
+    assert.match(text, /^version\.json holds no version string in its "version" field, but null/);
   });
 
   it("fails, naming the file, when a version isn't a string", async () => {
-    const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.2" }), JSON.stringify({ version: 2 })));
+    const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.2" }), { "package.json": manifest(2) }));
 
     assert.equal(passed, false);
-    assert.match(text, /The root package\.json holds no version string in its "version" field, but 2/);
+    assert.match(text, /^package\.json holds no version string in its "version" field, but 2/);
   });
 });
