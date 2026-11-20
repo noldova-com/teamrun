@@ -252,6 +252,26 @@ export class DraftsServiceTests {
   }
 
   @TestMethod
+  public async sweepsPastEachDraftWhoseSelectFailsKeepingItsFilesAndStillSweepsTheSentFiles(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const first = await host.createConversationAsync();
+    const second = await host.createConversationAsync();
+    const saved = await host.drafts.saveAsync(new DraftSaveParams(first.id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
+    const kept = await host.drafts.saveAsync(new DraftSaveParams(second.id, "Keep", [DraftsServiceTests.upload("b.txt", "b")]));
+    const stray = join(host.directory.path, "attachments", "stray.txt");
+    writeFileSync(stray, "left by a crash");
+    await host.context.database.connection.executeAsync(new SqlQuery("ALTER TABLE drafts RENAME TO draftsGone"));
+
+    await host.drafts.sweepAsync();
+
+    Assert.isTrue(existsSync(saved.attachments[0]!.path));
+    Assert.isTrue(existsSync(kept.attachments[0]!.path));
+    Assert.isFalse(existsSync(stray));
+    Assert.areEqual([first.id, second.id].map(t => `The draft of the chat ending in "${t.slice(-12)}" was not read, so its files were kept: ERR_SQLITE_ERROR.`).sort().join("\n"),
+      [...host.log.lines].sort().join("\n"));
+  }
+
+  @TestMethod
   public async sweepKeepsADraftsFilesAfterItsDataFolderMoved(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
