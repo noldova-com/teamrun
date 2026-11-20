@@ -22,8 +22,7 @@ export class AddProviderCommand extends TeamRunCommand {
   }
 
   protected async runAsync(values: CommandValues, signal: AbortSignal): Promise<CliCommandResult> {
-    const params = new ProviderCreateParams(values.readText(Resources.kindValue), values.readText(Resources.labelValue),
-      values.readFolder(Resources.profileFolderValue));
+    const params = new ProviderCreateParams(values.readText(Resources.kindValue), values.readText(Resources.labelValue), null);
     const provider = Provider.fromJson(await this.client.requestAsync(MethodName.ProviderCreate, params.toJson(), signal));
     return new CliCommandResult(provider.toJson(), Resources.formatProviderAdded(provider));
   }

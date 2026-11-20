@@ -58,7 +58,6 @@ export class Resources {
   public static readonly pendingValue: string = "pending";
   public static readonly providerIdValue: string = "providerId";
   public static readonly labelValue: string = "label";
-  public static readonly profileFolderValue: string = "profileFolder";
   public static readonly folderValue: string = "folder";
   public static readonly messageIdValue: string = "messageId";
   public static readonly restoreFilesValue: string = "restoreFiles";
