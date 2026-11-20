@@ -49,8 +49,7 @@ interface ISwitchRecorder {
   recent: readonly { readonly at: number; readonly bitmap: Buffer; readonly png: () => Buffer }[];
   tick: number;
   readonly frames: IFrame[];
-  readonly others: string[];
-  readonly differences: string[];
+  readonly unmatched: { readonly bitmap: Buffer; readonly width: number; readonly png: () => Buffer }[];
   readonly atRest: string[];
 }
 
@@ -105,32 +104,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     if (window === undefined)
       throw new Error(`No web contents shows ${address}.`);
     await window.insertCSS(style);
-    const recorder: ISwitchRecorder = { area: null, width: 0, page: null, chat: null, recent: [], tick: 0, frames: [], others: [], differences: [], atRest: [] };
-    const differenceOf = (name: string, frame: Buffer, rest: Buffer, width: number): string => {
-      if (frame.length !== rest.length)
-        return `${name}: ${String(frame.length)} bytes against ${String(rest.length)}`;
-      let count = 0;
-      let largest = 0;
-      const box = { left: width, top: Number.MAX_SAFE_INTEGER, right: -1, bottom: -1 };
-      for (let index = 0; index < frame.length; index += 4) {
-        const delta = Math.max(...[0, 1, 2, 3].map(t => Math.abs((frame[index + t] ?? 0) - (rest[index + t] ?? 0))));
-        if (delta === 0)
-          continue;
-        const pixel = index / 4;
-        const x = pixel % width;
-        const y = Math.floor(pixel / width);
-        count++;
-        largest = Math.max(largest, delta);
-        box.left = Math.min(box.left, x);
-        box.top = Math.min(box.top, y);
-        box.right = Math.max(box.right, x);
-        box.bottom = Math.max(box.bottom, y);
-      }
-      if (count === 0)
-        return `${name}: no pixel differs`;
-      return `${name}: ${String(count)} pixels differ, in x ${String(box.left)} to ${String(box.right)} and y ${String(box.top)} to ${String(box.bottom)} `
-        + `of ${String(width)} by ${String(frame.length / 4 / width)}, by up to ${String(largest)} in a channel`;
-    };
+    const recorder: ISwitchRecorder = { area: null, width: 0, page: null, chat: null, recent: [], tick: 0, frames: [], unmatched: [], atRest: [] };
     window.beginFrameSubscription(false, image => {
       const at = performance.timeOrigin + performance.now();
       if (recorder.area === null || recorder.width === 0)
@@ -148,11 +122,8 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
         return;
       const kind = bitmap.equals(recorder.page) ? "page" : bitmap.equals(recorder.chat) ? "chat" : "other";
       recorder.frames.push({ at, kind });
-      if (kind === "other" && recorder.others.length < 5) {
-        recorder.others.push(cropped.toPNG().toString("base64"));
-        const width = cropped.getSize().width;
-        recorder.differences.push(`${differenceOf("page", bitmap, recorder.page, width)}; ${differenceOf("chat", bitmap, recorder.chat, width)}`);
-      }
+      if (kind === "other" && recorder.unmatched.length < 5)
+        recorder.unmatched.push({ bitmap, width: cropped.getSize().width, png: () => cropped.toPNG() });
     });
     globalThis.nolSwitchRecorder = recorder;
   }, { address: page.url(), style: STILL_STYLE });
@@ -212,7 +183,36 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     const calls = await page.evaluate(() => globalThis.nolViewCalls ?? []);
     return recordOf(JsonReader.parse(await app.electronApp.evaluate((_electron, shown) => {
       const recorder = globalThis.nolSwitchRecorder;
-      return JSON.stringify({ calls: shown, frames: recorder?.frames ?? [], others: recorder?.others ?? [], differences: recorder?.differences ?? [], atRest: recorder?.atRest ?? [] });
+      const differenceOf = (name: string, frame: Buffer, rest: Buffer, width: number): string => {
+        if (frame.length !== rest.length)
+          return `${name}: ${String(frame.length)} bytes against ${String(rest.length)}`;
+        let count = 0;
+        let largest = 0;
+        const box = { left: width, top: Number.MAX_SAFE_INTEGER, right: -1, bottom: -1 };
+        for (let index = 0; index < frame.length; index += 4) {
+          const delta = Math.max(...[0, 1, 2, 3].map(t => Math.abs((frame[index + t] ?? 0) - (rest[index + t] ?? 0))));
+          if (delta === 0)
+            continue;
+          const pixel = index / 4;
+          const x = pixel % width;
+          const y = Math.floor(pixel / width);
+          count++;
+          largest = Math.max(largest, delta);
+          box.left = Math.min(box.left, x);
+          box.top = Math.min(box.top, y);
+          box.right = Math.max(box.right, x);
+          box.bottom = Math.max(box.bottom, y);
+        }
+        if (count === 0)
+          return `${name}: no pixel differs`;
+        return `${name}: ${String(count)} pixels differ, in x ${String(box.left)} to ${String(box.right)} and y ${String(box.top)} to ${String(box.bottom)} `
+          + `of ${String(width)} by ${String(frame.length / 4 / width)}, by up to ${String(largest)} in a channel`;
+      };
+      const unmatched = recorder?.unmatched ?? [];
+      const { page: atRestPage, chat: atRestChat } = recorder ?? { page: null, chat: null };
+      const differences = atRestPage === null || atRestChat === null ? []
+        : unmatched.map(t => `${differenceOf("page", t.bitmap, atRestPage, t.width)}; ${differenceOf("chat", t.bitmap, atRestChat, t.width)}`);
+      return JSON.stringify({ calls: shown, frames: recorder?.frames ?? [], others: unmatched.map(t => t.png().toString("base64")), differences, atRest: recorder?.atRest ?? [] });
     }, calls)));
   };
   const switchToAsync = async (tab: Locator): Promise<void> => {
