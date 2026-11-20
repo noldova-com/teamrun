@@ -1129,6 +1129,7 @@ export class ComposerComponent {
 
   private show(conversationId: string, draft: Draft | null): void {
     this.shownConversationId = conversationId;
+    this.editingSignal.set(null);
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(draft?.text ?? String.empty);
@@ -1155,6 +1156,7 @@ export class ComposerComponent {
   }
 
   private take(offer: RewoundDraft): void {
+    this.editingSignal.set(null);
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(offer.text);
