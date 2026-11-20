@@ -1544,6 +1544,37 @@ export class RuntimePartTests {
   }
 
   @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
+  @TestData("teamrun.tools")
+  public async takesAProvidersServerPathOnlyFromTheAppsMainProcessAndItsOtherSettingsFromAnyClient(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new ServerPathAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const profileDir = join(directory.path, "profile");
+    const chosen = join(directory.path, "chosen-server");
+    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
+      { kind: MentioningAdapter.id, label: "Work", profileDir }) as { id: string };
+    const update = { providerId: provider.id, label: "Work", profileDir };
+
+    await RuntimePartTests.callAsync(context, "teamrun.providerUpdate", { ...update, binaryPath: chosen }, ShellClients.mainProcess);
+    const codes = await Promise.all([join(directory.path, "other-server"), ""].map(t =>
+      RuntimePartTests.failureCodeAsync(context, "teamrun.providerUpdate", { ...update, binaryPath: t }, client)));
+    const renamed = await RuntimePartTests.callAsync(context, "teamrun.providerUpdate", { ...update, label: "Home" }, client) as
+      { label: string; binaryPath: string | null };
+    await part.deactivateAsync();
+
+    Assert.areEqual(JSON.stringify([FailureCode.Unauthorized, FailureCode.Unauthorized]), JSON.stringify(codes));
+    Assert.areEqual("Home", renamed.label);
+    Assert.areEqual(chosen, renamed.binaryPath);
+  }
+
+  @TestMethod
   public async refusesAReloadOfATeamRunWindowWhoseDesktopWindowClosedOrWhosePageWasReplaced(): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);
@@ -2696,6 +2727,11 @@ class MentioningAdapter implements IProviderAdapter {
   public shutdown(): Promise<void> {
     return Promise.resolve();
   }
+}
+
+class ServerPathAdapter extends MentioningAdapter {
+  public override readonly descriptor: ProviderKind = new ProviderKind(MentioningAdapter.id, "Server path provider", true, false, null, null, false, null,
+    false, null, false, null, null, false, false, { resume: false, fork: false, ownMcpServersUnavailable: null }, null, true);
 }
 
 class ChangingAdapter implements IProviderAdapter {

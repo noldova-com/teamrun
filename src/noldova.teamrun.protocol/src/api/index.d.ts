@@ -10032,7 +10032,8 @@ export declare class ProviderUpdateParams {
    */
   public readonly ownMcpServers: boolean | null;
   /**
-   * Absolute path of the server the person chose, an empty string to choose none, or `null` to leave the choice as it is.
+   * Absolute path of the server the person chose, an empty string to choose none, or `null` to leave the choice as it is; the runtime takes
+   * a path or an empty string only from the app's main process, TeamRun's window.
    */
   public readonly binaryPath: string | null;
 

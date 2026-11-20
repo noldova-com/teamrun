@@ -379,6 +379,7 @@ export class RuntimePart implements IRuntimePart {
 
   private handlerOf(context: IRuntimePartContext, engine: ConversationEngine, method: MethodName, dispatched: IMethodHandler): IMethodHandler {
     const handler = RuntimePart.MAIN_PROCESS_ONLY.has(method) ? new MainProcessMethod(dispatched)
+      : method === MethodName.ProviderUpdate ? new MainProcessMethod(dispatched, Resources.binaryPathField)
       : RuntimePart.MODE_SETTING.has(method) ? new MainProcessMethod(dispatched, Resources.modeField)
       : method === MethodName.MessageSend ? new RequestedModeMethod(dispatched, engine, t => MessageSendParams.fromJson(t))
       : method === MethodName.WaitingMessageAdd ? new RequestedModeMethod(dispatched, engine, t => WaitingMessageAddParams.fromJson(t).message,
