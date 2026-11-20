@@ -13,7 +13,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Changed
 
-- **`@noldova/ui.components.angular` 0.0.20 and Noldova's `context` packages 0.0.9:** TeamRun is built on these versions (#283, #288, #305).
+- **Noldova Desktop 0.0.10, `@noldova/ui.components.angular` 0.0.20 and Noldova's `context` packages 0.0.9:** TeamRun is built on these versions (#283, #288, #305, #314).
 
 ## 0.0.7
 
