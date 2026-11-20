@@ -1553,7 +1553,7 @@ export class Resources {
   }
 
   public static formatWakeLost(title: string, chatId: string): string {
-    return `TeamRun restarted before the work you sent to chat ${Resources.formatChatName(title, chatId)} ended, so no result came back and this chat wasn't woken.`;
+    return `${ProtocolResources.wakeLostOpening}${Resources.formatChatName(title, chatId)} ended, so no result came back and this chat wasn't woken.`;
   }
 
   public static formatCommandLimitReached(limit: number): string {
@@ -1585,7 +1585,7 @@ export class Resources {
   }
 
   public static formatWakeChatDeleted(chatId: string): string {
-    return `The chat ${chatId} that you sent work to was deleted before its result came back, so this chat wasn't woken.`;
+    return `${ProtocolResources.wakeChatDeletedOpening}${chatId} that you sent work to was deleted before its result came back, so this chat wasn't woken.`;
   }
 
   public static formatWakeProviderRefused(reason: string): string {

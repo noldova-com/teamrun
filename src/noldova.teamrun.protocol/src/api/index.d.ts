@@ -1718,6 +1718,14 @@ export declare class Resources {
    */
   public static readonly wakeChatDeletedEnd: string;
   /**
+   * The fixed opening of the text of a chat's wake TeamRun lost by restarting, which tells such a wake stored without a `wakeEnd` apart.
+   */
+  public static readonly wakeLostOpening: string;
+  /**
+   * The fixed opening of the text of a chat's wake whose chat was deleted, which tells such a wake stored without a `wakeEnd` apart.
+   */
+  public static readonly wakeChatDeletedOpening: string;
+  /**
    * The resumeSource protocol value: the `source` of the note that a provider could not resume a chat's native session and started a fresh one.
    */
   public static readonly resumeSource: string;

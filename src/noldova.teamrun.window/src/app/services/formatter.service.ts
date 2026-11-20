@@ -133,13 +133,14 @@ export class FormatterService {
 
   public static wakeReceivedOf(message: Message): WakeReceived | null {
     const source = message.author === MessageAuthor.User ? ProtocolResources.chatWakeSource : ProtocolResources.wakeReceivedSource;
-    const payload = message.details.map(t => FormatterService.payloadOf(t)).find(t => t?.[Resources.sourceField] === source) ?? null;
-    if (Object.isNull(payload))
+    const detail = message.details.find(t => FormatterService.payloadOf(t)?.[Resources.sourceField] === source) ?? null;
+    const payload = Object.isNull(detail) ? null : FormatterService.payloadOf(detail);
+    if (Object.isNull(detail) || Object.isNull(payload))
       return null;
     const end = payload[ProtocolResources.wakeEndField];
     const ended = Object.isString(end) ? end : null;
     const task = payload[ProtocolResources.wakeTaskField];
-    if (FormatterService.isJsonObject(task)) {
+    if (!Object.isUndefined(task) && FormatterService.isJsonObject(task)) {
       const kind = task[ProtocolResources.kindField];
       const name = task[ProtocolResources.nameField];
       const ending = task[ProtocolResources.endingField];
@@ -153,7 +154,8 @@ export class FormatterService {
       const sender = message.sender;
       if (message.author !== MessageAuthor.User || Object.isNull(sender))
         return null;
-      return new WakeReceived(sender.chatId === message.conversationId ? null : sender.chatId, [], null, null);
+      return sender.chatId === message.conversationId ? new WakeReceived(null, [], null, null)
+        : new WakeReceived(sender.chatId, [], FormatterService.oldWakeEndOf(detail.text), null);
     }
     return new WakeReceived(chatId, replies.filter(t => FormatterService.isJsonObject(t)).flatMap(t => {
         const name = t[ProtocolResources.nameField];
@@ -784,6 +786,12 @@ export class FormatterService {
 
   private static isDenied(detail: MessageDetail): boolean {
     return FormatterService.payloadOf(detail)?.[Resources.deniedField] === true;
+  }
+
+  private static oldWakeEndOf(text: string): string | null {
+    if (text.startsWith(ProtocolResources.wakeLostOpening))
+      return ProtocolResources.wakeLostEnd;
+    return text.startsWith(ProtocolResources.wakeChatDeletedOpening) ? ProtocolResources.wakeChatDeletedEnd : null;
   }
 
   private static payloadOf(detail: MessageDetail): JsonObject | null {
