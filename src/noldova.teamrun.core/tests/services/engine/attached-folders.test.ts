@@ -265,7 +265,7 @@ export class AttachedFoldersTests {
     await AttachedFoldersTests.succeedAsync(host, MethodName.ConversationDelete, new ConversationIdParams(deleted.id).toJson());
     const inProject = Conversation.fromJson(await AttachedFoldersTests.succeedAsync(host, MethodName.ConversationMove,
       new ConversationMoveParams(moved.id, project.id).toJson()));
-    await host.engine.sweepFoldersAsync();
+    await host.engine.sweepFoldersAsync(new AbortController().signal);
 
     Assert.areEqual("a.txt b.txt", `${readdirSync(site).join(",")} ${readdirSync(other).join(",")}`);
     Assert.areEqual("null null", `${inProject.attachedFolder} ${inProject.folder}`);

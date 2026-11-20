@@ -630,8 +630,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return this.keptSessions.releaseFolderAsync(conversationId);
   }
 
-  public sweepFoldersAsync(): Promise<void> {
-    return this.keptSessions.sweepFoldersAsync();
+  public sweepFoldersAsync(signal: AbortSignal): Promise<void> {
+    return this.keptSessions.sweepFoldersAsync(signal);
   }
 
   private async attachmentOfAsync(params: AttachmentReadParams, draft: Draft | null): Promise<MessageAttachment> {

@@ -2312,9 +2312,10 @@ export interface IConversationEngine {
 
   /**
    * Releases, as `releaseFolderAsync` does, every own folder in the data folder whose conversation is gone or now has a project; the
-   * runtime runs it at its start. Never rejects.
+   * runtime runs it at its start. It releases no further folder once the signal aborts. Never rejects.
+   * @param signal Aborts when the sweep should stop, such as when the runtime part deactivates.
    */
-  sweepFoldersAsync(): Promise<void>;
+  sweepFoldersAsync(signal: AbortSignal): Promise<void>;
 
   /**
    * Lists the tools of a running turn, for TeamRun's MCP endpoint: a provider session's token reaches only the turn it was issued for.
@@ -9327,7 +9328,7 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * See {@link IConversationEngine.sweepFoldersAsync}.
    */
-  public sweepFoldersAsync(): Promise<void>;
+  public sweepFoldersAsync(signal: AbortSignal): Promise<void>;
 
   /**
    * See {@link IConversationEngine.listMcpToolsAsync}.

@@ -239,7 +239,7 @@ export class KeptSessionsTests {
     await KeptSessionsTests.succeedAsync(host, MethodName.ConversationDelete, new ConversationIdParams(chat.id).toJson());
     const kept = existsSync(folder);
     host.checkpoints.deleteOutcome = DeleteFolderOutcome.Deleted;
-    await host.engine.sweepFoldersAsync();
+    await host.engine.sweepFoldersAsync(new AbortController().signal);
 
     Assert.isTrue(kept);
     Assert.isFalse(existsSync(folder));
@@ -293,7 +293,7 @@ export class KeptSessionsTests {
     await host.conversations.moveAsync(new ConversationMoveParams(moved.id, project.id));
     mkdirSync(join(host.directory.path, "chats", "orphan"));
 
-    await host.engine.sweepFoldersAsync();
+    await host.engine.sweepFoldersAsync(new AbortController().signal);
 
     Assert.isTrue(existsSync(keptFolder));
     Assert.isFalse(existsSync(deletedFolder) || existsSync(movedFolder));
@@ -306,10 +306,30 @@ export class KeptSessionsTests {
     await using host = await CoreHost.createAsync();
     writeFileSync(join(host.directory.path, "chats"), "not a folder");
 
-    await host.engine.sweepFoldersAsync();
+    await host.engine.sweepFoldersAsync(new AbortController().signal);
 
     Assert.areEqual(Resources.formatChatFoldersNotSwept("Error ENOTDIR"), host.log.lines.join("\n"));
     Assert.areEqual(0, host.checkpoints.deletes.length);
+  }
+
+  @TestMethod
+  public async stopsTheSweepOnceItsSignalAbortsAndLogsAFolderWhoseChatCantBeReadWithoutRejecting(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    for (const chat of [await host.conversations.createAsync(new ConversationCreateParams(null, null)),
+      await host.conversations.createAsync(new ConversationCreateParams(null, null))])
+      await host.conversations.deleteAsync(new ConversationIdParams(chat.id));
+    const [first] = host.context.chatFolders.list();
+    const stop = new AbortController();
+    host.conversations.findAsync = (): Promise<null> => {
+      stop.abort();
+      return Promise.reject(new TypeError("closed"));
+    };
+
+    await host.engine.sweepFoldersAsync(stop.signal);
+
+    Assert.areEqual(Resources.formatChatFolderKept(first ?? "", "TypeError"), host.log.lines.join("\n"));
+    Assert.areEqual(0, host.checkpoints.deletes.length);
+    Assert.areEqual(2, host.context.chatFolders.list().length);
   }
 
   private static deletedChats(host: CoreHost): readonly string[] {

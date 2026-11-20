@@ -215,7 +215,7 @@ export class SharedImagesTests {
 
     const engine = new ConversationEngine(host.context, host.projects, host.conversations, host.messages, host.approvals, host.providers, host.teammates,
       host.registry, host.events, host.attachments, undefined, host.log, undefined, null, null, null, null, null, new SharedImages(blocked));
-    await engine.sweepFoldersAsync();
+    await engine.sweepFoldersAsync(new AbortController().signal);
 
     Assert.areEqual(Resources.formatSharedImagesNotCleaned("Error ENOTDIR"), host.log.lines.join("\n"));
   }

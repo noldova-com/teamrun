@@ -49,6 +49,7 @@ import {
   AcpAgentOffer,
   AcpStoredAgent,
   ApprovalAsk,
+  ConversationEngine,
   DatabaseContext,
   type ForkRequest,
   type IAcpAgentCatalog,
@@ -544,6 +545,39 @@ export class RuntimePartTests {
     Assert.areEqual("A chat is rewinding.", during.join(","));
     Assert.areEqual("m1", rewound.removedMessageIds.join(","));
     Assert.areEqual(0, context.openWork.size);
+  }
+
+  @TestMethod
+  public async stopsTheFolderSweepAndWaitsForItBeforeEndingTheEngineOnQuit(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    const steps: string[] = [];
+    const sweep = ConversationEngine.prototype.sweepFoldersAsync;
+    const shutdown = ConversationEngine.prototype.shutdown;
+    ConversationEngine.prototype.sweepFoldersAsync = (signal: AbortSignal): Promise<void> => new Promise(resolve => {
+      signal.addEventListener("abort", () => {
+        steps.push("sweep stopped");
+        resolve();
+      }, { once: true });
+    });
+    ConversationEngine.prototype.shutdown = function (this: ConversationEngine): Promise<void> {
+      steps.push("engine shut down");
+      return shutdown.call(this);
+    };
+
+    try {
+      await part.activateAsync(context);
+      await part.deactivateAsync();
+    }
+    finally {
+      ConversationEngine.prototype.sweepFoldersAsync = sweep;
+      ConversationEngine.prototype.shutdown = shutdown;
+    }
+
+    Assert.areEqual("sweep stopped,engine shut down", steps.join(","));
   }
 
   @TestMethod
