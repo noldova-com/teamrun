@@ -29,7 +29,7 @@ export class SharedMcpOauthTests {
     const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const finished = Promise.withResolvers<SharedMcpAccess>();
 
-    const started = new URL(await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t)));
+    const started = new URL(await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t)) ?? String.empty);
     const redirect = started.searchParams.get("redirect_uri") ?? String.empty;
     const browser = await server.signInInTheBrowserAsync(started.toString());
     const access = await finished.promise;
@@ -163,7 +163,7 @@ export class SharedMcpOauthTests {
     const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const answerAsync = async (query: (state: string) => string, path: string = "/callback"): Promise<{ status: number; access: SharedMcpAccess | null }> => {
       const finished = Promise.withResolvers<SharedMcpAccess>();
-      const started = new URL(await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t)));
+      const started = new URL(await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t)) ?? String.empty);
       const redirect = new URL(started.searchParams.get("redirect_uri") ?? String.empty);
       const elsewhere = await fetch(`${redirect.origin}/elsewhere`);
       const answer = await fetch(`${redirect.origin}${path}?${query(started.searchParams.get("state") ?? String.empty)}`);
@@ -190,6 +190,96 @@ export class SharedMcpOauthTests {
     Assert.areEqual(Resources.sharedMcpSignInTimedOut, (await timedOut.promise).needsSignIn);
     Assert.areEqual(Resources.sharedMcpSignInTimedOut, (await expired.promise).needsSignIn);
     Assert.isFalse(saved.has(SharedMcpOauthTests.reference));
+  }
+
+  @TestMethod
+  public async endsWithNoAddressAStartSignedOutWhileItAsksTheServerOrRegistersWhetherOrNotThatRequestIsAnswered(): Promise<void> {
+    await using server = await OauthTestServer.startAsync();
+    await using silentProbe = await OauthTestServer.startAsync();
+    await using silentRegistration = await OauthTestServer.startAsync();
+    const [secrets, saved] = SharedMcpOauthTests.secrets();
+    const requests: AbortController[] = [];
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start, () => {
+      const request = new AbortController();
+      requests.push(request);
+      return request.signal;
+    });
+    const ends: SharedMcpAccess[] = [];
+    const signOutWhileAsync = async (url: string, asked: Promise<void>, answer: () => void): Promise<string | null> => {
+      const starting = oauth.startAsync(url, SharedMcpOauthTests.reference, t => ends.push(t));
+      await asked;
+      await oauth.signOutAsync(SharedMcpOauthTests.reference);
+      answer();
+      return starting;
+    };
+    const timeOut = (): void => requests.forEach(t => t.abort(new DOMException("The request timed out.", "TimeoutError")));
+    const probe = server.holdAt("/mcp");
+    const registration = server.holdAt("/register");
+
+    const answeredProbe = await signOutWhileAsync(server.url, probe.asked, probe.release);
+    const answeredRegistration = await signOutWhileAsync(server.url, registration.asked, registration.release);
+    const unansweredProbe = await signOutWhileAsync(silentProbe.url, silentProbe.hangAt("/mcp"), timeOut);
+    const unansweredRegistration = await signOutWhileAsync(silentRegistration.url, silentRegistration.hangAt("/register"), timeOut);
+
+    Assert.areEqual(JSON.stringify([null, null, null, null]),
+      JSON.stringify([answeredProbe, answeredRegistration, unansweredProbe, unansweredRegistration]));
+    Assert.areEqual(0, ends.length);
+    Assert.isFalse(saved.has(SharedMcpOauthTests.reference));
+  }
+
+  @TestMethod
+  public async endsWithNoAddressAStartSignedOutWhileItsCallbackListenerOpensAndSendsTheServerNothing(): Promise<void> {
+    await using server = await OauthTestServer.startAsync();
+    const [secrets, saved] = SharedMcpOauthTests.secrets();
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const ends: SharedMcpAccess[] = [];
+
+    const starting = oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => ends.push(t));
+    await oauth.signOutAsync(SharedMcpOauthTests.reference);
+
+    Assert.isNull(await starting);
+    Assert.areEqual("[]", JSON.stringify(server.requests));
+    Assert.areEqual(0, ends.length);
+    Assert.isFalse(saved.has(SharedMcpOauthTests.reference));
+  }
+
+  @TestMethod
+  public async endsWithNoAddressAnEarlierStartWhenALaterOneStartsWhileTheEarlierRegisters(): Promise<void> {
+    await using server = await OauthTestServer.startAsync();
+    const [secrets] = SharedMcpOauthTests.secrets();
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const ends: string[] = [];
+    const finished = Promise.withResolvers<SharedMcpAccess>();
+    const registration = server.holdAt("/register");
+
+    const earlier = oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => ends.push(`earlier ${t.token}`));
+    await registration.asked;
+    const later = await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t));
+    registration.release();
+    const ended = await earlier;
+    await server.signInInTheBrowserAsync(later);
+    const access = await finished.promise;
+
+    Assert.isNull(ended);
+    Assert.areEqual("access-1", access.token);
+    Assert.areEqual(0, ends.length);
+  }
+
+  @TestMethod
+  public async failsAStartWhoseServerNeverAnswersItsFirstRequestOnceThatRequestsTimeRunsOut(): Promise<void> {
+    await using server = await OauthTestServer.startAsync();
+    const [secrets] = SharedMcpOauthTests.secrets();
+    const probe = new AbortController();
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start, () => probe.signal);
+    const asked = server.hangAt("/mcp");
+
+    const starting = oauth.startAsync(server.url, SharedMcpOauthTests.reference, () => undefined);
+    await asked;
+    probe.abort(new DOMException("The request timed out.", "TimeoutError"));
+    const failure = await Assert.throwsAsync(() => starting, DOMException);
+
+    Assert.areEqual("TimeoutError", failure.name);
+    Assert.isFalse(server.requests.includes("GET /.well-known/oauth-protected-resource/mcp"));
   }
 
   @TestMethod

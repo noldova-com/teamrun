@@ -977,6 +977,18 @@ describe("McpServersViewComponent", () => {
         .toEqual([Array(3).fill("https://auth.example/authorize?state=1"), [LinkGesture.Plain, LinkGesture.Modified, LinkGesture.Middle], 3]);
     });
 
+    it("opens no browser for a sign-in that a Sign out or a later start ended before it had an address", async () => {
+      shared = [new SharedMcpServerListing(wiki, [])];
+      await create(t => t.answer(MethodName.SharedMcpSignInStart, () => new SharedMcpSignInStarted(null).toJson()));
+      await listedShared();
+      const action = part<HTMLButtonElement>(details(), ".nol-teamrun-shared-mcp-sign-in button");
+
+      action.dispatchEvent(new MouseEvent("click", { button: 0, bubbles: true }));
+      await Wait.until(() => expect([sent(MethodName.SharedMcpSignInStart).length, action.disabled]).toEqual([1, false]));
+
+      expect([context.links, texts(".nol-teamrun-error-text")]).toEqual([[], []]);
+    });
+
     it("starts a sign-in in the system's browser while the in-app browser places links in the app", async () => {
       shared = [new SharedMcpServerListing(wiki, [])];
       await create(t => t.answer(MethodName.SharedMcpSignInStart, () => new SharedMcpSignInStarted("https://auth.example/authorize?state=1").toJson()));

@@ -16,12 +16,23 @@ export class FakeSharedMcpSignIn implements ISharedMcpSignIn {
   public access: SharedMcpAccess = SharedMcpAccess.granted("access-token-5b2e8d", "2026-11-02T11:00:00.000Z");
   public refusal: string | null = null;
   public startRefusal: string | null = null;
+  public isHolding: boolean = false;
+  private held: PromiseWithResolvers<PromiseWithResolvers<string | null>> = Promise.withResolvers();
 
-  public startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string> {
+  public startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null> {
     if (!Object.isNull(this.startRefusal))
       return Promise.reject(new Error(this.startRefusal));
     this.started.push({ url, reference, finished });
-    return Promise.resolve(`https://auth.example.com/authorize?state=${this.started.length}`);
+    if (!this.isHolding)
+      return Promise.resolve(`https://auth.example.com/authorize?state=${this.started.length}`);
+    const start = Promise.withResolvers<string | null>();
+    this.held.resolve(start);
+    this.held = Promise.withResolvers();
+    return start.promise;
+  }
+
+  public nextHeldAsync(): Promise<PromiseWithResolvers<string | null>> {
+    return this.held.promise;
   }
 
   public accessAsync(url: string, reference: string): Promise<SharedMcpAccess> {

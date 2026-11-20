@@ -1554,12 +1554,14 @@ export declare class SharedMcpOauth implements ISharedMcpSignIn {
    */
   public constructor(secrets: IModuleSecrets, expiry?: () => AbortSignal, now?: () => number, deadline?: () => AbortSignal);
   /**
-   * Asks the server for its 401, registers TeamRun as a client and returns the address of the authorization server's sign-in page. The listener
+   * Registers the sign-in under `reference` at once, ending an earlier one there without an answer, then asks the server for its 401, registers
+   * TeamRun as a client and returns the address of the authorization server's sign-in page, or `null` when a Sign out or a later start of the same
+   * reference ended it first. The listener
    * answers one request at its callback path, ending the sign-in: refused when its state isn't the one sent or it carries an error, otherwise the
    * code is exchanged for tokens, which are saved. A request at another path gets 404 and doesn't end it.
    * @throws The server's or the SDK's error when discovery or registration fails, or `RuntimePartException` when the server sends no sign-in page.
    */
-  public startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string>;
+  public startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null>;
   /**
    * Reads the access token; one that expires within a minute is refreshed first, and the new tokens are saved. Refused when no sign-in is saved,
    * none can renew it, or the refresh fails. Reads of the same reference share one refresh.
