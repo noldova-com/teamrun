@@ -8,15 +8,21 @@
 
 import {
   Component,
+  ElementRef,
+  Injector,
   type InputSignal,
   type OnInit,
   type OutputEmitterRef,
   type Signal,
   type WritableSignal,
+  afterNextRender,
   computed,
+  effect,
+  inject,
   input,
   output,
-  signal
+  signal,
+  untracked
 } from "@angular/core";
 
 import "@noldova/context.core";
@@ -67,6 +73,23 @@ export class AcpAgentsDialogComponent implements OnInit {
 
   private readonly report: (message: string) => void = t => this.error.set(t);
   private readonly pending: Set<Promise<void>> = new Set();
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector: Injector = inject(Injector);
+  private readonly added: WritableSignal<string | null> = signal(null);
+
+  public constructor() {
+    effect(() => {
+      const id = this.added();
+      if (Object.isNull(id))
+        return;
+      const installing = this.store().installations().get(id)?.state === ProviderKindInstallState.Installing;
+      untracked(() => {
+        this.keepFocus(id);
+        if (!installing)
+          this.added.set(null);
+      });
+    });
+  }
 
   public ngOnInit(): void {
     void this.load();
@@ -98,6 +121,7 @@ export class AcpAgentsDialogComponent implements OnInit {
 
   protected async add(agent: AcpAgentEntry): Promise<void> {
     await this.work(agent.id, () => this.store().addAcpAgent(agent.id, this.report));
+    this.added.set(agent.id);
   }
 
   protected installingOf(agent: AcpAgentEntry): ProviderKindInstallation | null {
@@ -112,6 +136,7 @@ export class AcpAgentsDialogComponent implements OnInit {
 
   protected async remove(agent: AcpAgentEntry): Promise<void> {
     await this.work(agent.id, () => this.store().removeAcpAgent(agent.id, this.report));
+    this.keepFocus(agent.id);
   }
 
   protected addVariable(): void {
@@ -201,6 +226,17 @@ export class AcpAgentsDialogComponent implements OnInit {
       return;
     this.listing.set(listing);
     void this.loadIconsAsync(listing);
+  }
+
+  private keepFocus(id: string): void {
+    if (!this.host.isConnected)
+      return;
+    const owner = this.host.ownerDocument;
+    afterNextRender(() => {
+      if (Object.isNull(owner.activeElement) || owner.activeElement === owner.body)
+        [...this.host.querySelectorAll<HTMLElement>(Resources.acpAgentSelector)].find(t => t.dataset["agent"] === id)
+          ?.querySelector<HTMLElement>(`${Resources.acpRemoveSelector}, ${Resources.acpAddSelector}`)?.focus();
+    }, { injector: this.injector });
   }
 
   private async loadIconsAsync(listing: AcpAgentListing): Promise<void> {

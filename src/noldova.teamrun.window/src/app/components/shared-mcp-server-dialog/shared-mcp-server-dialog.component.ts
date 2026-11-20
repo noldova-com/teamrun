@@ -6,8 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, type InputSignal, type OutputEmitterRef, type Signal, type WritableSignal, computed, inject, input, linkedSignal, output, signal }
-  from "@angular/core";
+import {
+  Component, ElementRef, Injector, type InputSignal, type OutputEmitterRef, type Signal, type WritableSignal, afterNextRender, computed, inject, input, linkedSignal,
+  output, signal
+} from "@angular/core";
 
 import "@noldova/context.core";
 import { Resources as ProtocolResources, type SharedMcpServer, SharedMcpHeader, SharedMcpServerDefinition, SharedMcpTransport, SharedMcpVariable,
@@ -95,6 +97,8 @@ export class SharedMcpServerDialogComponent {
   private readonly movedVariables: WritableSignal<readonly string[]> = signal([]);
   private readonly times: TimeFormatService = inject(TimeFormatService);
   private readonly announcer: Announcer = inject(Announcer);
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector: Injector = inject(Injector);
   private readonly savedId: WritableSignal<string | null> = linkedSignal(() => this.server()?.id ?? null);
   private readonly stored: WritableSignal<boolean> = signal(false);
   private readonly report: (message: string) => void = t => this.error.set(t);
@@ -207,11 +211,13 @@ export class SharedMcpServerDialogComponent {
 
   protected change(variable: string): void {
     this.changing.update(t => new Set([...t, variable]));
+    this.focusIn(variable, Resources.sharedMcpSecretSelector);
   }
 
   protected remove(variable: string): void {
     this.sources.update(t => new Map(t).set(variable, SharedMcpVariableSource.Environment));
     this.forget(variable);
+    this.focusIn(variable, Resources.sharedMcpSourceSelector);
   }
 
   protected dismiss(): void {
@@ -281,6 +287,11 @@ export class SharedMcpServerDialogComponent {
 
   private forgetRefusal(variable: string): void {
     this.valueRefusals.update(t => new Map([...t].filter(([name]) => name !== variable)));
+  }
+
+  private focusIn(variable: string, selector: string): void {
+    afterNextRender(() => [...this.host.querySelectorAll(Resources.sharedMcpValueSelector)].find(t => t.getAttribute("aria-label") === variable)
+      ?.querySelector<HTMLElement>(selector)?.focus(), { injector: this.injector });
   }
 
   private definition(): SharedMcpServerDefinition | null {

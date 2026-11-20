@@ -737,6 +737,7 @@ export class ComposerComponent {
     this.editingSignal.set(null);
     this.value.set(String.empty);
     void this.drafts.discard(this.shownConversationId);
+    this.box().nativeElement.focus();
   }
 
   private editLastWaiting(event: KeyboardEvent): void {
@@ -787,6 +788,7 @@ export class ComposerComponent {
   }
 
   protected async stop(): Promise<void> {
+    this.box().nativeElement.focus();
     await this.store.stop(this.conversationId());
   }
 

@@ -1334,6 +1334,9 @@ export class Resources {
   public static readonly sharedMcpVariableColumn: string = "Variable";
   public static readonly sharedMcpSourceColumn: string = "Source";
   public static readonly sharedMcpValueColumn: string = "Value";
+  public static readonly sharedMcpValueSelector: string = ".nol-teamrun-shared-mcp-value";
+  public static readonly sharedMcpSecretSelector: string = ".nol-teamrun-shared-mcp-secret";
+  public static readonly sharedMcpSourceSelector: string = ".nol-teamrun-shared-mcp-source .nol-select-button";
   public static readonly sharedMcpShowValueLabel: string = "Show";
   public static readonly sharedMcpHideValueLabel: string = "Hide";
   public static readonly sharedMcpVariableNotSetLabel: string = "Not set on this machine";
@@ -1347,6 +1350,9 @@ export class Resources {
   public static readonly acpAboutLabel: string = "About";
   public static readonly acpAddLabel: string = "Add";
   public static readonly acpRemoveLabel: string = "Remove";
+  public static readonly acpAgentSelector: string = "[data-agent]";
+  public static readonly acpAddSelector: string = ".nol-teamrun-acp-add";
+  public static readonly acpRemoveSelector: string = ".nol-teamrun-acp-remove";
   public static readonly acpNotCheckedLabel: string = "Not checked";
   public static readonly acpNotCheckedHint: string = "The registry lists no SHA-256 for this download, so TeamRun can't check it. It still comes over HTTPS, up to a size limit.";
   public static readonly acpNoAgentsText: string = "No agents to show.";
@@ -1561,6 +1567,8 @@ export class Resources {
   public static readonly usageHandOffsHeadingLevel: number = 3;
   public static readonly sustainReasonId: string = "nol-teamrun-sustain-reason";
   public static readonly moveUpLabel: string = "Move up";
+  public static readonly fallbackUpSelector: string = ".nol-teamrun-fallback-up";
+  public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
 
   public static formatSustainUnavailable(kind: string): string {

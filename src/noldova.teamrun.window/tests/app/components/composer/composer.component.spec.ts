@@ -2910,6 +2910,29 @@ describe("ComposerComponent", () => {
       expect(context.count(MethodName.ConversationCancel)).toBe(1);
     });
 
+    it("puts the focus back in the box once Cancel edit ends an edit", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      const cancel = present(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-cancel-edit"));
+      cancel.focus();
+
+      await click(cancel);
+
+      expect([editingNote(), document.activeElement === box()]).toEqual([undefined, true]);
+    });
+
+    it("puts the focus in the box once Stop is pressed, so it never drops to the page as Stop turns off and goes", async () => {
+      await running();
+      await Wait.until(() => expect(root().querySelector(".nol-teamrun-composer-stop")).not.toBeNull());
+      const stop = present(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-stop"));
+      stop.focus();
+
+      await click(stop);
+
+      expect([context.count(MethodName.ConversationCancel), document.activeElement === box()]).toEqual([1, true]);
+    });
+
     it("refuses a file pasted during an edit with a note, keeps Add files off, and saves the edit with the message's own files", async () => {
       await running();
       await listed(waiting("w1", "first"));
