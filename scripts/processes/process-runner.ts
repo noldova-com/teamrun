@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import type { Writable } from "node:stream";
 
@@ -97,7 +97,32 @@ export class ProcessRunner {
       child.stdout.on("data", (t: Buffer) => forward(output, t));
       child.stderr.on("data", (t: Buffer) => forward(errorOutput, t));
       child.on("error", t => failure = new ProcessException(`"${command}" could not start.`, { cause: t }));
+      let probe: NodeJS.Timeout | undefined;
+      const tree = (): void => {
+        const list = spawnSync("powershell", ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress"], { encoding: "utf8" });
+        const rows = JSON.parse(list.stdout) as { ProcessId: number; ParentProcessId: number; Name: string; CommandLine: string | null }[];
+        const roots = new Set([process.pid, child.pid]);
+        for (let grew = true; grew;) {
+          grew = false;
+          for (const row of rows)
+            if (roots.has(row.ParentProcessId) && !roots.has(row.ProcessId)) {
+              roots.add(row.ProcessId);
+              grew = true;
+            }
+        }
+        for (const row of rows.filter(t => roots.has(t.ProcessId) && t.ProcessId !== process.pid))
+          process.stderr.write(`PROBE ${new Date().toISOString()} tree ${row.ProcessId}<${row.ParentProcessId} ${row.Name} ${(row.CommandLine ?? "").slice(0, 160)}\n`);
+      };
+      child.on("exit", code => {
+        process.stderr.write(`PROBE ${new Date().toISOString()} child ${child.pid} exit ${code}\n`);
+        if (process.platform === "win32") {
+          tree();
+          probe = setInterval(tree, 3000);
+        }
+      });
       child.on("close", (code, signal) => {
+        clearInterval(probe);
+        process.stderr.write(`PROBE ${new Date().toISOString()} child ${child.pid} close ${code}\n`);
         clearTimeout(timer);
         file.end(() => failure === null ? resolve(new ProcessEnd(code, signal)) : reject(failure));
       });

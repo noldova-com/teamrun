@@ -31,7 +31,7 @@
     "set-version": "node scripts/set-version.ts",
     "start": "node scripts/app.ts start",
     "test": "node scripts/test.ts",
-    "test:angular": "node scripts/test.ts angular",
+    "test:angular": "node scripts/probe/start.mjs",
     "test:e2e": "node node_modules/playwright/cli.js test --config src/noldova.teamrun/tests/e2e/playwright.config.ts"
   },
   "dependencies": {
