@@ -476,6 +476,31 @@ export class TeammateChainsTests {
   }
 
   @TestMethod
+  public async listsAReplyAHandOffStoresOnlyInTheFirstOfTwoStopsThatLandDuringItsTransaction(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const [alice, bob] = await TeammateChainsTests.teamAsync(host, "Alice", "Bob");
+    host.adapter.turnTexts = [["@Bob please review"], ["Bob working"]];
+    const stops: Promise<readonly Message[]>[] = [];
+    const insert = host.messages.insertAsync.bind(host.messages);
+    host.messages.insertAsync = (message: Message, transaction?: SqlTransaction): Promise<void> => {
+      if (message.teammateId === bob!.id && stops.length === 0)
+        stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id)),
+          host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id)));
+      return insert(message, transaction);
+    };
+
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice go", null, null, [], [alice!.id]));
+    await host.until("the hand-off's Stops", () => stops.length === 2, host.runs());
+    const [first, second] = await Promise.all(stops);
+    await host.engine.waitForIdle();
+
+    const [, , bobReply] = await TeammateChainsTests.chatAsync(host, conversation.id);
+    Assert.areEqual(MessageStatus.Cancelled, bobReply!.status);
+    Assert.areEqual(`${bobReply!.id}|`, `${first!.map(t => t.id).join(",")}|${second!.map(t => t.id).join(",")}`);
+  }
+
+  @TestMethod
   public async asksForAChainedTurnsApprovalsOnItsOwnReply(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();

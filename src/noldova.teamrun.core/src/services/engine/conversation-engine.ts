@@ -163,6 +163,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   private readonly writers: Map<string, Promise<void>> = new Map();
   private readonly replyHops: Map<string, Map<string, number>> = new Map();
   private readonly stopping: Map<ReplyWork, Promise<void>> = new Map();
+  private readonly listedAfterStop: WeakSet<ReplyWork> = new WeakSet();
   private readonly wakes: ChatWakes;
   private readonly context: DatabaseContext;
   private readonly projects: IProjectsService;
@@ -699,7 +700,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const known = new Set(group);
     await Promise.all(group.map(t => this.stopAsync(t)));
     await completion;
-    const added = group.filter(t => !known.has(t));
+    const added = group.filter(t => !known.has(t) && !this.listedAfterStop.has(t));
+    for (const item of added)
+      this.listedAfterStop.add(item);
     return (await Promise.all([...open, ...added].map(t => this.requireMessageAsync(t.message.id)))).filter(t => t.status === MessageStatus.Cancelled);
   }
 
