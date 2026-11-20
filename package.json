@@ -54,7 +54,9 @@
   "devDependencies": {
     "@noldova/computer-use": "0.0.2",
     "@noldova/computer-use.runtime": "0.0.2",
+    "@noldova/context.collections": "0.0.9",
     "@noldova/context.testing": "0.0.9",
+    "@noldova/context.text": "0.0.9",
     "@types/node": "26.6.6",
     "typescript": "6.0.3"
   },

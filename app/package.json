@@ -120,6 +120,7 @@
     "@noldova/browser": "0.0.3",
     "@noldova/checkpoints": "0.0.3",
     "@noldova/computer-use": "0.0.2",
+    "@noldova/context.collections": "0.0.9",
     "@noldova/context.core": "0.0.9",
     "@noldova/context.data": "0.0.9",
     "@noldova/context.data.sql": "0.0.9",
