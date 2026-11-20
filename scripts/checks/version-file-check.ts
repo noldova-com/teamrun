@@ -10,11 +10,11 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import { VersionSetter } from "../packages/version-setter.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
 
 export class VersionFileCheck implements ICheck {
   public static readonly VERSION_FILE: string = "version.json";
-  public static readonly MANIFEST_FILE: string = "package.json";
   private static readonly VERSION_FIELD: string = "version";
 
   private readonly root: string;
@@ -27,15 +27,20 @@ export class VersionFileCheck implements ICheck {
 
   public async runAsync(output: Writable): Promise<boolean> {
     const released = await this.readVersionAsync(VersionFileCheck.VERSION_FILE, output);
-    const built = await this.readVersionAsync(VersionFileCheck.MANIFEST_FILE, output);
-    if (released === null || built === null)
-      return false;
-    if (released !== built) {
-      output.write(`${VersionFileCheck.VERSION_FILE} holds the version ${released}, but the root ${VersionFileCheck.MANIFEST_FILE}, whose version the build stamps on every package, holds ${built}; the release reads ${VersionFileCheck.VERSION_FILE}, so both change together.\n`);
-      return false;
+    let passed = released !== null;
+    const files = [...VersionSetter.TEXT_FILES.filter(t => t !== VersionFileCheck.VERSION_FILE), ...VersionSetter.MANIFESTS];
+    for (const manifest of files) {
+      const version = await this.readVersionAsync(manifest, output);
+      if (version === null)
+        passed = false;
+      else if (released !== null && version !== released) {
+        output.write(`${manifest} holds the version ${version}, but ${VersionFileCheck.VERSION_FILE} holds ${released}; npm run set-version moves only the files that hold ${VersionFileCheck.VERSION_FILE}'s version, and the release compares app/package.json's with the version it builds, so each holds it.\n`);
+        passed = false;
+      }
     }
-    output.write(`${VersionFileCheck.VERSION_FILE} and the root ${VersionFileCheck.MANIFEST_FILE} both hold ${released}.\n`);
-    return true;
+    if (passed)
+      output.write(`${VersionFileCheck.VERSION_FILE}, ${files.join(", ")} all hold ${released}.\n`);
+    return passed;
   }
 
   private async readVersionAsync(file: string, output: Writable): Promise<string | null> {
@@ -44,7 +49,7 @@ export class VersionFileCheck implements ICheck {
       text = await readFile(path.join(this.root, file), "utf8");
     }
     catch (error) {
-      output.write(`The root ${file} can't be read: ${error instanceof Error ? error.message : String(error)}\n`);
+      output.write(`${file} can't be read: ${error instanceof Error ? error.message : String(error)}\n`);
       return null;
     }
     let fields: unknown;
@@ -52,12 +57,12 @@ export class VersionFileCheck implements ICheck {
       fields = JSON.parse(text);
     }
     catch (error) {
-      output.write(`The root ${file} isn't valid JSON: ${error instanceof Error ? error.message : String(error)}\n`);
+      output.write(`${file} isn't valid JSON: ${error instanceof Error ? error.message : String(error)}\n`);
       return null;
     }
     const version: unknown = typeof fields === "object" && fields !== null ? Object.entries(fields).find(([t]) => t === VersionFileCheck.VERSION_FIELD)?.[1] : undefined;
     if (typeof version !== "string") {
-      output.write(`The root ${file} holds no version string in its "${VersionFileCheck.VERSION_FIELD}" field, but ${JSON.stringify(version ?? null)}.\n`);
+      output.write(`${file} holds no version string in its "${VersionFileCheck.VERSION_FIELD}" field, but ${JSON.stringify(version ?? null)}.\n`);
       return null;
     }
     return version;
