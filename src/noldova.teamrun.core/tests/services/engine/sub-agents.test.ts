@@ -409,12 +409,12 @@ export class SubAgentsTests {
     const lineOf = (id: string | undefined): string => Resources.formatSubAgentNotStopped(id ?? String.empty, Resources.formatFailureKind(failure));
 
     const reply = await SubAgentsTests.sendAsync(host, await host.createConversationAsync());
-    await host.adapter.requested(2);
+    await host.until("the first queued helper", () => queued.length === 1, host.runs());
     await host.engine.cancelAsync(new MessageIdParams(reply.id));
     await host.until("the logged stop", () => host.log.lines.includes(lineOf(queued[0])));
     holdsParent = false;
     await SubAgentsTests.sendAsync(host, await host.createConversationAsync());
-    await host.adapter.requested(4);
+    await host.until("the second queued helper", () => queued.length === 2, host.runs());
     await host.engine.waitForIdle();
     await host.engine.shutdown();
 
