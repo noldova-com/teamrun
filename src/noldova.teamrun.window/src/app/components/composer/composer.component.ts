@@ -1272,17 +1272,25 @@ export class ComposerComponent {
     mentioned: readonly string[], delivery: MessageDelivery | null): Promise<boolean> {
     const editing = this.editing();
     if (!Object.isNull(editing))
-      return this.saveEdit(editing, text);
+      return this.saveEdit(editing, text, conversationId);
     if (Object.isNull(this.runningReply()))
       return this.store.send(text, settings, conversationId, attachments, mentioned, this.activeResponderId());
     return this.store.addWaiting(text, settings, conversationId, delivery ?? this.store.whileReplying(), attachments, mentioned, this.activeResponderId());
   }
 
-  private async saveEdit(editing: WaitingMessage, text: string): Promise<boolean> {
+  private async saveEdit(editing: WaitingMessage, text: string, conversationId: string): Promise<boolean> {
     const saved = await this.store.editWaiting(editing, text, editing.message.attachments);
     if (saved && this.editingSignal() === editing)
       this.editingSignal.set(null);
+    if (!saved && conversationId !== this.shownConversationId)
+      this.keepHiddenDraft(new ComposerDraft(conversationId, text, []));
     return saved;
+  }
+
+  private keepHiddenDraft(draft: ComposerDraft): void {
+    void this.drafts.flush();
+    this.drafts.schedule(draft);
+    void this.drafts.flush();
   }
 
   private signOutProviderOf(): string | null | undefined {

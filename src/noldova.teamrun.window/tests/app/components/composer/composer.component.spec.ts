@@ -3007,6 +3007,24 @@ describe("ComposerComponent", () => {
       expect([edited(), editingNote(), box().value, fileNames()]).toEqual([["w1:first, changed:0"], undefined, "for the other chat", ["other.txt"]]);
     });
 
+    it("keeps an edit's text as its chat's unsent message when its save fails after a switch to another chat", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      const saving = new DeferredResponse();
+      context.answer(MethodName.WaitingMessageEdit, () => saving.promise);
+      const saves = (): string[][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftSave))
+        .map(t => DraftSaveParams.fromJson(t.parameters)).map(t => [t.chatId, t.text]);
+      await key("ArrowUp");
+      await write("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect(editingNote()).toBeUndefined());
+      saving.reject(new Error("Disconnected"));
+      await Wait.until(() => expect(saves()).toEqual([["c1", "first, changed"]]));
+
+      expect([edited(), box().value]).toEqual([["w1:first, changed:0"], ""]);
+    });
+
     it("keeps an edit open when its save fails, so the next Enter tries the edit again and sends no new message", async () => {
       await running();
       await listed(waiting("w1", "first"));
