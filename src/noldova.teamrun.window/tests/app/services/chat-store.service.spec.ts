@@ -4198,6 +4198,21 @@ describe("ChatStoreService", () => {
       expect(context.count(MethodName.WaitingMessageList)).toBe(lists + 1);
     });
 
+    it("keeps the list a change gives while the chat's read is pending over the older list the read answers", async () => {
+      const read = new DeferredResponse();
+      await store.initialize();
+      const lists = context.count(MethodName.WaitingMessageList);
+      context.answer(MethodName.WaitingMessageList, () => read.promise);
+      const opening = store.selectConversation("c1");
+      await Wait.until(() => expect(context.count(MethodName.WaitingMessageList)).toBe(lists + 1));
+
+      context.emit(EventName.WaitingMessagesChanged, listed());
+      read.resolve(listed(waiting("w1", "First")));
+      await opening;
+
+      expect(store.waitingOf("c1")).toEqual([]);
+    });
+
     it("adds one with the send it would make and how it goes, says why when it can't, and clears that once one is added", async () => {
       context.answer(MethodName.WaitingMessageAdd, t => waiting("w1", WaitingMessageAddParams.fromJson(t).message.text).toJson());
       await store.initialize();
