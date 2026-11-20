@@ -2298,8 +2298,9 @@ export class ChatStoreService {
       }));
       const open = ChatStoreService.readArray(await this.request(MethodName.MessageListOpen, null), Message.fromJson);
       const approvals = ChatStoreService.readArray(await this.request(MethodName.ApprovalListPending, null), Approval.fromJson);
-      const installations = this.loadedSignal() && !this.resyncRequested ? null
-        : ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationList, null), ProviderKindInstallation.fromJson);
+      const resyncing = !this.loadedSignal() || this.resyncRequested;
+      const installations = resyncing
+        ? ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationList, null), ProviderKindInstallation.fromJson) : null;
       if (this.disposed)
         return;
       this.setProviders(providers);
@@ -2318,7 +2319,7 @@ export class ChatStoreService {
       const checks = await Promise.all(dropped.map(t => this.confirmDropped(t.id).catch((u: unknown) => u)));
       this.setWorking(new Map(open.map(t => [t.id, t])));
       this.thinkingSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
-      this.savingCheckpointSignal.set(new Set());
+      this.savingCheckpointSignal.update(t => resyncing ? new Set() : new Set([...t].filter(u => this.workingSignal().has(u))));
       this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending));
       for (const approval of approvals)
         this.upsertApproval(approval);

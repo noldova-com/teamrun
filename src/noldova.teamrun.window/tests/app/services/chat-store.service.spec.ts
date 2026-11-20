@@ -1809,6 +1809,26 @@ describe("ChatStoreService", () => {
     expect(seen).toEqual([["m2"], ["m2"], [], [], [], ["true"], [], []]);
   });
 
+  it("keeps a running reply saving its checkpoint through a catalog read that isn't a resync, and drops it once a read finds the reply ended", async () => {
+    let open = [SampleData.reply];
+    context.answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()));
+    await store.initialize();
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const read = async (): Promise<void> => {
+      const reads = context.count(MethodName.PlanUsageList);
+      context.emit(EventName.StateInvalidated, null);
+      await Wait.until(() => expect(context.count(MethodName.PlanUsageList)).toBe(reads + 1));
+    };
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
+
+    await read();
+    const kept = saving();
+    open = [];
+    await read();
+
+    expect([kept, saving()]).toEqual([["m2"], []]);
+  });
+
   it("loads the catalog and selects a project without opening a conversation", async () => {
     context.answer(MethodName.ApprovalListPending, () => [SampleData.approval.toJson()]);
     context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
