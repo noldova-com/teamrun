@@ -204,6 +204,7 @@ export class ComposerComponent {
   protected readonly text: Signal<string> = computed(() => MentionValue.parse(this.value()).text);
   protected readonly attachments: WritableSignal<readonly ComposerAttachment[]> = signal([]);
   protected readonly attachmentError: WritableSignal<string | null> = signal(null);
+  protected readonly filesRefused: WritableSignal<boolean> = signal(false);
   protected readonly signOutNote: WritableSignal<string | null> = signal(null);
   protected readonly signOutFailure: WritableSignal<string | null> = signal(null);
   protected readonly preparing: WritableSignal<boolean> = signal(false);
@@ -726,6 +727,7 @@ export class ComposerComponent {
   }
 
   protected editWaiting(waiting: WaitingMessage): void {
+    this.filesRefused.set(false);
     this.editingSignal.set(waiting);
     this.value.set(waiting.message.text);
     this.box().nativeElement.focus();
@@ -1028,6 +1030,10 @@ export class ComposerComponent {
   private addFiles(files: readonly File[]): void {
     if (!this.canCompose())
       return;
+    if (!Object.isNull(this.editing())) {
+      this.filesRefused.set(true);
+      return;
+    }
     const existing = this.attachments();
     if (existing.length + files.length > ProtocolResources.maximumAttachments
       || files.some(t => t.size > ProtocolResources.maximumAttachmentBytes
@@ -1261,13 +1267,18 @@ export class ComposerComponent {
   private deliver(text: string, settings: ComposerSettings, conversationId: string, attachments: readonly AttachmentInput[],
     mentioned: readonly string[], delivery: MessageDelivery | null): Promise<boolean> {
     const editing = this.editing();
-    if (!Object.isNull(editing)) {
-      this.editingSignal.set(null);
-      return this.store.editWaiting(editing, text, editing.message.attachments);
-    }
+    if (!Object.isNull(editing))
+      return this.saveEdit(editing, text);
     if (Object.isNull(this.runningReply()))
       return this.store.send(text, settings, conversationId, attachments, mentioned, this.activeResponderId());
     return this.store.addWaiting(text, settings, conversationId, delivery ?? this.store.whileReplying(), attachments, mentioned, this.activeResponderId());
+  }
+
+  private async saveEdit(editing: WaitingMessage, text: string): Promise<boolean> {
+    const saved = await this.store.editWaiting(editing, text, editing.message.attachments);
+    if (saved && this.editingSignal() === editing)
+      this.editingSignal.set(null);
+    return saved;
   }
 
   private signOutProviderOf(): string | null | undefined {

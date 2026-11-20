@@ -2910,6 +2910,45 @@ describe("ComposerComponent", () => {
       expect(context.count(MethodName.ConversationCancel)).toBe(1);
     });
 
+    it("refuses a file pasted during an edit with a note, keeps Add files off, and saves the edit with the message's own files", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      const add = present(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-add"));
+      const paste = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+
+      box().dispatchEvent(paste);
+      await fixture.whenStable();
+      const note = present(root().querySelector(".nol-teamrun-composer-files-refused"));
+      const row = present(root().querySelector(".nol-teamrun-composer-editing")).getBoundingClientRect();
+      const message = note.getBoundingClientRect();
+      const field = box().getBoundingClientRect();
+      const refused = [add.disabled, note.textContent?.trim()];
+      await write("first, changed");
+
+      expect([message.top >= row.bottom, message.bottom <= field.top]).toEqual([true, true]);
+      expect([...refused, rows().length, paste.defaultPrevented]).toEqual([true, Resources.editingFilesRefused, 0, true]);
+      expect([edited(), added()]).toEqual([["w1:first, changed:0"], []]);
+    });
+
+    it("keeps an edit open when its save fails, so the next Enter tries the edit again and sends no new message", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      context.fail(MethodName.WaitingMessageEdit, "Disconnected");
+      await key("ArrowUp");
+
+      await write("first, changed");
+      await Wait.until(() => expect(context.noticeText()).not.toBeNull());
+      const failed = [editingNote(), box().value];
+      context.answer(MethodName.WaitingMessageEdit, () => null);
+      await key("Enter");
+
+      expect(failed).toEqual([Resources.editingWaitingNote, "first, changed"]);
+      await Wait.until(() => expect(editingNote()).toBeUndefined());
+      expect([edited(), added(), box().value]).toEqual([["w1:first, changed:0", "w1:first, changed:0"], [], ""]);
+    });
+
     it("ends editing once its message no longer waits, and keeps the text to send as a new message", async () => {
       await running();
       await listed(waiting("w1", "first"));
