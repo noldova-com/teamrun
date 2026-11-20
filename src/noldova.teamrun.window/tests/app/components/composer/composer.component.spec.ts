@@ -2575,6 +2575,31 @@ describe("ComposerComponent", () => {
     expect(alert()).toContain("could not be read");
   });
 
+  it("leaves a file pasted while a send prepares its files to the box, which is read-only then, as it refuses a drag, attaching nothing", async () => {
+    const held = new DeferredResponse();
+    context.answer(MethodName.AttachmentPrepare, t => {
+      const input = AttachmentInput.fromJson(t);
+      return Object.isNull(input.path) ? new MessageAttachment(input.name, input.mediaType, 1, `D:/data/attachments/drafts/${input.name}`).toJson() : held.promise;
+    });
+    await prepare();
+    await render();
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    await pick([file]);
+    await ready();
+    required(root().querySelector("form")).dispatchEvent(new Event("submit", { cancelable: true }));
+    await Wait.until(() => expect(box().readOnly).toBe(true));
+
+    const paste = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "other.txt", { type: "text/plain" })] } });
+    box().dispatchEvent(paste);
+    await fixture.whenStable();
+    const during = [paste.defaultPrevented, box().readOnly, rows().length, alert()];
+    held.resolve(new MessageAttachment("notes.txt", "text/plain", 1, "D:/data/attachments/drafts/sent-notes.txt").toJson());
+    await Wait.until(() => expect(sent()).toHaveLength(1));
+
+    expect([during, sent()[0]?.attachments.map(t => t.name)]).toEqual([[false, true, 1, undefined], ["notes.txt"]]);
+  });
+
   it("takes files chosen, pasted and dropped, keeps them when sending fails, then sends a message of files alone", async () => {
     context.fail(MethodName.MessageSend, "Disconnected");
     await prepare();
