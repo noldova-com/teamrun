@@ -20,19 +20,22 @@ interface IBlockLanguage {
   readonly write: (file: string) => string;
   readonly type: (file: string) => string;
   readonly compute: (file: string) => string;
+  readonly clearKey: string;
 }
 
 const BASH: IBlockLanguage = {
   language: "bash",
   write: file => `echo $$ > '${file.replaceAll("\\", "/")}'`,
   type: file => `echo typed > '${file.replaceAll("\\", "/")}'`,
-  compute: file => `echo typed-$((6*7)) > '${file.replaceAll("\\", "/")}'`
+  compute: file => `echo typed-$((6*7)) > '${file.replaceAll("\\", "/")}'`,
+  clearKey: "Control+U"
 };
 const POWERSHELL: IBlockLanguage = {
   language: "powershell",
   write: file => `Set-Content -LiteralPath '${file}' -Value $PID`,
   type: file => `Set-Content -LiteralPath '${file}' -Value typed`,
-  compute: file => `Set-Content -LiteralPath '${file}' -Value ("typed-" + 42)`
+  compute: file => `Set-Content -LiteralPath '${file}' -Value ("typed-" + 42)`,
+  clearKey: "Escape"
 };
 const COMPUTED: string = "typed-42";
 const BASH_PROFILES: readonly string[] = [".bash_profile", ".bashrc"];
@@ -135,7 +138,7 @@ const boxOf = async (locator: Locator): Promise<IBox> => {
   return boxFrom(box);
 };
 
-for (const { language, write, compute } of LANGUAGES)
+for (const { language, write, compute, clearKey } of LANGUAGES)
   test(`Run on a reply's ${language} block shows the chat's terminal inline under it, across its width, and the next Run, clicked after the person typed a command into it, moves the same shell under its own block, leaving the earlier Run's output under its block`,
     async ({ app }, testInfo) => {
       const page = await app.openChatAsync();
@@ -167,8 +170,7 @@ for (const { language, write, compute } of LANGUAGES)
       expect(underSecond.height).toBeLessThanOrEqual(Math.min(history.height, Math.max(history.height / 2, MINIMUM_ROWS * rowHeight) + TERMINAL_INSET) + EDGE_TOLERANCE);
 
       const computed = app.pidFile(`${language}-computed`);
-      await page.keyboard.type(compute(computed));
-      await page.keyboard.press("Enter");
+      await TerminalScreen.enterAsync(page, page.locator("nol-teamrun-inline-terminal .xterm-rows"), compute(computed), clearKey);
       await expect.poll(() => shownUnlessWrittenAsync(page, computed, COMPUTED), { ...TeamRunApp.pollOf(30_000), message: "the typed command writes its file" }).toEqual([]);
       await settledAtPromptAsync(page, path.basename(computed));
       await runs.nth(0).click();
