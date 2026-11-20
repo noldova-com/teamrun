@@ -29,6 +29,7 @@ import {
   MessageDetail,
   MessagePage,
   MessagePageParams,
+  MessageSender,
   MessageStatus,
   MethodName,
   PlanStep,
@@ -1878,6 +1879,41 @@ describe("HistoryComponent", () => {
         expect(text.right).toBeLessThanOrEqual(reply.right + 0.5);
         expect([style.color, getComputedStyle(line.querySelector(".nol-teamrun-usage-hand-off-glyph") ?? line).color]).toEqual([muted, muted]);
       }
+    });
+
+    it("draws a chat's wake as one closed row at the top of the reply it started, hiding the wake's own message, and one that started no turn as the row alone, on the reply column's edges", async () => {
+      const at = SampleData.timestamp;
+      const agent = "The work you sent to chat \"Second\" (c2) has ended.\n\n@Bob replied (message n9):\nDone.\n\nRead a message whole with `teamrun_list_messages`.";
+      const view = { wakeChatId: "c2", wakeReplies: [{ name: "Bob", status: MessageStatus.Completed, text: "Done." }] };
+      const wake = (id: string, sequence: number, reply: string | null): Message => new Message(id, "c3", sequence, MessageAuthor.User, null, MessageStatus.Completed,
+        [new MessageDetail(0, DetailKind.Text, agent, { source: "chatWake", wakeId: `${id}-wake`, wakeSourceMessageId: "q0", ...view, ...Object.isNull(reply) ? {} : { wakeReplyId: reply } }, at)],
+        null, at, null, at, [], null, null, [], new MessageSender("c2", "bob", "Bob"));
+      const messages = [new Message("q0", "c3", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "Ask Bob.")], null, at, null, at),
+        wake("w1", 1, "r2"),
+        new Message("r2", "c3", 2, MessageAuthor.Provider, "w1", MessageStatus.Completed, [new MessageDetail(0, DetailKind.Note, `Received a message from "Second".`,
+          { source: "wakeReceived", ...view }, at), SampleData.detail(1, DetailKind.Text, "Thanks, Bob.")], SampleData.provenance, at, at, at),
+        wake("w3", 3, null)];
+      context.answer(MethodName.MessagePage, t => MessagePageParams.fromJson(t).conversationId === "c3" ? new MessagePage(messages, false, false, 4).toJson() : pageOf(t));
+      const lines = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-wake-line")];
+
+      fixture.componentRef.setInput("chatId", "c3");
+      await open("c3");
+      await until(() => expect([lines().length, replyOf("Thanks, Bob.")]).toEqual([2, expect.anything()]));
+      await settle();
+      const [inside, alone] = lines();
+      const reply = bounds(replyOf("Thanks, Bob."));
+
+      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(2);
+      expect(replyOf("Thanks, Bob.")?.contains(inside ?? null)).toBe(true);
+      expect(alone?.closest("nol-teamrun-history-message")).toBeNull();
+      expect(element().textContent).not.toMatch(/has ended|teamrun_list_messages|\(c2\)|n9/);
+      for (const line of [inside, alone])
+        expect([line?.querySelector(".wake-toggle")?.textContent?.trim(), line?.querySelector(".wake-chat")?.textContent?.trim()]).toEqual(["Received a message from", "Second"]);
+      const row = alone?.querySelector(".wake-line")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+      expect(document.getElementById(alone?.closest("[role='article']")?.getAttribute("aria-labelledby") ?? "")).toBe(alone?.querySelector(".wake-line"));
+      AppearanceFixture.expectPixels(row.left, reply.left);
+      AppearanceFixture.expectPixels(row.height, AppearanceFixture.measureLook("pointer-target"));
+      expect(row.right).toBeLessThanOrEqual(reply.right + 0.5);
     });
   });
 });

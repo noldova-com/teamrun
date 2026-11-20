@@ -1669,6 +1669,26 @@ export declare class Resources {
    */
   public static readonly usageHandOffSource: string;
   /**
+   * The chatWakeSource protocol value: the `source` of the message a chat's wake posts when the work it sent to another chat ends, whose text is what its teammate reads.
+   */
+  public static readonly chatWakeSource: string;
+  /**
+   * The wakeReceivedSource protocol value: the `source` of the note at the top of a reply that a chat's wake started, which names the chat and its replies for the person.
+   */
+  public static readonly wakeReceivedSource: string;
+  /**
+   * Name of the field carrying the ID of the chat a wake came from: `wakeChatId`.
+   */
+  public static readonly wakeChatField: string;
+  /**
+   * Name of the field carrying a wake's replies for the person, each with its teammate's `name`, its `status` and its `text` or null: `wakeReplies`.
+   */
+  public static readonly wakeRepliesField: string;
+  /**
+   * Name of the field carrying the ID of the reply a chat's wake started: `wakeReplyId`.
+   */
+  public static readonly wakeReplyField: string;
+  /**
    * The resumeSource protocol value: the `source` of the note that a provider could not resume a chat's native session and started a fresh one.
    */
   public static readonly resumeSource: string;

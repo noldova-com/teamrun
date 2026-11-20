@@ -68,9 +68,13 @@ export class ChatWakesTests {
       `@Bob replied (message ${bobReply.id}):\nThe login fix is in.\n@Carol please check it.`,
       `Also ended there, from hand-offs: @Carol (message ${carolReply.id}).`, "Read a message whole with `teamrun_list_messages`."].join("\n\n");
     Assert.isNotNull(result.wakeId);
-    Assert.areEqual(JSON.stringify([MessageAuthor.User, second.id, bob!.id, "Bob", text, { source: "chatWake", wakeId: result.wakeId, wakeSourceMessageId: asked!.id }]),
+    const replies = [{ name: "Bob", status: MessageStatus.Completed, text: "The login fix is in.\n@Carol please check it." }];
+    Assert.areEqual(JSON.stringify([MessageAuthor.User, second.id, bob!.id, "Bob", text,
+      { source: "chatWake", wakeId: result.wakeId, wakeSourceMessageId: asked!.id, wakeChatId: second.id, wakeReplies: replies, wakeReplyId: woken!.id }]),
       JSON.stringify([wake!.author, wake!.sender?.conversationId, wake!.sender?.teammateId, wake!.sender?.name, wake!.details[0]?.text, wake!.details[0]?.payload]));
     Assert.areEqual(JSON.stringify([alice!.id, wake!.id, MessageStatus.Completed]), JSON.stringify([woken!.teammateId, woken!.inReplyTo, woken!.status]));
+    Assert.areEqual(JSON.stringify([DetailKind.Note, `Received a message from "Fixes".`, { source: "wakeReceived", wakeChatId: second.id, wakeReplies: replies }]),
+      JSON.stringify([woken!.details[0]?.kind, woken!.details[0]?.text, woken!.details[0]?.payload]));
     Assert.isTrue(wake!.sequence > asked!.sequence);
     Assert.isTrue(host.adapter.requests[3]!.prompt.includes(`From @Bob in chat "Fixes" (${second.id}): ${text}`), host.adapter.requests[3]!.prompt);
     Assert.areEqual(4, host.adapter.requests.length);
@@ -795,6 +799,8 @@ export class ChatWakesTests {
       `Done.|${Resources.formatChainStopped(2)}`,
       "Done.|This chat wasn't woken: the provider that asked for it is turned off or signed out."
     ]), JSON.stringify((await Promise.all(chats.map(t => ChatWakesTests.chatAsync(host, t.id)))).map(t => t.at(-1)!.details.map(u => u.text).join("|"))));
+    Assert.areEqual(JSON.stringify({ source: "chatWake", wakeId: "w1", wakeSourceMessageId: sources[1]!.id, wakeChatId: removed!.id, wakeReplies: [] }),
+      JSON.stringify((await ChatWakesTests.chatAsync(host, removed!.id)).at(-1)!.details[0]?.payload));
     Assert.areEqual(requests, host.adapter.requests.length);
     Assert.areEqual("Undeliverable,Undeliverable,Undeliverable,Undeliverable,Undeliverable,Undeliverable", await ChatWakesTests.statesAsync(host));
   }

@@ -1497,6 +1497,10 @@ export class Resources {
     return Object.isNull(command) ? "Started when a background task ended." : `Started when the background task \`${command}\` ended.`;
   }
 
+  public static formatWakeReceived(title: string | null): string {
+    return Object.isNull(title) ? "Received a message from a deleted chat." : `Received a message from ${JSON.stringify(title)}.`;
+  }
+
   public static formatWakeHeader(title: string, chatId: string): string {
     return `The work you sent to chat ${Resources.formatChatName(title, chatId)} has ended.`;
   }

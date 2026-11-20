@@ -4378,6 +4378,12 @@ export declare class Resources {
   public static formatWakeNote(command: string | null): string;
 
   /**
+   * The note at the top of a reply that a chat's wake started: the chat the work went to, with no ID.
+   * @param title The chat's title, or `null` when the chat is gone.
+   */
+  public static formatWakeReceived(title: string | null): string;
+
+  /**
    * The text of the message that wakes a chat whose sub-agent ended after the turn that started it: the sub-agent, how it ended, and its summary cut
    * at 2,000 characters.
    * @param status The sub-agent's status as it ended.

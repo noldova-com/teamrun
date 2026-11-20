@@ -155,6 +155,11 @@ export class Resources {
   public static readonly maximumDiffLines: number = 400;
   public static readonly handOffSource: string = "handOff";
   public static readonly usageHandOffSource: string = "usageHandOff";
+  public static readonly chatWakeSource: string = "chatWake";
+  public static readonly wakeReceivedSource: string = "wakeReceived";
+  public static readonly wakeChatField: string = "wakeChatId";
+  public static readonly wakeRepliesField: string = "wakeReplies";
+  public static readonly wakeReplyField: string = "wakeReplyId";
   public static readonly resumeSource: string = "resume";
   public static readonly changesNoteField: string = "changesNote";
   public static readonly writesField: string = "writes";
