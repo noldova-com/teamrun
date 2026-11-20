@@ -9,7 +9,7 @@
 import { signal, untracked } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
-import type { JsonValue } from "@noldova/context.json";
+import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
   Approval,
@@ -29,6 +29,7 @@ import {
   MessageDetail,
   MessagePage,
   MessagePageParams,
+  MessageSender,
   MessageStatus,
   MethodName,
   PlanStep,
@@ -1878,6 +1879,92 @@ describe("HistoryComponent", () => {
         expect(text.right).toBeLessThanOrEqual(reply.right + 0.5);
         expect([style.color, getComputedStyle(line.querySelector(".nol-teamrun-usage-hand-off-glyph") ?? line).color]).toEqual([muted, muted]);
       }
+    });
+
+    it("draws a chat's wake as one closed row at the top of the reply it started, hiding the wake's own message, and one that started no turn as the row alone, on the reply column's edges", async () => {
+      const at = SampleData.timestamp;
+      const agent = "The work you sent to chat \"Second\" (c2) has ended.\n\n@Bob replied (message n9):\nDone.\n\nRead a message whole with `teamrun_list_messages`.";
+      const view = { wakeChatId: "c2", wakeReplies: [{ name: "Bob", status: MessageStatus.Completed, text: "Done." }] };
+      const wake = (id: string, sequence: number, reply: string | null): Message => new Message(id, "c3", sequence, MessageAuthor.User, null, MessageStatus.Completed,
+        [new MessageDetail(0, DetailKind.Text, agent, { source: "chatWake", wakeId: `${id}-wake`, wakeSourceMessageId: "q0", ...view, ...Object.isNull(reply) ? {} : { wakeReplyId: reply } }, at)],
+        null, at, null, at, [], null, null, [], new MessageSender("c2", "bob", "Bob"));
+      const messages = [new Message("q0", "c3", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "Ask Bob.")], null, at, null, at),
+        wake("w1", 1, "r2"),
+        new Message("r2", "c3", 2, MessageAuthor.Provider, "w1", MessageStatus.Completed, [new MessageDetail(0, DetailKind.Note, `Received a message from "Second".`,
+          { source: "wakeReceived", ...view }, at), SampleData.detail(1, DetailKind.Text, "Thanks, Bob.")], SampleData.provenance, at, at, at),
+        wake("w3", 3, null)];
+      context.answer(MethodName.MessagePage, t => MessagePageParams.fromJson(t).conversationId === "c3" ? new MessagePage(messages, false, false, 4).toJson() : pageOf(t));
+      const lines = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-wake-line")];
+
+      fixture.componentRef.setInput("chatId", "c3");
+      await open("c3");
+      await until(() => expect([lines().length, replyOf("Thanks, Bob.")]).toEqual([2, expect.anything()]));
+      await settle();
+      const [inside, alone] = lines();
+      const reply = bounds(replyOf("Thanks, Bob."));
+
+      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(2);
+      expect(replyOf("Thanks, Bob.")?.contains(inside ?? null)).toBe(true);
+      expect(alone?.closest("nol-teamrun-history-message")).toBeNull();
+      expect(element().textContent).not.toMatch(/has ended|teamrun_list_messages|\(c2\)|n9/);
+      for (const line of [inside, alone])
+        expect([line?.querySelector(".wake-toggle")?.textContent?.trim(), line?.querySelector(".wake-chat")?.textContent?.trim()]).toEqual(["Received a message from", "Second"]);
+      const row = alone?.querySelector(".wake-line")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+      expect(document.getElementById(alone?.closest("[role='article']")?.getAttribute("aria-labelledby") ?? "")).toBe(alone?.querySelector(".wake-line"));
+      AppearanceFixture.expectPixels(row.left, reply.left);
+      AppearanceFixture.expectPixels(row.height, AppearanceFixture.measureLook("pointer-target"));
+      expect(row.right).toBeLessThanOrEqual(reply.right + 0.5);
+    });
+
+    it("draws a wake that started no turn as its row with the wake's note below it, a lost or deleted chat's wake as no reply coming back, old or new, a deleted chat's replies that came back as received, and an old wake from its sender's chat, never with an ID", async () => {
+      const at = SampleData.timestamp;
+      const view = { wakeChatId: "c2", wakeReplies: [{ name: "Bob", status: MessageStatus.Completed, text: "Done." }] };
+      const ended = (end: string, chatId: string): JsonObject => ({ wakeChatId: chatId, wakeReplies: [], wakeEnd: end });
+      const wake = (id: string, sequence: number, text: string, payload: JsonObject, notes: readonly string[], senderChat: string = "c2"): Message =>
+        new Message(id, "c3", sequence, MessageAuthor.User, null, MessageStatus.Completed,
+          [new MessageDetail(0, DetailKind.Text, text, { source: "chatWake", wakeId: `${id}-wake`, wakeSourceMessageId: "q0", ...payload }, at),
+            ...notes.map((t, i) => new MessageDetail(i + 1, DetailKind.Note, t, null, at))], null, at, null, at, [], null, null, [], new MessageSender(senderChat, "bob", "Bob"));
+      const notWoken = "This chat wasn't woken: the teammate that asked for it is no longer in this chat.";
+      const stopped = "The chain stopped after 2 hand-offs. You can change this limit in Settings › TeamRun. Mention a teammate to go on.";
+      const messages = [new Message("q0", "c3", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "Ask Bob.")], null, at, null, at),
+        wake("w1", 1, "The work you sent to chat \"Second\" (c2) has ended.", view, [notWoken]),
+        wake("w2", 2, "The work you sent to chat \"Second\" (c2) has ended.", view, [stopped]),
+        wake("w3", 3, "TeamRun restarted before the work you sent to chat \"Second\" (c2) ended.", ended("lost", "c2"), []),
+        wake("w4", 4, "The chat gone-chat that you sent work to was deleted.", ended("chatDeleted", "gone-chat"), [], "gone-chat"),
+        wake("w5", 5, "@Bob replied (message n9): Done. Read a message whole with `teamrun_list_messages`.", {}, []),
+        wake("w6", 6, "Your sub-agent \"Search\" (agent-1) ended as completed.", {}, [], "c3"),
+        wake("w7", 7, "TeamRun restarted before the work you sent to chat \"Second\" (c2) ended, so no result came back and this chat wasn't woken.", {}, []),
+        wake("w8", 8, "The chat gone-chat that you sent work to was deleted before its result came back, so this chat wasn't woken.", {}, [], "gone-chat"),
+        wake("w9", 9, "The work you sent to chat \"Gone\" (gone-chat) has ended.", { ...view, wakeChatId: "gone-chat" }, [], "gone-chat")];
+      context.answer(MethodName.MessagePage, t => MessagePageParams.fromJson(t).conversationId === "c3" ? new MessagePage(messages, false, false, 10).toJson() : pageOf(t));
+      const lines = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-wake-line")];
+      const textOf = (line: HTMLElement | undefined, selector: string): readonly string[] =>
+        [...line?.querySelectorAll(selector) ?? []].map(t => t.textContent?.trim() ?? "");
+
+      fixture.componentRef.setInput("chatId", "c3");
+      await open("c3");
+      await until(() => expect(lines().length).toBe(8));
+      await settle();
+      const opened = [2, 3, 5, 6, 7].map(t => lines()[t]);
+      for (const line of opened)
+        line?.querySelector<HTMLButtonElement>(".wake-toggle")?.click();
+      await settle();
+
+      expect(lines().map(t => [...textOf(t, ".wake-toggle, .wake-label"), ...textOf(t, ".wake-chat, .wake-chat-gone")])).toEqual([
+        ["Received a message from", "Second"], ["Received a message from", "Second"], ["No reply came back from", "Second"],
+        ["No reply came back from", "a deleted chat"], ["Received a message from", "Second"], ["No reply came back from", "Second"],
+        ["No reply came back from", "a deleted chat"], ["Received a message from", "a deleted chat"]]);
+      expect(lines().map(t => textOf(t, ".wake-note"))).toEqual([[notWoken], [stopped], [], [], [], [], [], []]);
+      const lostText = "TeamRun restarted before the work sent there ended.";
+      const deletedText = "The chat was deleted before the work sent there ended.";
+      expect(opened.map(t => textOf(t, ".wake-reply-heading, .wake-reply-text"))).toEqual([[lostText], [deletedText], [lostText], [deletedText], ["Bob replied:", "Done."]]);
+      expect([lines()[4]?.querySelector(".wake-toggle"), lines()[4]?.querySelector(".wake-chevron")]).toEqual([null, null]);
+      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(2);
+      expect(element().textContent).not.toMatch(/has ended|restarted before the work you sent|that you sent work to|teamrun_list_messages|\(c2\)|n9|gone-chat|w\d-wake/);
+      const row = lines()[0]?.querySelector(".wake-line")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+      const note = lines()[0]?.querySelector(".wake-note")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+      AppearanceFixture.expectPixels(note.left, row.left);
+      expect(note.top).toBeGreaterThanOrEqual(row.bottom - 0.5);
     });
   });
 });

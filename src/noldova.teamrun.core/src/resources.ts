@@ -705,7 +705,6 @@ export class Resources {
   public static readonly idleCompactionField: string = "idleCompaction";
   public static readonly compactionField: string = "compaction";
   public static readonly idleCompactionNote: string = "Compacted while idle, before the prompt cache expired, so the next message starts from a summary.";
-  public static readonly chatWakeSource: string = "chatWake";
   public static readonly wakeIdField: string = "wakeId";
   public static readonly wakeSourceMessageField: string = "wakeSourceMessageId";
   public static readonly kindField: string = "kind";
@@ -716,6 +715,7 @@ export class Resources {
   public static readonly stateField: string = "state";
   public static readonly textField: string = "text";
   public static readonly hopField: string = "hop";
+  public static readonly viewField: string = "view";
   public static readonly createdAtField: string = "createdAt";
   public static readonly chatIdParameterName: string = "chatId";
   public static readonly sourceMessageIdParameterName: string = "sourceMessageId";
@@ -725,6 +725,7 @@ export class Resources {
   public static readonly wakeWatchesNothing: string = "A wake watches at least one reply or sub-agent.";
   public static readonly wakeQuoteLength: number = 2_000;
   public static readonly wakeReadWhole: string = "Read a message whole with `teamrun_list_messages`.";
+  public static readonly wakeChatDeletedSince: string = "That chat has since been deleted, so its messages can't be read.";
   public static readonly wakeSenderGone: string = "the reply that asked for it is gone.";
   public static readonly wakeTeammateGone: string = "the teammate that asked for it is no longer in this chat.";
   public static readonly wakeProviderUnavailable: string = "the provider that asked for it is turned off or signed out.";
@@ -1497,6 +1498,10 @@ export class Resources {
     return Object.isNull(command) ? "Started when a background task ended." : `Started when the background task \`${command}\` ended.`;
   }
 
+  public static formatWakeReceived(title: string | null): string {
+    return Object.isNull(title) ? "Received a message from a deleted chat." : `Received a message from ${JSON.stringify(title)}.`;
+  }
+
   public static formatWakeHeader(title: string, chatId: string): string {
     return `The work you sent to chat ${Resources.formatChatName(title, chatId)} has ended.`;
   }
@@ -1534,7 +1539,7 @@ export class Resources {
   }
 
   public static formatWakeLost(title: string, chatId: string): string {
-    return `TeamRun restarted before the work you sent to chat ${Resources.formatChatName(title, chatId)} ended, so no result came back and this chat wasn't woken.`;
+    return `${ProtocolResources.wakeLostOpening}${Resources.formatChatName(title, chatId)} ended, so no result came back and this chat wasn't woken.`;
   }
 
   public static formatCommandLimitReached(limit: number): string {
@@ -1570,7 +1575,7 @@ export class Resources {
   }
 
   public static formatWakeChatDeleted(chatId: string): string {
-    return `The chat ${chatId} that you sent work to was deleted before its result came back, so this chat wasn't woken.`;
+    return `${ProtocolResources.wakeChatDeletedOpening}${chatId} that you sent work to was deleted before its result came back, so this chat wasn't woken.`;
   }
 
   public static formatWakeProviderRefused(reason: string): string {

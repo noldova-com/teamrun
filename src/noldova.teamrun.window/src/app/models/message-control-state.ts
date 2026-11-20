@@ -17,17 +17,19 @@ export class MessageControlState {
   private readonly drafts: WritableSignal<ReadonlyMap<string, QuestionDraft>>;
 
   public readonly activityChoice: WritableSignal<boolean | null>;
+  public readonly wakeChoice: WritableSignal<boolean | null>;
   public readonly expansion: ReplyExpansion;
 
   public constructor() {
     this.wrapping = new Map();
     this.drafts = signal(new Map());
     this.activityChoice = signal(null);
+    this.wakeChoice = signal(null);
     this.expansion = new ReplyExpansion();
   }
 
   public get hasChanges(): boolean {
-    return !Object.isNull(this.activityChoice()) || this.expansion.hasChanges || [...this.wrapping.values()].some(t => t.size > 0)
+    return !Object.isNull(this.activityChoice()) || !Object.isNull(this.wakeChoice()) || this.expansion.hasChanges || [...this.wrapping.values()].some(t => t.size > 0)
       || [...this.drafts().values()].some(t => t.hasChanges);
   }
 
