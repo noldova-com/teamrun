@@ -164,6 +164,7 @@ export class RuntimePart implements IRuntimePart {
   }
 
   public async deactivateAsync(): Promise<void> {
+    this.sweepStop?.abort();
     this.answerer?.[Symbol.dispose]();
     this.answerer = null;
     this.sessionStops?.[Symbol.dispose]();
@@ -185,8 +186,6 @@ export class RuntimePart implements IRuntimePart {
       await this.endpoint?.closeAsync();
       this.endpoint = null;
       await Promise.all(this.awaited.map(t => t.whenIdle()));
-      this.sweepStop?.abort();
-      await this.sweeping;
       if (!Object.isNull(this.engine))
         await this.engine.shutdown();
       const results = await Promise.allSettled((this.registry?.all() ?? []).map(t => t.shutdown()));
@@ -195,6 +194,7 @@ export class RuntimePart implements IRuntimePart {
     }
     finally {
       try {
+        await this.sweeping;
         await this.tasks?.closeAsync();
       }
       finally {

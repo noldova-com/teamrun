@@ -548,7 +548,9 @@ export class RuntimePartTests {
   }
 
   @TestMethod
-  public async stopsTheFolderSweepAndWaitsForItBeforeEndingTheEngineOnQuit(): Promise<void> {
+  @TestData(false)
+  @TestData(true)
+  public async stopsTheFolderSweepFirstOnQuitAndWaitsForItToEndBeforeClosingTheDatabaseEvenWhenAnEarlierCloseFails(closeFails: boolean): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);
     await using checkpoints = await CheckpointsModule.startAsync();
@@ -556,28 +558,40 @@ export class RuntimePartTests {
     const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
     const steps: string[] = [];
     const sweep = ConversationEngine.prototype.sweepFoldersAsync;
-    const shutdown = ConversationEngine.prototype.shutdown;
+    const close = McpHttpEndpoint.prototype.closeAsync;
+    const dispose = DatabaseContext.prototype[Symbol.asyncDispose];
     ConversationEngine.prototype.sweepFoldersAsync = (signal: AbortSignal): Promise<void> => new Promise(resolve => {
       signal.addEventListener("abort", () => {
         steps.push("sweep stopped");
-        resolve();
+        setImmediate(() => {
+          steps.push("sweep ended");
+          resolve();
+        });
       }, { once: true });
     });
-    ConversationEngine.prototype.shutdown = function (this: ConversationEngine): Promise<void> {
-      steps.push("engine shut down");
-      return shutdown.call(this);
+    McpHttpEndpoint.prototype.closeAsync = async function (this: McpHttpEndpoint): Promise<void> {
+      await close.call(this);
+      if (closeFails)
+        throw new Error("The endpoint didn't close.");
+    };
+    DatabaseContext.prototype[Symbol.asyncDispose] = function (this: DatabaseContext): Promise<void> {
+      steps.push("database closed");
+      return dispose.call(this);
     };
 
+    let failure: unknown = null;
     try {
       await part.activateAsync(context);
-      await part.deactivateAsync();
+      failure = await part.deactivateAsync().then(() => null, (error: unknown) => error);
     }
     finally {
       ConversationEngine.prototype.sweepFoldersAsync = sweep;
-      ConversationEngine.prototype.shutdown = shutdown;
+      McpHttpEndpoint.prototype.closeAsync = close;
+      DatabaseContext.prototype[Symbol.asyncDispose] = dispose;
     }
 
-    Assert.areEqual("sweep stopped,engine shut down", steps.join(","));
+    Assert.areEqual(closeFails ? "The endpoint didn't close." : "null", failure instanceof Error ? failure.message : String(failure));
+    Assert.areEqual("sweep stopped,sweep ended,database closed", steps.join(","));
   }
 
   @TestMethod

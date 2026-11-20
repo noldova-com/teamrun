@@ -98,13 +98,13 @@ export class KeptSessions {
     }
   }
 
-  public async releaseFolderAsync(conversationId: string): Promise<void> {
+  public async releaseFolderAsync(conversationId: string, signal?: AbortSignal): Promise<void> {
     const folders = this.context.chatFolders;
     try {
       const conversation = await this.conversations.findAsync(conversationId);
       if (!folders.exists(conversationId) || (!Object.isNull(conversation) && Object.isNull(conversation.projectId)))
         return;
-      if (!Object.isNull(this.checkpoints) && !await this.checkpoints.deleteAsync(new WorkFolder(conversationId, folders.pathOf(conversationId)))) {
+      if (!Object.isNull(this.checkpoints) && !await this.checkpoints.deleteAsync(new WorkFolder(conversationId, folders.pathOf(conversationId)), signal)) {
         this.log?.write(Resources.formatChatFolderKept(conversationId, Resources.checkpointsHeldUp));
         return;
       }
@@ -127,7 +127,7 @@ export class KeptSessions {
     for (const conversationId of conversationIds) {
       if (signal.aborted)
         return;
-      await this.releaseFolderAsync(conversationId);
+      await this.releaseFolderAsync(conversationId, signal);
     }
   }
 

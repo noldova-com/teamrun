@@ -8565,10 +8565,11 @@ export declare class ReplyCheckpoints {
   /**
    * Deletes all of the work folder's checkpoints.
    * @param folder The work folder.
+   * @param signal Ends the delete when it aborts, as the checkpoints module's `DeleteFolder` does.
    * @returns Whether they are deleted; `false` while an interrupted restore of the folder holds them up.
-   * @throws {Error} When the system refuses to move the folder's store aside.
+   * @throws {Error} When the system refuses to move the folder's store aside, or the signal aborts the delete.
    */
-  public deleteAsync(folder: WorkFolder): Promise<boolean>;
+  public deleteAsync(folder: WorkFolder, signal?: AbortSignal): Promise<boolean>;
 }
 
 /**
