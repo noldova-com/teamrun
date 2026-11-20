@@ -16,5 +16,7 @@ export enum ChangeEntity {
   Provider = "Provider",
   Preference = "Preference",
   SharedMcpServer = "SharedMcpServer",
-  AcpAgent = "AcpAgent"
+  AcpAgent = "AcpAgent",
+  Department = "Department",
+  DepartmentMember = "DepartmentMember"
 }

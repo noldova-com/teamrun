@@ -10,8 +10,8 @@ import { ChangeOperation } from "@noldova/context.data";
 import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChangeEntity, Resources } from "@noldova/teamrun.core";
-import { ComposerDefaultSaveParams, ContextUsage, ConversationIdParams, ConversationMemberParams, DefaultTeammate, DefaultTeammateSetParams, ErrorCode, Harness, Message, MessageAuthor,
+import { ChangeEntity, type IOrganizationService, Resources, TeammatesService } from "@noldova/teamrun.core";
+import { ComposerDefaultSaveParams, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, ContextUsage, ConversationIdParams, ConversationMemberParams, DefaultTeammate, DefaultTeammateSetParams, ErrorCode, Harness, Message, MessageAuthor,
   MessageSendParams, MessageStatus, ObservedSettings, Provenance, ProviderIdParams, ReplyUsage, RequestedSettings, TeammateCreateParams, TeammateFallback, TeammateIdParams,
   TeammateMention, TeammateUpdateParams } from "@noldova/teamrun.protocol";
 
@@ -228,6 +228,39 @@ export class TeammatesServiceTests {
     Assert.areEqual(ChangeEntity.Teammate, changes.at(-1)?.entity);
     Assert.areEqual(ChangeOperation.Delete, changes.at(-1)?.operation);
     await Assert.throwsAsync(() => host.teammates.deleteAsync(new TeammateIdParams(teammate.id)), ServiceException);
+  }
+
+  @TestMethod
+  public async takesADeletedLeaderOutOfItsDepartmentAndItsLeadershipInTheDeletingTransaction(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const provider = await host.createProviderAsync();
+    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
+    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", null));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, design.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, ada.id));
+    const organization = host.organization;
+    const failing: IOrganizationService = {
+      listAsync: t => organization.listAsync(t),
+      createAsync: t => organization.createAsync(t),
+      updateAsync: t => organization.updateAsync(t),
+      moveAsync: t => organization.moveAsync(t),
+      deleteAsync: t => organization.deleteAsync(t),
+      setMemberAsync: t => organization.setMemberAsync(t),
+      removeTeammateAsync: async (teammateId, transaction) => {
+        await organization.removeTeammateAsync(teammateId, transaction);
+        throw new Error("The delete failed after the teammate left its department.");
+      }
+    };
+
+    await Assert.throwsAsync(() => new TeammatesService(host.context, host.providers, host.conversations, failing).deleteAsync(new TeammateIdParams(ada.id)), Error);
+    const kept = await host.organization.listAsync();
+    await host.teammates.deleteAsync(new TeammateIdParams(ada.id));
+    const left = await host.organization.listAsync();
+
+    Assert.areEqual(`${ada.id},${design.id}`, `${kept.departments[0]?.leaderId},${kept.departmentOf(ada.id)}`);
+    Assert.isNull(left.departments[0]?.leaderId);
+    Assert.isNull(left.departmentOf(ada.id));
+    Assert.isNull(await host.teammates.findAsync(ada.id));
   }
 
   @TestMethod

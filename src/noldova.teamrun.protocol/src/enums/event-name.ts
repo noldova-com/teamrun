@@ -34,5 +34,6 @@ export enum EventName {
   BackgroundTasksCleared = "BackgroundTasksCleared",
   PanelRequested = "PanelRequested",
   WindowReloadRequested = "WindowReloadRequested",
-  WaitingMessagesChanged = "WaitingMessagesChanged"
+  WaitingMessagesChanged = "WaitingMessagesChanged",
+  OrganizationChanged = "OrganizationChanged"
 }
