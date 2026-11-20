@@ -149,7 +149,9 @@ export class WaitingSends {
           return found;
         });
       if (!Object.isUndefined(taken))
-        await this.publishWaitingAsync(chatId);
+        await this.publishWaitingAsync(chatId).catch((error: unknown) => {
+          this.log?.write(Resources.formatWaitingMessagesNotShown(chatId, Resources.formatFailureKind(error)));
+        });
     }
     catch (error) {
       this.endSending(chatId);

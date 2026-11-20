@@ -1002,6 +1002,7 @@ Product names and trademarks, such as the providers' names above, belong to thei
   `WaitingMessageList` lists them in that order, `WaitingMessageEdit` replaces one's send in its place and clears its failure, `WaitingMessageRemove` removes one, and `WaitingMessageSendNow` makes one Stop and send; each change publishes `WaitingMessagesChanged` with the chat's whole list.
   A send that fails keeps its message with the reason, the refusal's own text or "It couldn't be sent." for any other failure, and the next one goes; the log names the chat and the failure's kind.
   When a chat's work ends, its answers, its waiting messages and the wakes watching it each go on their own: a step that fails, such as a database error reading the chat, is logged with the chat and the failure's kind, and the next step still runs, so the wakes of other chats still settle.
+  A message taken off the list still sends when the list can't be read again to show it; the log names the chat and the failure's kind.
   They survive a restart and go once the engine has reconciled; none goes while the runtime closes.
   A waiting message's attachments are copied into its own folder, `attachments/waiting-files/<chat>/<message>`, when it is added or edited, so they outlast the composer's prepared files and a restart; the folder goes once the message is sent or removed.
   A removal that fails is logged and the queue, the edit or the delete goes on, and at start the engine removes every waiting folder no kept message holds.

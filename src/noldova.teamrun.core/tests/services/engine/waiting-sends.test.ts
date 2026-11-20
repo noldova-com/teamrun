@@ -312,6 +312,48 @@ export class WaitingSendsTests {
   }
 
   @TestMethod
+  public async logsAWaitingListItCantReadAfterTakingAMessageOffAndStillSendsTheMessage(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+    await host.engine.addWaitingAsync(new WaitingMessageAddParams(await WaitingSendsTests.paramsAsync(host, chat.id, "Queued"), MessageDelivery.Queue));
+    const failure = new Error("The database is busy.");
+    const notSent = Resources.formatWaitingMessageNotSent(chat.id, Resources.formatFailureKind(failure));
+    const failed: string[] = [];
+    const connection = host.context.database.connection;
+    const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
+    const queryAsync = connection.queryAsync.bind(connection);
+    let transactions = 0;
+    connection.runInTransactionAsync = async work => {
+      transactions += 1;
+      try {
+        return await runInTransactionAsync(work);
+      }
+      finally {
+        transactions -= 1;
+      }
+    };
+    connection.queryAsync = query => {
+      if (transactions === 0 && failed.length === 0 && query.text.includes("FROM waitingMessages WHERE chatId")) {
+        failed.push(chat.id);
+        return Promise.reject(failure);
+      }
+      return queryAsync(query);
+    };
+
+    release();
+    await host.until("the queued send or its failure", () => host.adapter.requests.length === 2 || host.log.lines.includes(notSent));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(JSON.stringify([chat.id]), JSON.stringify(failed));
+    Assert.isTrue(host.log.lines.includes(Resources.formatWaitingMessagesNotShown(chat.id, Resources.formatFailureKind(failure))), host.log.lines.join("\n"));
+    Assert.areEqual("First,Queued", await WaitingSendsTests.sentAsync(host, chat.id));
+    Assert.areEqual(0, (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length);
+  }
+
+  @TestMethod
   public async sendsOneOfTwoQueueMessagesAddedToAnIdleChatAtOnceAndTheOtherOnceItsReplyEnds(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.createConversationAsync();
