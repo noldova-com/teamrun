@@ -165,13 +165,19 @@ export class SharedMcpServersService implements ISharedMcpServersService {
   }
 
   public async startSignInAsync(params: SharedMcpServerIdParams): Promise<SharedMcpSignInStarted> {
-    const removals = this.removals.get(params.serverId) ?? 0;
-    const server = await this.requireAsync(params.serverId);
+    let removals = this.removals.get(params.serverId) ?? 0;
+    let server = await this.requireAsync(params.serverId);
+    let removed = false;
+    while ((this.removals.get(params.serverId) ?? 0) !== removals) {
+      removed = true;
+      removals = this.removals.get(params.serverId) ?? 0;
+      server = await this.requireAsync(params.serverId);
+    }
     const url = server.definition.url;
     if (!server.definition.signsIn || Object.isNull(url))
       throw new ServiceException(ErrorCode.InvalidParams, Resources.formatSharedMcpServerDoesntSignIn(server.definition.name), [server.id]);
     const stored = this.signingIn.get(server.id);
-    const ended = !Object.isUndefined(stored) || (this.removals.get(server.id) ?? 0) !== removals;
+    const ended = !Object.isUndefined(stored) || removed;
     const pending = !Object.isUndefined(stored) && !stored.ended ? stored : { reference: ended ? SharedMcpServersService.newReference()
       : [...this.finishing.get(server.id) ?? []].find(t => !t.ended)?.reference ?? server.signIn?.reference ?? SharedMcpServersService.newReference(), latest: 0, ended: false };
     const start = ++pending.latest;

@@ -647,6 +647,18 @@ export class SharedMcpServersServiceTests {
   }
 
   @TestMethod
+  public async refusesASignInThatComesDuringItsServersDeleteAndStartsNothing(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+
+    const later = host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    await host.sharedServers.deleteAsync(new SharedMcpServerIdParams(server.id));
+    const refused = await Assert.throwsAsync(() => later, ServiceException);
+
+    Assert.areEqual(JSON.stringify([ErrorCode.NotFound, 0]), JSON.stringify([refused.info.name, host.signIns.started.length]));
+  }
+
+  @TestMethod
   public async keepsAServerSignedOutWhoseSignOutComesWhileItsSignInsFinishIsSaving(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
