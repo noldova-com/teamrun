@@ -2191,8 +2191,8 @@ export interface IConversationEngine {
    * started, a hand-off's among them, that ended cancelled. A reply that had already ended, that a
    * Stop is still ending, its own or an earlier chat Stop, or that completed before the stop reached
    * it, is left out; so of two chat Stops that overlap, such as the window's and `teamrun cancel`, the
-   * second answers with none of the replies the first is ending. A reply a hand-off stores once a Stop has begun is listed by the first
-   * such Stop to settle, and by no other.
+   * second answers with none of the replies the first is ending. A reply is listed by one Stop only: one that joins the send once a Stop
+   * has begun, such as a hand-off's or another chat's teammate's, goes to the first Stop to settle that it was open or added for.
    * @throws ServiceException named `ErrorCode.Conflict` when the conversation has no active send.
    */
   cancelConversationAsync(params: ConversationIdParams): Promise<readonly Message[]>;
