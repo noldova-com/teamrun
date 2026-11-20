@@ -165,12 +165,12 @@ export class SharedMcpServersService implements ISharedMcpServersService {
   }
 
   public async startSignInAsync(params: SharedMcpServerIdParams): Promise<SharedMcpSignInStarted> {
-    let removals = this.removals.get(params.serverId) ?? 0;
+    let removals = this.removalsOf(params.serverId);
     let server = await this.requireAsync(params.serverId);
     let removed = false;
-    while ((this.removals.get(params.serverId) ?? 0) !== removals) {
+    while (this.removalsOf(params.serverId) !== removals) {
       removed = true;
-      removals = this.removals.get(params.serverId) ?? 0;
+      removals = this.removalsOf(params.serverId);
       server = await this.requireAsync(params.serverId);
     }
     const url = server.definition.url;
@@ -400,12 +400,16 @@ export class SharedMcpServersService implements ISharedMcpServersService {
   }
 
   private endSignIn(serverId: string): ISharedMcpPendingSignIn | undefined {
-    this.removals.set(serverId, (this.removals.get(serverId) ?? 0) + 1);
+    this.removals.set(serverId, this.removalsOf(serverId) + 1);
     const pending = this.signingIn.get(serverId);
     for (const ending of [pending, ...this.finishing.get(serverId) ?? []])
       if (!Object.isUndefined(ending))
         ending.ended = true;
     return pending;
+  }
+
+  private removalsOf(serverId: string): number {
+    return this.removals.get(serverId) ?? 0;
   }
 
   private dropStart(serverId: string, pending: ISharedMcpPendingSignIn, start: number): void {
