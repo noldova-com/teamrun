@@ -78,6 +78,10 @@ export class CommandWakesTests {
     Assert.areEqual(JSON.stringify([conversation.id, null, "TeamRun", text]),
       JSON.stringify([wake.sender?.conversationId, wake.sender?.teammateId, wake.sender?.name, wake.details[0]?.text]));
     Assert.areEqual(JSON.stringify([wake.id, MessageStatus.Completed]), JSON.stringify([woken.inReplyTo, woken.status]));
+    const [row] = await host.context.database.connection.queryAsync(new SqlQuery("SELECT id FROM chatWakes"));
+    Assert.areEqual(JSON.stringify({ source: "chatWake", wakeId: row?.readString("id"), wakeSourceMessageId: reply.id,
+      wakeTask: { kind: "command", name: "Run the tests", ending: "exited with code 1", text: `…${lines.slice(-20).join("\n").slice(-2000)}` }, wakeReplyId: woken.id }),
+      JSON.stringify(wake.details[0]?.payload));
     Assert.isTrue(wakeRequest.prompt.includes(`From TeamRun: ${text}`), wakeRequest.prompt);
     Assert.areEqual(JSON.stringify([first.id, BackgroundTaskStatus.Failed, 1]), JSON.stringify([task.id, task.status, task.exitCode]));
     Assert.isTrue((await host.tasks.readAsync(new BackgroundTaskIdParams(task.id))).output?.endsWith(`${lines.at(-1)}\r\n\r\n`) ?? false);
@@ -354,6 +358,9 @@ export class CommandWakesTests {
       state: "Waiting", text: null, hop: null, createdAt: "t" };
     await host.context.database.connection.executeAsync(new SqlQuery("INSERT INTO chatWakes (id, chatId, state, json, updatedAt) VALUES (?, ?, ?, ?, 't')",
       ["w1", lost.id, "Waiting", JSON.stringify(json)]));
+    const view = { kind: "command", name: "Serve the docs", ending: null, text: null };
+    await host.context.database.connection.executeAsync(new SqlQuery("INSERT INTO chatWakes (id, chatId, state, json, updatedAt) VALUES (?, ?, ?, ?, 't')",
+      ["w2", lost.id, "Waiting", JSON.stringify({ ...json, id: "w2", watchedIds: ["cmd-2"], view })]));
 
     await host.engine.reconcileAsync();
     await host.engine.waitForIdle();
@@ -363,10 +370,13 @@ export class CommandWakesTests {
     await host.until("the started command", () => host.commands.started.length === 1, host.runs());
     await host.engine.shutdown();
 
-    Assert.areEqual("TeamRun restarted before your background command cmd-1 ended, so it was stopped and this chat wasn't woken by it.",
-      (await CommandWakesTests.chatAsync(host, lost.id)).at(-1)?.details[0]?.text);
+    const woken = (await CommandWakesTests.chatAsync(host, lost.id)).slice(-2);
+    Assert.areEqual(JSON.stringify(["cmd-1", "cmd-2"].map(t => `TeamRun restarted before your background command ${t} ended, so it was stopped and this chat wasn't woken by it.`)),
+      JSON.stringify(woken.map(t => t.details[0]?.text)));
+    Assert.areEqual(JSON.stringify([{ source: "chatWake", wakeId: "w1", wakeSourceMessageId: reply.id },
+      { source: "chatWake", wakeId: "w2", wakeSourceMessageId: reply.id, wakeTask: view, wakeEnd: "lost" }]), JSON.stringify(woken.map(t => t.details[0]?.payload)));
     Assert.areEqual("1", host.commands.started.map(t => t.stops).join());
-    Assert.areEqual("Undeliverable", await CommandWakesTests.statesAsync(host));
+    Assert.areEqual("Undeliverable,Undeliverable", await CommandWakesTests.statesAsync(host));
   }
 
   @TestMethod

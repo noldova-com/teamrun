@@ -4379,6 +4379,22 @@ export declare class Resources {
   public static formatWakeReceived(title: string | null): string;
 
   /**
+   * How a sub-agent ended, in words for its wake: `ended as <status>`.
+   */
+  public static formatSubAgentEnding(status: string): string;
+  /**
+   * How a background command ended, in words for its wake: its error, signal or exit code.
+   */
+  public static formatCommandEnding(exit: CommandExit): string;
+  /**
+   * A background command's last lines for its wake, cut to their last 2,000 characters, or `null` when it wrote none.
+   */
+  public static formatCommandQuote(lastLines: string): string | null;
+  /**
+   * The note at the top of a reply that a sub-agent's or background command's wake started.
+   */
+  public static readonly taskWakeReceived: string;
+  /**
    * The text of the message that wakes a chat whose sub-agent ended after the turn that started it: the sub-agent, how it ended, and its summary cut
    * at 2,000 characters.
    * @param status The sub-agent's status as it ended.
