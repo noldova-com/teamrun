@@ -14,6 +14,7 @@ import { AuthStatus, PlanWindow, PlanWindowName, type Provider, ProviderModelLis
 import { AcpRequestException } from "../../exceptions/acp-request.exception.js";
 import { ModelListException } from "../../exceptions/model-list.exception.js";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
+import type { IProcessTree } from "../../interfaces/i-process-tree.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
 import { CommandSource } from "../../models/command-source.js";
 import type { ProcessCommand } from "../../models/process-command.js";
@@ -43,9 +44,10 @@ export class CopilotAdapter extends AcpAdapter {
 
   public constructor(command: ProcessCommand | null, environment: NodeJS.ProcessEnv, workDirectory: string, clientInfo: AppServerClientInfo,
     starter: IProcessStarter, timings: ProviderTimings, timer: ITimer = new NodeTimer(), log: ILog | null = null,
-    locate: () => ProcessCommand | null = CommandSource.none, installation: IProviderKindInstallation | null = null, idleTimer: ITimer = new NodeTimer()) {
+    locate: () => ProcessCommand | null = CommandSource.none, installation: IProviderKindInstallation | null = null, idleTimer: ITimer = new NodeTimer(),
+    processTree?: IProcessTree) {
     const agent = new CopilotAgent(command, environment, workDirectory, locate);
-    super(agent, clientInfo, starter, timings, timer, undefined, undefined, undefined, idleTimer);
+    super(agent, clientInfo, starter, timings, timer, undefined, undefined, processTree, idleTimer);
     this.lister = new CopilotModelLister(agent, starter, timings, timer, log);
     this.log = log;
     if (!Object.isNull(installation))

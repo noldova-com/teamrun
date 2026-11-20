@@ -12068,9 +12068,10 @@ export declare class CopilotAdapter extends AcpAdapter {
    * a failed model listing writes one line to the log, when there is one.
    * @param installation How TeamRun installs and updates Copilot, kept as `installation`; none by default.
    * @param idleTimer Tells the time a kept session has had no turn, as `AcpAdapter` takes it; a `NodeTimer` by default.
+   * @param processTree Ends what an agent started when it stops, as `AcpAdapter` takes it; `AcpAdapter`'s `ProcessTree` by default.
    */
   public constructor(command: ProcessCommand | null, environment: NodeJS.ProcessEnv, workDirectory: string, clientInfo: AppServerClientInfo, starter: IProcessStarter, timings: ProviderTimings, timer?: ITimer, log?: ILog | null, locate?: () => ProcessCommand | null,
-    installation?: IProviderKindInstallation | null, idleTimer?: ITimer);
+    installation?: IProviderKindInstallation | null, idleTimer?: ITimer, processTree?: IProcessTree);
 
   /**
    * How TeamRun installs and updates Copilot, when it was given one.
