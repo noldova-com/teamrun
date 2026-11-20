@@ -2923,6 +2923,43 @@ describe("ComposerComponent", () => {
       expect([edited(), added()]).toEqual([[], ["Steer:c1:first, changed"]]);
     });
 
+    it("ends an edit when the composer shows another chat, so a message typed back in its chat goes as a new one and the waiting one keeps its text", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      await type("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect(box().value).toBe(""));
+      fixture.componentRef.setInput("conversationId", "c1");
+      await fixture.whenStable();
+      const back = [editingNote(), box().value];
+      await write("then the docs");
+
+      expect(back).toEqual([undefined, ""]);
+      expect([edited(), added()]).toEqual([[], ["Steer:c1:then the docs"]]);
+    });
+
+    it("ends an edit when the composer takes a rewound message, so Enter sends the rewound text as a new message", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      context.answer(MethodName.ConversationRewind, () => new ConversationRewindResult(SampleData.conversation, [], null).toJson());
+      await key("ArrowUp");
+      await type("first, changed");
+
+      await ChatStoreService.of(context).rewind(SampleData.userMessage, false);
+      await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
+      document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
+      await fixture.whenStable();
+      const rewound = box().value;
+      const taken = editingNote();
+      await key("Enter");
+
+      expect([taken, rewound === "first, changed", rewound.length > 0]).toEqual([undefined, false, true]);
+      expect(edited()).toEqual([]);
+      expect([...added().map(t => t.split(":").slice(2).join(":")), ...sent().slice(1).map(t => t.text)]).toEqual([rewound]);
+    });
+
     it("keeps the text of an edit out of the chat's unsent message, saving nothing for it on a save, after Escape or as the tab closes", async () => {
       await running();
       await listed(waiting("w1", "And run the linter after that"));
