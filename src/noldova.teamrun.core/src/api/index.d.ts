@@ -9962,9 +9962,9 @@ export interface ITeammatesService {
   clearUnlistedAsync(providerId: string, list: ProviderModelList): Promise<readonly Teammate[]>;
 
   /**
-   * Deletes memberships while retaining historical messages and mentions.
+   * Deletes memberships while retaining historical messages and mentions, and answers whether the teammate left a department.
    */
-  deleteAsync(params: TeammateIdParams): Promise<void>;
+  deleteAsync(params: TeammateIdParams): Promise<boolean>;
 
   /**
    * Reads the default teammate set in Settings, or `null` when none is set.
@@ -10034,9 +10034,9 @@ export declare class TeammatesService implements ITeammatesService {
 
   /**
    * Deletes memberships while retaining historical messages and mentions; the teammate leaves its department, and a department
-   * it led has no leader, in the same transaction.
+   * it led has no leader, in the same transaction; it answers whether the teammate left a department.
    */
-  public deleteAsync(params: TeammateIdParams): Promise<void>;
+  public deleteAsync(params: TeammateIdParams): Promise<boolean>;
 
   /**
    * Reads the default teammate from the `preferences` table, or `null` when none is set.

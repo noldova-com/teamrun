@@ -113,16 +113,17 @@ export class TeammatesService implements ITeammatesService {
     return teammate;
   }
 
-  public async deleteAsync(params: TeammateIdParams): Promise<void> {
-    await this.context.database.connection.runInTransactionAsync(async transaction => {
+  public async deleteAsync(params: TeammateIdParams): Promise<boolean> {
+    return await this.context.database.connection.runInTransactionAsync(async transaction => {
       const teammate = await this.requireAsync(params.teammateId, transaction);
       await this.conversations.removeTeammateMembersAsync(teammate.id, transaction);
-      await this.organization.removeTeammateAsync(teammate.id, transaction);
+      const departed = await this.organization.removeTeammateAsync(teammate.id, transaction);
       await transaction.executeAsync(new SqlQuery(Resources.deleteTeammate, [teammate.id]));
       await this.context.database.changeFeed.appendAsync(ChangeEntity.Teammate, teammate.id, ChangeOperation.Delete, JSON.stringify(teammate.toJson()), transaction);
       const updatedAt = new Date().toISOString();
       for (const other of (await this.listAsync(transaction)).filter(t => t.usageHandOffs.includes(teammate.id)))
         await this.saveAsync(TeammateUpdateParams.of(other.id, { usageHandOffs: other.usageHandOffs.filter(t => t !== teammate.id) }).applyTo(other, updatedAt), transaction);
+      return departed;
     });
   }
 

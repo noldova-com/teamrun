@@ -217,6 +217,7 @@ export class RequestDispatcherTests {
       host.approvals, host.engine, host.teammates, host.events);
     const unknown = await without.dispatch(new Request("r", MethodName.OrganizationList, null));
     const carol = await host.teammates.createAsync(new TeammateCreateParams("Carol", null, provider.id, Harness.Provider, null, null));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(carol.id, design.id));
     const deleted = await without.dispatch(new Request("r", MethodName.TeammateDelete, new TeammateIdParams(carol.id).toJson()));
 
     Assert.areEqual(0, outside);

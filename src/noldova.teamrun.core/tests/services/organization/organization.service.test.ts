@@ -155,6 +155,24 @@ export class OrganizationServiceTests {
   }
 
   @TestMethod
+  public async listsTheDepartmentsAndMembersOfOneMomentThoughAMembershipChangeIsQueuedBetweenItsReads(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
+    const parent = await OrganizationServiceTests.createAsync(host, "Parent");
+    const inner = await OrganizationServiceTests.createAsync(host, "Inner", parent.id);
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, inner.id));
+    const before = await host.organization.listAsync();
+
+    const listing = host.organization.listAsync();
+    const deleting = host.organization.deleteAsync(new DepartmentIdParams(inner.id));
+    const listed = await listing;
+    await deleting;
+
+    Assert.areEqual(JSON.stringify(before.toJson()), JSON.stringify(listed.toJson()));
+    Assert.areEqual(parent.id, (await host.organization.listAsync()).departmentOf(ada.id));
+  }
+
+  @TestMethod
   public async keepsATeammateInOneDepartmentAtATimeAndALeaderWhoLeavesStopsLeading(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
