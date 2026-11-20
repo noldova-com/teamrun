@@ -88,18 +88,20 @@ export class SubAgentRun implements ITurnListener {
     if (!this.row.isRunning)
       return;
     this.started = true;
+    let status: SubAgentStatus;
+    let summary: string | null;
     try {
       const result = await adapter.runTurn(await request(), this, this.controller.signal);
       this.session = result.nativeSessionId;
-      if (result.outcome === TurnOutcome.Failed)
-        await this.endAsync(SubAgentStatus.Failed, result.error);
-      else
-        await this.endAsync(result.outcome === TurnOutcome.Completed && !this.controller.signal.aborted ? SubAgentStatus.Completed : SubAgentStatus.Stopped,
-          this.result());
+      status = result.outcome === TurnOutcome.Failed ? SubAgentStatus.Failed
+        : result.outcome === TurnOutcome.Completed && !this.controller.signal.aborted ? SubAgentStatus.Completed : SubAgentStatus.Stopped;
+      summary = result.outcome === TurnOutcome.Failed ? result.error : this.result();
     }
     catch (error) {
-      await this.endAsync(this.controller.signal.aborted ? SubAgentStatus.Stopped : SubAgentStatus.Failed, error instanceof Error ? error.message : String(error));
+      status = this.controller.signal.aborted ? SubAgentStatus.Stopped : SubAgentStatus.Failed;
+      summary = error instanceof Error ? error.message : String(error);
     }
+    await this.endAsync(status, summary);
   }
 
   public async stopAsync(): Promise<void> {
@@ -181,9 +183,17 @@ export class SubAgentRun implements ITurnListener {
 
   private async endAsync(status: SubAgentStatus, summary: string | null): Promise<void> {
     this.row = this.row.with({ status, summary, toolUses: this.tools.size, tokens: this.tokens, durationMs: Date.now() - this.startedAt });
-    await this.parent.onDetailAsync(new TurnDetail(DetailKind.SubAgent, this.row.description, this.row.toJson(), this.id));
-    await this.parent.onTaskEndedAsync(new TaskEnd(this.id, SubAgentRun.taskStatusOf(status)));
-    this.ending.resolve(this.row);
+    try {
+      try {
+        await this.parent.onDetailAsync(new TurnDetail(DetailKind.SubAgent, this.row.description, this.row.toJson(), this.id));
+      }
+      finally {
+        await this.parent.onTaskEndedAsync(new TaskEnd(this.id, SubAgentRun.taskStatusOf(status)));
+      }
+    }
+    finally {
+      this.ending.resolve(this.row);
+    }
   }
 
   private async denyAsync(ask: ApprovalAsk): Promise<string> {
