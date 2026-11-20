@@ -298,6 +298,71 @@ describe("AcpAgentsDialogComponent", () => {
       .toEqual(["true", ["Installing… 25%"], true]);
   });
 
+  it("moves the focus to the Remove that takes Add's place once an add ends, and to the Add that takes Remove's place once a remove ends", async () => {
+    await create();
+    const before = listing;
+    listing = new AcpAgentListing([new AcpAgentEntry(droid.id, droid.name, droid.version, droid.description, null, null, false, true), devin, plain], [mine], null,
+      SampleData.timestamp);
+    part<HTMLButtonElement>(".nol-teamrun-acp-add", row("droid")).focus();
+
+    await click(".nol-teamrun-acp-add", row("droid"));
+    await Wait.until(() => expect(row("droid").querySelector(".nol-teamrun-acp-remove")).not.toBeNull());
+    await settle();
+    const added = document.activeElement === part(".nol-teamrun-acp-remove", row("droid"));
+    listing = before;
+    await click(".nol-teamrun-acp-remove", row("droid"));
+    await Wait.until(() => expect(row("droid").querySelector(".nol-teamrun-acp-add")).not.toBeNull());
+    await settle();
+
+    expect([added, document.activeElement === part(".nol-teamrun-acp-add", row("droid"))]).toEqual([true, true]);
+  });
+
+  it("moves the focus to the Remove that takes the busy Add's place once an install still running after the add ends", async () => {
+    await create(t => t.answer(MethodName.ProviderKindInstall,
+      () => new ProviderKindInstallation(droid.id, ProviderKindInstallState.Installing, null, 25, 100).toJson()));
+    listing = new AcpAgentListing([new AcpAgentEntry(droid.id, droid.name, droid.version, droid.description, null, null, false, true), devin, plain], [mine], null,
+      SampleData.timestamp);
+    part<HTMLButtonElement>(".nol-teamrun-acp-add", row("droid")).focus();
+
+    await click(".nol-teamrun-acp-add", row("droid"));
+    await Wait.until(() => expect(context.count(MethodName.AcpAgentList)).toBe(2));
+    await Wait.until(() => expect(texts(".nol-teamrun-acp-progress", row("droid"))).toEqual(["Installing… 25%"]));
+    await settle();
+    const busy = document.activeElement === part(".nol-teamrun-acp-add", row("droid"));
+    context.emit(EventName.ProviderKindInstallationChanged, new ProviderKindInstallation(droid.id, ProviderKindInstallState.Installed).toJson());
+    await Wait.until(() => expect(row("droid").querySelector(".nol-teamrun-acp-remove")).not.toBeNull());
+    await settle();
+
+    expect([busy, document.activeElement === part(".nol-teamrun-acp-remove", row("droid"))]).toEqual([true, true]);
+  });
+
+  it("moves no focus once a remove ends after the dialog has closed", async () => {
+    const removing = new DeferredResponse();
+    await create(t => t.answer(MethodName.AcpAgentRemove, () => removing.promise));
+    const failures: unknown[] = [];
+    const record = (event: PromiseRejectionEvent): void => {
+      failures.push(event.reason);
+    };
+    window.addEventListener("unhandledrejection", record);
+    const outside = document.body.appendChild(document.createElement("button"));
+
+    await click(".nol-teamrun-acp-remove", row("devin"));
+    await Wait.until(() => expect(context.count(MethodName.AcpAgentRemove)).toBe(1));
+    const dialog = fixture.componentInstance;
+    element().remove();
+    fixture.destroy();
+    outside.focus();
+    removing.resolve(null);
+    await Wait.until(() => expect(context.count(MethodName.AcpAgentList)).toBe(2));
+    await dialog.settled();
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    window.removeEventListener("unhandledrejection", record);
+    const focused = document.activeElement === outside;
+    outside.remove();
+
+    expect([failures, focused]).toEqual([[], true]);
+  });
+
   it("removes an agent and a local command, and clears an old error when it tries again", async () => {
     const removed: string[] = [];
     await create(t => t.answer(MethodName.AcpAgentRemove, u => {
