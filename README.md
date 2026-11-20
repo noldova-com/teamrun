@@ -302,7 +302,7 @@ It lists the root `LICENSE`, the package's `README.md`, the module files the Tea
 [CHANGELOG.md](CHANGELOG.md) says what each version changed.
 
 `desktop.supportedTargets` in `app/package.json`, the targets an official build calls supported, lists Linux x64 and arm64, Windows x64 and arm64, and macOS x64 and arm64.
-The installed app checks `desktop.updateFeed` in `app/package.json`, `https://updates.teamrun.noldova.com/`, for updates.
+The installed app checks `desktop.product.updateFeed` in `app/package.json`, `https://updates.teamrun.noldova.com/`, for updates.
 Before an official release, a Windows x64 computer runs the end-to-end specs in its desktop session with `TEAMRUN_E2E_HIGH_CONTRAST=1`, which adds the real High Contrast check of `high-contrast.spec.ts`, after `install:app` and `build:app`.
 
 ## Checks
@@ -314,7 +314,7 @@ Every pull request into `main` must pass both checks before it merges.
 | Check / Linked issue | The organization's shared check, which `.github/workflows/require-linked-issue.yml` calls from its `check` job, named "Check": the PR description has a standalone `Issue: #N`, `Issue #N` or closing reference, such as `Closes #N`, that names an issue in this repository. |
 | All targets | The shared build and test, with every target's job, the Linux x64 Angular tests and the end-to-end test, the Angular tests and app on every other target, and the unsigned package passed. |
 
-The "Build and test" job calls the organization's shared `build-and-test.yml` workflow at the `.github` repository's v2.36.0, which runs each target in a job of its own, such as "Build and test / Windows x64": it builds and runs `npm test -- --skip-test-details --skip-coverage-details` with `NOLDOVA_SEPARATE_TEST=angular`, which leaves the Angular tests and coverage out.
+The "Build and test" job calls the organization's shared `build-and-test.yml` workflow at the `.github` repository's v2.40.0, the version its `uses:` lines pin and a pin PR moves here too, which runs each target in a job of its own, such as "Build and test / Windows x64": it builds and runs `npm test -- --skip-test-details --skip-coverage-details` with `NOLDOVA_SEPARATE_TEST=angular`, which leaves the Angular tests and coverage out.
 Its "Separate test" job runs `npm run test:angular`, the Angular tests and coverage alone, on Linux x64, and its "End-to-end test" job runs the [end-to-end test](#end-to-end-test).
 On every other target, "<target>, Angular tests and app" installs and builds, runs `npm run test:angular`, and then installs and builds the app; the end-to-end test and the unsigned package install and build the app on Linux x64.
 The jobs run side by side, so the run takes about the longest of them, not their sum.

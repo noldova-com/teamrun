@@ -4,9 +4,9 @@
 
 ## What it is
 
-`app/` is a project of its own: its `package.json` declares the app under `desktop`, as Noldova Desktop's [BUILD.md](https://github.com/noldova-com/desktop/blob/main/documents/BUILD.md#an-apps-inputs) says, and lists this repository's module, `@noldova/teamrun`, and the terminal module, `@noldova/terminal`, as modules from packages, as Noldova Desktop's [MODULES.md](https://github.com/noldova-com/desktop/blob/main/documents/MODULES.md#modules-from-packages) says.
+`app/` is a project of its own: its `package.json` declares the app under `desktop`, as Noldova Desktop's [BUILD.md](https://github.com/noldova-com/desktop/blob/main/documents/BUILD.md#an-apps-inputs) says, and lists the modules `desktop.modules` names, this repository's `@noldova/teamrun` among them, as modules from packages, as Noldova Desktop's [MODULES.md](https://github.com/noldova-com/desktop/blob/main/documents/MODULES.md#modules-from-packages) says.
 The terminal's view joins the bottom dock after Activity when the person opens a terminal.
-It installs Noldova Desktop's packages, the terminal module and `@noldova/desktop.build` at exact versions from the registry, and TeamRun's packages from the checkout's build at the version it pins, and `@noldova/desktop.build` builds and starts it from those.
+It installs Noldova Desktop's packages, the other modules and `@noldova/desktop.build` at exact versions from the registry, and TeamRun's packages from the checkout's build at the version it pins, and `@noldova/desktop.build` builds and starts it from those.
 `src/noldova.teamrun.window.app/` is the window app, the npm workspace `package.json` names: its entry, `src/main.ts`, starts the window with what the build generates in `_build/generated/`.
 It also gives the window the kit's code highlighting worker, from `src/code-highlighting.worker.ts`, which the window app's `tsconfig.app.json` lists beside the entry so the build bundles it.
 `tsconfig-base.json` holds the strict TypeScript options the window app's `tsconfig.json` extends; `@noldova/desktop.build` also hashes it, with `package.json` and `package-lock.json`, which `npm run lock:app` writes, into its build inputs, and fails when one is missing.
