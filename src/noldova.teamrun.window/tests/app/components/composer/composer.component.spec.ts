@@ -2924,12 +2924,6 @@ describe("ComposerComponent", () => {
       const row = present(root().querySelector(".nol-teamrun-composer-editing")).getBoundingClientRect();
       const message = note.getBoundingClientRect();
       const field = box().getBoundingClientRect();
-      const textStart = (element: Element): number => {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        return range.getBoundingClientRect().left;
-      };
-      const offset = textStart(note) - textStart(present(root().querySelector(".nol-teamrun-composer-editing .nol-teamrun-composer-note")));
       const refused = [add.disabled, note.textContent?.trim()];
       const transfer = new DataTransfer();
       transfer.items.add(new File(["a"], "notes.txt", { type: "text/plain" }));
@@ -2939,10 +2933,41 @@ describe("ComposerComponent", () => {
       const highlighted = root().querySelector(".nol-teamrun-composer-card")?.classList.contains("nol-teamrun-composer-dropping");
       await write("first, changed");
 
-      expect([message.top >= row.bottom, message.bottom <= field.top, Math.abs(offset) < 0.5]).toEqual([true, true, true]);
+      expect([message.top >= row.bottom, message.bottom <= field.top]).toEqual([true, true]);
       expect([...refused, rows().length, paste.defaultPrevented]).toEqual([true, Resources.editingFilesRefused, 0, true]);
       expect([over.defaultPrevented, highlighted]).toEqual([true, false]);
       expect([edited(), added()]).toEqual([["w1:first, changed:0"], []]);
+    });
+
+    describe.each([
+      { look: "the fixture theme", theme: FixtureTheme.theme, mode: ThemeMode.Light },
+      { look: "the fixture theme", theme: FixtureTheme.theme, mode: ThemeMode.Dark },
+      { look: "the default theme", theme: DefaultTheme.theme, mode: ThemeMode.Light },
+      { look: "the default theme", theme: DefaultTheme.theme, mode: ThemeMode.Dark }
+    ])("in $look's $mode mode", ({ theme, mode }) => {
+      beforeEach(() => AppearanceFixture.apply(theme, mode));
+
+      afterEach(() => AppearanceFixture.reset());
+
+      it("starts a file refusal's text where the edit note's text starts", async () => {
+        await running();
+        await listed(waiting("w1", "first"));
+        await key("ArrowUp");
+        const paste = new Event("paste", { bubbles: true, cancelable: true });
+        Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+
+        box().dispatchEvent(paste);
+        await fixture.whenStable();
+        const textStart = (element: Element): number => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          return range.getBoundingClientRect().left;
+        };
+        const note = present(root().querySelector(".nol-teamrun-composer-files-refused"));
+        const editing = present(root().querySelector(".nol-teamrun-composer-editing .nol-teamrun-composer-note"));
+
+        AppearanceFixture.expectPixels(textStart(note), textStart(editing));
+      });
     });
 
     it("clears a file refusal when the next edit starts", async () => {
