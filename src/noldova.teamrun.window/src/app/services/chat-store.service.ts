@@ -141,6 +141,7 @@ import { LinkGesture } from "@noldova/ui.components.angular";
 import { Resources } from "../../resources";
 import { ChatAction } from "../enums/chat-action";
 import { SendKey } from "../enums/send-key";
+import { TeammateStopReason } from "../enums/teammate-stop-reason";
 import { TerminalStep } from "../enums/terminal-step";
 import { DraftStaleException } from "../exceptions/draft-stale.exception";
 import { FileGrantException } from "../exceptions/file-grant.exception";
@@ -960,9 +961,19 @@ export class ChatStoreService {
   }
 
   public isTeammateUnavailable(id: string): boolean {
+    return !Object.isNull(this.teammateStopReason(id));
+  }
+
+  public teammateStopReason(id: string): TeammateStopReason | null {
     const teammate = this.teammate(id);
     const provider = this.providers().find(t => t.id === teammate?.providerId);
-    return Object.isUndefined(provider) || !provider.enabled || provider.authStatus === AuthStatus.LoggedOut || !this.hasKind(provider.kind);
+    if (Object.isUndefined(provider))
+      return TeammateStopReason.ProviderDeleted;
+    if (!provider.enabled)
+      return TeammateStopReason.ProviderTurnedOff;
+    if (provider.authStatus === AuthStatus.LoggedOut)
+      return TeammateStopReason.SignedOut;
+    return this.hasKind(provider.kind) ? null : TeammateStopReason.KindMissing;
   }
 
   public isTeammateProviderDisabled(id: string): boolean {
