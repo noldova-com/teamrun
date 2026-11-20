@@ -72,7 +72,7 @@ describe("FormatterService", () => {
     expect(FormatterService.wakeReceivedOf(received("Bob"))).toBeNull();
   });
 
-  it("reads why a chat's wake brought nothing back, and an old wake with no view from its sender's chat, but not one from its own chat or with no sender", () => {
+  it("reads why a chat's wake brought nothing back, an old wake with no view from its sender's chat, or as its own chat's task with none, and none with no sender", () => {
     const wake = (payload: JsonObject, sender: MessageSender | null): Message => new Message("w1", "c1", 1, MessageAuthor.User, null, MessageStatus.Completed,
       [detail(0, DetailKind.Text, "The work you sent has ended.", { source: "chatWake", wakeId: "w1", ...payload })], null, SampleData.timestamp, null,
       SampleData.timestamp, [], null, null, [], sender);
@@ -84,9 +84,24 @@ describe("FormatterService", () => {
     expect(read(wake({ wakeChatId: "c2", wakeReplies: [], wakeEnd: "lost" }, null))).toEqual(["c2", 0, "lost"]);
     expect(read(wake({ wakeChatId: "c2", wakeReplies: [], wakeEnd: 1 }, null))).toEqual(["c2", 0, null]);
     expect(read(wake({}, new MessageSender("c2", "bob", "Bob")))).toEqual(["c2", 0, null]);
-    expect(read(wake({}, new MessageSender("c1", null, "TeamRun")))).toBeNull();
+    expect(read(wake({}, new MessageSender("c1", null, "TeamRun")))).toEqual([null, 0, null]);
     expect(read(wake({}, null))).toBeNull();
     expect(read(reply([detail(0, DetailKind.Note, "Received a message.", { source: "wakeReceived" })]))).toBeNull();
+  });
+
+  it("reads a sub-agent's or command's wake as its task's kind, name, ending and text, an ending or text that isn't text as none, and none without a kind or name", () => {
+    const wake = (task: JsonValue, end: string | null = null): Message => new Message("w1", "c1", 1, MessageAuthor.User, null, MessageStatus.Completed,
+      [detail(0, DetailKind.Text, "Your sub-agent ended.", { source: "chatWake", wakeId: "w1", wakeTask: task, ...Object.isNull(end) ? {} : { wakeEnd: end } })],
+      null, SampleData.timestamp, null, SampleData.timestamp, [], null, null, [], new MessageSender("c1", null, "TeamRun"));
+    const read = (message: Message): readonly unknown[] | null => {
+      const received = FormatterService.wakeReceivedOf(message);
+      return Object.isNull(received) ? null : [received.chatId, received.end, received.task?.kind, received.task?.name, received.task?.ending, received.task?.text];
+    };
+
+    expect(read(wake({ kind: "command", name: "Run the tests", ending: "exited with code 1", text: "1 failed" })))
+      .toEqual([null, null, "command", "Run the tests", "exited with code 1", "1 failed"]);
+    expect(read(wake({ kind: "subAgent", name: "Search", ending: 1, text: false }, "lost"))).toEqual([null, "lost", "subAgent", "Search", null, null]);
+    expect([read(wake({ kind: "subAgent", name: 7 })), read(wake({ name: "Search" }))]).toEqual([null, null]);
   });
 
   it("sorts steps into commands, edits, reads, searches, thoughts and other steps, the order a summary counts them in", () => {

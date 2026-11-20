@@ -14,7 +14,7 @@ LICENSE file in the root directory of this source tree.
   }
   @if (chat(); as shown) {
     <button type="button" class="wake-chat" (click)="open(shown)">{{ shown.title }}</button>
-  } @else {
+  } @else if (received().chatId !== null) {
     <span class="wake-chat-gone">{{ resources.wakeChatGone }}</span>
   }
   @if (expandable()) {
@@ -25,6 +25,11 @@ LICENSE file in the root directory of this source tree.
   <div class="wake-replies" role="region" [attr.aria-label]="resources.wakeRepliesLabel">
     @if (endText(); as text) {
       <p class="wake-reply-text">{{ text }}</p>
+    }
+    @if (received().task; as task) {
+      @if (task.text; as text) {
+        <p class="wake-reply-text" [class.wake-command-text]="task.kind === commandTask">{{ text }}</p>
+      }
     }
     @for (reply of received().replies; track $index) {
       <p class="wake-reply-heading">{{ headingOf(reply) }}</p>

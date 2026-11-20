@@ -1916,7 +1916,7 @@ describe("HistoryComponent", () => {
       expect(row.right).toBeLessThanOrEqual(reply.right + 0.5);
     });
 
-    it("draws a wake that started no turn as its row with the wake's note below it, a lost or deleted chat's wake as no reply coming back, and an old wake from its sender's chat, never with an ID", async () => {
+    it("draws a wake that started no turn as its row with the wake's note below it, a lost or deleted chat's wake as no reply coming back, and an old wake from its sender's chat or as its own chat's task, never with an ID", async () => {
       const at = SampleData.timestamp;
       const view = { wakeChatId: "c2", wakeReplies: [{ name: "Bob", status: MessageStatus.Completed, text: "Done." }] };
       const ended = (end: string, chatId: string): JsonObject => ({ wakeChatId: chatId, wakeReplies: [], wakeEnd: end });
@@ -1940,7 +1940,7 @@ describe("HistoryComponent", () => {
 
       fixture.componentRef.setInput("chatId", "c3");
       await open("c3");
-      await until(() => expect(lines().length).toBe(5));
+      await until(() => expect(lines().length).toBe(6));
       await settle();
       const [lost, deleted] = [lines()[2], lines()[3]];
       for (const line of [lost, deleted])
@@ -1949,17 +1949,65 @@ describe("HistoryComponent", () => {
 
       expect(lines().map(t => [...textOf(t, ".wake-toggle, .wake-label"), ...textOf(t, ".wake-chat, .wake-chat-gone")])).toEqual([
         ["Received a message from", "Second"], ["Received a message from", "Second"], ["No reply came back from", "Second"],
-        ["No reply came back from", "a deleted chat"], ["Received a message from", "Second"]]);
-      expect(lines().map(t => textOf(t, ".wake-note"))).toEqual([[notWoken], [stopped], [], [], []]);
+        ["No reply came back from", "a deleted chat"], ["Received a message from", "Second"], ["A sub-agent or background command of this chat ended"]]);
+      expect(lines().map(t => textOf(t, ".wake-note"))).toEqual([[notWoken], [stopped], [], [], [], []]);
       expect([lost, deleted].map(t => textOf(t, ".wake-replies"))).toEqual([["TeamRun restarted before the work sent there ended."],
         ["The chat was deleted before the work sent there ended."]]);
-      expect([lines()[4]?.querySelector(".wake-toggle"), lines()[4]?.querySelector(".wake-chevron")]).toEqual([null, null]);
-      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(2);
-      expect(element().textContent).not.toMatch(/has ended|restarted before the work you sent|teamrun_list_messages|\(c2\)|n9|gone-chat|w\d-wake/);
+      expect([4, 5].flatMap(t => [lines()[t]?.querySelector(".wake-toggle"), lines()[t]?.querySelector(".wake-chevron")])).toEqual([null, null, null, null]);
+      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(1);
+      expect(element().textContent).not.toMatch(/has ended|restarted before the work you sent|teamrun_list_messages|\(c2\)|n9|gone-chat|w\d-wake|agent-1/);
       const row = lines()[0]?.querySelector(".wake-line")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
       const note = lines()[0]?.querySelector(".wake-note")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
       AppearanceFixture.expectPixels(note.left, row.left);
       expect(note.top).toBeGreaterThanOrEqual(row.bottom - 0.5);
+    });
+
+    it("draws a sub-agent's or command's wake as a closed row naming it and how it ended, opening to its result or why none came, never with an ID", async () => {
+      const at = SampleData.timestamp;
+      const task = (kind: string, name: string, ending: string | null, text: string | null): JsonObject => ({ kind, name, ending, text });
+      const wake = (id: string, sequence: number, text: string, wakeTask: JsonObject, end: string | null = null): Message =>
+        new Message(id, "c3", sequence, MessageAuthor.User, null, MessageStatus.Completed,
+          [new MessageDetail(0, DetailKind.Text, text, { source: "chatWake", wakeId: `${id}-wake`, wakeTask, ...Object.isNull(end) ? {} : { wakeEnd: end } }, at)],
+          null, at, null, at, [], null, null, [], new MessageSender("c3", null, "TeamRun"));
+      const messages = [new Message("q0", "c3", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "Run them.")], null, at, null, at),
+        wake("w1", 1, "Your sub-agent \"Search\" (agent-1) ended as completed:\n> Found 3 files.", task("subAgent", "Search", "ended as completed", "Found 3 files.")),
+        wake("w2", 2, "Your background command \"Run the tests\" (bg-7) exited with code 1.", task("command", "Run the tests", "exited with code 1", "1 failed\n2 passed")),
+        wake("w3", 3, "TeamRun restarted before your background command \"Build\" (bg-8) ended.", task("command", "Build", null, null), "lost"),
+        wake("w4", 4, "TeamRun restarted before your sub-agent \"Plan\" (agent-2) ended.", task("subAgent", "Plan", null, null), "lost"),
+        wake("w5", 5, "Your sub-agent \"Quiet\" (agent-3) ended as failed.", task("subAgent", "Quiet", "ended as failed", null))];
+      context.answer(MethodName.MessagePage, t => MessagePageParams.fromJson(t).conversationId === "c3" ? new MessagePage(messages, false, false, 6).toJson() : pageOf(t));
+      const lines = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-wake-line")];
+      const textOf = (line: HTMLElement | undefined, selector: string): readonly string[] =>
+        [...line?.querySelectorAll(selector) ?? []].map(t => t.textContent?.trim() ?? "");
+
+      fixture.componentRef.setInput("chatId", "c3");
+      await open("c3");
+      await until(() => expect(lines().length).toBe(5));
+      await settle();
+
+      expect(lines().map(t => textOf(t, ".wake-toggle, .wake-label"))).toEqual([["Sub-agent \"Search\" ended as completed"],
+        ["Background command \"Run the tests\" exited with code 1"], ["Background command \"Build\" was stopped"], ["Sub-agent \"Plan\" didn't come back"],
+        ["Sub-agent \"Quiet\" ended as failed"]]);
+      expect(lines().map(t => [t.querySelector(".wake-toggle")?.getAttribute("aria-expanded") ?? null, t.querySelectorAll(".wake-chevron").length]))
+        .toEqual([["false", 1], ["false", 1], ["false", 1], ["false", 1], [null, 0]]);
+      expect(lines().map(t => t.querySelectorAll(".wake-replies, .wake-chat, .wake-chat-gone").length)).toEqual([0, 0, 0, 0, 0]);
+      for (const line of lines().slice(0, 4))
+        line.querySelector<HTMLButtonElement>(".wake-toggle")?.click();
+      await settle();
+
+      expect(lines().map(t => t.querySelector(".wake-toggle")?.getAttribute("aria-expanded") ?? null)).toEqual(["true", "true", "true", "true", null]);
+      expect(lines().map(t => textOf(t, ".wake-reply-text"))).toEqual([["Found 3 files."], ["1 failed\n2 passed"],
+        ["TeamRun restarted before it ended, so it was stopped."], ["TeamRun restarted before it ended."], []]);
+      const fontOf = (line: HTMLElement | undefined): string => getComputedStyle(line?.querySelector(".wake-reply-text") ?? element()).fontFamily;
+      expect(lines()[1]?.querySelector(".wake-reply-text")?.classList.contains("wake-command-text")).toBe(true);
+      expect(fontOf(lines()[1])).not.toBe(fontOf(lines()[0]));
+      const mono = document.createElement("span");
+      mono.style.fontFamily = "var(--nol-font-mono)";
+      element().append(mono);
+      expect(fontOf(lines()[1])).toBe(getComputedStyle(mono).fontFamily);
+      mono.remove();
+      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(1);
+      expect(element().textContent).not.toMatch(/agent-\d|bg-\d|w\d-wake|Your sub-agent|Your background command|restarted before your/);
     });
   });
 });

@@ -149,6 +149,13 @@ describe("Resources", () => {
     expect([null, "Done."].map(t => Resources.formatWakeReplyHeading("Bob", MessageStatus.Completed, t))).toEqual(["Bob replied without text.", "Bob replied:"]);
   });
 
+  it("names a sub-agent's or command's wake by its kind, name and ending, and one with no ending by how it was lost", () => {
+    expect(["subAgent", "command"].map(t => Resources.formatTaskWakeLabel(t, "Search", "ended as completed")))
+      .toEqual(["Sub-agent \"Search\" ended as completed", "Background command \"Search\" ended as completed"]);
+    expect(["subAgent", "command"].map(t => Resources.formatTaskWakeLabel(t, "Search", null)))
+      .toEqual(["Sub-agent \"Search\" didn't come back", "Background command \"Search\" was stopped"]);
+  });
+
   it("words a reply's activity for one and for many", () => {
     expect(Resources.formatProvenance("codex", null, "high")).toBe("codex · high");
     expect([1, 2].map(t => Resources.formatCommandCount(t))).toEqual(["ran 1 command", "ran 2 commands"]);

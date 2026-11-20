@@ -98,6 +98,10 @@
   user-select: text;
 }
 
+.wake-command-text {
+  font-family: var(--nol-font-mono);
+}
+
 .wake-note {
   margin: 0;
   padding-inline-start: var(--nol-space-3);

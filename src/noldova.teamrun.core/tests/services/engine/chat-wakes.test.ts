@@ -411,6 +411,12 @@ export class ChatWakesTests {
     Assert.areEqual(JSON.stringify([conversation.id, null, "TeamRun", text, "chatWake"]), JSON.stringify([wake!.sender?.conversationId, wake!.sender?.teammateId,
       wake!.sender?.name, wake!.details[0]?.text, (wake!.details[0]?.payload as Record<string, unknown>)["source"]]));
     Assert.areEqual(JSON.stringify([wake!.id, null, MessageStatus.Completed]), JSON.stringify([woken!.inReplyTo, woken!.teammateId, woken!.status]));
+    const [row] = await host.context.database.connection.queryAsync(new SqlQuery("SELECT id FROM chatWakes"));
+    const view = { wakeTask: { kind: "subAgent", name: "Slow", ending: "ended as completed", text: "All 12 pass." } };
+    Assert.areEqual(JSON.stringify({ source: "chatWake", wakeId: row?.readString("id"), wakeSourceMessageId: reply!.id, ...view, wakeReplyId: woken!.id }),
+      JSON.stringify(wake!.details[0]?.payload));
+    Assert.areEqual(JSON.stringify([DetailKind.Note, "Woken when a sub-agent or background command of this chat ended.", { source: "wakeReceived", ...view }]),
+      JSON.stringify([woken!.details[0]?.kind, woken!.details[0]?.text, woken!.details[0]?.payload]));
     Assert.isTrue(host.adapter.requests[3]!.prompt.includes(`From TeamRun: ${text}`), host.adapter.requests[3]!.prompt);
     Assert.areEqual(4, host.adapter.requests.length);
     Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));

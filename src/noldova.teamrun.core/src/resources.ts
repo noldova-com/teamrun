@@ -715,6 +715,8 @@ export class Resources {
   public static readonly stateField: string = "state";
   public static readonly textField: string = "text";
   public static readonly hopField: string = "hop";
+  public static readonly viewField: string = "view";
+  public static readonly taskWakeReceived: string = "Woken when a sub-agent or background command of this chat ended.";
   public static readonly createdAtField: string = "createdAt";
   public static readonly chatIdParameterName: string = "chatId";
   public static readonly sourceMessageIdParameterName: string = "sourceMessageId";
@@ -1531,8 +1533,22 @@ export class Resources {
     return `@${name} (message ${messageId})`;
   }
 
+  public static formatSubAgentEnding(status: string): string {
+    return `ended as ${status.toLowerCase()}`;
+  }
+
+  public static formatCommandEnding(exit: CommandExit): string {
+    return !Object.isNull(exit.error) ? `couldn't run: ${exit.error}` : !Object.isNull(exit.signal) ? `was ended by ${exit.signal}` : `exited with code ${exit.code}`;
+  }
+
+  public static formatCommandQuote(lastLines: string): string | null {
+    if (lastLines.length === 0)
+      return null;
+    return lastLines.length <= Resources.wakeQuoteLength ? lastLines : `${Resources.ellipsis}${lastLines.slice(-Resources.wakeQuoteLength)}`;
+  }
+
   public static formatSubAgentWake(description: string, subAgentId: string, status: string, summary: string | null): string {
-    const ending = `Your sub-agent "${description}" (${subAgentId}) ended as ${status.toLowerCase()}`;
+    const ending = `Your sub-agent "${description}" (${subAgentId}) ${Resources.formatSubAgentEnding(status)}`;
     return Object.isNull(summary) ? `${ending}, without a summary.` : `${ending}:${Resources.lineSeparator}${Resources.formatWakeQuote(summary)}`;
   }
 
@@ -1555,13 +1571,9 @@ export class Resources {
   }
 
   public static formatCommandWake(description: string, commandId: string, exit: CommandExit, lastLines: string): string {
-    const ending = !Object.isNull(exit.error) ? `couldn't run: ${exit.error}` : !Object.isNull(exit.signal) ? `was ended by ${exit.signal}`
-      : `exited with code ${exit.code}`;
-    const head = `Your background command "${description}" (${commandId}) ${ending}`;
-    if (lastLines.length === 0)
-      return `${head}, with no output.`;
-    const quoted = lastLines.length <= Resources.wakeQuoteLength ? lastLines : `${Resources.ellipsis}${lastLines.slice(-Resources.wakeQuoteLength)}`;
-    return `${head}. Its last lines:${Resources.lineSeparator}${quoted}`;
+    const head = `Your background command "${description}" (${commandId}) ${Resources.formatCommandEnding(exit)}`;
+    const quoted = Resources.formatCommandQuote(lastLines);
+    return Object.isNull(quoted) ? `${head}, with no output.` : `${head}. Its last lines:${Resources.lineSeparator}${quoted}`;
   }
 
   public static formatCommandWakeLost(commandId: string): string {

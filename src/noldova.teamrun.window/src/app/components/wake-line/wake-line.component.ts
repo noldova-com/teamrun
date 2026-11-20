@@ -37,17 +37,35 @@ export class WakeLineComponent {
   public readonly labelId: InputSignal<string | null> = input<string | null>(null);
 
   protected readonly resources: typeof Resources = Resources;
-  protected readonly chat: Signal<Conversation | null> = computed(() => this.store.conversation(this.received().chatId));
+  protected readonly commandTask: string = ProtocolResources.wakeCommandTask;
+  protected readonly chat: Signal<Conversation | null> = computed(() => {
+    const chatId = this.received().chatId;
+    return Object.isNull(chatId) ? null : this.store.conversation(chatId);
+  });
   protected readonly controls: Signal<MessageControlState> = computed(() => {
     const message = this.message();
     return this.state() ?? this.store.messageControlsOf(message.conversationId, message.id) ?? this.fallback;
   });
   protected readonly endText: Signal<string | null> = computed(() => {
-    const end = this.received().end;
-    return end === ProtocolResources.wakeLostEnd ? Resources.wakeLostText : end === ProtocolResources.wakeChatDeletedEnd ? Resources.wakeChatDeletedText : null;
+    const { end, task } = this.received();
+    if (end === ProtocolResources.wakeChatDeletedEnd)
+      return Resources.wakeChatDeletedText;
+    if (end !== ProtocolResources.wakeLostEnd)
+      return null;
+    return Object.isNull(task) ? Resources.wakeLostText : task.kind === ProtocolResources.wakeCommandTask ? Resources.wakeCommandLostText : Resources.wakeTaskLostText;
   });
-  protected readonly label: Signal<string> = computed(() => Object.isNull(this.received().end) ? Resources.wakeReceivedLabel : Resources.wakeEndedLabel);
-  protected readonly expandable: Signal<boolean> = computed(() => this.received().replies.length > 0 || !Object.isNull(this.endText()));
+  protected readonly label: Signal<string> = computed(() => {
+    const { chatId, end, task } = this.received();
+    if (!Object.isNull(task))
+      return Resources.formatTaskWakeLabel(task.kind, task.name, task.ending);
+    if (Object.isNull(chatId))
+      return Resources.wakeOldTaskLabel;
+    return Object.isNull(end) ? Resources.wakeReceivedLabel : Resources.wakeEndedLabel;
+  });
+  protected readonly expandable: Signal<boolean> = computed(() => {
+    const { replies, task } = this.received();
+    return replies.length > 0 || !Object.isNull(this.endText()) || !Object.isNull(task?.text ?? null);
+  });
   protected readonly notes: Signal<readonly string[]> = computed(() => {
     const message = this.message();
     return message.author === MessageAuthor.User ? message.details.filter(t => t.kind === DetailKind.Note).map(t => t.text) : [];

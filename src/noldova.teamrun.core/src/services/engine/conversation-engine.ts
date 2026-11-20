@@ -1337,7 +1337,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       if (turn.run.isCancelled || this.state.closing)
         continue;
       await this.wakes.addAsync(new ChatWake(Guid.createVersion7().toString(), ChatWakeKind.Command, turn.message.conversationId, turn.message.id,
-        turn.message.conversationId, [run.id], ChatWakeState.Waiting, null, null, new Date().toISOString()));
+        turn.message.conversationId, [run.id], ChatWakeState.Waiting, null, null, new Date().toISOString(),
+        ConversationEngine.taskViewOf(ProtocolResources.wakeCommandTask, run.description, null, null)));
       const exit = run.endedWith;
       if (!Object.isNull(exit))
         await this.wakeForCommandAsync(run, exit);
@@ -1352,7 +1353,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       if (turn.run.isCancelled || this.state.closing)
         continue;
       await this.wakes.addAsync(new ChatWake(Guid.createVersion7().toString(), ChatWakeKind.SubAgent, turn.message.conversationId, turn.message.id,
-        turn.message.conversationId, [child.id], ChatWakeState.Waiting, null, null, new Date().toISOString()));
+        turn.message.conversationId, [child.id], ChatWakeState.Waiting, null, null, new Date().toISOString(),
+        ConversationEngine.taskViewOf(ProtocolResources.wakeSubAgentTask, child.current.description, null, null)));
       if (!child.current.isRunning)
         await this.wakeForSubAgentAsync(turn, child);
     }
@@ -2106,10 +2108,12 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     await this.settleSafelyAsync(turn.message.conversationId, async () => {
       const ended = child.current;
       const text = Resources.formatSubAgentWake(ended.description, child.id, ended.status, ended.summary);
+      const view = ConversationEngine.taskViewOf(ProtocolResources.wakeSubAgentTask, ended.description, Resources.formatSubAgentEnding(ended.status),
+        Object.isNull(ended.summary) ? null : Resources.formatWakeQuote(ended.summary));
       const settled = await this.context.database.connection.runInTransactionAsync(async transaction => {
         const waiting = (await this.wakes.listAsync(ChatWakeState.Waiting, transaction)).filter(t => t.kind === ChatWakeKind.SubAgent && t.watchedIds.includes(child.id));
         for (const wake of waiting)
-          await this.wakes.updateAsync(wake.settled(child.wasStopped ? ChatWakeState.Undeliverable : ChatWakeState.Ready, text, turn.hop + 1), transaction);
+          await this.wakes.updateAsync(wake.settled(child.wasStopped ? ChatWakeState.Undeliverable : ChatWakeState.Ready, text, turn.hop + 1, view), transaction);
         return waiting;
       });
       for (const wake of settled)
@@ -2122,8 +2126,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const settled = await this.context.database.connection.runInTransactionAsync(async transaction => {
         const waiting = (await this.wakes.listAsync(ChatWakeState.Waiting, transaction)).filter(t => t.kind === ChatWakeKind.Command && t.watchedIds.includes(run.id));
         for (const wake of waiting)
-          await this.wakes.updateAsync(wake.settled(run.wasStopped ? ChatWakeState.Undeliverable : ChatWakeState.Ready, run.wakeTextOf(exit), run.turn.hop + 1),
-            transaction);
+          await this.wakes.updateAsync(wake.settled(run.wasStopped ? ChatWakeState.Undeliverable : ChatWakeState.Ready, run.wakeTextOf(exit), run.turn.hop + 1,
+            ConversationEngine.taskViewOf(ProtocolResources.wakeCommandTask, run.description, Resources.formatCommandEnding(exit),
+              Resources.formatCommandQuote(run.lastLines))), transaction);
         return waiting;
       });
       for (const wake of settled)
@@ -2192,7 +2197,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const stopped = startsTurn && Object.isNull(blocked) && hop > limit;
       const watched = Object.isNull(view) ? null : await this.conversations.findAsync(wake.watchedChatId, transaction);
       const received = Object.isNull(view) ? null
-        : new MessageDetail(0, DetailKind.Note, Resources.formatWakeReceived(watched?.title ?? null), { source: ProtocolResources.wakeReceivedSource, ...view }, now);
+        : new MessageDetail(0, DetailKind.Note, wake.kind === ChatWakeKind.Reply ? Resources.formatWakeReceived(watched?.title ?? null) : Resources.taskWakeReceived,
+          { source: ProtocolResources.wakeReceivedSource, ...view }, now);
       const started = !startsTurn || stopped ? null : blocked ?? await this.wakeReplyOfAsync(source!, message, sequence + 1, now, hop, received, transaction);
       const item = started instanceof ReplyWork ? started : null;
       const note = stopped ? new MessageDetail(1, DetailKind.Note, Resources.formatChainStopped(limit), { source: Resources.handOffSource }, now)
@@ -2257,7 +2263,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   private async wakeViewOfAsync(wake: ChatWake, end: string | null, transaction?: SqlTransaction): Promise<JsonObject | null> {
     if (wake.kind !== ChatWakeKind.Reply)
-      return null;
+      return Object.isNull(wake.view) ? null : { [ProtocolResources.wakeTaskField]: wake.view, ...Object.isNull(end) ? {} : { [ProtocolResources.wakeEndField]: end } };
     if (!Object.isNull(end))
       return { [ProtocolResources.wakeChatField]: wake.watchedChatId, [ProtocolResources.wakeRepliesField]: [], [ProtocolResources.wakeEndField]: end };
     const replies: JsonObject[] = [];
@@ -2306,6 +2312,10 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
           : [Resources.formatWakeLost(watched.title, wake.watchedChatId), ProtocolResources.wakeLostEnd];
       }
     }
+  }
+
+  private static taskViewOf(kind: string, name: string, ending: string | null, text: string | null): JsonObject {
+    return { [ProtocolResources.kindField]: kind, [ProtocolResources.nameField]: name, [ProtocolResources.endingField]: ending, [ProtocolResources.textField]: text };
   }
 
   private nameOf(reply: Message): string {

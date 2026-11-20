@@ -1693,6 +1693,23 @@ export declare class Resources {
    */
   public static readonly wakeEndField: string;
   /**
+   * Name of the field carrying, for a sub-agent's or background command's wake, what the person sees of it: its `kind`, `subAgent` or
+   * `command`, its `name`, how it `ending`, in words without IDs, or null while it never ended, and its result `text` or null: `wakeTask`.
+   */
+  public static readonly wakeTaskField: string;
+  /**
+   * The `kind` of a sub-agent's wake in `wakeTask`: `subAgent`.
+   */
+  public static readonly wakeSubAgentTask: string;
+  /**
+   * The `kind` of a background command's wake in `wakeTask`: `command`.
+   */
+  public static readonly wakeCommandTask: string;
+  /**
+   * Name of the field carrying how a sub-agent or background command ended, in words: `ending`.
+   */
+  public static readonly endingField: string;
+  /**
    * The `wakeEnd` of a wake TeamRun lost by restarting before the work it sent ended: `lost`.
    */
   public static readonly wakeLostEnd: string;
