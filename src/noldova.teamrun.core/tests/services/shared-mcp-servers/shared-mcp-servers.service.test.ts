@@ -286,10 +286,10 @@ export class SharedMcpServersServiceTests {
     Assert.areEqual(saved.updatedAt, saved.secrets[0]!.updatedAt);
     Assert.areEqual(saved.secrets[0]!.updatedAt, (await host.sharedServers.listAsync()).find(t => t.server.id === saved.id)!.variables.find(t => t.source === SharedMcpVariableSource.Saved)!.updatedAt);
     const again = await host.sharedServers.setSecretAsync(new SharedMcpSecretSetParams(server.id, "GITHUB_TOKEN", SharedMcpServersServiceTests.reference));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const removedBefore = host.secrets.removed.length;
     const environment = await host.sharedServers.setSecretAsync(new SharedMcpSecretSetParams(server.id, "GITHUB_TOKEN", null));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
 
     Assert.areEqual(SharedMcpServersServiceTests.reference, saved.referenceOf("GITHUB_TOKEN"));
     Assert.areEqual(SharedMcpServersServiceTests.reference, again.referenceOf("GITHUB_TOKEN"));
@@ -324,7 +324,7 @@ export class SharedMcpServersServiceTests {
     const between = await host.sharedServers.selectAsync(provider, null, "/projects/app");
     const removedBetween = host.secrets.removed.length;
     release();
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
 
     Assert.areEqual(other, saved.referenceOf("GITHUB_TOKEN"));
     Assert.areEqual(0, removedBetween);
@@ -359,7 +359,7 @@ export class SharedMcpServersServiceTests {
     host.secrets.refusal = "Open the app to use saved secrets.";
 
     const cleared = await host.sharedServers.setSecretAsync(new SharedMcpSecretSetParams(server.id, "GITHUB_TOKEN", null));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
 
     Assert.isNull(cleared.referenceOf("GITHUB_TOKEN"));
     Assert.isTrue(host.log.lines.some(t => t.includes(Resources.formatSharedMcpSecretKept("GITHUB_TOKEN", "Open the app to use saved secrets."))));
@@ -376,12 +376,12 @@ export class SharedMcpServersServiceTests {
     await host.sharedServers.setSecretAsync(new SharedMcpSecretSetParams(search.id, "SEARCH_KEY", other));
 
     const edited = await host.sharedServers.updateAsync(new SharedMcpServerUpdateParams(search.id, SharedMcpServersServiceTests.stdio("search", ["SEARCH_KEY"])));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const afterEdit = [...host.secrets.removed];
     await host.sharedServers.setSecretAsync(new SharedMcpSecretSetParams(docs.id, "DOCS_KEY", SharedMcpServersServiceTests.reference));
     host.secrets.refusal = "Open the app to use saved secrets.";
     await host.sharedServers.deleteAsync(new SharedMcpServerIdParams(docs.id));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
 
     Assert.areEqual(JSON.stringify([{ variable: "SEARCH_KEY", reference: other }]), JSON.stringify(edited.secrets.map(t => ({ variable: t.variable, reference: t.reference }))));
     Assert.areEqual(JSON.stringify([SharedMcpServersServiceTests.reference]), JSON.stringify(afterEdit));
@@ -516,7 +516,7 @@ export class SharedMcpServersServiceTests {
     await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
     const signingIn = (await host.sharedServers.listAsync())[0]?.signingIn;
     await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const listed = (await host.sharedServers.listAsync())[0];
 
     const [first] = host.signIns.started;
@@ -535,7 +535,7 @@ export class SharedMcpServersServiceTests {
     await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
     await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
     host.signIns.started[0]?.finished(SharedMcpAccess.granted("access-token-5b2e8d", "2026-11-02T11:00:00.000Z"));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const listed = (await host.sharedServers.listAsync())[0];
 
     const reference = host.signIns.started[0]?.reference;
@@ -550,14 +550,14 @@ export class SharedMcpServersServiceTests {
     const second = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("wiki"));
     await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(second.id));
     host.signIns.started[0]?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const finishWhileSigningOutAsync = async (serverId: string): Promise<string | undefined> => {
       await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(serverId));
       const running = host.signIns.started.at(-1);
       const signingOut = host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(serverId));
       running?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
       await signingOut;
-      await SharedMcpServersServiceTests.settleAsync();
+      await SharedMcpServersServiceTests.afterMicrotasksAsync();
       return running?.reference;
     };
 
@@ -580,7 +580,7 @@ export class SharedMcpServersServiceTests {
     const later = host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
     first?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
     await later;
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const [listed] = await host.sharedServers.listAsync();
 
     Assert.areEqual(JSON.stringify([first?.reference, true, first?.reference]),
@@ -598,12 +598,52 @@ export class SharedMcpServersServiceTests {
     const later = host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
     await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
     await later;
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const second = host.signIns.started[1]?.reference;
 
     Assert.areNotEqual(first?.reference, second);
     Assert.isTrue((await host.sharedServers.listAsync())[0]?.signingIn ?? false);
     Assert.areEqual(JSON.stringify([first?.reference]), JSON.stringify(host.signIns.signedOut));
+  }
+
+  @TestMethod
+  public async startsASignInThatComesDuringTheSignOutOfASignedInServerUnderANewReferenceTheSignOutLeavesRunning(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    host.signIns.started[0]?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
+    const signedIn = host.signIns.started[0]?.reference;
+
+    const later = host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
+    await later;
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
+
+    Assert.areNotEqual(signedIn, host.signIns.started[1]?.reference);
+    Assert.isTrue((await host.sharedServers.listAsync())[0]?.signingIn ?? false);
+    Assert.areEqual(JSON.stringify([signedIn]), JSON.stringify(host.signIns.signedOut));
+  }
+
+  @TestMethod
+  public async startsASignInThatComesDuringASignOutWhileASignInFinishesUnderANewReferenceTheSignOutLeavesRunning(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    host.signIns.started[0]?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    const signedIn = host.signIns.started[1]?.reference;
+
+    host.signIns.started[1]?.finished(SharedMcpAccess.granted("access-token-9c4f1a", null));
+    const later = host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
+    await later;
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
+
+    Assert.areNotEqual(signedIn, host.signIns.started[2]?.reference);
+    Assert.isTrue((await host.sharedServers.listAsync())[0]?.signingIn ?? false);
+    Assert.isTrue(host.signIns.signedOut.length > 0 && host.signIns.signedOut.every(t => t === signedIn));
   }
 
   @TestMethod
@@ -615,7 +655,7 @@ export class SharedMcpServersServiceTests {
 
     running?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
     await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const [listed] = await host.sharedServers.listAsync();
 
     Assert.areEqual(JSON.stringify([null, false]), JSON.stringify([listed?.server.signIn, listed?.signingIn]));
@@ -711,11 +751,11 @@ export class SharedMcpServersServiceTests {
     const moved = await host.sharedServers.updateAsync(new SharedMcpServerUpdateParams(wiki,
       new SharedMcpServerDefinition("wiki", SharedMcpTransport.Http, null, [], [], "https://wiki.example.org/mcp", [], null, true)));
     const stopped = await host.sharedServers.updateAsync(new SharedMcpServerUpdateParams(notes, SharedMcpServersServiceTests.http("notes")));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const signedOut = [...host.signIns.signedOut];
     host.signIns.refusal = "Open the app to use saved secrets.";
     await host.sharedServers.deleteAsync(new SharedMcpServerIdParams(team));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
 
     Assert.areEqual(JSON.stringify([null, null, references[1], null, null]),
       JSON.stringify([out.signIn, again.signIn, kept.signIn?.reference, moved.signIn, stopped.signIn]));
@@ -792,7 +832,7 @@ export class SharedMcpServersServiceTests {
     await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
 
     await host.sharedServers.deleteAsync(new SharedMcpServerIdParams(server.id));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
 
     Assert.areEqual(JSON.stringify([host.signIns.started[0]?.reference]), JSON.stringify(host.signIns.signedOut));
   }
@@ -808,7 +848,7 @@ export class SharedMcpServersServiceTests {
     await host.sharedServers.deleteAsync(new SharedMcpServerIdParams(server.id));
 
     late?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     await host.context.database.connection.executeAsync(new SqlQuery("DROP TABLE sharedMcpServers"));
     unsaved?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
     await host.until("the unsaved sign-in's end", () => host.listener.count(EventName.StateInvalidated) >= 4);
@@ -828,10 +868,10 @@ export class SharedMcpServersServiceTests {
 
     await host.sharedServers.updateAsync(new SharedMcpServerUpdateParams(server.id,
       new SharedMcpServerDefinition("wiki", SharedMcpTransport.Http, null, [], [], "https://wiki.example.org/mcp", [], null, true)));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const ended = [[...host.signIns.signedOut], (await host.sharedServers.listAsync())[0]?.signingIn];
     moving?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
     const [listed] = await host.sharedServers.listAsync();
 
     const other = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("notes"));
@@ -858,7 +898,7 @@ export class SharedMcpServersServiceTests {
 
     await host.context.database.connection.executeAsync(new SqlQuery("DELETE FROM sharedMcpServers"));
     late?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
-    await SharedMcpServersServiceTests.settleAsync();
+    await SharedMcpServersServiceTests.afterMicrotasksAsync();
 
     Assert.areEqual(JSON.stringify([late?.reference]), JSON.stringify(host.signIns.signedOut));
     Assert.areEqual("[]", JSON.stringify(await host.sharedServers.listAsync()));
@@ -938,7 +978,7 @@ export class SharedMcpServersServiceTests {
     return [adapter, await host.createProviderAsync("taking", "Taking")];
   }
 
-  private static settleAsync(): Promise<void> {
+  private static afterMicrotasksAsync(): Promise<void> {
     return new Promise(resolve => setImmediate(resolve));
   }
 
