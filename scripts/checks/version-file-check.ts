@@ -28,7 +28,8 @@ export class VersionFileCheck implements ICheck {
   public async runAsync(output: Writable): Promise<boolean> {
     const released = await this.readVersionAsync(VersionFileCheck.VERSION_FILE, output);
     let passed = released !== null;
-    for (const manifest of VersionSetter.MANIFESTS) {
+    const files = [...VersionSetter.TEXT_FILES.filter(t => t !== VersionFileCheck.VERSION_FILE), ...VersionSetter.MANIFESTS];
+    for (const manifest of files) {
       const version = await this.readVersionAsync(manifest, output);
       if (version === null)
         passed = false;
@@ -38,7 +39,7 @@ export class VersionFileCheck implements ICheck {
       }
     }
     if (passed)
-      output.write(`${VersionFileCheck.VERSION_FILE}, ${VersionSetter.MANIFESTS.join(", ")} all hold ${released}.\n`);
+      output.write(`${VersionFileCheck.VERSION_FILE}, ${files.join(", ")} all hold ${released}.\n`);
     return passed;
   }
 

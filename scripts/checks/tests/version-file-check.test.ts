@@ -23,7 +23,7 @@ const manifest = (version: unknown): string => JSON.stringify({ name: "sample", 
 const rootWith = (versionFile: string | null, manifests: Readonly<Record<string, string | null>> = {}): string => {
   const root = mkdtempSync(path.join(tmpdir(), "version-file-"));
   folders.push(root);
-  for (const file of VersionSetter.MANIFESTS) {
+  for (const file of [...VersionSetter.MANIFESTS, "src/noldova.teamrun/module.json"]) {
     const text = Object.hasOwn(manifests, file) ? manifests[file] : manifest("0.0.2");
     if (text === null || text === undefined)
       continue;
@@ -48,18 +48,19 @@ describe("VersionFileCheck", () => {
       rmSync(folder, { recursive: true, force: true });
   });
 
-  it("reads every package.json that set-version writes", () => {
+  it("reads every package.json and text file that set-version writes", () => {
     assert.deepEqual(VersionSetter.MANIFESTS, ["package.json", "src/package.json", "app/package.json", "app/src/noldova.teamrun.window.app/package.json"]);
+    assert.deepEqual(VersionSetter.TEXT_FILES, ["version.json", "src/noldova.teamrun/module.json"]);
   });
 
   it("passes when version.json and every package.json hold the same version", async () => {
     const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.2" })));
 
     assert.equal(passed, true);
-    assert.match(text, /all hold 0\.0\.2/);
+    assert.equal(text, "version.json, src/noldova.teamrun/module.json, package.json, src/package.json, app/package.json, app/src/noldova.teamrun.window.app/package.json all hold 0.0.2.\n");
   });
 
-  for (const file of ["package.json", "src/package.json", "app/package.json", "app/src/noldova.teamrun.window.app/package.json"]) {
+  for (const file of ["src/noldova.teamrun/module.json", "package.json", "src/package.json", "app/package.json", "app/src/noldova.teamrun.window.app/package.json"]) {
     it(`fails, naming the file, when ${file} holds another version`, async () => {
       const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.2" }), { [file]: manifest("0.0.1") }));
 
@@ -68,11 +69,11 @@ describe("VersionFileCheck", () => {
     });
   }
 
-  it("names every package.json that differs", async () => {
+  it("names every file that differs", async () => {
     const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.1" })));
 
     assert.equal(passed, false);
-    assert.equal(text.split("\n").filter(line => line.includes("but version.json holds 0.0.1")).length, 4);
+    assert.equal(text.split("\n").filter(line => line.includes("but version.json holds 0.0.1")).length, 5);
   });
 
   it("fails, naming the file, when version.json is missing", async () => {
@@ -80,6 +81,13 @@ describe("VersionFileCheck", () => {
 
     assert.equal(passed, false);
     assert.match(text, /^version\.json can't be read/);
+  });
+
+  it("fails, naming the file, when src/noldova.teamrun/module.json is missing", async () => {
+    const { passed, text } = await runIn(rootWith(JSON.stringify({ version: "0.0.2" }), { "src/noldova.teamrun/module.json": null }));
+
+    assert.equal(passed, false);
+    assert.match(text, /^src\/noldova\.teamrun\/module\.json can't be read/);
   });
 
   it("fails, naming the file, when app/package.json is missing", async () => {
