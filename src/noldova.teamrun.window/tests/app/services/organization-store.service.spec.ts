@@ -93,6 +93,15 @@ describe("OrganizationStoreService", () => {
     expect(namesOf(store)).toBe("Design");
   });
 
+  it("says a listing failure that isn't an error in its own words", async () => {
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => Promise.reject("The runtime stopped."));
+    const store = OrganizationStoreService.of(context);
+
+    await store.reload();
+
+    expect(store.loadError()).toBe("The runtime stopped.");
+  });
+
   it("drops a listing that fails after a newer change, and one that ends after the store is released", async () => {
     let answer: () => Promise<JsonValue> = () => Promise.resolve(Organization.empty.toJson());
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answer());
