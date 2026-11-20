@@ -2187,11 +2187,11 @@ export interface IConversationEngine {
    * Cancels every open reply of the conversation's active send: the working reply stops and the
    * waiting ones are cancelled before they start.
    * @param params The conversation.
-   * @returns The replies this cancel stopped, after the send has settled: those still open when it
-   * started, a hand-off's among them, that ended cancelled. A reply that had already ended, that a
-   * Stop is still ending, its own or an earlier chat Stop, or that completed before the stop reached
-   * it, is left out; so of two chat Stops that overlap, such as the window's and `teamrun cancel`, the
-   * second answers with none of the replies the first is ending.
+   * @returns After the send has settled, the replies still open when this Stop began, or that joined the send after it began, such as
+   * a hand-off's or another chat's teammate's, that ended cancelled and that no Stop which settled earlier has listed. A reply that
+   * had already ended, that an earlier Stop is still ending, or that completed before the Stop reached it is left out, so each
+   * reply is listed by one Stop at most; of two chat Stops that overlap, such as the window's and `teamrun cancel`, the second
+   * answers with none of the replies the first is ending.
    * @throws ServiceException named `ErrorCode.Conflict` when the conversation has no active send.
    */
   cancelConversationAsync(params: ConversationIdParams): Promise<readonly Message[]>;
