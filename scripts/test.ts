@@ -19,6 +19,7 @@ import { CommentCheck } from "./checks/comment-check.ts";
 import { CopyListCheck } from "./checks/copy-list-check.ts";
 import { DependencyPinCheck } from "./checks/dependency-pin-check.ts";
 import { DocumentCheck } from "./checks/document-check.ts";
+import { FailureScreenshotCheck } from "./checks/failure-screenshot-check.ts";
 import { FieldOrderCheck } from "./checks/field-order-check.ts";
 import { FlakyRecord } from "./checks/flaky-record.ts";
 import type { FlakyTest } from "./checks/flaky-test.ts";
@@ -92,7 +93,7 @@ export class Test {
     if (options.isDocuments)
       return await this.runChecksAsync([this.createDocumentChecks()], Test.DOCUMENTS_NOTICE, null, null);
     if (options.isAngular)
-      return await this.runChecksAsync([[new AngularTestCheck(new AngularProject(this.root, this.runner), null)]], null, null, null);
+      return await this.runChecksAsync([[new AngularTestCheck(new AngularProject(this.root, this.runner), null), new FailureScreenshotCheck(this.root, this.runner)]], null, null, null);
 
     const flaky = options.isRerunningFailed ? new FlakyRecord(this.root, this.environment) : null;
     await flaky?.clearAsync();
@@ -238,7 +239,7 @@ export class Test {
       new CopyListCheck(this.root, async () => await new NpmCommand(this.runner, this.environment).runAsync(CopyListCheck.LIST_ARGUMENTS, this.root),
         async () => await build.readArchivesAsync()),
       new PackageTestCheck(this.root, build, this.runner, this.environment, flaky, options),
-      ...this.environment[Test.SEPARATE_VARIABLE] === Test.ANGULAR ? [] : [new AngularTestCheck(new AngularProject(this.root, this.runner), flaky)],
+      ...this.environment[Test.SEPARATE_VARIABLE] === Test.ANGULAR ? [] : [new AngularTestCheck(new AngularProject(this.root, this.runner), flaky), new FailureScreenshotCheck(this.root, this.runner)],
       new TypeCheck(this.root, this.runner),
       new ScriptTestCheck(this.root, this.runner)
     ];
