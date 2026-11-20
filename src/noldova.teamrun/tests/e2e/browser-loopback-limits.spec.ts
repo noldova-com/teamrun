@@ -86,7 +86,7 @@ const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: stri
   return navigated();
 };
 
-test("limit: a page's request to a name that resolves to this computer reaches it, and the page reads the answer, until Noldova Desktop refuses it", async ({ app }) => {
+test("limit: a page's request reads its answer", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const [pageServer, origin] = await servePageAsync(`fetch("http://${service.name}/data").then(t => t.text()).then(t => { document.title = "Read " + t; }, `
     + "e => { document.title = \"Failed \" + e; });");
@@ -121,7 +121,7 @@ test("a navigation to an allowed name that resolves to this computer is refused 
   }
 });
 
-test("limit: a named local page's WebSocket to an allowed name that resolves to this computer connects, until Noldova Desktop refuses it", async ({ app }) => {
+test("limit: a page's WebSocket hears its message", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const [pageServer, origin] = await servePageAsync(`const socket = new WebSocket("ws://${service.name}/socket"); `
     + "socket.onmessage = e => { document.title = \"Heard \" + e.data; }; socket.onerror = () => { document.title = \"Failed\"; };");
