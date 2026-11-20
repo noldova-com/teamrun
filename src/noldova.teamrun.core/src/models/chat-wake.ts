@@ -8,7 +8,7 @@
 
 import "@noldova/context.core";
 import { ArgumentException } from "@noldova/context.exceptions";
-import { JsonReader, type JsonObject } from "@noldova/context.json";
+import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.json";
 
 import { ChatWakeKind } from "../enums/chat-wake-kind.js";
 import { ChatWakeState } from "../enums/chat-wake-state.js";
@@ -25,9 +25,10 @@ export class ChatWake {
   public readonly text: string | null;
   public readonly hop: number | null;
   public readonly createdAt: string;
+  public readonly view: JsonObject | null;
 
   public constructor(id: string, kind: ChatWakeKind, chatId: string, sourceMessageId: string, watchedChatId: string, watchedIds: readonly string[],
-    state: ChatWakeState, text: string | null, hop: number | null, createdAt: string) {
+    state: ChatWakeState, text: string | null, hop: number | null, createdAt: string, view: JsonObject | null = null) {
     ArgumentException.throwIfNullOrWhitespace(id, Resources.idParameterName);
     ArgumentException.throwIfNullOrWhitespace(chatId, Resources.chatIdParameterName);
     ArgumentException.throwIfNullOrWhitespace(sourceMessageId, Resources.sourceMessageIdParameterName);
@@ -45,10 +46,12 @@ export class ChatWake {
     this.text = text;
     this.hop = hop;
     this.createdAt = createdAt;
+    this.view = view;
   }
 
   public static fromJson(value: unknown): ChatWake {
     const reader = JsonReader.fromValue(value);
+    const view = reader.toJson()[Resources.viewField];
     return new ChatWake(
       reader.readNonBlankString(Resources.idColumn),
       reader.readOneOf(Resources.kindField, Object.values(ChatWakeKind)),
@@ -59,11 +62,12 @@ export class ChatWake {
       reader.readOneOf(Resources.stateField, Object.values(ChatWakeState)),
       reader.readNullableString(Resources.textField),
       reader.readNullableInteger(Resources.hopField),
-      reader.readNonBlankString(Resources.createdAtField));
+      reader.readNonBlankString(Resources.createdAtField),
+      ChatWake.isJsonObject(view) ? view : null);
   }
 
-  public settled(state: ChatWakeState, text: string, hop: number | null): ChatWake {
-    return new ChatWake(this.id, this.kind, this.chatId, this.sourceMessageId, this.watchedChatId, this.watchedIds, state, text, hop, this.createdAt);
+  public settled(state: ChatWakeState, text: string, hop: number | null, view: JsonObject | null = this.view): ChatWake {
+    return new ChatWake(this.id, this.kind, this.chatId, this.sourceMessageId, this.watchedChatId, this.watchedIds, state, text, hop, this.createdAt, view);
   }
 
   public toJson(): JsonObject {
@@ -77,7 +81,12 @@ export class ChatWake {
       [Resources.stateField]: this.state,
       [Resources.textField]: this.text,
       [Resources.hopField]: this.hop,
-      [Resources.createdAtField]: this.createdAt
+      [Resources.createdAtField]: this.createdAt,
+      ...Object.isNull(this.view) ? {} : { [Resources.viewField]: this.view }
     };
+  }
+
+  private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 }

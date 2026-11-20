@@ -736,8 +736,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     }
     this.sharedFailures.forget(conversationIds);
     this.stoppedCommands.forget(conversationIds);
-    for (const wake of [...await this.wakes.listAsync(ChatWakeState.Waiting), ...await this.wakes.listAsync(ChatWakeState.Ready)]
-      .filter(t => conversationIds.includes(t.watchedChatId)))
+    for (const wake of (await this.wakes.listAsync(ChatWakeState.Waiting)).filter(t => conversationIds.includes(t.watchedChatId)))
       await this.settleSafelyAsync(wake.chatId, async () => {
         await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, Resources.formatWakeChatDeleted(wake.watchedChatId), null), ProtocolResources.wakeChatDeletedEnd);
       });
@@ -2084,7 +2083,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
           .filter(t => t.kind === ChatWakeKind.Reply && t.watchedChatId === conversationId)) {
           if (!await this.watchedEndedAsync(wake, transaction))
             continue;
-          await this.wakes.updateAsync(wake.settled(ChatWakeState.Ready, await this.wakeTextOfAsync(wake, work, transaction), hop), transaction);
+          await this.wakes.updateAsync(wake.settled(ChatWakeState.Ready, await this.wakeTextOfAsync(wake, work, transaction), hop,
+            await this.wakeViewOfAsync(wake, null, transaction)), transaction);
           ready.push(wake);
         }
         return ready;
@@ -2260,6 +2260,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       return null;
     if (!Object.isNull(end))
       return { [ProtocolResources.wakeChatField]: wake.watchedChatId, [ProtocolResources.wakeRepliesField]: [], [ProtocolResources.wakeEndField]: end };
+    if (!Object.isNull(wake.view))
+      return wake.view;
     const replies: JsonObject[] = [];
     for (const id of wake.watchedIds) {
       const reply = await this.messages.findAsync(id, transaction);

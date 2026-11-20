@@ -163,6 +163,8 @@ export class Resources {
   public static readonly wakeEndField: string = "wakeEnd";
   public static readonly wakeLostEnd: string = "lost";
   public static readonly wakeChatDeletedEnd: string = "chatDeleted";
+  public static readonly wakeLostOpening: string = "TeamRun restarted before the work you sent to chat ";
+  public static readonly wakeChatDeletedOpening: string = "The chat ";
   public static readonly resumeSource: string = "resume";
   public static readonly changesNoteField: string = "changesNote";
   public static readonly writesField: string = "writes";

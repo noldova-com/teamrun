@@ -715,6 +715,7 @@ export class Resources {
   public static readonly stateField: string = "state";
   public static readonly textField: string = "text";
   public static readonly hopField: string = "hop";
+  public static readonly viewField: string = "view";
   public static readonly createdAtField: string = "createdAt";
   public static readonly chatIdParameterName: string = "chatId";
   public static readonly sourceMessageIdParameterName: string = "sourceMessageId";
@@ -1537,7 +1538,7 @@ export class Resources {
   }
 
   public static formatWakeLost(title: string, chatId: string): string {
-    return `TeamRun restarted before the work you sent to chat ${Resources.formatChatName(title, chatId)} ended, so no result came back and this chat wasn't woken.`;
+    return `${ProtocolResources.wakeLostOpening}${Resources.formatChatName(title, chatId)} ended, so no result came back and this chat wasn't woken.`;
   }
 
   public static formatCommandLimitReached(limit: number): string {
@@ -1573,7 +1574,7 @@ export class Resources {
   }
 
   public static formatWakeChatDeleted(chatId: string): string {
-    return `The chat ${chatId} that you sent work to was deleted before its result came back, so this chat wasn't woken.`;
+    return `${ProtocolResources.wakeChatDeletedOpening}${chatId} that you sent work to was deleted before its result came back, so this chat wasn't woken.`;
   }
 
   public static formatWakeProviderRefused(reason: string): string {

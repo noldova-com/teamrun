@@ -72,10 +72,11 @@ describe("FormatterService", () => {
     expect(FormatterService.wakeReceivedOf(received("Bob"))).toBeNull();
   });
 
-  it("reads why a chat's wake brought nothing back, and an old wake with no view from its sender's chat, but not one from its own chat or with no sender", () => {
-    const wake = (payload: JsonObject, sender: MessageSender | null): Message => new Message("w1", "c1", 1, MessageAuthor.User, null, MessageStatus.Completed,
-      [detail(0, DetailKind.Text, "The work you sent has ended.", { source: "chatWake", wakeId: "w1", ...payload })], null, SampleData.timestamp, null,
-      SampleData.timestamp, [], null, null, [], sender);
+  it("reads why a chat's wake brought nothing back, and an old wake with no view from its sender's chat, lost or deleted by its text's opening, but not one from its own chat or with no sender", () => {
+    const wake = (payload: JsonObject, sender: MessageSender | null, text: string = "The work you sent to chat \"Second\" (c2) has ended."): Message =>
+      new Message("w1", "c1", 1, MessageAuthor.User, null, MessageStatus.Completed,
+        [detail(0, DetailKind.Text, text, { source: "chatWake", wakeId: "w1", ...payload })], null, SampleData.timestamp, null,
+        SampleData.timestamp, [], null, null, [], sender);
     const read = (message: Message): readonly unknown[] | null => {
       const received = FormatterService.wakeReceivedOf(message);
       return Object.isNull(received) ? null : [received.chatId, received.replies.length, received.end];
@@ -84,6 +85,10 @@ describe("FormatterService", () => {
     expect(read(wake({ wakeChatId: "c2", wakeReplies: [], wakeEnd: "lost" }, null))).toEqual(["c2", 0, "lost"]);
     expect(read(wake({ wakeChatId: "c2", wakeReplies: [], wakeEnd: 1 }, null))).toEqual(["c2", 0, null]);
     expect(read(wake({}, new MessageSender("c2", "bob", "Bob")))).toEqual(["c2", 0, null]);
+    expect(read(wake({}, new MessageSender("c2", null, "TeamRun"),
+      "TeamRun restarted before the work you sent to chat \"Second\" (c2) ended, so no result came back and this chat wasn't woken."))).toEqual(["c2", 0, "lost"]);
+    expect(read(wake({}, new MessageSender("c2", null, "TeamRun"),
+      "The chat c2 that you sent work to was deleted before its result came back, so this chat wasn't woken."))).toEqual(["c2", 0, "chatDeleted"]);
     expect(read(wake({}, new MessageSender("c1", null, "TeamRun")))).toBeNull();
     expect(read(wake({}, null))).toBeNull();
     expect(read(reply([detail(0, DetailKind.Note, "Received a message.", { source: "wakeReceived" })]))).toBeNull();

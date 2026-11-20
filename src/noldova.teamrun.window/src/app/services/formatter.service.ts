@@ -132,14 +132,16 @@ export class FormatterService {
 
   public static wakeReceivedOf(message: Message): WakeReceived | null {
     const source = message.author === MessageAuthor.User ? ProtocolResources.chatWakeSource : ProtocolResources.wakeReceivedSource;
-    const payload = message.details.map(t => FormatterService.payloadOf(t)).find(t => t?.[Resources.sourceField] === source) ?? null;
-    if (Object.isNull(payload))
+    const detail = message.details.find(t => FormatterService.payloadOf(t)?.[Resources.sourceField] === source) ?? null;
+    const payload = Object.isNull(detail) ? null : FormatterService.payloadOf(detail);
+    if (Object.isNull(detail) || Object.isNull(payload))
       return null;
     const chatId = payload[ProtocolResources.wakeChatField];
     const replies = payload[ProtocolResources.wakeRepliesField];
     if (!Object.isString(chatId) || !Array.isArray(replies)) {
       const sender = message.sender;
-      return message.author === MessageAuthor.User && !Object.isNull(sender) && sender.chatId !== message.conversationId ? new WakeReceived(sender.chatId, [], null) : null;
+      return message.author === MessageAuthor.User && !Object.isNull(sender) && sender.chatId !== message.conversationId
+        ? new WakeReceived(sender.chatId, [], FormatterService.oldWakeEndOf(detail.text)) : null;
     }
     const end = payload[ProtocolResources.wakeEndField];
     return new WakeReceived(chatId, replies.filter(t => FormatterService.isJsonObject(t)).flatMap(t => {
@@ -771,6 +773,12 @@ export class FormatterService {
 
   private static isDenied(detail: MessageDetail): boolean {
     return FormatterService.payloadOf(detail)?.[Resources.deniedField] === true;
+  }
+
+  private static oldWakeEndOf(text: string): string | null {
+    if (text.startsWith(ProtocolResources.wakeLostOpening))
+      return ProtocolResources.wakeLostEnd;
+    return text.startsWith(ProtocolResources.wakeChatDeletedOpening) ? ProtocolResources.wakeChatDeletedEnd : null;
   }
 
   private static payloadOf(detail: MessageDetail): JsonObject | null {
