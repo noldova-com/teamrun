@@ -362,6 +362,7 @@ export class Resources {
   public static readonly speedField: string = "speed";
   public static readonly modeField: string = "mode";
   public static readonly contextWindowField: string = "contextWindow";
+  public static readonly binaryPathField: string = "binaryPath";
   public static readonly expectedProviderIdField: string = "expectedProviderId";
   public static readonly projectLabel: string = "Project";
   public static readonly folderLabel: string = "Folder";

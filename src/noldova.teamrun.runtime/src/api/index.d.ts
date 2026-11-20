@@ -2396,7 +2396,8 @@ export declare class RuntimePart implements IRuntimePart {
    * finishes the replies a stopped runtime left running, and registers its methods and events, and `TeamRunTools`' tools in
    * Noldova Desktop's tool registry, each running its command-line command in this process. Each teammate's turn opens its own agent
    * session of the registry, which every provider reaches through TeamRun's MCP endpoint.
-   * `teamrun.approvalDecide` answers only the app's main process, through `MainProcessMethod`. It registers `PermissionAnswerer` as the
+   * `teamrun.approvalDecide` answers only the app's main process, through `MainProcessMethod`, and so does `teamrun.providerUpdate` when it
+   * sets `binaryPath`, an empty one included, so only the person names the server a provider runs. It registers `PermissionAnswerer` as the
    * app's answerer of permission requests, and answers `ComputerUseGrantList` and `ComputerUseGrantRevoke` through
    * `RuntimeRememberedAppGrants`; when Noldova Desktop refuses it, because the app names another permissions module, the part logs
    * `Resources.answererNotRegistered`, answers none and fails those two methods as `UnknownMethod`.

@@ -1859,10 +1859,12 @@ export interface IProvidersService {
    * Changes a provider's label and profile directory, and switches its own MCP servers when the parameters say so, keeps its
    * id and provider so its teammates keep it, and publishes `ProviderUpdated`; a new profile directory clears the last
    * sign-in check and forgets the provider sessions kept in the old one; a new directory that is empty gets the kind's `prepareProfile`.
-   * @param params The provider id, the label, the absolute profile directory, and the own servers' switch or `null`.
+   * It also sets or clears the server path the parameters name, which the runtime takes only from the app's main process.
+   * @param params The provider id, the label, the absolute profile directory, the own servers' switch or `null`, and the server path or `null`.
    * @returns The updated provider.
    * @throws ServiceException named `ErrorCode.NotFound` when the provider does not exist,
-   * `ErrorCode.InvalidParams` when the directory is not absolute or the switch turns on the servers of a kind whose
+   * `ErrorCode.InvalidParams` when the directory or a server path is not absolute, a server path names a kind without
+   * `choosesServerPath`, or the switch turns on the servers of a kind whose
    * `ownMcpServersUnavailable` says why they can't be, with that reason as the message, and `ErrorCode.Conflict` when the
    * directory changes while a reply on the provider is open, or, with the directory as its argument, when another provider already uses
    * the directory, compared as `ProfileFolderPath` compares folders; and whatever the kind's `prepareProfile` throws, with the provider
