@@ -17,10 +17,12 @@ import {
   type WritableSignal,
   afterNextRender,
   computed,
+  effect,
   inject,
   input,
   output,
-  signal
+  signal,
+  untracked
 } from "@angular/core";
 
 import "@noldova/context.core";
@@ -73,6 +75,21 @@ export class AcpAgentsDialogComponent implements OnInit {
   private readonly pending: Set<Promise<void>> = new Set();
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
+  private readonly added: WritableSignal<string | null> = signal(null);
+
+  public constructor() {
+    effect(() => {
+      const id = this.added();
+      if (Object.isNull(id))
+        return;
+      const installing = this.store().installations().get(id)?.state === ProviderKindInstallState.Installing;
+      untracked(() => {
+        this.keepFocus(id);
+        if (!installing)
+          this.added.set(null);
+      });
+    });
+  }
 
   public ngOnInit(): void {
     void this.load();
@@ -104,7 +121,7 @@ export class AcpAgentsDialogComponent implements OnInit {
 
   protected async add(agent: AcpAgentEntry): Promise<void> {
     await this.work(agent.id, () => this.store().addAcpAgent(agent.id, this.report));
-    this.keepFocus(agent.id);
+    this.added.set(agent.id);
   }
 
   protected installingOf(agent: AcpAgentEntry): ProviderKindInstallation | null {

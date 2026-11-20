@@ -317,6 +317,25 @@ describe("AcpAgentsDialogComponent", () => {
     expect([added, document.activeElement === part(".nol-teamrun-acp-add", row("droid"))]).toEqual([true, true]);
   });
 
+  it("moves the focus to the Remove that takes the busy Add's place once an install still running after the add ends", async () => {
+    await create(t => t.answer(MethodName.ProviderKindInstall,
+      () => new ProviderKindInstallation(droid.id, ProviderKindInstallState.Installing, null, 25, 100).toJson()));
+    listing = new AcpAgentListing([new AcpAgentEntry(droid.id, droid.name, droid.version, droid.description, null, null, false, true), devin, plain], [mine], null,
+      SampleData.timestamp);
+    part<HTMLButtonElement>(".nol-teamrun-acp-add", row("droid")).focus();
+
+    await click(".nol-teamrun-acp-add", row("droid"));
+    await Wait.until(() => expect(context.count(MethodName.AcpAgentList)).toBe(2));
+    await Wait.until(() => expect(texts(".nol-teamrun-acp-progress", row("droid"))).toEqual(["Installing… 25%"]));
+    await settle();
+    const busy = document.activeElement === part(".nol-teamrun-acp-add", row("droid"));
+    context.emit(EventName.ProviderKindInstallationChanged, new ProviderKindInstallation(droid.id, ProviderKindInstallState.Installed).toJson());
+    await Wait.until(() => expect(row("droid").querySelector(".nol-teamrun-acp-remove")).not.toBeNull());
+    await settle();
+
+    expect([busy, document.activeElement === part(".nol-teamrun-acp-remove", row("droid"))]).toEqual([true, true]);
+  });
+
   it("removes an agent and a local command, and clears an old error when it tries again", async () => {
     const removed: string[] = [];
     await create(t => t.answer(MethodName.AcpAgentRemove, u => {
