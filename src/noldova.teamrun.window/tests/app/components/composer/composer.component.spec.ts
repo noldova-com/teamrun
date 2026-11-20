@@ -2910,6 +2910,19 @@ describe("ComposerComponent", () => {
       expect(context.count(MethodName.ConversationCancel)).toBe(1);
     });
 
+    it("keeps an edit through an Escape that closes an input method's candidates, stopping nothing, and ends it on the next Escape", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      box().addEventListener("keydown", t => fixture.componentInstance.stopOnEscape(t), { once: true });
+
+      await key("Escape", { isComposing: true });
+      const composing = [editingNote(), box().value];
+      await escape();
+
+      expect([composing, [editingNote(), box().value], context.count(MethodName.ConversationCancel)]).toEqual([[Resources.editingWaitingNote, "first"], [undefined, ""], 0]);
+    });
+
     it("puts the focus back in the box once Cancel edit ends an edit", async () => {
       await running();
       await listed(waiting("w1", "first"));

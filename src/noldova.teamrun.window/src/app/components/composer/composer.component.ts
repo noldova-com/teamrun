@@ -651,7 +651,7 @@ export class ComposerComponent {
   }
 
   public stopOnEscape(event: KeyboardEvent): void {
-    if (event.key === Resources.escapeKey && !event.defaultPrevented && !Object.isNull(this.editing()) && event.target instanceof Element
+    if (event.key === Resources.escapeKey && !event.defaultPrevented && !event.isComposing && !Object.isNull(this.editing()) && event.target instanceof Element
       && this.card().nativeElement.contains(event.target) && !this.ownsEscape(event.target)) {
       event.preventDefault();
       this.cancelEditing();
