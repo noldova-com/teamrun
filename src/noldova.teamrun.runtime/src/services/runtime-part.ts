@@ -56,7 +56,7 @@ import {
 } from "@noldova/teamrun.core";
 import { CliPart } from "@noldova/teamrun.cli";
 import { DataSource, DbContextOptionsBuilder } from "@noldova/context.data";
-import { DataFolder, EventName, MethodName } from "@noldova/teamrun.protocol";
+import { DataFolder, EventName, MessageSendParams, MethodName, WaitingMessageAddParams, WaitingMessageEditParams } from "@noldova/teamrun.protocol";
 import { RuntimeTerminalOwners } from "@noldova/terminal.protocol";
 
 import { RuntimePartException } from "../exceptions/runtime-part.exception.js";
@@ -83,6 +83,7 @@ import { PermissionAnswerer } from "./permission-answerer.js";
 import { ProviderKindRegistryFactory } from "./provider-kind-registry-factory.js";
 import { ReplyFailureNotices } from "./reply-failure-notices.js";
 import { ReplyWork } from "./reply-work.js";
+import { RequestedModeMethod } from "./requested-mode-method.js";
 import { RuntimeAppDescriptions } from "./runtime-app-descriptions.js";
 import { RuntimeProcessStarter } from "./runtime-process-starter.js";
 import { RuntimeCommandStarter } from "./runtime-command-starter.js";
@@ -117,7 +118,9 @@ export class RuntimePart implements IRuntimePart {
   private static readonly AWAITED: ReadonlySet<string> = new Set([MethodName.ConversationRewind, MethodName.ConversationMove]);
   private static readonly OUTSIDE: ReadonlySet<string> = new Set([MethodName.OutsideConnectionRead, MethodName.OutsideTokenReset]);
   private static readonly MAIN_PROCESS_ONLY: ReadonlySet<string> = new Set([MethodName.ApprovalDecide, MethodName.WindowFocused, MethodName.WindowClosed,
-    MethodName.WindowReload, MethodName.PanelAnswered]);
+    MethodName.WindowReload, MethodName.PanelAnswered, MethodName.ConversationSetMemberMode, MethodName.ConversationSetPlanFirst, MethodName.MessageApprovePlan,
+    MethodName.DefaultTeammateSet, MethodName.ConversationResponderSet, MethodName.ComposerDefaultSave]);
+  private static readonly MODE_SETTING: ReadonlySet<string> = new Set([MethodName.TeammateCreate, MethodName.TeammateUpdate]);
 
   private readonly registries: IProviderKindRegistryFactory;
   private readonly productVersion: string | null;
@@ -376,6 +379,12 @@ export class RuntimePart implements IRuntimePart {
 
   private handlerOf(context: IRuntimePartContext, engine: ConversationEngine, method: MethodName, dispatched: IMethodHandler): IMethodHandler {
     const handler = RuntimePart.MAIN_PROCESS_ONLY.has(method) ? new MainProcessMethod(dispatched)
+      : RuntimePart.MODE_SETTING.has(method) ? new MainProcessMethod(dispatched, Resources.modeField)
+      : method === MethodName.MessageSend ? new RequestedModeMethod(dispatched, engine, t => MessageSendParams.fromJson(t))
+      : method === MethodName.WaitingMessageAdd ? new RequestedModeMethod(dispatched, engine, t => WaitingMessageAddParams.fromJson(t).message,
+        async t => (await engine.addWaitingAsync(WaitingMessageAddParams.fromJson(t), true)).toJson())
+      : method === MethodName.WaitingMessageEdit ? new RequestedModeMethod(dispatched, engine, t => WaitingMessageEditParams.fromJson(t).message,
+        async t => (await engine.editWaitingAsync(WaitingMessageEditParams.fromJson(t), true)).toJson())
       : method === MethodName.AttachmentShare || method === MethodName.WrittenImageShare ? new FileShareMethod(dispatched, context)
         : method === MethodName.AttachmentPrepare ? new GrantedAttachmentMethod(dispatched, context, engine) : dispatched;
     const description = RuntimePart.WORK.get(method);

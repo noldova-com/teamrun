@@ -3014,6 +3014,7 @@ export declare class Resources {
   public static readonly agentsField: string;
   public static readonly localCommandsField: string;
   public static readonly failureField: string;
+  public static readonly fromOutsideField: string;
   public static readonly failureCodeField: string;
   public static readonly failureModuleCodeField: string;
   /** Name of a Browser step's field for the permission request that decided its call: `permission`, with `risk`, `decision`, `isRemembered` and `isAsked`. */
@@ -12324,21 +12325,26 @@ export declare class WaitingMessage {
   /** Why its send failed, when it did; a failed message stays, and the ones after it go. */
   public readonly failure: string | null;
   /**
+   * Whether a client other than TeamRun's window added it or has edited it, so its requested mode is checked again when it is sent; a
+   * message kept before this field existed reads as `false`.
+   */
+  public readonly fromOutside: boolean;
+  /**
    * Initializes the waiting message.
    * @throws ArgumentException when `id`, `createdAt` or a given `failure` is blank, or `message` has a sender token.
    */
-  public constructor(id: string, delivery: MessageDelivery, message: MessageSendParams, createdAt: string, failure?: string | null);
+  public constructor(id: string, delivery: MessageDelivery, message: MessageSendParams, createdAt: string, failure?: string | null, fromOutside?: boolean);
   /** The `Chat` id, the message's. */
   public get chatId(): string;
-  /** The waiting message with another delivery, keeping its failure. */
+  /** The waiting message with another delivery, keeping its failure and whether it is from outside. */
   public withDelivery(delivery: MessageDelivery): WaitingMessage;
-  /** The waiting message with another send, and no failure. */
-  public withMessage(message: MessageSendParams): WaitingMessage;
-  /** The waiting message with the failure of its send. */
+  /** The waiting message with another send and no failure, from outside when `fromOutside` says so, by default as it was. */
+  public withMessage(message: MessageSendParams, fromOutside?: boolean): WaitingMessage;
+  /** The waiting message with the failure of its send, keeping whether it is from outside. */
   public withFailure(failure: string): WaitingMessage;
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): WaitingMessage;
-  /** Returns the wire representation, with `id`, `chatId`, `delivery`, `message`, `createdAt` and, when it failed, `failure`. */
+  /** Returns the wire representation, with `id`, `chatId`, `delivery`, `message`, `createdAt`, `failure` when it failed and `fromOutside` when it is. */
   public toJson(): JsonObject;
 }
 

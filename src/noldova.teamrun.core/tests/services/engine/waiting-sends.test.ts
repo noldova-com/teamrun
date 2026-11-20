@@ -19,6 +19,8 @@ import {
   AttachmentInput,
   ChatIdParams,
   ConversationIdParams,
+  ConversationResponder,
+  ConversationResponderParams,
   ErrorCode,
   EventName,
   Harness,
@@ -987,6 +989,78 @@ export class WaitingSendsTests {
     Assert.areEqual(1, host.log.lines.filter(t => t.startsWith(`A waiting message in the chat ${chat.id} wasn't sent: `)).length,
       host.log.lines.join("\n"));
     Assert.areEqual(0, (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length);
+  }
+
+  @TestMethod
+  public async refusesAMessageFromOutsideWhoseModeThePersonChangedBeforeItWentAndSendsTheWindowsInThatMode(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const providerId = (await host.providerOfAsync()).id;
+    host.adapter.modeIds = ["default", "acceptEdits"];
+    const accept = new RequestedSettings("fake", null, null, null, "acceptEdits");
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(null, accept, providerId), true));
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+    const outside = await host.engine.addWaitingAsync(new WaitingMessageAddParams(new MessageSendParams(chat.id, "From outside", accept, providerId), MessageDelivery.Queue), true);
+    const own = await host.engine.addWaitingAsync(new WaitingMessageAddParams(new MessageSendParams(chat.id, "From the window", accept, providerId), MessageDelivery.Queue));
+
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id,
+      new ConversationResponder(null, new RequestedSettings("fake", null, null, null, "default"), providerId), true));
+    release();
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+    const kept = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages;
+
+    Assert.areEqual("true,false", [outside.fromOutside, own.fromOutside].join(","));
+    Assert.areEqual("First,From the window", await WaitingSendsTests.sentAsync(host, chat.id));
+    Assert.areEqual("acceptEdits", host.adapter.requests[1]?.requested.mode ?? null);
+    Assert.areEqual(JSON.stringify([[outside.id, Resources.unchosenModeRefused, true]]), JSON.stringify(kept.map(t => [t.id, t.failure, t.fromOutside])));
+  }
+
+  @TestMethod
+  public async refusesAMessageFromOutsideAgainWhenTheWindowEditsItAfterThePersonLoweredTheMode(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const providerId = (await host.providerOfAsync()).id;
+    host.adapter.modeIds = ["default", "acceptEdits"];
+    const accept = new RequestedSettings("fake", null, null, null, "acceptEdits");
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(null, accept, providerId), true));
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+    const outside = await host.engine.addWaitingAsync(new WaitingMessageAddParams(new MessageSendParams(chat.id, "From outside", accept, providerId), MessageDelivery.Queue), true);
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id,
+      new ConversationResponder(null, new RequestedSettings("fake", null, null, null, "default"), providerId), true));
+    release();
+    await host.engine.waitForIdle();
+
+    const edited = await host.engine.editWaitingAsync(new WaitingMessageEditParams(outside.id, new MessageSendParams(chat.id, "Retried", accept, providerId)));
+    await host.engine.waitForIdle();
+    const kept = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages;
+
+    Assert.isTrue(edited.fromOutside);
+    Assert.areEqual("First", await WaitingSendsTests.sentAsync(host, chat.id));
+    Assert.areEqual(JSON.stringify([[outside.id, "Retried", Resources.unchosenModeRefused]]), JSON.stringify(kept.map(t => [t.id, t.message.text, t.failure])));
+  }
+
+  @TestMethod
+  public async marksAMessageFromOutsideOnceAnEditIsFromOutsideAndKeepsTheMarkThroughAWindowsEditAndSendNow(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+    const added = await host.engine.addWaitingAsync(new WaitingMessageAddParams(await WaitingSendsTests.paramsAsync(host, chat.id, "Second"), MessageDelivery.Queue));
+
+    const own = await host.engine.editWaitingAsync(new WaitingMessageEditParams(added.id, await WaitingSendsTests.paramsAsync(host, chat.id, "Mine")));
+    const outside = await host.engine.editWaitingAsync(new WaitingMessageEditParams(added.id, await WaitingSendsTests.paramsAsync(host, chat.id, "Changed")), true);
+    const kept = await host.engine.editWaitingAsync(new WaitingMessageEditParams(added.id, await WaitingSendsTests.paramsAsync(host, chat.id, "Mine again")));
+    const now = await host.engine.sendWaitingNowAsync(new WaitingMessageIdParams(added.id));
+    release();
+    await host.engine.waitForIdle();
+
+    Assert.areEqual("false,false,true,true,true", [added.fromOutside, own.fromOutside, outside.fromOutside, kept.fromOutside, now.fromOutside].join(","));
   }
 
   @TestMethod

@@ -17,6 +17,8 @@ import {
   ConversationMemberParams,
   ConversationResponder,
   ConversationResponderParams,
+  DefaultTeammate,
+  DefaultTeammateSetParams,
   DetailKind,
   ErrorCode,
   EventName,
@@ -467,6 +469,67 @@ export class CrossChatMessagesTests {
     Assert.areEqual("fake,bypass", refused.info.arguments.join(","));
     Assert.areEqual(0, (await CrossChatMessagesTests.chatAsync(host, second.id)).length);
     Assert.areEqual("null,default", host.adapter.requests.map(t => String(t.requested.mode)).join(","));
+  }
+
+  @TestMethod
+  public async refusesAModeNoOneChoseWithNoTokenAndPassesTheChatsChosenModeTheDefaultTeammatesOrNone(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const other = await host.createConversationAsync();
+    const providerId = (await host.providerOfAsync()).id;
+    host.adapter.modeIds = ["default", "bypass"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const asking = (conversationId: string, mode: string | null): MessageSendParams =>
+      new MessageSendParams(conversationId, "Check the build", new RequestedSettings("fake", null, null, null, mode), providerId);
+    const passes = (params: MessageSendParams): Promise<boolean> => host.engine.refuseRaisedModeAsync(params).then(() => true, () => false);
+
+    const refused = await Assert.throwsAsync(() => host.engine.refuseRaisedModeAsync(asking(chat.id, "bypass")), ServiceException);
+    const restricted = [await passes(asking(chat.id, "default")), await passes(asking(chat.id, null))];
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(null, new RequestedSettings("fake", null, null, null, "bypass"),
+      providerId), true));
+    const chosen = [await passes(asking(chat.id, "bypass")), await passes(asking(other.id, "bypass"))];
+    await host.teammates.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(new RequestedSettings("fake", null, null, null, "bypass"), providerId)));
+    const byDefault = await passes(asking(other.id, "bypass"));
+
+    Assert.areEqual(ErrorCode.Unauthorized, refused.info.name);
+    Assert.areEqual(Resources.unchosenModeRefused, refused.message);
+    Assert.areEqual(JSON.stringify([false, true]), JSON.stringify(restricted));
+    Assert.areEqual(JSON.stringify([true, false]), JSON.stringify(chosen));
+    Assert.isTrue(byDefault);
+  }
+
+  @TestMethod
+  public async refusesAModeThatActsWithoutAskingWhenThePersonChoseOneThatAsks(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const providerId = (await host.providerOfAsync()).id;
+    host.adapter.modeIds = ["default", "acceptEdits", "bypass"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const manual = new RequestedSettings("fake", null, null, null, "default");
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(null, manual, providerId), true));
+    await host.teammates.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(manual, providerId)));
+
+    const refused = await Assert.throwsAsync(() => host.engine.refuseRaisedModeAsync(
+      new MessageSendParams(chat.id, "Edit the build", new RequestedSettings("fake", null, null, null, "acceptEdits"), providerId)), ServiceException);
+
+    Assert.areEqual(`${ErrorCode.Unauthorized} fake,acceptEdits`, `${refused.info.name} ${refused.info.arguments.join(",")}`);
+  }
+
+  @TestMethod
+  public async refusesAnUnrestrictedModeTheChatsChosenOrTheDefaultTeammatesModeNamesOnlyUnderAnotherKind(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const providerId = (await host.providerOfAsync()).id;
+    host.adapter.modeIds = ["default", "bypass"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const elsewhere = new RequestedSettings("other", null, null, null, "bypass");
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(null, elsewhere, null), true));
+    await host.teammates.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(elsewhere, null)));
+
+    const refused = await Assert.throwsAsync(() => host.engine.refuseRaisedModeAsync(
+      new MessageSendParams(chat.id, "Check the build", new RequestedSettings("fake", null, null, null, "bypass"), providerId)), ServiceException);
+
+    Assert.areEqual(ErrorCode.Unauthorized, refused.info.name);
   }
 
   @TestMethod

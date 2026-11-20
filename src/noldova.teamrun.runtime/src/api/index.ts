@@ -45,6 +45,7 @@ export { RuntimeRememberedAppGrants } from "../services/runtime-remembered-app-g
 export { ProviderKindRegistryFactory } from "../services/provider-kind-registry-factory.js";
 export { ReplyFailureNotices } from "../services/reply-failure-notices.js";
 export { ReplyWork } from "../services/reply-work.js";
+export { RequestedModeMethod } from "../services/requested-mode-method.js";
 export { RuntimePart } from "../services/runtime-part.js";
 export { RuntimeProcessStarter } from "../services/runtime-process-starter.js";
 export { RuntimeCommandStarter } from "../services/runtime-command-starter.js";

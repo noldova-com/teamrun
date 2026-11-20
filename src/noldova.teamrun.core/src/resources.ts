@@ -91,6 +91,7 @@ export class Resources {
   public static readonly chatMovedWhileSent: string = "The chat moved to another project while this message was sent, so nothing was sent. Send it again.";
   public static readonly replyEndedWhileSent: string = "The reply this message was joining ended while it was sent, so nothing was sent. Send it again.";
   public static readonly unrestrictedModeRefused: string = "A teammate's message can't start a turn in an unrestricted mode; only the person can choose one.";
+  public static readonly unchosenModeRefused: string = "A message from outside TeamRun's window can only ask for the mode the person chose for the chat or for the default teammate.";
   public static readonly helperAgent: string = "helper";
   public static readonly helperType: string = "Helper";
   public static readonly explorerAgent: string = "explorer";

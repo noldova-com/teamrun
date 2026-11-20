@@ -78,6 +78,7 @@ import type {
   IMcpTransport,
   McpToolCallParams,
   McpToolListParams,
+  MessageSendParams,
   MethodName,
   OutsideConnection,
   PageAuthor,
@@ -1999,6 +2000,32 @@ export declare class GrantedAttachmentMethod implements IMethodHandler {
 }
 
 /**
+ * A method that sends a message, whose requested mode a client other than the app's main process can't raise: before the method sees the request, Core
+ * refuses a mode that is neither the chat's chosen responder's mode nor the default teammate's, as `Unauthorized`.
+ */
+export declare class RequestedModeMethod implements IMethodHandler {
+  /**
+   * Initializes the method.
+   * @param method The method that sends the message.
+   * @param engine The engine that checks the requested mode.
+   * @param read Reads the message from the request's payload; a payload it can't read goes on unchecked, and is refused there.
+   * @param outside Answers a client other than the main process in the method's place, such as by marking a waiting message it adds as from
+   * outside; by default, the method answers every client.
+   */
+  public constructor(method: IMethodHandler, engine: Pick<IConversationEngine, "refuseRaisedModeAsync">, read: (payload: JsonValue) => MessageSendParams,
+    outside?: ((payload: JsonValue) => Promise<JsonValue>) | null);
+
+  /**
+   * Answers the request through the method at once for the main process, or once its requested mode passes through `outside` when given,
+   * else the method.
+   * @param request The request.
+   * @returns The answer.
+   * @throws MethodFailureException `Unauthorized` when Core refuses the mode, or the failure of `outside`.
+   */
+  public handleAsync(request: RequestContext): Promise<JsonValue>;
+}
+
+/**
  * A method only the app's main process may call, the client `ShellClients.mainProcess` that speaks for TeamRun's
  * window, so only the person answers through it: the command line, a module's own entry, and so a program a
  * teammate runs, can't. What the client's name proves on each platform is Noldova Desktop's, in its `RUNTIME.md`.
@@ -2007,8 +2034,9 @@ export declare class MainProcessMethod implements IMethodHandler {
   /**
    * Initializes the method.
    * @param method The method that answers the main process's requests.
+   * @param field The payload field that limits the method to the main process only when a request sets it, or `null` to limit every request.
    */
-  public constructor(method: IMethodHandler);
+  public constructor(method: IMethodHandler, field?: string | null);
 
   /**
    * Answers a request of the main process through the method.

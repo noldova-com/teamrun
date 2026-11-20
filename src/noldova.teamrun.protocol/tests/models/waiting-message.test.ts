@@ -48,6 +48,18 @@ export class WaitingMessageTests {
   }
 
   @TestMethod
+  public keepsWhetherItIsFromOutsideThroughJsonADeliveryAFailureAndAnEditUnlessTheEditSaysOtherwise(): void {
+    const outside = WaitingMessage.fromJson({ ...WaitingMessageTests.json, fromOutside: true });
+    const edited = outside.withMessage(WaitingMessageTests.send);
+    const own = outside.withMessage(WaitingMessageTests.send, false);
+
+    Assert.areEqual(JSON.stringify({ ...WaitingMessageTests.json, fromOutside: true }), JSON.stringify(outside.toJson()));
+    Assert.areEqual("false,true,true,true,true,false", [WaitingMessage.fromJson(WaitingMessageTests.json).fromOutside, outside.fromOutside,
+      outside.withDelivery(MessageDelivery.Steer).fromOutside, outside.withFailure("No provider.").fromOutside, edited.fromOutside, own.fromOutside].join(","));
+    Assert.areEqual(JSON.stringify(WaitingMessageTests.json), JSON.stringify(own.toJson()));
+  }
+
+  @TestMethod
   public rejectsInvalidArgumentsAndATeammatesSend(): void {
     const send = WaitingMessageTests.send;
     const time = "2026-11-02T20:00:00.000Z";
@@ -64,10 +76,11 @@ export class WaitingMessageTests {
   public rejectsInvalidValuesWithTheirPath(): void {
     const delivery = Assert.throws(() => WaitingMessage.fromJson({ ...WaitingMessageTests.json, delivery: "Later" }), JsonException);
     const failure = Assert.throws(() => WaitingMessage.fromJson({ ...WaitingMessageTests.json, failure: 3 }), JsonException);
+    const outside = Assert.throws(() => WaitingMessage.fromJson({ ...WaitingMessageTests.json, fromOutside: "yes" }), JsonException);
     const text = Assert.throws(() => WaitingMessage.fromJson({ ...WaitingMessageTests.json, message: { ...WaitingMessageTests.send.toJson(), chatId: 4 } }),
       JsonException);
 
-    Assert.areEqual("$.delivery,$.failure,$.message.chatId", [delivery.path, failure.path, text.path].join(","));
+    Assert.areEqual("$.delivery,$.failure,$.fromOutside,$.message.chatId", [delivery.path, failure.path, outside.path, text.path].join(","));
   }
 
   @TestMethod

@@ -642,6 +642,7 @@ export class Resources {
   public static readonly agentsField: string = "agents";
   public static readonly localCommandsField: string = "localCommands";
   public static readonly failureField: string = "failure";
+  public static readonly fromOutsideField: string = "fromOutside";
   public static readonly failureCodeField: string = "code";
   public static readonly failureModuleCodeField: string = "moduleCode";
   public static readonly permissionField: string = "permission";

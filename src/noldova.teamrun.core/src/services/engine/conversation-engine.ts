@@ -263,6 +263,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       requireTeammateAsync: (id, transaction) => this.requireTeammateAsync(id, transaction),
       capEndsTasksAsync: (teammate, chatId) => this.capEndsTasksAsync(teammate, chatId),
       sendMessageAsync: (params, prompt, allowed, signal, outside) => this.sendMessageAsync(params, prompt, allowed, signal, outside),
+      refuseRaisedModeAsync: params => this.refuseRaisedModeAsync(params),
       toolModeOfAsync: open => this.toolModeOfAsync(open),
       modeIn: requested => this.modeIn(requested),
       nameOf: reply => this.nameOf(reply),
@@ -301,6 +302,16 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   public prepareOpenedAttachmentAsync(input: AttachmentInput, source: IOpenedFile): Promise<MessageAttachment> {
     return this.attachments.prepareOpenedAsync(input, source);
+  }
+
+  public async refuseRaisedModeAsync(params: MessageSendParams): Promise<void> {
+    const requested = params.requested;
+    if (Object.isNull(requested) || Object.isNull(requested.mode))
+      return;
+    const chosen = (await this.conversations.findAsync(params.conversationId))?.responder?.requested ?? null;
+    const allowed = [chosen, (await this.teammates.readDefaultAsync())?.requested ?? null];
+    if (!allowed.some(t => t?.kind === requested.kind && t.mode === requested.mode))
+      throw new ServiceException(ErrorCode.Unauthorized, Resources.unchosenModeRefused, [requested.kind, requested.mode]);
   }
 
   public discardAttachment(attachment: MessageAttachment): void {
@@ -361,16 +372,16 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return this.sendMessageAsync(params, null, null, signal);
   }
 
-  public addWaitingAsync(params: WaitingMessageAddParams): Promise<WaitingMessage> {
-    return this.waitingSends.addWaitingAsync(params);
+  public addWaitingAsync(params: WaitingMessageAddParams, fromOutside: boolean = false): Promise<WaitingMessage> {
+    return this.waitingSends.addWaitingAsync(params, fromOutside);
   }
 
   public listWaitingAsync(params: ChatIdParams): Promise<WaitingMessagesPayload> {
     return this.waitingSends.listWaitingAsync(params);
   }
 
-  public editWaitingAsync(params: WaitingMessageEditParams): Promise<WaitingMessage> {
-    return this.waitingSends.editWaitingAsync(params);
+  public editWaitingAsync(params: WaitingMessageEditParams, fromOutside: boolean = false): Promise<WaitingMessage> {
+    return this.waitingSends.editWaitingAsync(params, fromOutside);
   }
 
   public removeWaitingAsync(params: WaitingMessageIdParams): Promise<void> {
