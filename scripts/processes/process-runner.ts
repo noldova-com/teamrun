@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawn, spawnSync } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import type { Writable } from "node:stream";
 
@@ -98,28 +98,23 @@ export class ProcessRunner {
       child.stderr.on("data", (t: Buffer) => forward(errorOutput, t));
       child.on("error", t => failure = new ProcessException(`"${command}" could not start.`, { cause: t }));
       let probe: NodeJS.Timeout | undefined;
+      const started = new Date(Date.now() - 5000).toISOString();
       const tree = (): void => {
-        const list = spawnSync("powershell", ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress"], { encoding: "utf8" });
-        const rows = JSON.parse(list.stdout) as { ProcessId: number; ParentProcessId: number; Name: string; CommandLine: string | null }[];
-        const roots = new Set([process.pid, child.pid]);
-        for (let grew = true; grew;) {
-          grew = false;
-          for (const row of rows)
-            if (roots.has(row.ParentProcessId) && !roots.has(row.ProcessId)) {
-              roots.add(row.ProcessId);
-              grew = true;
-            }
-        }
-        for (const row of rows.filter(t => roots.has(t.ProcessId) && t.ProcessId !== process.pid))
-          process.stderr.write(`PROBE ${new Date().toISOString()} tree ${row.ProcessId}<${row.ParentProcessId} ${row.Name} ${(row.CommandLine ?? "").slice(0, 160)}\n`);
+        const asked = new Date().toISOString();
+        execFile("powershell", ["-NoProfile", "-Command", `$s = [datetime]::Parse('${started}').ToUniversalTime(); Get-CimInstance Win32_Process | Where-Object { $_.CreationDate -and $_.CreationDate.ToUniversalTime() -ge $s -and $_.Name -ne 'powershell.exe' } | ForEach-Object { 'PROBE-TREE ' + $_.ProcessId + '<' + $_.ParentProcessId + ' ' + $_.Name + ' ' + $_.CreationDate.ToUniversalTime().ToString('HH:mm:ss.fff') + ' ' + ([string]$_.CommandLine).Substring(0, [Math]::Min(160, ([string]$_.CommandLine).Length)) }`], { encoding: "utf8" }, (_error, stdout) => {
+          for (const line of stdout.split(/\r?\n/).filter(t => t.length > 0))
+            process.stderr.write(`PROBE ${asked} ${line}\n`);
+        });
       };
-      child.on("exit", code => {
-        process.stderr.write(`PROBE ${new Date().toISOString()} child ${child.pid} exit ${code}\n`);
-        if (process.platform === "win32") {
+      const watch = (chunk: Buffer): void => {
+        if (probe === undefined && process.platform === "win32" && chunk.toString().includes("Coverage ignores")) {
+          process.stderr.write(`PROBE ${new Date().toISOString()} child ${child.pid} reported\n`);
           tree();
-          probe = setInterval(tree, 3000);
+          probe = setInterval(tree, 5000);
         }
-      });
+      };
+      child.stdout.on("data", watch);
+      child.on("exit", code => process.stderr.write(`PROBE ${new Date().toISOString()} child ${child.pid} exit ${code}\n`));
       child.on("close", (code, signal) => {
         clearInterval(probe);
         process.stderr.write(`PROBE ${new Date().toISOString()} child ${child.pid} close ${code}\n`);
