@@ -102,6 +102,7 @@ import {
   Harness,
   Message,
   MessageAuthor,
+  MessageDelivery,
   MessageDetail,
   MessageIdParams,
   MessageListParams,
@@ -130,7 +131,11 @@ import {
   SubAgent,
   SubAgentStatus,
   TeammateCreateParams,
-  TeammateUpdateParams
+  TeammateUpdateParams,
+  WaitingMessage,
+  WaitingMessageAddParams,
+  WaitingMessageEditParams,
+  WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
 import { ExecutableLocator, type IProcessStarter } from "@noldova/teamrun.providers";
 import {
@@ -384,10 +389,11 @@ export class RuntimePartTests {
     const conversation = await RuntimePartTests.callAsync(first, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
     const other = await RuntimePartTests.callAsync(first, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
     await RuntimePartTests.callAsync(first, "teamrun.conversationResponderSet",
-      new ConversationResponderParams(conversation.id, new ConversationResponder(null, requested), true).toJson());
+      new ConversationResponderParams(conversation.id, new ConversationResponder(null, requested), true).toJson(), ShellClients.mainProcess);
     await RuntimePartTests.callAsync(first, "teamrun.conversationResponderSet",
-      new ConversationResponderParams(other.id, new ConversationResponder(null, new RequestedSettings("gone", null, null)), true).toJson());
-    await RuntimePartTests.callAsync(first, "teamrun.defaultTeammateSet", new DefaultTeammateSetParams(new DefaultTeammate(requested)).toJson());
+      new ConversationResponderParams(other.id, new ConversationResponder(null, new RequestedSettings("gone", null, null)), true).toJson(), ShellClients.mainProcess);
+    await RuntimePartTests.callAsync(first, "teamrun.defaultTeammateSet", new DefaultTeammateSetParams(new DefaultTeammate(requested)).toJson(),
+      ShellClients.mainProcess);
     const provider = await RuntimePartTests.callAsync(first, "teamrun.providerCreate", new ProviderCreateParams(MentioningAdapter.id, "Home", usual).toJson()) as
       { id: string };
     await part.deactivateAsync();
@@ -445,7 +451,8 @@ export class RuntimePartTests {
     const requested = new RequestedSettings("gone", null, null);
     const first = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
     await part.activateAsync(first);
-    await RuntimePartTests.callAsync(first, "teamrun.defaultTeammateSet", new DefaultTeammateSetParams(new DefaultTeammate(requested)).toJson());
+    await RuntimePartTests.callAsync(first, "teamrun.defaultTeammateSet", new DefaultTeammateSetParams(new DefaultTeammate(requested)).toJson(),
+      ShellClients.mainProcess);
     await RuntimePartTests.callAsync(first, "teamrun.providerCreate", new ProviderCreateParams(MentioningAdapter.id, "Home", join(directory.path, "usual")).toJson());
     await part.deactivateAsync();
     const second = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
@@ -1423,6 +1430,120 @@ export class RuntimePartTests {
   }
 
   @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
+  @TestData("teamrun.tools")
+  public async takesAChatsModesPlanFirstPlanApprovalsResponderDefaultTeammateAndComposerDefaultOnlyFromTheAppsMainProcess(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    await part.activateAsync(context);
+
+    const calls: readonly [string, JsonObject][] = [
+      ["teamrun.conversationSetMemberMode", { conversationId: "c1", teammateId: "t1", mode: "bypassPermissions" }],
+      ["teamrun.conversationSetPlanFirst", { conversationId: "c1", teammateId: "t1", planFirst: false }],
+      ["teamrun.messageApprovePlan", { messageId: "m1" }],
+      ["teamrun.conversationResponderSet", { conversationId: "c1", responder: null, clearSession: false }],
+      ["teamrun.defaultTeammateSet", { teammate: null }],
+      ["teamrun.composerDefaultSave", { kind: "claude", mode: "bypassPermissions" }]
+    ];
+    const codes = await Promise.all(calls.map(([method, payload]) => RuntimePartTests.failureCodeAsync(context, method, payload, client)));
+    await part.deactivateAsync();
+
+    Assert.areEqual(JSON.stringify(calls.map(() => FailureCode.Unauthorized)), JSON.stringify(codes));
+  }
+
+  @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
+  public async refusesAnUnrestrictedModeNoOneChoseOnASendOrAWaitingMessageFromAClientOtherThanTheMainProcess(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new CommandModeAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
+    const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const providerId = await RuntimePartTests.providerIdAsync(context, CommandModeAdapter.id, directory.path);
+    const send = new MessageSendParams(chat.id, "Build it", new RequestedSettings(CommandModeAdapter.id, null, null, null, "all"), providerId);
+
+    const codes = await Promise.all([
+      RuntimePartTests.failureCodeAsync(context, "teamrun.messageSend", send.toJson(), client),
+      RuntimePartTests.failureCodeAsync(context, "teamrun.waitingMessageAdd", new WaitingMessageAddParams(send, MessageDelivery.Queue).toJson(), client),
+      RuntimePartTests.failureCodeAsync(context, "teamrun.waitingMessageEdit", new WaitingMessageEditParams("w1", send).toJson(), client)
+    ]);
+    await part.deactivateAsync();
+
+    Assert.areEqual(JSON.stringify([FailureCode.Unauthorized, FailureCode.Unauthorized, FailureCode.Unauthorized]), JSON.stringify(codes));
+  }
+
+  @TestMethod
+  public async marksAWaitingMessageAsFromOutsideOnceAClientOtherThanTheMainProcessAddsOrEditsIt(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new CommandModeAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
+    const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const providerId = await RuntimePartTests.providerIdAsync(context, CommandModeAdapter.id, directory.path);
+    const send = new MessageSendParams(chat.id, "To nobody", new RequestedSettings(CommandModeAdapter.id, null, null), providerId, [], ["teammate-gone"]);
+
+    let failed = RuntimePartTests.waitingFailed(context);
+    const added = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageAdd",
+      new WaitingMessageAddParams(send, MessageDelivery.Queue).toJson(), ShellClients.mainProcess));
+    await failed;
+    failed = RuntimePartTests.waitingFailed(context);
+    const theirs = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageEdit",
+      new WaitingMessageEditParams(added.id, send).toJson(), ShellClients.commandLine));
+    await failed;
+    failed = RuntimePartTests.waitingFailed(context);
+    const outside = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageAdd",
+      new WaitingMessageAddParams(send, MessageDelivery.Queue).toJson(), ShellClients.commandLine));
+    await failed;
+    await part.deactivateAsync();
+
+    Assert.areEqual("false,true,true", [added.fromOutside, theirs.fromOutside, outside.fromOutside].join(","));
+  }
+
+  @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
+  @TestData("teamrun.tools")
+  public async takesATeammatesModeOnlyFromTheAppsMainProcessAndItsOtherSettingsFromAnyClient(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new MentioningAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
+      { kind: MentioningAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }) as { id: string };
+    const created = new TeammateCreateParams("Alice", null, provider.id, Harness.Provider, null, null).toJson();
+
+    const teammate = await RuntimePartTests.callAsync(context, "teamrun.teammateCreate", created, client) as { id: string };
+    const renamed = await RuntimePartTests.callAsync(context, "teamrun.teammateUpdate", { teammateId: teammate.id, name: "Ada" }, client) as { name: string };
+    const codes = await Promise.all([
+      RuntimePartTests.failureCodeAsync(context, "teamrun.teammateCreate", { ...created, name: "Bob", mode: "bypassPermissions" }, client),
+      RuntimePartTests.failureCodeAsync(context, "teamrun.teammateUpdate", { teammateId: teammate.id, mode: "bypassPermissions" }, client)
+    ]);
+    await part.deactivateAsync();
+
+    Assert.areEqual("Ada", renamed.name);
+    Assert.areEqual(JSON.stringify([FailureCode.Unauthorized, FailureCode.Unauthorized]), JSON.stringify(codes));
+  }
+
+  @TestMethod
   public async refusesAReloadOfATeamRunWindowWhoseDesktopWindowClosedOrWhosePageWasReplaced(): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);
@@ -1715,7 +1836,7 @@ export class RuntimePartTests {
       const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: mode }) as { id: string };
       const answered = adapter.answered(adapter.answers.length + 1);
       await RuntimePartTests.callAsync(context, "teamrun.messageSend",
-        new MessageSendParams(chat.id, "Build it", new RequestedSettings(CommandModeAdapter.id, null, null, null, mode), providerId).toJson());
+        new MessageSendParams(chat.id, "Build it", new RequestedSettings(CommandModeAdapter.id, null, null, null, mode), providerId).toJson(), ShellClients.mainProcess);
       await answered;
     }
     const approved = RuntimePartTests.toolsOf(adapter).approvedTools;
@@ -1893,7 +2014,7 @@ export class RuntimePartTests {
       const answers = adapter.answers.length;
       const wakes = adapter.wakes().length;
       await RuntimePartTests.callAsync(context, "teamrun.messageSend",
-        new MessageSendParams(chat.id, "Build it", new RequestedSettings(kind, null, null, null, mode.id), providerId).toJson());
+        new MessageSendParams(chat.id, "Build it", new RequestedSettings(kind, null, null, null, mode.id), providerId).toJson(), ShellClients.mainProcess);
       await adapter.recordedAsync(() => adapter.answers.length > answers && (mode.readOnly || adapter.wakes().length > wakes));
       const answer = RuntimePartTests.textOf(adapter.answers.at(-1));
       if (mode.readOnly) {
@@ -1955,7 +2076,7 @@ export class RuntimePartTests {
         adapter.holds = holds;
         const answers = adapter.answers.length;
         const sent = MessageSendResult.fromJson(await RuntimePartTests.callAsync(before, "teamrun.messageSend",
-          new MessageSendParams(chat.id, "Build it", new RequestedSettings(kind, null, null, null, mode), providerId).toJson()));
+          new MessageSendParams(chat.id, "Build it", new RequestedSettings(kind, null, null, null, mode), providerId).toJson(), ShellClients.mainProcess));
         await adapter.recordedAsync(() => adapter.answers.length > answers);
         const task = JSON.parse(RuntimePartTests.textOf(adapter.answers.at(-1))) as { id: string };
         return { chatId: chat.id, replyId: sent.replies[0]!.id, taskId: task.id, pids: await RuntimePartTests.pidsAsync(join(directory.path, `${name}.pids`)) };
@@ -2093,7 +2214,7 @@ export class RuntimePartTests {
     const teammate = await RuntimePartTests.callAsync(context, "teamrun.teammateCreate",
       new TeammateCreateParams("Ada", null, providerId, Harness.Provider, null, null).toJson()) as { id: string };
     await RuntimePartTests.callAsync(context, "teamrun.teammateUpdate",
-      TeammateUpdateParams.of(teammate.id, { model: "model", effort: "high", speed: "fast", mode: "plan" }, providerId).toJson());
+      TeammateUpdateParams.of(teammate.id, { model: "model", effort: "high", speed: "fast", mode: "plan" }, providerId).toJson(), ShellClients.mainProcess);
     adapter.calls = [["teamrun_update_teammate", { teammate_id: teammate.id, name: "Bea" }]];
 
     const ended = context.whenWorkEnds();
@@ -2364,12 +2485,27 @@ export class RuntimePartTests {
     }
   }
 
-  private static callAsync(context: RecordingPartContext, method: string, payload: unknown): Promise<unknown> {
+  private static waitingFailed(context: RecordingPartContext): Promise<void> {
+    return new Promise(resolve => {
+      context.onPublished = (name, payload) => {
+        if (name === "teamrun.waitingMessagesChanged" && WaitingMessagesPayload.fromJson(payload).messages.some(t => !Object.isNull(t.failure))) {
+          context.onPublished = null;
+          resolve();
+        }
+      };
+    });
+  }
+
+  private static callAsync(context: RecordingPartContext, method: string, payload: unknown, client: string = "tests"): Promise<unknown> {
     const handler = context.methods.get(method);
     if (handler === undefined)
       throw new Error(`The part did not register ${method}.`);
 
-    return handler.handleAsync(new RequestContext("tests", payload as null, new AbortController().signal, 1));
+    return handler.handleAsync(new RequestContext(client, payload as null, new AbortController().signal, 1));
+  }
+
+  private static failureCodeAsync(context: RecordingPartContext, method: string, payload: JsonObject, client: string): Promise<unknown> {
+    return RuntimePartTests.callAsync(context, method, payload, client).then(() => null, (t: unknown) => t instanceof MethodFailureException ? t.failure.code : t);
   }
 
   private static gitState(folder: string): string {
@@ -2644,7 +2780,8 @@ class CommandModeAdapter implements IProviderAdapter {
   }
 
   public listModels(_provider: Provider | null): Promise<ProviderModelList> {
-    return Promise.resolve(new ProviderModelList([new ProviderModel("model", "model", "Fixture", ["high"], true, null, true)], true));
+    return Promise.resolve(new ProviderModelList([new ProviderModel("model", "model", "Fixture", ["high"], true, null, true)], true, false, null, false, this.modes,
+      this.defaultMode));
   }
 
   public async runTurn(request: TurnRequest, listener: ITurnListener, signal: AbortSignal): Promise<TurnResult> {

@@ -48,6 +48,7 @@ import type { IOpenedFile } from "./i-opened-file.js";
 export interface IConversationEngine {
   prepareAttachment(input: AttachmentInput): MessageAttachment;
   prepareOpenedAttachmentAsync(input: AttachmentInput, source: IOpenedFile): Promise<MessageAttachment>;
+  refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
   discardAttachment(attachment: MessageAttachment): void;
   readAttachmentAsync(params: AttachmentReadParams, draft: Draft | null): Promise<AttachmentContent>;
   locateAttachmentAsync(params: AttachmentReadParams, draft: Draft | null): Promise<MessageAttachment>;
@@ -59,9 +60,9 @@ export interface IConversationEngine {
   cancelAsync(params: MessageIdParams): Promise<Message>;
   approvePlanAsync(params: MessageIdParams): Promise<MessageSendResult>;
   cancelConversationAsync(params: ConversationIdParams): Promise<readonly Message[]>;
-  addWaitingAsync(params: WaitingMessageAddParams): Promise<WaitingMessage>;
+  addWaitingAsync(params: WaitingMessageAddParams, fromOutside?: boolean): Promise<WaitingMessage>;
   listWaitingAsync(params: ChatIdParams): Promise<WaitingMessagesPayload>;
-  editWaitingAsync(params: WaitingMessageEditParams): Promise<WaitingMessage>;
+  editWaitingAsync(params: WaitingMessageEditParams, fromOutside?: boolean): Promise<WaitingMessage>;
   removeWaitingAsync(params: WaitingMessageIdParams): Promise<void>;
   sendWaitingNowAsync(params: WaitingMessageIdParams): Promise<WaitingMessage>;
   setResponderAsync(params: ConversationResponderParams): Promise<Conversation>;

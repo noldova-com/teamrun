@@ -44,6 +44,23 @@ export class MainProcessMethodTests {
     Assert.areEqual(0, requests.length);
   }
 
+  @TestMethod
+  public async refusesAnotherClientOnlyWhenItsRequestSetsTheMethodsFieldAndAnswersTheMainProcessEither(): Promise<void> {
+    const requests: RequestContext[] = [];
+    const method = new MainProcessMethod(MainProcessMethodTests.method(requests), "mode");
+    const asked = (client: string, payload: JsonValue): Promise<unknown> =>
+      method.handleAsync(new RequestContext(client, payload, new AbortController().signal, 1)).then(() => null, (t: unknown) => t instanceof MethodFailureException ? t.failure.code : t);
+
+    const answered = await Promise.all([{ name: "Ada" }, { name: "Ada", mode: null }, null, ["mode"], "mode"].map(t => asked(ShellClients.commandLine, t)));
+    const refused = await asked(ShellClients.commandLine, { name: "Ada", mode: "bypassPermissions" });
+    const main = await asked(ShellClients.mainProcess, { name: "Ada", mode: "bypassPermissions" });
+
+    Assert.areEqual(JSON.stringify([null, null, null, null, null]), JSON.stringify(answered));
+    Assert.areEqual(FailureCode.Unauthorized, refused);
+    Assert.isNull(main);
+    Assert.areEqual(6, requests.length);
+  }
+
   private static method(requests: RequestContext[]): IMethodHandler {
     return {
       handleAsync: (request: RequestContext): Promise<JsonValue> => {

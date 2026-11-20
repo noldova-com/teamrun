@@ -19,6 +19,7 @@ export interface IEngineCallbacks {
   capEndsTasksAsync(teammate: Teammate, chatId: string): Promise<boolean>;
   sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null, signal: AbortSignal | undefined,
     outside?: MessageSender | null): Promise<MessageSendResult>;
+  refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
   toolModeOfAsync(open: { readonly reply: Message; readonly mode: ProviderMode | null }): Promise<ProviderMode | null>;
   modeIn(requested: RequestedSettings): ProviderMode | null;
   nameOf(reply: Message): string;

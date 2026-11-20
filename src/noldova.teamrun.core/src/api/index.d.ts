@@ -2065,6 +2065,14 @@ export interface IConversationEngine {
   prepareOpenedAttachmentAsync(input: AttachmentInput, source: IOpenedFile): Promise<MessageAttachment>;
 
   /**
+   * Refuses a send's requested mode unless the same kind and mode are the chat's chosen responder's or the default teammate's, so a client
+   * other than TeamRun's window can't choose the mode a reply runs in; a send that asks for no mode passes.
+   * @param params The send, as a client other than the window's process sent it.
+   * @throws ServiceException `Unauthorized` when the mode is refused, with `Resources.unchosenModeRefused` and the kind and mode.
+   */
+  refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
+
+  /**
    * Deletes only a transient preparation; never deletes a committed message attachment.
    */
   discardAttachment(attachment: MessageAttachment): void;
@@ -2206,11 +2214,14 @@ export interface IConversationEngine {
    * the reply of a teammate it names, or any running reply when it names none. Taken, it leaves the waiting messages and is kept in the
    * chat as a person's message whose `Text` detail names that reply in `Resources.steeredIntoField`, with its files copied as a sent
    * message's; refused, or with a file that can't be copied, it waits as Queue. Until a reply offers a steer, it waits like Queue.
+   * A message from outside goes only after `refuseRaisedModeAsync` passes its send again, so a mode the person changed since it was
+   * added refuses it, kept with that failure.
    * @param params The send and how it goes.
+   * @param fromOutside Whether a client other than TeamRun's window added it; by default, it didn't.
    * @returns The waiting message, as added.
    * @throws ServiceException named `ErrorCode.NotFound` for an unknown chat.
    */
-  addWaitingAsync(params: WaitingMessageAddParams): Promise<WaitingMessage>;
+  addWaitingAsync(params: WaitingMessageAddParams, fromOutside?: boolean): Promise<WaitingMessage>;
 
   /**
    * Lists the chat's waiting messages in the order they go.
@@ -2224,11 +2235,13 @@ export interface IConversationEngine {
    * Replaces a waiting message's send, keeping its place and clearing its failure, publishes `WaitingMessagesChanged`, and sends the
    * chat's waiting messages when it has no running reply.
    * @param params The waiting message and its new send.
+   * @param fromOutside Whether a client other than TeamRun's window edited it, which makes it a message from outside, as
+   * `addWaitingAsync` says; by default, the window did, and a message from outside stays one, since the edit keeps its mode.
    * @returns The edited waiting message.
    * @throws ServiceException named `ErrorCode.NotFound` for an unknown waiting message, or `ErrorCode.InvalidParams` for a send to
    * another chat.
    */
-  editWaitingAsync(params: WaitingMessageEditParams): Promise<WaitingMessage>;
+  editWaitingAsync(params: WaitingMessageEditParams, fromOutside?: boolean): Promise<WaitingMessage>;
 
   /**
    * Removes a waiting message and publishes `WaitingMessagesChanged`.
@@ -2626,6 +2639,11 @@ export declare class Resources {
    * The refusal of a teammate's send that asks for one of its kind's unrestricted modes, which only the person chooses.
    */
   public static readonly unrestrictedModeRefused: string;
+  /**
+   * The refusal of a send, from a client other than TeamRun's window, that asks for a mode the person chose neither for the chat nor for the
+   * default teammate.
+   */
+  public static readonly unchosenModeRefused: string;
   /**
    * The agent a turn names to start a Helper sub-agent: `helper`.
    */
@@ -9168,6 +9186,11 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * @inheritdoc
    */
+  public refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
+
+  /**
+   * @inheritdoc
+   */
   public discardAttachment(attachment: MessageAttachment): void;
 
   /**
@@ -9278,7 +9301,7 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * @inheritdoc
    */
-  public addWaitingAsync(params: WaitingMessageAddParams): Promise<WaitingMessage>;
+  public addWaitingAsync(params: WaitingMessageAddParams, fromOutside?: boolean): Promise<WaitingMessage>;
 
   /**
    * @inheritdoc
@@ -9288,7 +9311,7 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * @inheritdoc
    */
-  public editWaitingAsync(params: WaitingMessageEditParams): Promise<WaitingMessage>;
+  public editWaitingAsync(params: WaitingMessageEditParams, fromOutside?: boolean): Promise<WaitingMessage>;
 
   /**
    * @inheritdoc
