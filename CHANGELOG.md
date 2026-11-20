@@ -6,6 +6,29 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ## Unreleased
 
+### Fixed
+
+- **Modes and plan approvals:** a teammate's mode, Plan first, a plan's approval, the chat's responder and the default teammate change only from TeamRun's own window, and a message from elsewhere keeps only a mode you chose for the chat or the default teammate.
+- **A question card off the screen:** a question card keeps its picks and typed text when its row scrolls away and after a far jump in the chat's history, as wrapped code blocks and a row's other controls are kept (#158, #250).
+- **Editing a waiting message:**
+  - The edit ends when the box shows another chat or takes a rewound message, so Enter no longer saves that text as the edit (#206).
+  - While an edit is open, a pasted or dropped file is refused with a note, and the edit stays open until its save succeeds (#259, #260).
+  - An Escape that closes an input method's candidates keeps the edit (#209).
+  - A file pasted while a send prepares its files is no longer dropped without a word (#211).
+- **Waiting messages:** a sent message no longer shows as still waiting when a change arrives during the chat's read (#162), and a message being sent or steered still goes when the waiting list can't be read again, rather than being lost (#269).
+- **Saving a checkpoint:** a reply keeps "Saving a checkpoint…" through a rename or another change made in another window (#165).
+- **The focus:** Cancel edit, Stop, a Sustain move and the swaps in the ACP agents and shared MCP servers dialogs keep the focus on a control, so the next Tab goes on from there (#208).
+- **Sent files:** deleting a chat, forgetting a project or rewinding a chat removes the files its messages sent, and files left from before are swept (#189).
+- **Stop during a hand-off:** a Stop that lands while a reply hands off to a mentioned teammate stops that teammate's reply too and lists it as stopped (#221).
+- **Signing in to a shared MCP server:** Sign out, or a later sign-in, ends a sign-in still under way, which no longer comes back as signed in, and the first request to the server has a time limit (#225, #234, #235).
+- **The end of a chat's work:** each step after a chat's work ends, sending answers, sending waiting messages and starting wakes, runs even when an earlier one fails, and the failure is logged (#222).
+- **Quitting:** quitting waits for the start-up folder sweep, and a rewind or a move that starts during the quit is refused, rather than the database closing under them (#231, #232).
+- **Helpers:** Stop and quitting return when a helper's end can't be written, such as on a full disk, a helper's task and its row agree on how it ended, and a helper's failed save or stop is logged rather than skipping the other stops (#220, #279).
+
+### Changed
+
+- **Noldova Desktop 0.0.9 and `@noldova/ui.components.angular` 0.0.18:** TeamRun is built on these versions (#253, #255).
+
 ## 0.0.6
 
 ### Fixed
