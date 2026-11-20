@@ -8,6 +8,17 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **A chat's wake:** when work a chat sent to another chat ends, the chat shows a closed row, `Received a message from <chat> ›`, at the top of the reply it starts, rather than a message that read as the other teammate answering there, with the chat's IDs and a hint meant for the teammate; the chat's name opens that chat, and opening the row shows the replies; a wake that started no turn shows why below its row, one whose work never came back reads `No reply came back from <chat> ›`, and wakes from earlier versions show as the same row; deleting a chat whose replies already came back no longer drops them: they are delivered as received from a deleted chat and start the asking chat's turn (#296).
+- **A sub-agent's or command's wake:** when a sub-agent or a background command of a chat ends and wakes it, the chat shows a closed row naming the work and how it ended, such as `Sub-agent "Search" ended as completed ›`, rather than a message with its IDs; opening the row shows its summary or the command's last lines, and one TeamRun restarted before says it was stopped or didn't come back (#300).
+
+### Changed
+
+- **`@noldova/ui.components.angular` 0.0.20 and Noldova's `context` packages 0.0.9:** TeamRun is built on these versions (#283, #288, #305).
+
+## 0.0.7
+
+### Fixed
+
 - **Modes and plan approvals:** a teammate's mode, Plan first, a plan's approval, the chat's responder and the default teammate change only from TeamRun's own window, and a message from elsewhere keeps only a mode you chose for the chat or the default teammate.
 - **An Antigravity provider's server path:** it is set only from TeamRun's own window.
 - **Providers and shared MCP servers:** only TeamRun's own window can give a provider a profile folder, when it's added or later, or switch a provider's own MCP servers, and a shared MCP server's secrets, the providers and teammates it reaches and the commands TeamRun runs for a provider or a shared server change only from the window.
@@ -26,8 +37,6 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **The end of a chat's work:** each step after a chat's work ends, sending answers, sending waiting messages and starting wakes, runs even when an earlier one fails, and the failure is logged (#222).
 - **Quitting:** quitting waits for the start-up folder sweep, and a rewind or a move that starts during the quit is refused, rather than the database closing under them (#231, #232).
 - **Helpers:** Stop and quitting return when a helper's end can't be written, such as on a full disk, a helper's task and its row agree on how it ended, and a helper's failed save or stop is logged rather than skipping the other stops (#220, #279).
-- **A chat's wake:** when work a chat sent to another chat ends, the chat shows a closed row, `Received a message from <chat> ›`, at the top of the reply it starts, rather than a message that read as the other teammate answering there, with the chat's IDs and a hint meant for the teammate; the chat's name opens that chat, and opening the row shows the replies; a wake that started no turn shows why below its row, one whose work never came back reads `No reply came back from <chat> ›`, and wakes from earlier versions show as the same row; deleting a chat whose replies already came back no longer drops them: they are delivered as received from a deleted chat and start the asking chat's turn (#296).
-- **A sub-agent's or command's wake:** when a sub-agent or a background command of a chat ends and wakes it, the chat shows a closed row naming the work and how it ended, such as `Sub-agent "Search" ended as completed ›`, rather than a message with its IDs; opening the row shows its summary or the command's last lines, and one TeamRun restarted before says it was stopped or didn't come back (#300).
 
 ### Changed
 
