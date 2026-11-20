@@ -2178,10 +2178,13 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const now = new Date().toISOString();
       const sequence = await this.messages.nextSequenceAsync(conversation.id, transaction);
       const view = await this.wakeViewOfAsync(wake, end, transaction);
+      const watched = Object.isNull(view) ? null : await this.conversations.findAsync(wake.watchedChatId, transaction);
+      const body = Object.isNull(view) || !Object.isNull(end) || !Object.isNull(watched) ? text
+        : `${text}${Resources.transcriptSeparator}${Resources.wakeChatDeletedSince}`;
       const id = Guid.createVersion7().toString();
       const sender = await this.wakeSenderOfAsync(wake, transaction);
       const messageOf = (reply: string | null): Message => new Message(id, conversation.id, sequence, MessageAuthor.User, null, MessageStatus.Completed,
-        [new MessageDetail(0, DetailKind.Text, text, {
+        [new MessageDetail(0, DetailKind.Text, body, {
           source: ProtocolResources.chatWakeSource, [Resources.wakeIdField]: wake.id, [Resources.wakeSourceMessageField]: wake.sourceMessageId, ...view,
           ...Object.isNull(reply) ? {} : { [ProtocolResources.wakeReplyField]: reply }
         }, now)], null, now, null, now, [], null, null, [], sender);
@@ -2190,7 +2193,6 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const hop = wake.hop ?? 0;
       const blocked = startsTurn ? await this.unwokenReasonOfAsync(conversation, source, transaction) : null;
       const stopped = startsTurn && Object.isNull(blocked) && hop > limit;
-      const watched = Object.isNull(view) ? null : await this.conversations.findAsync(wake.watchedChatId, transaction);
       const received = Object.isNull(view) ? null
         : new MessageDetail(0, DetailKind.Note, Resources.formatWakeReceived(watched?.title ?? null), { source: ProtocolResources.wakeReceivedSource, ...view }, now);
       const started = !startsTurn || stopped ? null : blocked ?? await this.wakeReplyOfAsync(source!, message, sequence + 1, now, hop, received, transaction);
@@ -2202,7 +2204,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       await this.messages.insertAsync(stored, transaction);
       if (!Object.isNull(item))
         await this.messages.insertAsync(item.message, transaction);
-      await this.wakes.updateAsync(wake.settled(Object.isNull(item) ? ChatWakeState.Undeliverable : ChatWakeState.Delivered, text, hop), transaction);
+      await this.wakes.updateAsync(wake.settled(Object.isNull(item) ? ChatWakeState.Undeliverable : ChatWakeState.Delivered, body, hop), transaction);
       return { stored, item };
     }).catch((error: unknown) => {
       leave();

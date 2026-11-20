@@ -725,6 +725,7 @@ export class Resources {
   public static readonly wakeWatchesNothing: string = "A wake watches at least one reply or sub-agent.";
   public static readonly wakeQuoteLength: number = 2_000;
   public static readonly wakeReadWhole: string = "Read a message whole with `teamrun_list_messages`.";
+  public static readonly wakeChatDeletedSince: string = "That chat has since been deleted, so its messages can't be read.";
   public static readonly wakeSenderGone: string = "the reply that asked for it is gone.";
   public static readonly wakeTeammateGone: string = "the teammate that asked for it is no longer in this chat.";
   public static readonly wakeProviderUnavailable: string = "the provider that asked for it is turned off or signed out.";

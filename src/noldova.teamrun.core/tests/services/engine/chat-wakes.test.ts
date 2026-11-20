@@ -343,6 +343,7 @@ export class ChatWakesTests {
     Assert.areEqual(JSON.stringify({ source: "chatWake", wakeId: row?.readString("id"), wakeSourceMessageId: asked?.id, wakeChatId: second.id, wakeReplies: replies,
       wakeReplyId: woken?.id }), JSON.stringify(wake?.details[0]?.payload));
     Assert.isTrue(wake?.details[0]?.text.includes("Fixed.") ?? false);
+    Assert.isTrue(wake?.details[0]?.text.endsWith("`teamrun_list_messages`.\n\nThat chat has since been deleted, so its messages can't be read.") ?? false);
     Assert.areEqual(JSON.stringify(["Received a message from a deleted chat.", { source: "wakeReceived", wakeChatId: second.id, wakeReplies: replies }]),
       JSON.stringify([woken?.details[0]?.text, woken?.details[0]?.payload]));
     Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));
