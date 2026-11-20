@@ -30,9 +30,10 @@ export class OrganizationService implements IOrganizationService {
   }
 
   public async listAsync(transaction?: SqlTransaction): Promise<Organization> {
-    const connection = transaction ?? this.context.database.connection;
-    const departments = await connection.queryAsync(new SqlQuery(Resources.selectDepartments));
-    const members = await connection.queryAsync(new SqlQuery(Resources.selectDepartmentMembers));
+    if (Object.isUndefined(transaction))
+      return await this.context.database.connection.runInTransactionAsync(t => this.listAsync(t));
+    const departments = await transaction.queryAsync(new SqlQuery(Resources.selectDepartments));
+    const members = await transaction.queryAsync(new SqlQuery(Resources.selectDepartmentMembers));
     return new Organization(departments.map(t => Department.fromJson(JsonReader.parse(t.readString(Resources.jsonColumn)).toJson())),
       members.map(t => OrganizationService.readMember(t)));
   }

@@ -239,11 +239,8 @@ export class RequestDispatcher {
       }
       case MethodName.TeammateDelete: {
         const params = TeammateIdParams.fromJson(payload);
-        const departed = Object.isNull(this.organization) || Object.isNull((await this.organization.listAsync()).departmentOf(params.teammateId))
-          ? null : this.organization;
-        await this.teammates.deleteAsync(params);
-        if (!Object.isNull(departed))
-          await this.publishOrganizationAsync(departed);
+        if (await this.teammates.deleteAsync(params) && !Object.isNull(this.organization))
+          await this.publishOrganizationAsync(this.organization);
         this.tasks?.stopTeammate(params.teammateId, null);
         this.engine.forgetTeammate(params.teammateId, null);
         return null;
