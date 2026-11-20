@@ -10,7 +10,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 - **Modes and plan approvals:** a teammate's mode, Plan first, a plan's approval, the chat's responder and the default teammate change only from TeamRun's own window, and a message from elsewhere keeps only a mode you chose for the chat or the default teammate.
 - **An Antigravity provider's server path:** it is set only from TeamRun's own window.
-- **Providers and shared MCP servers:** another program can no longer create a provider with a profile folder it names, the command line's add-provider no longer takes a folder, as TeamRun makes the provider's folder itself, and a shared MCP server's secrets and the commands TeamRun runs for a provider or a shared server change only from TeamRun's own window.
+- **Providers and shared MCP servers:** only TeamRun's own window can give a provider a profile folder, when it's added or later, or switch a provider's own MCP servers, and a shared MCP server's secrets, the providers and teammates it reaches and the commands TeamRun runs for a provider or a shared server change only from the window.
 - **A question card off the screen:** a question card keeps its picks and typed text when its row scrolls away and after a far jump in the chat's history, as wrapped code blocks and a row's other controls are kept (#158, #250).
 - **Editing a waiting message:**
   - The edit ends when the box shows another chat or takes a rewound message, so Enter no longer saves that text as the edit (#206).
@@ -29,6 +29,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Changed
 
+- **The command line's add-provider:** it no longer takes a folder: TeamRun makes the new provider's profile folder itself, and the provider signs in from TeamRun's window, so a script that passes a folder must drop it.
 - **Noldova Desktop 0.0.9 and `@noldova/ui.components.angular` 0.0.18:** TeamRun is built on these versions (#253, #255).
 
 ## 0.0.6
