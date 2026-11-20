@@ -336,6 +336,33 @@ describe("AcpAgentsDialogComponent", () => {
     expect([busy, document.activeElement === part(".nol-teamrun-acp-remove", row("droid"))]).toEqual([true, true]);
   });
 
+  it("moves no focus once a remove ends after the dialog has closed", async () => {
+    const removing = new DeferredResponse();
+    await create(t => t.answer(MethodName.AcpAgentRemove, () => removing.promise));
+    const failures: unknown[] = [];
+    const record = (event: PromiseRejectionEvent): void => {
+      failures.push(event.reason);
+    };
+    window.addEventListener("unhandledrejection", record);
+    const outside = document.body.appendChild(document.createElement("button"));
+
+    await click(".nol-teamrun-acp-remove", row("devin"));
+    await Wait.until(() => expect(context.count(MethodName.AcpAgentRemove)).toBe(1));
+    const dialog = fixture.componentInstance;
+    element().remove();
+    fixture.destroy();
+    outside.focus();
+    removing.resolve(null);
+    await Wait.until(() => expect(context.count(MethodName.AcpAgentList)).toBe(2));
+    await dialog.settled();
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    window.removeEventListener("unhandledrejection", record);
+    const focused = document.activeElement === outside;
+    outside.remove();
+
+    expect([failures, focused]).toEqual([[], true]);
+  });
+
   it("removes an agent and a local command, and clears an old error when it tries again", async () => {
     const removed: string[] = [];
     await create(t => t.answer(MethodName.AcpAgentRemove, u => {
