@@ -394,6 +394,8 @@ export class SubAgentsTests {
       await update(message, transaction);
     };
     const queued: string[] = [];
+    const firstQueued = Promise.withResolvers<void>();
+    const secondQueued = Promise.withResolvers<void>();
     let holdsParent = true;
     host.adapter.holdTurn = async (request, signal) => {
       const token = SenderEnvironment.read(request.environment);
@@ -404,17 +406,18 @@ export class SubAgentsTests {
       const id = (await host.engine.startSubAgentAsync(new SubAgentStartParams(token, "helper", "Queued", "Queued."))).toolUseId;
       Assert.isNotNull(id);
       queued.push(id);
+      (queued.length === 1 ? firstQueued : secondQueued).resolve();
       return holdsParent ? SubAgentsTests.abortOf(signal) : undefined;
     };
     const lineOf = (id: string | undefined): string => Resources.formatSubAgentNotStopped(id ?? String.empty, Resources.formatFailureKind(failure));
 
     const reply = await SubAgentsTests.sendAsync(host, await host.createConversationAsync());
-    await host.until("the first queued helper", () => queued.length === 1, host.runs());
+    await firstQueued.promise;
     await host.engine.cancelAsync(new MessageIdParams(reply.id));
     await host.until("the logged stop", () => host.log.lines.includes(lineOf(queued[0])));
     holdsParent = false;
     await SubAgentsTests.sendAsync(host, await host.createConversationAsync());
-    await host.until("the second queued helper", () => queued.length === 2, host.runs());
+    await secondQueued.promise;
     await host.engine.waitForIdle();
     await host.engine.shutdown();
 
