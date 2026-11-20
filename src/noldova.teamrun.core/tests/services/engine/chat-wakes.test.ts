@@ -737,6 +737,25 @@ export class ChatWakesTests {
   }
 
   @TestMethod
+  public async startsTheTurnOfAReadySubAgentWakeStoredWithoutAViewWithNoViewOrReceivedNote(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const woken = await host.createConversationAsync(project, "Release plan");
+    const asked = await ChatWakesTests.askDefault(host, woken.id);
+    await ChatWakesTests.insertAsync(host, "w1", "SubAgent", woken.id, asked.id, woken.id, ["agent-1"], "Ready", "Your sub-agent \"Search\" (agent-1) ended as completed.", 1);
+
+    await host.engine.reconcileAsync();
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+
+    const [, , wake, reply] = (await ChatWakesTests.chatAsync(host, woken.id));
+    Assert.areEqual(JSON.stringify({ source: "chatWake", wakeId: "w1", wakeSourceMessageId: asked.id }), JSON.stringify(wake?.details[0]?.payload));
+    Assert.areEqual(JSON.stringify([wake?.id, MessageStatus.Completed, false]),
+      JSON.stringify([reply?.inReplyTo, reply?.status, JSON.stringify(reply?.details.map(t => t.payload) ?? null).includes("wakeReceived")]));
+    Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));
+  }
+
+  @TestMethod
   public async keepsWaitingAWakeWhoseOtherWatchedReplyStillRunsAndWakesTheNextOne(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
