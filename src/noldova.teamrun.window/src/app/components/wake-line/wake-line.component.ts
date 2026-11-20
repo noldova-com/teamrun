@@ -62,6 +62,14 @@ export class WakeLineComponent {
       return Resources.wakeOldTaskLabel;
     return Object.isNull(end) ? Resources.wakeReceivedLabel : Resources.wakeEndedLabel;
   });
+  protected readonly regionLabel: Signal<string> = computed(() => {
+    const { end, task } = this.received();
+    if (Object.isNull(task))
+      return Resources.wakeRepliesLabel;
+    if (end === ProtocolResources.wakeLostEnd)
+      return Resources.wakeTaskLostLabel;
+    return task.kind === ProtocolResources.wakeCommandTask ? Resources.wakeCommandOutputLabel : Resources.wakeSubAgentResultLabel;
+  });
   protected readonly expandable: Signal<boolean> = computed(() => {
     const { replies, task } = this.received();
     return replies.length > 0 || !Object.isNull(this.endText()) || !Object.isNull(task?.text ?? null);

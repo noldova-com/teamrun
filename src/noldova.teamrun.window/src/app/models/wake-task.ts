@@ -7,6 +7,6 @@
  */
 
 export class WakeTask {
-  public constructor(public readonly kind: string, public readonly name: string, public readonly ending: string | null, public readonly text: string | null) {
+  public constructor(public readonly kind: string, public readonly name: string | null, public readonly ending: string | null, public readonly text: string | null) {
   }
 }

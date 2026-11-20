@@ -1726,6 +1726,14 @@ export declare class Resources {
    */
   public static readonly wakeChatDeletedOpening: string;
   /**
+   * The fixed opening of the text of a background command's wake TeamRun lost by restarting, which tells such a wake stored without a view apart.
+   */
+  public static readonly wakeCommandLostOpening: string;
+  /**
+   * The fixed opening of the text of a sub-agent's wake TeamRun lost by restarting, which tells such a wake stored without a view apart.
+   */
+  public static readonly wakeSubAgentLostOpening: string;
+  /**
    * The resumeSource protocol value: the `source` of the note that a provider could not resume a chat's native session and started a fresh one.
    */
   public static readonly resumeSource: string;

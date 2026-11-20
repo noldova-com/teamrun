@@ -154,8 +154,10 @@ export class FormatterService {
       const sender = message.sender;
       if (message.author !== MessageAuthor.User || Object.isNull(sender))
         return null;
-      return sender.chatId === message.conversationId ? new WakeReceived(null, [], null, null)
-        : new WakeReceived(sender.chatId, [], FormatterService.oldWakeEndOf(detail.text), null);
+      if (sender.chatId !== message.conversationId)
+        return new WakeReceived(sender.chatId, [], FormatterService.oldWakeEndOf(detail.text), null);
+      const kind = FormatterService.oldLostTaskOf(detail.text);
+      return Object.isNull(kind) ? new WakeReceived(null, [], null, null) : new WakeReceived(null, [], ProtocolResources.wakeLostEnd, new WakeTask(kind, null, null, null));
     }
     return new WakeReceived(chatId, replies.filter(t => FormatterService.isJsonObject(t)).flatMap(t => {
         const name = t[ProtocolResources.nameField];
@@ -792,6 +794,12 @@ export class FormatterService {
     if (text.startsWith(ProtocolResources.wakeLostOpening))
       return ProtocolResources.wakeLostEnd;
     return text.startsWith(ProtocolResources.wakeChatDeletedOpening) ? ProtocolResources.wakeChatDeletedEnd : null;
+  }
+
+  private static oldLostTaskOf(text: string): string | null {
+    if (text.startsWith(ProtocolResources.wakeCommandLostOpening))
+      return ProtocolResources.wakeCommandTask;
+    return text.startsWith(ProtocolResources.wakeSubAgentLostOpening) ? ProtocolResources.wakeSubAgentTask : null;
   }
 
   private static payloadOf(detail: MessageDetail): JsonObject | null {

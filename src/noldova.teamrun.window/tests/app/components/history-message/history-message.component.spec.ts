@@ -4328,6 +4328,32 @@ describe("HistoryMessageComponent", () => {
       expect(rect(".activity-toggle").top).toBeGreaterThanOrEqual(rect(".wake-replies").bottom - 0.5);
     });
 
+    it.each([
+      { kind: "subAgent", name: "x".repeat(200), ending: "ended as completed", text: "Found 3 files.", label: "The sub-agent's summary" },
+      { kind: "command", name: "Run the tests", ending: "exited with code 1", text: "1 failed\n2 passed", label: "The command's last lines" }
+    ])("shows a $kind's wake as a closed row at the top of the reply it started, within the answer's width, opening to its text in a region named for it", async ({ kind, name, ending, text, label }) => {
+      render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
+        detail(0, DetailKind.Note, "Woken when a sub-agent or background command of this chat ended.", { source: "wakeReceived", wakeTask: { kind, name, ending, text } }),
+        detail(1, DetailKind.Text, "The tests passed.")
+      ]));
+      await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view")).toHaveLength(1));
+      const rect = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      const right = rect(".nol-markdown-view").right;
+
+      expect(one("nol-message").contains(one(".wake-line"))).toBe(true);
+      expect(one(".wake-toggle").textContent?.trim()).toBe(Resources.formatTaskWakeLabel(kind, name, ending));
+      expect(rect(".wake-line").top).toBeGreaterThanOrEqual(rect(".nol-message-header").bottom - 0.5);
+      AppearanceFixture.expectPixels(rect(".wake-toggle").left, rect(".nol-markdown-view").left);
+      for (const part of [".wake-line", ".wake-toggle", ".wake-chevron"])
+        expect(rect(part).right).toBeLessThanOrEqual(right + 0.5);
+      expect(element().textContent).not.toContain("Woken when");
+
+      await click(one(".wake-toggle"));
+      await Wait.until(() => expect(element().querySelector(".wake-replies")).not.toBeNull());
+      expect([one(".wake-replies").getAttribute("aria-label"), one(".wake-reply-text").textContent]).toEqual([label, text]);
+      expect(rect(".wake-replies").right).toBeLessThanOrEqual(right + 0.5);
+    });
+
     it("shows a woken reply's mark as its first muted line, below its header and above its Activity and answer, in the answer's size, from its start edge, with the command in the code font", async () => {
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
         detail(0, DetailKind.Note, "Started when the background task `npm test` ended.", { source: "wake", taskId: "t1", command: "npm test" }),

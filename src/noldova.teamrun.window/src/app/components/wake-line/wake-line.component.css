@@ -47,7 +47,9 @@
 .wake-label,
 .wake-toggle,
 .wake-chat {
+  min-width: 0;
   font: inherit;
+  overflow-wrap: anywhere;
 }
 
 .wake-label {
@@ -60,9 +62,7 @@
 }
 
 .wake-chat {
-  min-width: 0;
   color: var(--nol-link);
-  overflow-wrap: anywhere;
 }
 
 .wake-chat:hover {

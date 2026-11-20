@@ -90,6 +90,15 @@ describe("FormatterService", () => {
     expect(read(wake({}, new MessageSender("c2", null, "TeamRun"),
       "The chat c2 that you sent work to was deleted before its result came back, so this chat wasn't woken."))).toEqual(["c2", 0, "chatDeleted"]);
     expect(read(wake({}, new MessageSender("c1", null, "TeamRun")))).toEqual([null, 0, null]);
+    const lostTask = (text: string): readonly unknown[] => {
+      const received = FormatterService.wakeReceivedOf(wake({}, new MessageSender("c1", null, "TeamRun"), text));
+      return [received?.chatId, received?.end, received?.task?.kind, received?.task?.name, received?.task?.ending, received?.task?.text];
+    };
+    expect(lostTask("TeamRun restarted before your background command bg-8 ended, so it was stopped and this chat wasn't woken by it."))
+      .toEqual([null, "lost", "command", null, null, null]);
+    expect(lostTask("TeamRun restarted before your sub-agent agent-2 ended, so no result came back and this chat wasn't woken."))
+      .toEqual([null, "lost", "subAgent", null, null, null]);
+    expect(lostTask("Your sub-agent \"Search\" (agent-1) ended as completed.")).toEqual([null, null, undefined, undefined, undefined, undefined]);
     expect(read(wake({}, null))).toBeNull();
     expect(read(reply([detail(0, DetailKind.Note, "Received a message.", { source: "wakeReceived" })]))).toBeNull();
   });

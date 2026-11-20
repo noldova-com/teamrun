@@ -22,7 +22,7 @@ LICENSE file in the root directory of this source tree.
   }
 </p>
 @if (isOpen() && expandable()) {
-  <div class="wake-replies" role="region" [attr.aria-label]="resources.wakeRepliesLabel">
+  <div class="wake-replies" role="region" [attr.aria-label]="regionLabel()">
     @if (endText(); as text) {
       <p class="wake-reply-text">{{ text }}</p>
     }

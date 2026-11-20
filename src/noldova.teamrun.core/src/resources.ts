@@ -1578,11 +1578,11 @@ export class Resources {
   }
 
   public static formatCommandWakeLost(commandId: string): string {
-    return `TeamRun restarted before your background command ${commandId} ended, so it was stopped and this chat wasn't woken by it.`;
+    return `${ProtocolResources.wakeCommandLostOpening}${commandId} ended, so it was stopped and this chat wasn't woken by it.`;
   }
 
   public static formatSubAgentWakeLost(subAgentId: string): string {
-    return `TeamRun restarted before your sub-agent ${subAgentId} ended, so no result came back and this chat wasn't woken.`;
+    return `${ProtocolResources.wakeSubAgentLostOpening}${subAgentId} ended, so no result came back and this chat wasn't woken.`;
   }
 
   public static formatWakeChatDeleted(chatId: string): string {

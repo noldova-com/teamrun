@@ -603,6 +603,9 @@ export class Resources {
   public static readonly wakeOldTaskLabel: string = "A sub-agent or background command of this chat ended";
   public static readonly wakeChatGone: string = "a deleted chat";
   public static readonly wakeRepliesLabel: string = "The message received";
+  public static readonly wakeCommandOutputLabel: string = "The command's last lines";
+  public static readonly wakeSubAgentResultLabel: string = "The sub-agent's summary";
+  public static readonly wakeTaskLostLabel: string = "Why it didn't end";
   public static readonly thinkingLabel: string = "Thinking…";
   public static readonly savingCheckpointLabel: string = "Saving a checkpoint…";
   public static readonly stoppingLabel: string = "Stopping…";
@@ -1690,9 +1693,10 @@ export class Resources {
     return JSON.stringify({ mcpServers: { teamrun: { type: "http", url, headers: { Authorization: "Bearer ${TEAMRUN_TOKEN}" } } } }, null, 2);
   }
 
-  public static formatTaskWakeLabel(kind: string, name: string, ending: string | null): string {
+  public static formatTaskWakeLabel(kind: string, name: string | null, ending: string | null): string {
     const command = kind === ProtocolResources.wakeCommandTask;
-    return `${command ? "Background command" : "Sub-agent"} "${name}" ${ending ?? (command ? "was stopped" : "didn't come back")}`;
+    const work = Object.isNull(name) ? `${command ? "A background command" : "A sub-agent"} of this chat` : `${command ? "Background command" : "Sub-agent"} "${name}"`;
+    return `${work} ${ending ?? (command ? "was stopped" : "didn't come back")}`;
   }
 
   public static formatWakeReplyHeading(name: string, status: MessageStatus, text: string | null): string {
