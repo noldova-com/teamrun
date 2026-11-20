@@ -9,6 +9,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 ### Fixed
 
 - **Modes and plan approvals:** a teammate's mode, Plan first, a plan's approval, the chat's responder and the default teammate change only from TeamRun's own window, and a message from elsewhere keeps only a mode you chose for the chat or the default teammate.
+- **An Antigravity provider's server path:** it is set only from TeamRun's own window.
 - **A question card off the screen:** a question card keeps its picks and typed text when its row scrolls away and after a far jump in the chat's history, as wrapped code blocks and a row's other controls are kept (#158, #250).
 - **Editing a waiting message:**
   - The edit ends when the box shows another chat or takes a rewound message, so Enter no longer saves that text as the edit (#206).
