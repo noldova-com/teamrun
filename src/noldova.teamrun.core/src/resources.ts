@@ -1592,6 +1592,10 @@ export class Resources {
     return `The waiting messages' files of the chat ending in "${chatId.slice(-Resources.loggedIdLength)}" were not removed: ${reason}.`;
   }
 
+  public static formatWaitingMessagesNotShown(chatId: string, reason: string): string {
+    return `The waiting messages of the chat ${chatId} couldn't be read to show them: ${reason}.`;
+  }
+
   public static formatWaitingMessageNotSent(chatId: string, reason: string): string {
     return `A waiting message in the chat ${chatId} wasn't sent: ${reason}.`;
   }

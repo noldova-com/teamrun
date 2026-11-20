@@ -138,6 +138,7 @@ export class WaitingSends {
     if (this.state.closing || this.steering.has(chatId) || !this.beginSending(chatId))
       return;
     let idle = false;
+    let shown = true;
     let taken: WaitingMessage | undefined;
     try {
       idle = await this.isIdleAsync(chatId, true);
@@ -149,7 +150,7 @@ export class WaitingSends {
           return found;
         });
       if (!Object.isUndefined(taken))
-        await this.publishWaitingAsync(chatId);
+        shown = await this.showWaitingAsync(chatId);
     }
     catch (error) {
       this.endSending(chatId);
@@ -164,6 +165,8 @@ export class WaitingSends {
     const next = taken;
     this.track(chatId, this.sendMessageAsync(next.message, null, null, undefined).finally(() => this.endSending(chatId)).then(async () => {
       this.removeWaitingFiles(next.id, () => this.attachments.removeWaitingFiles(chatId, next.id));
+      if (!shown)
+        await this.showWaitingAsync(chatId);
       await this.sendWaitingAsync(chatId);
     }, async (error: unknown) => {
       this.log?.write(Resources.formatWaitingMessageNotSent(chatId, Resources.formatFailureKind(error)));
@@ -195,6 +198,13 @@ export class WaitingSends {
     if (Object.isNull(found))
       throw new ServiceException(ErrorCode.NotFound, Resources.formatWaitingMessageNotFound(id), [id]);
     return found;
+  }
+
+  private showWaitingAsync(chatId: string): Promise<boolean> {
+    return this.publishWaitingAsync(chatId).then(() => true, (error: unknown) => {
+      this.log?.write(Resources.formatWaitingMessagesNotShown(chatId, Resources.formatFailureKind(error)));
+      return false;
+    });
   }
 
   private async publishWaitingAsync(chatId: string): Promise<void> {
@@ -240,7 +250,7 @@ export class WaitingSends {
     });
     if (Object.isNull(waiting))
       return;
-    await this.publishWaitingAsync(chatId);
+    const shown = await this.showWaitingAsync(chatId);
     let saved: readonly MessageAttachment[] = [];
     let steered = false;
     try {
@@ -268,6 +278,8 @@ export class WaitingSends {
       return inserted;
     });
     this.events.publish(new Event(EventName.MessageCreated, message.toJson()));
+    if (!shown)
+      await this.showWaitingAsync(chatId);
   }
 
   private static steersInto(message: MessageSendParams, reply: Message): boolean {
