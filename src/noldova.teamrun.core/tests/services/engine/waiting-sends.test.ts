@@ -342,6 +342,7 @@ export class WaitingSendsTests {
       }
       return queryAsync(query);
     };
+    const shown = host.listener.count(EventName.WaitingMessagesChanged);
 
     release();
     await host.until("the queued send or its failure", () => host.adapter.requests.length === 2 || host.log.lines.includes(notSent));
@@ -351,6 +352,53 @@ export class WaitingSendsTests {
     Assert.isTrue(host.log.lines.includes(Resources.formatWaitingMessagesNotShown(chat.id, Resources.formatFailureKind(failure))), host.log.lines.join("\n"));
     Assert.areEqual("First,Queued", await WaitingSendsTests.sentAsync(host, chat.id));
     Assert.areEqual(0, (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length);
+    Assert.areEqual(shown + 1, host.listener.count(EventName.WaitingMessagesChanged));
+  }
+
+  @TestMethod
+  public async logsAWaitingListItCantReadAfterTakingASteerOffAndStillSteersTheMessage(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const steers: string[] = [];
+    const release = WaitingSendsTests.offerSteer(host, t => {
+      steers.push(t.text);
+      return Promise.resolve(true);
+    });
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+    const failure = new Error("The database is busy.");
+    const failed: string[] = [];
+    const connection = host.context.database.connection;
+    const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
+    const queryAsync = connection.queryAsync.bind(connection);
+    let takenOff = false;
+    connection.runInTransactionAsync = async work => {
+      const result = await runInTransactionAsync(work);
+      takenOff ||= result instanceof WaitingMessage;
+      return result;
+    };
+    connection.queryAsync = query => {
+      if (takenOff && failed.length === 0 && query.text.includes("FROM waitingMessages WHERE chatId")) {
+        failed.push(chat.id);
+        return Promise.reject(failure);
+      }
+      return queryAsync(query);
+    };
+    const shown = host.listener.count(EventName.WaitingMessagesChanged);
+
+    await host.engine.addWaitingAsync(new WaitingMessageAddParams(await WaitingSendsTests.paramsAsync(host, chat.id, "Steered"), MessageDelivery.Steer));
+    const notKept = Resources.formatSteeredMessageNotKept(chat.id, Resources.formatFailureKind(failure));
+    await host.until("the steered message shown again or its loss", async () => host.log.lines.includes(notKept)
+      || host.listener.count(EventName.WaitingMessagesChanged) === shown + 2 && await WaitingSendsTests.sentAsync(host, chat.id) === "First,Steered");
+    release();
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(JSON.stringify([chat.id]), JSON.stringify(failed));
+    Assert.isTrue(host.log.lines.includes(Resources.formatWaitingMessagesNotShown(chat.id, Resources.formatFailureKind(failure))), host.log.lines.join("\n"));
+    Assert.areEqual(JSON.stringify(["Steered"]), JSON.stringify(steers));
+    Assert.areEqual("First,Steered", await WaitingSendsTests.sentAsync(host, chat.id));
+    Assert.areEqual(0, (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length);
+    Assert.areEqual(shown + 2, host.listener.count(EventName.WaitingMessagesChanged));
   }
 
   @TestMethod
