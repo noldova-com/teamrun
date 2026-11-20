@@ -15,9 +15,9 @@ import { SetVersionException } from "./set-version.exception.ts";
 export class VersionSetter {
   public static readonly CHANGELOG_FILE: string = "CHANGELOG.md";
   public static readonly MANIFESTS: readonly string[] = ["package.json", "src/package.json", "app/package.json", "app/src/noldova.teamrun.window.app/package.json"];
+  public static readonly TEXT_FILES: readonly string[] = ["version.json", "src/noldova.teamrun/module.json"];
   private static readonly VERSION_PATTERN: RegExp = /^\d+\.\d+\.\d+$/;
   private static readonly VERSION_FILE: string = "version.json";
-  public static readonly TEXT_FILES: readonly string[] = ["version.json", "src/noldova.teamrun/module.json"];
   private static readonly LOCKFILES: readonly string[] = ["package-lock.json", "app/package-lock.json"];
   private static readonly PACKAGES_FOLDER: string = "src";
   private static readonly MANIFEST_NAME: string = "package.json";
