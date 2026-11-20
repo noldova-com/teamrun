@@ -582,6 +582,64 @@ export class RuntimePartTests {
   }
 
   @TestMethod
+  @TestData(false)
+  @TestData(true)
+  public async stopsTheFolderSweepFirstOnQuitAndWaitsForItToEndBeforeClosingTheDatabaseEvenWhenAnEarlierCloseFails(closeFails: boolean): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    const steps: string[] = [];
+    const sweep = ConversationEngine.prototype.sweepFoldersAsync;
+    const shutdown = ConversationEngine.prototype.shutdown;
+    const close = McpHttpEndpoint.prototype.closeAsync;
+    const dispose = DatabaseContext.prototype[Symbol.asyncDispose];
+    let engineDown = (): void => undefined;
+    const shutDown = new Promise<void>(resolve => {
+      engineDown = resolve;
+    });
+    ConversationEngine.prototype.sweepFoldersAsync = (signal: AbortSignal): Promise<void> => new Promise(resolve => {
+      signal.addEventListener("abort", () => {
+        steps.push("sweep stopped");
+        void (closeFails ? Promise.resolve() : shutDown).then(() => setImmediate(() => {
+          steps.push("sweep ended");
+          resolve();
+        }));
+      }, { once: true });
+    });
+    ConversationEngine.prototype.shutdown = function (this: ConversationEngine): Promise<void> {
+      steps.push("engine shut down");
+      engineDown();
+      return shutdown.call(this);
+    };
+    McpHttpEndpoint.prototype.closeAsync = async function (this: McpHttpEndpoint): Promise<void> {
+      await close.call(this);
+      if (closeFails)
+        throw new Error("The endpoint didn't close.");
+    };
+    DatabaseContext.prototype[Symbol.asyncDispose] = function (this: DatabaseContext): Promise<void> {
+      steps.push("database closed");
+      return dispose.call(this);
+    };
+
+    let failure: unknown = null;
+    try {
+      await part.activateAsync(context);
+      failure = await part.deactivateAsync().then(() => null, (error: unknown) => error);
+    }
+    finally {
+      ConversationEngine.prototype.sweepFoldersAsync = sweep;
+      ConversationEngine.prototype.shutdown = shutdown;
+      McpHttpEndpoint.prototype.closeAsync = close;
+      DatabaseContext.prototype[Symbol.asyncDispose] = dispose;
+    }
+
+    Assert.areEqual(closeFails ? "The endpoint didn't close." : "null", failure instanceof Error ? failure.message : String(failure));
+    Assert.areEqual(closeFails ? "sweep stopped,sweep ended,database closed" : "sweep stopped,engine shut down,sweep ended,database closed", steps.join(","));
+  }
+
+  @TestMethod
   public async refusesARewindOrMoveStartedWhileQuittingWaitsForARunningRewindAndClosesTheDatabaseOnlyOnceThatOneEnds(): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);

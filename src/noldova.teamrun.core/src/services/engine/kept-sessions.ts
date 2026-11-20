@@ -102,13 +102,13 @@ export class KeptSessions {
     }
   }
 
-  public async releaseFolderAsync(conversationId: string): Promise<void> {
+  public async releaseFolderAsync(conversationId: string, signal?: AbortSignal): Promise<void> {
     const folders = this.context.chatFolders;
-    const conversation = await this.conversations.findAsync(conversationId);
-    if (!folders.exists(conversationId) || (!Object.isNull(conversation) && Object.isNull(conversation.projectId)))
-      return;
     try {
-      if (!Object.isNull(this.checkpoints) && !await this.checkpoints.deleteAsync(new WorkFolder(conversationId, folders.pathOf(conversationId)))) {
+      const conversation = await this.conversations.findAsync(conversationId);
+      if (!folders.exists(conversationId) || (!Object.isNull(conversation) && Object.isNull(conversation.projectId)))
+        return;
+      if (!Object.isNull(this.checkpoints) && !await this.checkpoints.deleteAsync(new WorkFolder(conversationId, folders.pathOf(conversationId)), signal)) {
         this.log?.write(Resources.formatChatFolderKept(conversationId, Resources.checkpointsHeldUp));
         return;
       }
@@ -119,7 +119,7 @@ export class KeptSessions {
     }
   }
 
-  public async sweepFoldersAsync(): Promise<void> {
+  public async sweepFoldersAsync(signal: AbortSignal): Promise<void> {
     let conversationIds: readonly string[];
     try {
       conversationIds = this.context.chatFolders.list();
@@ -128,8 +128,11 @@ export class KeptSessions {
       this.log?.write(Resources.formatChatFoldersNotSwept(Resources.formatFailureKind(error)));
       return;
     }
-    for (const conversationId of conversationIds)
-      await this.releaseFolderAsync(conversationId);
+    for (const conversationId of conversationIds) {
+      if (signal.aborted)
+        return;
+      await this.releaseFolderAsync(conversationId, signal);
+    }
   }
 
   public forget(conversationId: string): void {
