@@ -1480,6 +1480,14 @@ export class Resources {
     return `This reply started no sub-agent ${subAgentId}.`;
   }
 
+  public static formatSubAgentNotSaved(subAgentId: string, reason: string): string {
+    return `The sub-agent ${subAgentId} couldn't save its end, so a restart shows it as it was at its last save: ${reason}`;
+  }
+
+  public static formatSubAgentNotStopped(subAgentId: string, reason: string): string {
+    return `The sub-agent ${subAgentId} couldn't be stopped cleanly, so a restart shows it as it was at its last save: ${reason}`;
+  }
+
   public static formatSubAgentResultCut(left: number): string {
     return `\n\n[${left} more characters cut]`;
   }

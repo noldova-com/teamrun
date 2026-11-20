@@ -23,6 +23,7 @@ import {
   ApprovalScope,
   BackgroundTaskIdParams,
   BackgroundTaskStatus,
+  CommandStartParams,
   type Conversation,
   ConversationIdParams,
   DetailKind,
@@ -342,6 +343,86 @@ export class SubAgentsTests {
 
     Assert.areEqual(JSON.stringify([[SubAgentStatus.Completed], [[SubAgentStatus.Completed]], [BackgroundTaskStatus.Completed]]), JSON.stringify([[...new Set(ends)],
       waits.map(t => t.ended.map(u => u.status)), (await host.tasks.listAsync(new ConversationIdParams(conversation.id))).map(t => t.status)]));
+  }
+
+  @TestMethod
+  public async logsAHelperWhoseEndRowFailsToWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const failure = new Error("The disk is full.");
+    const update = host.messages.updateAsync.bind(host.messages);
+    let failures = 1;
+    host.messages.updateAsync = async (message, transaction) => {
+      if (failures > 0 && message.details.some(t => t.kind === DetailKind.SubAgent && SubAgent.fromJson(t.payload).status !== SubAgentStatus.Running)) {
+        failures -= 1;
+        throw failure;
+      }
+      await update(message, transaction);
+    };
+    const ids: (string | null)[] = [];
+    host.adapter.holdTurn = async request => {
+      const token = SenderEnvironment.read(request.environment);
+      if (Object.isNull(token))
+        return;
+      ids.push((await host.engine.startSubAgentAsync(new SubAgentStartParams(token, "helper", "Check the tests", "Run the tests."))).toolUseId);
+      await host.engine.waitSubAgents(new SubAgentWaitParams(token, [], 50));
+    };
+
+    await SubAgentsTests.sendAsync(host, conversation);
+    await host.engine.waitForIdle();
+    const [id] = ids;
+    Assert.isDefined(id);
+    Assert.isNotNull(id);
+    const line = Resources.formatSubAgentNotSaved(id, Resources.formatFailureKind(failure));
+    await host.until("the logged end", () => host.log.lines.includes(line));
+
+    Assert.areEqual(JSON.stringify([0, [line]]), JSON.stringify([failures, host.log.lines.filter(t => t.includes(id))]));
+  }
+
+  @TestMethod
+  public async logsAQueuedHelperWhoseStopFailsAtItsParentsStopAndAtShutdownAndStillStopsTheCommandsAfterIt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const failure = new Error("The disk is full.");
+    const update = host.messages.updateAsync.bind(host.messages);
+    const failed = new Set<string>();
+    host.messages.updateAsync = async (message, transaction) => {
+      if (!failed.has(message.id)
+        && message.details.some(t => t.kind === DetailKind.SubAgent && t.text === "Queued" && SubAgent.fromJson(t.payload).status !== SubAgentStatus.Running)) {
+        failed.add(message.id);
+        throw failure;
+      }
+      await update(message, transaction);
+    };
+    const queued: string[] = [];
+    const firstQueued = Promise.withResolvers<void>();
+    const secondQueued = Promise.withResolvers<void>();
+    let holdsParent = true;
+    host.adapter.holdTurn = async (request, signal) => {
+      const token = SenderEnvironment.read(request.environment);
+      if (Object.isNull(token))
+        return SubAgentsTests.abortOf(signal);
+      await host.engine.startCommandAsync(new CommandStartParams(token, "npm start", "Serve"));
+      await host.engine.startSubAgentAsync(new SubAgentStartParams(token, "helper", "Running", "Running."));
+      const id = (await host.engine.startSubAgentAsync(new SubAgentStartParams(token, "helper", "Queued", "Queued."))).toolUseId;
+      Assert.isNotNull(id);
+      queued.push(id);
+      (queued.length === 1 ? firstQueued : secondQueued).resolve();
+      return holdsParent ? SubAgentsTests.abortOf(signal) : undefined;
+    };
+    const lineOf = (id: string | undefined): string => Resources.formatSubAgentNotStopped(id ?? String.empty, Resources.formatFailureKind(failure));
+
+    const reply = await SubAgentsTests.sendAsync(host, await host.createConversationAsync());
+    await firstQueued.promise;
+    await host.engine.cancelAsync(new MessageIdParams(reply.id));
+    await host.until("the logged stop", () => host.log.lines.includes(lineOf(queued[0])));
+    holdsParent = false;
+    await SubAgentsTests.sendAsync(host, await host.createConversationAsync());
+    await secondQueued.promise;
+    await host.engine.waitForIdle();
+    await host.engine.shutdown();
+
+    Assert.areEqual(JSON.stringify([[lineOf(queued[0])], [lineOf(queued[1])], [1, 1]]), JSON.stringify([host.log.lines.filter(t => t.includes(queued[0] ?? "-")),
+      host.log.lines.filter(t => t.includes(queued[1] ?? "-")), host.commands.started.map(t => t.stops)]));
   }
 
   @TestMethod
