@@ -547,7 +547,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         this.context.projectActivity.leave(projectLease);
         completion.resolve();
         if (!Object.isNull(chatId)) {
-          await this.sendWaitingSafelyAsync(chatId);
+          await this.sendQueuedAsync(chatId);
           await this.settleWakesAsync(chatId, work);
         }
       }
