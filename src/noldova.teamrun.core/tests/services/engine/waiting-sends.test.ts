@@ -224,6 +224,7 @@ export class WaitingSendsTests {
       if (request === host.adapter.requests[0])
         host.adapter.lastListener?.onSteerable?.(t => {
           steers.push(t.text);
+          ChangeSignal.notify();
           return steers.length === 1 ? held.promise : Promise.resolve(true);
         });
       return request === host.adapter.requests[0] || request === host.adapter.requests[1] ? gate.promise : Promise.resolve();
@@ -448,6 +449,7 @@ export class WaitingSendsTests {
 
     host.adapter.lastListener?.onSteerable?.(t => {
       steers.push(t.text);
+      ChangeSignal.notify();
       return Promise.resolve(true);
     });
     await host.until("the steer", () => steers.length === 1);
@@ -1036,7 +1038,11 @@ export class WaitingSendsTests {
     host.adapter.holdTurn = () => {
       if (host.adapter.requests.length !== 1)
         return Promise.resolve();
-      host.adapter.lastListener?.onSteerable?.(steer);
+      host.adapter.lastListener?.onSteerable?.(t => {
+        const answer = steer(t);
+        ChangeSignal.notify();
+        return answer;
+      });
       return gate.promise;
     };
     return () => gate.resolve();
