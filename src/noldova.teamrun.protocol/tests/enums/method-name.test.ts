@@ -118,6 +118,12 @@ export class MethodNameTests {
     Assert.areEqual("ConversationSetMemberMode", MethodName.ConversationSetMemberMode);
     Assert.areEqual("ConversationSetMemberSettings", MethodName.ConversationSetMemberSettings);
     Assert.areEqual("ConversationSetPlanFirst", MethodName.ConversationSetPlanFirst);
+    Assert.areEqual("OrganizationList", MethodName.OrganizationList);
+    Assert.areEqual("DepartmentCreate", MethodName.DepartmentCreate);
+    Assert.areEqual("DepartmentUpdate", MethodName.DepartmentUpdate);
+    Assert.areEqual("DepartmentMove", MethodName.DepartmentMove);
+    Assert.areEqual("DepartmentDelete", MethodName.DepartmentDelete);
+    Assert.areEqual("DepartmentMemberSet", MethodName.DepartmentMemberSet);
   }
 
   @TestMethod

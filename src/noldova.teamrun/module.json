@@ -9,7 +9,8 @@
   "noldovaDesktop": ">=0.0.10 <0.1.0",
   "contributes": {
     "methods": [
-      "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.defaultTeammateRead",
+      "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.organizationList", "teamrun.departmentCreate", "teamrun.departmentUpdate",
+      "teamrun.departmentMove", "teamrun.departmentDelete", "teamrun.departmentMemberSet", "teamrun.defaultTeammateRead",
       "teamrun.defaultTeammateSet", "teamrun.conversationAddMember",
       "teamrun.conversationRemoveMember", "teamrun.conversationSetMemberMode", "teamrun.conversationSetMemberSettings", "teamrun.conversationSetPlanFirst", "teamrun.conversationListMembers", "teamrun.attachmentPrepare", "teamrun.attachmentDiscard", "teamrun.attachmentRead", "teamrun.attachmentShare", "teamrun.attachmentExists", "teamrun.writtenImageRead", "teamrun.writtenImageShare", "teamrun.linkedFolderList", "teamrun.draftSave", "teamrun.draftRead", "teamrun.draftDiscard", "teamrun.readingPositionList", "teamrun.readingPositionSave", "teamrun.runOutputList", "teamrun.runOutputSave", "teamrun.dataFolderRead", "teamrun.firstLaunchRead", "teamrun.firstLaunchFinish", "teamrun.providerKindList",
       "teamrun.providerListModels", "teamrun.providerModelCatalog", "teamrun.providerKindInstallationList", "teamrun.providerKindInstall",
@@ -35,7 +36,7 @@
       "teamrun.approvalUpdated", "teamrun.providerUpdated", "teamrun.providerSignInsChanged", "teamrun.providerKindsChanged", "teamrun.providerKindInstallationChanged",
       "teamrun.conversationRewound", "teamrun.conversationDeleted", "teamrun.signInLink", "teamrun.planUsageUpdated", "teamrun.backgroundTaskUpdated",
       "teamrun.backgroundTaskOutput", "teamrun.backgroundTasksCleared", "teamrun.projectsLayoutUpdated", "teamrun.projectFolderChanged", "teamrun.composerDefaultUpdated",
-      "teamrun.panelRequested", "teamrun.windowReloadRequested", "teamrun.waitingMessagesChanged",
+      "teamrun.panelRequested", "teamrun.windowReloadRequested", "teamrun.waitingMessagesChanged", "teamrun.organizationChanged",
       "teamrun.pageShown", "teamrun.pageUpdated", "teamrun.pageStopped"
     ],
     "commands": [

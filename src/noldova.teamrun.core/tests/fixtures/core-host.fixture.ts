@@ -11,6 +11,7 @@ import { join } from "node:path";
 
 import {
   TeammatesService,
+  OrganizationService,
   ApprovalsService,
   BackgroundTasksService,
   AttachmentStore,
@@ -90,6 +91,7 @@ export class CoreHost implements AsyncDisposable {
   public readonly commands: FakeCommandStarter = new FakeCommandStarter();
   public readonly providers: ProvidersService;
   public readonly teammates: TeammatesService;
+  public readonly organization: OrganizationService;
   public readonly kinds: ProviderKindsService;
   public readonly planUsage: PlanUsageService;
   public readonly engine: ConversationEngine;
@@ -133,7 +135,8 @@ export class CoreHost implements AsyncDisposable {
     this.approvals = new ApprovalsService(this.context);
     this.tasks = new BackgroundTasksService(this.events, 0, 50, null, this.context);
     this.providers = new ProvidersService(this.context, this.registry, this.conversations, this.events, signInTimeout, this.log);
-    this.teammates = new TeammatesService(this.context, this.providers, this.conversations);
+    this.organization = new OrganizationService(this.context);
+    this.teammates = new TeammatesService(this.context, this.providers, this.conversations, this.organization);
     this.planUsage = new PlanUsageService(this.events, this.timer);
     this.sharedServers = new SharedMcpServersService(this.context, this.providers, this.teammates, this.registry, () => Promise.resolve(this.environment),
       this.secrets, this.signIns, this.accounts, this.events, this.log);
@@ -147,7 +150,7 @@ export class CoreHost implements AsyncDisposable {
       this.checkpoints, this.sharedServers, null, runsCommands ? this.commands : null, readTitleModel, readIdleCompaction, this.timer);
     this.dispatcher = new RequestDispatcher(this.kinds, this.providers, this.projects, this.conversations,
       this.messages, this.approvals, this.engine, this.teammates, this.events, this.drafts, null, this.tasks, this.planUsage,
-      this.readingPositions, this.windows, this.sharedServers, this.computerUseGrants);
+      this.readingPositions, this.windows, this.sharedServers, this.computerUseGrants, null, this.organization);
   }
 
   public static async createAsync(supportsFork: boolean = false, supportsSignIn: boolean = false, signInTimeout?: number, readHopLimit?: () => number,

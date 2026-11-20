@@ -39,6 +39,7 @@ export class EventNameTests {
     Assert.areEqual("WaitingMessagesChanged", EventName.WaitingMessagesChanged);
     Assert.areEqual("PlanUsageUpdated", EventName.PlanUsageUpdated);
     Assert.areEqual("ProviderKindsChanged", EventName.ProviderKindsChanged);
+    Assert.areEqual("OrganizationChanged", EventName.OrganizationChanged);
   }
 
   @TestMethod

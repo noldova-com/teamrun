@@ -295,6 +295,12 @@ export class Resources {
   public static readonly tokensField: string = "tokens";
   public static readonly durationMsField: string = "durationMs";
   public static readonly updatedAtField: string = "updatedAt";
+  public static readonly parentIdField: string = "parentId";
+  public static readonly leaderIdField: string = "leaderId";
+  public static readonly orderField: string = "order";
+  public static readonly departmentIdField: string = "departmentId";
+  public static readonly departmentsField: string = "departments";
+  public static readonly membersField: string = "members";
   public static readonly revisionField: string = "revision";
   public static readonly missingField: string = "missing";
   public static readonly stateField: string = "state";
@@ -544,6 +550,15 @@ export class Resources {
     "A model's context windows run from a positive whole number of tokens to one no smaller, and its presets are distinct and between them.";
   public static readonly chosenContextWindowInvalid: string = "A chosen context window is a positive whole number of tokens.";
   public static readonly usageHandOffToSelf: string = "A teammate can't hand off to itself when its usage runs out.";
+  public static readonly departmentNamePattern: RegExp = /^[^\p{Cc}\p{Zl}\p{Zp}]{1,100}$/u;
+  public static readonly invalidDepartmentName: string = "A department name must be 1 to 100 characters on one line, with no line break or other control character, and not only spaces.";
+  public static readonly invalidDepartmentOrder: string = "A department's order among its siblings is a whole number from 0.";
+  public static readonly departmentOwnParent: string = "A department can't be its own parent.";
+  public static readonly emptyDepartmentUpdate: string = "A department update must change its name, its leader or both.";
+  public static readonly duplicateDepartment: string = "Each department of an organization has its own id.";
+  public static readonly unknownParentDepartment: string = "A department's parent is a department of the same organization.";
+  public static readonly unknownMemberDepartment: string = "A teammate's department is a department of the same organization.";
+  public static readonly teammateInTwoDepartments: string = "A teammate is in at most one department.";
   public static readonly usageHandOffRepeated: string = "A teammate's usage hand-offs name each teammate once.";
   public static readonly modeRepeated: string = "Each of a provider's modes has its own id.";
   public static readonly modeNotListed: string = "A provider's default mode is among its modes.";

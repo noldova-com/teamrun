@@ -32,6 +32,11 @@ import {
   AcpLocalCommandAddParams,
   SharedMcpTeammateSetParams,
   ComputerUseGrantIdParams,
+  DepartmentCreateParams,
+  DepartmentIdParams,
+  DepartmentMemberSetParams,
+  DepartmentMoveParams,
+  DepartmentUpdateParams,
   WaitingMessageAddParams,
   WaitingMessageEditParams,
   WaitingMessageIdParams,
@@ -109,6 +114,7 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { IAcpAgentsService } from "../../interfaces/i-acp-agents.service.js";
 import type { ISharedMcpServersService } from "../../interfaces/i-shared-mcp-servers.service.js";
 import type { ITeammatesService } from "../../interfaces/i-teammates.service.js";
+import type { IOrganizationService } from "../../interfaces/i-organization.service.js";
 import type { IWindowsService } from "../../interfaces/i-windows.service.js";
 import { Resources } from "../../resources.js";
 
@@ -141,6 +147,7 @@ export class RequestDispatcher {
   private readonly windows: IWindowsService | null;
   private readonly sharedServers: ISharedMcpServersService | null;
   private readonly acpAgents: IAcpAgentsService | null;
+  private readonly organization: IOrganizationService | null;
   private readonly computerUseGrants: IComputerUseGrantsService | null;
 
   public constructor(
@@ -161,8 +168,10 @@ export class RequestDispatcher {
     windows: IWindowsService | null = null,
     sharedServers: ISharedMcpServersService | null = null,
     computerUseGrants: IComputerUseGrantsService | null = null,
-    acpAgents: IAcpAgentsService | null = null) {
+    acpAgents: IAcpAgentsService | null = null,
+    organization: IOrganizationService | null = null) {
     this.acpAgents = acpAgents;
+    this.organization = organization;
     this.events = events;
     this.kinds = kinds;
     this.providers = providers;
@@ -230,11 +239,19 @@ export class RequestDispatcher {
       }
       case MethodName.TeammateDelete: {
         const params = TeammateIdParams.fromJson(payload);
-        await this.teammates.deleteAsync(params);
+        if (await this.teammates.deleteAsync(params) && !Object.isNull(this.organization))
+          await this.publishOrganizationAsync(this.organization);
         this.tasks?.stopTeammate(params.teammateId, null);
         this.engine.forgetTeammate(params.teammateId, null);
         return null;
       }
+      case MethodName.OrganizationList:
+      case MethodName.DepartmentCreate:
+      case MethodName.DepartmentUpdate:
+      case MethodName.DepartmentMove:
+      case MethodName.DepartmentDelete:
+      case MethodName.DepartmentMemberSet:
+        return await this.organizeAsync(RequestDispatcher.require(this.organization, method), method, payload);
       case MethodName.SharedMcpServerList:
         return (await RequestDispatcher.require(this.sharedServers, method).listAsync()).map(t => t.toJson());
       case MethodName.SharedMcpServerCreate:
@@ -588,6 +605,34 @@ export class RequestDispatcher {
     this.computerUseGrants?.forget(conversationIds);
     for (const conversationId of conversationIds)
       this.publish(new Event(EventName.ConversationDeleted, new ConversationIdParams(conversationId).toJson()));
+  }
+
+  private async organizeAsync(organization: IOrganizationService, method: string, payload: JsonValue): Promise<JsonValue> {
+    let result: JsonValue = null;
+    switch (method) {
+      case MethodName.OrganizationList:
+        return (await organization.listAsync()).toJson();
+      case MethodName.DepartmentCreate:
+        result = (await organization.createAsync(DepartmentCreateParams.fromJson(payload))).toJson();
+        break;
+      case MethodName.DepartmentUpdate:
+        result = (await organization.updateAsync(DepartmentUpdateParams.fromJson(payload))).toJson();
+        break;
+      case MethodName.DepartmentMove:
+        result = (await organization.moveAsync(DepartmentMoveParams.fromJson(payload))).toJson();
+        break;
+      case MethodName.DepartmentDelete:
+        await organization.deleteAsync(DepartmentIdParams.fromJson(payload));
+        break;
+      default:
+        await organization.setMemberAsync(DepartmentMemberSetParams.fromJson(payload));
+    }
+    await this.publishOrganizationAsync(organization);
+    return result;
+  }
+
+  private async publishOrganizationAsync(organization: IOrganizationService): Promise<void> {
+    this.publish(new Event(EventName.OrganizationChanged, (await organization.listAsync()).toJson()));
   }
 
   private publish(event: Event): void {

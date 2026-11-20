@@ -554,6 +554,35 @@ export declare enum MethodName {
    */
   TeammateDelete = "TeammateDelete",
   /**
+   * Lists the organization: its departments and which teammate is in which. Parameters: `null`. Result: `Organization`.
+   */
+  OrganizationList = "OrganizationList",
+  /**
+   * Creates a department, last among its siblings, and publishes `OrganizationChanged`. Parameters: `DepartmentCreateParams`.
+   * Result: `Department`; a parent that isn't a department fails with `NotFound`.
+   */
+  DepartmentCreate = "DepartmentCreate",
+  /**
+   * Renames a department or sets or clears its leader, and publishes `OrganizationChanged`. Parameters: `DepartmentUpdateParams`.
+   * Result: `Department`; a leader who isn't a member of the department fails with `InvalidParams`.
+   */
+  DepartmentUpdate = "DepartmentUpdate",
+  /**
+   * Moves a department under another parent, or to another place among its siblings, and publishes `OrganizationChanged`.
+   * Parameters: `DepartmentMoveParams`. Result: `Department`; a move under itself or one of its own departments fails with `InvalidParams`.
+   */
+  DepartmentMove = "DepartmentMove",
+  /**
+   * Deletes a department, moving its members and departments to its parent, and publishes `OrganizationChanged`.
+   * Parameters: `DepartmentIdParams`. Result: `null`.
+   */
+  DepartmentDelete = "DepartmentDelete",
+  /**
+   * Puts a teammate in a department, or in none, and publishes `OrganizationChanged`; a leader who leaves stops leading.
+   * Parameters: `DepartmentMemberSetParams`. Result: `null`.
+   */
+  DepartmentMemberSet = "DepartmentMemberSet",
+  /**
    * Adds a teammate to a chat. Parameters: `ChatMemberParams`. Result: `ChatMember`.
    */
   ConversationAddMember = "ConversationAddMember",
@@ -1274,7 +1303,12 @@ export declare enum EventName {
    * A chat's waiting messages changed: one was added, edited, removed, sent, failed or moved to go next. Payload:
    * `WaitingMessagesPayload`, with all of the chat's waiting messages in the order they go.
    */
-  WaitingMessagesChanged = "WaitingMessagesChanged"
+  WaitingMessagesChanged = "WaitingMessagesChanged",
+  /**
+   * The organization changed: a department was created, renamed, moved or deleted, a leader was set or cleared, a teammate
+   * changed department, or a deleted teammate left its department. Payload: `Organization`, the whole organization after the change.
+   */
+  OrganizationChanged = "OrganizationChanged"
 }
 
 /**
@@ -2109,6 +2143,36 @@ export declare class Resources {
    * Name of the last-update timestamp field of a model: `updatedAt`.
    */
   public static readonly updatedAtField: string;
+  /** Name of a department's parent field: `parentId`. */
+  public static readonly parentIdField: string;
+  /** Name of a department's leader field: `leaderId`. */
+  public static readonly leaderIdField: string;
+  /** Name of a department's order field among its siblings: `order`. */
+  public static readonly orderField: string;
+  /** Name of a department id field: `departmentId`. */
+  public static readonly departmentIdField: string;
+  /** Name of an organization's departments field: `departments`. */
+  public static readonly departmentsField: string;
+  /** Name of an organization's members field: `members`. */
+  public static readonly membersField: string;
+  /** What a department name may be: 1 to 100 characters with no line break or other control character. */
+  public static readonly departmentNamePattern: RegExp;
+  /** Why a department name is refused: it is blank, longer than 100 characters, or holds a line break or other control character. */
+  public static readonly invalidDepartmentName: string;
+  /** Why a department's order is refused: it isn't a whole number from 0. */
+  public static readonly invalidDepartmentOrder: string;
+  /** Why a department naming itself as its parent is refused. */
+  public static readonly departmentOwnParent: string;
+  /** Why a department update that changes nothing is refused. */
+  public static readonly emptyDepartmentUpdate: string;
+  /** Why an organization with two departments of one id is refused. */
+  public static readonly duplicateDepartment: string;
+  /** Why an organization with a department whose parent isn't one of its departments is refused. */
+  public static readonly unknownParentDepartment: string;
+  /** Why an organization with a teammate in a department that isn't one of its departments is refused. */
+  public static readonly unknownMemberDepartment: string;
+  /** Why an organization with a teammate in two departments is refused. */
+  public static readonly teammateInTwoDepartments: string;
   /**
    * Name of a draft's revision field: `revision`.
    */
@@ -11675,6 +11739,205 @@ export declare class TeammateIdParams {
     teammateId: string);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): TeammateIdParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A department of the organization: it has a name, an optional leader, and sits under the person or another department. */
+export declare class Department {
+  /** id. */
+  public readonly id: string;
+  /** The name, 1 to 100 characters on one line. */
+  public readonly name: string;
+  /** The department it sits under, or null when it sits under the person. */
+  public readonly parentId: string | null;
+  /** The teammate who leads it, always one of its members, or null. */
+  public readonly leaderId: string | null;
+  /** Its place among its siblings, from 0. */
+  public readonly order: number;
+  /** When it was created, as ISO 8601 text. */
+  public readonly createdAt: string;
+  /** When it last changed, as ISO 8601 text. */
+  public readonly updatedAt: string;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when a field is blank, the name is invalid, the department is its own parent, or the order isn't a whole number from 0.
+   */
+  public constructor(
+    id: string,
+    name: string,
+    parentId: string | null,
+    leaderId: string | null,
+    order: number,
+    createdAt: string,
+    updatedAt: string);
+  /**
+   * Checks a department name.
+   * @param name The name.
+   * @throws ArgumentException when it is blank, longer than 100 characters, or holds a line break or other control character.
+   */
+  public static validateName(name: string): void;
+  /**
+   * Reads a department name from its `name` field.
+   * @param reader The reader of the object holding it.
+   * @returns The name.
+   * @throws JsonException at the field's path when it isn't a valid name.
+   */
+  public static readName(reader: JsonReader): string;
+  /**
+   * Checks a department's order among its siblings.
+   * @param order The order.
+   * @throws ArgumentException when it isn't a whole number from 0.
+   */
+  public static validateOrder(order: number): void;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): Department;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A teammate's place in a department; a teammate is in at most one. */
+export declare class DepartmentMember {
+  /** teammate Id. */
+  public readonly teammateId: string;
+  /** department Id. */
+  public readonly departmentId: string;
+  /** Creates a validated immutable value. */
+  public constructor(
+    teammateId: string,
+    departmentId: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentMember;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** The organization under the person: its departments, and the teammates in them; a teammate in none shows under "No department". */
+export declare class Organization {
+  /** The organization with no departments. */
+  public static readonly empty: Organization;
+  /** The departments, by their order among their siblings, then by when they were created. */
+  public readonly departments: readonly Department[];
+  /** The teammates in a department. */
+  public readonly members: readonly DepartmentMember[];
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when two departments share an id, a parent or a member's department isn't one of the departments,
+   * or a teammate is in two departments.
+   */
+  public constructor(
+    departments: readonly Department[],
+    members: readonly DepartmentMember[]);
+  /**
+   * Returns the departments under a parent, in their order.
+   * @param parentId The parent department's id, or null for those under the person.
+   * @returns The departments.
+   */
+  public childrenOf(parentId: string | null): readonly Department[];
+  /**
+   * Returns the department a teammate is in.
+   * @param teammateId The teammate's id.
+   * @returns The department's id, or null when the teammate is in none.
+   */
+  public departmentOf(teammateId: string): string | null;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): Organization;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for creating a department. */
+export declare class DepartmentCreateParams {
+  /** The name. */
+  public readonly name: string;
+  /** The department it goes under, or null for the person. */
+  public readonly parentId: string | null;
+  /** Creates a validated immutable value. */
+  public constructor(
+    name: string,
+    parentId: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentCreateParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for renaming a department or setting or clearing its leader; an omitted field stays. */
+export declare class DepartmentUpdateParams {
+  /** department Id. */
+  public readonly departmentId: string;
+  /** The new name, or undefined to keep it. */
+  public readonly name: string | undefined;
+  /** The new leader, null to clear it, or undefined to keep it. */
+  public readonly leaderId: string | null | undefined;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when it changes nothing or a field is invalid.
+   */
+  public constructor(
+    departmentId: string,
+    name: string | undefined,
+    leaderId: string | null | undefined);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentUpdateParams;
+  /**
+   * Returns the department with this update's changes.
+   * @param department The department as it is.
+   * @param updatedAt The change's time, as ISO 8601 text.
+   * @returns The changed department.
+   */
+  public applyTo(department: Department, updatedAt: string): Department;
+  /** Returns the wire representation, without the omitted fields. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for moving a department under another parent or to another place among its siblings. */
+export declare class DepartmentMoveParams {
+  /** department Id. */
+  public readonly departmentId: string;
+  /** The department it goes under, or null for the person. */
+  public readonly parentId: string | null;
+  /** Its place among its new siblings, from 0; a place past the last puts it last. */
+  public readonly order: number;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when a field is blank, the department is its own parent, or the order isn't a whole number from 0.
+   */
+  public constructor(
+    departmentId: string,
+    parentId: string | null,
+    order: number);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentMoveParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters naming one department. */
+export declare class DepartmentIdParams {
+  /** department Id. */
+  public readonly departmentId: string;
+  /** Creates a validated immutable value. */
+  public constructor(
+    departmentId: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentIdParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for putting a teammate in a department, or in none. */
+export declare class DepartmentMemberSetParams {
+  /** teammate Id. */
+  public readonly teammateId: string;
+  /** The department, or null for none. */
+  public readonly departmentId: string | null;
+  /** Creates a validated immutable value. */
+  public constructor(
+    teammateId: string,
+    departmentId: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentMemberSetParams;
   /** Returns the wire representation. */
   public toJson(): JsonObject;
 }
