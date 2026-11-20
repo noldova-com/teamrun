@@ -36,6 +36,8 @@ export { MainProcessMethod } from "../services/main-process-method.js";
 export { MethodFailures } from "../services/method-failures.js";
 export { MethodTool } from "../services/method-tool.js";
 export { PanelTool } from "../services/panel-tool.js";
+export { ProviderCreateMethod } from "../services/provider-create-method.js";
+export { ProviderUpdateMethod } from "../services/provider-update-method.js";
 export { ModuleDatabaseConnection } from "../services/module-database-connection.js";
 export { ModuleDatabaseSession } from "../services/module-database-session.js";
 export { ModuleDatabaseProvider } from "../services/module-database-provider.js";

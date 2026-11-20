@@ -81,6 +81,8 @@ import { PanelTool } from "./panel-tool.js";
 import { ModuleDatabaseProvider } from "./module-database-provider.js";
 import { PermissionAnswerer } from "./permission-answerer.js";
 import { ProviderKindRegistryFactory } from "./provider-kind-registry-factory.js";
+import { ProviderCreateMethod } from "./provider-create-method.js";
+import { ProviderUpdateMethod } from "./provider-update-method.js";
 import { ReplyFailureNotices } from "./reply-failure-notices.js";
 import { ReplyWork } from "./reply-work.js";
 import { RequestedModeMethod } from "./requested-mode-method.js";
@@ -119,7 +121,8 @@ export class RuntimePart implements IRuntimePart {
   private static readonly OUTSIDE: ReadonlySet<string> = new Set([MethodName.OutsideConnectionRead, MethodName.OutsideTokenReset]);
   private static readonly MAIN_PROCESS_ONLY: ReadonlySet<string> = new Set([MethodName.ApprovalDecide, MethodName.WindowFocused, MethodName.WindowClosed,
     MethodName.WindowReload, MethodName.PanelAnswered, MethodName.ConversationSetMemberMode, MethodName.ConversationSetPlanFirst, MethodName.MessageApprovePlan,
-    MethodName.DefaultTeammateSet, MethodName.ConversationResponderSet, MethodName.ComposerDefaultSave]);
+    MethodName.DefaultTeammateSet, MethodName.ConversationResponderSet, MethodName.ComposerDefaultSave, MethodName.AcpLocalCommandAdd, MethodName.SharedMcpServerCreate,
+    MethodName.SharedMcpServerUpdate, MethodName.SharedMcpProviderSet, MethodName.SharedMcpTeammateSet, MethodName.SharedMcpSecretSet]);
   private static readonly MODE_SETTING: ReadonlySet<string> = new Set([MethodName.TeammateCreate, MethodName.TeammateUpdate]);
 
   private readonly registries: IProviderKindRegistryFactory;
@@ -303,7 +306,7 @@ export class RuntimePart implements IRuntimePart {
     context.registerMethod(Resources.formatQualifiedName(context.moduleId, MethodName.OutsideTokenReset), new OutsideConnectionMethod(() => outside.resetAsync()));
     for (const method of Object.values(MethodName).filter(t => !RuntimePart.OUTSIDE.has(t))) {
       const name = Resources.formatQualifiedName(context.moduleId, method);
-      const handler = this.handlerOf(context, engine, method, method === MethodName.WindowFocused ? clients : new DispatchedMethod(method, dispatcher));
+      const handler = this.handlerOf(context, engine, providers, method, method === MethodName.WindowFocused ? clients : new DispatchedMethod(method, dispatcher));
       context.registerMethod(name, handler);
       methods.set(name, handler);
     }
@@ -377,9 +380,11 @@ export class RuntimePart implements IRuntimePart {
     }
   }
 
-  private handlerOf(context: IRuntimePartContext, engine: ConversationEngine, method: MethodName, dispatched: IMethodHandler): IMethodHandler {
+  private handlerOf(context: IRuntimePartContext, engine: ConversationEngine, providers: ProvidersService, method: MethodName,
+    dispatched: IMethodHandler): IMethodHandler {
     const handler = RuntimePart.MAIN_PROCESS_ONLY.has(method) ? new MainProcessMethod(dispatched)
-      : method === MethodName.ProviderUpdate ? new MainProcessMethod(dispatched, Resources.binaryPathField)
+      : method === MethodName.ProviderCreate ? new ProviderCreateMethod(dispatched)
+      : method === MethodName.ProviderUpdate ? new ProviderUpdateMethod(new MainProcessMethod(dispatched, Resources.binaryPathField), providers)
       : RuntimePart.MODE_SETTING.has(method) ? new MainProcessMethod(dispatched, Resources.modeField)
       : method === MethodName.MessageSend ? new RequestedModeMethod(dispatched, engine, t => MessageSendParams.fromJson(t))
       : method === MethodName.WaitingMessageAdd ? new RequestedModeMethod(dispatched, engine, t => WaitingMessageAddParams.fromJson(t).message,
