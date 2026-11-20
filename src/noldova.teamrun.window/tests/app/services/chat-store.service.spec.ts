@@ -2437,6 +2437,18 @@ describe("ChatStoreService", () => {
     expect(store.pendingApprovals()).toEqual([]);
   });
 
+  it("empties the shown rows of a chat whose index was forgotten once a rewind from elsewhere comes", async () => {
+    await store.initialize();
+    await store.selectConversation("c1");
+    const shown = store.messageIndex().map(t => t.id);
+    store.forgetPosition("c1");
+    const forgotten = store.messageIndex().map(t => t.id);
+
+    context.emit(EventName.ConversationRewound, new ConversationRewoundPayload("c1", 0).toJson());
+
+    expect([shown, forgotten, store.messageIndex()]).toEqual([["m1", "m2"], ["m1", "m2"], []]);
+  });
+
   it("offers the person's rewound message back, its text and files, and nothing for a failure, a reply or a rewind from elsewhere", async () => {
     const file = new MessageAttachment("notes.txt", "text/plain", 1, "D:/data/attachments/c1/notes.txt");
     const asked = new Message("m1", "c1", 0, MessageAuthor.User, null, MessageStatus.Completed,
