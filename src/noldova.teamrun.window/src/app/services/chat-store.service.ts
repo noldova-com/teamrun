@@ -2036,13 +2036,17 @@ export class ChatStoreService {
       }
       case EventName.ReplyCheckpointStarted: {
         const messageId = MessageIdParams.fromJson(event.payload).messageId;
+        this.captureEvent(event, JSON.stringify([EventName.ReplyCheckpointStarted, messageId]));
         if (this.workingSignal().has(messageId))
           this.savingCheckpointSignal.update(t => new Set(t).add(messageId));
         break;
       }
-      case EventName.ReplyCheckpointEnded:
-        this.stopSavingCheckpoint(MessageIdParams.fromJson(event.payload).messageId);
+      case EventName.ReplyCheckpointEnded: {
+        const messageId = MessageIdParams.fromJson(event.payload).messageId;
+        this.captureEvent(event, JSON.stringify([EventName.ReplyCheckpointStarted, messageId]));
+        this.stopSavingCheckpoint(messageId);
         break;
+      }
       case EventName.WaitingMessagesChanged: {
         const payload = WaitingMessagesPayload.fromJson(event.payload);
         this.captureEvent(event, JSON.stringify([EventName.WaitingMessagesChanged, payload.chatId]));
