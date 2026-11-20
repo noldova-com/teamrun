@@ -49,7 +49,9 @@ import {
   AcpAgentOffer,
   AcpStoredAgent,
   ApprovalAsk,
+  ConversationEngine,
   DatabaseContext,
+  DraftsService,
   type ForkRequest,
   type IAcpAgentCatalog,
   type ILog,
@@ -397,6 +399,37 @@ export class RuntimePartTests {
     const chosen = (id: string): string | null | undefined => chats.map(t => Conversation.fromJson(t)).find(t => t.id === id)?.responder?.providerId;
     Assert.areEqual(`${provider.id} null`, `${chosen(conversation.id)} ${chosen(other.id)}`);
     Assert.areEqual(provider.id, kept.providerId);
+  }
+
+  @TestMethod
+  public async sweepsTheSentFilesAtStartUpBeforeAnyQueuedSendResumes(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    const steps: string[] = [];
+    const sweep = DraftsService.prototype.sweepAsync;
+    const reconcile = ConversationEngine.prototype.reconcileAsync;
+    DraftsService.prototype.sweepAsync = async function (this: DraftsService): Promise<void> {
+      await sweep.call(this);
+      steps.push("swept");
+    };
+    ConversationEngine.prototype.reconcileAsync = function (this: ConversationEngine): Promise<readonly Message[]> {
+      steps.push("resuming");
+      return reconcile.call(this);
+    };
+
+    try {
+      await part.activateAsync(context);
+      await part.deactivateAsync();
+    }
+    finally {
+      DraftsService.prototype.sweepAsync = sweep;
+      ConversationEngine.prototype.reconcileAsync = reconcile;
+    }
+
+    Assert.areEqual("swept,resuming", steps.join(","));
   }
 
   @TestMethod

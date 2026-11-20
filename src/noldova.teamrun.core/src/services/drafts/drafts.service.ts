@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { basename } from "node:path";
+
 import "@noldova/context.core";
 import { type DataRecord } from "@noldova/context.data";
 import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
@@ -97,7 +99,16 @@ export class DraftsService implements IDraftsService {
       this.attachments.removeWaitingFiles(conversationId);
     }
     catch (error) {
-      this.log.write(Resources.formatChatWaitingFilesNotRemoved(conversationId, DraftsService.reasonOf(error)));
+      this.log.write(Resources.formatChatWaitingFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
+    }
+  }
+
+  public removeSentFiles(conversationId: string, paths: readonly string[]): void {
+    try {
+      this.attachments.removeSent(paths);
+    }
+    catch (error) {
+      this.log.write(Resources.formatSentFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
     }
   }
 
@@ -108,6 +119,15 @@ export class DraftsService implements IDraftsService {
         if (!Object.isNull(held))
           this.removeFilesExcept(conversationId, held);
       });
+    try {
+      const files = this.attachments.listSent();
+      const named = new Set((await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectAttachmentPaths)))
+        .map(t => basename(t.readString(Resources.pathColumn))));
+      this.attachments.removeSent(files.filter(t => !named.has(basename(t))));
+    }
+    catch (error) {
+      this.log.write(Resources.formatSentFilesNotSwept(Resources.formatFailureReason(error)));
+    }
   }
 
   private removeFilesExcept(conversationId: string, keep: readonly MessageAttachment[]): boolean {
@@ -116,7 +136,7 @@ export class DraftsService implements IDraftsService {
       return true;
     }
     catch (error) {
-      this.log.write(Resources.formatDraftFilesNotRemoved(conversationId, DraftsService.reasonOf(error)));
+      this.log.write(Resources.formatDraftFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
       return false;
     }
   }
@@ -126,7 +146,7 @@ export class DraftsService implements IDraftsService {
       return (await this.findAsync(conversationId, transaction))?.attachments ?? [];
     }
     catch (error) {
-      this.log.write(Resources.formatDraftNotRead(conversationId, DraftsService.reasonOf(error)));
+      this.log.write(Resources.formatDraftNotRead(conversationId, Resources.formatFailureReason(error)));
       return null;
     }
   }
@@ -149,9 +169,5 @@ export class DraftsService implements IDraftsService {
     const [record] = await (transaction ?? this.context.database.connection).queryAsync(new SqlQuery(Resources.selectConversationById, [conversationId]));
     if (Object.isUndefined(record))
       throw new ServiceException(ErrorCode.NotFound, Resources.formatConversationNotFound(conversationId), [conversationId]);
-  }
-
-  private static reasonOf(error: unknown): string {
-    return error instanceof Error ? (error as NodeJS.ErrnoException).code ?? error.name : typeof error;
   }
 }

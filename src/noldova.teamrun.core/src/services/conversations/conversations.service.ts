@@ -282,8 +282,13 @@ export class ConversationsService implements IConversationsService {
 
   public async deleteAsync(params: ConversationIdParams, transaction?: SqlTransaction): Promise<void> {
     if (Object.isUndefined(transaction)) {
-      await this.context.database.connection.runInTransactionAsync(t => this.deleteAsync(params, t));
+      const sent = await this.context.database.connection.runInTransactionAsync(async t => {
+        const paths = await ConversationsService.sentPathsAsync(params.conversationId, t);
+        await this.deleteAsync(params, t);
+        return paths;
+      });
       this.drafts?.removeChatFiles(params.conversationId);
+      this.drafts?.removeSentFiles(params.conversationId, sent);
       return;
     }
     const conversation = await this.requireAsync(params.conversationId, transaction);
@@ -306,6 +311,10 @@ export class ConversationsService implements IConversationsService {
     await transaction.executeAsync(new SqlQuery(Resources.deleteBackgroundTasks, [conversation.id]));
     await transaction.executeAsync(new SqlQuery(Resources.deleteConversation, [conversation.id]));
     await this.context.database.changeFeed.appendAsync(ChangeEntity.Chat, conversation.id, ChangeOperation.Delete, JSON.stringify(conversation.toJson()), transaction);
+  }
+
+  private static async sentPathsAsync(conversationId: string, transaction: SqlTransaction): Promise<readonly string[]> {
+    return (await transaction.queryAsync(new SqlQuery(Resources.selectChatAttachmentPaths, [conversationId]))).map(t => t.readString(Resources.pathColumn));
   }
 
   public async removeFromAsync(conversationId: string, fromSequence: number, transaction?: SqlTransaction): Promise<readonly Message[]> {

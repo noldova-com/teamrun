@@ -23,6 +23,7 @@ import { WorkFolder } from "../../models/work-folder.js";
 import { Resources } from "../../resources.js";
 import type { DatabaseContext } from "../database-context.js";
 import type { ProviderKindRegistry } from "../provider-kinds/provider-kind-registry.js";
+import type { AttachmentStore } from "./attachment-store.js";
 import type { EngineServices } from "./engine-services.js";
 import type { ReplyCheckpoints } from "./reply-checkpoints.js";
 import { ReplyRun } from "./reply-run.js";
@@ -36,6 +37,7 @@ export class KeptSessions {
   private readonly events: IEventSink;
   private readonly log: ILog | null;
   private readonly checkpoints: ReplyCheckpoints | null;
+  private readonly attachments: AttachmentStore;
   private readonly nativeSessions: Map<string, Map<string, Set<string>>> = new Map();
   private readonly forgotten: Set<string> = new Set();
   private readonly requireConversationAsync: IEngineCallbacks["requireConversationAsync"];
@@ -51,6 +53,7 @@ export class KeptSessions {
     this.events = services.events;
     this.log = services.log;
     this.checkpoints = services.checkpoints;
+    this.attachments = services.attachments;
     this.requireConversationAsync = callbacks.requireConversationAsync;
     this.requireMessageAsync = callbacks.requireMessageAsync;
     this.requireWorkFolderAsync = callbacks.requireWorkFolderAsync;
@@ -88,6 +91,7 @@ export class KeptSessions {
           ? await this.conversations.setSessionResetAsync(conversation.id, true, transaction)
           : await this.conversations.setForkedSessionAsync(conversation.id, forked, transaction)];
       });
+      this.removeSentFiles(conversation.id, removed.filter(t => t.id !== target.id || t.author !== MessageAuthor.User));
       this.events.publish(new Event(EventName.ConversationRewound, new ConversationRewoundPayload(conversation.id, target.sequence).toJson()));
       this.events.publish(new Event(EventName.StateInvalidated, null));
 
@@ -197,6 +201,15 @@ export class KeptSessions {
     }
     catch {
       return null;
+    }
+  }
+
+  private removeSentFiles(conversationId: string, removed: readonly Message[]): void {
+    try {
+      this.attachments.removeSent(removed.flatMap(t => t.attachments.map(u => u.path)));
+    }
+    catch (error) {
+      this.log?.write(Resources.formatSentFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
     }
   }
 }
