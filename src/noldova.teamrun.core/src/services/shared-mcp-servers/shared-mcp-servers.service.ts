@@ -49,6 +49,7 @@ export class SharedMcpServersService implements ISharedMcpServersService {
   private readonly events: IEventSink | null;
   private readonly log: ILog | null;
   private readonly signingIn: Map<string, ISharedMcpPendingSignIn> = new Map();
+  private readonly finishing: Map<string, Set<ISharedMcpPendingSignIn>> = new Map();
 
   public constructor(context: DatabaseContext, providers: IProvidersService, teammates: ITeammatesService, registry: ProviderKindRegistry,
     readEnvironment: () => Promise<Readonly<Record<string, string | undefined>>>, secrets: ISharedMcpSecrets, signIns: ISharedMcpSignIn,
@@ -98,9 +99,7 @@ export class SharedMcpServersService implements ISharedMcpServersService {
       const current = await this.requireAsync(params.serverId, transaction);
       await this.requireUniqueNameAsync(params.definition.name, current.id, transaction);
       const updated = await this.saveAsync(await this.keptAsync(current, params.definition, new Date().toISOString(), transaction), transaction);
-      const pending = this.signingIn.get(current.id);
-      if (!Object.isUndefined(pending) && (!updated.definition.signsIn || updated.definition.url !== current.definition.url))
-        pending.ended = true;
+      const pending = !updated.definition.signsIn || updated.definition.url !== current.definition.url ? this.endSignIn(current.id) : undefined;
       return [current, updated, pending] as const;
     });
     this.forget(current.secrets.filter(t => Object.isNull(updated.referenceOf(t.variable))));
@@ -169,8 +168,10 @@ export class SharedMcpServersService implements ISharedMcpServersService {
     const url = server.definition.url;
     if (!server.definition.signsIn || Object.isNull(url))
       throw new ServiceException(ErrorCode.InvalidParams, Resources.formatSharedMcpServerDoesntSignIn(server.definition.name), [server.id]);
-    const pending = this.signingIn.get(server.id) ?? { reference: server.signIn?.reference
-      ?? `${Resources.sharedMcpSignInReferencePrefix}${Guid.newGuid().toString().replaceAll(Resources.guidGroupSeparator, String.empty)}`, latest: 0, ended: false };
+    const stored = this.signingIn.get(server.id);
+    const pending = !Object.isUndefined(stored) && !stored.ended ? stored : { reference: Object.isUndefined(stored)
+      ? [...this.finishing.get(server.id) ?? []].find(t => !t.ended)?.reference ?? server.signIn?.reference ?? SharedMcpServersService.newReference()
+      : SharedMcpServersService.newReference(), latest: 0, ended: false };
     const start = ++pending.latest;
     this.signingIn.set(server.id, pending);
     let address: string | null;
@@ -363,6 +364,10 @@ export class SharedMcpServersService implements ISharedMcpServersService {
 
   private async finishAsync(started: SharedMcpServer, url: string, pending: ISharedMcpPendingSignIn, access: SharedMcpAccess): Promise<void> {
     const reference = pending.reference;
+    if (this.signingIn.get(started.id) === pending)
+      this.signingIn.delete(started.id);
+    const finishing = this.finishing.get(started.id) ?? new Set();
+    this.finishing.set(started.id, finishing.add(pending));
     try {
       const kept = await this.context.database.connection.runInTransactionAsync(async transaction => {
         if (pending.ended)
@@ -380,15 +385,17 @@ export class SharedMcpServersService implements ISharedMcpServersService {
     catch (error) {
       this.log?.write(Resources.formatSharedMcpSignInUnsaved(started.definition.name, SharedMcpServersService.describe(error)));
     }
-    if (this.signingIn.get(started.id) === pending)
-      this.signingIn.delete(started.id);
+    finishing.delete(pending);
+    if (finishing.size === 0)
+      this.finishing.delete(started.id);
     this.events?.publish(new Event(EventName.StateInvalidated, null));
   }
 
   private endSignIn(serverId: string): ISharedMcpPendingSignIn | undefined {
     const pending = this.signingIn.get(serverId);
-    if (!Object.isUndefined(pending))
-      pending.ended = true;
+    for (const ending of [pending, ...this.finishing.get(serverId) ?? []])
+      if (!Object.isUndefined(ending))
+        ending.ended = true;
     return pending;
   }
 
@@ -486,6 +493,10 @@ export class SharedMcpServersService implements ISharedMcpServersService {
   private static withBearer(definition: SharedMcpServerDefinition): SharedMcpServerDefinition {
     return new SharedMcpServerDefinition(definition.name, definition.transport, definition.command, definition.arguments, definition.variables,
       definition.url, definition.headers, Resources.sharedMcpAccessVariable);
+  }
+
+  private static newReference(): string {
+    return `${Resources.sharedMcpSignInReferencePrefix}${Guid.newGuid().toString().replaceAll(Resources.guidGroupSeparator, String.empty)}`;
   }
 
   private static describe(error: unknown): string {

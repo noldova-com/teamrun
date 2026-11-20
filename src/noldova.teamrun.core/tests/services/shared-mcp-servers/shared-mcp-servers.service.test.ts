@@ -571,6 +571,58 @@ export class SharedMcpServersServiceTests {
   }
 
   @TestMethod
+  public async keepsALaterStartWaitingUnderTheSameReferenceWhenAnEarlierSignInFinishesAsItStarts(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    const [first] = host.signIns.started;
+
+    const later = host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    first?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
+    await later;
+    await SharedMcpServersServiceTests.settleAsync();
+    const [listed] = await host.sharedServers.listAsync();
+
+    Assert.areEqual(JSON.stringify([first?.reference, true, first?.reference]),
+      JSON.stringify([listed?.server.signIn?.reference, listed?.signingIn, host.signIns.started[1]?.reference]));
+    Assert.areEqual("[]", JSON.stringify(host.signIns.signedOut));
+  }
+
+  @TestMethod
+  public async startsASignInThatComesDuringASignOutUnderANewReferenceTheSignOutLeavesRunning(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    const [first] = host.signIns.started;
+
+    const later = host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
+    await later;
+    await SharedMcpServersServiceTests.settleAsync();
+    const second = host.signIns.started[1]?.reference;
+
+    Assert.areNotEqual(first?.reference, second);
+    Assert.isTrue((await host.sharedServers.listAsync())[0]?.signingIn ?? false);
+    Assert.areEqual(JSON.stringify([first?.reference]), JSON.stringify(host.signIns.signedOut));
+  }
+
+  @TestMethod
+  public async keepsAServerSignedOutWhoseSignOutComesWhileItsSignInsFinishIsSaving(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    const [running] = host.signIns.started;
+
+    running?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
+    await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
+    await SharedMcpServersServiceTests.settleAsync();
+    const [listed] = await host.sharedServers.listAsync();
+
+    Assert.areEqual(JSON.stringify([null, false]), JSON.stringify([listed?.server.signIn, listed?.signingIn]));
+    Assert.isTrue(host.signIns.signedOut.includes(running?.reference ?? String.empty));
+  }
+
+  @TestMethod
   public async refusesToStartASignInForAServerThatDoesntSignInOrIsUnknown(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.http("docs"));
