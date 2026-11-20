@@ -514,7 +514,8 @@ export class AcpTasksTests {
   @TestMethod
   public async endsTheTasksProcessTreeBeforeShowingItEndedWhenGrokHadToBeStopped(): Promise<void> {
     await using host = new GrokTestHost();
-    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_IGNORE_CANCEL: "1" }, host.command, host.terminator, host.ignoredCancelTimings);
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_IGNORE_CANCEL: "1" }, host.command, host.terminator, host.ignoredCancelTimings,
+      new NodeProcessStarter(host.terminator), host.realTree(undefined, host.ignoredCancelTimings));
     const controller = new AbortController();
     const listener = new TreeWatchingListener();
 
@@ -556,7 +557,8 @@ export class AcpTasksTests {
   @TestMethod
   public async endsAProcessGrokStartsAsItClosesOnceGrokHasExited(): Promise<void> {
     await using host = new GrokTestHost();
-    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_CLOSE_CHILD: "1" }, host.command, host.terminator, host.closingTimings);
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_CLOSE_CHILD: "1" }, host.command, host.terminator, host.closingTimings,
+      new NodeProcessStarter(host.terminator), host.realTree(undefined, host.closingTimings));
 
     const result = await adapter.runTurn(host.request("complete"), new RecordingTurnListener(), new AbortController().signal);
     await host.programs.endedAt(1);

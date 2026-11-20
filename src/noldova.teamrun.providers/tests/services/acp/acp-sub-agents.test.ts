@@ -10,7 +10,7 @@ import { BackgroundTasksService, TurnOutcome, TurnRequest, TurnTools, WakeTurn }
 import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.json";
 import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { ApprovalKind, AuthStatus, BackgroundTaskStatus, DetailKind, ObservedSettings, Provider, RequestedSettings, SenderEnvironment, SubAgent, SubAgentStatus } from "@noldova/teamrun.protocol";
-import { AcpSubAgents, AcpTurn, Resources } from "@noldova/teamrun.providers";
+import { AcpSubAgents, AcpTurn, NodeProcessStarter, Resources } from "@noldova/teamrun.providers";
 import { AntigravitySubAgentRecording } from "../../fixtures/antigravity-sub-agent.recording.js";
 import { CopilotSubAgentEndsRecording } from "../../fixtures/copilot-sub-agent-ends.recording.js";
 import { CopilotSubAgentRecording } from "../../fixtures/copilot-sub-agent.recording.js";
@@ -757,7 +757,8 @@ export class AcpSubAgentsTests {
     const listener = new RecordingTurnListener();
     listener.wakeTurn = new WakeTurn({});
     const provider = new Provider("a", "grok", "Work", host.directory.resolve("added"), AuthStatus.LoggedIn, null, null, null, null, "t");
-    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_SUB_AGENT_TREE: "1" });
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_SUB_AGENT_TREE: "1" }, host.command, host.terminator, host.timings,
+      new NodeProcessStarter(host.terminator), host.realTree());
     const stop = new AbortController();
     const tree = AcpSubAgentsTests.pathOf(host, "sub-agent-tree.txt");
 

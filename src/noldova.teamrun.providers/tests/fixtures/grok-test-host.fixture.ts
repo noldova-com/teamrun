@@ -11,12 +11,14 @@ import { fileURLToPath } from "node:url";
 import { type ILog, type ITimer, TurnRequest } from "@noldova/teamrun.core";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
 import { RequestedSettings } from "@noldova/teamrun.protocol";
-import { AcpAdapter, AppServerClientInfo, GrokAdapter, type IAcpAgent, type IProcessStarter, type IProcessTree, NodeProcessStarter, ProcessCommand, ProcessTerminator, ProviderTimings } from "@noldova/teamrun.providers";
+import { AcpAdapter, AppServerClientInfo, CommandRunner, GrokAdapter, type IAcpAgent, type IProcessStarter, type IProcessTree, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator,
+  ProcessTree, ProviderTimings, Resources } from "@noldova/teamrun.providers";
 
 import { ElapsedDelayTimer } from "./elapsed-delay-timer.fixture.js";
 import { HeldDelayTimer } from "./held-delay-timer.fixture.js";
 import { ProgramRecorder } from "./program-recorder.fixture.js";
 import { IsolatedPath } from "./isolated-path.fixture.js";
+import { SettledProcessTree } from "./settled-process-tree.fixture.js";
 import { TemporaryDirectory } from "./temporary-directory.fixture.js";
 
 export class GrokTestHost implements AsyncDisposable {
@@ -45,7 +47,7 @@ export class GrokTestHost implements AsyncDisposable {
   }
 
   public createAdapter(environment: NodeJS.ProcessEnv = this.environment, command: ProcessCommand | null = this.command, terminator: ProcessTerminator = this.terminator,
-    timings: ProviderTimings = this.timings, starter: IProcessStarter = new NodeProcessStarter(terminator), processTree?: IProcessTree, timer: ITimer = this.timer,
+    timings: ProviderTimings = this.timings, starter: IProcessStarter = new NodeProcessStarter(terminator), processTree: IProcessTree = new SettledProcessTree(), timer: ITimer = this.timer,
     log: ILog | null = null, idleTimer: ITimer = this.elapsedIdleTimer): GrokAdapter {
     const adapter = new GrokAdapter(command, environment, this.directory.resolve("profile"), this.info, this.programs.wrap(starter), timings, timer, processTree, undefined, log, null,
       idleTimer);
@@ -58,6 +60,11 @@ export class GrokTestHost implements AsyncDisposable {
     const adapter = new AcpAdapter(agent, this.info, this.programs.wrap(starter), timings, timer, null, log, undefined, idleTimer);
     this.adapters.push(adapter);
     return adapter;
+  }
+
+  public realTree(starter: IProcessStarter = new NodeProcessStarter(this.terminator), timings: ProviderTimings = this.timings, timer: ITimer = this.timer): IProcessTree {
+    return new ProcessTree(process.platform, new CommandRunner(this.programs.wrap(starter)), process.env, Resources.processListTimeout, timer, timings.stopGrace, undefined,
+      PowershellSession.shared);
   }
 
   public request(prompt: string, resume: string | null = null, model: string | null = null, effort: string | null = null,
