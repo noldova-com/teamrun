@@ -3047,6 +3047,8 @@ export declare class Resources {
   public static readonly runOutputsKeptCharacters: number;
   public static formatWaitingMessageNotFound(waitingId: string): string;
   public static formatWaitingMessageOtherChat(waitingId: string, chatId: string): string;
+  /** The log line for a chat's waiting messages that couldn't be read to show them once one was taken off to send or steer; that one still sends or steers. */
+  public static formatWaitingMessagesNotShown(chatId: string, reason: string): string;
   public static formatWaitingMessageNotSent(chatId: string, reason: string): string;
   /** The log line for a chat's background sending that failed; the chat sends again at its next reply's end. */
   public static formatChatSendingStopped(chatId: string, reason: string): string;
