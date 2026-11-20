@@ -270,6 +270,30 @@ describe("TeammateDialogComponent", () => {
       expect(nth(up, 0).getAttribute("aria-label")).toBe(Resources.formatMoveUp(Resources.formatSustainEntry(2, "Codex · Team · This computer")));
     });
 
+    it("keeps the focus on the moved entry's button, or on its other move once that one turns off at the end", async () => {
+      await create(sustained, withSustain);
+      field<HTMLButtonElement>(".nol-teamrun-add-fallback").click();
+      await settle();
+      const team = "Codex · Team · This computer";
+      entryButton(2, "down").focus();
+
+      entryButton(2, "down").click();
+      await settle();
+      const middle = document.activeElement?.getAttribute("aria-label");
+      entryButton(3, "down").click();
+      await settle();
+      const last = document.activeElement?.getAttribute("aria-label");
+      entryButton(4, "up").click();
+      await settle();
+      const back = document.activeElement?.getAttribute("aria-label");
+      entryButton(3, "up").click();
+      await settle();
+
+      expect([middle, last, back, document.activeElement?.getAttribute("aria-label")])
+        .toEqual([Resources.formatMoveDown(Resources.formatSustainEntry(3, team)), Resources.formatMoveUp(Resources.formatSustainEntry(4, team)),
+          Resources.formatMoveUp(Resources.formatSustainEntry(3, team)), Resources.formatMoveDown(Resources.formatSustainEntry(2, team))]);
+    });
+
     it("shows Sustain unavailable, with the reason, on a teammate whose provider's limits TeamRun can't read, and sends none of its settings", async () => {
       await create(new TeammateFixture(SampleData.createContext()).alice);
       const reason = field(".nol-teamrun-sustain-reason");

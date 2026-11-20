@@ -50,7 +50,7 @@ LICENSE file in the root directory of this source tree.
               }
             </td>
           </tr>
-          @for (entry of fallbacks(); track $index; let index = $index, first = $first, last = $last) {
+          @for (entry of fallbacks(); track entry; let index = $index, first = $first, last = $last) {
             <tr class="nol-teamrun-fallback">
               <td class="nol-teamrun-muted">{{ index + 2 }}</td>
               <td nolConfigurationTableFill>

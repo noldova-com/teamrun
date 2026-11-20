@@ -6,7 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, type InputSignal, type ModelSignal, type Signal, type WritableSignal, computed, effect, input, model, signal, untracked } from "@angular/core";
+import {
+  Component, ElementRef, Injector, type InputSignal, type ModelSignal, type Signal, type WritableSignal, afterNextRender, computed, effect, inject, input, model, signal,
+  untracked
+} from "@angular/core";
 
 import "@noldova/context.core";
 import { NameOrder, type Provider, type ProviderKind, TeammateFallback } from "@noldova/teamrun.protocol";
@@ -58,6 +61,8 @@ export class SustainSettingsComponent {
   protected readonly headingId: string = "nol-teamrun-sustain-heading";
   protected readonly reasonId: string = Resources.sustainReasonId;
   protected readonly added: WritableSignal<ReadonlySet<TeammateFallback>> = signal(new Set<TeammateFallback>());
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly injector: Injector = inject(Injector);
   private readonly catalogs: WritableSignal<ReadonlyMap<string, ModelCatalog>> = signal(new Map<string, ModelCatalog>());
 
   private readonly providers: Signal<ReadonlyMap<string, Provider>> = computed(() => new Map(this.store().providers().map(t => [t.id, t])));
@@ -160,6 +165,10 @@ export class SustainSettingsComponent {
   protected move(index: number, by: number): void {
     const entries = this.fallbacks();
     this.fallbacks.set(entries.toSpliced(index, 1).toSpliced(index + by, 0, ...entries.slice(index, index + 1)));
+    const moved = index + by;
+    const up = by < 0 ? moved > 0 : moved === entries.length - 1;
+    afterNextRender(() => this.host.querySelectorAll<HTMLElement>(up ? Resources.fallbackUpSelector : Resources.fallbackDownSelector).item(moved).focus(),
+      { injector: this.injector });
   }
 
   protected remove(index: number): void {

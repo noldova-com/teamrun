@@ -298,6 +298,25 @@ describe("AcpAgentsDialogComponent", () => {
       .toEqual(["true", ["Installing… 25%"], true]);
   });
 
+  it("moves the focus to the Remove that takes Add's place once an add ends, and to the Add that takes Remove's place once a remove ends", async () => {
+    await create();
+    const before = listing;
+    listing = new AcpAgentListing([new AcpAgentEntry(droid.id, droid.name, droid.version, droid.description, null, null, false, true), devin, plain], [mine], null,
+      SampleData.timestamp);
+    part<HTMLButtonElement>(".nol-teamrun-acp-add", row("droid")).focus();
+
+    await click(".nol-teamrun-acp-add", row("droid"));
+    await Wait.until(() => expect(row("droid").querySelector(".nol-teamrun-acp-remove")).not.toBeNull());
+    await settle();
+    const added = document.activeElement === part(".nol-teamrun-acp-remove", row("droid"));
+    listing = before;
+    await click(".nol-teamrun-acp-remove", row("droid"));
+    await Wait.until(() => expect(row("droid").querySelector(".nol-teamrun-acp-add")).not.toBeNull());
+    await settle();
+
+    expect([added, document.activeElement === part(".nol-teamrun-acp-add", row("droid"))]).toEqual([true, true]);
+  });
+
   it("removes an agent and a local command, and clears an old error when it tries again", async () => {
     const removed: string[] = [];
     await create(t => t.answer(MethodName.AcpAgentRemove, u => {
