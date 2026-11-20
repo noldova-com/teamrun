@@ -2023,6 +2023,8 @@ export class ChatStoreService {
       case EventName.DetailUpdated: {
         const payload = DetailEventPayload.fromJson(event.payload);
         this.captureEvent(event, JSON.stringify([EventName.DetailUpdated, payload.messageId, payload.detail.sequence]));
+        this.captureEvent(new Event(EventName.ReplyCheckpointEnded, new MessageIdParams(payload.messageId).toJson()),
+          JSON.stringify([EventName.ReplyCheckpointStarted, payload.messageId]));
         this.stopThinking(payload.messageId);
         this.stopSavingCheckpoint(payload.messageId);
         this.applyDetail(payload);
@@ -2036,13 +2038,17 @@ export class ChatStoreService {
       }
       case EventName.ReplyCheckpointStarted: {
         const messageId = MessageIdParams.fromJson(event.payload).messageId;
+        this.captureEvent(event, JSON.stringify([EventName.ReplyCheckpointStarted, messageId]));
         if (this.workingSignal().has(messageId))
           this.savingCheckpointSignal.update(t => new Set(t).add(messageId));
         break;
       }
-      case EventName.ReplyCheckpointEnded:
-        this.stopSavingCheckpoint(MessageIdParams.fromJson(event.payload).messageId);
+      case EventName.ReplyCheckpointEnded: {
+        const messageId = MessageIdParams.fromJson(event.payload).messageId;
+        this.captureEvent(event, JSON.stringify([EventName.ReplyCheckpointStarted, messageId]));
+        this.stopSavingCheckpoint(messageId);
         break;
+      }
       case EventName.WaitingMessagesChanged: {
         const payload = WaitingMessagesPayload.fromJson(event.payload);
         this.captureEvent(event, JSON.stringify([EventName.WaitingMessagesChanged, payload.chatId]));
@@ -2298,8 +2304,9 @@ export class ChatStoreService {
       }));
       const open = ChatStoreService.readArray(await this.request(MethodName.MessageListOpen, null), Message.fromJson);
       const approvals = ChatStoreService.readArray(await this.request(MethodName.ApprovalListPending, null), Approval.fromJson);
-      const installations = this.loadedSignal() && !this.resyncRequested ? null
-        : ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationList, null), ProviderKindInstallation.fromJson);
+      const resyncing = !this.loadedSignal() || this.resyncRequested;
+      const installations = resyncing
+        ? ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationList, null), ProviderKindInstallation.fromJson) : null;
       if (this.disposed)
         return;
       this.setProviders(providers);
@@ -2318,7 +2325,7 @@ export class ChatStoreService {
       const checks = await Promise.all(dropped.map(t => this.confirmDropped(t.id).catch((u: unknown) => u)));
       this.setWorking(new Map(open.map(t => [t.id, t])));
       this.thinkingSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
-      this.savingCheckpointSignal.set(new Set());
+      this.savingCheckpointSignal.update(t => resyncing ? new Set() : new Set([...t].filter(u => this.workingSignal().has(u))));
       this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending));
       for (const approval of approvals)
         this.upsertApproval(approval);
@@ -2376,7 +2383,8 @@ export class ChatStoreService {
 
   private replaySnapshot(events: Map<string, Event>): void {
     this.snapshots.delete(events);
-    for (const event of events.values())
+    const checkpoint = (event: Event): boolean => event.name === EventName.ReplyCheckpointStarted || event.name === EventName.ReplyCheckpointEnded;
+    for (const event of [...events.values()].sort((left, right) => Number(checkpoint(left)) - Number(checkpoint(right))))
       this.apply(event);
   }
 
