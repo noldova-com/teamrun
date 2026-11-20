@@ -2924,12 +2924,62 @@ describe("ComposerComponent", () => {
       const row = present(root().querySelector(".nol-teamrun-composer-editing")).getBoundingClientRect();
       const message = note.getBoundingClientRect();
       const field = box().getBoundingClientRect();
+      const textStart = (element: Element): number => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return range.getBoundingClientRect().left;
+      };
+      const offset = textStart(note) - textStart(present(root().querySelector(".nol-teamrun-composer-editing .nol-teamrun-composer-note")));
       const refused = [add.disabled, note.textContent?.trim()];
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["a"], "notes.txt", { type: "text/plain" }));
+      const over = new DragEvent("dragover", { dataTransfer: transfer, bubbles: true, cancelable: true });
+      present(root().querySelector("form")).dispatchEvent(over);
+      await fixture.whenStable();
+      const highlighted = root().querySelector(".nol-teamrun-composer-card")?.classList.contains("nol-teamrun-composer-dropping");
       await write("first, changed");
 
-      expect([message.top >= row.bottom, message.bottom <= field.top]).toEqual([true, true]);
+      expect([message.top >= row.bottom, message.bottom <= field.top, Math.abs(offset) < 0.5]).toEqual([true, true, true]);
       expect([...refused, rows().length, paste.defaultPrevented]).toEqual([true, Resources.editingFilesRefused, 0, true]);
+      expect([over.defaultPrevented, highlighted]).toEqual([true, false]);
       expect([edited(), added()]).toEqual([["w1:first, changed:0"], []]);
+    });
+
+    it("clears a file refusal when the next edit starts", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      const paste = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+      box().dispatchEvent(paste);
+      await fixture.whenStable();
+      const refused = root().querySelector(".nol-teamrun-composer-files-refused") !== null;
+
+      await click(present(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-cancel-edit")));
+      await key("ArrowUp");
+
+      expect([refused, editingNote(), root().querySelector(".nol-teamrun-composer-files-refused")]).toEqual([true, Resources.editingWaitingNote, null]);
+    });
+
+    it("keeps the other chat's text and files when an edit's save answers after a switch to it", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      const saving = new DeferredResponse();
+      const other = new MessageAttachment("other.txt", "text/plain", 1, "D:/data/attachments/drafts/c2/other.txt");
+      context.answer(MethodName.WaitingMessageEdit, () => saving.promise)
+        .answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c2"
+          ? new Draft("c2", "for the other chat", [other], [], 2, SampleData.timestamp).toJson() : null);
+      await key("ArrowUp");
+      await write("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect([box().value, fileNames()]).toEqual(["for the other chat", ["other.txt"]]));
+      const kept = context.keptDocuments.length;
+      saving.resolve(null);
+      await Wait.until(() => expect(context.keptDocuments).toHaveLength(kept + 1));
+      await fixture.whenStable();
+
+      expect([edited(), editingNote(), box().value, fileNames()]).toEqual([["w1:first, changed:0"], undefined, "for the other chat", ["other.txt"]]);
     });
 
     it("keeps an edit open when its save fails, so the next Enter tries the edit again and sends no new message", async () => {

@@ -807,7 +807,7 @@ export class ComposerComponent {
     if (!this.canCompose() || !Array.from(event.dataTransfer?.types ?? []).includes(Resources.filesTransferType))
       return;
     event.preventDefault();
-    this.dropping.set(true);
+    this.dropping.set(this.editingSignal() === null);
   }
 
   protected dragLeave(): void {
@@ -1247,10 +1247,12 @@ export class ComposerComponent {
         }
         else if (conversationId === this.conversationId() && !settings.equals(this.currentSettings()))
           this.choices.remember(conversationId, this.currentSettings()!);
-        this.value.set(String.empty);
         for (const attachment of drafted)
           attachment.dispose();
-        this.attachments.set([]);
+        if (conversationId === this.shownConversationId) {
+          this.value.set(String.empty);
+          this.attachments.set([]);
+        }
         void this.drafts.discard(conversationId, arrivals);
       }
     }
