@@ -3025,6 +3025,30 @@ describe("ComposerComponent", () => {
       expect([edited(), box().value]).toEqual([["w1:first, changed:0"], ""]);
     });
 
+    it("keeps an edit's text as its chat's unsent message when its save fails while the next chat's unsent message is still being read", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      const saving = new DeferredResponse();
+      const reading = new DeferredResponse();
+      context.answer(MethodName.WaitingMessageEdit, () => saving.promise)
+        .answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c2" ? reading.promise : null);
+      const reads = (): number => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftRead)
+        && ConversationIdParams.fromJson(t.parameters).conversationId === "c2").length;
+      const saves = (): string[][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftSave))
+        .map(t => DraftSaveParams.fromJson(t.parameters)).map(t => [t.chatId, t.text]);
+      await key("ArrowUp");
+      await write("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect(reads()).toBe(1));
+      saving.reject(new Error("Disconnected"));
+      await Wait.until(() => expect(saves()).toEqual([["c1", "first, changed"]]));
+      reading.resolve(null);
+      await Wait.until(() => expect(box().value).toBe(""));
+
+      expect([edited(), editingNote()]).toEqual([["w1:first, changed:0"], undefined]);
+    });
+
     it("keeps an edit open when its save fails, so the next Enter tries the edit again and sends no new message", async () => {
       await running();
       await listed(waiting("w1", "first"));

@@ -1282,7 +1282,7 @@ export class ComposerComponent {
     const saved = await this.store.editWaiting(editing, text, editing.message.attachments);
     if (saved && this.editingSignal() === editing)
       this.editingSignal.set(null);
-    if (!saved && conversationId !== this.shownConversationId)
+    if (!saved && conversationId !== this.conversationId())
       this.keepHiddenDraft(new ComposerDraft(conversationId, text, []));
     return saved;
   }
