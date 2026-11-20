@@ -805,6 +805,57 @@ export class PermissionAsksTests {
     Assert.areEqual("Ask me|> Which platform?\n\nWeb|> Which platform?\n\nWeb", people.join("|"));
   }
 
+  @TestMethod
+  public async sendsAnAnswerHeldBehindASendThatFailsOnceThatSendsRepliesAreFailed(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const send = async (text: string): Promise<MessageSendParams> =>
+      new MessageSendParams(chat.id, text, new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id);
+    host.adapter.questionPosts = [new QuestionAsk("msg-1", "request_user_input_async",
+      [new ApprovalQuestion("0", "", "Which platform?", [new QuestionOption("Web", "")], false, true, false)])];
+    await host.engine.sendAsync(await send("Ask me"));
+    await host.until("the posted question", async () => (await host.approvals.listAsync(new ConversationIdParams(chat.id))).length === 1);
+    await host.engine.waitForIdle();
+    host.adapter.questionPosts = [];
+    const questions = await host.approvals.listAsync(new ConversationIdParams(chat.id));
+    const failure = new RangeError("The window is gone.");
+    const answered: Approval[] = [];
+    let breaking = true;
+    let answering = false;
+    using _breaker = host.events.subscribe({
+      onEvent: event => {
+        if (breaking && event.name === EventName.MessageCreated) {
+          breaking = false;
+          answering = true;
+          throw failure;
+        }
+      }
+    });
+    const connection = host.context.database.connection;
+    const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
+    connection.runInTransactionAsync = async work => {
+      if (answering) {
+        answering = false;
+        for (const question of questions)
+          answered.push(await host.engine.decideAsync(new ApprovalDecideParams(question.id, Resources.answerOptionId, [new QuestionAnswer("0", ["Web"], null)])));
+      }
+      return await runInTransactionAsync(work);
+    };
+
+    const error = await host.engine.sendAsync(await send("Again")).then(() => null, (t: unknown) => t);
+    await host.engine.waitForIdle();
+    const people = (await host.messages.listAsync(new MessageListParams(chat.id, null))).filter(t => t.author === MessageAuthor.User).map(t => t.details[0]?.text);
+
+    Assert.isTrue(error === failure);
+    Assert.areEqual(JSON.stringify([{ replyTo: "msg-1", answerUnsent: true }]), JSON.stringify(answered.map(t => t.payload)));
+    Assert.areEqual("Ask me|Again|> Which platform?\n\nWeb", people.join("|"));
+    Assert.areEqual(0, (await host.approvals.listUnsentAnswersAsync()).length);
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+    const replies = (await host.messages.listAsync(new MessageListParams(chat.id, null))).filter(t => t.author !== MessageAuthor.User);
+    Assert.areEqual(`${MessageStatus.Completed}|${MessageStatus.Failed}|${MessageStatus.Completed}`, replies.map(t => t.status).join("|"), host.log.lines.join("\n"));
+  }
+
   private static hostAsync(): Promise<CoreHost> {
     return CoreHost.createAsync(false, false, undefined, undefined, undefined, new FakeTurnToolSessions());
   }

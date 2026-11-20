@@ -523,6 +523,39 @@ export class ChatWakesTests {
   }
 
   @TestMethod
+  public async logsAWaitingSendThatFailsAsASendsOrAWakesRepliesEndAndStillSettlesTheWakesWatchingThatChat(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const [first, second] = [await host.createConversationAsync(project, "Release plan"), await host.createConversationAsync(project, "Notes")];
+    host.adapter.turnTexts = [["Asked."], ["Done."], ["Again."], ["Thanks."]];
+    const asked = await ChatWakesTests.askDefault(host, first.id);
+    const done = await ChatWakesTests.askDefault(host, second.id);
+    await ChatWakesTests.insertAsync(host, "w1", "Reply", first.id, asked.id, second.id, [done.id], "Waiting", null, null);
+    const failure = new Error("The database is busy.");
+    const failed: string[] = [];
+    const findOpenReplyAsync = host.messages.findOpenReplyAsync.bind(host.messages);
+    host.messages.findOpenReplyAsync = async (chatId, transaction) => {
+      const failing = chatId === second.id ? 3 : 4;
+      if (Object.isUndefined(transaction) && host.engine.activeRunCount === 0 && host.adapter.requests.length === failing && !failed.includes(chatId)) {
+        failed.push(chatId);
+        throw failure;
+      }
+      return findOpenReplyAsync(chatId, transaction);
+    };
+
+    await ChatWakesTests.askDefault(host, second.id);
+    await host.adapter.requested(4);
+    await host.engine.waitForIdle();
+
+    const [, , wake, woken] = await ChatWakesTests.chatAsync(host, first.id);
+    const notSent = [second.id, first.id].map(t => Resources.formatWaitingMessageNotSent(t, Resources.formatFailureKind(failure)));
+    Assert.areEqual(JSON.stringify([second.id, first.id]), JSON.stringify(failed));
+    Assert.areEqual(JSON.stringify(notSent), JSON.stringify(host.log.lines.filter(t => notSent.includes(t))), host.log.lines.join("\n"));
+    Assert.areEqual("Delivered", await ChatWakesTests.statesAsync(host));
+    Assert.areEqual(JSON.stringify([wake?.id, MessageStatus.Completed]), JSON.stringify([woken?.inReplyTo, woken?.status]));
+  }
+
+  @TestMethod
   public async logsTheWakesOfAChatItCannotSettleWhenTheirTableFailsAndStillEndsTheReply(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
