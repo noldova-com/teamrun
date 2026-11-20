@@ -165,6 +165,8 @@ export class RuntimePart implements IRuntimePart {
 
   public async deactivateAsync(): Promise<void> {
     this.sweepStop?.abort();
+    for (const method of this.awaited)
+      method.close();
     this.answerer?.[Symbol.dispose]();
     this.answerer = null;
     this.sessionStops?.[Symbol.dispose]();
@@ -259,6 +261,7 @@ export class RuntimePart implements IRuntimePart {
     this.engine = engine;
     this.sessionStops = context.tools.onSessionStopped((session, reason) => void engine.stopSessionAsync(session, reason)
       .catch((error: unknown) => context.log.write(Resources.formatSessionStopFailed(CoreResources.formatFailureKind(error)))));
+    await drafts.sweepAsync();
     endpoint.serve(engine);
     const channels = new Map<string, EventChannel>(Object.values(EventName).map(t => [t, context.declareEvent(Resources.formatQualifiedName(context.moduleId, t))]));
     this.subscriptions.push(events.subscribe(new EventForwarder(channels)));
@@ -272,7 +275,6 @@ export class RuntimePart implements IRuntimePart {
       await conversations.moveProviderlessAsync(kind => usual.get(kind) ?? null, transaction);
     });
     await teammates.moveProviderlessDefaultAsync(async (kind, transaction) => (await providers.findUsualAsync(kind, transaction))?.id ?? null);
-    await drafts.sweepAsync();
     const pages = new Pages(database.database.connection, context.moduleFolder, new TeamRunPagesHost(conversations), context.log);
     await pages.sweepAsync();
     this.pages = pages;

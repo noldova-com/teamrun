@@ -112,22 +112,28 @@ export class ProjectsService implements IProjectsService {
       : await this.forgetRecordAsync(params, transaction);
     this.missingFolders.delete(params.projectId);
     this.keptChecks.set(params.projectId, ++this.checks);
-    for (const conversation of deleted)
+    for (const [conversation, sent] of deleted) {
       this.drafts?.removeChatFiles(conversation.id);
-    return deleted.map(t => t.id);
+      this.drafts?.removeSentFiles(conversation.id, sent);
+    }
+    return deleted.map(([t]) => t.id);
   }
 
-  private async forgetRecordAsync(params: ProjectIdParams, transaction: SqlTransaction): Promise<readonly Conversation[]> {
+  private async forgetRecordAsync(params: ProjectIdParams, transaction: SqlTransaction): Promise<readonly (readonly [Conversation, readonly string[]])[]> {
     const project = await this.findAsync(params.projectId, transaction);
     if (Object.isNull(project))
       throw new ServiceException(ErrorCode.NotFound, Resources.formatProjectNotFound(params.projectId), [params.projectId]);
 
     const conversations = await this.conversations.listAsync(new ConversationListParams(params.projectId), transaction);
-    for (const conversation of conversations)
+    const deleted: (readonly [Conversation, readonly string[]])[] = [];
+    for (const conversation of conversations) {
+      const sent = await transaction.queryAsync(new SqlQuery(Resources.selectChatAttachmentPaths, [conversation.id]));
+      deleted.push([conversation, sent.map(t => t.readString(Resources.pathColumn))]);
       await this.conversations.deleteAsync(new ConversationIdParams(conversation.id), transaction);
+    }
     await transaction.executeAsync(new SqlQuery(Resources.deleteProject, [params.projectId]));
     await this.context.database.changeFeed.appendAsync(ChangeEntity.Project, project.id, ChangeOperation.Delete, JSON.stringify(project.toJson()), transaction);
-    return conversations;
+    return deleted;
   }
 
   public async readLayoutAsync(transaction?: SqlTransaction): Promise<JsonObject | null> {

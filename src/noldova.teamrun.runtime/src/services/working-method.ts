@@ -6,15 +6,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IMethodHandler, IRuntimePartContext, RequestContext } from "@noldova/desktop.runtime";
+import { Failure, FailureCode } from "@noldova/desktop.protocol";
+import { type IMethodHandler, type IRuntimePartContext, MethodFailureException, type RequestContext } from "@noldova/desktop.runtime";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
+
+import { Resources } from "../resources.js";
 
 export class WorkingMethod implements IMethodHandler {
   private readonly method: IMethodHandler;
   private readonly context: Pick<IRuntimePartContext, "beginWork">;
   private readonly description: string;
   private readonly running: Set<Promise<JsonValue>> = new Set();
+  private closed: boolean = false;
 
   public constructor(method: IMethodHandler, context: Pick<IRuntimePartContext, "beginWork">, description: string) {
     this.method = method;
@@ -23,6 +27,9 @@ export class WorkingMethod implements IMethodHandler {
   }
 
   public async handleAsync(request: RequestContext): Promise<JsonValue> {
+    if (this.closed)
+      throw new MethodFailureException(new Failure(FailureCode.Unavailable, Resources.partStopping,
+        { [Resources.errorField]: FailureCode.Unavailable, [Resources.argumentsField]: [] }));
     const work = this.context.beginWork(this.description);
     const handled = this.method.handleAsync(request);
     this.running.add(handled);
@@ -33,6 +40,10 @@ export class WorkingMethod implements IMethodHandler {
       this.running.delete(handled);
       work[Symbol.dispose]();
     }
+  }
+
+  public close(): void {
+    this.closed = true;
   }
 
   public async whenIdle(): Promise<void> {

@@ -2187,11 +2187,11 @@ export interface IConversationEngine {
    * Cancels every open reply of the conversation's active send: the working reply stops and the
    * waiting ones are cancelled before they start.
    * @param params The conversation.
-   * @returns The replies this cancel stopped, after the send has settled: those still open when it
-   * started, a hand-off's among them, that ended cancelled. A reply that had already ended, that a
-   * Stop is still ending, its own or an earlier chat Stop, or that completed before the stop reached
-   * it, is left out; so of two chat Stops that overlap, such as the window's and `teamrun cancel`, the
-   * second answers with none of the replies the first is ending.
+   * @returns After the send has settled, the replies still open when this Stop began, or that joined the send after it began, such as
+   * a hand-off's or another chat's teammate's, that ended cancelled and that no Stop which settled earlier has listed. A reply that
+   * had already ended, that an earlier Stop is still ending, or that completed before the Stop reached it is left out, so each
+   * reply is listed by one Stop at most; of two chat Stops that overlap, such as the window's and `teamrun cancel`, the second
+   * answers with none of the replies the first is ending.
    * @throws ServiceException named `ErrorCode.Conflict` when the conversation has no active send.
    */
   cancelConversationAsync(params: ConversationIdParams): Promise<readonly Message[]>;
@@ -4978,6 +4978,11 @@ export declare class Resources {
    * value's type; never its message, which a provider may fill with what it was sent.
    */
   public static formatFailureKind(error: unknown): string;
+
+  /**
+   * Names a file removal's failure for a log line: the error's code when it has one, else its name, or the thrown value's type.
+   */
+  public static formatFailureReason(error: unknown): string;
 
   /**
    * Names a provider for a log line by its id's last `loggedIdLength` characters, or `noLoggedProvider` without
@@ -9627,6 +9632,20 @@ export declare class AttachmentStore {
   public discard(attachments: readonly MessageAttachment[]): void;
 
   /**
+   * Removes the sent files of messages that are gone, leaving any path that isn't directly in the store's folder.
+   * @param paths The removed messages' attachment paths.
+   * @throws Error on filesystem failure.
+   */
+  public removeSent(paths: readonly string[]): void;
+
+  /**
+   * Lists the files directly in the store's folder, where sent messages' files are saved.
+   * @returns Their paths, or none when the folder is missing.
+   * @throws Error on filesystem failure.
+   */
+  public listSent(): readonly string[];
+
+  /**
    * Reads a saved attachment's bytes, after checking that its file is still the one saved.
    * The file must resolve inside the store before and after the read, be a regular file of the recorded size on the open handle,
    * and give exactly that many bytes.
@@ -9940,6 +9959,11 @@ export interface IDraftsService {
    * Removes a deleted conversation's draft files and its waiting messages' files, after its rows are gone.
    */
   removeChatFiles(conversationId: string): void;
+
+  /**
+   * Removes the sent files of a deleted conversation's messages, or of the messages a rewind removed, after their rows are gone.
+   */
+  removeSentFiles(conversationId: string, paths: readonly string[]): void;
 }
 
 /**
@@ -9984,8 +10008,14 @@ export declare class DraftsService implements IDraftsService {
   public removeChatFiles(conversationId: string): void;
 
   /**
-   * Removes, at start-up, the draft files no draft holds: what a failed removal or a crash after a commit left; a draft that
-   * cannot be read keeps its files. A draft it cannot read, like any removal that fails, writes a line to the log.
+   * Removes the sent files the paths name; a failure is logged, and the files are swept at the next start.
+   */
+  public removeSentFiles(conversationId: string, paths: readonly string[]): void;
+
+  /**
+   * Removes, at start-up, the draft files no draft holds and the sent files no message names: what a failed removal or a crash
+   * after a save or a commit left; a draft that cannot be read keeps its files. A draft it cannot read, like any removal that fails,
+   * writes a line to the log.
    */
   public sweepAsync(): Promise<void>;
 }
