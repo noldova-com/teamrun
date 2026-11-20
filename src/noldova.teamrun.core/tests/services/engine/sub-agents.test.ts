@@ -299,17 +299,49 @@ export class SubAgentsTests {
     const stopped = await host.createConversationAsync();
     const reply = await SubAgentsTests.sendAsync(host, stopped);
     await host.adapter.requested(2);
-    failures = 2;
+    failures = 1;
     await host.engine.cancelAsync(new MessageIdParams(reply.id));
     const left = failures;
     const shut = await host.createConversationAsync();
     await SubAgentsTests.sendAsync(host, shut);
     await host.adapter.requested(4);
-    failures = 2;
+    failures = 1;
     await host.engine.shutdown();
 
     Assert.areEqual(JSON.stringify([0, 0, [BackgroundTaskStatus.Stopped], [BackgroundTaskStatus.Stopped]]),
       JSON.stringify([left, failures, await statusesAsync(stopped), await statusesAsync(shut)]));
+  }
+
+  @TestMethod
+  public async endsACompletedHelperWhoseEndRowFailsToWriteAsCompletedWritingNoFailedRowAfter(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const update = host.messages.updateAsync.bind(host.messages);
+    const ends: SubAgentStatus[] = [];
+    host.messages.updateAsync = async (message, transaction) => {
+      const row = message.details.find(t => t.kind === DetailKind.SubAgent);
+      const status = Object.isUndefined(row) ? SubAgentStatus.Running : SubAgent.fromJson(row.payload).status;
+      if (status !== SubAgentStatus.Running) {
+        ends.push(status);
+        if (ends.length === 1)
+          throw new Error("The disk is full.");
+      }
+      await update(message, transaction);
+    };
+    const waits: SubAgentWaitResult[] = [];
+    host.adapter.holdTurn = async request => {
+      const token = SenderEnvironment.read(request.environment);
+      if (Object.isNull(token))
+        return;
+      await host.engine.startSubAgentAsync(new SubAgentStartParams(token, "helper", "Check the tests", "Run the tests."));
+      waits.push(await host.engine.waitSubAgents(new SubAgentWaitParams(token, [], 50)));
+    };
+
+    await SubAgentsTests.sendAsync(host, conversation);
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(JSON.stringify([[SubAgentStatus.Completed], [[SubAgentStatus.Completed]], [BackgroundTaskStatus.Completed]]), JSON.stringify([[...new Set(ends)],
+      waits.map(t => t.ended.map(u => u.status)), (await host.tasks.listAsync(new ConversationIdParams(conversation.id))).map(t => t.status)]));
   }
 
   @TestMethod
