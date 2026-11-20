@@ -687,6 +687,11 @@ export class ChatWakesTests {
       "TeamRun restarted before your sub-agent agent-1 ended, so no result came back and this chat wasn't woken.",
       "The chat gone-chat that you sent work to was deleted before its result came back, so this chat wasn't woken."
     ]), JSON.stringify((await ChatWakesTests.chatAsync(host, lost.id)).slice(2).map(t => t.details.map(u => u.text).join("|"))));
+    Assert.areEqual(JSON.stringify([
+      { source: "chatWake", wakeId: "w2", wakeSourceMessageId: noted.id, wakeChatId: fixes.id, wakeReplies: [], wakeEnd: "lost" },
+      { source: "chatWake", wakeId: "w3", wakeSourceMessageId: noted.id },
+      { source: "chatWake", wakeId: "w4", wakeSourceMessageId: noted.id, wakeChatId: "gone-chat", wakeReplies: [], wakeEnd: "chatDeleted" }
+    ]), JSON.stringify((await ChatWakesTests.chatAsync(host, lost.id)).slice(2).map(t => t.details[0]?.payload)));
     Assert.areEqual(1, host.log.lines.filter(t => t.startsWith("The chat wake w5 couldn't be read, so it was skipped: ")).length, host.log.lines.join("\n"));
     Assert.areEqual(3, host.adapter.requests.length);
     Assert.areEqual("Delivered,Undeliverable,Undeliverable,Undeliverable,Waiting", await ChatWakesTests.statesAsync(host));
@@ -822,6 +827,10 @@ export class ChatWakesTests {
     const rows = await host.context.database.connection.queryAsync(new SqlQuery("SELECT id, state FROM chatWakes ORDER BY id"));
     Assert.areEqual("w2 Undeliverable,w3 Undeliverable,w4 Waiting", rows.map(t => `${t.readString("id")} ${t.readString("state")}`).join());
     Assert.areEqual(JSON.stringify([note, note]), JSON.stringify((await ChatWakesTests.chatAsync(host, second.id)).map(t => t.details.map(u => u.text).join("|"))));
+    Assert.areEqual(JSON.stringify([
+      { source: "chatWake", wakeId: "w3", wakeSourceMessageId: "m3", wakeChatId: first.id, wakeReplies: [], wakeEnd: "chatDeleted" },
+      { source: "chatWake", wakeId: "w2", wakeSourceMessageId: "m2", wakeChatId: first.id, wakeReplies: [], wakeEnd: "chatDeleted" }
+    ]), JSON.stringify((await ChatWakesTests.chatAsync(host, second.id)).map(t => t.details[0]?.payload)));
     Assert.areEqual(0, host.adapter.requests.length);
   }
 

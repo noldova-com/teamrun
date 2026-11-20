@@ -595,6 +595,9 @@ export class Resources {
   public static readonly youLabel: string = "You";
   public static readonly senderChatGone: string = "from a deleted chat";
   public static readonly wakeReceivedLabel: string = "Received a message from";
+  public static readonly wakeEndedLabel: string = "No reply came back from";
+  public static readonly wakeLostText: string = "TeamRun restarted before the work sent there ended.";
+  public static readonly wakeChatDeletedText: string = "The chat was deleted before the work sent there ended.";
   public static readonly wakeChatGone: string = "a deleted chat";
   public static readonly wakeRepliesLabel: string = "The message received";
   public static readonly thinkingLabel: string = "Thinking…";

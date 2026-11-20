@@ -705,7 +705,6 @@ export class Resources {
   public static readonly idleCompactionField: string = "idleCompaction";
   public static readonly compactionField: string = "compaction";
   public static readonly idleCompactionNote: string = "Compacted while idle, before the prompt cache expired, so the next message starts from a summary.";
-  public static readonly chatWakeSource: string = "chatWake";
   public static readonly wakeIdField: string = "wakeId";
   public static readonly wakeSourceMessageField: string = "wakeSourceMessageId";
   public static readonly kindField: string = "kind";

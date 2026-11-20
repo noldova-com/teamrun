@@ -16,6 +16,7 @@ import {
   Message,
   MessageAuthor,
   MessageDetail,
+  MessageSender,
   MessageStatus,
   ObservedSettings,
   PermissionPayload,
@@ -69,6 +70,23 @@ describe("FormatterService", () => {
     expect(read?.chatId).toBe("c2");
     expect(read?.replies.map(t => [t.name, t.status, t.text])).toEqual([["Bob", MessageStatus.Completed, null]]);
     expect(FormatterService.wakeReceivedOf(received("Bob"))).toBeNull();
+  });
+
+  it("reads why a chat's wake brought nothing back, and an old wake with no view from its sender's chat, but not one from its own chat or with no sender", () => {
+    const wake = (payload: JsonObject, sender: MessageSender | null): Message => new Message("w1", "c1", 1, MessageAuthor.User, null, MessageStatus.Completed,
+      [detail(0, DetailKind.Text, "The work you sent has ended.", { source: "chatWake", wakeId: "w1", ...payload })], null, SampleData.timestamp, null,
+      SampleData.timestamp, [], null, null, [], sender);
+    const read = (message: Message): readonly unknown[] | null => {
+      const received = FormatterService.wakeReceivedOf(message);
+      return Object.isNull(received) ? null : [received.chatId, received.replies.length, received.end];
+    };
+
+    expect(read(wake({ wakeChatId: "c2", wakeReplies: [], wakeEnd: "lost" }, null))).toEqual(["c2", 0, "lost"]);
+    expect(read(wake({ wakeChatId: "c2", wakeReplies: [], wakeEnd: 1 }, null))).toEqual(["c2", 0, null]);
+    expect(read(wake({}, new MessageSender("c2", "bob", "Bob")))).toEqual(["c2", 0, null]);
+    expect(read(wake({}, new MessageSender("c1", null, "TeamRun")))).toBeNull();
+    expect(read(wake({}, null))).toBeNull();
+    expect(read(reply([detail(0, DetailKind.Note, "Received a message.", { source: "wakeReceived" })]))).toBeNull();
   });
 
   it("sorts steps into commands, edits, reads, searches, thoughts and other steps, the order a summary counts them in", () => {

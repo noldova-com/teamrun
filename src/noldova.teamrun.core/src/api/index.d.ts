@@ -3923,11 +3923,6 @@ export declare class Resources {
    * The note at the top of the reply that compacts an idle chat before its prompt cache expires.
    */
   public static readonly idleCompactionNote: string;
-  /**
-   * The `source` of a chat wake's message, with its `wakeId`: the message that tells a turn the work it sent to another chat, or its
-   * sub-agent, has ended.
-   */
-  public static readonly chatWakeSource: string;
   public static readonly addKind: string;
   public static readonly updateKind: string;
   public static readonly deleteKind: string;

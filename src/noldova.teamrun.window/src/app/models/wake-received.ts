@@ -9,6 +9,6 @@
 import type { WakeReply } from "./wake-reply";
 
 export class WakeReceived {
-  public constructor(public readonly chatId: string, public readonly replies: readonly WakeReply[]) {
+  public constructor(public readonly chatId: string, public readonly replies: readonly WakeReply[], public readonly end: string | null) {
   }
 }

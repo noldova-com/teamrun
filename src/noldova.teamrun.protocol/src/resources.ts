@@ -160,6 +160,9 @@ export class Resources {
   public static readonly wakeChatField: string = "wakeChatId";
   public static readonly wakeRepliesField: string = "wakeReplies";
   public static readonly wakeReplyField: string = "wakeReplyId";
+  public static readonly wakeEndField: string = "wakeEnd";
+  public static readonly wakeLostEnd: string = "lost";
+  public static readonly wakeChatDeletedEnd: string = "chatDeleted";
   public static readonly resumeSource: string = "resume";
   public static readonly changesNoteField: string = "changesNote";
   public static readonly writesField: string = "writes";

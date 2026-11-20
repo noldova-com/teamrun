@@ -132,17 +132,22 @@ export class FormatterService {
 
   public static wakeReceivedOf(message: Message): WakeReceived | null {
     const source = message.author === MessageAuthor.User ? ProtocolResources.chatWakeSource : ProtocolResources.wakeReceivedSource;
-    const payload = message.details.map(t => FormatterService.payloadOf(t)).find(t => t?.[Resources.sourceField] === source);
-    const chatId = payload?.[ProtocolResources.wakeChatField];
-    const replies = payload?.[ProtocolResources.wakeRepliesField];
-    if (!Object.isString(chatId) || !Array.isArray(replies))
+    const payload = message.details.map(t => FormatterService.payloadOf(t)).find(t => t?.[Resources.sourceField] === source) ?? null;
+    if (Object.isNull(payload))
       return null;
+    const chatId = payload[ProtocolResources.wakeChatField];
+    const replies = payload[ProtocolResources.wakeRepliesField];
+    if (!Object.isString(chatId) || !Array.isArray(replies)) {
+      const sender = message.sender;
+      return message.author === MessageAuthor.User && !Object.isNull(sender) && sender.chatId !== message.conversationId ? new WakeReceived(sender.chatId, [], null) : null;
+    }
+    const end = payload[ProtocolResources.wakeEndField];
     return new WakeReceived(chatId, replies.filter(t => FormatterService.isJsonObject(t)).flatMap(t => {
         const name = t[ProtocolResources.nameField];
         const status = t[ProtocolResources.statusField];
         const text = t[ProtocolResources.textField];
         return Object.isString(name) && FormatterService.isMessageStatus(status) ? [new WakeReply(name, status, Object.isString(text) ? text : null)] : [];
-      }));
+      }), Object.isString(end) ? end : null);
   }
 
   public static startsTurn(message: Message): boolean {

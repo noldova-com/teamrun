@@ -622,7 +622,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     }
     for (const wake of await this.wakes.listAsync(ChatWakeState.Waiting))
       await this.settleSafelyAsync(wake.chatId, async () => {
-        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, await this.lostTextOfAsync(wake), null), false);
+        const [text, end] = await this.lostOfAsync(wake);
+        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, text, null), end);
       });
     for (const conversationId of unsent)
       await this.permissions.sendAnswersAsync(conversationId);
@@ -738,7 +739,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     for (const wake of [...await this.wakes.listAsync(ChatWakeState.Waiting), ...await this.wakes.listAsync(ChatWakeState.Ready)]
       .filter(t => conversationIds.includes(t.watchedChatId)))
       await this.settleSafelyAsync(wake.chatId, async () => {
-        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, Resources.formatWakeChatDeleted(wake.watchedChatId), null), false);
+        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, Resources.formatWakeChatDeleted(wake.watchedChatId), null), ProtocolResources.wakeChatDeletedEnd);
       });
   }
 
@@ -2148,12 +2149,13 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         return;
       }
       const next = (await this.wakes.listAsync(ChatWakeState.Ready)).find(t => t.chatId === conversationId);
-      if (Object.isUndefined(next) || await this.deliverWakeAsync(next, true))
+      if (Object.isUndefined(next) || await this.deliverWakeAsync(next, null))
         return;
     }
   }
 
-  private async deliverWakeAsync(wake: ChatWake, startsTurn: boolean): Promise<boolean> {
+  private async deliverWakeAsync(wake: ChatWake, end: string | null): Promise<boolean> {
+    const startsTurn = Object.isNull(end);
     const conversation = await this.requireConversationAsync(wake.chatId);
     const folder = await this.requireWorkFolderAsync(conversation, true);
     const text = wake.text!;
@@ -2175,12 +2177,12 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const source = await this.messages.findAsync(wake.sourceMessageId, transaction);
       const now = new Date().toISOString();
       const sequence = await this.messages.nextSequenceAsync(conversation.id, transaction);
-      const view = await this.wakeViewOfAsync(wake, transaction);
+      const view = await this.wakeViewOfAsync(wake, end, transaction);
       const id = Guid.createVersion7().toString();
       const sender = await this.wakeSenderOfAsync(wake, transaction);
       const messageOf = (reply: string | null): Message => new Message(id, conversation.id, sequence, MessageAuthor.User, null, MessageStatus.Completed,
         [new MessageDetail(0, DetailKind.Text, text, {
-          source: Resources.chatWakeSource, [Resources.wakeIdField]: wake.id, [Resources.wakeSourceMessageField]: wake.sourceMessageId, ...view,
+          source: ProtocolResources.chatWakeSource, [Resources.wakeIdField]: wake.id, [Resources.wakeSourceMessageField]: wake.sourceMessageId, ...view,
           ...Object.isNull(reply) ? {} : { [ProtocolResources.wakeReplyField]: reply }
         }, now)], null, now, null, now, [], null, null, [], sender);
       const message = messageOf(null);
@@ -2253,9 +2255,11 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       : new ReplyWork(work.message.withDetail(received), work.provider, work.instructions, work.trigger, work.hop, work.wake, work.chain, work.continued);
   }
 
-  private async wakeViewOfAsync(wake: ChatWake, transaction?: SqlTransaction): Promise<JsonObject | null> {
+  private async wakeViewOfAsync(wake: ChatWake, end: string | null, transaction?: SqlTransaction): Promise<JsonObject | null> {
     if (wake.kind !== ChatWakeKind.Reply)
       return null;
+    if (!Object.isNull(end))
+      return { [ProtocolResources.wakeChatField]: wake.watchedChatId, [ProtocolResources.wakeRepliesField]: [], [ProtocolResources.wakeEndField]: end };
     const replies: JsonObject[] = [];
     for (const id of wake.watchedIds) {
       const reply = await this.messages.findAsync(id, transaction);
@@ -2290,15 +2294,16 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       .join(Resources.transcriptSeparator);
   }
 
-  private async lostTextOfAsync(wake: ChatWake): Promise<string> {
+  private async lostOfAsync(wake: ChatWake): Promise<readonly [string, string]> {
     switch (wake.kind) {
       case ChatWakeKind.SubAgent:
-        return Resources.formatSubAgentWakeLost(wake.watchedIds[0]!);
+        return [Resources.formatSubAgentWakeLost(wake.watchedIds[0]!), ProtocolResources.wakeLostEnd];
       case ChatWakeKind.Command:
-        return Resources.formatCommandWakeLost(wake.watchedIds.join(Resources.listSeparator));
+        return [Resources.formatCommandWakeLost(wake.watchedIds.join(Resources.listSeparator)), ProtocolResources.wakeLostEnd];
       case ChatWakeKind.Reply: {
         const watched = await this.conversations.findAsync(wake.watchedChatId);
-        return Object.isNull(watched) ? Resources.formatWakeChatDeleted(wake.watchedChatId) : Resources.formatWakeLost(watched.title, wake.watchedChatId);
+        return Object.isNull(watched) ? [Resources.formatWakeChatDeleted(wake.watchedChatId), ProtocolResources.wakeChatDeletedEnd]
+          : [Resources.formatWakeLost(watched.title, wake.watchedChatId), ProtocolResources.wakeLostEnd];
       }
     }
   }

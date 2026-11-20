@@ -1689,6 +1689,18 @@ export declare class Resources {
    */
   public static readonly wakeReplyField: string;
   /**
+   * Name of the field saying why a chat's wake brought no replies back, `lost` or `chatDeleted`, absent when they came back: `wakeEnd`.
+   */
+  public static readonly wakeEndField: string;
+  /**
+   * The `wakeEnd` of a wake TeamRun lost by restarting before the work it sent ended: `lost`.
+   */
+  public static readonly wakeLostEnd: string;
+  /**
+   * The `wakeEnd` of a wake whose chat was deleted before the work sent there ended: `chatDeleted`.
+   */
+  public static readonly wakeChatDeletedEnd: string;
+  /**
    * The resumeSource protocol value: the `source` of the note that a provider could not resume a chat's native session and started a fresh one.
    */
   public static readonly resumeSource: string;

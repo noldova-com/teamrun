@@ -9,7 +9,7 @@
 import { Component, computed, effect, inject, input, type InputSignal, type Signal, untracked } from "@angular/core";
 import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
-import type { Conversation, Message } from "@noldova/teamrun.protocol";
+import { type Conversation, DetailKind, type Message, MessageAuthor, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../../resources";
 import { MessageControlState } from "../../models/message-control-state";
@@ -41,6 +41,16 @@ export class WakeLineComponent {
   protected readonly controls: Signal<MessageControlState> = computed(() => {
     const message = this.message();
     return this.state() ?? this.store.messageControlsOf(message.conversationId, message.id) ?? this.fallback;
+  });
+  protected readonly endText: Signal<string | null> = computed(() => {
+    const end = this.received().end;
+    return end === ProtocolResources.wakeLostEnd ? Resources.wakeLostText : end === ProtocolResources.wakeChatDeletedEnd ? Resources.wakeChatDeletedText : null;
+  });
+  protected readonly label: Signal<string> = computed(() => Object.isNull(this.received().end) ? Resources.wakeReceivedLabel : Resources.wakeEndedLabel);
+  protected readonly expandable: Signal<boolean> = computed(() => this.received().replies.length > 0 || !Object.isNull(this.endText()));
+  protected readonly notes: Signal<readonly string[]> = computed(() => {
+    const message = this.message();
+    return message.author === MessageAuthor.User ? message.details.filter(t => t.kind === DetailKind.Note).map(t => t.text) : [];
   });
   protected readonly isOpen: Signal<boolean> = computed(() => this.controls().wakeChoice() ?? false);
 

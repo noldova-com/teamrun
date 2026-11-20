@@ -29,6 +29,7 @@
   line-height: var(--nol-line-label);
 }
 
+.wake-label,
 .wake-toggle,
 .wake-chat,
 .wake-chevron {
@@ -42,6 +43,10 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
+}
+
+.wake-label {
+  cursor: default;
 }
 
 .wake-toggle:hover,
@@ -84,6 +89,17 @@
 .wake-reply-text {
   margin: 0;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.wake-note {
+  margin: 0;
+  padding-inline-start: var(--nol-space-3);
+  border-inline-start: calc(var(--nol-border-width) * 2) solid var(--nol-border);
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-message);
+  line-height: var(--nol-line-message);
   overflow-wrap: anywhere;
   user-select: text;
 }
