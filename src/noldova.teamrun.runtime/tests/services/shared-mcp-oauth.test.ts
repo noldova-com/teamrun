@@ -228,6 +228,22 @@ export class SharedMcpOauthTests {
   }
 
   @TestMethod
+  public async endsWithNoAddressAStartSignedOutWhileItsCallbackListenerOpensAndSendsTheServerNothing(): Promise<void> {
+    await using server = await OauthTestServer.startAsync();
+    const [secrets, saved] = SharedMcpOauthTests.secrets();
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const ends: SharedMcpAccess[] = [];
+
+    const starting = oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => ends.push(t));
+    await oauth.signOutAsync(SharedMcpOauthTests.reference);
+
+    Assert.isNull(await starting);
+    Assert.areEqual("[]", JSON.stringify(server.requests));
+    Assert.areEqual(0, ends.length);
+    Assert.isFalse(saved.has(SharedMcpOauthTests.reference));
+  }
+
+  @TestMethod
   public async endsWithNoAddressAnEarlierStartWhenALaterOneStartsWhileTheEarlierRegisters(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();

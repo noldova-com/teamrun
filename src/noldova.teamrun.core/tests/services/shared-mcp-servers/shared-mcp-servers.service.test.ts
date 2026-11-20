@@ -18,8 +18,8 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity, Resources, SharedMcpAccess, SharedMcpRefusal, type SharedMcpSelection } from "@noldova/teamrun.core";
 import {
   ErrorCode, EventName, Harness, type Provider, ProviderIdParams, SharedMcpAccount, SharedMcpHeader, SharedMcpProviderSetParams, SharedMcpSecretSetParams, SharedMcpServerDefinition,
-  SharedMcpServerIdParams, SharedMcpServerUpdateParams, SharedMcpSetting, SharedMcpTeammateSetParams, SharedMcpTransport, SharedMcpVariableSource,
-  TeammateCreateParams, TeammateIdParams
+  SharedMcpServerIdParams, SharedMcpServerUpdateParams, SharedMcpSetting, type SharedMcpSignInStarted, SharedMcpTeammateSetParams, SharedMcpTransport,
+  SharedMcpVariableSource, TeammateCreateParams, TeammateIdParams
 } from "@noldova/teamrun.protocol";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
@@ -544,6 +544,33 @@ export class SharedMcpServersServiceTests {
   }
 
   @TestMethod
+  public async keepsAServerSignedOutWhoseSignInFinishesWhileItsSignOutSavesAFirstSignInOrASecond(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const first = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+    const second = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("wiki"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(second.id));
+    host.signIns.started[0]?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
+    await SharedMcpServersServiceTests.settleAsync();
+    const finishWhileSigningOutAsync = async (serverId: string): Promise<string | undefined> => {
+      await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(serverId));
+      const running = host.signIns.started.at(-1);
+      const signingOut = host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(serverId));
+      running?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
+      await signingOut;
+      await SharedMcpServersServiceTests.settleAsync();
+      return running?.reference;
+    };
+
+    const firstReference = await finishWhileSigningOutAsync(first.id);
+    const secondReference = await finishWhileSigningOutAsync(second.id);
+    const listed = await host.sharedServers.listAsync();
+
+    Assert.areEqual(JSON.stringify([["docs", null, false], ["wiki", null, false]]),
+      JSON.stringify(listed.map(t => [t.server.definition.name, t.server.signIn, t.signingIn])));
+    Assert.areEqual(JSON.stringify([firstReference, firstReference, secondReference, secondReference]), JSON.stringify(host.signIns.signedOut));
+  }
+
+  @TestMethod
   public async refusesToStartASignInForAServerThatDoesntSignInOrIsUnknown(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.http("docs"));
@@ -647,7 +674,7 @@ export class SharedMcpServersServiceTests {
   }
 
   @TestMethod
-  public async startsTwoSignInsOfAServerTogetherUnderOneReferenceAndKeepsItWaitingWhileOneThatStartedRuns(): Promise<void> {
+  public async startsTwoSignInsOfAServerTogetherUnderOneReferenceAndStopsWaitingOnceALaterStartFails(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
     const other = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("wiki"));
@@ -662,7 +689,48 @@ export class SharedMcpServersServiceTests {
     const [first, second] = host.signIns.started;
     Assert.areEqual(first?.reference, second?.reference);
     Assert.areEqual("The server can't be reached.", refused.message);
-    Assert.areEqual(JSON.stringify([["docs", true], ["wiki", false]]), JSON.stringify(listed.map(t => [t.server.definition.name, t.signingIn])));
+    Assert.areEqual(JSON.stringify([["docs", false], ["wiki", false]]), JSON.stringify(listed.map(t => [t.server.definition.name, t.signingIn])));
+  }
+
+  @TestMethod
+  public async keepsWaitingWhenAnEarlierStartEndsWithNoAddressAndStopsOnceTheLatestEndsWithNoAddressOrFails(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("docs"));
+    const start = (): Promise<SharedMcpSignInStarted> => host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
+    const isWaiting = async (): Promise<boolean | undefined> => (await host.sharedServers.listAsync())[0]?.signingIn;
+    const invalidated = (): number => host.listener.count(EventName.StateInvalidated);
+    host.signIns.isHolding = true;
+
+    const firstHeld = host.signIns.nextHeldAsync();
+    const first = start();
+    const firstStart = await firstHeld;
+    const secondHeld = host.signIns.nextHeldAsync();
+    const second = start();
+    const secondStart = await secondHeld;
+    firstStart.resolve(null);
+    const superseded = await first;
+    const whileTheLatestRuns = await isWaiting();
+    const beforeTheLatestEnds = invalidated();
+    secondStart.resolve(null);
+    const ended = await second;
+    const afterTheLatestEnded = [await isWaiting(), invalidated() - beforeTheLatestEnds];
+    host.signIns.isHolding = false;
+    await start();
+    host.signIns.startRefusal = "The server can't be reached.";
+    const beforeTheLatestFails = invalidated();
+    await Assert.throwsAsync(() => start(), Error);
+    const afterTheLatestFailed = [await isWaiting(), invalidated() - beforeTheLatestFails];
+    host.signIns.startRefusal = null;
+    host.signIns.isHolding = true;
+    const signedOutHeld = host.signIns.nextHeldAsync();
+    const signedOut = start();
+    const signedOutStart = await signedOutHeld;
+    await host.sharedServers.signOutOfAsync(new SharedMcpServerIdParams(server.id));
+    signedOutStart.resolve(null);
+    const afterSignOut = [(await signedOut).url, await isWaiting()];
+
+    Assert.areEqual(JSON.stringify([null, true, null]), JSON.stringify([superseded.url, whileTheLatestRuns, ended.url]));
+    Assert.areEqual(JSON.stringify([[false, 1], [false, 1], [null, false]]), JSON.stringify([afterTheLatestEnded, afterTheLatestFailed, afterSignOut]));
   }
 
   @TestMethod
@@ -700,7 +768,7 @@ export class SharedMcpServersServiceTests {
   }
 
   @TestMethod
-  public async removesTheTokensOfASignInThatEndsAfterItsServersAddressChangedAndKeepsTheServerSignedOut(): Promise<void> {
+  public async endsASignInWhenAnEditMovesItsServersAddressOrStopsItSigningInAndRemovesTheTokensItStillGets(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const server = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("wiki"));
     await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(server.id));
@@ -708,11 +776,23 @@ export class SharedMcpServersServiceTests {
 
     await host.sharedServers.updateAsync(new SharedMcpServerUpdateParams(server.id,
       new SharedMcpServerDefinition("wiki", SharedMcpTransport.Http, null, [], [], "https://wiki.example.org/mcp", [], null, true)));
+    await SharedMcpServersServiceTests.settleAsync();
+    const ended = [[...host.signIns.signedOut], (await host.sharedServers.listAsync())[0]?.signingIn];
     moving?.finished(SharedMcpAccess.granted("access-token-5b2e8d", null));
     await SharedMcpServersServiceTests.settleAsync();
     const [listed] = await host.sharedServers.listAsync();
 
-    Assert.areEqual(JSON.stringify([moving?.reference]), JSON.stringify(host.signIns.signedOut));
+    const other = await host.sharedServers.createAsync(SharedMcpServersServiceTests.signingIn("notes"));
+    await host.sharedServers.startSignInAsync(new SharedMcpServerIdParams(other.id));
+    const isNotesWaiting = async (): Promise<boolean | undefined> => (await host.sharedServers.listAsync()).find(t => t.server.id === other.id)?.signingIn;
+    await host.sharedServers.updateAsync(new SharedMcpServerUpdateParams(other.id, SharedMcpServersServiceTests.signingIn("notes")));
+    const renamed = await isNotesWaiting();
+    await host.sharedServers.updateAsync(new SharedMcpServerUpdateParams(other.id, SharedMcpServersServiceTests.http("notes")));
+    const stopped = await isNotesWaiting();
+
+    Assert.areEqual(JSON.stringify([[moving?.reference], false]), JSON.stringify(ended));
+    Assert.areEqual(JSON.stringify([true, false]), JSON.stringify([renamed, stopped]));
+    Assert.areEqual(JSON.stringify([moving?.reference, moving?.reference, host.signIns.started.at(-1)?.reference]), JSON.stringify(host.signIns.signedOut));
     Assert.areEqual(JSON.stringify(["https://wiki.example.org/mcp", null, false]),
       JSON.stringify([listed?.server.definition.url, listed?.server.signIn, listed?.signingIn]));
   }

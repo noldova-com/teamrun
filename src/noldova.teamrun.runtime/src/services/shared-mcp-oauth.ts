@@ -51,20 +51,27 @@ export class SharedMcpOauth implements ISharedMcpSignIn {
         this.attempts.delete(reference);
     });
 
+    const server = createServer();
+    const port = await SharedMcpOauth.listenAsync(server);
+    if (!isLive) {
+      SharedMcpOauth.close(server);
+      return null;
+    }
     let challenge: ISharedMcpChallenge;
     try {
       challenge = await SharedMcpOauth.challengeAsync(url, this.deadline());
     }
     catch (error) {
+      SharedMcpOauth.close(server);
       ended.resolve(null);
       if (!isLive)
         return null;
       throw error;
     }
-    if (!isLive)
+    if (!isLive) {
+      SharedMcpOauth.close(server);
       return null;
-    const server = createServer();
-    const port = await SharedMcpOauth.listenAsync(server);
+    }
     const flow = new SharedMcpOauthFlow(Resources.formatSharedMcpRedirectUrl(port), randomBytes(Resources.sharedMcpStateBytes).toString(Resources.hexEncoding));
     try {
       await auth(flow, this.optionsOf(url, challenge, null));

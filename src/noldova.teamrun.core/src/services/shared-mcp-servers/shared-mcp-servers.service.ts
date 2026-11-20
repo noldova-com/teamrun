@@ -23,6 +23,7 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { ILog } from "../../interfaces/i-log.js";
 import type { IProvidersService } from "../../interfaces/i-providers.service.js";
 import type { ISharedMcpAccounts } from "../../interfaces/i-shared-mcp-accounts.js";
+import type { ISharedMcpPendingSignIn } from "../../interfaces/i-shared-mcp-pending-sign-in.js";
 import type { ISharedMcpSecrets } from "../../interfaces/i-shared-mcp-secrets.js";
 import type { ISharedMcpServersService } from "../../interfaces/i-shared-mcp-servers.service.js";
 import type { ISharedMcpSignIn } from "../../interfaces/i-shared-mcp-sign-in.js";
@@ -47,7 +48,7 @@ export class SharedMcpServersService implements ISharedMcpServersService {
   private readonly accounts: ISharedMcpAccounts;
   private readonly events: IEventSink | null;
   private readonly log: ILog | null;
-  private readonly signingIn: Map<string, { reference: string; starts: number; ended: boolean }> = new Map();
+  private readonly signingIn: Map<string, ISharedMcpPendingSignIn> = new Map();
 
   public constructor(context: DatabaseContext, providers: IProvidersService, teammates: ITeammatesService, registry: ProviderKindRegistry,
     readEnvironment: () => Promise<Readonly<Record<string, string | undefined>>>, secrets: ISharedMcpSecrets, signIns: ISharedMcpSignIn,
@@ -93,18 +94,23 @@ export class SharedMcpServersService implements ISharedMcpServersService {
   }
 
   public async updateAsync(params: SharedMcpServerUpdateParams): Promise<SharedMcpServer> {
-    const [current, updated] = await this.context.database.connection.runInTransactionAsync(async transaction => {
+    const [current, updated, pending] = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const current = await this.requireAsync(params.serverId, transaction);
       await this.requireUniqueNameAsync(params.definition.name, current.id, transaction);
-      return [current, await this.saveAsync(await this.keptAsync(current, params.definition, new Date().toISOString(), transaction), transaction)] as const;
+      const updated = await this.saveAsync(await this.keptAsync(current, params.definition, new Date().toISOString(), transaction), transaction);
+      const pending = this.signingIn.get(current.id);
+      if (!Object.isUndefined(pending) && (!updated.definition.signsIn || updated.definition.url !== current.definition.url))
+        pending.ended = true;
+      return [current, updated, pending] as const;
     });
     this.forget(current.secrets.filter(t => Object.isNull(updated.referenceOf(t.variable))));
-    if (updated.signIn?.reference !== current.signIn?.reference)
-      this.signOut(current);
+    if (updated.signIn?.reference !== current.signIn?.reference || pending?.ended === true)
+      this.signOut(current, pending);
     return updated;
   }
 
   public async deleteAsync(params: SharedMcpServerIdParams): Promise<void> {
+    const pending = this.endSignIn(params.serverId);
     const server = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const server = await this.requireAsync(params.serverId, transaction);
       await transaction.executeAsync(new SqlQuery(Resources.deleteSharedMcpServer, [server.id]));
@@ -112,7 +118,7 @@ export class SharedMcpServersService implements ISharedMcpServersService {
       return server;
     });
     this.forget(server.secrets);
-    this.signOut(server);
+    this.signOut(server, pending);
   }
 
   public async setProviderAsync(params: SharedMcpProviderSetParams): Promise<SharedMcpServer> {
@@ -164,32 +170,33 @@ export class SharedMcpServersService implements ISharedMcpServersService {
     if (!server.definition.signsIn || Object.isNull(url))
       throw new ServiceException(ErrorCode.InvalidParams, Resources.formatSharedMcpServerDoesntSignIn(server.definition.name), [server.id]);
     const pending = this.signingIn.get(server.id) ?? { reference: server.signIn?.reference
-      ?? `${Resources.sharedMcpSignInReferencePrefix}${Guid.newGuid().toString().replaceAll(Resources.guidGroupSeparator, String.empty)}`, starts: 0, ended: false };
-    const reference = pending.reference;
-    pending.starts += 1;
+      ?? `${Resources.sharedMcpSignInReferencePrefix}${Guid.newGuid().toString().replaceAll(Resources.guidGroupSeparator, String.empty)}`, latest: 0, ended: false };
+    const start = ++pending.latest;
     this.signingIn.set(server.id, pending);
     let address: string | null;
     try {
-      address = await this.signIns.startAsync(url, reference, access => void this.finishAsync(server, url, pending, access));
+      address = await this.signIns.startAsync(url, pending.reference, access => void this.finishAsync(server, url, pending, access));
     }
     catch (error) {
-      pending.starts -= 1;
-      if (pending.starts === 0 && this.signingIn.get(server.id) === pending)
-        this.signingIn.delete(server.id);
+      this.dropStart(server.id, pending, start);
       throw error;
     }
-    this.events?.publish(new Event(EventName.StateInvalidated, null));
+    if (Object.isNull(address))
+      this.dropStart(server.id, pending, start);
+    else
+      this.events?.publish(new Event(EventName.StateInvalidated, null));
     return new SharedMcpSignInStarted(address);
   }
 
   public async signOutOfAsync(params: SharedMcpServerIdParams): Promise<SharedMcpServer> {
+    const pending = this.endSignIn(params.serverId);
     const [server, saved] = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const server = await this.requireAsync(params.serverId, transaction);
       const kept = await this.keptAsync(server, server.definition, new Date().toISOString(), transaction);
       const signedOut = new SharedMcpServer(kept.id, kept.definition, kept.providerIds, kept.teammates, kept.createdAt, kept.updatedAt, kept.secrets);
       return [server, await this.saveAsync(signedOut, transaction)] as const;
     });
-    this.signOut(server);
+    this.signOut(server, pending);
     return saved;
   }
 
@@ -354,17 +361,12 @@ export class SharedMcpServersService implements ISharedMcpServersService {
     });
   }
 
-  private async finishAsync(started: SharedMcpServer, url: string, pending: { reference: string; ended: boolean }, access: SharedMcpAccess): Promise<void> {
+  private async finishAsync(started: SharedMcpServer, url: string, pending: ISharedMcpPendingSignIn, access: SharedMcpAccess): Promise<void> {
     const reference = pending.reference;
-    if (pending.ended) {
-      this.signOut(SharedMcpServersService.signedIn(started, reference, access), pending);
-      this.events?.publish(new Event(EventName.StateInvalidated, null));
-      return;
-    }
-    if (this.signingIn.get(started.id) === pending)
-      this.signingIn.delete(started.id);
     try {
       const kept = await this.context.database.connection.runInTransactionAsync(async transaction => {
+        if (pending.ended)
+          return false;
         const server = await this.findAsync(started.id, transaction);
         if (Object.isNull(server) || !server.definition.signsIn || server.definition.url !== url)
           return false;
@@ -378,10 +380,26 @@ export class SharedMcpServersService implements ISharedMcpServersService {
     catch (error) {
       this.log?.write(Resources.formatSharedMcpSignInUnsaved(started.definition.name, SharedMcpServersService.describe(error)));
     }
+    if (this.signingIn.get(started.id) === pending)
+      this.signingIn.delete(started.id);
     this.events?.publish(new Event(EventName.StateInvalidated, null));
   }
 
-  private signOut(server: SharedMcpServer, pending: { reference: string; ended: boolean } | undefined = this.signingIn.get(server.id)): void {
+  private endSignIn(serverId: string): ISharedMcpPendingSignIn | undefined {
+    const pending = this.signingIn.get(serverId);
+    if (!Object.isUndefined(pending))
+      pending.ended = true;
+    return pending;
+  }
+
+  private dropStart(serverId: string, pending: ISharedMcpPendingSignIn, start: number): void {
+    if (pending.latest !== start || this.signingIn.get(serverId) !== pending)
+      return;
+    this.signingIn.delete(serverId);
+    this.events?.publish(new Event(EventName.StateInvalidated, null));
+  }
+
+  private signOut(server: SharedMcpServer, pending: ISharedMcpPendingSignIn | undefined = this.signingIn.get(server.id)): void {
     if (!Object.isUndefined(pending)) {
       pending.ended = true;
       if (this.signingIn.get(server.id) === pending)
