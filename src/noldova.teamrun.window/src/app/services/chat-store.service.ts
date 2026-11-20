@@ -729,6 +729,11 @@ export class ChatStoreService {
     };
   }
 
+  public messageControlsOf(conversationId: string, messageId: string): MessageControlState | null {
+    this.windowOf(conversationId)?.index();
+    return this.messageIndexes.get(conversationId)?.find(messageId)?.controls ?? null;
+  }
+
   public rememberMessageControls(messageId: string, controls: MessageControlState, conversationId: string | null = this.selectedConversationId()): void {
     const entry = Object.isNull(conversationId) ? null : this.messageIndexes.get(conversationId)?.find(messageId) ?? null;
     if (!Object.isNull(entry))

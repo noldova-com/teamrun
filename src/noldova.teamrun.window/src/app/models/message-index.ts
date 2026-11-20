@@ -13,16 +13,18 @@ import { MessageIndexEntry } from "./message-index-entry";
 
 export class MessageIndex {
   private readonly byId: Map<string, MessageIndexEntry>;
+  private readonly kept: Map<string, MessageIndexEntry>;
 
   public entries: readonly MessageIndexEntry[];
 
   public constructor() {
     this.byId = new Map();
+    this.kept = new Map();
     this.entries = [];
   }
 
   public find(id: string): MessageIndexEntry | null {
-    return this.byId.get(id) ?? null;
+    return this.byId.get(id) ?? this.kept.get(id) ?? null;
   }
 
   public rememberPage(page: MessagePage): void {
@@ -31,32 +33,49 @@ export class MessageIndex {
     const start = this.entries[0]?.sequence;
     const end = this.entries.at(-1)?.sequence;
     if (Object.isUndefined(first) || Object.isUndefined(last)
-      || (!Object.isUndefined(start) && last + 1 < start) || (!Object.isUndefined(end) && first > end + 1))
+      || (!Object.isUndefined(start) && last + 1 < start) || (!Object.isUndefined(end) && first > end + 1)) {
+      for (const entry of this.byId.values())
+        if (!Object.isNull(entry.controls))
+          this.kept.set(entry.id, entry);
       this.byId.clear();
+    }
+    if (Object.isUndefined(first) || Object.isUndefined(last))
+      this.kept.clear();
     const ids = new Set(page.messages.map(t => t.id));
-    for (const entry of this.byId.values())
+    for (const entry of [...this.byId.values(), ...this.kept.values()])
       if ((!Object.isUndefined(first) && !Object.isUndefined(last) && entry.sequence >= first && entry.sequence <= last && !ids.has(entry.id))
         || (!page.hasEarlier && !Object.isUndefined(first) && entry.sequence < first)
         || (!page.hasLater && !Object.isUndefined(last) && entry.sequence > last))
-        this.byId.delete(entry.id);
+        this.forget(entry.id);
     for (const message of page.messages)
-      if (!this.byId.has(message.id))
-        this.byId.set(message.id, new MessageIndexEntry(message.id, message.sequence));
+      this.add(message);
     this.publish();
   }
 
   public rememberMessage(message: Message): void {
     if (this.byId.has(message.id))
       return;
-    this.byId.set(message.id, new MessageIndexEntry(message.id, message.sequence));
+    this.add(message);
     this.publish();
   }
 
   public removeFrom(sequence: number): void {
-    for (const entry of this.byId.values())
+    for (const entry of [...this.byId.values(), ...this.kept.values()])
       if (entry.sequence >= sequence)
-        this.byId.delete(entry.id);
+        this.forget(entry.id);
     this.publish();
+  }
+
+  private add(message: Message): void {
+    if (this.byId.has(message.id))
+      return;
+    this.byId.set(message.id, this.kept.get(message.id) ?? new MessageIndexEntry(message.id, message.sequence));
+    this.kept.delete(message.id);
+  }
+
+  private forget(id: string): void {
+    this.byId.delete(id);
+    this.kept.delete(id);
   }
 
   private publish(): void {

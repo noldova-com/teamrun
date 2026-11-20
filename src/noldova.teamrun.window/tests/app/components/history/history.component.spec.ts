@@ -1634,6 +1634,50 @@ describe("HistoryComponent", () => {
     expect(draft()).toBeNull();
   });
 
+  it("keeps a pending question's pick and typed text through a far jump and back, and forgets them once the question closes while it's far away", { timeout: 3 * revealLimit }, async () => {
+    const asking = new Approval("q1", "m5000", ApprovalKind.Question, "AskUserQuestion", "Which platform?", null, SampleData.approval.options, ApprovalStatus.Pending, null,
+      SampleData.timestamp, null, [new ApprovalQuestion("platform", "Platform", "Which platform?", [new QuestionOption("Web", "A browser")], false, false, false),
+        new ApprovalQuestion("name", "Name", "Which name?", [], false, true, false)]);
+    const reply = new Message("m5000", "c1", 5_000, MessageAuthor.Provider, "m4999", MessageStatus.AwaitingApproval, [SampleData.detail(0, DetailKind.Text, "Message 5000")],
+      SampleData.provenance, SampleData.timestamp, SampleData.timestamp, null);
+    const card = (): Element | null => rowOf(5_000)?.querySelector("nol-teamrun-question-card") ?? null;
+    const field = (selector: string): HTMLInputElement => {
+      const found = card()?.querySelector<HTMLInputElement>(selector);
+      if (Object.isNullOrUndefined(found))
+        throw new Error(`The question card has no ${selector}.`);
+      return found;
+    };
+    const draft = (): unknown => store().messageControlsOf("c1", "m5000")?.draftOf("q1") ?? null;
+    const farAway = async (): Promise<void> => {
+      list().reveal(4_000, VirtualListAlign.Start);
+      await until(() => expect(rowOf(4_000)).toBeDefined(), { timeout: revealLimit });
+      await until(() => expect([store().messageIndex().some(t => t.id === "m5000"), rowOf(5_000)]).toEqual([false, undefined]), { timeout: revealLimit });
+    };
+    await open("c1");
+    await until(() => expect(rowOf(4_999)).toBeDefined());
+    arrived.push(reply);
+    context.emit(EventName.MessageCreated, reply.toJson());
+    await until(() => expect(rowOf(5_000)).toBeDefined());
+    context.emit(EventName.ApprovalCreated, asking.toJson());
+    await until(() => expect(card()).not.toBeNull());
+
+    field(".nol-choice-row input").click();
+    Object.assign(field(".nol-teamrun-question-other"), { value: "Atlas" }).dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    await farAway();
+    expect(draft()).not.toBeNull();
+    list().reveal(5_000, VirtualListAlign.Start);
+    await until(() => expect(card()).not.toBeNull(), { timeout: revealLimit });
+    await settle();
+    expect([field(".nol-choice-row input").checked, field(".nol-teamrun-question-other").value]).toEqual([true, "Atlas"]);
+
+    await farAway();
+    expect(draft()).not.toBeNull();
+    context.emit(EventName.ApprovalUpdated, asking.withCancellation(SampleData.timestamp).toJson());
+    await fixture.whenStable();
+    expect(draft()).toBeNull();
+  });
+
   it("asks for the first message in the messages' column, its first 18px line 2rem down, while its conversation has none, and shows the first that comes", async () => {
     fixture.componentRef.setInput("chatId", "c3");
     await open("c3");
