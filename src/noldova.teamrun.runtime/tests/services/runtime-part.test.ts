@@ -90,6 +90,7 @@ import {
   Conversation,
   ConversationResponder,
   ConversationResponderParams,
+  ConversationRewindParams,
   ConversationRewindResult,
   DataFolder,
   DefaultTeammate,
@@ -141,7 +142,8 @@ import {
   Resources as RuntimeResources,
   RuntimePart,
   RuntimePartException,
-  RuntimeToolSession
+  RuntimeToolSession,
+  WorkingMethod
 } from "@noldova/teamrun.runtime";
 
 import { AnsweringAsker } from "../fixtures/answering-asker.fixture.js";
@@ -577,6 +579,135 @@ export class RuntimePartTests {
     Assert.areEqual("A chat is rewinding.", during.join(","));
     Assert.areEqual("m1", rewound.removedMessageIds.join(","));
     Assert.areEqual(0, context.openWork.size);
+  }
+
+  @TestMethod
+  @TestData(false)
+  @TestData(true)
+  public async stopsTheFolderSweepFirstOnQuitAndWaitsForItToEndBeforeClosingTheDatabaseEvenWhenAnEarlierCloseFails(closeFails: boolean): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    const steps: string[] = [];
+    const sweep = ConversationEngine.prototype.sweepFoldersAsync;
+    const shutdown = ConversationEngine.prototype.shutdown;
+    const close = McpHttpEndpoint.prototype.closeAsync;
+    const dispose = DatabaseContext.prototype[Symbol.asyncDispose];
+    let engineDown = (): void => undefined;
+    const shutDown = new Promise<void>(resolve => {
+      engineDown = resolve;
+    });
+    ConversationEngine.prototype.sweepFoldersAsync = (signal: AbortSignal): Promise<void> => new Promise(resolve => {
+      signal.addEventListener("abort", () => {
+        steps.push("sweep stopped");
+        void (closeFails ? Promise.resolve() : shutDown).then(() => setImmediate(() => {
+          steps.push("sweep ended");
+          resolve();
+        }));
+      }, { once: true });
+    });
+    ConversationEngine.prototype.shutdown = function (this: ConversationEngine): Promise<void> {
+      steps.push("engine shut down");
+      engineDown();
+      return shutdown.call(this);
+    };
+    McpHttpEndpoint.prototype.closeAsync = async function (this: McpHttpEndpoint): Promise<void> {
+      await close.call(this);
+      if (closeFails)
+        throw new Error("The endpoint didn't close.");
+    };
+    DatabaseContext.prototype[Symbol.asyncDispose] = function (this: DatabaseContext): Promise<void> {
+      steps.push("database closed");
+      return dispose.call(this);
+    };
+
+    let failure: unknown = null;
+    try {
+      await part.activateAsync(context);
+      failure = await part.deactivateAsync().then(() => null, (error: unknown) => error);
+    }
+    finally {
+      ConversationEngine.prototype.sweepFoldersAsync = sweep;
+      ConversationEngine.prototype.shutdown = shutdown;
+      McpHttpEndpoint.prototype.closeAsync = close;
+      DatabaseContext.prototype[Symbol.asyncDispose] = dispose;
+    }
+
+    Assert.areEqual(closeFails ? "The endpoint didn't close." : "null", failure instanceof Error ? failure.message : String(failure));
+    Assert.areEqual(closeFails ? "sweep stopped,sweep ended,database closed" : "sweep stopped,engine shut down,sweep ended,database closed", steps.join(","));
+  }
+
+  @TestMethod
+  public async refusesARewindOrMoveStartedWhileQuittingWaitsForARunningRewindAndClosesTheDatabaseOnlyOnceThatOneEnds(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    await part.activateAsync(context);
+    const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
+    const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const other = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const now = new Date().toISOString();
+    {
+      await using seeding = DatabaseContext.attach(new DbContextOptionsBuilder().use(new ModuleDatabaseProvider(database), new DataSource("seeding", directory.path)), directory.path);
+      await new MessagesService(seeding).insertAsync(new Message("m1", chat.id, 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, now, null, now));
+      await new MessagesService(seeding).insertAsync(new Message("m2", other.id, 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, now, null, now));
+    }
+    const steps: string[] = [];
+    const held = Promise.withResolvers<void>();
+    const quit = Promise.withResolvers<void>();
+    const waiting = Promise.withResolvers<void>();
+    const rewind = ConversationEngine.prototype.rewindAsync;
+    const whenIdle = WorkingMethod.prototype.whenIdle;
+    const dispose = DatabaseContext.prototype[Symbol.asyncDispose];
+    let rewinds = 0;
+    ConversationEngine.prototype.rewindAsync = async function (this: ConversationEngine, params: ConversationRewindParams): Promise<ConversationRewindResult> {
+      const index = ++rewinds;
+      await (index === 1 ? held.promise : quit.promise);
+      try {
+        return await rewind.call(this, params);
+      }
+      finally {
+        steps.push(`rewind ${index} ended`);
+      }
+    };
+    WorkingMethod.prototype.whenIdle = function (this: WorkingMethod): Promise<void> {
+      const idle = whenIdle.call(this);
+      waiting.resolve();
+      return idle;
+    };
+    DatabaseContext.prototype[Symbol.asyncDispose] = function (this: DatabaseContext): Promise<void> {
+      steps.push("database closed");
+      return dispose.call(this);
+    };
+
+    try {
+      const rewinding = RuntimePartTests.callAsync(context, "teamrun.conversationRewind", { chatId: chat.id, messageId: "m1", restoreFiles: true });
+      const quitting = part.deactivateAsync();
+      await waiting.promise;
+      const refused = [
+        RuntimePartTests.callAsync(context, "teamrun.conversationRewind", { chatId: other.id, messageId: "m2", restoreFiles: true }),
+        RuntimePartTests.callAsync(context, "teamrun.conversationMove", { chatId: other.id, projectId: null })
+      ].map(t => t.then(() => null, (error: unknown) => error));
+      held.resolve();
+      const rewound = await rewinding as { removedMessageIds: readonly string[] };
+      await quitting;
+      quit.resolve();
+      const codes = (await Promise.all(refused)).map(t => t instanceof MethodFailureException ? t.failure.code : String(t));
+
+      Assert.areEqual("rewind 1 ended,database closed", steps.join(","));
+      Assert.areEqual(`${FailureCode.Unavailable},${FailureCode.Unavailable}`, codes.join(","));
+      Assert.areEqual("m1", rewound.removedMessageIds.join(","));
+      Assert.areEqual(0, context.openWork.size);
+    }
+    finally {
+      ConversationEngine.prototype.rewindAsync = rewind;
+      WorkingMethod.prototype.whenIdle = whenIdle;
+      DatabaseContext.prototype[Symbol.asyncDispose] = dispose;
+    }
   }
 
   @TestMethod

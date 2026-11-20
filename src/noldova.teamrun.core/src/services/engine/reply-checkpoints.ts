@@ -79,8 +79,8 @@ export class ReplyCheckpoints {
       : CheckpointRestore.refused(Resources.formatRestoreRefusal(restored.outcome.value));
   }
 
-  public async deleteAsync(folder: WorkFolder): Promise<boolean> {
-    const deleted = await this.service.deleteFolderAsync(new DeleteFolderRequest(ReplyCheckpoints.referenceOf(folder)));
+  public async deleteAsync(folder: WorkFolder, signal?: AbortSignal): Promise<boolean> {
+    const deleted = await this.service.deleteFolderAsync(new DeleteFolderRequest(ReplyCheckpoints.referenceOf(folder)), signal);
     return deleted.outcome.value === Resources.checkpointsDeleted;
   }
 

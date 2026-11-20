@@ -134,6 +134,8 @@ export class RuntimePart implements IRuntimePart {
   private failures: ReplyFailureNotices | null = null;
   private planUsage: PlanUsageService | null = null;
   private awaited: WorkingMethod[] = [];
+  private sweepStop: AbortController | null = null;
+  private sweeping: Promise<void> = Promise.resolve();
   private answerer: Registration | null = null;
   private sessionStops: Registration | null = null;
   private subscriptions: EventSubscription[] = [];
@@ -162,6 +164,9 @@ export class RuntimePart implements IRuntimePart {
   }
 
   public async deactivateAsync(): Promise<void> {
+    this.sweepStop?.abort();
+    for (const method of this.awaited)
+      method.close();
     this.answerer?.[Symbol.dispose]();
     this.answerer = null;
     this.sessionStops?.[Symbol.dispose]();
@@ -191,6 +196,7 @@ export class RuntimePart implements IRuntimePart {
     }
     finally {
       try {
+        await this.sweeping;
         await this.tasks?.closeAsync();
       }
       finally {
@@ -203,6 +209,8 @@ export class RuntimePart implements IRuntimePart {
           this.engine = null;
           this.registry = null;
           this.awaited = [];
+          this.sweepStop = null;
+          this.sweeping = Promise.resolve();
         }
       }
     }
@@ -271,7 +279,9 @@ export class RuntimePart implements IRuntimePart {
     await pages.sweepAsync();
     this.pages = pages;
     await pages.serveAsync(context, new NodeTimer());
-    void engine.sweepFoldersAsync();
+    const sweepStop = new AbortController();
+    this.sweepStop = sweepStop;
+    this.sweeping = engine.sweepFoldersAsync(sweepStop.signal);
     const folder = new DataFolder(context.moduleFolder, join(context.moduleFolder, Resources.formatDatabaseFileName(context.moduleId)));
     const apps = new RuntimeAppDescriptions(() => context.findService(Resources.computerUseAppsService, RuntimeAppDescriptions.isApps));
     const grants = Object.isNull(this.answerer) ? null

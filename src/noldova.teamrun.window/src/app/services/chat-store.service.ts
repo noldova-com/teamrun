@@ -1578,7 +1578,8 @@ export class ChatStoreService {
   public async startSharedMcpSignIn(serverId: string, gesture: LinkGesture, report: (message: string) => void): Promise<boolean> {
     return this.perform(async () => {
       const started = SharedMcpSignInStarted.fromJson(await this.request(MethodName.SharedMcpSignInStart, new SharedMcpServerIdParams(serverId).toJson()));
-      await this.context.openLinkAsync(started.url, { gesture, place: LinkPlace.System });
+      if (!Object.isNull(started.url))
+        await this.context.openLinkAsync(started.url, { gesture, place: LinkPlace.System });
     }, report);
   }
 
@@ -2030,9 +2031,12 @@ export class ChatStoreService {
       case EventName.ReplyCheckpointEnded:
         this.stopSavingCheckpoint(MessageIdParams.fromJson(event.payload).messageId);
         break;
-      case EventName.WaitingMessagesChanged:
-        this.setWaiting(WaitingMessagesPayload.fromJson(event.payload));
+      case EventName.WaitingMessagesChanged: {
+        const payload = WaitingMessagesPayload.fromJson(event.payload);
+        this.captureEvent(event, JSON.stringify([EventName.WaitingMessagesChanged, payload.chatId]));
+        this.setWaiting(payload);
         break;
+      }
       case EventName.ApprovalCreated:
       case EventName.ApprovalUpdated: {
         const approval = Approval.fromJson(event.payload);
@@ -2158,7 +2162,14 @@ export class ChatStoreService {
   }
 
   private async loadWaiting(conversationId: string): Promise<void> {
-    this.setWaiting(WaitingMessagesPayload.fromJson(await this.request(MethodName.WaitingMessageList, new ChatIdParams(conversationId).toJson())));
+    const events = this.beginSnapshot();
+    try {
+      this.setWaiting(WaitingMessagesPayload.fromJson(await this.request(MethodName.WaitingMessageList, new ChatIdParams(conversationId).toJson())));
+      this.replaySnapshot(events);
+    }
+    finally {
+      this.snapshots.delete(events);
+    }
   }
 
   private setWaiting(payload: WaitingMessagesPayload): void {

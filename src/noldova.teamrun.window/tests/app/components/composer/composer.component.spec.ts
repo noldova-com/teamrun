@@ -3037,6 +3037,67 @@ describe("ComposerComponent", () => {
       expect([edited(), added()]).toEqual([[], ["Steer:c1:first, changed"]]);
     });
 
+    it("ends an edit when the composer shows another chat, so a message typed back in its chat goes as a new one and the waiting one keeps its text", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      await key("ArrowUp");
+      await type("first, changed");
+
+      fixture.componentRef.setInput("conversationId", "c2");
+      await Wait.until(() => expect(box().value).toBe(""));
+      fixture.componentRef.setInput("conversationId", "c1");
+      await fixture.whenStable();
+      const back = [editingNote(), box().value];
+      await write("then the docs");
+
+      expect(back).toEqual([undefined, ""]);
+      expect([edited(), added()]).toEqual([[], ["Steer:c1:then the docs"]]);
+    });
+
+    it("ends an edit when a draft save refused as stale shows the other window's draft, and leaves the waiting message's text as it was", async () => {
+      const held = new DeferredResponse();
+      await running();
+      await listed(waiting("w1", "first"));
+      context.answer(MethodName.DraftSave, () => held.promise.then(() => {
+        throw Object.assign(new Error("The draft changed."), { code: ErrorCode.Conflict, details: { error: ErrorCode.Conflict, arguments: ["c1"] } });
+      })).answer(MethodName.DraftRead, () => new Draft("c1", "from the other window", [], [], 4, SampleData.timestamp).toJson());
+      await type("an aside");
+      const saving = [...context.saves].at(-1)?.();
+      await Wait.until(() => expect(context.count(MethodName.DraftSave)).toBe(1));
+      await type("");
+      await key("ArrowUp");
+      await type("first, changed");
+      const edit = editingNote();
+
+      held.resolve(null);
+      await saving;
+      await Wait.until(() => expect(box().value).toBe("from the other window"));
+      await key("Enter");
+
+      expect([edit, editingNote(), edited()]).toEqual([Resources.editingWaitingNote, undefined, []]);
+      expect(added()).toEqual(["Steer:c1:from the other window"]);
+    });
+
+    it("ends an edit when the composer takes a rewound message, so Enter sends the rewound text as a new message", async () => {
+      await running();
+      await listed(waiting("w1", "first"));
+      context.answer(MethodName.ConversationRewind, () => new ConversationRewindResult(SampleData.conversation, [], null).toJson());
+      await key("ArrowUp");
+      await type("first, changed");
+
+      await ChatStoreService.of(context).rewind(SampleData.userMessage, false);
+      await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
+      document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
+      await fixture.whenStable();
+      const rewound = box().value;
+      const taken = editingNote();
+      await key("Enter");
+
+      expect([taken, rewound === "first, changed", rewound.length > 0]).toEqual([undefined, false, true]);
+      expect(edited()).toEqual([]);
+      expect([...added().map(t => t.split(":").slice(2).join(":")), ...sent().slice(1).map(t => t.text)]).toEqual([rewound]);
+    });
+
     it("keeps the text of an edit out of the chat's unsent message, saving nothing for it on a save, after Escape or as the tab closes", async () => {
       await running();
       await listed(waiting("w1", "And run the linter after that"));
