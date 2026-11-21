@@ -10,7 +10,7 @@ import { Component, ElementRef, computed, effect, inject, type InputSignal, inpu
 
 import { type Department, type Teammate, type TeammateLastReply, TeammateUpdateParams } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
-  MeterComponent, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+  MeterComponent, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
@@ -45,6 +45,7 @@ export class OrganizationCardComponent {
   private readonly statuses: TeammateStatusStoreService = inject(TeammateStatusStoreService);
   private readonly clock: ClockService = inject(ClockService);
   private readonly time: WritableSignal<number> = signal(this.clock.now());
+  private readonly details: PopoverTriggerDirective | null = inject(PopoverTriggerDirective, { self: true, optional: true });
   private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("nameField", { read: ElementRef });
 
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
@@ -107,6 +108,10 @@ export class OrganizationCardComponent {
     }
     if (!await this.store.updateTeammate(teammate.id, params, message => this.organization.fail(message)))
       field.value = this.teammate().name;
+  }
+
+  protected closeDetails(): void {
+    this.details?.close();
   }
 
   protected move(departmentId: string): void {

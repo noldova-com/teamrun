@@ -10,7 +10,8 @@ import { Component, ElementRef, computed, inject, type InputSignal, input, type 
 
 import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
-  MenuTriggerDirective, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+  MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent }
+  from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { ConfirmRequest } from "../../models/confirm-request";
@@ -21,11 +22,12 @@ import { OrganizationStoreService } from "../../services/organization-store.serv
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
+import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 
 @Component({
   selector: "nol-teamrun-organization-department",
   imports: [ButtonComponent, CanvasItemDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
-    OrganizationCardComponent, SelectComponent, TextFieldComponent],
+    OrganizationCardComponent, OrganizationDetailsComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { class: "nol-teamrun-organization-department" },
   templateUrl: "./organization-department.component.html",
@@ -44,6 +46,9 @@ export class OrganizationDepartmentComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
+  protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
+  protected readonly detailsSide: OverlaySide = OverlaySide.below;
+  protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
   protected readonly isOpen: Signal<boolean> = computed(() => !this.layout.layout().isCollapsed(this.node().department.id));
   protected readonly summary: Signal<string> = computed(() => {
     const node = this.node();
