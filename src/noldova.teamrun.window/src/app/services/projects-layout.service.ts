@@ -34,6 +34,7 @@ export class ProjectsLayoutService {
   private edits: number = 0;
   private received: number = 0;
   private saving: number = 0;
+  private missed: ProjectsLayout | null = null;
   private saved: Promise<void> = Promise.resolve();
 
   public readonly layout: Signal<ProjectsLayout> = this.current.asReadonly();
@@ -48,6 +49,8 @@ export class ProjectsLayoutService {
         this.latest = ProjectsLayout.fromJson(t);
         if (this.saving === 0)
           this.current.set(this.held.reduce((layout, change) => change(layout), this.latest));
+        else
+          this.missed = this.latest;
       }),
       EngineResync.on(context, () => void this.load())
     ];
@@ -116,7 +119,7 @@ export class ProjectsLayoutService {
     else if (Object.isNull(kept) && !Object.isNull(this.stored)) {
       const moved = await this.save(this.stored.toJson(), true);
       if (!Object.isUndefined(moved)) {
-        base = ProjectsLayout.fromJson(moved);
+        base = this.latest ?? ProjectsLayout.fromJson(moved);
         ProjectsLayoutService.removeStored();
       }
     }
@@ -143,9 +146,18 @@ export class ProjectsLayoutService {
     this.saving++;
     const done = this.saved.then(() => this.request(MethodName.ProjectsLayoutSave, new ProjectsLayoutSaveParams(layout, onlyIfNone).toJson()))
       .catch(() => undefined)
-      .finally(() => this.saving--);
+      .finally(() => this.settle());
     this.saved = done.then(() => undefined);
     return done;
+  }
+
+  private settle(): void {
+    this.saving--;
+    const missed = this.missed;
+    if (this.saving > 0 || Object.isNull(missed))
+      return;
+    this.missed = null;
+    this.current.set(this.held.reduce((layout, change) => change(layout), missed));
   }
 
   private request(method: MethodName, parameters: JsonValue): Promise<JsonValue> {

@@ -3260,6 +3260,20 @@ describe("ComposerComponent", () => {
       expect([edited(), editingNote()]).toEqual([["w1:first, changed:0"], undefined]);
     });
 
+    it("saves an edit with the teammates its new text mentions, not the ones the message first named", async () => {
+      new TeammateFixture(context);
+      await running();
+      await listed(new WaitingMessage("w1", MessageDelivery.Queue,
+        new MessageSendParams("c1", "@Bob check X", SampleData.provenance.requested, "a1", [], ["bob"]), SampleData.timestamp));
+      await key("ArrowUp");
+
+      await write("@Alice check X");
+
+      await Wait.until(() => expect(edited()).toEqual(["w1:@Alice check X:0"]));
+      const params = WaitingMessageEditParams.fromJson(context.parametersOf(MethodName.WaitingMessageEdit));
+      expect(params.message.mentionedTeammateIds).toEqual(["alice"]);
+    });
+
     it("keeps an edit open when its save fails, so the next Enter tries the edit again and sends no new message", async () => {
       await running();
       await listed(waiting("w1", "first"));
@@ -4852,21 +4866,40 @@ describe("ComposerComponent", () => {
       expect(box().value).toBe("hello");
     });
 
-    it("says when the unsent message could not be read, and keeps nothing written there over it", async () => {
+    it("says when the unsent message could not be read, saves nothing written there over it while it still can't be read, and saves it once it can", async () => {
+      let readable = false;
       context.answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c1"
-        ? Promise.reject(new Error("unreadable")) : Promise.reject("offline"));
+        ? readable ? null : Promise.reject(new Error("unreadable")) : Promise.reject("offline"));
       await prepare();
       await render();
 
       expect(alert()).toBe(Resources.formatDraftUnreadable("unreadable"));
       expect(box().readOnly).toBe(false);
       await type("hello");
-      await saveStep()();
+      await expect(saveStep()()).rejects.toThrow(Resources.draftNotSaved);
       expect(context.count(MethodName.DraftSave)).toBe(0);
+      readable = true;
+      await saveStep()();
+      expect(saves().map(t => t.text)).toEqual(["hello"]);
 
       fixture.componentRef.setInput("conversationId", "c2");
       await fixture.whenStable();
       expect(alert()).toBe(Resources.formatDraftUnreadable("offline"));
+    });
+
+    it("shows the unsent message a save's read finds after a failed read, in place of what was written, and saves nothing over it", async () => {
+      let readable = false;
+      context.answer(MethodName.DraftRead, () => readable
+        ? new Draft("c1", "a long unsent message", [], [], 3, SampleData.timestamp).toJson() : Promise.reject(new Error("unreadable")));
+      await prepare();
+      await render();
+      await type("ok");
+      readable = true;
+
+      await saveStep()();
+
+      await Wait.until(() => expect(box().value).toBe("a long unsent message"));
+      expect(context.count(MethodName.DraftSave)).toBe(0);
     });
 
     it("keeps the field closed and takes no files until the unsent message is read", async () => {

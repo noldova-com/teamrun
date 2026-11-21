@@ -31,6 +31,16 @@ export class FileChangeReaderTests {
   }
 
   @TestMethod
+  public keepsTheNewPathOfAMoveWhoseLaterChangesMergeIntoIt(): void {
+    const edits = new FileChangeReader().editsOf(FileChangeReaderTests.message([
+      { changes: [{ path: "plan.md", kind: "{\"type\":\"update\",\"move_path\":\"docs/plan.md\"}", diff: "-a" }] },
+      { changes: [{ path: "plan.md", diff: "+b" }] }
+    ]));
+
+    Assert.areEqual("plan.md:move:docs/plan.md:1:1", edits.map(t => `${t.path}:${t.kind}:${t.movePath ?? ""}:${t.additions}:${t.deletions}`).join(","));
+  }
+
+  @TestMethod
   public readsCodexKindsAndCountsANewOrDeletedFilesContentAsItsLines(): void {
     const edits = new FileChangeReader().editsOf(FileChangeReaderTests.message([
       { changes: [
@@ -52,6 +62,7 @@ export class FileChangeReaderTests {
     Assert.areEqual("new.ts:add:4:0,stored.ts:add:1:0,gone.ts:delete:0:2,moved.ts:move:1:1,edited.ts:update:1:1,patch.diff:add:3:0,list.yml:delete:0:4,"
       + "plus.txt:add:2:0,empty.ts:add:0:0,number.ts:update:0:0,broken.ts:update:0:0,list.ts:update:0:0,other.ts:rename:0:0,acp.ts:add:2:0,removed.ts:delete:0:2,"
       + "hunk.ts:add:1:0", edits.map(t => `${t.path}:${t.kind}:${t.additions}:${t.deletions}`).join(","));
+    Assert.areEqual(",,,to.ts,,,,,,,,,,,,", edits.map(t => t.movePath ?? "").join(","));
     Assert.areEqual("one|two||four", edits[0]?.lines.map(t => t.text).join("|"));
     Assert.areEqual("a|b", edits[2]?.lines.map(t => t.text).join("|"));
     Assert.areEqual("@@ -1 +1 @@|-a|+b", edits[5]?.lines.map(t => t.text).join("|"));

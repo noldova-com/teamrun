@@ -6,12 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import path from "node:path";
+
 import "@noldova/context.core";
 import { ChangeOperation, type DataRecord } from "@noldova/context.data";
 import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
 import { JsonReader } from "@noldova/context.json";
-import { Message, MessageAttachment, type MessageListParams, MessagePage, type MessagePageParams, MessageStatus, ReplyPanel, ReplyPage, ReplySummary,
-  ReplyUsage, TeammateLastReply, TeammateUsage } from "@noldova/teamrun.protocol";
+import { FileChangeReader, type FileEdit, Message, MessageAttachment, type MessageListParams, MessagePage, type MessagePageParams, MessageStatus, ReplyPanel, ReplyPage,
+  ReplySummary, ReplyUsage, TeammateDocument, TeammateLastReply, TeammateUsage, TeammateWork } from "@noldova/teamrun.protocol";
 
 import { ChangeEntity } from "../../enums/change-entity.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
@@ -20,6 +22,7 @@ import type { DatabaseContext } from "../database-context.js";
 
 export class MessagesService implements IMessagesService {
   private static readonly openStatuses: readonly MessageStatus[] = [MessageStatus.Pending, MessageStatus.Running, MessageStatus.AwaitingApproval];
+  private static readonly fileChanges: FileChangeReader = new FileChangeReader();
   private readonly context: DatabaseContext;
 
   public constructor(context: DatabaseContext) {
@@ -136,6 +139,37 @@ export class MessagesService implements IMessagesService {
       t.readString(Resources.endedAtColumn)));
   }
 
+  public async readTeammateWorkAsync(teammateId: string): Promise<TeammateWork> {
+    const connection = this.context.database.connection;
+    const folders = (await connection.queryAsync(new SqlQuery(Resources.selectTeammateChatFolders, [teammateId]))).map(t => this.folderOf(t));
+    const documents = new Map<string, TeammateDocument>();
+    const seen = new Set<string>();
+    for (const reply of await connection.queryAsync(new SqlQuery(Resources.selectTeammateDocumentReplies, [teammateId]))) {
+      if (documents.size >= Resources.teammateDocumentLimit)
+        break;
+      const message = MessagesService.read(reply);
+      for (const [file, present] of MessagesService.filesLeftBy(MessagesService.fileChanges.editsOf(message), this.folderOf(reply, message.chatId))) {
+        if (seen.has(file))
+          continue;
+        seen.add(file);
+        if (present && Resources.teammateDocumentPattern.test(file))
+          documents.set(file, new TeammateDocument(file, message.chatId, reply.readString(Resources.endedAtColumn)));
+      }
+    }
+    const ordered = [...new Set(folders)];
+    return new TeammateWork(teammateId, ordered[0] ?? null, ordered, [...documents.values()].slice(0, Resources.teammateDocumentLimit));
+  }
+
+  private static filesLeftBy(edits: readonly FileEdit[], folder: string): ReadonlyMap<string, boolean> {
+    const files = new Map<string, boolean>();
+    for (const edit of edits) {
+      files.set(path.resolve(folder, edit.path), Object.isNull(edit.movePath) && edit.kind !== Resources.deletedFileKind);
+      if (!Object.isNull(edit.movePath))
+        files.set(path.resolve(folder, edit.movePath), true);
+    }
+    return files;
+  }
+
   public async listOpenAsync(transaction?: SqlTransaction): Promise<readonly Message[]> {
     return (await (transaction ?? this.context.database.connection).queryAsync(new SqlQuery(Resources.selectOpenReplies, []))).map(t => MessagesService.read(t));
   }
@@ -185,6 +219,10 @@ export class MessagesService implements IMessagesService {
       return null;
 
     return MessagesService.read(record);
+  }
+
+  private folderOf(record: DataRecord, chatId: string = record.readString(Resources.conversationIdColumn)): string {
+    return record.readNullableString(Resources.folderColumn) ?? this.context.chatFolders.pathOf(chatId);
   }
 
   private static read(record: DataRecord): Message {

@@ -10,7 +10,7 @@ import { Failure, FailureCode } from "@noldova/desktop.protocol";
 import { type IMethodHandler, type IRuntimeWebViews, MethodFailureException, type RequestContext, ToolFailureCode } from "@noldova/desktop.runtime";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
-import { type Page, PageAuthor, PageListRequest, PageMethodName, PageRequest, PageView } from "@noldova/teamrun.protocol";
+import { type Page, PageAuthor, PageEditedListRequest, PageListRequest, PageMethodName, PageRequest, PageView } from "@noldova/teamrun.protocol";
 
 import { PageException } from "../../exceptions/pages/page.exception.js";
 import type { PageServer } from "./page-server.js";
@@ -38,6 +38,8 @@ export class PageMethod implements IMethodHandler {
   public async handleAsync(context: RequestContext): Promise<JsonValue> {
     if (this.name === PageMethodName.PageList)
       return (await this.store.listAsync(PageMethod.parse(() => PageListRequest.fromJson(context.payload)).chatId)).map(t => t.toJson());
+    if (this.name === PageMethodName.PageEditedList)
+      return (await this.store.listOfTeammateAsync(PageMethod.parse(() => PageEditedListRequest.fromJson(context.payload)).teammateId)).map(t => t.toJson());
     const request = PageMethod.parse(() => PageRequest.fromJson(context.payload));
     try {
       switch (this.name) {
