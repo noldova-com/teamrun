@@ -6,6 +6,13 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ## Unreleased
 
+### New
+
+- **Organization:** Show organization in the View menu opens the team's organization as its own view: you at the root, then each department with its count, its leader's card and its members' cards, nested to any depth, on a canvas you pan, zoom and fit, with an overview map (#317).
+  A card shows its teammate's status, what it runs now and for how long, and, when chosen, its usage, its last message and its model; Cards show chooses the fields for every card, a card's own menu for itself.
+  Edit structure adds, renames and deletes departments, chooses a department's leader, and adds, moves and removes members, asking before a delete or a removal.
+  The view, the collapsed departments and the cards' fields are kept across a restart.
+
 ### Fixed
 
 - **A chat's wake:** when work a chat sent to another chat ends, the chat shows a closed row, `Received a message from <chat> ›`, at the top of the reply it starts, rather than a message that read as the other teammate answering there, with the chat's IDs and a hint meant for the teammate; the chat's name opens that chat, and opening the row shows the replies; a wake that started no turn shows why below its row, one whose work never came back reads `No reply came back from <chat> ›`, and wakes from earlier versions show as the same row; deleting a chat whose replies already came back no longer drops them: they are delivered as received from a deleted chat and start the asking chat's turn (#296).
