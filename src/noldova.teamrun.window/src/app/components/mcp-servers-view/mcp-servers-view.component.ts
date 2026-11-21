@@ -7,7 +7,7 @@
  */
 
 import { NgTemplateOutlet } from "@angular/common";
-import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
+import { Component, computed, DestroyRef, effect, ElementRef, inject, Injector, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
 import "@noldova/context.core";
 import {
@@ -37,6 +37,7 @@ import {
 
 import { Resources } from "../../../resources";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { FocusAfterDelete } from "../../models/focus-after-delete";
 import { OwnMcpServerListing } from "../../models/own-mcp-server-listing";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { FormatterService } from "../../services/formatter.service";
@@ -261,13 +262,14 @@ export class McpServersViewComponent {
   }
 
   protected removeShared(server: SharedMcpServer): void {
+    const control = document.activeElement;
     const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
     dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.deleteSharedMcpServerLabel,
       Resources.formatDeleteSharedMcpServer(server.definition.name), Resources.deleteSharedMcpServerLabel, null, true));
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
       if (confirmed)
-        void this.deleteShared(server);
+        void this.deleteShared(server, control);
     });
   }
 
@@ -366,16 +368,16 @@ export class McpServersViewComponent {
     return Object.isNull(listing.server.signIn) ? Resources.sharedMcpNotSignedInShort : Resources.sharedMcpSignInNeededShort;
   }
 
-  private async deleteShared(server: SharedMcpServer): Promise<void> {
+  private async deleteShared(server: SharedMcpServer, control: Element | null): Promise<void> {
     const ids = [...this.host.querySelectorAll<HTMLElement>(".nol-teamrun-shared-mcp-row[data-server]")].map(t => t.dataset["server"]);
     const at = ids.indexOf(server.id);
     const neighbour = ids[at + 1] ?? ids[at - 1];
     if (await this.store.deleteSharedMcpServer(server.id, this.report)) {
       this.secretsSaved.set(null);
       await this.listShared();
-      afterNextRender(() => (Object.isUndefined(neighbour)
-        ? this.host.querySelector<HTMLElement>(".nol-teamrun-add-shared-mcp")
-        : this.host.querySelector<HTMLElement>(`.nol-teamrun-shared-mcp-row[data-server="${CSS.escape(neighbour)}"]`))?.focus(), { injector: this.injector });
+      FocusAfterDelete.later(this.injector, control,
+        () => Object.isUndefined(neighbour) ? null : this.host.querySelector<HTMLElement>(`.nol-teamrun-shared-mcp-row[data-server="${CSS.escape(neighbour)}"]`),
+        () => this.host.querySelector<HTMLElement>(".nol-teamrun-add-shared-mcp"));
     }
   }
 

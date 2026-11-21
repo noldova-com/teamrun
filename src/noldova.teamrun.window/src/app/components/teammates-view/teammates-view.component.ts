@@ -31,6 +31,7 @@ import {
 import { Resources } from "../../../resources";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { FocusAfterDelete } from "../../models/focus-after-delete";
 import { ModelCatalog } from "../../models/model-catalog";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
@@ -182,24 +183,25 @@ export class TeammatesViewComponent {
   }
 
   protected remove(teammate: Teammate): void {
+    const control = document.activeElement;
     const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
     dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.deleteTeammateLabel, Resources.formatDeleteTeammate(teammate.name), Resources.deleteTeammateLabel,
       null, true));
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
       if (confirmed)
-        void this.delete(teammate);
+        void this.delete(teammate, control);
     });
   }
 
-  private async delete(teammate: Teammate): Promise<void> {
+  private async delete(teammate: Teammate, control: Element | null): Promise<void> {
     const ids = [...this.host.querySelectorAll<HTMLElement>(".nol-teamrun-item[data-teammate]")].map(t => t.dataset["teammate"]);
     const at = ids.indexOf(teammate.id);
     const neighbour = ids[at + 1] ?? ids[at - 1];
     if (await this.store.deleteTeammate(teammate, this.report))
-      afterNextRender(() => (Object.isUndefined(neighbour)
-        ? this.host.querySelector<HTMLElement>(".nol-teamrun-add")
-        : this.host.querySelector<HTMLElement>(`.nol-teamrun-item[data-teammate="${CSS.escape(neighbour)}"] .nol-teamrun-delete`))?.focus(), { injector: this.injector });
+      FocusAfterDelete.later(this.injector, control,
+        () => Object.isUndefined(neighbour) ? null : this.host.querySelector<HTMLElement>(`.nol-teamrun-item[data-teammate="${CSS.escape(neighbour)}"] .nol-teamrun-delete`),
+        () => this.host.querySelector<HTMLElement>(".nol-teamrun-add"));
   }
 
   private connectionName(kind: string, provider: Provider): string {
