@@ -123,14 +123,14 @@ describe("OrganizationFocusComponent", () => {
     expect([indent("Design"), indent("UI"), indent("Build"), indent("Alice"), indent("Code Reviewer")]).toEqual([0.25, 1.75, 0.25, 2.25, 3.75]);
   });
 
-  it("outlines the teammates in no department under No department, last, which opens and closes but isn't a unit, and focuses each of them", async () => {
+  it("outlines the teammates in no department under No department, first, which opens and closes but isn't a unit, and focuses each of them", async () => {
     await create();
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
       ChatStoreService.of(context).teammates()));
     await settle();
 
-    expect([texts(".orow.root nol-chip"), all(".orow.department").map(t => text(one(".label", t))), texts("nol-chip", row("No department")), all(".orow.person").at(-1)?.textContent?.includes("Carol")])
-      .toEqual([["5"], ["Design", "UI", "Build", "No department"], ["1"], true]);
+    expect([texts(".orow.root nol-chip"), all(".orow.department").map(t => text(one(".label", t))), texts("nol-chip", row("No department")), all(".orow.person").at(0)?.textContent?.includes("Carol")])
+      .toEqual([["5"], ["No department", "Design", "UI", "Build"], ["1"], true]);
 
     await click(one(".obtn", row("Carol")));
     const carol = unit();
@@ -369,6 +369,23 @@ describe("OrganizationFocusComponent", () => {
     afterEach(() => AppearanceFixture.reset());
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
+
+    it("heads the outline with No department at a top-level department's indent, its teammates at a department's people's indent", async () => {
+      await create();
+      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+        ChatStoreService.of(context).teammates()));
+      await settle();
+      const label = (name: string): DOMRect => box(one(".label", row(name)));
+
+      expect(all(".orow.department")[0]).toBe(row("No department"));
+      AppearanceFixture.expectPixels(label("No department").left, label("Design").left);
+      AppearanceFixture.expectPixels(label("Carol").left, label("Alice").left);
+      AppearanceFixture.expectPixels(box(row("No department")).height, box(row("Design")).height);
+      AppearanceFixture.expectPixels(box(row("No department")).left, box(row("Design")).left);
+      AppearanceFixture.expectPixels(box(row("No department")).right, box(row("Design")).right);
+      AppearanceFixture.expectPixels(box(row("No department")).top - box(one(".orow.root")).bottom, box(row("UI")).top - box(row("Bob")).bottom);
+      AppearanceFixture.expectPixels(box(row("Carol")).top - box(row("No department")).bottom, box(row("Alice")).top - box(row("Design")).bottom);
+    });
 
     it("sets the 16rem outline beside the focus, whose canvas holds the 60rem unit above the 17rem conversation: its cards in columns of at least 18rem, one card at up to 36rem", async () => {
       await create();

@@ -10,10 +10,12 @@ import "@noldova/context.core";
 import { type Department, NameOrder, type Organization, type Teammate } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
+import { OrganizationNodeKind } from "../enums/organization-node-kind";
 
 export class OrganizationNode {
   public static readonly unplacedId: string = "no-department";
 
+  public readonly kind: OrganizationNodeKind;
   public readonly department: Department | null;
   public readonly leader: Teammate | null;
   public readonly members: readonly Teammate[];
@@ -22,7 +24,9 @@ export class OrganizationNode {
   public readonly total: number;
   public readonly hidden: number;
 
-  public constructor(department: Department | null, leader: Teammate | null, members: readonly Teammate[], children: readonly OrganizationNode[]) {
+  private constructor(kind: OrganizationNodeKind, department: Department | null, leader: Teammate | null, members: readonly Teammate[],
+    children: readonly OrganizationNode[]) {
+    this.kind = kind;
     this.department = department;
     this.leader = leader;
     this.members = members;
@@ -42,7 +46,7 @@ export class OrganizationNode {
   }
 
   public get isUnplaced(): boolean {
-    return Object.isNull(this.department);
+    return this.kind === OrganizationNodeKind.NoDepartment;
   }
 
   public static treeOf(organization: Organization, teammates: readonly Teammate[]): readonly OrganizationNode[] {
@@ -51,11 +55,11 @@ export class OrganizationNode {
       const leader = Object.isNull(department.leaderId) ? null : byId.get(department.leaderId) ?? null;
       const members = organization.members.filter(t => t.departmentId === department.id && t.teammateId !== department.leaderId)
         .flatMap(t => byId.get(t.teammateId) ?? []);
-      return new OrganizationNode(department, leader, NameOrder.sort(members, t => t.name), nodesOf(department.id));
+      return new OrganizationNode(OrganizationNodeKind.Department, department, leader, NameOrder.sort(members, t => t.name), nodesOf(department.id));
     });
     const placed = new Set(organization.members.map(t => t.teammateId));
     const unplaced = NameOrder.sort(teammates.filter(t => !placed.has(t.id)), t => t.name);
-    return [...nodesOf(null), ...unplaced.length === 0 ? [] : [new OrganizationNode(null, null, unplaced, [])]];
+    return [...unplaced.length === 0 ? [] : [new OrganizationNode(OrganizationNodeKind.NoDepartment, null, null, unplaced, [])], ...nodesOf(null)];
   }
 
   public static departmentsOf(organization: Organization, parentId: string | null = null): readonly Department[] {

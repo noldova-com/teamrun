@@ -7,6 +7,7 @@
  */
 import { Department, DepartmentMember, Harness, Organization, Teammate } from "@noldova/teamrun.protocol";
 
+import { OrganizationNodeKind } from "../../../src/app/enums/organization-node-kind";
 import { OrganizationNode } from "../../../src/app/models/organization.node";
 import { Resources } from "../../../src/resources";
 
@@ -53,14 +54,14 @@ describe("OrganizationNode", () => {
     expect(shape(OrganizationNode.treeOf(organization, [ada]))).toEqual([["design", null, ["ada"], 1, 1, 1, []]]);
   });
 
-  it("puts the teammates in no department last, under No department in name order, and leaves it out once every teammate is placed", () => {
+  it("puts the teammates in no department first, under No department in name order, and leaves it out once every teammate is placed", () => {
     const organization = new Organization([new Department("design", "Design", null, "ada", 0, "c", "u"), new Department("ui", "UI", "design", null, 0, "c", "u")],
       [new DepartmentMember("ada", "design"), new DepartmentMember("bea", "ui")]);
     const tree = OrganizationNode.treeOf(organization, [fay, ada, dee, bea, cy]);
 
-    expect([shape(tree), tree.map(t => [t.name, t.isUnplaced, t.department?.id ?? null])]).toEqual([
-      [["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]], ["no-department", null, ["cy", "dee", "fay"], 3, 3, 3, []]],
-      [["Design", false, "design"], [Resources.organizationNoDepartment, true, null]]
+    expect([shape(tree), tree.map(t => [t.name, t.isUnplaced, t.department?.id ?? null, t.kind])]).toEqual([
+      [["no-department", null, ["cy", "dee", "fay"], 3, 3, 3, []], ["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]],
+      [[Resources.organizationNoDepartment, true, null, OrganizationNodeKind.NoDepartment], ["Design", false, "design", OrganizationNodeKind.Department]]
     ]);
     expect(shape(OrganizationNode.treeOf(organization, [ada, bea]))).toEqual([["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]]);
     expect(shape(OrganizationNode.treeOf(Organization.empty, [bea, ada]))).toEqual([["no-department", null, ["ada", "bea"], 2, 2, 2, []]]);

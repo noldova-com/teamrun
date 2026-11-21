@@ -158,8 +158,8 @@ describe("OrganizationViewComponent", () => {
       [new DepartmentMember("offline", "build")]).toJson());
     await settle();
 
-    expect([tree(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []],
-      ["No department", "3", "3 idle", [], ["Alice", "Bob", "Code Reviewer"], [], []]], ["Owner · 1 leader reports to you"]]);
+    expect([tree(), texts(".owner .role")]).toEqual([[["No department", "3", "3 idle", [], ["Alice", "Bob", "Code Reviewer"], [], []],
+      ["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Owner · 1 leader reports to you"]]);
 
     context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
     await settle();
@@ -168,7 +168,7 @@ describe("OrganizationViewComponent", () => {
       [], []]], [], ["Owner · 0 leaders report to you"]]);
   });
 
-  it("shows the teammates in no department last, under No department, so the headcount counts what the tree shows, with no department's own controls", async () => {
+  it("shows the teammates in no department first, under No department, so the headcount counts what the tree shows, with no department's own controls", async () => {
     await create(() => {
       organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
         [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design")]);
@@ -178,8 +178,8 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".top .headcount"), tree(), all(".chart nol-teamrun-organization-card").length, controls(none())]).toEqual([
       ["4 teammates in 2 departments"],
-      [["Design", "2", "2 idle", ["Alice"], ["Bob"], [], []], ["Build", "0", undefined, [], [], [], []],
-        ["No department", "2", "1 idle · 1 stopped", [], ["Code Reviewer", "Offline"], [], []]],
+      [["No department", "2", "1 idle · 1 stopped", [], ["Code Reviewer", "Offline"], [], []], ["Design", "2", "2 idle", ["Alice"], ["Bob"], [], []],
+        ["Build", "0", undefined, [], [], [], []]],
       4, [0, 0, 0, 0]
     ]);
     await userEvent.click(one("aside.messages .to-choice .nol-select-button"));
@@ -942,6 +942,43 @@ describe("OrganizationViewComponent", () => {
         AppearanceFixture.expectPixels(Number.parseFloat(length), expected);
       expect(getComputedStyle(one(":scope > .department .department-name", design)).fontWeight)
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
+    });
+
+    it("lays No department out first in the row under you, as a department card with its members hung off one line, as a department without a leader is", async () => {
+      await create(() => {
+        organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
+          [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design"), new DepartmentMember("offline", "build")]);
+      });
+      element().style.width = "100rem";
+      element().style.height = "76rem";
+      await settle();
+      await Wait.until(async () => {
+        one(".chart .nol-canvas-actual").click();
+        await settle();
+        await settle();
+        expect(texts(".chart .nol-canvas-zoom")).toEqual(["100%"]);
+      });
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const [none, build] = [department("No department"), department("Build")];
+      const kids = one(".chart .tree > .kids");
+      const card = (view: HTMLElement): HTMLElement => one(":scope > .department", view);
+      const reports = (view: HTMLElement): HTMLElement => one(":scope > .reports", view);
+      const member = (view: HTMLElement): HTMLElement => one(":scope > nol-teamrun-organization-card", reports(view));
+
+      expect(all(":scope > nol-teamrun-organization-department", kids)[0]).toBe(none);
+      AppearanceFixture.expectPixels(box(card(none)).width, 15 * rem);
+      AppearanceFixture.expectPixels(box(member(none)).width, 13.25 * rem);
+      AppearanceFixture.expectPixels(box(none).left, box(kids).left);
+      AppearanceFixture.expectPixels(box(department("Design")).left - box(none).right, 0);
+      AppearanceFixture.expectPixels(box(card(none)).top - box(kids).top, space(3) * 2);
+      AppearanceFixture.expectPixels(box(card(none)).top, box(card(build)).top);
+      AppearanceFixture.expectPixels(box(reports(none)).left - box(card(none)).left, box(reports(build)).left - box(card(build)).left);
+      AppearanceFixture.expectPixels(box(member(none)).top - box(card(none)).bottom, box(member(build)).top - box(card(build)).bottom);
+      AppearanceFixture.expectPixels(box(member(none)).left - box(reports(none)).left, space(3) + 1);
+      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(none, "::before").left), box(none).width / 2);
+      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(none, "::after").height), space(3));
     });
 
     it("fills the space under the header, inside the view's padding, with the canvas and the messages beside it, 22rem wide for the Tree's thread and 24rem for the Board's inbox as the chart takes the rest, and fits the chart at 100% to its top, under the canvas's tools", async () => {
