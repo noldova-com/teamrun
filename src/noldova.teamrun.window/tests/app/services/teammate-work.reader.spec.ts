@@ -95,6 +95,10 @@ describe("TeammateWorkReader", () => {
     vi.restoreAllMocks();
   });
 
+  it("names every state a source of the teammate's work can be in", () => {
+    expect(Object.values(TeammateSourceState)).toEqual(["Reading", "Shown", "NoFolder", "ModuleMissing", "SignedOut", "Failed"]);
+  });
+
   it("reads the teammate's work and artifacts, watches its folder and shows its branch with its changes and its open pull request with CI state", async () => {
     const work = start();
 
