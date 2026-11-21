@@ -24,6 +24,7 @@ import { Resources } from "../../resources.js";
 import type { DatabaseContext } from "../database-context.js";
 import { AttachmentStore } from "./attachment-store.js";
 import type { EngineServices } from "./engine-services.js";
+import { MentionCheck } from "./mention-check.js";
 import type { ReplyRun } from "./reply-run.js";
 import type { TurnState } from "./turn-state.js";
 import { WaitingMessages } from "./waiting-messages.js";
@@ -95,6 +96,9 @@ export class WaitingSends {
       if (params.message.chatId !== found.chatId)
         throw new ServiceException(ErrorCode.InvalidParams, Resources.formatWaitingMessageOtherChat(found.id, params.message.chatId),
           [found.id, params.message.chatId]);
+      const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
+      if (!MentionCheck.matches(params.message.text, params.message.mentionedTeammateIds, available, false))
+        throw new ServiceException(ErrorCode.Conflict, Resources.editMentionsMismatch, []);
       const [message, files] = this.keepWaitingFiles(found.id, params.message);
       const changed = found.withMessage(message, found.fromOutside || fromOutside);
       await this.waiting.updateAsync(changed, transaction);
