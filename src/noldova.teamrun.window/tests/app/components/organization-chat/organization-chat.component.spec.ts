@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
@@ -46,7 +47,8 @@ describe("OrganizationChatComponent", () => {
         return openAnswer(id);
       })
       .answer(MethodName.MessageSend, () => new MessageSendResult(SampleData.userMessage, []).toJson());
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider] });
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, { provide: WindowPartTokens.shown, useValue: signal(true).asReadonly() },
+      ChatStoreService.provider] });
     fixture = TestBed.createComponent(OrganizationChatComponent);
     fixture.componentRef.setInput("teammateId", teammateId);
     element().style.display = "block";
