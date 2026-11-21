@@ -14,4 +14,8 @@ export interface IWatchedPage {
   on(event: "pageerror", listener: (error: Error) => void): unknown;
   on(event: "request" | "requestfinished" | "requestfailed", listener: (request: IPageRequest) => void): unknown;
   on(event: "domcontentloaded" | "load", listener: () => void): unknown;
+  off(event: "console", listener: (message: IPageMessage) => void): unknown;
+  off(event: "pageerror", listener: (error: Error) => void): unknown;
+  off(event: "request" | "requestfinished" | "requestfailed", listener: (request: IPageRequest) => void): unknown;
+  off(event: "domcontentloaded" | "load", listener: () => void): unknown;
 }

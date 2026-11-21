@@ -41,7 +41,7 @@ export class BrowserSessionDiagnostics {
       return opening.catch((error: unknown) => {
         run.logger.log(record.report(sessionId));
         throw error;
-      });
+      }).finally(() => record.stop());
     };
   }
 

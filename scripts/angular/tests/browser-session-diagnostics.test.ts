@@ -52,10 +52,12 @@ const page = (): IWatchedPage & EventEmitter => new EventEmitter();
 const request = (url: string, errorText: string | null = null): IPageRequest => ({ url: () => url, failure: () => errorText === null ? null : { errorText } });
 const message = (type: string, text: string): IPageMessage => ({ type: () => type, text: () => text });
 const timeless = (report: string | undefined): string[] => (report ?? "").replaceAll(/\d+ ms/gu, "N ms").split("\n");
+const listening = (watched: EventEmitter): number => ["domcontentloaded", "load", "request", "requestfinished", "requestfailed", "console", "pageerror"]
+  .reduce((sum, t) => sum + watched.listenerCount(t), 0);
 const timeout = (sessionId: string): Error => new Error(`Failed to connect to the browser session "${sessionId}" [chromium] within the timeout.`);
 
 describe("BrowserSessionDiagnostics", () => {
-  it("logs, for a session that never connects, how far its page got, what it still loads, what failed and what it printed, and passes the timeout on", async () => {
+  it("logs, for a session that connects but never becomes ready, how far its page got, what it still loads, what failed and what it printed, stops listening to the page, and passes the timeout on", async () => {
     const fake = fakeRun();
     new BrowserSessionDiagnostics().configureVitest({ vitest: fake.run });
     const provider: IPageProvider = { pages: new Map([["earlier", page()]]) };
@@ -77,30 +79,31 @@ describe("BrowserSessionDiagnostics", () => {
 
     await assert.rejects(opening, error);
     assert.deepEqual(timeless(fake.logged[0]), [
-      "Browser session s1 did not connect: page at N ms, domcontentloaded at N ms, load not reached, connected at N ms, ready not reached.",
+      "Browser session s1 did not become ready: page at N ms, domcontentloaded at N ms, load not reached, connected at N ms, ready not reached.",
       "  Still loading: http://127.0.0.1:63315/stuck.js",
       "  Request failed: http://127.0.0.1:63315/failed.js (net::ERR_CONNECTION_RESET)",
       "  Request failed: http://127.0.0.1:63315/unexplained.js (no reason given)",
       "  Console error: boom",
       "  Page error: not defined"
     ]);
-    assert.deepEqual([fake.logged.length, fake.calls, [...provider.pages?.keys() ?? []]], [1, ["s1 connected"], ["earlier", "s1"]]);
+    assert.deepEqual([fake.logged.length, fake.calls, [...provider.pages?.keys() ?? []], listening(opened)], [1, ["s1 connected"], ["earlier", "s1"], 0]);
   });
 
-  it("logs nothing for a session that connects and becomes ready, and passes both on", async () => {
+  it("logs nothing for a session that connects and becomes ready, passes both on, and stops listening to its page once it is ready", async () => {
     const fake = fakeRun();
     new BrowserSessionDiagnostics().configureVitest({ vitest: fake.run });
     const provider: IPageProvider = { pages: new Map() };
     const opening = fake.sessions.createSession("s1", { browser: { provider } });
     const opened = page();
     provider.pages?.set("s1", opened);
+    const watching = listening(opened);
     fake.sessions.getSession("s1")?.ready();
     fake.sessions.getSession("s1")?.connected();
-    opened.emit("console", message("log", "after ready"));
+    const settled = listening(opened);
     fake.answer("s1");
 
     await opening;
-    assert.deepEqual([fake.logged, fake.calls], [[], ["s1 ready", "s1 connected"]]);
+    assert.deepEqual([fake.logged, fake.calls, watching, settled], [[], ["s1 ready", "s1 connected"], 7, 0]);
   });
 
   it("keeps the last 40 things a page printed and names the first 40 requests it still loads, with a count of the rest", async () => {
@@ -160,6 +163,26 @@ describe("BrowserSessionDiagnostics", () => {
     assert.deepEqual([timeless(fake.logged.join("\n")), timeless(lost.logged.join("\n"))], [
       ["Browser session s1 did not connect: page not reached, domcontentloaded not reached, load not reached, connected not reached, ready not reached."],
       ["Browser session s2 did not connect: page not reached, domcontentloaded not reached, load not reached, connected not reached, ready not reached."]
+    ]);
+  });
+
+  it("masks every token in what it logs, as in a failed WebSocket's address that carries the run's API token", async () => {
+    const fake = fakeRun();
+    new BrowserSessionDiagnostics().configureVitest({ vitest: fake.run });
+    const provider: IPageProvider = { pages: new Map() };
+    const opening = fake.sessions.createSession("s1", { browser: { provider } });
+    const opened = page();
+    provider.pages?.set("s1", opened);
+    opened.emit("request", request("http://127.0.0.1:24316/__vitest_test__/?sessionId=s1&token=pending1"));
+    opened.emit("requestfailed", request("ws://127.0.0.1:24316/__vitest_browser_api__?type=tester&token=failed2&sessionId=s1", "net::ERR_CONNECTION_REFUSED"));
+    opened.emit("console", message("error", "WebSocket connection to 'ws://127.0.0.1:24316/__vitest_browser_api__?type=tester&sessionId=s1&token=Secret_3-x' failed"));
+    fake.answer("s1", timeout("s1"));
+
+    await assert.rejects(opening);
+    assert.deepEqual(timeless(fake.logged[0]).slice(1), [
+      "  Still loading: http://127.0.0.1:24316/__vitest_test__/?sessionId=s1&token=***",
+      "  Request failed: ws://127.0.0.1:24316/__vitest_browser_api__?type=tester&token=***&sessionId=s1 (net::ERR_CONNECTION_REFUSED)",
+      "  Console error: WebSocket connection to 'ws://127.0.0.1:24316/__vitest_browser_api__?type=tester&sessionId=s1&token=***' failed"
     ]);
   });
 
