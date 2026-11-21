@@ -9,10 +9,15 @@
 import { signal, untracked } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
-import type { JsonValue } from "@noldova/context.json";
+import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
+  Approval,
+  ApprovalKind,
+  ApprovalQuestion,
+  ApprovalStatus,
   AttachmentContent,
+  ChatFolderAttachParams,
   Conversation,
   ConversationSearchHit,
   DetailEventPayload,
@@ -24,10 +29,12 @@ import {
   MessageDetail,
   MessagePage,
   MessagePageParams,
+  MessageSender,
   MessageStatus,
   MethodName,
   PlanStep,
   PlanStepStatus,
+  QuestionOption,
   ReadingPositionSaveParams,
   ReplyPlan,
   SubAgent,
@@ -773,7 +780,7 @@ describe("HistoryComponent", () => {
       expect((viewport()?.scrollHeight ?? 0) - (viewport()?.scrollTop ?? 0) - (viewport()?.clientHeight ?? 0)).toBeGreaterThan(200);
     });
 
-    it("shows the reply a plan in the Plans view asks for with the kit's flash around the whole reply, grown by a bubble's padding with its corners and moving nothing, then scrolls the least that shows its plan block deep in the reply, which a search hit doesn't", { timeout: 2 * revealLimit }, async () => {
+    it("shows the reply a Plans view plan asks for in the kit's flash, grown by a bubble's padding with its corners, moving nothing, then scrolls the least that shows the plan deep in it, unlike a search hit", { timeout: 2 * revealLimit }, async () => {
       const plan = new ReplyPlan([new PlanStep("Read the code", PlanStepStatus.Completed, null), new PlanStep("Fix the bug", PlanStepStatus.Pending, null)], null);
       await reopen("left-plan");
       await settle();
@@ -1582,6 +1589,137 @@ describe("HistoryComponent", () => {
     expect(flashing()).toEqual([]);
   });
 
+  it("keeps a pending question's pick and typed text while its row is off the screen, and forgets them once the question closes while it's away", { timeout: 3 * revealLimit }, async () => {
+    const asking = new Approval("q1", "m5000", ApprovalKind.Question, "AskUserQuestion", "Which platform?", null, SampleData.approval.options, ApprovalStatus.Pending, null,
+      SampleData.timestamp, null, [new ApprovalQuestion("platform", "Platform", "Which platform?", [new QuestionOption("Web", "A browser")], false, false, false),
+        new ApprovalQuestion("name", "Name", "Which name?", [], false, true, false)]);
+    const reply = new Message("m5000", "c1", 5_000, MessageAuthor.Provider, "m4999", MessageStatus.AwaitingApproval, [SampleData.detail(0, DetailKind.Text, "Message 5000")],
+      SampleData.provenance, SampleData.timestamp, SampleData.timestamp, null);
+    const card = (): Element | null => rowOf(5_000)?.querySelector("nol-teamrun-question-card") ?? null;
+    const field = (selector: string): HTMLInputElement => {
+      const found = card()?.querySelector<HTMLInputElement>(selector);
+      if (Object.isNullOrUndefined(found))
+        throw new Error(`The question card has no ${selector}.`);
+      return found;
+    };
+    const draft = (): unknown => store().messageIndex().find(t => t.id === "m5000")?.controls?.draftOf("q1") ?? null;
+    const away = async (): Promise<void> => {
+      list().reveal(4_920, VirtualListAlign.Start);
+      await until(() => expect(rowOf(5_000)).toBeUndefined(), { timeout: revealLimit });
+      expect(rowOf(4_920)).toBeDefined();
+      expect(element().querySelectorAll("nol-teamrun-question-card")).toHaveLength(0);
+    };
+    await open("c1");
+    await until(() => expect(rowOf(4_999)).toBeDefined());
+    arrived.push(reply);
+    context.emit(EventName.MessageCreated, reply.toJson());
+    await until(() => expect(rowOf(5_000)).toBeDefined());
+    context.emit(EventName.ApprovalCreated, asking.toJson());
+    await until(() => expect(card()).not.toBeNull());
+
+    field(".nol-choice-row input").click();
+    Object.assign(field(".nol-teamrun-question-other"), { value: "Atlas" }).dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    expect([field(".nol-choice-row input").checked, field(".nol-teamrun-question-other").value]).toEqual([true, "Atlas"]);
+    await away();
+    expect(draft()).not.toBeNull();
+    list().reveal(5_000, VirtualListAlign.Start);
+    await until(() => expect(card()).not.toBeNull(), { timeout: revealLimit });
+    await settle();
+    expect([field(".nol-choice-row input").checked, field(".nol-teamrun-question-other").value]).toEqual([true, "Atlas"]);
+
+    await away();
+    expect(draft()).not.toBeNull();
+    context.emit(EventName.ApprovalUpdated, asking.withCancellation(SampleData.timestamp).toJson());
+    await fixture.whenStable();
+    expect(draft()).toBeNull();
+  });
+
+  it("keeps a pending question's pick and typed text through a far jump and back, and forgets them once the question closes while it's far away", { timeout: 3 * revealLimit }, async () => {
+    const asking = new Approval("q1", "m5000", ApprovalKind.Question, "AskUserQuestion", "Which platform?", null, SampleData.approval.options, ApprovalStatus.Pending, null,
+      SampleData.timestamp, null, [new ApprovalQuestion("platform", "Platform", "Which platform?", [new QuestionOption("Web", "A browser")], false, false, false),
+        new ApprovalQuestion("name", "Name", "Which name?", [], false, true, false)]);
+    const reply = new Message("m5000", "c1", 5_000, MessageAuthor.Provider, "m4999", MessageStatus.AwaitingApproval, [SampleData.detail(0, DetailKind.Text, "Message 5000")],
+      SampleData.provenance, SampleData.timestamp, SampleData.timestamp, null);
+    const card = (): Element | null => rowOf(5_000)?.querySelector("nol-teamrun-question-card") ?? null;
+    const field = (selector: string): HTMLInputElement => {
+      const found = card()?.querySelector<HTMLInputElement>(selector);
+      if (Object.isNullOrUndefined(found))
+        throw new Error(`The question card has no ${selector}.`);
+      return found;
+    };
+    const draft = (): unknown => store().messageControlsOf("c1", "m5000")?.draftOf("q1") ?? null;
+    const farAway = async (): Promise<void> => {
+      list().reveal(4_000, VirtualListAlign.Start);
+      await until(() => expect(rowOf(4_000)).toBeDefined(), { timeout: revealLimit });
+      await until(() => expect([store().messageIndex().some(t => t.id === "m5000"), rowOf(5_000)]).toEqual([false, undefined]), { timeout: revealLimit });
+    };
+    await open("c1");
+    await until(() => expect(rowOf(4_999)).toBeDefined());
+    arrived.push(reply);
+    context.emit(EventName.MessageCreated, reply.toJson());
+    await until(() => expect(rowOf(5_000)).toBeDefined());
+    context.emit(EventName.ApprovalCreated, asking.toJson());
+    await until(() => expect(card()).not.toBeNull());
+
+    field(".nol-choice-row input").click();
+    Object.assign(field(".nol-teamrun-question-other"), { value: "Atlas" }).dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    await farAway();
+    expect(draft()).not.toBeNull();
+    list().reveal(5_000, VirtualListAlign.Start);
+    await until(() => expect(card()).not.toBeNull(), { timeout: revealLimit });
+    await settle();
+    expect([field(".nol-choice-row input").checked, field(".nol-teamrun-question-other").value]).toEqual([true, "Atlas"]);
+
+    await farAway();
+    expect(draft()).not.toBeNull();
+    context.emit(EventName.ApprovalUpdated, asking.withCancellation(SampleData.timestamp).toJson());
+    await fixture.whenStable();
+    expect(draft()).toBeNull();
+  });
+
+  it("keeps the pick and typed text of a question that arrives after a far jump and back, through the next far jump and back", { timeout: 4 * revealLimit }, async () => {
+    const asking = new Approval("q1", "m5000", ApprovalKind.Question, "AskUserQuestion", "Which platform?", null, SampleData.approval.options, ApprovalStatus.Pending, null,
+      SampleData.timestamp, null, [new ApprovalQuestion("platform", "Platform", "Which platform?", [new QuestionOption("Web", "A browser")], false, false, false),
+        new ApprovalQuestion("name", "Name", "Which name?", [], false, true, false)]);
+    const reply = new Message("m5000", "c1", 5_000, MessageAuthor.Provider, "m4999", MessageStatus.AwaitingApproval, [SampleData.detail(0, DetailKind.Text, "Message 5000")],
+      SampleData.provenance, SampleData.timestamp, SampleData.timestamp, null);
+    const card = (): Element | null => rowOf(5_000)?.querySelector("nol-teamrun-question-card") ?? null;
+    const field = (selector: string): HTMLInputElement => {
+      const found = card()?.querySelector<HTMLInputElement>(selector);
+      if (Object.isNullOrUndefined(found))
+        throw new Error(`The question card has no ${selector}.`);
+      return found;
+    };
+    const farAway = async (): Promise<void> => {
+      list().reveal(4_000, VirtualListAlign.Start);
+      await until(() => expect(rowOf(4_000)).toBeDefined(), { timeout: revealLimit });
+      await until(() => expect([store().messageIndex().some(t => t.id === "m4999"), rowOf(4_999)]).toEqual([false, undefined]), { timeout: revealLimit });
+    };
+    await open("c1");
+    await until(() => expect(rowOf(4_999)).toBeDefined());
+    await farAway();
+    list().reveal(4_999, VirtualListAlign.Start);
+    await until(() => expect(rowOf(4_999)).toBeDefined(), { timeout: revealLimit });
+    const indexed = store().messageIndex().some(t => t.id === "m4999");
+    arrived.push(reply);
+    context.emit(EventName.MessageCreated, reply.toJson());
+    await until(() => expect(rowOf(5_000)).toBeDefined());
+    context.emit(EventName.ApprovalCreated, asking.toJson());
+    await until(() => expect(card()).not.toBeNull());
+
+    field(".nol-choice-row input").click();
+    Object.assign(field(".nol-teamrun-question-other"), { value: "Atlas" }).dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    await farAway();
+    list().reveal(5_000, VirtualListAlign.Start);
+    await until(() => expect(card()).not.toBeNull(), { timeout: revealLimit });
+    await settle();
+
+    expect([indexed, field(".nol-choice-row input").checked, field(".nol-teamrun-question-other").value]).toEqual([false, true, "Atlas"]);
+  });
+
   it("asks for the first message in the messages' column, its first 18px line 2rem down, while its conversation has none, and shows the first that comes", async () => {
     fixture.componentRef.setInput("chatId", "c3");
     await open("c3");
@@ -1667,6 +1805,14 @@ describe("HistoryComponent", () => {
       AppearanceFixture.expectPixels(shown.left, text.left);
       AppearanceFixture.expectPixels(shown.top - text.bottom, AppearanceFixture.measureLook("space-4"));
       expect([shown.width > 0, shown.right <= empty.right + 0.5, element().scrollWidth <= element().clientWidth]).toEqual([true, true, true]);
+      const own = new Conversation("c3", null, "Scratch", SampleData.timestamp, SampleData.timestamp, false, null, null, false, "/data/chats/c3");
+      context.answer(MethodName.ChatFolderAttach, t => own.withAttachedFolder(ChatFolderAttachParams.fromJson(t).folder, SampleData.timestamp).toJson())
+        .answer(MethodName.ChatFolderDetach, () => own.toJson());
+      await store().attachFolder("c3", "/work/site");
+      await until(() => expect(button()).toBeNull());
+      expect(element().querySelector(".nol-teamrun-history-empty-text")?.textContent?.trim()).toBe(Resources.emptyHistoryText);
+      await store().detachFolder("c3");
+      await until(() => expect(button()).not.toBeNull());
 
       button()!.click();
       await until(() => expect(context.parametersOf(MethodName.ProjectOpen)).toEqual({ rootPath: SampleData.project.rootPath }));
@@ -1733,6 +1879,148 @@ describe("HistoryComponent", () => {
         expect(text.right).toBeLessThanOrEqual(reply.right + 0.5);
         expect([style.color, getComputedStyle(line.querySelector(".nol-teamrun-usage-hand-off-glyph") ?? line).color]).toEqual([muted, muted]);
       }
+    });
+
+    it("draws a chat's wake as one closed row at the top of the reply it started, hiding the wake's own message, and one that started no turn as the row alone, on the reply column's edges", async () => {
+      const at = SampleData.timestamp;
+      const agent = "The work you sent to chat \"Second\" (c2) has ended.\n\n@Bob replied (message n9):\nDone.\n\nRead a message whole with `teamrun_list_messages`.";
+      const view = { wakeChatId: "c2", wakeReplies: [{ name: "Bob", status: MessageStatus.Completed, text: "Done." }] };
+      const wake = (id: string, sequence: number, reply: string | null): Message => new Message(id, "c3", sequence, MessageAuthor.User, null, MessageStatus.Completed,
+        [new MessageDetail(0, DetailKind.Text, agent, { source: "chatWake", wakeId: `${id}-wake`, wakeSourceMessageId: "q0", ...view, ...Object.isNull(reply) ? {} : { wakeReplyId: reply } }, at)],
+        null, at, null, at, [], null, null, [], new MessageSender("c2", "bob", "Bob"));
+      const messages = [new Message("q0", "c3", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "Ask Bob.")], null, at, null, at),
+        wake("w1", 1, "r2"),
+        new Message("r2", "c3", 2, MessageAuthor.Provider, "w1", MessageStatus.Completed, [new MessageDetail(0, DetailKind.Note, `Received a message from "Second".`,
+          { source: "wakeReceived", ...view }, at), SampleData.detail(1, DetailKind.Text, "Thanks, Bob.")], SampleData.provenance, at, at, at),
+        wake("w3", 3, null)];
+      context.answer(MethodName.MessagePage, t => MessagePageParams.fromJson(t).conversationId === "c3" ? new MessagePage(messages, false, false, 4).toJson() : pageOf(t));
+      const lines = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-wake-line")];
+
+      fixture.componentRef.setInput("chatId", "c3");
+      await open("c3");
+      await until(() => expect([lines().length, replyOf("Thanks, Bob.")]).toEqual([2, expect.anything()]));
+      await settle();
+      const [inside, alone] = lines();
+      const reply = bounds(replyOf("Thanks, Bob."));
+
+      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(2);
+      expect(replyOf("Thanks, Bob.")?.contains(inside ?? null)).toBe(true);
+      expect(alone?.closest("nol-teamrun-history-message")).toBeNull();
+      expect(element().textContent).not.toMatch(/has ended|teamrun_list_messages|\(c2\)|n9/);
+      for (const line of [inside, alone])
+        expect([line?.querySelector(".wake-toggle")?.textContent?.trim(), line?.querySelector(".wake-chat")?.textContent?.trim()]).toEqual(["Received a message from", "Second"]);
+      const row = alone?.querySelector(".wake-line")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+      expect(document.getElementById(alone?.closest("[role='article']")?.getAttribute("aria-labelledby") ?? "")).toBe(alone?.querySelector(".wake-line"));
+      AppearanceFixture.expectPixels(row.left, reply.left);
+      AppearanceFixture.expectPixels(row.height, AppearanceFixture.measureLook("pointer-target"));
+      expect(row.right).toBeLessThanOrEqual(reply.right + 0.5);
+    });
+
+    it("draws a wake that started no turn as its row with the wake's note below it, a lost or deleted chat's wake as no reply coming back, old or new, a deleted chat's replies that came back as received, and an old wake from its sender's chat or as its own chat's task, never with an ID", async () => {
+      const at = SampleData.timestamp;
+      const view = { wakeChatId: "c2", wakeReplies: [{ name: "Bob", status: MessageStatus.Completed, text: "Done." }] };
+      const ended = (end: string, chatId: string): JsonObject => ({ wakeChatId: chatId, wakeReplies: [], wakeEnd: end });
+      const wake = (id: string, sequence: number, text: string, payload: JsonObject, notes: readonly string[], senderChat: string = "c2"): Message =>
+        new Message(id, "c3", sequence, MessageAuthor.User, null, MessageStatus.Completed,
+          [new MessageDetail(0, DetailKind.Text, text, { source: "chatWake", wakeId: `${id}-wake`, wakeSourceMessageId: "q0", ...payload }, at),
+            ...notes.map((t, i) => new MessageDetail(i + 1, DetailKind.Note, t, null, at))], null, at, null, at, [], null, null, [], new MessageSender(senderChat, "bob", "Bob"));
+      const notWoken = "This chat wasn't woken: the teammate that asked for it is no longer in this chat.";
+      const stopped = "The chain stopped after 2 hand-offs. You can change this limit in Settings › TeamRun. Mention a teammate to go on.";
+      const messages = [new Message("q0", "c3", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "Ask Bob.")], null, at, null, at),
+        wake("w1", 1, "The work you sent to chat \"Second\" (c2) has ended.", view, [notWoken]),
+        wake("w2", 2, "The work you sent to chat \"Second\" (c2) has ended.", view, [stopped]),
+        wake("w3", 3, "TeamRun restarted before the work you sent to chat \"Second\" (c2) ended.", ended("lost", "c2"), []),
+        wake("w4", 4, "The chat gone-chat that you sent work to was deleted.", ended("chatDeleted", "gone-chat"), [], "gone-chat"),
+        wake("w5", 5, "@Bob replied (message n9): Done. Read a message whole with `teamrun_list_messages`.", {}, []),
+        wake("w6", 6, "Your sub-agent \"Search\" (agent-1) ended as completed.", {}, [], "c3"),
+        wake("w7", 7, "TeamRun restarted before the work you sent to chat \"Second\" (c2) ended, so no result came back and this chat wasn't woken.", {}, []),
+        wake("w8", 8, "The chat gone-chat that you sent work to was deleted before its result came back, so this chat wasn't woken.", {}, [], "gone-chat"),
+        wake("w9", 9, "The work you sent to chat \"Gone\" (gone-chat) has ended.", { ...view, wakeChatId: "gone-chat" }, [], "gone-chat")];
+      context.answer(MethodName.MessagePage, t => MessagePageParams.fromJson(t).conversationId === "c3" ? new MessagePage(messages, false, false, 10).toJson() : pageOf(t));
+      const lines = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-wake-line")];
+      const textOf = (line: HTMLElement | undefined, selector: string): readonly string[] =>
+        [...line?.querySelectorAll(selector) ?? []].map(t => t.textContent?.trim() ?? "");
+
+      fixture.componentRef.setInput("chatId", "c3");
+      await open("c3");
+      await until(() => expect(lines().length).toBe(9));
+      await settle();
+      const opened = [2, 3, 6, 7, 8].map(t => lines()[t]);
+      for (const line of opened)
+        line?.querySelector<HTMLButtonElement>(".wake-toggle")?.click();
+      await settle();
+
+      expect(lines().map(t => [...textOf(t, ".wake-toggle, .wake-label"), ...textOf(t, ".wake-chat, .wake-chat-gone")])).toEqual([
+        ["Received a message from", "Second"], ["Received a message from", "Second"], ["No reply came back from", "Second"],
+        ["No reply came back from", "a deleted chat"], ["Received a message from", "Second"], ["A sub-agent or background command of this chat ended"],
+        ["No reply came back from", "Second"], ["No reply came back from", "a deleted chat"], ["Received a message from", "a deleted chat"]]);
+      expect(lines().map(t => textOf(t, ".wake-note"))).toEqual([[notWoken], [stopped], [], [], [], [], [], [], []]);
+      const lostText = "TeamRun restarted before the work sent there ended.";
+      const deletedText = "The chat was deleted before the work sent there ended.";
+      expect(opened.map(t => textOf(t, ".wake-reply-heading, .wake-reply-text"))).toEqual([[lostText], [deletedText], [lostText], [deletedText], ["Bob replied:", "Done."]]);
+      expect([4, 5].flatMap(t => [lines()[t]?.querySelector(".wake-toggle"), lines()[t]?.querySelector(".wake-chevron")])).toEqual([null, null, null, null]);
+      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(1);
+      expect(element().textContent).not.toMatch(/has ended|restarted before the work you sent|that you sent work to|teamrun_list_messages|\(c2\)|n9|gone-chat|w\d-wake|agent-1/);
+      const row = lines()[0]?.querySelector(".wake-line")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+      const note = lines()[0]?.querySelector(".wake-note")?.getBoundingClientRect() ?? new DOMRect(Number.NaN, Number.NaN);
+      AppearanceFixture.expectPixels(note.left, row.left);
+      expect(note.top).toBeGreaterThanOrEqual(row.bottom - 0.5);
+    });
+
+    it("draws a sub-agent's or command's wake as a closed row naming it and how it ended, opening to its result or why none came, an old lost one by its text's opening, never with an ID", async () => {
+      const at = SampleData.timestamp;
+      const task = (kind: string, name: string, ending: string | null, text: string | null): JsonObject => ({ kind, name, ending, text });
+      const wake = (id: string, sequence: number, text: string, wakeTask: JsonObject, end: string | null = null): Message =>
+        new Message(id, "c3", sequence, MessageAuthor.User, null, MessageStatus.Completed,
+          [new MessageDetail(0, DetailKind.Text, text, { source: "chatWake", wakeId: `${id}-wake`, wakeTask, ...Object.isNull(end) ? {} : { wakeEnd: end } }, at)],
+          null, at, null, at, [], null, null, [], new MessageSender("c3", null, "TeamRun"));
+      const old = (id: string, sequence: number, text: string): Message => new Message(id, "c3", sequence, MessageAuthor.User, null, MessageStatus.Completed,
+        [new MessageDetail(0, DetailKind.Text, text, { source: "chatWake", wakeId: `${id}-wake` }, at)], null, at, null, at, [], null, null, [], new MessageSender("c3", null, "TeamRun"));
+      const messages = [new Message("q0", "c3", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "Run them.")], null, at, null, at),
+        wake("w1", 1, "Your sub-agent \"Search\" (agent-1) ended as completed:\n> Found 3 files.", task("subAgent", "Search", "ended as completed", "Found 3 files.")),
+        wake("w2", 2, "Your background command \"Run the tests\" (bg-7) exited with code 1.", task("command", "Run the tests", "exited with code 1", "1 failed\n2 passed")),
+        wake("w3", 3, "TeamRun restarted before your background command \"Build\" (bg-8) ended.", task("command", "Build", null, null), "lost"),
+        wake("w4", 4, "TeamRun restarted before your sub-agent \"Plan\" (agent-2) ended.", task("subAgent", "Plan", null, null), "lost"),
+        wake("w5", 5, "Your sub-agent \"Quiet\" (agent-3) ended as failed.", task("subAgent", "Quiet", "ended as failed", null)),
+        old("w6", 6, "TeamRun restarted before your background command bg-9 ended, so it was stopped and this chat wasn't woken by it."),
+        old("w7", 7, "TeamRun restarted before your sub-agent agent-4 ended, so no result came back and this chat wasn't woken.")];
+      context.answer(MethodName.MessagePage, t => MessagePageParams.fromJson(t).conversationId === "c3" ? new MessagePage(messages, false, false, 8).toJson() : pageOf(t));
+      const lines = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-wake-line")];
+      const textOf = (line: HTMLElement | undefined, selector: string): readonly string[] =>
+        [...line?.querySelectorAll(selector) ?? []].map(t => t.textContent?.trim() ?? "");
+
+      fixture.componentRef.setInput("chatId", "c3");
+      await open("c3");
+      await until(() => expect(lines().length).toBe(7));
+      await settle();
+
+      expect(lines().map(t => textOf(t, ".wake-toggle, .wake-label"))).toEqual([["Sub-agent \"Search\" ended as completed"],
+        ["Background command \"Run the tests\" exited with code 1"], ["Background command \"Build\" was stopped"], ["Sub-agent \"Plan\" didn't come back"],
+        ["Sub-agent \"Quiet\" ended as failed"], ["A background command of this chat was stopped"], ["A sub-agent of this chat didn't come back"]]);
+      expect(lines().map(t => [t.querySelector(".wake-toggle")?.getAttribute("aria-expanded") ?? null, t.querySelectorAll(".wake-chevron").length]))
+        .toEqual([["false", 1], ["false", 1], ["false", 1], ["false", 1], [null, 0], ["false", 1], ["false", 1]]);
+      expect(lines().map(t => t.querySelectorAll(".wake-replies, .wake-chat, .wake-chat-gone").length)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+      for (const line of lines())
+        line.querySelector<HTMLButtonElement>(".wake-toggle")?.click();
+      await settle();
+
+      expect(lines().map(t => t.querySelector(".wake-toggle")?.getAttribute("aria-expanded") ?? null)).toEqual(["true", "true", "true", "true", null, "true", "true"]);
+      expect(lines().map(t => textOf(t, ".wake-reply-text"))).toEqual([["Found 3 files."], ["1 failed\n2 passed"],
+        ["TeamRun restarted before it ended, so it was stopped."], ["TeamRun restarted before it ended."], [],
+        ["TeamRun restarted before it ended, so it was stopped."], ["TeamRun restarted before it ended."]]);
+      const lost = "Why it didn't end";
+      expect(lines().map(t => t.querySelector(".wake-replies")?.getAttribute("aria-label") ?? null))
+        .toEqual(["The sub-agent's summary", "The command's last lines", lost, lost, null, lost, lost]);
+      const fontOf = (line: HTMLElement | undefined): string => getComputedStyle(line?.querySelector(".wake-reply-text") ?? element()).fontFamily;
+      expect(lines()[1]?.querySelector(".wake-reply-text")?.classList.contains("wake-command-text")).toBe(true);
+      expect(fontOf(lines()[1])).not.toBe(fontOf(lines()[0]));
+      const mono = document.createElement("span");
+      mono.style.fontFamily = "var(--nol-font-mono)";
+      element().append(mono);
+      expect(fontOf(lines()[1])).toBe(getComputedStyle(mono).fontFamily);
+      mono.remove();
+      expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(1);
+      expect(element().textContent).not.toMatch(/agent-\d|bg-\d|w\d-wake|Your sub-agent|Your background command|restarted before your/);
     });
   });
 });
@@ -1903,7 +2191,7 @@ describe("HistoryComponent over 10,000 messages with files and edits", () => {
       .toEqual([count, true, true, true]);
   });
 
-  it("keeps the thumb where it is dragged and its size through a drag to the first message and back to the last while earlier pages load, its first message in view moving one way, shows the first and the last message, not a loading row, within 30 frames at each end while the thumb is held, and moves nothing on release", { timeout: 25_000 }, async () => {
+  it("keeps the thumb's place and size through a drag to the first message and back while pages load, the top message moving one way, shows each end within 30 frames, and moves nothing on release", { timeout: 60_000 }, async () => {
     await settle();
     const view = viewport();
     const height = view.scrollHeight;

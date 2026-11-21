@@ -1,6 +1,6 @@
 {
   "name": "teamrun-app",
-  "version": "0.0.1",
+  "version": "0.0.7",
   "workspaces": [
     "src/noldova.teamrun.window.app"
   ],
@@ -39,6 +39,7 @@
     "product": {
       "name": "TeamRun",
       "publisher": "Noldova",
+      "installFolder": "Noldova",
       "slug": "teamrun",
       "applicationId": "com.noldova.teamrun",
       "developmentApplicationId": "com.noldova.teamrun.development",
@@ -95,15 +96,6 @@
           ],
           "reason": "TeamRun starts the claude program the person installed, through the SDK's pathToClaudeCodeExecutable, and never loads the one these packages bundle."
         }
-      },
-      "typeOnlyPeers": {
-        "@anthropic-ai/claude-agent-sdk@0.3.263": {
-          "peers": [
-            "@modelcontextprotocol/sdk",
-            "zod"
-          ],
-          "reason": "The SDK names them only in its type declarations, and its scripts never load them; TeamRun gives the SDK no MCP servers or tool schemas of its own."
-        }
       }
     }
   },
@@ -128,24 +120,25 @@
     "@noldova/browser": "0.0.3",
     "@noldova/checkpoints": "0.0.3",
     "@noldova/computer-use": "0.0.2",
-    "@noldova/context.core": "0.0.8",
-    "@noldova/context.data": "0.0.8",
-    "@noldova/context.data.sql": "0.0.8",
-    "@noldova/context.data.sql.sqlite": "0.0.8",
-    "@noldova/context.exceptions": "0.0.8",
-    "@noldova/context.json": "0.0.8",
-    "@noldova/context.text": "0.0.8",
-    "@noldova/desktop.cli": "0.0.3",
-    "@noldova/desktop.electron": "0.0.3",
-    "@noldova/desktop.protocol": "0.0.3",
-    "@noldova/desktop.runtime": "0.0.3",
-    "@noldova/git": "0.0.2",
-    "@noldova/git.github": "0.0.2",
-    "@noldova/teamrun": "0.0.1",
-    "@noldova/terminal": "0.0.2"
+    "@noldova/context.collections": "0.0.10",
+    "@noldova/context.core": "0.0.10",
+    "@noldova/context.data": "0.0.10",
+    "@noldova/context.data.sql": "0.0.10",
+    "@noldova/context.data.sql.sqlite": "0.0.10",
+    "@noldova/context.exceptions": "0.0.10",
+    "@noldova/context.json": "0.0.10",
+    "@noldova/context.text": "0.0.10",
+    "@noldova/desktop.cli": "0.0.11",
+    "@noldova/desktop.electron": "0.0.11",
+    "@noldova/desktop.protocol": "0.0.11",
+    "@noldova/desktop.runtime": "0.0.11",
+    "@noldova/git": "0.0.6",
+    "@noldova/git.github": "0.0.6",
+    "@noldova/teamrun": "0.0.7",
+    "@noldova/terminal": "0.0.3"
   },
   "devDependencies": {
-    "@noldova/desktop.build": "0.0.3",
+    "@noldova/desktop.build": "0.0.11",
     "electron": "44.9.1"
   },
   "overrides": {

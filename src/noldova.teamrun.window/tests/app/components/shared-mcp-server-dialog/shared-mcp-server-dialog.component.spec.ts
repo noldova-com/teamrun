@@ -457,6 +457,23 @@ describe("SharedMcpServerDialogComponent", () => {
       expect(JSON.stringify(context.requests)).not.toContain(value);
     });
 
+  it("moves the focus to the value field once Change takes its place, and to the source once Remove clears a saved secret", async () => {
+    await create(tracker, () => undefined, [new SharedMcpVariable("TRACKER_TEAM", SharedMcpVariableSource.Saved, true),
+      new SharedMcpVariable("TRACKER_TOKEN", SharedMcpVariableSource.Saved, true)]);
+    const change = rowOf("TRACKER_TEAM").querySelector<HTMLButtonElement>(".nol-teamrun-shared-mcp-change");
+    const remove = rowOf("TRACKER_TOKEN").querySelector<HTMLButtonElement>(".nol-teamrun-shared-mcp-remove");
+
+    change?.focus();
+    change?.click();
+    await settle();
+    const changing = document.activeElement === secretOf("TRACKER_TEAM");
+    remove?.focus();
+    remove?.click();
+    await settle();
+
+    expect([changing, document.activeElement === rowOf("TRACKER_TOKEN").querySelector(".nol-teamrun-shared-mcp-source .nol-select-button")]).toEqual([true, true]);
+  });
+
   it("shows a saved secret as Saved with Change and Remove, never its value, and Change takes a new value under a new reference", async () => {
     await create(docs, () => undefined, [new SharedMcpVariable("DOCS_KEY", SharedMcpVariableSource.Saved, true)]);
 

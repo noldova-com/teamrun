@@ -15,6 +15,7 @@ import { defineConfig } from "vitest/config";
 import { ClassMetadataCoverage } from "../scripts/angular/class-metadata-coverage.ts";
 import { PreBundleCheck } from "../scripts/angular/pre-bundle-check.ts";
 import { PreBundleRun } from "../scripts/angular/pre-bundle-run.ts";
+import { ShortScreenshotNames } from "../scripts/angular/short-screenshot-names.ts";
 import { SpecTransformCheck } from "../scripts/angular/spec-transform-check.ts";
 
 const compilerOptions: { paths: Record<string, string[]> } = JSON.parse(readFileSync(new URL("./tsconfig.spec.json", import.meta.url), "utf8")).compilerOptions;
@@ -35,6 +36,7 @@ export default defineConfig({
   },
   test: {
     api: { port: 24315 },
+    browser: { commands: { __vitest_screenshot: new ShortScreenshotNames().screenshot } },
     coverage: {
       reportsDirectory: fileURLToPath(new URL("../_build/angular-coverage", import.meta.url))
     },

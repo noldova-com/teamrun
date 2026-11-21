@@ -131,6 +131,7 @@ export class Resources {
   public static readonly gitHubAccessService: string = "git-github.access";
   public static readonly appIconEncoding: BufferEncoding = "base64";
   public static readonly mainProcessOnly: string = "Only the person answers this, from TeamRun's window.";
+  public static readonly partStopping: string = "TeamRun is stopping, so it starts no rewind or move now.";
   public static readonly commandFolderName: string = "command";
   public static readonly commandOutsideTurn: string = "This command runs only in a teammate's turn, whose environment names the app's program.";
   public static readonly loopbackAddress: string = "127.0.0.1";
@@ -361,6 +362,7 @@ export class Resources {
   public static readonly speedField: string = "speed";
   public static readonly modeField: string = "mode";
   public static readonly contextWindowField: string = "contextWindow";
+  public static readonly binaryPathField: string = "binaryPath";
   public static readonly expectedProviderIdField: string = "expectedProviderId";
   public static readonly projectLabel: string = "Project";
   public static readonly folderLabel: string = "Folder";

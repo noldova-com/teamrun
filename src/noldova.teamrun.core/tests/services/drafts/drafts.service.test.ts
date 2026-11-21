@@ -72,6 +72,33 @@ export class DraftsServiceTests {
   }
 
   @TestMethod
+  public async refusesASaveBasedOnAnOlderRevisionAndKeepsTheNewerDraftAndItsFiles(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const id = new ConversationIdParams(conversation.id);
+    const folder = join(host.directory.path, "attachments", "draft-files", conversation.id);
+    const refusal = async (params: DraftSaveParams): Promise<string> => (await Assert.throwsAsync(() => host.drafts.saveAsync(params), ServiceException)).info.name;
+    const opened = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Hi", [], 0));
+    const attached = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Hi, see the file", [DraftsServiceTests.upload("a.txt", "a")], opened.revision));
+    const files = JSON.stringify(attached.attachments.map(t => basename(t.path)));
+
+    for (const revision of [0, opened.revision])
+      Assert.areEqual(ErrorCode.Conflict, await refusal(new DraftSaveParams(conversation.id, "Hi!", [DraftsServiceTests.upload("b.txt", "b")], revision)));
+    Assert.areEqual(JSON.stringify(attached.toJson()), JSON.stringify((await host.drafts.readAsync(id))?.toJson()));
+    Assert.areEqual(files, JSON.stringify(readdirSync(folder)));
+
+    const typed = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Hi, see the file!",
+      attached.attachments.map(t => new AttachmentInput(t.name, t.mediaType, null, t.path)), attached.revision));
+    Assert.areEqual(attached.revision + 1, typed.revision);
+    Assert.areEqual(files, JSON.stringify(readdirSync(folder)));
+
+    await host.drafts.discardAsync(new DraftDiscardParams(conversation.id, typed.revision));
+    Assert.areEqual(ErrorCode.Conflict, await refusal(new DraftSaveParams(conversation.id, "Late", [], typed.revision)));
+    Assert.isNull(await host.drafts.readAsync(id));
+    Assert.areEqual("Again", (await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Again", [], 0))).text);
+  }
+
+  @TestMethod
   public async forgetsAChatsDraftOnItsOwnConnectionWhenGivenNoTransaction(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
@@ -222,6 +249,26 @@ export class DraftsServiceTests {
     Assert.isTrue(existsSync(saved.attachments[0]!.path));
     Assert.isFalse(existsSync(stray));
     Assert.areEqual(`The draft of the chat ending in "${conversation.id.slice(-12)}" was not read, so its files were kept: JsonException.`, host.log.lines.join("\n"));
+  }
+
+  @TestMethod
+  public async sweepsPastEachDraftWhoseSelectFailsKeepingItsFilesAndStillSweepsTheSentFiles(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const first = await host.createConversationAsync();
+    const second = await host.createConversationAsync();
+    const saved = await host.drafts.saveAsync(new DraftSaveParams(first.id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
+    const kept = await host.drafts.saveAsync(new DraftSaveParams(second.id, "Keep", [DraftsServiceTests.upload("b.txt", "b")]));
+    const stray = join(host.directory.path, "attachments", "stray.txt");
+    writeFileSync(stray, "left by a crash");
+    await host.context.database.connection.executeAsync(new SqlQuery("ALTER TABLE drafts RENAME TO draftsGone"));
+
+    await host.drafts.sweepAsync();
+
+    Assert.isTrue(existsSync(saved.attachments[0]!.path));
+    Assert.isTrue(existsSync(kept.attachments[0]!.path));
+    Assert.isFalse(existsSync(stray));
+    Assert.areEqual([first.id, second.id].map(t => `The draft of the chat ending in "${t.slice(-12)}" was not read, so its files were kept: ERR_SQLITE_ERROR.`).sort().join("\n"),
+      [...host.log.lines].sort().join("\n"));
   }
 
   @TestMethod

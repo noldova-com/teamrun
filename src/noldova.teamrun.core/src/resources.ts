@@ -91,6 +91,7 @@ export class Resources {
   public static readonly chatMovedWhileSent: string = "The chat moved to another project while this message was sent, so nothing was sent. Send it again.";
   public static readonly replyEndedWhileSent: string = "The reply this message was joining ended while it was sent, so nothing was sent. Send it again.";
   public static readonly unrestrictedModeRefused: string = "A teammate's message can't start a turn in an unrestricted mode; only the person can choose one.";
+  public static readonly unchosenModeRefused: string = "A message from outside TeamRun's window can only ask for the mode the person chose for the chat or for the default teammate.";
   public static readonly helperAgent: string = "helper";
   public static readonly helperType: string = "Helper";
   public static readonly explorerAgent: string = "explorer";
@@ -272,6 +273,9 @@ export class Resources {
   public static readonly sharedImageHash: string = "sha256";
   public static readonly hexEncoding: "hex" = "hex";
   public static readonly partialFileSuffix: string = ".partial";
+  public static readonly selectChatAttachmentPaths: string =
+    "SELECT json_extract(a.value, '$.path') AS path FROM messages m, json_each(m.json, '$.attachments') a WHERE m.chatId = ?";
+  public static readonly selectAttachmentPaths: string = "SELECT json_extract(a.value, '$.path') AS path FROM messages m, json_each(m.json, '$.attachments') a";
   public static readonly selectMessageAttachment: string =
     "SELECT a.value AS json FROM messages m, json_each(m.json, '$.attachments') a "
     + "WHERE m.chatId = ? AND json_extract(a.value, '$.path') = ? LIMIT 1";
@@ -388,7 +392,9 @@ export class Resources {
   public static readonly renameChatEntities: readonly string[] = ["UPDATE __changes SET entity = 'Chat' WHERE entity = 'Conversation'",
     "UPDATE __changes SET entity = 'ChatMember' WHERE entity = 'ConversationMember'"];
   public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ? WHERE id = ?";
+  public static readonly updateMessageCheckpointFolder: string = "UPDATE messages SET checkpointFolderId = ? WHERE id = ?";
   public static readonly selectMessageCheckpoint: string = "SELECT checkpointId FROM messages WHERE id = ?";
+  public static readonly selectMessageCheckpointFolder: string = "SELECT checkpointFolderId FROM messages WHERE id = ?";
   public static readonly selectCommandReply: string =
     `SELECT 1 FROM messages m WHERE chatId = ? AND json_extract(m.json, '$.author') = '${MessageAuthor.Provider}' AND json_extract(m.json, '$.endedAt') IS NOT NULL `
     + `AND EXISTS (SELECT 1 FROM json_each(m.json, '$.details') d WHERE json_extract(d.value, '$.kind') = '${DetailKind.Command}') LIMIT 1`;
@@ -463,6 +469,32 @@ export class Resources {
   public static readonly handoverSummariesTable: string = "handoverSummaries";
   public static readonly handoverSummaryKindsMigrationId: string = "20261112040000_HandoverSummaryKinds";
   public static readonly addHandoverSummaryKind: string = "ALTER TABLE handoverSummaries ADD COLUMN kind TEXT";
+  public static readonly checkpointFoldersMigrationId: string = "20261119120000_CheckpointFolders";
+  public static readonly addMessageCheckpointFolder: string = "ALTER TABLE messages ADD COLUMN checkpointFolderId TEXT";
+  public static readonly checkpointFolderIdColumn: string = "checkpointFolderId";
+  public static readonly departmentsMigrationId: string = "20261120120000_Departments";
+  public static readonly departmentsTable: string = "departments";
+  public static readonly departmentMembersTable: string = "departmentMembers";
+  public static readonly departmentIdColumn: string = "departmentId";
+  public static readonly selectDepartments: string = "SELECT json FROM departments ORDER BY createdAt, rowid";
+  public static readonly selectDepartmentMembers: string = "SELECT teammateId, departmentId FROM departmentMembers ORDER BY rowid";
+  public static readonly insertDepartment: string = "INSERT INTO departments (id, parentId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)";
+  public static readonly updateDepartment: string = "UPDATE departments SET parentId = ?, json = ?, updatedAt = ? WHERE id = ?";
+  public static readonly deleteDepartment: string = "DELETE FROM departments WHERE id = ?";
+  public static readonly insertDepartmentMember: string = "INSERT INTO departmentMembers (teammateId, departmentId) VALUES (?, ?)";
+  public static readonly deleteDepartmentMember: string = "DELETE FROM departmentMembers WHERE teammateId = ?";
+  public static readonly organizationMessagesMigrationId: string = "20261121090000_OrganizationMessages";
+  public static readonly organizationMessagesTable: string = "organizationMessages";
+  public static readonly selectOrganizationMessages: string = "SELECT json FROM organizationMessages ORDER BY createdAt, rowid";
+  public static readonly teammateLastRepliesMigrationId: string = "20261122090000_TeammateLastReplies";
+  public static readonly createTeammateLastReplyIndex: string =
+    "CREATE INDEX IX_messages_teammateId_endedAt ON messages (json_extract(json, '$.teammateId'), json_extract(json, '$.endedAt')) "
+    + `WHERE ${Resources.formatFinishedReply(null)}`;
+  public static readonly selectOrganizationMessage: string = "SELECT json FROM organizationMessages WHERE id = ?";
+  public static readonly insertOrganizationMessage: string = "INSERT INTO organizationMessages (id, json, createdAt) VALUES (?, ?, ?)";
+  public static readonly updateOrganizationMessage: string = "UPDATE organizationMessages SET json = ? WHERE id = ?";
+  public static readonly organizationMessageLabel: string = "Organization";
+  public static readonly organizationSendInterrupted: string = "TeamRun stopped before it was sent.";
   public static readonly selectHandoverSummary: string = "SELECT text, kind FROM handoverSummaries WHERE chatId = ? AND teammateId = ? AND through = ?";
   public static readonly upsertHandoverSummary: string = "INSERT INTO handoverSummaries (chatId, teammateId, through, text, kind) VALUES (?, ?, ?, ?, ?) "
     + "ON CONFLICT (chatId, teammateId) DO UPDATE SET through = excluded.through, text = excluded.text, kind = excluded.kind";
@@ -546,6 +578,7 @@ export class Resources {
   public static readonly endedAtColumn: string = "endedAt";
   public static readonly idColumn: string = "id";
   public static readonly jsonColumn: string = "json";
+  public static readonly pathColumn: string = "path";
   public static readonly outputColumn: string = "output";
   public static readonly revisionColumn: string = "revision";
   public static readonly sequenceColumn: string = "sequence";
@@ -599,6 +632,8 @@ export class Resources {
   public static readonly selectLastSequenceByConversation: string = "SELECT sequence FROM messages WHERE chatId = ? ORDER BY sequence DESC LIMIT 1";
   public static readonly selectMessageById: string = "SELECT json FROM messages WHERE id = ?";
   public static readonly selectMessagesByConversation: string = "SELECT json FROM messages WHERE chatId = ? AND sequence > ? ORDER BY sequence";
+  public static readonly selectRepliesTo: string =
+    "SELECT json FROM messages WHERE chatId = ? AND sequence > ? AND json_valid(json) AND json_extract(json, '$.inReplyTo') = ? ORDER BY sequence";
   public static readonly selectMessageOutlinesByConversation: string =
     "SELECT json_set(json, '$.details', json('[]')) AS json FROM messages WHERE chatId = ? AND sequence > ? ORDER BY sequence";
   public static readonly selectNewestMessagesByConversation: string = "SELECT json FROM messages WHERE chatId = ? ORDER BY sequence DESC LIMIT ?";
@@ -616,6 +651,13 @@ export class Resources {
     + "ORDER BY chatId, sequence";
   public static readonly selectOpenReplyByConversation: string =
     `SELECT json FROM messages WHERE chatId = ? AND status IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}') ORDER BY sequence LIMIT 1`;
+  public static readonly textBlanks: string = " \t\n\v\f\r\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
+  public static readonly selectTeammateLastReplies: string =
+    "SELECT l.teammateId, m.chatId, m.id, t.text, json_extract(m.json, '$.endedAt') AS endedAt FROM (SELECT tm.id AS teammateId, "
+    + `(SELECT r.rowid FROM messages r CROSS JOIN messageText x ON x.rowid = r.rowid WHERE ${Resources.formatFinishedReply("r")} `
+    + "AND json_extract(r.json, '$.teammateId') = +tm.id AND json_extract(r.json, '$.endedAt') IS NOT NULL AND trim(x.text, ?) <> '' "
+    + "ORDER BY json_extract(r.json, '$.endedAt') DESC, r.rowid DESC LIMIT 1) AS lastRowid FROM teammates tm) l "
+    + "CROSS JOIN messages m ON m.rowid = l.lastRowid CROSS JOIN messageText t ON t.rowid = m.rowid ORDER BY l.teammateId";
   public static readonly selectTeammateUsage: string =
     "SELECT u.id, u.chatId, u.teammateId, u.startedAt, u.endedAt, u.usage FROM (SELECT id, chatId, sequence, "
     + "json_extract(json, '$.teammateId') AS teammateId, json_extract(json, '$.startedAt') AS startedAt, "
@@ -695,7 +737,6 @@ export class Resources {
   public static readonly idleCompactionField: string = "idleCompaction";
   public static readonly compactionField: string = "compaction";
   public static readonly idleCompactionNote: string = "Compacted while idle, before the prompt cache expired, so the next message starts from a summary.";
-  public static readonly chatWakeSource: string = "chatWake";
   public static readonly wakeIdField: string = "wakeId";
   public static readonly wakeSourceMessageField: string = "wakeSourceMessageId";
   public static readonly kindField: string = "kind";
@@ -706,6 +747,8 @@ export class Resources {
   public static readonly stateField: string = "state";
   public static readonly textField: string = "text";
   public static readonly hopField: string = "hop";
+  public static readonly viewField: string = "view";
+  public static readonly taskWakeReceived: string = "Woken when a sub-agent or background command of this chat ended.";
   public static readonly createdAtField: string = "createdAt";
   public static readonly chatIdParameterName: string = "chatId";
   public static readonly sourceMessageIdParameterName: string = "sourceMessageId";
@@ -715,6 +758,7 @@ export class Resources {
   public static readonly wakeWatchesNothing: string = "A wake watches at least one reply or sub-agent.";
   public static readonly wakeQuoteLength: number = 2_000;
   public static readonly wakeReadWhole: string = "Read a message whole with `teamrun_list_messages`.";
+  public static readonly wakeChatDeletedSince: string = "That chat has since been deleted, so its messages can't be read.";
   public static readonly wakeSenderGone: string = "the reply that asked for it is gone.";
   public static readonly wakeTeammateGone: string = "the teammate that asked for it is no longer in this chat.";
   public static readonly wakeProviderUnavailable: string = "the provider that asked for it is turned off or signed out.";
@@ -769,7 +813,8 @@ export class Resources {
   public static readonly existsErrorCode: string = "EEXIST";
   public static readonly maximumDiffLines: number = ProtocolResources.maximumDiffLines;
   public static readonly checkpointPathSeparator: string = "/";
-  public static readonly noCheckpointRefusal: string = "No checkpoint was taken of the project's folder before that reply, so no files were restored.";
+  public static readonly noCheckpointRefusal: string = "No checkpoint was taken before that reply, so no files were restored.";
+  public static readonly checkpointFolderChangedRefusal: string = "The chat's folder has changed since that reply, so no files were restored.";
   public static readonly restoreRefusals: ReadonlyMap<string, string> = new Map([
     ["CheckpointMissing", "The checkpoint taken before that reply is gone, so no files were restored."],
     ["FolderMissing", "The project's folder is missing, so no files were restored."],
@@ -876,6 +921,10 @@ export class Resources {
 
   public static formatCompactRefused(provider: string, reason: string): string {
     return `${provider} can't compact its context here: ${reason}.`;
+  }
+
+  public static formatDescriptorNotRefreshed(kind: string, failure: string): string {
+    return `The ${kind} kind's descriptor couldn't be rebuilt from the environment its tooling is given, so it keeps the last one: ${failure}.`;
   }
 
   public static formatAcpAgentNotOpened(kind: string, reason: string): string {
@@ -1107,8 +1156,20 @@ export class Resources {
     return `The draft's file "${name}" does not exist.`;
   }
 
+  public static formatDraftStale(conversationId: string): string {
+    return `The draft of the chat "${conversationId}" changed since this save read it.`;
+  }
+
   public static formatDraftFilesNotRemoved(conversationId: string, reason: string): string {
     return `The draft files of the chat ending in "${conversationId.slice(-Resources.loggedIdLength)}" were not removed: ${reason}.`;
+  }
+
+  public static formatSentFilesNotRemoved(conversationId: string, reason: string): string {
+    return `The sent files of the chat ending in "${conversationId.slice(-Resources.loggedIdLength)}" were not removed: ${reason}.`;
+  }
+
+  public static formatSentFilesNotSwept(reason: string): string {
+    return `The sent files no message names were not removed: ${reason}.`;
   }
 
   public static formatDraftNotRead(conversationId: string, reason: string): string {
@@ -1120,6 +1181,10 @@ export class Resources {
       return typeof error;
     const code = (error as NodeJS.ErrnoException).code;
     return Object.isString(code) ? `${error.name} ${code}` : error.name;
+  }
+
+  public static formatFailureReason(error: unknown): string {
+    return error instanceof Error ? (error as NodeJS.ErrnoException).code ?? error.name : typeof error;
   }
 
   public static formatLoggedProvider(providerId: string | null): string {
@@ -1236,6 +1301,11 @@ export class Resources {
 
   public static formatSettled(row: string): string {
     return `${row}.status NOT IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}')`;
+  }
+
+  public static formatFinishedReply(row: string | null): string {
+    const prefix = Object.isNull(row) ? "" : `${row}.`;
+    return `${prefix}status = '${MessageStatus.Completed}' AND json_valid(${prefix}json) AND json_extract(${prefix}json, '$.author') = '${MessageAuthor.Provider}'`;
   }
 
   public static formatMessageText(row: string): string {
@@ -1454,12 +1524,24 @@ export class Resources {
     return `This reply started no sub-agent ${subAgentId}.`;
   }
 
+  public static formatSubAgentNotSaved(subAgentId: string, reason: string): string {
+    return `The sub-agent ${subAgentId} couldn't save its end, so a restart shows it as it was at its last save: ${reason}`;
+  }
+
+  public static formatSubAgentNotStopped(subAgentId: string, reason: string): string {
+    return `The sub-agent ${subAgentId} couldn't be stopped cleanly, so a restart shows it as it was at its last save: ${reason}`;
+  }
+
   public static formatSubAgentResultCut(left: number): string {
     return `\n\n[${left} more characters cut]`;
   }
 
   public static formatWakeNote(command: string | null): string {
     return Object.isNull(command) ? "Started when a background task ended." : `Started when the background task \`${command}\` ended.`;
+  }
+
+  public static formatWakeReceived(title: string | null): string {
+    return Object.isNull(title) ? "Received a message from a deleted chat." : `Received a message from ${JSON.stringify(title)}.`;
   }
 
   public static formatWakeHeader(title: string, chatId: string): string {
@@ -1493,13 +1575,27 @@ export class Resources {
     return `@${name} (message ${messageId})`;
   }
 
+  public static formatSubAgentEnding(status: string): string {
+    return `ended as ${status.toLowerCase()}`;
+  }
+
+  public static formatCommandEnding(exit: CommandExit): string {
+    return !Object.isNull(exit.error) ? `couldn't run: ${exit.error}` : !Object.isNull(exit.signal) ? `was ended by ${exit.signal}` : `exited with code ${exit.code}`;
+  }
+
+  public static formatCommandQuote(lastLines: string): string | null {
+    if (lastLines.length === 0)
+      return null;
+    return lastLines.length <= Resources.wakeQuoteLength ? lastLines : `${Resources.ellipsis}${lastLines.slice(-Resources.wakeQuoteLength)}`;
+  }
+
   public static formatSubAgentWake(description: string, subAgentId: string, status: string, summary: string | null): string {
-    const ending = `Your sub-agent "${description}" (${subAgentId}) ended as ${status.toLowerCase()}`;
+    const ending = `Your sub-agent "${description}" (${subAgentId}) ${Resources.formatSubAgentEnding(status)}`;
     return Object.isNull(summary) ? `${ending}, without a summary.` : `${ending}:${Resources.lineSeparator}${Resources.formatWakeQuote(summary)}`;
   }
 
   public static formatWakeLost(title: string, chatId: string): string {
-    return `TeamRun restarted before the work you sent to chat ${Resources.formatChatName(title, chatId)} ended, so no result came back and this chat wasn't woken.`;
+    return `${ProtocolResources.wakeLostOpening}${Resources.formatChatName(title, chatId)} ended, so no result came back and this chat wasn't woken.`;
   }
 
   public static formatCommandLimitReached(limit: number): string {
@@ -1517,25 +1613,21 @@ export class Resources {
   }
 
   public static formatCommandWake(description: string, commandId: string, exit: CommandExit, lastLines: string): string {
-    const ending = !Object.isNull(exit.error) ? `couldn't run: ${exit.error}` : !Object.isNull(exit.signal) ? `was ended by ${exit.signal}`
-      : `exited with code ${exit.code}`;
-    const head = `Your background command "${description}" (${commandId}) ${ending}`;
-    if (lastLines.length === 0)
-      return `${head}, with no output.`;
-    const quoted = lastLines.length <= Resources.wakeQuoteLength ? lastLines : `${Resources.ellipsis}${lastLines.slice(-Resources.wakeQuoteLength)}`;
-    return `${head}. Its last lines:${Resources.lineSeparator}${quoted}`;
+    const head = `Your background command "${description}" (${commandId}) ${Resources.formatCommandEnding(exit)}`;
+    const quoted = Resources.formatCommandQuote(lastLines);
+    return Object.isNull(quoted) ? `${head}, with no output.` : `${head}. Its last lines:${Resources.lineSeparator}${quoted}`;
   }
 
   public static formatCommandWakeLost(commandId: string): string {
-    return `TeamRun restarted before your background command ${commandId} ended, so it was stopped and this chat wasn't woken by it.`;
+    return `${ProtocolResources.wakeCommandLostOpening}${commandId} ended, so it was stopped and this chat wasn't woken by it.`;
   }
 
   public static formatSubAgentWakeLost(subAgentId: string): string {
-    return `TeamRun restarted before your sub-agent ${subAgentId} ended, so no result came back and this chat wasn't woken.`;
+    return `${ProtocolResources.wakeSubAgentLostOpening}${subAgentId} ended, so no result came back and this chat wasn't woken.`;
   }
 
   public static formatWakeChatDeleted(chatId: string): string {
-    return `The chat ${chatId} that you sent work to was deleted before its result came back, so this chat wasn't woken.`;
+    return `${ProtocolResources.wakeChatDeletedOpening}${chatId} that you sent work to was deleted before its result came back, so this chat wasn't woken.`;
   }
 
   public static formatWakeProviderRefused(reason: string): string {
@@ -1564,6 +1656,10 @@ export class Resources {
 
   public static formatChatWaitingFilesNotRemoved(chatId: string, reason: string): string {
     return `The waiting messages' files of the chat ending in "${chatId.slice(-Resources.loggedIdLength)}" were not removed: ${reason}.`;
+  }
+
+  public static formatWaitingMessagesNotShown(chatId: string, reason: string): string {
+    return `The waiting messages of the chat ${chatId} couldn't be read to show them: ${reason}.`;
   }
 
   public static formatWaitingMessageNotSent(chatId: string, reason: string): string {
@@ -1688,6 +1784,30 @@ export class Resources {
     return `The provider "${label}" is disabled. Enable it on the Providers page first.`;
   }
 
+  public static formatAttachedFolderId(hash: string): string {
+    return `folder-${hash}`;
+  }
+
+  public static formatAttachedFolderMissing(path: string): string {
+    return `The folder attached to this chat, "${path}", is missing or can't be read, so the reply didn't start. Restore the folder there, or attach another folder or detach this one in the chat's menu.`;
+  }
+
+  public static formatAttachedFolderUnreachable(path: string): string {
+    return `The folder attached to this chat, "${path}", didn't answer in time, so the reply didn't start. Check that its drive or share is connected, then send again.`;
+  }
+
+  public static formatFolderNotAttached(path: string): string {
+    return `The folder "${path}" is missing, can't be read or didn't answer in time, so it wasn't attached.`;
+  }
+
+  public static formatFolderNotAbsolute(path: string): string {
+    return `The folder "${path}" is not an absolute path.`;
+  }
+
+  public static formatChatInProject(conversationId: string): string {
+    return `The chat "${conversationId}" is in a project, which gives it its folder.`;
+  }
+
   public static formatWorkFolderMissing(path: string): string {
     return `The project's folder "${path}" is missing, so the reply didn't start. Restore the folder there, or move this chat with Move to another project… in its menu.`;
   }
@@ -1801,6 +1921,27 @@ export class Resources {
 
   public static formatTeammateNotFound(id: string): string {
     return `Teammate not found: ${id}.`;
+  }
+
+  public static formatDepartmentNotFound(id: string): string {
+    return `Department not found: ${id}.`;
+  }
+
+  public static formatOrganizationMessageNotFound(id: string): string {
+    return `Organization message not found: ${id}.`;
+  }
+
+  public static formatAccountCannotReply(teammate: string, account: string | null): string {
+    return Object.isNull(account) ? `${teammate}'s account is deleted, so it can't reply.`
+      : `${teammate}'s account ${account} can't reply: it is turned off, signed out or of a kind TeamRun lacks.`;
+  }
+
+  public static formatDepartmentLeaderNotMember(teammate: string, department: string): string {
+    return `${teammate} can't lead ${department} without being one of its members.`;
+  }
+
+  public static formatDepartmentUnderItself(department: string): string {
+    return `${department} can't move under itself or one of its own departments.`;
   }
 
   public static formatSharedMcpServerNotFound(id: string): string {

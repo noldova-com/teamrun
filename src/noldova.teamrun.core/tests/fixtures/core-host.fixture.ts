@@ -11,6 +11,8 @@ import { join } from "node:path";
 
 import {
   TeammatesService,
+  OrganizationMessagesService,
+  OrganizationService,
   ApprovalsService,
   BackgroundTasksService,
   AttachmentStore,
@@ -90,6 +92,8 @@ export class CoreHost implements AsyncDisposable {
   public readonly commands: FakeCommandStarter = new FakeCommandStarter();
   public readonly providers: ProvidersService;
   public readonly teammates: TeammatesService;
+  public readonly organization: OrganizationService;
+  public readonly organizationMessages: OrganizationMessagesService;
   public readonly kinds: ProviderKindsService;
   public readonly planUsage: PlanUsageService;
   public readonly engine: ConversationEngine;
@@ -133,7 +137,8 @@ export class CoreHost implements AsyncDisposable {
     this.approvals = new ApprovalsService(this.context);
     this.tasks = new BackgroundTasksService(this.events, 0, 50, null, this.context);
     this.providers = new ProvidersService(this.context, this.registry, this.conversations, this.events, signInTimeout, this.log);
-    this.teammates = new TeammatesService(this.context, this.providers, this.conversations);
+    this.organization = new OrganizationService(this.context);
+    this.teammates = new TeammatesService(this.context, this.providers, this.conversations, this.organization);
     this.planUsage = new PlanUsageService(this.events, this.timer);
     this.sharedServers = new SharedMcpServersService(this.context, this.providers, this.teammates, this.registry, () => Promise.resolve(this.environment),
       this.secrets, this.signIns, this.accounts, this.events, this.log);
@@ -141,13 +146,14 @@ export class CoreHost implements AsyncDisposable {
     this.windows = new WindowsService(this.events, this.conversations, 50);
     this.computerUseGrants = new ComputerUseGrantsService(this.rememberedGrants, this.conversations, this.teammates, this.appDescriptions,
       new ComputerUseGrantTimings(1_000, 60_000), this.timer);
-    this.kinds = new ProviderKindsService(this.registry, this.providers, this.events, this.planUsage, this.teammates);
+    this.kinds = new ProviderKindsService(this.registry, this.providers, this.events, this.planUsage, this.teammates, this.log);
     this.engine = new ConversationEngine(this.context, this.projects, this.conversations, this.messages, this.approvals,
       this.providers, this.teammates, this.registry, this.events, this.attachments, readHopLimit, this.log, readCommand, this.tasks, this.planUsage, tools,
       this.checkpoints, this.sharedServers, null, runsCommands ? this.commands : null, readTitleModel, readIdleCompaction, this.timer);
+    this.organizationMessages = new OrganizationMessagesService(this.context, this.organization, this.teammates, this.messages, this.engine, this.events);
     this.dispatcher = new RequestDispatcher(this.kinds, this.providers, this.projects, this.conversations,
       this.messages, this.approvals, this.engine, this.teammates, this.events, this.drafts, null, this.tasks, this.planUsage,
-      this.readingPositions, this.windows, this.sharedServers, this.computerUseGrants);
+      this.readingPositions, this.windows, this.sharedServers, this.computerUseGrants, null, this.organization, this.organizationMessages);
   }
 
   public static async createAsync(supportsFork: boolean = false, supportsSignIn: boolean = false, signInTimeout?: number, readHopLimit?: () => number,

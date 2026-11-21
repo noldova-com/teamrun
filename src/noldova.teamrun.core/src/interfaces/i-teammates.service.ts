@@ -18,7 +18,7 @@ export interface ITeammatesService {
   createAsync(params: TeammateCreateParams): Promise<Teammate>;
   updateAsync(params: TeammateUpdateParams, checked?: Teammate | null): Promise<Teammate>;
   clearUnlistedAsync(providerId: string, list: ProviderModelList): Promise<readonly Teammate[]>;
-  deleteAsync(params: TeammateIdParams): Promise<void>;
+  deleteAsync(params: TeammateIdParams): Promise<boolean>;
   readDefaultAsync(transaction?: SqlTransaction): Promise<DefaultTeammate | null>;
   setDefaultAsync(params: DefaultTeammateSetParams, transaction?: SqlTransaction): Promise<DefaultTeammate | null>;
   moveProviderlessDefaultAsync(providerOf: (kind: string, transaction: SqlTransaction) => Promise<string | null>): Promise<DefaultTeammate | null>;

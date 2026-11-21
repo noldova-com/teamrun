@@ -88,6 +88,7 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { ILog } from "../../interfaces/i-log.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
 import type { IEngineCallbacks } from "../../interfaces/i-engine-callbacks.js";
+import type { IOrganizationSender } from "../../interfaces/i-organization-sender.js";
 import type { IOutsideMessages } from "../../interfaces/i-outside-messages.js";
 import type { IPermissionAsker } from "../../interfaces/i-permission-asker.js";
 import type { ISenderSends } from "../../interfaces/i-sender-sends.js";
@@ -149,7 +150,7 @@ import { CommandRun } from "./command-run.js";
 import { StoppedCommands } from "./stopped-commands.js";
 import { SubAgentRun } from "./sub-agent-run.js";
 
-export class ConversationEngine implements IConversationEngine, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
+export class ConversationEngine implements IConversationEngine, IOrganizationSender, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
   private readonly adoptedSenders: Map<ReplyWork, string> = new Map();
   private readonly teammates: ITeammatesService;
   private readonly sharedFailures: ReportedSharedMcpFailures = new ReportedSharedMcpFailures();
@@ -163,6 +164,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   private readonly writers: Map<string, Promise<void>> = new Map();
   private readonly replyHops: Map<string, Map<string, number>> = new Map();
   private readonly stopping: Map<ReplyWork, Promise<void>> = new Map();
+  private readonly listedByStop: WeakSet<ReplyWork> = new WeakSet();
   private readonly wakes: ChatWakes;
   private readonly context: DatabaseContext;
   private readonly projects: IProjectsService;
@@ -261,7 +263,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       requireConversationAsync: (id, transaction) => this.requireConversationAsync(id, transaction),
       requireTeammateAsync: (id, transaction) => this.requireTeammateAsync(id, transaction),
       capEndsTasksAsync: (teammate, chatId) => this.capEndsTasksAsync(teammate, chatId),
-      sendMessageAsync: (params, prompt, allowed, signal, outside) => this.sendMessageAsync(params, prompt, allowed, signal, outside),
+      sendMessageAsync: (params, prompt, allowed, signal, outside, queues) => this.sendMessageAsync(params, prompt, allowed, signal, outside, queues),
+      refuseRaisedModeAsync: params => this.refuseRaisedModeAsync(params),
       toolModeOfAsync: open => this.toolModeOfAsync(open),
       modeIn: requested => this.modeIn(requested),
       nameOf: reply => this.nameOf(reply),
@@ -300,6 +303,16 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   public prepareOpenedAttachmentAsync(input: AttachmentInput, source: IOpenedFile): Promise<MessageAttachment> {
     return this.attachments.prepareOpenedAsync(input, source);
+  }
+
+  public async refuseRaisedModeAsync(params: MessageSendParams): Promise<void> {
+    const requested = params.requested;
+    if (Object.isNull(requested) || Object.isNull(requested.mode))
+      return;
+    const chosen = (await this.conversations.findAsync(params.conversationId))?.responder?.requested ?? null;
+    const allowed = [chosen, (await this.teammates.readDefaultAsync())?.requested ?? null];
+    if (!allowed.some(t => t?.kind === requested.kind && t.mode === requested.mode))
+      throw new ServiceException(ErrorCode.Unauthorized, Resources.unchosenModeRefused, [requested.kind, requested.mode]);
   }
 
   public discardAttachment(attachment: MessageAttachment): void {
@@ -360,16 +373,16 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return this.sendMessageAsync(params, null, null, signal);
   }
 
-  public addWaitingAsync(params: WaitingMessageAddParams): Promise<WaitingMessage> {
-    return this.waitingSends.addWaitingAsync(params);
+  public addWaitingAsync(params: WaitingMessageAddParams, fromOutside: boolean = false): Promise<WaitingMessage> {
+    return this.waitingSends.addWaitingAsync(params, fromOutside);
   }
 
   public listWaitingAsync(params: ChatIdParams): Promise<WaitingMessagesPayload> {
     return this.waitingSends.listWaitingAsync(params);
   }
 
-  public editWaitingAsync(params: WaitingMessageEditParams): Promise<WaitingMessage> {
-    return this.waitingSends.editWaitingAsync(params);
+  public editWaitingAsync(params: WaitingMessageEditParams, fromOutside: boolean = false): Promise<WaitingMessage> {
+    return this.waitingSends.editWaitingAsync(params, fromOutside);
   }
 
   public removeWaitingAsync(params: WaitingMessageIdParams): Promise<void> {
@@ -399,6 +412,14 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return this.outside.sendOutsideAsync(teammateId, text, label, chatId);
   }
 
+  public async startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult> {
+    const teammate = await this.requireTeammateAsync(teammateId);
+    const provider = await this.providers.findAsync(teammate.providerId);
+    if (!this.canReply(provider))
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatAccountCannotReply(teammate.name, provider?.label ?? null), [teammateId]);
+    return this.outside.startOutsideAsync(teammateId, text, label);
+  }
+
   public listOutsideChatsAsync(): Promise<readonly JsonObject[]> {
     return this.outside.listOutsideChatsAsync();
   }
@@ -416,12 +437,12 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   }
 
   private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null,
-    signal: AbortSignal | undefined, outside: MessageSender | null = null): Promise<MessageSendResult> {
+    signal: AbortSignal | undefined, outside: MessageSender | null = null, queues: boolean = false): Promise<MessageSendResult> {
     if (!Object.isNull(params.senderToken) && !Object.isNull(params.requested) && !Object.isNull(params.requested.mode)) {
       this.requireTurn(params.senderToken);
       await this.refuseUnrestrictedAsync(params.requested, params.requested.mode, params.providerId);
     }
-    let plan = await this.planSendAsync(params, true, null, outside);
+    let plan = await this.planSendAsync(params, true, null, outside, queues);
     if (!Object.isNull(plan.origin)) {
       const shown = Object.isNull(allowed) ? await this.permissions.askSendAsync(plan.origin, await this.askOfAsync(plan), params.text, signal) : allowed.starts;
       plan = await this.planSendAsync(params, true, plan.origin);
@@ -441,12 +462,12 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const { message, pending, wake, opening, joined, joining } = await this.context.database.connection.runInTransactionAsync(async transaction => {
         await this.requireUnmovedAsync(conversation, transaction);
         const busy = !Object.isNull(await this.messages.findOpenReplyAsync(conversation.id, transaction)) || !Object.isNull(this.findGroup(conversation.id));
-        const joining = Object.isNull(sender) ? null : this.findGroup(conversation.id);
+        const joining = Object.isNull(sender) && !queues ? null : this.findGroup(conversation.id);
         if (busy && Object.isNull(joining))
           throw new ServiceException(ErrorCode.Conflict, Resources.formatReplyInProgress(conversation.id), [conversation.id]);
         if (!Object.isNull(origin) && (Object.isNull(params.senderToken) || this.state.turns.get(params.senderToken) !== origin))
           throw new ServiceException(ErrorCode.Unauthorized, Resources.senderTurnEnded, []);
-        if (!Object.isNull(group) && joining !== group)
+        if (!Object.isNull(group) && joining !== group && !queues)
           throw new ServiceException(ErrorCode.Conflict, Resources.replyEndedWhileSent, [conversation.id]);
         const sequence = await this.messages.nextSequenceAsync(conversation.id, transaction);
         const opening = ConversationEngine.openingOf(conversation, sequence, params.text, attachments);
@@ -518,8 +539,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         this.completions.delete(message.id);
         this.titles.end(message.conversationId);
         this.context.projectActivity.leave(projectLease);
-        await this.permissions.sendAnswersAsync(message.conversationId);
-        await this.waitingSends.sendWaitingAsync(message.conversationId);
+        await this.sendQueuedAsync(message.conversationId);
         await this.settleWakesAsync(message.conversationId, pending);
       });
       void execution.then(() => completion.resolve(), error => completion.reject(error));
@@ -547,7 +567,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         this.context.projectActivity.leave(projectLease);
         completion.resolve();
         if (!Object.isNull(chatId)) {
-          await this.waitingSends.sendWaitingAsync(chatId);
+          await this.sendQueuedAsync(chatId);
           await this.settleWakesAsync(chatId, work);
         }
       }
@@ -611,7 +631,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     }
     for (const wake of await this.wakes.listAsync(ChatWakeState.Waiting))
       await this.settleSafelyAsync(wake.chatId, async () => {
-        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, await this.lostTextOfAsync(wake), null), false);
+        const [text, end] = await this.lostOfAsync(wake);
+        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, text, null), end);
       });
     for (const conversationId of unsent)
       await this.permissions.sendAnswersAsync(conversationId);
@@ -630,8 +651,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return this.keptSessions.releaseFolderAsync(conversationId);
   }
 
-  public sweepFoldersAsync(): Promise<void> {
-    return this.keptSessions.sweepFoldersAsync();
+  public sweepFoldersAsync(signal: AbortSignal): Promise<void> {
+    return this.keptSessions.sweepFoldersAsync(signal);
   }
 
   private async attachmentOfAsync(params: AttachmentReadParams, draft: Draft | null): Promise<MessageAttachment> {
@@ -696,9 +717,13 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       throw new ServiceException(ErrorCode.Conflict, Resources.formatNoReplyInProgress(params.conversationId), [params.conversationId]);
 
     const open = group.filter(t => !t.isEnded && !t.run.isCancelled);
+    const known = new Set(group);
     await Promise.all(group.map(t => this.stopAsync(t)));
     await completion;
-    return (await Promise.all(open.map(t => this.requireMessageAsync(t.message.id)))).filter(t => t.status === MessageStatus.Cancelled);
+    const listed = [...open, ...group.filter(t => !known.has(t))].filter(t => !this.listedByStop.has(t));
+    for (const item of listed)
+      this.listedByStop.add(item);
+    return (await Promise.all(listed.map(t => this.requireMessageAsync(t.message.id)))).filter(t => t.status === MessageStatus.Cancelled);
   }
 
   public async setResponderAsync(params: ConversationResponderParams): Promise<Conversation> {
@@ -720,10 +745,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     }
     this.sharedFailures.forget(conversationIds);
     this.stoppedCommands.forget(conversationIds);
-    for (const wake of [...await this.wakes.listAsync(ChatWakeState.Waiting), ...await this.wakes.listAsync(ChatWakeState.Ready)]
-      .filter(t => conversationIds.includes(t.watchedChatId)))
+    for (const wake of (await this.wakes.listAsync(ChatWakeState.Waiting)).filter(t => conversationIds.includes(t.watchedChatId)))
       await this.settleSafelyAsync(wake.chatId, async () => {
-        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, Resources.formatWakeChatDeleted(wake.watchedChatId), null), false);
+        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, Resources.formatWakeChatDeleted(wake.watchedChatId), null), ProtocolResources.wakeChatDeletedEnd);
       });
   }
 
@@ -807,7 +831,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     this.subAgents.set(child.id, child);
     turn.run.signal.addEventListener(Resources.abortEvent, () => {
       if (turn.run.isCancelled)
-        void child.stopAsync();
+        void this.stopSubAgentAsync(child);
     }, { once: true });
     await child.beginAsync();
     const ahead = isExplorer ? Promise.resolve() : this.writers.get(root) ?? Promise.resolve();
@@ -824,7 +848,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         void this.wakeForSubAgentAsync(turn, child);
       }
     };
-    void done.then(settle, settle);
+    void done.catch((error: unknown) => this.log?.write(Resources.formatSubAgentNotSaved(child.id, Resources.formatFailureKind(error)))).then(settle);
     return child.current;
   }
 
@@ -907,10 +931,11 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   public async shutdown(): Promise<void> {
     this.state.closing = true;
+    this.context.projectActivity.releaseWaiting();
     for (const run of this.state.runs.values())
       run.cancel();
     await this.titles.shutdown();
-    await Promise.all([...this.subAgents.values()].map(t => t.stopAsync()));
+    await Promise.all([...this.subAgents.values()].map(t => this.stopSubAgentAsync(t)));
     await Promise.all([...this.commands.values()].map(t => t.stopAsync()));
     await this.waitForIdle();
   }
@@ -925,14 +950,15 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return Object.isUndefined(item) || Object.isNull(provenance) ? null : new TitleModel(item.provider, provenance.requested.kind, provenance.requested.model);
   }
 
-  private async planSendAsync(params: MessageSendParams, prepare: boolean, allowedFor: ReplyWork | null = null, outside: MessageSender | null = null): Promise<SendPlan> {
+  private async planSendAsync(params: MessageSendParams, prepare: boolean, allowedFor: ReplyWork | null = null, outside: MessageSender | null = null,
+    queues: boolean = false): Promise<SendPlan> {
     const conversation = await this.requireConversationAsync(params.conversationId);
     const folder = await this.requireWorkFolderAsync(conversation, prepare);
     const origin = Object.isNull(params.senderToken) ? null : allowedFor ?? this.requireTurn(params.senderToken);
     const sender = Object.isNull(origin) ? null : await this.senderOfAsync(origin);
     const group = this.findGroup(conversation.id);
     const busy = !Object.isNull(await this.messages.findOpenReplyAsync(conversation.id)) || !Object.isNull(group);
-    if (busy && (Object.isNull(sender) || Object.isNull(group)))
+    if (busy && (Object.isNull(group) || (Object.isNull(sender) && !queues)))
       throw new ServiceException(ErrorCode.Conflict, Resources.formatReplyInProgress(conversation.id), [conversation.id]);
 
     const mentions: Teammate[] = [];
@@ -1118,6 +1144,14 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     await stopping;
   }
 
+  private async interruptUnstartedAsync(reply: Message): Promise<void> {
+    const now = new Date().toISOString();
+    const interrupted = reply.withDetail(new MessageDetail(reply.details.length, DetailKind.Note, Resources.replyInterruptedByStop, null, now))
+      .withStatus(MessageStatus.Interrupted, now);
+    await this.messages.updateAsync(interrupted);
+    this.events.publish(new Event(EventName.MessageCreated, interrupted.toJson()));
+  }
+
   private async cancelPendingAsync(item: ReplyWork): Promise<void> {
     try {
       const cancelled = item.message.withStatus(MessageStatus.Cancelled, new Date().toISOString());
@@ -1185,6 +1219,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     for (const next of pending) {
       work.push(next);
       this.state.runs.set(next.message.id, next.run);
+      if (item.run.isCancelled)
+        next.run.cancel();
     }
     this.events.publish(new Event(EventName.MessageUpdated, stored.toJson()));
     for (const next of pending)
@@ -1221,13 +1257,21 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   }
 
   private async resumeSendingAsync(chatId: string): Promise<void> {
+    await this.sendQueuedAsync(chatId);
+    await this.settleSafelyAsync(chatId, () => this.sendWakesAsync(chatId));
+  }
+
+  private async sendQueuedAsync(chatId: string): Promise<void> {
     await this.permissions.sendAnswersAsync(chatId).catch((error: unknown) => {
       this.log?.write(Resources.formatQuestionReplyNotSent(chatId, Resources.formatFailureKind(error)));
     });
+    await this.sendWaitingSafelyAsync(chatId);
+  }
+
+  private async sendWaitingSafelyAsync(chatId: string): Promise<void> {
     await this.waitingSends.sendWaitingAsync(chatId).catch((error: unknown) => {
       this.log?.write(Resources.formatWaitingMessageNotSent(chatId, Resources.formatFailureKind(error)));
     });
-    await this.settleSafelyAsync(chatId, () => this.sendWakesAsync(chatId));
   }
 
   private findGroup(conversationId: string): ReplyWork[] | null {
@@ -1268,6 +1312,15 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return ids.length === 0 ? own : own.filter(t => ids.includes(t.id));
   }
 
+  private async stopSubAgentAsync(run: SubAgentRun): Promise<void> {
+    try {
+      await run.stopAsync();
+    }
+    catch (error) {
+      this.log?.write(Resources.formatSubAgentNotStopped(run.id, Resources.formatFailureKind(error)));
+    }
+  }
+
   private stopCommand(run: CommandRun): Promise<void> {
     if (run.isRunning && !run.wasStopped && !String.isNullOrEmpty(run.id))
       this.noteStopped(run);
@@ -1293,7 +1346,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       if (turn.run.isCancelled || this.state.closing)
         continue;
       await this.wakes.addAsync(new ChatWake(Guid.createVersion7().toString(), ChatWakeKind.Command, turn.message.conversationId, turn.message.id,
-        turn.message.conversationId, [run.id], ChatWakeState.Waiting, null, null, new Date().toISOString()));
+        turn.message.conversationId, [run.id], ChatWakeState.Waiting, null, null, new Date().toISOString(),
+        ConversationEngine.taskViewOf(ProtocolResources.wakeCommandTask, run.description, null, null)));
       const exit = run.endedWith;
       if (!Object.isNull(exit))
         await this.wakeForCommandAsync(run, exit);
@@ -1308,7 +1362,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       if (turn.run.isCancelled || this.state.closing)
         continue;
       await this.wakes.addAsync(new ChatWake(Guid.createVersion7().toString(), ChatWakeKind.SubAgent, turn.message.conversationId, turn.message.id,
-        turn.message.conversationId, [child.id], ChatWakeState.Waiting, null, null, new Date().toISOString()));
+        turn.message.conversationId, [child.id], ChatWakeState.Waiting, null, null, new Date().toISOString(),
+        ConversationEngine.taskViewOf(ProtocolResources.wakeSubAgentTask, child.current.description, null, null)));
       if (!child.current.isRunning)
         await this.wakeForSubAgentAsync(turn, child);
     }
@@ -1335,8 +1390,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         const item = work[index]!;
         const reply = item.message;
         if (!item.run.isCancelled && !item.isEnded && Object.isNull(item.wake)) {
-          checked ??= this.projects.checkFolderAsync(folder.path, (await this.conversations.findAsync(reply.conversationId))?.projectId ?? null);
-          await this.failIfUnableAsync(item, folder, await checked);
+          const conversation = await this.conversations.findAsync(reply.conversationId);
+          checked ??= this.projects.checkFolderAsync(folder.path, conversation?.projectId ?? null);
+          await this.failIfUnableAsync(item, folder, await checked, !Object.isNullOrUndefined(conversation?.attachedFolder));
         }
         if (item.run.isCancelled)
           await this.stopAsync(item);
@@ -1764,9 +1820,15 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const hop = this.replyHops.get(source.conversationId)?.get(source.id);
     if (Object.isUndefined(hop) || this.state.closing)
       return null;
+    const activity = this.context.projectActivity;
+    const lease = activity.tryEnterTurn(folder.path);
+    if (Object.isNull(lease)) {
+      await activity.whenReleasedAsync();
+      return this.startWakeAsync(source, wake, ahead);
+    }
     const reply = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const current = await this.conversations.findAsync(source.conversationId, transaction);
-      if (Object.isNull(current) || current.projectId !== conversation.projectId)
+      if (Object.isNull(current) || current.projectId !== conversation.projectId || Object.isNull(await this.messages.findAsync(source.id, transaction)))
         return null;
       const created = new Message(Guid.createVersion7().toString(), source.conversationId, await this.messages.nextSequenceAsync(source.conversationId, transaction),
         MessageAuthor.Provider, source.id, MessageStatus.Pending, [note],
@@ -1774,9 +1836,16 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         now, null, null, [], teammate?.id ?? null, teammate?.name ?? null);
       await this.messages.insertAsync(created, transaction);
       return created;
+    }).catch((error: unknown) => {
+      activity.leave(lease);
+      throw error;
     });
-    if (Object.isNull(reply))
+    if (Object.isNull(reply) || this.state.closing) {
+      activity.leave(lease);
+      if (!Object.isNull(reply))
+        await this.interruptUnstartedAsync(reply);
       return null;
+    }
     const item = new ReplyWork(reply, provider, teammate?.role ?? null, source, hop, turn);
     this.state.runs.set(reply.id, item.run);
     this.state.turns.set(token, item);
@@ -1784,12 +1853,13 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const group = this.findGroup(source.conversationId);
     if (!Object.isNull(group)) {
       group.push(item);
+      activity.leave(lease);
       if (ahead)
         this.followAhead(item, turn, folder);
       return turn;
     }
 
-    this.runGroup(reply.id, [item], folder);
+    this.runGroup(reply.id, [item], folder, lease);
     return turn;
   }
 
@@ -1800,10 +1870,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return !listed.some(t => t.status === BackgroundTaskStatus.Running);
   }
 
-  private runGroup(key: string, work: ReplyWork[], folder: WorkFolder): void {
+  private runGroup(key: string, work: ReplyWork[], folder: WorkFolder, lease: string): void {
     const conversationId = work[0]!.message.conversationId;
     this.state.groups.set(key, work);
-    const lease = this.context.projectActivity.enterTurn(folder.path);
     const execution = this.executeRepliesAsync(work, folder).catch(ConversationEngine.ignore).finally(async () => {
       for (const done of work) {
         done.end();
@@ -1814,8 +1883,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       this.state.groups.delete(key);
       this.completions.delete(key);
       this.context.projectActivity.leave(lease);
-      await this.permissions.sendAnswersAsync(conversationId);
-      await this.waitingSends.sendWaitingAsync(conversationId);
+      await this.sendQueuedAsync(conversationId);
       await this.settleWakesAsync(conversationId, work);
     });
     this.completions.set(key, execution);
@@ -1843,6 +1911,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   private async findWorkFolderAsync(conversation: Conversation, prepare: boolean, transaction?: SqlTransaction): Promise<WorkFolder | null> {
     const folders = this.context.chatFolders;
+    if (!Object.isNull(conversation.attachedFolder))
+      return WorkFolder.attached(conversation.attachedFolder);
     if (Object.isNull(conversation.projectId))
       return new WorkFolder(conversation.id, prepare ? folders.prepare(conversation.id) : folders.pathOf(conversation.id));
     const project = await this.projects.findAsync(conversation.projectId, transaction);
@@ -1865,6 +1935,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       resume();
     await wake.useToolsAsync(tools);
     try {
+      await this.messages.setCheckpointFolderAsync(item.message.id, folder.id);
       await run.followAsync(wake);
     }
     finally {
@@ -1916,7 +1987,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     }
   }
 
-  private async failIfUnableAsync(item: ReplyWork, folder: WorkFolder, state: FolderState): Promise<void> {
+  private async failIfUnableAsync(item: ReplyWork, folder: WorkFolder, state: FolderState, isAttached: boolean): Promise<void> {
     if (item.isEnded)
       return;
     const provenance = item.message.provenance!;
@@ -1924,7 +1995,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       : await this.providers.findAsync(provenance.providerId);
     const reason = provider?.enabled === false ? Resources.formatProviderDisabled(provider.label)
       : state === FolderState.Present ? null
-        : state === FolderState.Missing ? Resources.formatWorkFolderMissing(folder.path) : Resources.formatWorkFolderUnreachable(folder.path);
+        : state === FolderState.Missing
+          ? isAttached ? Resources.formatAttachedFolderMissing(folder.path) : Resources.formatWorkFolderMissing(folder.path)
+          : isAttached ? Resources.formatAttachedFolderUnreachable(folder.path) : Resources.formatWorkFolderUnreachable(folder.path);
     if (Object.isNull(reason) || item.isEnded)
       return;
     const now = new Date().toISOString();
@@ -2022,7 +2095,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
           .filter(t => t.kind === ChatWakeKind.Reply && t.watchedChatId === conversationId)) {
           if (!await this.watchedEndedAsync(wake, transaction))
             continue;
-          await this.wakes.updateAsync(wake.settled(ChatWakeState.Ready, await this.wakeTextOfAsync(wake, work, transaction), hop), transaction);
+          await this.wakes.updateAsync(wake.settled(ChatWakeState.Ready, await this.wakeTextOfAsync(wake, work, transaction), hop,
+            await this.wakeViewOfAsync(wake, null, transaction)), transaction);
           ready.push(wake);
         }
         return ready;
@@ -2044,10 +2118,12 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     await this.settleSafelyAsync(turn.message.conversationId, async () => {
       const ended = child.current;
       const text = Resources.formatSubAgentWake(ended.description, child.id, ended.status, ended.summary);
+      const view = ConversationEngine.taskViewOf(ProtocolResources.wakeSubAgentTask, ended.description, Resources.formatSubAgentEnding(ended.status),
+        Object.isNull(ended.summary) ? null : Resources.formatWakeQuote(ended.summary));
       const settled = await this.context.database.connection.runInTransactionAsync(async transaction => {
         const waiting = (await this.wakes.listAsync(ChatWakeState.Waiting, transaction)).filter(t => t.kind === ChatWakeKind.SubAgent && t.watchedIds.includes(child.id));
         for (const wake of waiting)
-          await this.wakes.updateAsync(wake.settled(child.wasStopped ? ChatWakeState.Undeliverable : ChatWakeState.Ready, text, turn.hop + 1), transaction);
+          await this.wakes.updateAsync(wake.settled(child.wasStopped ? ChatWakeState.Undeliverable : ChatWakeState.Ready, text, turn.hop + 1, view), transaction);
         return waiting;
       });
       for (const wake of settled)
@@ -2060,8 +2136,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const settled = await this.context.database.connection.runInTransactionAsync(async transaction => {
         const waiting = (await this.wakes.listAsync(ChatWakeState.Waiting, transaction)).filter(t => t.kind === ChatWakeKind.Command && t.watchedIds.includes(run.id));
         for (const wake of waiting)
-          await this.wakes.updateAsync(wake.settled(run.wasStopped ? ChatWakeState.Undeliverable : ChatWakeState.Ready, run.wakeTextOf(exit), run.turn.hop + 1),
-            transaction);
+          await this.wakes.updateAsync(wake.settled(run.wasStopped ? ChatWakeState.Undeliverable : ChatWakeState.Ready, run.wakeTextOf(exit), run.turn.hop + 1,
+            ConversationEngine.taskViewOf(ProtocolResources.wakeCommandTask, run.description, Resources.formatCommandEnding(exit),
+              Resources.formatCommandQuote(run.lastLines))), transaction);
         return waiting;
       });
       for (const wake of settled)
@@ -2087,15 +2164,26 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         return;
       }
       const next = (await this.wakes.listAsync(ChatWakeState.Ready)).find(t => t.chatId === conversationId);
-      if (Object.isUndefined(next) || await this.deliverWakeAsync(next, true))
+      if (Object.isUndefined(next) || await this.deliverWakeAsync(next, null))
         return;
     }
   }
 
-  private async deliverWakeAsync(wake: ChatWake, startsTurn: boolean): Promise<boolean> {
+  private async deliverWakeAsync(wake: ChatWake, end: string | null): Promise<boolean> {
+    const startsTurn = Object.isNull(end);
     const conversation = await this.requireConversationAsync(wake.chatId);
     const folder = await this.requireWorkFolderAsync(conversation, true);
     const text = wake.text!;
+    const activity = this.context.projectActivity;
+    const lease = startsTurn ? activity.tryEnterTurn(folder.path) : null;
+    if (startsTurn && Object.isNull(lease)) {
+      void activity.whenReleasedAsync().then(() => this.settleSafelyAsync(conversation.id, () => this.sendWakesAsync(conversation.id)));
+      return true;
+    }
+    const leave = (): void => {
+      if (!Object.isNull(lease))
+        activity.leave(lease);
+    };
     const delivered = await this.context.database.connection.runInTransactionAsync(async transaction => {
       await this.requireUnmovedAsync(conversation, transaction);
       const open = [...await this.wakes.listAsync(ChatWakeState.Waiting, transaction), ...await this.wakes.listAsync(ChatWakeState.Ready, transaction)];
@@ -2104,33 +2192,58 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const source = await this.messages.findAsync(wake.sourceMessageId, transaction);
       const now = new Date().toISOString();
       const sequence = await this.messages.nextSequenceAsync(conversation.id, transaction);
-      const payload = { source: Resources.chatWakeSource, [Resources.wakeIdField]: wake.id, [Resources.wakeSourceMessageField]: wake.sourceMessageId };
-      const message = new Message(Guid.createVersion7().toString(), conversation.id, sequence, MessageAuthor.User, null, MessageStatus.Completed,
-        [new MessageDetail(0, DetailKind.Text, text, payload, now)], null, now, null, now, [], null, null, [], await this.wakeSenderOfAsync(wake, transaction));
+      const view = await this.wakeViewOfAsync(wake, end, transaction);
+      const watched = Object.isNull(view) ? null : await this.conversations.findAsync(wake.watchedChatId, transaction);
+      const body = Object.isNull(view) || !Object.isNull(end) || !Object.isNull(watched) ? text
+        : `${text}${Resources.transcriptSeparator}${Resources.wakeChatDeletedSince}`;
+      const id = Guid.createVersion7().toString();
+      const sender = await this.wakeSenderOfAsync(wake, transaction);
+      const messageOf = (reply: string | null): Message => new Message(id, conversation.id, sequence, MessageAuthor.User, null, MessageStatus.Completed,
+        [new MessageDetail(0, DetailKind.Text, body, {
+          source: ProtocolResources.chatWakeSource, [Resources.wakeIdField]: wake.id, [Resources.wakeSourceMessageField]: wake.sourceMessageId, ...view,
+          ...Object.isNull(reply) ? {} : { [ProtocolResources.wakeReplyField]: reply }
+        }, now)], null, now, null, now, [], null, null, [], sender);
+      const message = messageOf(null);
       const limit = this.readHopLimit();
       const hop = wake.hop ?? 0;
       const blocked = startsTurn ? await this.unwokenReasonOfAsync(conversation, source, transaction) : null;
       const stopped = startsTurn && Object.isNull(blocked) && hop > limit;
-      const started = !startsTurn || stopped ? null : blocked ?? await this.wakeReplyOfAsync(source!, message, sequence + 1, now, hop, transaction);
+      const received = Object.isNull(view) ? null
+        : new MessageDetail(0, DetailKind.Note, wake.kind === ChatWakeKind.Reply ? Resources.formatWakeReceived(watched?.title ?? null) : Resources.taskWakeReceived,
+          { source: ProtocolResources.wakeReceivedSource, ...view }, now);
+      const started = !startsTurn || stopped ? null : blocked ?? await this.wakeReplyOfAsync(source!, message, sequence + 1, now, hop, received, transaction);
       const item = started instanceof ReplyWork ? started : null;
       const note = stopped ? new MessageDetail(1, DetailKind.Note, Resources.formatChainStopped(limit), { source: Resources.handOffSource }, now)
         : Object.isString(started) ? new MessageDetail(1, DetailKind.Note, Resources.formatWakeNotStarted(started), null, now) : null;
-      const stored = Object.isNull(note) ? message : message.withDetail(note);
+      const shown = Object.isNull(item) || Object.isNull(view) ? message : messageOf(item.message.id);
+      const stored = Object.isNull(note) ? shown : shown.withDetail(note);
       await this.messages.insertAsync(stored, transaction);
       if (!Object.isNull(item))
         await this.messages.insertAsync(item.message, transaction);
-      await this.wakes.updateAsync(wake.settled(Object.isNull(item) ? ChatWakeState.Undeliverable : ChatWakeState.Delivered, text, hop), transaction);
+      await this.wakes.updateAsync(wake.settled(Object.isNull(item) ? ChatWakeState.Undeliverable : ChatWakeState.Delivered, body, hop), transaction);
       return { stored, item };
+    }).catch((error: unknown) => {
+      leave();
+      throw error;
     });
-    if (Object.isNull(delivered))
+    if (Object.isNull(delivered)) {
+      leave();
       return false;
+    }
     const { stored, item } = delivered;
     this.events.publish(new Event(EventName.MessageCreated, stored.toJson()));
-    if (Object.isNull(item))
+    if (Object.isNull(item) || Object.isNull(lease)) {
+      leave();
       return false;
+    }
+    if (this.state.closing) {
+      leave();
+      await this.interruptUnstartedAsync(item.message);
+      return true;
+    }
     this.state.runs.set(item.message.id, item.run);
     this.events.publish(new Event(EventName.MessageCreated, item.message.toJson()));
-    this.runGroup(stored.id, [item], folder);
+    this.runGroup(stored.id, [item], folder, lease);
     return true;
   }
 
@@ -2143,17 +2256,43 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return null;
   }
 
-  private async wakeReplyOfAsync(source: Message, trigger: Message, sequence: number, createdAt: string, hop: number,
+  private async wakeReplyOfAsync(source: Message, trigger: Message, sequence: number, createdAt: string, hop: number, received: MessageDetail | null,
     transaction?: SqlTransaction): Promise<ReplyWork | string> {
     const provenance = source.provenance!;
     const teammate = Object.isNull(source.teammateId) ? null : await this.teammates.findAsync(source.teammateId, transaction);
+    let work: ReplyWork | null;
     try {
-      return await this.prepareReplyAsync(teammate, provenance.requested, provenance.providerId, trigger, sequence, createdAt, hop, null, null, transaction)
-        ?? Resources.wakeProviderUnavailable;
+      work = await this.prepareReplyAsync(teammate, provenance.requested, provenance.providerId, trigger, sequence, createdAt, hop, null, null, transaction);
     }
     catch (error) {
       return Resources.formatWakeProviderRefused((error as Error).message);
     }
+    if (Object.isNull(work))
+      return Resources.wakeProviderUnavailable;
+    return Object.isNull(received) ? work
+      : new ReplyWork(work.message.withDetail(received), work.provider, work.instructions, work.trigger, work.hop, work.wake, work.chain, work.continued);
+  }
+
+  private async wakeViewOfAsync(wake: ChatWake, end: string | null, transaction?: SqlTransaction): Promise<JsonObject | null> {
+    if (wake.kind !== ChatWakeKind.Reply)
+      return Object.isNull(wake.view) ? null : { [ProtocolResources.wakeTaskField]: wake.view, ...Object.isNull(end) ? {} : { [ProtocolResources.wakeEndField]: end } };
+    if (!Object.isNull(end))
+      return { [ProtocolResources.wakeChatField]: wake.watchedChatId, [ProtocolResources.wakeRepliesField]: [], [ProtocolResources.wakeEndField]: end };
+    if (!Object.isNull(wake.view))
+      return wake.view;
+    const replies: JsonObject[] = [];
+    for (const id of wake.watchedIds) {
+      const reply = await this.messages.findAsync(id, transaction);
+      if (!Object.isNull(reply)) {
+        const quote = ConversationEngine.quoteOf(reply);
+        replies.push({
+          [ProtocolResources.nameField]: this.nameOf(reply),
+          [ProtocolResources.statusField]: reply.status,
+          [ProtocolResources.textField]: Object.isNull(quote) ? null : Resources.formatWakeQuote(quote)
+        });
+      }
+    }
+    return { [ProtocolResources.wakeChatField]: wake.watchedChatId, [ProtocolResources.wakeRepliesField]: replies };
   }
 
   private async wakeSenderOfAsync(wake: ChatWake, transaction?: SqlTransaction): Promise<MessageSender> {
@@ -2175,17 +2314,22 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       .join(Resources.transcriptSeparator);
   }
 
-  private async lostTextOfAsync(wake: ChatWake): Promise<string> {
+  private async lostOfAsync(wake: ChatWake): Promise<readonly [string, string]> {
     switch (wake.kind) {
       case ChatWakeKind.SubAgent:
-        return Resources.formatSubAgentWakeLost(wake.watchedIds[0]!);
+        return [Resources.formatSubAgentWakeLost(wake.watchedIds[0]!), ProtocolResources.wakeLostEnd];
       case ChatWakeKind.Command:
-        return Resources.formatCommandWakeLost(wake.watchedIds.join(Resources.listSeparator));
+        return [Resources.formatCommandWakeLost(wake.watchedIds.join(Resources.listSeparator)), ProtocolResources.wakeLostEnd];
       case ChatWakeKind.Reply: {
         const watched = await this.conversations.findAsync(wake.watchedChatId);
-        return Object.isNull(watched) ? Resources.formatWakeChatDeleted(wake.watchedChatId) : Resources.formatWakeLost(watched.title, wake.watchedChatId);
+        return Object.isNull(watched) ? [Resources.formatWakeChatDeleted(wake.watchedChatId), ProtocolResources.wakeChatDeletedEnd]
+          : [Resources.formatWakeLost(watched.title, wake.watchedChatId), ProtocolResources.wakeLostEnd];
       }
     }
+  }
+
+  private static taskViewOf(kind: string, name: string, ending: string | null, text: string | null): JsonObject {
+    return { [ProtocolResources.kindField]: kind, [ProtocolResources.nameField]: name, [ProtocolResources.endingField]: ending, [ProtocolResources.textField]: text };
   }
 
   private nameOf(reply: Message): string {

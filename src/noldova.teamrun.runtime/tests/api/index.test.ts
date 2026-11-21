@@ -16,7 +16,7 @@ export class RuntimeApiTests {
     const expected = [
       "TitleModelSetting", "ChangeGuard", "ChangeSubjects", "ChangeView", "ChatPagesRemover", "ChatTerminalsCloser", "CommandTool", "DispatchedMethod", "EventForwarder", "FileShareMethod", "GrantedAttachmentMethod", "HopLimitSetting", "IdleCompactionSetting",
       "HostedMigrations", "InProcessCliContext", "MainProcessMethod", "McpHttpEndpoint", "McpHttpTransport", "MethodFailures", "MethodTool", "ModuleDatabaseConnection", "OutsideConnectionMethod", "OutsideSessions",
-      "ModuleDatabaseProvider", "ModuleDatabaseSession", "PanelTool", "PermissionAnswerer", "ProviderKindRegistryFactory", "ReplyFailureNotices", "ReplyWork", "Resources", "RuntimeAppDescriptions",
+      "ModuleDatabaseProvider", "ModuleDatabaseSession", "PanelTool", "PermissionAnswerer", "ProviderCreateMethod", "ProviderKindRegistryFactory", "ProviderUpdateMethod", "ReplyFailureNotices", "ReplyWork", "RequestedModeMethod", "Resources", "RuntimeAppDescriptions",
       "RuntimeCommandStarter", "RuntimePart", "RuntimeException", "RuntimePartException", "ProcessNotStartedException", "RuntimeProcessStarter", "RuntimeRememberedAppGrants", "RuntimeToolSession", "RuntimeToolSessions", "SendTool", "ServedCalls", "SharedMcpAccounts", "SharedMcpOauth", "SubAgentTool",
       "SubAgentTools", "CommandTools", "TeammateCommandFolder",
       "TeamRunChange", "TeamRunChanges", "TeamRunTool", "TeamRunTools", "WindowClients", "WorkingMethod",

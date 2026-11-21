@@ -52,11 +52,13 @@ import {
   ComputerUseGrantTimings,
   NodeTimer,
   TeammatesService,
+  OrganizationMessagesService,
+  OrganizationService,
   WindowsService
 } from "@noldova/teamrun.core";
 import { CliPart } from "@noldova/teamrun.cli";
 import { DataSource, DbContextOptionsBuilder } from "@noldova/context.data";
-import { DataFolder, EventName, MethodName } from "@noldova/teamrun.protocol";
+import { DataFolder, EventName, MessageSendParams, MethodName, WaitingMessageAddParams, WaitingMessageEditParams } from "@noldova/teamrun.protocol";
 import { RuntimeTerminalOwners } from "@noldova/terminal.protocol";
 
 import { RuntimePartException } from "../exceptions/runtime-part.exception.js";
@@ -81,8 +83,11 @@ import { PanelTool } from "./panel-tool.js";
 import { ModuleDatabaseProvider } from "./module-database-provider.js";
 import { PermissionAnswerer } from "./permission-answerer.js";
 import { ProviderKindRegistryFactory } from "./provider-kind-registry-factory.js";
+import { ProviderCreateMethod } from "./provider-create-method.js";
+import { ProviderUpdateMethod } from "./provider-update-method.js";
 import { ReplyFailureNotices } from "./reply-failure-notices.js";
 import { ReplyWork } from "./reply-work.js";
+import { RequestedModeMethod } from "./requested-mode-method.js";
 import { RuntimeAppDescriptions } from "./runtime-app-descriptions.js";
 import { RuntimeProcessStarter } from "./runtime-process-starter.js";
 import { RuntimeCommandStarter } from "./runtime-command-starter.js";
@@ -117,7 +122,10 @@ export class RuntimePart implements IRuntimePart {
   private static readonly AWAITED: ReadonlySet<string> = new Set([MethodName.ConversationRewind, MethodName.ConversationMove]);
   private static readonly OUTSIDE: ReadonlySet<string> = new Set([MethodName.OutsideConnectionRead, MethodName.OutsideTokenReset]);
   private static readonly MAIN_PROCESS_ONLY: ReadonlySet<string> = new Set([MethodName.ApprovalDecide, MethodName.WindowFocused, MethodName.WindowClosed,
-    MethodName.WindowReload, MethodName.PanelAnswered]);
+    MethodName.WindowReload, MethodName.PanelAnswered, MethodName.ConversationSetMemberMode, MethodName.ConversationSetPlanFirst, MethodName.MessageApprovePlan,
+    MethodName.DefaultTeammateSet, MethodName.ConversationResponderSet, MethodName.ComposerDefaultSave, MethodName.AcpLocalCommandAdd, MethodName.SharedMcpServerCreate,
+    MethodName.SharedMcpServerUpdate, MethodName.SharedMcpProviderSet, MethodName.SharedMcpTeammateSet, MethodName.SharedMcpSecretSet]);
+  private static readonly MODE_SETTING: ReadonlySet<string> = new Set([MethodName.TeammateCreate, MethodName.TeammateUpdate]);
 
   private readonly registries: IProviderKindRegistryFactory;
   private readonly productVersion: string | null;
@@ -134,6 +142,8 @@ export class RuntimePart implements IRuntimePart {
   private failures: ReplyFailureNotices | null = null;
   private planUsage: PlanUsageService | null = null;
   private awaited: WorkingMethod[] = [];
+  private sweepStop: AbortController | null = null;
+  private sweeping: Promise<void> = Promise.resolve();
   private answerer: Registration | null = null;
   private sessionStops: Registration | null = null;
   private subscriptions: EventSubscription[] = [];
@@ -162,6 +172,9 @@ export class RuntimePart implements IRuntimePart {
   }
 
   public async deactivateAsync(): Promise<void> {
+    this.sweepStop?.abort();
+    for (const method of this.awaited)
+      method.close();
     this.answerer?.[Symbol.dispose]();
     this.answerer = null;
     this.sessionStops?.[Symbol.dispose]();
@@ -191,6 +204,7 @@ export class RuntimePart implements IRuntimePart {
     }
     finally {
       try {
+        await this.sweeping;
         await this.tasks?.closeAsync();
       }
       finally {
@@ -203,6 +217,8 @@ export class RuntimePart implements IRuntimePart {
           this.engine = null;
           this.registry = null;
           this.awaited = [];
+          this.sweepStop = null;
+          this.sweeping = Promise.resolve();
         }
       }
     }
@@ -227,10 +243,11 @@ export class RuntimePart implements IRuntimePart {
     const tasks = new BackgroundTasksService(events, undefined, undefined, context.log, database);
     this.tasks = tasks;
     const providers = new ProvidersService(database, registry, conversations, events, undefined, context.log);
-    const teammates = new TeammatesService(database, providers, conversations);
+    const organization = new OrganizationService(database);
+    const teammates = new TeammatesService(database, providers, conversations, organization);
     const planUsage = new PlanUsageService(events);
     this.planUsage = planUsage;
-    const kinds = new ProviderKindsService(registry, providers, events, planUsage, teammates);
+    const kinds = new ProviderKindsService(registry, providers, events, planUsage, teammates, context.log);
     const sharedServers = new SharedMcpServersService(database, providers, teammates, registry, () => context.readEnvironmentAsync(), context.secrets,
       new SharedMcpOauth(context.secrets), new SharedMcpAccounts(() => context.findService(Resources.gitHubAccessService, SharedMcpAccounts.isGitHubAccess)),
       events, context.log);
@@ -253,10 +270,13 @@ export class RuntimePart implements IRuntimePart {
     this.engine = engine;
     this.sessionStops = context.tools.onSessionStopped((session, reason) => void engine.stopSessionAsync(session, reason)
       .catch((error: unknown) => context.log.write(Resources.formatSessionStopFailed(CoreResources.formatFailureKind(error)))));
+    await drafts.sweepAsync();
     endpoint.serve(engine);
     const channels = new Map<string, EventChannel>(Object.values(EventName).map(t => [t, context.declareEvent(Resources.formatQualifiedName(context.moduleId, t))]));
     this.subscriptions.push(events.subscribe(new EventForwarder(channels)));
     await engine.reconcileAsync();
+    const organizationMessages = new OrganizationMessagesService(database, organization, teammates, messages, engine, events);
+    await organizationMessages.reconcileAsync();
     this.answerer = RuntimePart.registerAnswerer(context, engine, calls);
     await database.database.connection.runInTransactionAsync(async transaction => {
       const usual = new Map<string, string | null>();
@@ -266,19 +286,20 @@ export class RuntimePart implements IRuntimePart {
       await conversations.moveProviderlessAsync(kind => usual.get(kind) ?? null, transaction);
     });
     await teammates.moveProviderlessDefaultAsync(async (kind, transaction) => (await providers.findUsualAsync(kind, transaction))?.id ?? null);
-    await drafts.sweepAsync();
     const pages = new Pages(database.database.connection, context.moduleFolder, new TeamRunPagesHost(conversations), context.log);
     await pages.sweepAsync();
     this.pages = pages;
     await pages.serveAsync(context, new NodeTimer());
-    void engine.sweepFoldersAsync();
+    const sweepStop = new AbortController();
+    this.sweepStop = sweepStop;
+    this.sweeping = engine.sweepFoldersAsync(sweepStop.signal);
     const folder = new DataFolder(context.moduleFolder, join(context.moduleFolder, Resources.formatDatabaseFileName(context.moduleId)));
     const apps = new RuntimeAppDescriptions(() => context.findService(Resources.computerUseAppsService, RuntimeAppDescriptions.isApps));
     const grants = Object.isNull(this.answerer) ? null
       : new ComputerUseGrantsService(new RuntimeRememberedAppGrants(context.permissions), conversations, teammates, apps,
         ComputerUseGrantTimings.createDefault(), new NodeTimer());
     const dispatcher = new RequestDispatcher(kinds, providers, projects, conversations, messages, approvals, engine, teammates, events, drafts, folder,
-      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents);
+      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents, organization, organizationMessages);
     const methods = new Map<string, IMethodHandler>();
     const clients = new WindowClients(new DispatchedMethod(MethodName.WindowFocused, dispatcher), windows);
     context.onClientClosed(t => clients.close(t));
@@ -290,7 +311,7 @@ export class RuntimePart implements IRuntimePart {
     context.registerMethod(Resources.formatQualifiedName(context.moduleId, MethodName.OutsideTokenReset), new OutsideConnectionMethod(() => outside.resetAsync()));
     for (const method of Object.values(MethodName).filter(t => !RuntimePart.OUTSIDE.has(t))) {
       const name = Resources.formatQualifiedName(context.moduleId, method);
-      const handler = this.handlerOf(context, engine, method, method === MethodName.WindowFocused ? clients : new DispatchedMethod(method, dispatcher));
+      const handler = this.handlerOf(context, engine, providers, method, method === MethodName.WindowFocused ? clients : new DispatchedMethod(method, dispatcher));
       context.registerMethod(name, handler);
       methods.set(name, handler);
     }
@@ -364,8 +385,17 @@ export class RuntimePart implements IRuntimePart {
     }
   }
 
-  private handlerOf(context: IRuntimePartContext, engine: ConversationEngine, method: MethodName, dispatched: IMethodHandler): IMethodHandler {
+  private handlerOf(context: IRuntimePartContext, engine: ConversationEngine, providers: ProvidersService, method: MethodName,
+    dispatched: IMethodHandler): IMethodHandler {
     const handler = RuntimePart.MAIN_PROCESS_ONLY.has(method) ? new MainProcessMethod(dispatched)
+      : method === MethodName.ProviderCreate ? new ProviderCreateMethod(dispatched)
+      : method === MethodName.ProviderUpdate ? new ProviderUpdateMethod(new MainProcessMethod(dispatched, Resources.binaryPathField), providers)
+      : RuntimePart.MODE_SETTING.has(method) ? new MainProcessMethod(dispatched, Resources.modeField)
+      : method === MethodName.MessageSend ? new RequestedModeMethod(dispatched, engine, t => MessageSendParams.fromJson(t))
+      : method === MethodName.WaitingMessageAdd ? new RequestedModeMethod(dispatched, engine, t => WaitingMessageAddParams.fromJson(t).message,
+        async t => (await engine.addWaitingAsync(WaitingMessageAddParams.fromJson(t), true)).toJson())
+      : method === MethodName.WaitingMessageEdit ? new RequestedModeMethod(dispatched, engine, t => WaitingMessageEditParams.fromJson(t).message,
+        async t => (await engine.editWaitingAsync(WaitingMessageEditParams.fromJson(t), true)).toJson())
       : method === MethodName.AttachmentShare || method === MethodName.WrittenImageShare ? new FileShareMethod(dispatched, context)
         : method === MethodName.AttachmentPrepare ? new GrantedAttachmentMethod(dispatched, context, engine) : dispatched;
     const description = RuntimePart.WORK.get(method);

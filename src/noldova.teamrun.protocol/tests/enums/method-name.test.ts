@@ -57,6 +57,8 @@ export class MethodNameTests {
     Assert.areEqual("ConversationRewind", MethodName.ConversationRewind);
     Assert.areEqual("ConversationSearch", MethodName.ConversationSearch);
     Assert.areEqual("ChatFind", MethodName.ChatFind);
+    Assert.areEqual("ChatFolderAttach", MethodName.ChatFolderAttach);
+    Assert.areEqual("ChatFolderDetach", MethodName.ChatFolderDetach);
     Assert.areEqual("MessageSearch", MethodName.MessageSearch);
     Assert.areEqual("MessageList", MethodName.MessageList);
     Assert.areEqual("MessageSend", MethodName.MessageSend);
@@ -75,6 +77,7 @@ export class MethodNameTests {
     Assert.areEqual("PlanUsageList", MethodName.PlanUsageList);
     Assert.areEqual("PlanUsageRead", MethodName.PlanUsageRead);
     Assert.areEqual("TeammateUsageList", MethodName.TeammateUsageList);
+    Assert.areEqual("TeammateLastReplyList", MethodName.TeammateLastReplyList);
     Assert.areEqual("WindowFocused", MethodName.WindowFocused);
     Assert.areEqual("WindowClosed", MethodName.WindowClosed);
     Assert.areEqual("WindowReload", MethodName.WindowReload);
@@ -116,6 +119,16 @@ export class MethodNameTests {
     Assert.areEqual("ConversationSetMemberMode", MethodName.ConversationSetMemberMode);
     Assert.areEqual("ConversationSetMemberSettings", MethodName.ConversationSetMemberSettings);
     Assert.areEqual("ConversationSetPlanFirst", MethodName.ConversationSetPlanFirst);
+    Assert.areEqual("OrganizationList", MethodName.OrganizationList);
+    Assert.areEqual("DepartmentCreate", MethodName.DepartmentCreate);
+    Assert.areEqual("DepartmentUpdate", MethodName.DepartmentUpdate);
+    Assert.areEqual("DepartmentMove", MethodName.DepartmentMove);
+    Assert.areEqual("DepartmentDelete", MethodName.DepartmentDelete);
+    Assert.areEqual("DepartmentMemberSet", MethodName.DepartmentMemberSet);
+    Assert.areEqual("OrganizationMessageSend", MethodName.OrganizationMessageSend);
+    Assert.areEqual("OrganizationMessageStop", MethodName.OrganizationMessageStop);
+    Assert.areEqual("OrganizationMessageList", MethodName.OrganizationMessageList);
+    Assert.areEqual("OrganizationMessageReplyList", MethodName.OrganizationMessageReplyList);
   }
 
   @TestMethod

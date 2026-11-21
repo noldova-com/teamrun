@@ -12,7 +12,7 @@ import { TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { CommandRun, NotificationAction, QualifiedName } from "@noldova/desktop.protocol";
-import { WindowPartTokens } from "@noldova/desktop.window";
+import { LinkPlace, WindowPartTokens } from "@noldova/desktop.window";
 import {
   AcpAgentEntry,
   AcpAgentIdParams,
@@ -248,8 +248,8 @@ describe("ChatStoreService", () => {
     expect([...context.events].sort()).toEqual([
       "teamrun.approvalCreated", "teamrun.approvalUpdated", "teamrun.backgroundTaskOutput", "teamrun.backgroundTaskUpdated", "teamrun.backgroundTasksCleared",
       "teamrun.composerDefaultUpdated", "teamrun.conversationDeleted", "teamrun.conversationRewound", "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.messageCreated", "teamrun.messageUpdated",
-      "teamrun.panelRequested", "teamrun.planUsageUpdated", "teamrun.projectFolderChanged", "teamrun.projectsLayoutUpdated", "teamrun.providerKindInstallationChanged", "teamrun.providerKindsChanged",
-      "teamrun.providerSignInsChanged", "teamrun.providerUpdated", "teamrun.replyThinking", "teamrun.signInLink",
+      "teamrun.organizationChanged", "teamrun.organizationMessageUpdated", "teamrun.panelRequested", "teamrun.planUsageUpdated", "teamrun.projectFolderChanged", "teamrun.projectsLayoutUpdated", "teamrun.providerKindInstallationChanged", "teamrun.providerKindsChanged",
+      "teamrun.providerSignInsChanged", "teamrun.providerUpdated", "teamrun.replyCheckpointEnded", "teamrun.replyCheckpointStarted", "teamrun.replyThinking", "teamrun.signInLink",
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.waitingMessagesChanged", "teamrun.windowReloadRequested"
     ]);
     expect(context.watchedSettings).toEqual(["teamrun.sendKey", "teamrun.whileReplying"]);
@@ -1738,6 +1738,7 @@ describe("ChatStoreService", () => {
     await store.initialize();
     await store.selectConversation("c1");
     context.emit(EventName.ReplyThinking, new MessageIdParams("m2").toJson());
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
     expect(store.pendingApprovals()).toHaveLength(1);
     context.answer(MethodName.MessageListOpen, () => []);
     context.answer(MethodName.ApprovalList, () => []);
@@ -1751,6 +1752,7 @@ describe("ChatStoreService", () => {
     expect(store.resyncs()).toBe(resyncs + 1);
     expect(store.isWorking("c1")).toBe(false);
     expect([...store.thinkingReplies()]).toEqual([]);
+    expect([...store.savingCheckpointReplies()]).toEqual([]);
     expect(store.pendingApprovals()).toEqual([]);
     expect(messages()[1]?.status).toBe(MessageStatus.Completed);
     context.fail(MethodName.ProviderList, "The runtime part is away.");
@@ -1774,6 +1776,115 @@ describe("ChatStoreService", () => {
     expect([...store.thinkingReplies()]).toEqual([]);
     thinking("m2");
     expect([...store.thinkingReplies()]).toEqual([]);
+  });
+
+  it("marks a running reply as saving a checkpoint until the checkpoint ends, a detail comes, a resync or the reply ends, and ignores replies that are not running", async () => {
+    context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
+    await store.initialize();
+    const emit = (name: EventName, messageId: string): void => context.emit(name, new MessageIdParams(messageId).toJson());
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const seen: string[][] = [];
+
+    emit(EventName.ReplyCheckpointStarted, "unknown");
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointEnded, "unknown");
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointEnded, "m2");
+    seen.push(saving());
+    for (const name of [EventName.DetailAppended, EventName.DetailUpdated]) {
+      emit(EventName.ReplyCheckpointStarted, "m2");
+      context.emit(name, new DetailEventPayload("m2", SampleData.detail(0, DetailKind.Text, "Hello")).toJson());
+      seen.push(saving());
+    }
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    await expect(store.resync()).resolves.toBe(true);
+    seen.push([String(store.isWorking("c1")), ...saving()]);
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    context.emit(EventName.MessageUpdated, SampleData.withStatus(SampleData.reply, MessageStatus.Cancelled).toJson());
+    seen.push(saving());
+    emit(EventName.ReplyCheckpointStarted, "m2");
+    seen.push(saving());
+
+    expect(seen).toEqual([["m2"], ["m2"], [], [], [], ["true"], [], []]);
+  });
+
+  it("keeps a running reply saving its checkpoint through a catalog read that isn't a resync, and drops it once a read finds the reply ended", async () => {
+    let open = [SampleData.reply];
+    context.answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()));
+    await store.initialize();
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const read = async (): Promise<void> => {
+      const reads = context.count(MethodName.PlanUsageList);
+      context.emit(EventName.StateInvalidated, null);
+      await Wait.until(() => expect(context.count(MethodName.PlanUsageList)).toBe(reads + 1));
+    };
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
+
+    await read();
+    const kept = saving();
+    open = [];
+    await read();
+
+    expect([kept, saving()]).toEqual([["m2"], []]);
+  });
+
+  it("keeps a checkpoint that starts while a first load or a resync reads, and applies the reply's latest checkpoint event after the read", async () => {
+    let held: DeferredResponse | null = null;
+    context.answer(MethodName.MessageListOpen, () => [SampleData.reply.toJson()]);
+    context.answer(MethodName.ApprovalListPending, () => Object.isNull(held) ? [] : held.promise);
+    const emit = (name: EventName): void => context.emit(name, new MessageIdParams("m2").toJson());
+    const saving = (): string[] => [...store.savingCheckpointReplies()];
+    const hold = async (read: () => Promise<unknown>, ...names: readonly EventName[]): Promise<string[]> => {
+      held = new DeferredResponse();
+      const asked = context.count(MethodName.ApprovalListPending);
+      const reading = read();
+      await Wait.until(() => expect(context.count(MethodName.ApprovalListPending)).toBe(asked + 1));
+      for (const name of names)
+        emit(name);
+      held.resolve([]);
+      await reading;
+      held = null;
+      return saving();
+    };
+
+    const loaded = await hold(() => store.initialize(), EventName.ReplyCheckpointStarted);
+    const resynced = await hold(() => store.resync(), EventName.ReplyCheckpointStarted);
+    const ended = await hold(() => store.resync(), EventName.ReplyCheckpointStarted, EventName.ReplyCheckpointEnded);
+
+    expect([loaded, resynced, ended]).toEqual([["m2"], ["m2"], []]);
+  });
+
+  it("applies a reply's checkpoint after a read's other events, so an update that lands after the start keeps it and a detail after the start ends it", async () => {
+    let held: DeferredResponse | null = null;
+    let open: readonly Message[] = [];
+    context.answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()));
+    context.answer(MethodName.ApprovalListPending, () => Object.isNull(held) ? [] : held.promise);
+    const started = (): void => context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams("m2").toJson());
+    const hold = async (read: () => Promise<unknown>, during: () => void): Promise<string[]> => {
+      held = new DeferredResponse();
+      const asked = context.count(MethodName.ApprovalListPending);
+      const reading = read();
+      await Wait.until(() => expect(context.count(MethodName.ApprovalListPending)).toBe(asked + 1));
+      during();
+      held.resolve([]);
+      await reading;
+      held = null;
+      return [...store.savingCheckpointReplies()];
+    };
+
+    const updated = await hold(() => store.initialize(), () => {
+      context.emit(EventName.MessageCreated, SampleData.reply.toJson());
+      started();
+      context.emit(EventName.MessageUpdated, SampleData.reply.toJson());
+    });
+    open = [SampleData.reply];
+    const detailed = await hold(() => store.resync(), () => {
+      started();
+      context.emit(EventName.DetailAppended, new DetailEventPayload("m2", SampleData.detail(0, DetailKind.Text, "Hello")).toJson());
+    });
+
+    expect([updated, detailed]).toEqual([["m2"], []]);
   });
 
   it("loads the catalog and selects a project without opening a conversation", async () => {
@@ -2404,6 +2515,18 @@ describe("ChatStoreService", () => {
     expect(store.pendingApprovals()).toEqual([]);
   });
 
+  it("empties the shown rows of a chat whose index was forgotten once a rewind from elsewhere comes", async () => {
+    await store.initialize();
+    await store.selectConversation("c1");
+    const shown = store.messageIndex().map(t => t.id);
+    store.forgetPosition("c1");
+    const forgotten = store.messageIndex().map(t => t.id);
+
+    context.emit(EventName.ConversationRewound, new ConversationRewoundPayload("c1", 0).toJson());
+
+    expect([shown, forgotten, store.messageIndex()]).toEqual([["m1", "m2"], ["m1", "m2"], []]);
+  });
+
   it("offers the person's rewound message back, its text and files, and nothing for a failure, a reply or a rewind from elsewhere", async () => {
     const file = new MessageAttachment("notes.txt", "text/plain", 1, "D:/data/attachments/c1/notes.txt");
     const asked = new Message("m1", "c1", 0, MessageAuthor.User, null, MessageStatus.Completed,
@@ -2878,9 +3001,9 @@ describe("ChatStoreService", () => {
       expect(await store.finishFirstLaunch()).toBe(true);
       expect(store.welcoming()).toBe(false);
       expect((await store.readFirstLaunch())?.finishedAt).toBe(SampleData.timestamp);
-      await store.openPage("https://claude.com/pricing", LinkGesture.Modified);
+      await store.openPage("https://example.com/droid", LinkGesture.Modified);
 
-      expect([context.links, context.linkGestures]).toEqual([["https://claude.com/pricing"], [LinkGesture.Modified]]);
+      expect([context.links, context.linkGestures]).toEqual([["https://example.com/droid"], [LinkGesture.Modified]]);
       expect(context.noticeText()).toBeNull();
     });
 
@@ -3343,6 +3466,67 @@ describe("ChatStoreService", () => {
           XDG_STATE_HOME: "D:\\profiles\\opencode\\Work\\home\\.local\\state", OPENCODE_CONFIG: "", OPENCODE_DISABLE_PROJECT_CONFIG: "1" }, "opencode auth login"],
         ["/home/person/profiles/opencode/Work", { XDG_DATA_HOME: "/home/person/profiles/opencode/Work", XDG_CONFIG_HOME: "/home/person/profiles/opencode/Work/config",
           XDG_STATE_HOME: "/home/person/profiles/opencode/Work/home/.local/state", OPENCODE_CONFIG: "", OPENCODE_DISABLE_PROJECT_CONFIG: "1" }, "opencode auth login"]]);
+    });
+
+    it("reads Claude Code's person folder again when signing in, so a folder the environment names after the listing signs in without the variable, " +
+      "trailing separator and all", async () => {
+      let usual = "/person/.claude";
+      context.answer(MethodName.ProviderKindList, () => [new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", usual, null, {}, {}, [usual])).toJson()]);
+      const folders = new Map([["c1", "/person/.claude"], ["c2", "/person/claude-work"]]);
+      context.answer(MethodName.ProviderList, () => [...folders].map(([id, folder]) => provider(id, "claude", folder).toJson()));
+      context.answer(MethodName.ProviderCheck, t => {
+        const id = (t as { readonly providerId: string }).providerId;
+        return provider(id, "claude", folders.get(id) ?? String.empty, AuthStatus.LoggedIn).toJson();
+      });
+      await store.initialize();
+      usual = "/person/claude-work/";
+
+      for (const [index, id] of ["c1", "c2"].entries()) {
+        const signIn = store.signInProvider(id);
+        await Wait.until(() => expect(terminals.launches).toHaveLength(index + 1));
+        terminals.end(index);
+        await signIn;
+      }
+
+      expect(terminals.launches.map(({ request }) => request.environment)).toEqual([{ CLAUDE_CONFIG_DIR: "/person/.claude" }, {}]);
+    });
+
+    it("reports a sign-in whose read of the provider types fails, opening no terminal", async () => {
+      context.answer(MethodName.ProviderKindList, () => [new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"])).toJson()]);
+      context.answer(MethodName.ProviderList, () => [provider("c1", "claude", "/person/.claude").toJson()]);
+      await store.initialize();
+      context.fail(MethodName.ProviderKindList, "The runtime is restarting.");
+      const reported: string[] = [];
+
+      await store.signInProvider("c1", t => reported.push(t));
+
+      expect(reported).toEqual([Resources.signInKindsNotRead]);
+      expect(terminals.launches).toHaveLength(0);
+    });
+
+    it("signs Claude Code in its usual folder in with the person's own environment, and one with its own folder with its folder named", async () => {
+      const usual = new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"]));
+      context.answer(MethodName.ProviderKindList, () => [usual.toJson()]);
+      const folders = new Map([["c1", "/person/.claude"], ["c2", "/person/profiles/claude/Work"]]);
+      context.answer(MethodName.ProviderList, () => [...folders].map(([id, folder]) => provider(id, "claude", folder).toJson()));
+      context.answer(MethodName.ProviderCheck, t => {
+        const id = (t as { readonly providerId: string }).providerId;
+        return provider(id, "claude", folders.get(id) ?? String.empty, AuthStatus.LoggedIn).toJson();
+      });
+      await store.initialize();
+
+      for (const [index, id] of ["c1", "c2"].entries()) {
+        const signIn = store.signInProvider(id);
+        await Wait.until(() => expect(terminals.launches).toHaveLength(index + 1));
+        terminals.end(index);
+        await signIn;
+      }
+
+      expect(terminals.launches.map(({ request }) => [request.environment, request.command])).toEqual([[{}, "claude auth login"],
+        [{ CLAUDE_CONFIG_DIR: "/person/profiles/claude/Work" }, "claude auth login"]]);
     });
 
     it("leaves the kind's variable to the person's own environment for a provider in one of the person's folders, so the sign-in lands where its turns look", async () => {
@@ -3957,6 +4141,25 @@ describe("ChatStoreService", () => {
     expect(store.signInLinks().size).toBe(0);
   });
 
+  it("opens a sign-in's page in the system's browser, the one it opens itself and the one opened again, while the in-app browser takes every other link", async () => {
+    const signIn = new DeferredResponse();
+    const url = "https://auth.example.com/oauth/authorize?state=1";
+    context.answer(MethodName.ProviderSignIn, () => signIn.promise);
+    const browser = { placeFor: (): LinkPlace => LinkPlace.InApp, openAsync: (): Promise<void> => Promise.resolve() };
+    context.registerInAppBrowser(browser);
+    await store.initialize();
+    const placed = (): LinkPlace[] => context.linkPlaces.map(t => t ?? browser.placeFor());
+
+    const signing = store.signInProvider("a1");
+    context.emit(EventName.SignInLink, new SignInLinkPayload("a1", url).toJson());
+    await store.openSignInLink("a1", LinkGesture.Modified);
+    await store.openPage("https://example.com/droid", LinkGesture.Plain);
+
+    expect([context.links, placed()]).toEqual([[url, url, "https://example.com/droid"], [LinkPlace.System, LinkPlace.System, LinkPlace.InApp]]);
+    signIn.resolve(SampleData.provider.toJson());
+    await signing;
+  });
+
   it("reads each provider's installation with the catalog, follows its changes, and counts a provider TeamRun doesn't install as installed", async () => {
     context.answer(MethodName.ProviderKindInstallationList, () => [new ProviderKindInstallation("antigravity", ProviderKindInstallState.NotInstalled).toJson()]);
     await store.initialize();
@@ -4144,6 +4347,21 @@ describe("ChatStoreService", () => {
       context.emit(EventName.StateResyncRequested, null);
       await Wait.until(() => expect(store.waitingOf("c1")).toEqual([]));
       expect(context.count(MethodName.WaitingMessageList)).toBe(lists + 1);
+    });
+
+    it("keeps the list a change gives while the chat's read is pending over the older list the read answers", async () => {
+      const read = new DeferredResponse();
+      await store.initialize();
+      const lists = context.count(MethodName.WaitingMessageList);
+      context.answer(MethodName.WaitingMessageList, () => read.promise);
+      const opening = store.selectConversation("c1");
+      await Wait.until(() => expect(context.count(MethodName.WaitingMessageList)).toBe(lists + 1));
+
+      context.emit(EventName.WaitingMessagesChanged, listed());
+      read.resolve(listed(waiting("w1", "First")));
+      await opening;
+
+      expect(store.waitingOf("c1")).toEqual([]);
     });
 
     it("adds one with the send it would make and how it goes, says why when it can't, and clears that once one is added", async () => {
@@ -4873,6 +5091,9 @@ describe("ChatStoreService", () => {
       { method: MethodName.ConversationCreate, act: t => t.createConversation("x"), unchanged: t => expect(t.conversations()).toHaveLength(1) },
       { method: MethodName.ConversationRename, act: t => t.renameConversation("c1", "x"), unchanged: t => expect(t.selectedConversation()?.title).toBe("First") },
       { method: MethodName.ConversationMove, act: async t => expect(await t.moveConversation("c1", "p2")).toBe(false), unchanged: t => expect(t.conversation("c1")?.projectId).toBe("p1") },
+      { method: MethodName.ChatFolderAttach, act: async t => expect(await t.attachFolder("c1", "D:/site")).toBe(false),
+        unchanged: t => expect(t.conversation("c1")?.attachedFolder).toBeNull() },
+      { method: MethodName.ChatFolderDetach, act: async t => expect(await t.detachFolder("c1")).toBe(false), unchanged: t => expect(t.conversation("c1")?.folder).toBeNull() },
       { method: MethodName.ConversationResponderSet, act: t => t.setResponder("c1", new ConversationResponder("bob")), unchanged: t => expect(t.conversation("c1")?.responder).toBeNull() },
       { method: MethodName.ConversationDelete, act: t => t.deleteConversation("c1"), unchanged: t => expect(t.selectedConversationId()).toBe("c1") },
       { method: MethodName.ConversationAddMember, act: t => t.addMember("c1", "bob"), unchanged: t => expect(t.membersOf("c1")).toEqual([]) },

@@ -10,6 +10,7 @@ import type { SqlTransaction } from "@noldova/context.data.sql";
 import type {
   ChatFindParams,
   ChatFindResult,
+  ChatFolderAttachParams,
   ChatMemberModeParams,
   ChatMemberSettingsParams,
   ChatPlanFirstParams,
@@ -29,6 +30,8 @@ import type {
   MessageSearchResult,
   RunOutput
 } from "@noldova/teamrun.protocol";
+
+import type { FolderState } from "../enums/folder-state.js";
 
 export interface IConversationsService {
   listMembersAsync(params: ConversationIdParams, transaction?: SqlTransaction): Promise<readonly ConversationMember[]>;
@@ -58,6 +61,8 @@ export interface IConversationsService {
   moveAsync(params: ConversationMoveParams): Promise<Conversation>;
   deleteAsync(params: ConversationIdParams, transaction?: SqlTransaction): Promise<void>;
   countFolderFilesAsync(params: ConversationIdParams): Promise<number>;
+  attachFolderAsync(params: ChatFolderAttachParams, check: (path: string) => Promise<FolderState>): Promise<Conversation>;
+  detachFolderAsync(params: ConversationIdParams): Promise<Conversation>;
   removeFromAsync(conversationId: string, fromSequence: number, transaction?: SqlTransaction): Promise<readonly Message[]>;
   listRunOutputsAsync(params: ConversationIdParams): Promise<readonly RunOutput[]>;
   saveRunOutputAsync(output: RunOutput, transaction?: SqlTransaction): Promise<void>;

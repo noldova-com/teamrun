@@ -76,7 +76,7 @@ const servePageAsync = async (script: string): Promise<[Server, string]> => {
 
 const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: string): Promise<string | undefined> => {
   await app.submitAsync(`${CodexDouble.NAVIGATE_PREFIX}${address}`);
-  await expect(page.getByText("Codex is waiting for your answer", { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText("Codex is waiting for your answer", { exact: true }).and(page.locator(".nol-browser-agent-bar-message"))).toBeVisible({ timeout: 60_000 });
   await page.getByRole("tree").locator(".nol-teamrun-conversation-row[aria-selected='true'] .nol-teamrun-conversation-title").click();
   const card = page.locator("nol-permission-card").filter({ has: page.getByRole("button", { name: "Allow this site for the workspace", exact: true }) });
   await card.getByRole("button", { name: "Allow this site for the workspace", exact: true }).click({ timeout: 60_000 });
@@ -86,7 +86,7 @@ const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: stri
   return navigated();
 };
 
-test("limit: a page's request to a name that resolves to this computer reaches it, and the page reads the answer, until Noldova Desktop refuses it", async ({ app }) => {
+test("limit: a page's request reads its answer", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const [pageServer, origin] = await servePageAsync(`fetch("http://${service.name}/data").then(t => t.text()).then(t => { document.title = "Read " + t; }, `
     + "e => { document.title = \"Failed \" + e; });");
@@ -121,7 +121,7 @@ test("a navigation to an allowed name that resolves to this computer is refused 
   }
 });
 
-test("limit: a named local page's WebSocket to an allowed name that resolves to this computer connects, until Noldova Desktop refuses it", async ({ app }) => {
+test("limit: a page's WebSocket hears its message", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const [pageServer, origin] = await servePageAsync(`const socket = new WebSocket("ws://${service.name}/socket"); `
     + "socket.onmessage = e => { document.title = \"Heard \" + e.data; }; socket.onerror = () => { document.title = \"Failed\"; };");

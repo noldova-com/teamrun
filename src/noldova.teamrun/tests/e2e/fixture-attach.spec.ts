@@ -31,7 +31,7 @@ test("reads a window's tree at teardown at once after the window refused a navig
     await app.attachAsync(testInfo, false);
     const tree = String(testInfo.attachments.find(t => t.name === "window-0.txt")?.body ?? "");
 
-    expect([tree.split("\n")[0], tree.includes("menubar \"Menus\""), tree.includes("TimeoutError")]).toEqual([address, true, false]);
+    expect([tree.split("\n")[0], tree.includes("button \"Settings\""), tree.includes("TimeoutError")]).toEqual([address, true, false]);
   });
 
 test("reads the main window's tree for a test's own snapshot at once after the window refused a navigation", async ({ app }, testInfo) => {
@@ -40,5 +40,5 @@ test("reads the main window's tree for a test's own snapshot at once after the w
   await app.snapshotAsync(testInfo, "after-leave");
   const tree = String(testInfo.attachments.find(t => t.name === "after-leave.txt")?.body ?? "");
 
-  expect([tree.includes("menubar \"Menus\""), tree.includes("TimeoutError")]).toEqual([true, false]);
+  expect([tree.includes("button \"Settings\""), tree.includes("TimeoutError")]).toEqual([true, false]);
 });

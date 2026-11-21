@@ -17,7 +17,7 @@ import "@noldova/context.core";
 import { Resources as CoreResources, type ForkRequest, type ILog, type IProviderAdapter, type IProviderKindInstallation, type ITimer, type ITurnListener, NodeTimer, PlanReading,
   ProfileSearch, SessionCarry, SharedMcpFailure, SharedMcpFailureKind, SharedMcpRefusal, SignInCheck, TimeoutException, TurnDetail, type TurnRequest, TurnOutcome, TurnResult, type TurnTools } from "@noldova/teamrun.core";
 import { RoleApplication, AuthStatus, DetailKind, ForkedSession, ObservedSettings, type OwnMcpServer, type Provider, ProviderKind,
-  ProviderContextWindows, ProviderModel, ProviderProfile, ProviderMode, ProviderModelList, type ProviderSignInCommand, ProviderSpeed, RequestedSettings, Resources as ProtocolResources, type SharedMcpServerDefinition }
+  ProfileFolderPath, ProviderContextWindows, ProviderModel, ProviderProfile, ProviderMode, ProviderModelList, type ProviderSignInCommand, ProviderSpeed, RequestedSettings, Resources as ProtocolResources, type SharedMcpServerDefinition }
   from "@noldova/teamrun.protocol";
 
 import { ExecutableNotFoundException } from "../../exceptions/executable-not-found.exception.js";
@@ -43,6 +43,7 @@ import { TerminalSignIn } from "../terminal-sign-in.js";
 import { UsualFolder } from "../usual-folder.js";
 import { SharedMcpLaunch } from "../mcp/shared-mcp-launch.js";
 import { ReadOnlyMcpTools } from "../mcp/read-only-mcp-tools.js";
+import { ServedToolNames } from "../mcp/served-tool-names.js";
 import type { CommandRunner } from "../process/command-runner.js";
 import { ClaudeEnvironment } from "./claude-environment.js";
 import { ClaudeMcpServers } from "./claude-mcp-servers.js";
@@ -67,7 +68,6 @@ export class ClaudeAdapter implements IProviderAdapter {
     new ProviderMode(Resources.acceptEditsPermissionMode, Resources.claudeAcceptEditsModeName, Resources.claudeAcceptEditsModeDescription),
     new ProviderMode(Resources.planPermissionMode, Resources.claudePlanModeName, Resources.claudePlanModeDescription, false, true),
     new ProviderMode(Resources.bypassPermissionMode, Resources.claudeBypassModeName, Resources.claudeBypassModeDescription, true)];
-  public readonly descriptor: ProviderKind;
   public readonly takesTeamRunTools: boolean = true;
   public readonly profileSearch: ProfileSearch;
   public readonly modes: readonly ProviderMode[] = ClaudeAdapter.modes;
@@ -76,6 +76,7 @@ export class ClaudeAdapter implements IProviderAdapter {
   public readonly planMode: string = Resources.planPermissionMode;
   private readonly commands: CommandSource;
   private readonly baseEnvironment: NodeJS.ProcessEnv;
+  private kind: ProviderKind;
   private readonly homeDirectory: string;
   private readonly appVersion: string;
   private readonly queryFactory: IClaudeQueryFactory;
@@ -88,6 +89,7 @@ export class ClaudeAdapter implements IProviderAdapter {
   private readonly signInReader: ClaudeSignInReader = new ClaudeSignInReader();
   private readonly runs: Set<ClaudeRun> = new Set();
   private readonly chats: Set<ClaudeChat> = new Set();
+  private readonly servedTools: WeakMap<ClaudeChat, readonly string[] | null> = new WeakMap();
   private readonly chatProviders: WeakMap<ClaudeChat, string | null> = new WeakMap();
   private readonly reportedEfforts: Map<string, string> = new Map();
   private readonly reportedWindows: Map<string, number> = new Map();
@@ -114,11 +116,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     idleTimer: ITimer = new NodeTimer()) {
     this.log = log;
     this.idleTimer = idleTimer;
-    this.descriptor = new ProviderKind(Resources.claudeKindId, Resources.claudeDisplayName, true, false, null,
-      new ProviderProfile(Resources.claudeConfigDirVariable, Resources.claudeSignInCommand,
-        UsualFolder.of(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory)),
-      true, null, false, null, false, Resources.claudeOwnMcpServersNote, ProviderAbilityTable.claude, false, false, undefined,
-      Resources.claudeOwnMcpServersShortNote, false, true);
+    this.kind = ClaudeAdapter.kindOf(UsualFolder.of(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory));
     this.profileSearch = new ProfileSearch(UsualFolder.places(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory),
       Resources.claudeProfileEntries);
     this.commands = new CommandSource(command, locate);
@@ -134,8 +132,17 @@ export class ClaudeAdapter implements IProviderAdapter {
     this.timer = timer;
   }
 
+  public get descriptor(): ProviderKind {
+    return this.kind;
+  }
+
   public get activeRunCount(): number {
     return this.runs.size + this.chats.size;
+  }
+
+  public async refreshDescriptorAsync(): Promise<void> {
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    this.kind = ClaudeAdapter.kindOf(UsualFolder.of(passed, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, this.homeDirectory));
   }
 
   public async readSignInCommand(_provider: Provider): Promise<ProviderSignInCommand | null> {
@@ -157,7 +164,8 @@ export class ClaudeAdapter implements IProviderAdapter {
       return new SignInCheck(AuthStatus.Error, null, null, Resources.claudeNotFound);
 
     mkdirSync(provider.profileDir, { recursive: true });
-    const environment = { ...ClaudeEnvironment.build(await this.runner.readEnvironmentAsync(this.baseEnvironment), provider.profileDir, this.appVersion), ...quiet };
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    const environment = { ...ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider.profileDir), this.appVersion), ...quiet };
     const own = command.withOrigin(this.originOf(provider));
     const version = await this.versionReader.read(own, environment);
     try {
@@ -208,9 +216,10 @@ export class ClaudeAdapter implements IProviderAdapter {
     if (Object.isNull(command))
       throw new ExecutableNotFoundException(Resources.claudeNotFound);
     const abort = new AbortController();
+    const passed = await this.readBeforeStartAsync();
     const query = this.queryFactory.start(ClaudeAdapter.emptyPrompt(), {
       pathToClaudeCodeExecutable: command.executable,
-      env: ClaudeEnvironment.build(await this.readBeforeStartAsync(), provider?.profileDir ?? null, this.appVersion),
+      env: ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider?.profileDir ?? null), this.appVersion),
       settingSources: [], strictMcpConfig: true, mcpServers: {}, plugins: [], tools: [], persistSession: false, abortController: abort
     }, this.originOf(provider));
     const run = new ClaudeRun(query, abort);
@@ -245,7 +254,8 @@ export class ClaudeAdapter implements IProviderAdapter {
     if (Object.isNull(command))
       throw new ExecutableNotFoundException(Resources.claudeNotFound);
 
-    const environment = ClaudeEnvironment.build(await this.runner.readEnvironmentAsync(this.baseEnvironment), provider.profileDir, this.appVersion);
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    const environment = ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider.profileDir), this.appVersion);
     const logout = command.withOrigin(this.originOf(provider)).withArguments(Resources.authArgument, Resources.logoutArgument);
     const result = await this.runner.run(logout, environment, this.timings.signInCheckTimeout);
     if (result.timedOut)
@@ -436,9 +446,22 @@ export class ClaudeAdapter implements IProviderAdapter {
     return new ProcessOrigin(this.descriptor.id, provider?.id ?? null);
   }
 
+  private static kindOf(usual: string): ProviderKind {
+    return new ProviderKind(Resources.claudeKindId, Resources.claudeDisplayName, true, false, null,
+      new ProviderProfile(Resources.claudeConfigDirVariable, Resources.claudeSignInCommand, usual, null, {}, {}, [usual]),
+      true, null, false, null, false, Resources.claudeOwnMcpServersNote, ProviderAbilityTable.claude, false, false, undefined,
+      Resources.claudeOwnMcpServersShortNote, false, true);
+  }
+
+  private ownFolderOf(passed: NodeJS.ProcessEnv, profileDir: string | null): string | null {
+    const usual = UsualFolder.of(passed, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, this.homeDirectory);
+    return Object.isNull(profileDir) || ProfileFolderPath.isSame(profileDir, usual) ? null : profileDir;
+  }
+
   private async runQuery(command: ProcessCommand, request: TurnRequest, resume: string | null, text: string, effort: EffortLevel | null,
     profileDir: string | null, listener: ITurnListener, signal: AbortSignal, shutdowns: number): Promise<ClaudeTurn> {
-    const [chat, settle] = await this.openChat(command, request, resume, effort, profileDir, listener, shutdowns);
+    const [chat, settle] = await this.openChat(command, request, resume, effort, profileDir, listener, shutdowns,
+      await ServedToolNames.listAsync(request.tools, signal));
     const turn = new ClaudeTurn(listener, resume, new DeltaStream(listener, this.timings.streamInterval),
       Object.isNull(request.instructions) ? null : RoleApplication.Instructions, chat.tasks, this.timings.requestTimeout, chat.plan, chat.subAgents,
       request.requested.planFirst ? () => chat.setPermissionMode(ClaudeAdapter.modeOf(request.requested.mode)) : null, request.requested.contextWindow);
@@ -506,11 +529,11 @@ export class ClaudeAdapter implements IProviderAdapter {
   }
 
   private async openChat(command: ProcessCommand, request: TurnRequest, resume: string | null, effort: EffortLevel | null,
-    profileDir: string | null, listener: ITurnListener, shutdowns: number): Promise<readonly [ClaudeChat, ((signal: AbortSignal) => Promise<void>) | null]> {
+    profileDir: string | null, listener: ITurnListener, shutdowns: number, tools: readonly string[] | null): Promise<readonly [ClaudeChat, ((signal: AbortSignal) => Promise<void>) | null]> {
     const endpoint = request.tools?.endpoint ?? null;
     if (!Object.isNull(request.tools) && Object.isNull(endpoint))
       throw new ToolsUnavailableException(Resources.formatToolsNotServed(this.descriptor.displayName));
-    const key = ClaudeAdapter.keyOf(command, request, effort, profileDir);
+    const key = ClaudeAdapter.keyOf(command, request, effort, profileDir, tools);
     const continued = Object.isNull(request.resumeAt) ? resume : null;
     await Promise.all([...this.chats].filter(t => !Object.isNull(resume) && t.sessionId === resume).map(t => t.closing));
     const open = Object.isNull(continued) ? undefined : [...this.chats].find(t => t.sessionId === continued && !t.isClosed && !t.isBusy);
@@ -525,6 +548,8 @@ export class ClaudeAdapter implements IProviderAdapter {
         await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.claudeChatEndedForTools, null, null));
     }
     if (!Object.isUndefined(open)) {
+      if (open.isRunningTasks && JSON.stringify(this.servedTools.get(open)) !== JSON.stringify(tools))
+        await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.claudeChatEndedForToolsChange, null, null));
       this.chats.delete(open);
       void open.stop();
     }
@@ -546,7 +571,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     }, new ClaudeTasks(this.timer, this.timings.taskOutputInterval), (Object.isNull(continued) ? undefined : this.plans.get(continued)) ?? new ClaudePlan(),
       undefined, served?.token ?? null, this.log, this.timings.requestTimeout, withheld ? (t, named) => this.ownServersStartedAsync(t, passed, [...fromProject, ...named]) : null,
       this.idleTimer, this.timings.silenceLimit, this.timings.idleLimit);
-    const environment: Record<string, string | undefined> = { ...ClaudeEnvironment.build(base, profileDir, this.appVersion, !request.isolated),
+    const environment: Record<string, string | undefined> = { ...ClaudeEnvironment.build(base, this.ownFolderOf(base, profileDir), this.appVersion, !request.isolated),
       [Resources.claudeSessionStateEventsVariable]: Resources.enabledValue, ...Object.fromEntries(Object.entries(request.environment)
         .filter(([name]) => (Object.isNull(served) && !withheld) || name !== ProtocolResources.senderTokenVariable)) };
     const trusted = !request.isolated && await this.trustsAsync(request);
@@ -555,6 +580,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     chat.attach(query, ClaudeAdapter.startModeOf(request));
     this.chats.add(chat);
     this.chatProviders.set(chat, request.provider?.id ?? null);
+    this.servedTools.set(chat, tools);
     const own = await this.ownServersOf(request, environment);
     const others = ClaudeAdapter.serversOf(request, served, environment);
     const servers = { ...own, ...others };
@@ -735,11 +761,11 @@ export class ClaudeAdapter implements IProviderAdapter {
     return Object.fromEntries(Object.entries(request.environment).filter(([name]) => name === ProtocolResources.senderTokenVariable));
   }
 
-  private static keyOf(command: ProcessCommand, request: TurnRequest, effort: EffortLevel | null, profileDir: string | null): string {
+  private static keyOf(command: ProcessCommand, request: TurnRequest, effort: EffortLevel | null, profileDir: string | null, tools: readonly string[] | null): string {
     const environment = Object.entries(request.environment).filter(([name]) => name !== ProtocolResources.senderTokenVariable);
     return JSON.stringify([command.executable, request.provider?.id ?? null, profileDir, request.workingDirectory, request.instructions, request.requested.model,
       effort, request.requested.speed, request.requested.mode, request.requested.planFirst, request.requested.contextWindow, environment,
-      request.sharedServers.map(t => t.toJson()), request.provider?.ownMcpServers === true]);
+      request.sharedServers.map(t => t.toJson()), request.provider?.ownMcpServers === true, tools]);
   }
 
   private createOptions(

@@ -16,6 +16,7 @@ import {
   Message,
   MessageAuthor,
   MessageDetail,
+  MessageSender,
   MessageStatus,
   ObservedSettings,
   PermissionPayload,
@@ -36,6 +37,7 @@ import { ToolCall, ToolCallKind, ToolCallOutputState, ToolCallStatus } from "@no
 
 import { SampleData } from "../../fixtures/sample-data.fixture";
 import { SamplePages } from "../../fixtures/sample-pages.fixture";
+import { ReplyActivity } from "../../../src/app/enums/reply-activity";
 import { SegmentKind } from "../../../src/app/enums/segment-kind";
 import { StepCategory } from "../../../src/app/enums/step-category";
 import { ActivityEntry } from "../../../src/app/models/activity-entry";
@@ -54,6 +56,67 @@ describe("FormatterService", () => {
   const kind = (provenance: Provenance, teammateId: string | null = null, teammateName: string | null = null): Message =>
     new Message("m3", "c1", 2, MessageAuthor.Provider, null, MessageStatus.Completed, [], provenance, SampleData.timestamp, null, SampleData.timestamp, [],
       teammateId, teammateName);
+
+  it("reads a chat's wake from its payload, a reply's missing text as none, and leaves out a reply without a name or a status it knows", () => {
+    const received = (replies: JsonValue): Message =>
+      reply([detail(0, DetailKind.Note, "Received a message.", { source: "wakeReceived", wakeChatId: "c2", wakeReplies: replies })]);
+    const read = FormatterService.wakeReceivedOf(received([
+      { name: "Bob", status: MessageStatus.Completed, text: null },
+      { name: 7, status: MessageStatus.Completed, text: "Done." },
+      { name: "Carol", status: "Asleep", text: "Done." },
+      "Dave"
+    ]));
+
+    expect(read?.chatId).toBe("c2");
+    expect(read?.replies.map(t => [t.name, t.status, t.text])).toEqual([["Bob", MessageStatus.Completed, null]]);
+    expect(FormatterService.wakeReceivedOf(received("Bob"))).toBeNull();
+  });
+
+  it("reads why a chat's wake brought nothing back, and an old wake with no view from its sender's chat, lost or deleted by its text's opening, or as its own chat's task with none, and none with no sender", () => {
+    const wake = (payload: JsonObject, sender: MessageSender | null, text: string = "The work you sent to chat \"Second\" (c2) has ended."): Message =>
+      new Message("w1", "c1", 1, MessageAuthor.User, null, MessageStatus.Completed,
+        [detail(0, DetailKind.Text, text, { source: "chatWake", wakeId: "w1", ...payload })], null, SampleData.timestamp, null,
+        SampleData.timestamp, [], null, null, [], sender);
+    const read = (message: Message): readonly unknown[] | null => {
+      const received = FormatterService.wakeReceivedOf(message);
+      return Object.isNull(received) ? null : [received.chatId, received.replies.length, received.end];
+    };
+
+    expect(read(wake({ wakeChatId: "c2", wakeReplies: [], wakeEnd: "lost" }, null))).toEqual(["c2", 0, "lost"]);
+    expect(read(wake({ wakeChatId: "c2", wakeReplies: [], wakeEnd: 1 }, null))).toEqual(["c2", 0, null]);
+    expect(read(wake({}, new MessageSender("c2", "bob", "Bob")))).toEqual(["c2", 0, null]);
+    expect(read(wake({}, new MessageSender("c2", null, "TeamRun"),
+      "TeamRun restarted before the work you sent to chat \"Second\" (c2) ended, so no result came back and this chat wasn't woken."))).toEqual(["c2", 0, "lost"]);
+    expect(read(wake({}, new MessageSender("c2", null, "TeamRun"),
+      "The chat c2 that you sent work to was deleted before its result came back, so this chat wasn't woken."))).toEqual(["c2", 0, "chatDeleted"]);
+    expect(read(wake({}, new MessageSender("c1", null, "TeamRun")))).toEqual([null, 0, null]);
+    const lostTask = (text: string): readonly unknown[] => {
+      const received = FormatterService.wakeReceivedOf(wake({}, new MessageSender("c1", null, "TeamRun"), text));
+      return [received?.chatId, received?.end, received?.task?.kind, received?.task?.name, received?.task?.ending, received?.task?.text];
+    };
+    expect(lostTask("TeamRun restarted before your background command bg-8 ended, so it was stopped and this chat wasn't woken by it."))
+      .toEqual([null, "lost", "command", null, null, null]);
+    expect(lostTask("TeamRun restarted before your sub-agent agent-2 ended, so no result came back and this chat wasn't woken."))
+      .toEqual([null, "lost", "subAgent", null, null, null]);
+    expect(lostTask("Your sub-agent \"Search\" (agent-1) ended as completed.")).toEqual([null, null, undefined, undefined, undefined, undefined]);
+    expect(read(wake({}, null))).toBeNull();
+    expect(read(reply([detail(0, DetailKind.Note, "Received a message.", { source: "wakeReceived" })]))).toBeNull();
+  });
+
+  it("reads a sub-agent's or command's wake as its task's kind, name, ending and text, an ending or text that isn't text as none, and none without a kind or name", () => {
+    const wake = (task: JsonValue, end: string | null = null): Message => new Message("w1", "c1", 1, MessageAuthor.User, null, MessageStatus.Completed,
+      [detail(0, DetailKind.Text, "Your sub-agent ended.", { source: "chatWake", wakeId: "w1", wakeTask: task, ...Object.isNull(end) ? {} : { wakeEnd: end } })],
+      null, SampleData.timestamp, null, SampleData.timestamp, [], null, null, [], new MessageSender("c1", null, "TeamRun"));
+    const read = (message: Message): readonly unknown[] | null => {
+      const received = FormatterService.wakeReceivedOf(message);
+      return Object.isNull(received) ? null : [received.chatId, received.end, received.task?.kind, received.task?.name, received.task?.ending, received.task?.text];
+    };
+
+    expect(read(wake({ kind: "command", name: "Run the tests", ending: "exited with code 1", text: "1 failed" })))
+      .toEqual([null, null, "command", "Run the tests", "exited with code 1", "1 failed"]);
+    expect(read(wake({ kind: "subAgent", name: "Search", ending: 1, text: false }, "lost"))).toEqual([null, "lost", "subAgent", "Search", null, null]);
+    expect([read(wake({ kind: "subAgent", name: 7 })), read(wake({ name: "Search" }))]).toEqual([null, null]);
+  });
 
   it("sorts steps into commands, edits, reads, searches, thoughts and other steps, the order a summary counts them in", () => {
     expect(Object.values(StepCategory)).toEqual(["Command", "Edit", "Read", "Search", "Thought", "Other"]);
@@ -864,19 +927,34 @@ describe("FormatterService", () => {
 
   it("says a working reply is thinking, timed from its start, until its first thought, step or text, and again while its provider says it thinks", () => {
     const at = Date.parse(SampleData.timestamp) + 12_000;
-    const label = (details: readonly MessageDetail[], status: MessageStatus, isThinking: boolean = false): string =>
-      formatter().activityLabel(reply(details, status), at, isThinking);
+    const label = (details: readonly MessageDetail[], status: MessageStatus, activity: ReplyActivity | null = null): string =>
+      formatter().activityLabel(reply(details, status), at, activity);
 
     expect([
       label([], MessageStatus.Running),
       label([detail(0, DetailKind.Reasoning, "Weighing it.")], MessageStatus.Running),
       label([detail(0, DetailKind.Command, "> ls", { tool: "Bash", toolUseId: "t1" })], MessageStatus.Running),
       label([detail(0, DetailKind.Text, "Hello")], MessageStatus.Running),
-      label([detail(0, DetailKind.Text, "Hello")], MessageStatus.Running, true),
+      label([detail(0, DetailKind.Text, "Hello")], MessageStatus.Running, ReplyActivity.Thinking),
       label([], MessageStatus.AwaitingApproval),
-      label([], MessageStatus.Pending, true),
-      label([], MessageStatus.Completed, true)
+      label([], MessageStatus.Pending, ReplyActivity.Thinking),
+      label([], MessageStatus.Completed, ReplyActivity.Thinking)
     ]).toEqual(["Thinking… 12s", "Working for 12s", "Working for 12s", "Working for 12s", "Thinking… 12s", "Working for 12s", "Waiting for its turn", "Worked for 0s"]);
+  });
+
+  it("says a working reply is saving a checkpoint, timed from its start, or stopping, and a reply that isn't working what it did", () => {
+    const at = Date.parse(SampleData.timestamp) + 12_000;
+    const label = (status: MessageStatus, activity: ReplyActivity): string =>
+      formatter().activityLabel(reply([detail(0, DetailKind.Text, "Hello")], status), at, activity);
+
+    expect([
+      label(MessageStatus.Running, ReplyActivity.SavingCheckpoint),
+      label(MessageStatus.Running, ReplyActivity.Stopping),
+      label(MessageStatus.AwaitingApproval, ReplyActivity.Stopping)
+    ]).toEqual(["Saving a checkpoint… 12s", "Stopping…", "Stopping…"]);
+    expect(Object.values(ReplyActivity).map(t => [label(MessageStatus.Pending, t), label(MessageStatus.Completed, t), label(MessageStatus.Cancelled, t)]))
+      .toEqual([["Waiting for its turn", "Worked for 0s", "Worked for 0s"], ["Waiting for its turn", "Worked for 0s", "Worked for 0s"],
+        ["Waiting for its turn", "Worked for 0s", "Worked for 0s"]]);
   });
 
   it("reads a thought's latest line as the first sentence of its last paragraph, without Markdown marks", () => {

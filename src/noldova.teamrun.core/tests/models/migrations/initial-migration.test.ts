@@ -48,8 +48,8 @@ export class InitialMigrationTests {
     const tables = await names("table");
     const indexes = (await names("index")).filter(t => t.startsWith("IX_"));
 
-    Assert.areEqual("__changes,__migrations,accountLimits,acpAgents,approvals,backgroundTasks,chatTeammates,chatWakes,chats,drafts,handoverSummaries,messageText,messageText_config,messageText_content,messageText_data,messageText_docsize,messageText_idx,messages,preferences,projects,providers,readingPositions,runOutputs,sharedMcpServers,sqlite_sequence,sustainAttempts,teammates,waitingMessages", tables.join(","));
-    Assert.areEqual(14, indexes.length);
+    Assert.areEqual("__changes,__migrations,accountLimits,acpAgents,approvals,backgroundTasks,chatTeammates,chatWakes,chats,departmentMembers,departments,drafts,handoverSummaries,messageText,messageText_config,messageText_content,messageText_data,messageText_docsize,messageText_idx,messages,organizationMessages,preferences,projects,providers,readingPositions,runOutputs,sharedMcpServers,sqlite_sequence,sustainAttempts,teammates,waitingMessages", tables.join(","));
+    Assert.areEqual(17, indexes.length);
     const orphan = "INSERT INTO chats (id, projectId, json, createdAt, updatedAt) VALUES ('c', 'missing', '{}', 't', 't')";
     await Assert.throwsAsync(() => context.database.connection.executeAsync(new SqlQuery(orphan)), Error);
   }

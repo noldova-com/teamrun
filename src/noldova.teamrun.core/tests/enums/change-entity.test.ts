@@ -21,6 +21,9 @@ export class ChangeEntityTests {
     Assert.areEqual("Provider", ChangeEntity.Provider);
     Assert.areEqual("SharedMcpServer", ChangeEntity.SharedMcpServer);
     Assert.areEqual("AcpAgent", ChangeEntity.AcpAgent);
+    Assert.areEqual("Department", ChangeEntity.Department);
+    Assert.areEqual("DepartmentMember", ChangeEntity.DepartmentMember);
+    Assert.areEqual("OrganizationMessage", ChangeEntity.OrganizationMessage);
   }
 
   @TestMethod

@@ -7,7 +7,7 @@
  */
 
 import type { FocusOrigin } from "@angular/cdk/a11y";
-import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
+import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, OrganizationRecipientState, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
   type ProviderKindInstallation, ReplyPanel, Resources as ProtocolResources, SharedMcpSetting, SharedMcpTransport, SharedMcpVariableSource, SubAgentStatus } from "@noldova/teamrun.protocol";
 import { TerminalShellKind } from "@noldova/terminal.window";
 import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
@@ -37,6 +37,8 @@ export class Resources {
   public static readonly retryLabel: string = "Retry";
   public static readonly kindsUnavailableForProviders: string = "The provider types couldn't be loaded, so providers can't be edited or checked.";
   public static readonly kindsUnavailableForMcpServers: string = "The provider types couldn't be loaded, so their MCP servers can't be shown.";
+  public static readonly signInKindsNotRead: string = "The provider types couldn't be read again, so the sign-in didn't start.";
+  public static readonly signOutKindsNotRead: string = "The provider types couldn't be read again, so the sign-out didn't start.";
   public static readonly nullKind: string = "null";
   public static readonly modelCatalogUnavailable: string = "Models could not be refreshed. Previously loaded choices are kept.";
   public static readonly errorCodeField: string = "code";
@@ -83,6 +85,7 @@ export class Resources {
   public static readonly attachmentLimitExceeded: string = "Attach up to 10 files: 10 MiB per image and 100 MiB per file.";
   public static readonly attachmentReadFailed: string = "The attachment could not be read. Try adding it again.";
   public static readonly draftNotSaved: string = "The unsent message could not be saved.";
+  public static readonly draftStale: string = "Another window changed the unsent message since this one read it.";
   public static readonly draftUnreadable: string = "The unsent message could not be read, so what is written here is not kept.";
   public static readonly modelImagesUnsupported: string = "No one in this chat takes images.";
   public static readonly chatPermissionsLabel: string = "Permissions in this chat";
@@ -163,6 +166,7 @@ export class Resources {
   public static readonly runOpensInSetting: string = "teamrun.runOpensIn";
   public static readonly runOpensInPanel: string = "Panel";
   public static readonly inlineTerminalRows: number = 15;
+  public static readonly inlineTerminalMinimumRows: number = 8;
   public static readonly inlineTerminalRowTolerance: number = 1e-3;
   public static readonly runBodySite: string = "body";
   public static readonly runPlanSite: string = "plan";
@@ -377,6 +381,7 @@ export class Resources {
   public static readonly saveWaitingLabel: string = "Save the waiting message";
   public static readonly cancelEditingLabel: string = "Cancel";
   public static readonly editingWaitingNote: string = "Editing a waiting message. Its files stay as they are.";
+  public static readonly editingFilesRefused: string = "Files can't be added to a waiting message. Send them in a new message once the edit is saved.";
   public static readonly deliveryGlyphs: Readonly<Record<MessageDelivery, string>> = {
     [MessageDelivery.Steer]: "subdirectory_arrow_right",
     [MessageDelivery.Queue]: "queue",
@@ -405,6 +410,13 @@ export class Resources {
   public static readonly moveTitle: string = "Move chat to a project";
   public static readonly moveConfirmLabel: string = "Move";
   public static readonly moveToProjectIcon: string = "drive_file_move";
+  public static readonly attachFolderLabel: string = "Attach a folder…";
+  public static readonly replaceFolderLabel: string = "Replace the folder…";
+  public static readonly detachFolderLabel: string = "Detach the folder";
+  public static readonly attachFolderIcon: string = "folder_open";
+  public static readonly detachFolderIcon: string = "folder_off";
+  public static readonly replaceFolderTitle: string = "Replace the attached folder";
+  public static readonly replaceFolderConfirmLabel: string = "Replace";
   public static readonly forgetTitle: string = "Forget project";
   public static readonly forgetConfirmLabel: string = "Forget";
   public static readonly rewindLabel: string = "Rewind to here";
@@ -495,6 +507,7 @@ export class Resources {
   public static readonly writtenImagesSlot: string = "writtenImages";
   public static readonly attachedImagesSlot: string = "attachedImages";
   public static readonly wakeNoteSlot: string = "wakeNote";
+  public static readonly wakeReceivedSlot: string = "wakeReceived";
   public static readonly resumeNoteSlot: string = "resumeNote";
   public static readonly sustainNoteSlot: string = "sustainNote";
   public static readonly planBlockSlot: string = "planBlock";
@@ -582,8 +595,39 @@ export class Resources {
   public static readonly historyWarmUpQuestion: string = "Warm up";
   public static readonly historyWarmUpReply: string = "Warm up with `code`, **bold** and a list:\n\n- one\n- two";
   public static readonly youLabel: string = "You";
+  public static readonly organizationInboxTitle: string = "Inbox";
+  public static readonly organizationChatsLabel: string = "Chats";
+  public static readonly organizationAllRead: string = "All read";
+  public static readonly organizationNoMessages: string = "No messages yet";
+  public static readonly organizationInboxEmpty: string = "No messages yet. Write the first.";
+  public static readonly organizationThreadEmpty: string = "No messages yet.";
+  public static readonly organizationChooseTarget: string = "Choose whom to message.";
+  public static readonly organizationLeadersTitle: string = "All leaders";
+  public static readonly organizationLeadersChat: string = "Chat with all leaders";
+  public static readonly organizationEveryoneTitle: string = "Everyone";
+  public static readonly organizationDeletedDepartment: string = "Deleted department";
+  public static readonly organizationRemovedTeammate: string = "Removed teammate";
+  public static readonly organizationTeammateNote: string = "Teammate";
+  public static readonly organizationSendLabel: string = "Send";
+  public static readonly organizationStopLabel: string = "Stop sending";
+  public static readonly organizationDepartmentIcon: string = "groups";
+  public static readonly organizationGroupIcon: string = "forum";
   public static readonly senderChatGone: string = "from a deleted chat";
+  public static readonly wakeReceivedLabel: string = "Received a message from";
+  public static readonly wakeEndedLabel: string = "No reply came back from";
+  public static readonly wakeLostText: string = "TeamRun restarted before the work sent there ended.";
+  public static readonly wakeChatDeletedText: string = "The chat was deleted before the work sent there ended.";
+  public static readonly wakeTaskLostText: string = "TeamRun restarted before it ended.";
+  public static readonly wakeCommandLostText: string = "TeamRun restarted before it ended, so it was stopped.";
+  public static readonly wakeOldTaskLabel: string = "A sub-agent or background command of this chat ended";
+  public static readonly wakeChatGone: string = "a deleted chat";
+  public static readonly wakeRepliesLabel: string = "The message received";
+  public static readonly wakeCommandOutputLabel: string = "The command's last lines";
+  public static readonly wakeSubAgentResultLabel: string = "The sub-agent's summary";
+  public static readonly wakeTaskLostLabel: string = "Why it didn't end";
   public static readonly thinkingLabel: string = "Thinking…";
+  public static readonly savingCheckpointLabel: string = "Saving a checkpoint…";
+  public static readonly stoppingLabel: string = "Stopping…";
   public static readonly waitingForTurnLabel: string = "Waiting for its turn";
   public static readonly didNotStartLabel: string = "Did not start";
   public static readonly stepLabel: string = "Step";
@@ -1029,6 +1073,8 @@ export class Resources {
     [ChatAction.SetMemberSettings]: "Couldn't change the teammate's model or effort in the chat",
     [ChatAction.SetPlanFirst]: "Couldn't change Plan first in the chat",
     [ChatAction.MoveChat]: "Couldn't move the chat",
+    [ChatAction.AttachFolder]: "Couldn't attach the folder to the chat",
+    [ChatAction.DetachFolder]: "Couldn't detach the folder from the chat",
     [ChatAction.RenameChat]: "Couldn't rename the chat",
     [ChatAction.SetResponder]: "Couldn't change who answers in the chat",
     [ChatAction.DeleteChat]: "Couldn't delete the chat",
@@ -1320,6 +1366,9 @@ export class Resources {
   public static readonly sharedMcpVariableColumn: string = "Variable";
   public static readonly sharedMcpSourceColumn: string = "Source";
   public static readonly sharedMcpValueColumn: string = "Value";
+  public static readonly sharedMcpValueSelector: string = ".nol-teamrun-shared-mcp-value";
+  public static readonly sharedMcpSecretSelector: string = ".nol-teamrun-shared-mcp-secret";
+  public static readonly sharedMcpSourceSelector: string = ".nol-teamrun-shared-mcp-source .nol-select-button";
   public static readonly sharedMcpShowValueLabel: string = "Show";
   public static readonly sharedMcpHideValueLabel: string = "Hide";
   public static readonly sharedMcpVariableNotSetLabel: string = "Not set on this machine";
@@ -1333,6 +1382,9 @@ export class Resources {
   public static readonly acpAboutLabel: string = "About";
   public static readonly acpAddLabel: string = "Add";
   public static readonly acpRemoveLabel: string = "Remove";
+  public static readonly acpAgentSelector: string = "[data-agent]";
+  public static readonly acpAddSelector: string = ".nol-teamrun-acp-add";
+  public static readonly acpRemoveSelector: string = ".nol-teamrun-acp-remove";
   public static readonly acpNotCheckedLabel: string = "Not checked";
   public static readonly acpNotCheckedHint: string = "The registry lists no SHA-256 for this download, so TeamRun can't check it. It still comes over HTTPS, up to a size limit.";
   public static readonly acpNoAgentsText: string = "No agents to show.";
@@ -1547,6 +1599,8 @@ export class Resources {
   public static readonly usageHandOffsHeadingLevel: number = 3;
   public static readonly sustainReasonId: string = "nol-teamrun-sustain-reason";
   public static readonly moveUpLabel: string = "Move up";
+  public static readonly fallbackUpSelector: string = ".nol-teamrun-fallback-up";
+  public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
 
   public static formatSustainUnavailable(kind: string): string {
@@ -1658,6 +1712,22 @@ export class Resources {
     return JSON.stringify({ mcpServers: { teamrun: { type: "http", url, headers: { Authorization: "Bearer ${TEAMRUN_TOKEN}" } } } }, null, 2);
   }
 
+  public static formatTaskWakeLabel(kind: string, name: string | null, ending: string | null): string {
+    const command = kind === ProtocolResources.wakeCommandTask;
+    const work = Object.isNull(name) ? `${command ? "A background command" : "A sub-agent"} of this chat` : `${command ? "Background command" : "Sub-agent"} "${name}"`;
+    return `${work} ${ending ?? (command ? "was stopped" : "didn't come back")}`;
+  }
+
+  public static formatWakeReplyHeading(name: string, status: MessageStatus, text: string | null): string {
+    if (status === MessageStatus.Cancelled)
+      return `${name}'s reply was cancelled.`;
+    if (status === MessageStatus.Failed)
+      return `${name}'s reply failed.`;
+    if (status === MessageStatus.Interrupted)
+      return `${name}'s reply was interrupted.`;
+    return Object.isNull(text) ? `${name} replied without text.` : `${name} replied:`;
+  }
+
   public static formatSenderChat(title: string): string {
     return `from ${title}`;
   }
@@ -1688,6 +1758,74 @@ export class Resources {
 
   public static formatDraftUnreadable(error: string): string {
     return `${Resources.draftUnreadable} ${error}`;
+  }
+
+  public static formatOrganizationUnread(count: number): string {
+    return `${count} unread`;
+  }
+
+  public static formatOrganizationLeadersNote(count: number): string {
+    return `Every department's leader (${count})`;
+  }
+
+  public static formatOrganizationChat(name: string): string {
+    return `Chat with ${name}`;
+  }
+
+  public static formatOrganizationOnlyNote(name: string): string {
+    return `Only ${name}`;
+  }
+
+  public static formatOrganizationDepartmentNote(count: number): string {
+    return `The leader and every member (${count})`;
+  }
+
+  public static formatOrganizationEveryoneNote(count: number): string {
+    return `Every teammate (${count})`;
+  }
+
+  public static formatOrganizationPlaceholder(title: string): string {
+    return `Message ${title}`;
+  }
+
+  public static formatOrganizationLastLine(author: string, text: string): string {
+    return `${author}: ${text}`;
+  }
+
+  public static formatOrganizationReplying(names: readonly string[]): string {
+    return names.length === 1 ? `${Resources.formatNameList(names)} is replying…` : `${Resources.formatNameList(names)} are replying…`;
+  }
+
+  public static formatOrganizationRecipients(state: OrganizationRecipientState, names: readonly string[]): string {
+    const list = Resources.formatNameList(names);
+    switch (state) {
+      case OrganizationRecipientState.Queued:
+        return `Waiting to start for ${list}`;
+      case OrganizationRecipientState.Started:
+        return `Sent to ${list}`;
+      case OrganizationRecipientState.Stopped:
+        return `Stopped before it reached ${list}`;
+      case OrganizationRecipientState.Removed:
+        return `${list} ${names.length === 1 ? "was" : "were"} removed before it arrived`;
+      case OrganizationRecipientState.Failed:
+        return `Couldn't reach ${list}`;
+    }
+  }
+
+  public static formatOrganizationFailure(name: string, reason: string): string {
+    return `${name}: ${reason}`;
+  }
+
+  public static formatOrganizationSendFailed(error: string): string {
+    return `The message wasn't sent: ${error}`;
+  }
+
+  public static formatOrganizationStopFailed(error: string): string {
+    return `Sending couldn't be stopped: ${error}`;
+  }
+
+  public static formatNameList(names: readonly string[]): string {
+    return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.slice(-1).join("")}`;
   }
 
   public static formatValueKind(value: unknown): string {
@@ -1897,6 +2035,18 @@ export class Resources {
       + "To keep the chat and its files, move it to a folder instead.";
   }
 
+  public static formatReplaceFolderText(attached: string, chosen: string): string {
+    return `From the next turn, this chat's teammates work in "${chosen}" instead of "${attached}". No files are copied, moved or changed.`;
+  }
+
+  public static formatAttachedFolderNote(folder: string): string {
+    return `Works in the attached folder ${folder}`;
+  }
+
+  public static formatAttachedFolderKept(folder: string): string {
+    return `The folder attached to it, "${folder}", and its files stay as they are.`;
+  }
+
   public static formatMoveText(count: number, project: string): string {
     return `The ${Resources.formatFileCount(count)} this chat holds ${count === 1 ? "is" : "are"} copied to "${project}", and the chat goes on there. Its own Git history isn't copied.`;
   }
@@ -2079,6 +2229,10 @@ export class Resources {
 
   public static formatThinkingFor(duration: string): string {
     return `${Resources.thinkingLabel} ${duration}`;
+  }
+
+  public static formatSavingCheckpointFor(duration: string): string {
+    return `${Resources.savingCheckpointLabel} ${duration}`;
   }
 
   public static formatCommandCount(count: number): string {

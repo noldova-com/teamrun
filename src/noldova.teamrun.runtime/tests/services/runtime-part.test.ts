@@ -49,7 +49,9 @@ import {
   AcpAgentOffer,
   AcpStoredAgent,
   ApprovalAsk,
+  ConversationEngine,
   DatabaseContext,
+  DraftsService,
   type ForkRequest,
   type IAcpAgentCatalog,
   type ILog,
@@ -88,6 +90,7 @@ import {
   Conversation,
   ConversationResponder,
   ConversationResponderParams,
+  ConversationRewindParams,
   ConversationRewindResult,
   DataFolder,
   DefaultTeammate,
@@ -99,6 +102,7 @@ import {
   Harness,
   Message,
   MessageAuthor,
+  MessageDelivery,
   MessageDetail,
   MessageIdParams,
   MessageListParams,
@@ -127,7 +131,11 @@ import {
   SubAgent,
   SubAgentStatus,
   TeammateCreateParams,
-  TeammateUpdateParams
+  TeammateUpdateParams,
+  WaitingMessage,
+  WaitingMessageAddParams,
+  WaitingMessageEditParams,
+  WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
 import { ExecutableLocator, type IProcessStarter } from "@noldova/teamrun.providers";
 import {
@@ -139,7 +147,8 @@ import {
   Resources as RuntimeResources,
   RuntimePart,
   RuntimePartException,
-  RuntimeToolSession
+  RuntimeToolSession,
+  WorkingMethod
 } from "@noldova/teamrun.runtime";
 
 import { AnsweringAsker } from "../fixtures/answering-asker.fixture.js";
@@ -235,7 +244,7 @@ export class RuntimePartTests {
     const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
 
     await part.activateAsync(context);
-    await RuntimePartTests.callAsync(context, "teamrun.sharedMcpServerCreate", SharedMcpServerDefinition.gitHub.toJson());
+    await RuntimePartTests.callAsync(context, "teamrun.sharedMcpServerCreate", SharedMcpServerDefinition.gitHub.toJson(), ShellClients.mainProcess);
     const listed = await RuntimePartTests.callAsync(context, "teamrun.sharedMcpServerList", null);
     await part.deactivateAsync();
 
@@ -380,11 +389,12 @@ export class RuntimePartTests {
     const conversation = await RuntimePartTests.callAsync(first, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
     const other = await RuntimePartTests.callAsync(first, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
     await RuntimePartTests.callAsync(first, "teamrun.conversationResponderSet",
-      new ConversationResponderParams(conversation.id, new ConversationResponder(null, requested), true).toJson());
+      new ConversationResponderParams(conversation.id, new ConversationResponder(null, requested), true).toJson(), ShellClients.mainProcess);
     await RuntimePartTests.callAsync(first, "teamrun.conversationResponderSet",
-      new ConversationResponderParams(other.id, new ConversationResponder(null, new RequestedSettings("gone", null, null)), true).toJson());
-    await RuntimePartTests.callAsync(first, "teamrun.defaultTeammateSet", new DefaultTeammateSetParams(new DefaultTeammate(requested)).toJson());
-    const provider = await RuntimePartTests.callAsync(first, "teamrun.providerCreate", new ProviderCreateParams(MentioningAdapter.id, "Home", usual).toJson()) as
+      new ConversationResponderParams(other.id, new ConversationResponder(null, new RequestedSettings("gone", null, null)), true).toJson(), ShellClients.mainProcess);
+    await RuntimePartTests.callAsync(first, "teamrun.defaultTeammateSet", new DefaultTeammateSetParams(new DefaultTeammate(requested)).toJson(),
+      ShellClients.mainProcess);
+    const provider = await RuntimePartTests.callAsync(first, "teamrun.providerCreate", new ProviderCreateParams(MentioningAdapter.id, "Home", usual).toJson(), ShellClients.mainProcess) as
       { id: string };
     await part.deactivateAsync();
     const second = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
@@ -400,6 +410,37 @@ export class RuntimePartTests {
   }
 
   @TestMethod
+  public async sweepsTheSentFilesAtStartUpBeforeAnyQueuedSendResumes(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    const steps: string[] = [];
+    const sweep = DraftsService.prototype.sweepAsync;
+    const reconcile = ConversationEngine.prototype.reconcileAsync;
+    DraftsService.prototype.sweepAsync = async function (this: DraftsService): Promise<void> {
+      await sweep.call(this);
+      steps.push("swept");
+    };
+    ConversationEngine.prototype.reconcileAsync = function (this: ConversationEngine): Promise<readonly Message[]> {
+      steps.push("resuming");
+      return reconcile.call(this);
+    };
+
+    try {
+      await part.activateAsync(context);
+      await part.deactivateAsync();
+    }
+    finally {
+      DraftsService.prototype.sweepAsync = sweep;
+      ConversationEngine.prototype.reconcileAsync = reconcile;
+    }
+
+    Assert.areEqual("swept,resuming", steps.join(","));
+  }
+
+  @TestMethod
   public async keepsTheDefaultTeammateSavedWithNoProviderWithoutOneWhenItsKindHasNoProviderAtStartUp(): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);
@@ -410,8 +451,9 @@ export class RuntimePartTests {
     const requested = new RequestedSettings("gone", null, null);
     const first = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
     await part.activateAsync(first);
-    await RuntimePartTests.callAsync(first, "teamrun.defaultTeammateSet", new DefaultTeammateSetParams(new DefaultTeammate(requested)).toJson());
-    await RuntimePartTests.callAsync(first, "teamrun.providerCreate", new ProviderCreateParams(MentioningAdapter.id, "Home", join(directory.path, "usual")).toJson());
+    await RuntimePartTests.callAsync(first, "teamrun.defaultTeammateSet", new DefaultTeammateSetParams(new DefaultTeammate(requested)).toJson(),
+      ShellClients.mainProcess);
+    await RuntimePartTests.callAsync(first, "teamrun.providerCreate", new ProviderCreateParams(MentioningAdapter.id, "Home", join(directory.path, "usual")).toJson(), ShellClients.mainProcess);
     await part.deactivateAsync();
     const second = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
 
@@ -547,6 +589,135 @@ export class RuntimePartTests {
   }
 
   @TestMethod
+  @TestData(false)
+  @TestData(true)
+  public async stopsTheFolderSweepFirstOnQuitAndWaitsForItToEndBeforeClosingTheDatabaseEvenWhenAnEarlierCloseFails(closeFails: boolean): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    const steps: string[] = [];
+    const sweep = ConversationEngine.prototype.sweepFoldersAsync;
+    const shutdown = ConversationEngine.prototype.shutdown;
+    const close = McpHttpEndpoint.prototype.closeAsync;
+    const dispose = DatabaseContext.prototype[Symbol.asyncDispose];
+    let engineDown = (): void => undefined;
+    const shutDown = new Promise<void>(resolve => {
+      engineDown = resolve;
+    });
+    ConversationEngine.prototype.sweepFoldersAsync = (signal: AbortSignal): Promise<void> => new Promise(resolve => {
+      signal.addEventListener("abort", () => {
+        steps.push("sweep stopped");
+        void (closeFails ? Promise.resolve() : shutDown).then(() => setImmediate(() => {
+          steps.push("sweep ended");
+          resolve();
+        }));
+      }, { once: true });
+    });
+    ConversationEngine.prototype.shutdown = function (this: ConversationEngine): Promise<void> {
+      steps.push("engine shut down");
+      engineDown();
+      return shutdown.call(this);
+    };
+    McpHttpEndpoint.prototype.closeAsync = async function (this: McpHttpEndpoint): Promise<void> {
+      await close.call(this);
+      if (closeFails)
+        throw new Error("The endpoint didn't close.");
+    };
+    DatabaseContext.prototype[Symbol.asyncDispose] = function (this: DatabaseContext): Promise<void> {
+      steps.push("database closed");
+      return dispose.call(this);
+    };
+
+    let failure: unknown = null;
+    try {
+      await part.activateAsync(context);
+      failure = await part.deactivateAsync().then(() => null, (error: unknown) => error);
+    }
+    finally {
+      ConversationEngine.prototype.sweepFoldersAsync = sweep;
+      ConversationEngine.prototype.shutdown = shutdown;
+      McpHttpEndpoint.prototype.closeAsync = close;
+      DatabaseContext.prototype[Symbol.asyncDispose] = dispose;
+    }
+
+    Assert.areEqual(closeFails ? "The endpoint didn't close." : "null", failure instanceof Error ? failure.message : String(failure));
+    Assert.areEqual(closeFails ? "sweep stopped,sweep ended,database closed" : "sweep stopped,engine shut down,sweep ended,database closed", steps.join(","));
+  }
+
+  @TestMethod
+  public async refusesARewindOrMoveStartedWhileQuittingWaitsForARunningRewindAndClosesTheDatabaseOnlyOnceThatOneEnds(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    await part.activateAsync(context);
+    const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
+    const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const other = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const now = new Date().toISOString();
+    {
+      await using seeding = DatabaseContext.attach(new DbContextOptionsBuilder().use(new ModuleDatabaseProvider(database), new DataSource("seeding", directory.path)), directory.path);
+      await new MessagesService(seeding).insertAsync(new Message("m1", chat.id, 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, now, null, now));
+      await new MessagesService(seeding).insertAsync(new Message("m2", other.id, 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, now, null, now));
+    }
+    const steps: string[] = [];
+    const held = Promise.withResolvers<void>();
+    const quit = Promise.withResolvers<void>();
+    const waiting = Promise.withResolvers<void>();
+    const rewind = ConversationEngine.prototype.rewindAsync;
+    const whenIdle = WorkingMethod.prototype.whenIdle;
+    const dispose = DatabaseContext.prototype[Symbol.asyncDispose];
+    let rewinds = 0;
+    ConversationEngine.prototype.rewindAsync = async function (this: ConversationEngine, params: ConversationRewindParams): Promise<ConversationRewindResult> {
+      const index = ++rewinds;
+      await (index === 1 ? held.promise : quit.promise);
+      try {
+        return await rewind.call(this, params);
+      }
+      finally {
+        steps.push(`rewind ${index} ended`);
+      }
+    };
+    WorkingMethod.prototype.whenIdle = function (this: WorkingMethod): Promise<void> {
+      const idle = whenIdle.call(this);
+      waiting.resolve();
+      return idle;
+    };
+    DatabaseContext.prototype[Symbol.asyncDispose] = function (this: DatabaseContext): Promise<void> {
+      steps.push("database closed");
+      return dispose.call(this);
+    };
+
+    try {
+      const rewinding = RuntimePartTests.callAsync(context, "teamrun.conversationRewind", { chatId: chat.id, messageId: "m1", restoreFiles: true });
+      const quitting = part.deactivateAsync();
+      await waiting.promise;
+      const refused = [
+        RuntimePartTests.callAsync(context, "teamrun.conversationRewind", { chatId: other.id, messageId: "m2", restoreFiles: true }),
+        RuntimePartTests.callAsync(context, "teamrun.conversationMove", { chatId: other.id, projectId: null })
+      ].map(t => t.then(() => null, (error: unknown) => error));
+      held.resolve();
+      const rewound = await rewinding as { removedMessageIds: readonly string[] };
+      await quitting;
+      quit.resolve();
+      const codes = (await Promise.all(refused)).map(t => t instanceof MethodFailureException ? t.failure.code : String(t));
+
+      Assert.areEqual("rewind 1 ended,database closed", steps.join(","));
+      Assert.areEqual(`${FailureCode.Unavailable},${FailureCode.Unavailable}`, codes.join(","));
+      Assert.areEqual("m1", rewound.removedMessageIds.join(","));
+      Assert.areEqual(0, context.openWork.size);
+    }
+    finally {
+      ConversationEngine.prototype.rewindAsync = rewind;
+      WorkingMethod.prototype.whenIdle = whenIdle;
+      DatabaseContext.prototype[Symbol.asyncDispose] = dispose;
+    }
+  }
+
+  @TestMethod
   public async holdsWorkWhileAMoveCopiesAChatsFilesAndWaitsForItBeforeClosingTheDatabaseOnQuit(): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);
@@ -605,7 +776,7 @@ export class RuntimePartTests {
     } as unknown as IProviderAdapter);
     const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
     await part.activateAsync(context);
-    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate", { kind: "stub", label: "Stub", profileDir: directory.path }) as
+    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate", { kind: "stub", label: "Stub", profileDir: directory.path }, ShellClients.mainProcess) as
       { id: string };
 
     const install = RuntimePartTests.callAsync(context, "teamrun.providerKindInstall", { kind: "stub" }).then(() => "installed", () => "failed");
@@ -798,7 +969,7 @@ export class RuntimePartTests {
     const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
     const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
     const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
-      { kind: MentioningAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }) as { id: string };
+      { kind: MentioningAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }, ShellClients.mainProcess) as { id: string };
     const team: { id: string }[] = [];
     for (const name of ["Alice", "Bob"])
       team.push(await RuntimePartTests.callAsync(context, "teamrun.teammateCreate",
@@ -832,12 +1003,14 @@ export class RuntimePartTests {
     const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
     const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
     const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
-      { kind: MentioningAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }) as { id: string };
+      { kind: MentioningAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }, ShellClients.mainProcess) as { id: string };
     const alice = await RuntimePartTests.callAsync(context, "teamrun.teammateCreate",
       new TeammateCreateParams("Alice", "Alice", provider.id, Harness.Provider, null, null).toJson()) as { id: string };
     const server = await RuntimePartTests.callAsync(context, "teamrun.sharedMcpServerCreate",
-      new SharedMcpServerDefinition("search", SharedMcpTransport.Stdio, "npx", ["-y", "search"], ["SEARCH_KEY"], null, [], null).toJson()) as { id: string };
-    await RuntimePartTests.callAsync(context, "teamrun.sharedMcpProviderSet", new SharedMcpProviderSetParams(server.id, provider.id, true).toJson());
+      new SharedMcpServerDefinition("search", SharedMcpTransport.Stdio, "npx", ["-y", "search"], ["SEARCH_KEY"], null, [], null).toJson(),
+      ShellClients.mainProcess) as { id: string };
+    await RuntimePartTests.callAsync(context, "teamrun.sharedMcpProviderSet", new SharedMcpProviderSetParams(server.id, provider.id, true).toJson(),
+      ShellClients.mainProcess);
 
     for (const environment of [{ PATH: "/before" }, { PATH: "/after", SEARCH_KEY: "set since" }]) {
       context.environment = environment;
@@ -869,7 +1042,7 @@ export class RuntimePartTests {
     const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
     const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
     const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
-      { kind: MentioningAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }) as { id: string };
+      { kind: MentioningAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }, ShellClients.mainProcess) as { id: string };
     const alice = await RuntimePartTests.callAsync(context, "teamrun.teammateCreate",
       new TeammateCreateParams("Alice", "Alice", provider.id, Harness.Provider, null, null).toJson()) as { id: string };
 
@@ -1216,7 +1389,7 @@ export class RuntimePartTests {
     const providerIds: string[] = [];
     for (const label of ["zeta", "Émile", "bob", "Alice", "edgar"])
       providerIds.push((await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
-        new ProviderCreateParams(ToolCallingAdapter.id, label, join(directory.path, "profiles", label)).toJson()) as { id: string }).id);
+        new ProviderCreateParams(ToolCallingAdapter.id, label, join(directory.path, "profiles", label)).toJson(), ShellClients.mainProcess) as { id: string }).id);
     for (const name of ["zoe", "Émile", "bob", "Alice", "edgar"])
       await RuntimePartTests.callAsync(context, "teamrun.teammateCreate", new TeammateCreateParams(name, null, providerIds[0]!, Harness.Provider, null, null).toJson());
 
@@ -1239,6 +1412,43 @@ export class RuntimePartTests {
   @TestMethod
   @TestData(ShellClients.commandLine)
   @TestData("module/teamrun")
+  @TestData("teamrun.tools")
+  public async takesWhatAProviderOrASharedServerRunsOnlyFromTheAppsMainProcessAndAProvidersNameFromAnyClient(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new MentioningAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const profileDir = join(directory.path, "profile");
+    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
+      { kind: MentioningAdapter.id, label: "Work", profileDir }, ShellClients.mainProcess) as { id: string };
+    const server = { name: "tools", command: join(directory.path, "server"), arguments: [], secrets: [] };
+
+    const calls: readonly [string, JsonObject][] = [
+      ["teamrun.providerUpdate", { providerId: provider.id, label: "Work", profileDir: join(directory.path, "other") }],
+      ["teamrun.providerUpdate", { providerId: provider.id, label: "Work", profileDir, ownMcpServers: false }],
+      ["teamrun.acpLocalCommandAdd", server], ["teamrun.sharedMcpServerCreate", server],
+      ["teamrun.sharedMcpServerUpdate", { serverId: "s1", definition: server }],
+      ["teamrun.sharedMcpProviderSet", { serverId: "s1", providerId: provider.id, on: true }],
+      ["teamrun.sharedMcpTeammateSet", { serverId: "s1", teammateId: "t1", setting: "on" }],
+      ["teamrun.sharedMcpSecretSet", { serverId: "s1", variable: "TOKEN", reference: "teamrun.outsideToken" }],
+      ["teamrun.providerCreate", { kind: MentioningAdapter.id, label: "Chosen", profileDir: join(directory.path, "chosen") }]
+    ];
+    const codes = await Promise.all(calls.map(([method, payload]) => RuntimePartTests.failureCodeAsync(context, method, payload, client)));
+    const renamed = await RuntimePartTests.callAsync(context, "teamrun.providerUpdate",
+      { providerId: provider.id, label: "Home", profileDir: join(directory.path, ".", "profile"), ownMcpServers: true }, client) as { label: string };
+    await part.deactivateAsync();
+
+    Assert.areEqual(JSON.stringify(calls.map(() => FailureCode.Unauthorized)), JSON.stringify(codes));
+    Assert.areEqual("Home", renamed.label);
+  }
+
+  @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
   public async takesWindowReportsAndPanelAnswersOnlyFromTheAppsMainProcess(client: string): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);
@@ -1256,6 +1466,151 @@ export class RuntimePartTests {
     await part.deactivateAsync();
 
     Assert.isTrue(errors.every(t => t instanceof MethodFailureException && t.failure.code === FailureCode.Unauthorized));
+  }
+
+  @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
+  @TestData("teamrun.tools")
+  public async takesAChatsModesPlanFirstPlanApprovalsResponderDefaultTeammateAndComposerDefaultOnlyFromTheAppsMainProcess(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const part = new RuntimePart(new RecordingRegistries(new ProviderKindRegistry()), "1.2.3");
+    await part.activateAsync(context);
+
+    const calls: readonly [string, JsonObject][] = [
+      ["teamrun.conversationSetMemberMode", { conversationId: "c1", teammateId: "t1", mode: "bypassPermissions" }],
+      ["teamrun.conversationSetPlanFirst", { conversationId: "c1", teammateId: "t1", planFirst: false }],
+      ["teamrun.messageApprovePlan", { messageId: "m1" }],
+      ["teamrun.conversationResponderSet", { conversationId: "c1", responder: null, clearSession: false }],
+      ["teamrun.defaultTeammateSet", { teammate: null }],
+      ["teamrun.composerDefaultSave", { kind: "claude", mode: "bypassPermissions" }]
+    ];
+    const codes = await Promise.all(calls.map(([method, payload]) => RuntimePartTests.failureCodeAsync(context, method, payload, client)));
+    await part.deactivateAsync();
+
+    Assert.areEqual(JSON.stringify(calls.map(() => FailureCode.Unauthorized)), JSON.stringify(codes));
+  }
+
+  @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
+  public async refusesAnUnrestrictedModeNoOneChoseOnASendOrAWaitingMessageFromAClientOtherThanTheMainProcess(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new CommandModeAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
+    const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const providerId = await RuntimePartTests.providerIdAsync(context, CommandModeAdapter.id, directory.path);
+    const send = new MessageSendParams(chat.id, "Build it", new RequestedSettings(CommandModeAdapter.id, null, null, null, "all"), providerId);
+
+    const codes = await Promise.all([
+      RuntimePartTests.failureCodeAsync(context, "teamrun.messageSend", send.toJson(), client),
+      RuntimePartTests.failureCodeAsync(context, "teamrun.waitingMessageAdd", new WaitingMessageAddParams(send, MessageDelivery.Queue).toJson(), client),
+      RuntimePartTests.failureCodeAsync(context, "teamrun.waitingMessageEdit", new WaitingMessageEditParams("w1", send).toJson(), client)
+    ]);
+    await part.deactivateAsync();
+
+    Assert.areEqual(JSON.stringify([FailureCode.Unauthorized, FailureCode.Unauthorized, FailureCode.Unauthorized]), JSON.stringify(codes));
+  }
+
+  @TestMethod
+  public async marksAWaitingMessageAsFromOutsideOnceAClientOtherThanTheMainProcessAddsOrEditsIt(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new CommandModeAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
+    const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
+    const providerId = await RuntimePartTests.providerIdAsync(context, CommandModeAdapter.id, directory.path);
+    const send = new MessageSendParams(chat.id, "To nobody", new RequestedSettings(CommandModeAdapter.id, null, null), providerId, [], ["teammate-gone"]);
+
+    let failed = RuntimePartTests.waitingFailed(context);
+    const added = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageAdd",
+      new WaitingMessageAddParams(send, MessageDelivery.Queue).toJson(), ShellClients.mainProcess));
+    await failed;
+    failed = RuntimePartTests.waitingFailed(context);
+    const theirs = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageEdit",
+      new WaitingMessageEditParams(added.id, send).toJson(), ShellClients.commandLine));
+    await failed;
+    failed = RuntimePartTests.waitingFailed(context);
+    const outside = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageAdd",
+      new WaitingMessageAddParams(send, MessageDelivery.Queue).toJson(), ShellClients.commandLine));
+    await failed;
+    await part.deactivateAsync();
+
+    Assert.areEqual("false,true,true", [added.fromOutside, theirs.fromOutside, outside.fromOutside].join(","));
+  }
+
+  @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
+  @TestData("teamrun.tools")
+  public async takesATeammatesModeOnlyFromTheAppsMainProcessAndItsOtherSettingsFromAnyClient(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new MentioningAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
+      { kind: MentioningAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }, ShellClients.mainProcess) as { id: string };
+    const created = new TeammateCreateParams("Alice", null, provider.id, Harness.Provider, null, null).toJson();
+
+    const teammate = await RuntimePartTests.callAsync(context, "teamrun.teammateCreate", created, client) as { id: string };
+    const renamed = await RuntimePartTests.callAsync(context, "teamrun.teammateUpdate", { teammateId: teammate.id, name: "Ada" }, client) as { name: string };
+    const codes = await Promise.all([
+      RuntimePartTests.failureCodeAsync(context, "teamrun.teammateCreate", { ...created, name: "Bob", mode: "bypassPermissions" }, client),
+      RuntimePartTests.failureCodeAsync(context, "teamrun.teammateUpdate", { teammateId: teammate.id, mode: "bypassPermissions" }, client)
+    ]);
+    await part.deactivateAsync();
+
+    Assert.areEqual("Ada", renamed.name);
+    Assert.areEqual(JSON.stringify([FailureCode.Unauthorized, FailureCode.Unauthorized]), JSON.stringify(codes));
+  }
+
+  @TestMethod
+  @TestData(ShellClients.commandLine)
+  @TestData("module/teamrun")
+  @TestData("teamrun.tools")
+  public async takesAProvidersServerPathOnlyFromTheAppsMainProcessAndItsOtherSettingsFromAnyClient(client: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const registry = new ProviderKindRegistry();
+    registry.register(new ServerPathAdapter());
+    const part = new RuntimePart(new RecordingRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    const profileDir = join(directory.path, "profile");
+    const chosen = join(directory.path, "chosen-server");
+    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
+      { kind: MentioningAdapter.id, label: "Work", profileDir }, ShellClients.mainProcess) as { id: string };
+    const update = { providerId: provider.id, label: "Work", profileDir };
+
+    await RuntimePartTests.callAsync(context, "teamrun.providerUpdate", { ...update, binaryPath: chosen }, ShellClients.mainProcess);
+    const codes = await Promise.all([join(directory.path, "other-server"), ""].map(t =>
+      RuntimePartTests.failureCodeAsync(context, "teamrun.providerUpdate", { ...update, binaryPath: t }, client)));
+    const renamed = await RuntimePartTests.callAsync(context, "teamrun.providerUpdate", { ...update, label: "Home" }, client) as
+      { label: string; binaryPath: string | null };
+    await part.deactivateAsync();
+
+    Assert.areEqual(JSON.stringify([FailureCode.Unauthorized, FailureCode.Unauthorized]), JSON.stringify(codes));
+    Assert.areEqual("Home", renamed.label);
+    Assert.areEqual(chosen, renamed.binaryPath);
   }
 
   @TestMethod
@@ -1551,7 +1906,7 @@ export class RuntimePartTests {
       const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: mode }) as { id: string };
       const answered = adapter.answered(adapter.answers.length + 1);
       await RuntimePartTests.callAsync(context, "teamrun.messageSend",
-        new MessageSendParams(chat.id, "Build it", new RequestedSettings(CommandModeAdapter.id, null, null, null, mode), providerId).toJson());
+        new MessageSendParams(chat.id, "Build it", new RequestedSettings(CommandModeAdapter.id, null, null, null, mode), providerId).toJson(), ShellClients.mainProcess);
       await answered;
     }
     const approved = RuntimePartTests.toolsOf(adapter).approvedTools;
@@ -1729,7 +2084,7 @@ export class RuntimePartTests {
       const answers = adapter.answers.length;
       const wakes = adapter.wakes().length;
       await RuntimePartTests.callAsync(context, "teamrun.messageSend",
-        new MessageSendParams(chat.id, "Build it", new RequestedSettings(kind, null, null, null, mode.id), providerId).toJson());
+        new MessageSendParams(chat.id, "Build it", new RequestedSettings(kind, null, null, null, mode.id), providerId).toJson(), ShellClients.mainProcess);
       await adapter.recordedAsync(() => adapter.answers.length > answers && (mode.readOnly || adapter.wakes().length > wakes));
       const answer = RuntimePartTests.textOf(adapter.answers.at(-1));
       if (mode.readOnly) {
@@ -1791,7 +2146,7 @@ export class RuntimePartTests {
         adapter.holds = holds;
         const answers = adapter.answers.length;
         const sent = MessageSendResult.fromJson(await RuntimePartTests.callAsync(before, "teamrun.messageSend",
-          new MessageSendParams(chat.id, "Build it", new RequestedSettings(kind, null, null, null, mode), providerId).toJson()));
+          new MessageSendParams(chat.id, "Build it", new RequestedSettings(kind, null, null, null, mode), providerId).toJson(), ShellClients.mainProcess));
         await adapter.recordedAsync(() => adapter.answers.length > answers);
         const task = JSON.parse(RuntimePartTests.textOf(adapter.answers.at(-1))) as { id: string };
         return { chatId: chat.id, replyId: sent.replies[0]!.id, taskId: task.id, pids: await RuntimePartTests.pidsAsync(join(directory.path, `${name}.pids`)) };
@@ -1886,7 +2241,7 @@ export class RuntimePartTests {
     const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
     const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: "Work" }) as { id: string };
     const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
-      { kind: ChangingAdapter.id, label: "Gone", profileDir: join(directory.path, "profile") }) as { id: string };
+      { kind: ChangingAdapter.id, label: "Gone", profileDir: join(directory.path, "profile") }, ShellClients.mainProcess) as { id: string };
     const teammate = await RuntimePartTests.callAsync(context, "teamrun.teammateCreate",
       new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null).toJson()) as { id: string };
     await RuntimePartTests.callAsync(context, "teamrun.providerDelete", { providerId: provider.id });
@@ -1929,7 +2284,7 @@ export class RuntimePartTests {
     const teammate = await RuntimePartTests.callAsync(context, "teamrun.teammateCreate",
       new TeammateCreateParams("Ada", null, providerId, Harness.Provider, null, null).toJson()) as { id: string };
     await RuntimePartTests.callAsync(context, "teamrun.teammateUpdate",
-      TeammateUpdateParams.of(teammate.id, { model: "model", effort: "high", speed: "fast", mode: "plan" }, providerId).toJson());
+      TeammateUpdateParams.of(teammate.id, { model: "model", effort: "high", speed: "fast", mode: "plan" }, providerId).toJson(), ShellClients.mainProcess);
     adapter.calls = [["teamrun_update_teammate", { teammate_id: teammate.id, name: "Bea" }]];
 
     const ended = context.whenWorkEnds();
@@ -1957,7 +2312,7 @@ export class RuntimePartTests {
     const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
     const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
     const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate",
-      { kind: FailingAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }) as { id: string };
+      { kind: FailingAdapter.id, label: "Work", profileDir: join(directory.path, "profile") }, ShellClients.mainProcess) as { id: string };
     const teammate = await RuntimePartTests.callAsync(context, "teamrun.teammateCreate",
       new TeammateCreateParams("Alice", "Alice", provider.id, Harness.Provider, null, null).toJson()) as { id: string };
 
@@ -2130,7 +2485,7 @@ export class RuntimePartTests {
   }
 
   private static async providerIdAsync(context: RecordingPartContext, kind: string, folder: string): Promise<string> {
-    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate", new ProviderCreateParams(kind, "Work", join(folder, "profiles", kind)).toJson());
+    const provider = await RuntimePartTests.callAsync(context, "teamrun.providerCreate", new ProviderCreateParams(kind, "Work", join(folder, "profiles", kind)).toJson(), ShellClients.mainProcess);
     return (provider as { id: string }).id;
   }
 
@@ -2200,12 +2555,27 @@ export class RuntimePartTests {
     }
   }
 
-  private static callAsync(context: RecordingPartContext, method: string, payload: unknown): Promise<unknown> {
+  private static waitingFailed(context: RecordingPartContext): Promise<void> {
+    return new Promise(resolve => {
+      context.onPublished = (name, payload) => {
+        if (name === "teamrun.waitingMessagesChanged" && WaitingMessagesPayload.fromJson(payload).messages.some(t => !Object.isNull(t.failure))) {
+          context.onPublished = null;
+          resolve();
+        }
+      };
+    });
+  }
+
+  private static callAsync(context: RecordingPartContext, method: string, payload: unknown, client: string = "tests"): Promise<unknown> {
     const handler = context.methods.get(method);
     if (handler === undefined)
       throw new Error(`The part did not register ${method}.`);
 
-    return handler.handleAsync(new RequestContext("tests", payload as null, new AbortController().signal, 1));
+    return handler.handleAsync(new RequestContext(client, payload as null, new AbortController().signal, 1));
+  }
+
+  private static failureCodeAsync(context: RecordingPartContext, method: string, payload: JsonObject, client: string): Promise<unknown> {
+    return RuntimePartTests.callAsync(context, method, payload, client).then(() => null, (t: unknown) => t instanceof MethodFailureException ? t.failure.code : t);
   }
 
   private static gitState(folder: string): string {
@@ -2398,6 +2768,11 @@ class MentioningAdapter implements IProviderAdapter {
   }
 }
 
+class ServerPathAdapter extends MentioningAdapter {
+  public override readonly descriptor: ProviderKind = new ProviderKind(MentioningAdapter.id, "Server path provider", true, false, null, null, false, null,
+    false, null, false, null, null, false, false, { resume: false, fork: false, ownMcpServersUnavailable: null }, null, true);
+}
+
 class ChangingAdapter implements IProviderAdapter {
   public static readonly id: string = "changing";
 
@@ -2480,7 +2855,8 @@ class CommandModeAdapter implements IProviderAdapter {
   }
 
   public listModels(_provider: Provider | null): Promise<ProviderModelList> {
-    return Promise.resolve(new ProviderModelList([new ProviderModel("model", "model", "Fixture", ["high"], true, null, true)], true));
+    return Promise.resolve(new ProviderModelList([new ProviderModel("model", "model", "Fixture", ["high"], true, null, true)], true, false, null, false, this.modes,
+      this.defaultMode));
   }
 
   public async runTurn(request: TurnRequest, listener: ITurnListener, signal: AbortSignal): Promise<TurnResult> {
@@ -2720,7 +3096,8 @@ class TeamRunChat implements AsyncDisposable {
     const call = (method: string, payload: unknown): Promise<unknown> => TeamRunChat.callAsync(context, method, payload);
     const project = await call("teamrun.projectOpen", { rootPath: folder }) as { id: string; rootPath: string };
     const chat = await call("teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
-    const provider = await call("teamrun.providerCreate", { kind: WritingAdapter.id, label: "Work", profileDir: directory.resolve("profile") }) as { id: string };
+    const provider = await TeamRunChat.callAsync(context, "teamrun.providerCreate", { kind: WritingAdapter.id, label: "Work", profileDir: directory.resolve("profile") },
+      ShellClients.mainProcess) as { id: string };
     const teammate = await call("teamrun.teammateCreate", new TeammateCreateParams("Alice", "Alice", provider.id, Harness.Provider, null, null).toJson()) as
       { id: string };
     return new TeamRunChat({ checkpoints, folder: project.rootPath, projectId: project.id }, directory, database, context, part, adapter, chat.id, teammate.id);
@@ -2756,11 +3133,11 @@ class TeamRunChat implements AsyncDisposable {
     return await new MessagesService(reading).listAsync(new MessageListParams(this.chatId, null));
   }
 
-  private static callAsync(context: RecordingPartContext, method: string, payload: unknown): Promise<unknown> {
+  private static callAsync(context: RecordingPartContext, method: string, payload: unknown, client: string = "tests"): Promise<unknown> {
     const handler = context.methods.get(method);
     if (Object.isUndefined(handler))
       throw new Error(`The part did not register ${method}.`);
-    return handler.handleAsync(new RequestContext("tests", payload as null, new AbortController().signal, 1));
+    return handler.handleAsync(new RequestContext(client, payload as null, new AbortController().signal, 1));
   }
 }
 

@@ -11,7 +11,7 @@ import { type FactoryProvider, InjectionToken, type Signal, type WritableSignal,
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { CommandRun, NotificationAction, NotificationSeverity, QualifiedName } from "@noldova/desktop.protocol";
-import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
+import { type IWindowPartContext, LinkPlace, WindowPartTokens } from "@noldova/desktop.window";
 import { type LaunchedTerminal, TerminalLaunch, TerminalLauncher, type TerminalShellKind } from "@noldova/terminal.window";
 import {
   Approval,
@@ -23,6 +23,7 @@ import {
   AttachmentReadParams,
   AttachmentShare,
   AuthStatus,
+  ChatFolderAttachParams,
   ChatIdParams,
   ChatMemberModeParams,
   ChatMemberSettings,
@@ -140,7 +141,9 @@ import { LinkGesture } from "@noldova/ui.components.angular";
 import { Resources } from "../../resources";
 import { ChatAction } from "../enums/chat-action";
 import { SendKey } from "../enums/send-key";
+import { TeammateStopReason } from "../enums/teammate-stop-reason";
 import { TerminalStep } from "../enums/terminal-step";
+import { DraftStaleException } from "../exceptions/draft-stale.exception";
 import { FileGrantException } from "../exceptions/file-grant.exception";
 import { ListNotArrayException } from "../exceptions/list-not-array.exception";
 import { ModelCatalogUnavailableException } from "../exceptions/model-catalog-unavailable.exception";
@@ -255,6 +258,7 @@ export class ChatStoreService {
   private readonly rewoundDraftSignal: WritableSignal<RewoundDraft | null> = signal(null);
   private readonly workingSignal: WritableSignal<ReadonlyMap<string, Message>> = signal(new Map());
   private readonly replyChatsSignal: WritableSignal<ReadonlyMap<string, string>> = signal(new Map());
+  private readonly replyTeammatesSignal: WritableSignal<ReadonlyMap<string, string | null>> = signal(new Map());
   private readonly resolvingChats: Set<string> = new Set();
   private readonly arrivedMessages: Map<string, string> = new Map();
   private readonly waitingReplies: Signal<readonly string[]> = computed(() => {
@@ -264,6 +268,7 @@ export class ChatStoreService {
   });
   private readonly workingTabs: Map<string, () => void> = new Map();
   private readonly thinkingSignal: WritableSignal<ReadonlySet<string>> = signal(new Set());
+  private readonly savingCheckpointSignal: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly busySignal: WritableSignal<number> = signal(0);
   private readonly loadedSignal: WritableSignal<boolean> = signal(false);
   private readonly resyncsSignal: WritableSignal<number> = signal(0);
@@ -358,8 +363,14 @@ export class ChatStoreService {
   public readonly recentConversations: Signal<readonly Conversation[]> = computed(() =>
     ChatStoreService.newestFirst([...this.conversationsByProjectSignal().values()].flat()).slice(0, Resources.recentCount));
   public readonly pendingApprovals: Signal<readonly Approval[]> = computed(() => this.approvalsSignal().filter(t => t.status === ApprovalStatus.Pending));
+  public readonly waitingTeammates: Signal<ReadonlySet<string>> = computed(() => {
+    const teammates = this.replyTeammatesSignal();
+    const asking = [...this.workingSignal().values()].filter(t => t.status === MessageStatus.AwaitingApproval).map(t => t.id);
+    return new Set([...asking, ...this.pendingApprovals().map(t => t.messageId)].map(t => teammates.get(t)).filter(t => Object.isString(t)));
+  });
   public readonly workingReplies: Signal<readonly Message[]> = computed(() => [...this.workingSignal().values()]);
   public readonly thinkingReplies: Signal<ReadonlySet<string>> = this.thinkingSignal.asReadonly();
+  public readonly savingCheckpointReplies: Signal<ReadonlySet<string>> = this.savingCheckpointSignal.asReadonly();
   public readonly runningReply: Signal<Message | null> = computed(() => this.runningReplyOf(this.screenConversationId()));
 
   public constructor(context: IWindowPartContext, terminals: ITerminalLauncher = TerminalLauncher) {
@@ -539,17 +550,23 @@ export class ChatStoreService {
 
   public async saveDraft(conversationId: string, params: () => Promise<DraftSaveParams>): Promise<Draft | null> {
     let draft: Draft | null = null;
+    let stale = false;
     await this.attempt(async () => {
       const saving = await params();
       try {
         draft = Draft.fromJson(await this.request(MethodName.DraftSave, saving.toJson()));
       }
       catch (error) {
+        stale = ChatStoreService.isRefusalOver(error, ErrorCode.Conflict, saving.conversationId);
+        if (stale)
+          return;
         if (!ChatStoreService.isRefusalOver(error, ErrorCode.NotFound, saving.conversationId))
           throw error;
         this.applyDeleted(saving.conversationId);
       }
     }, t => this.actionFailed(ChatAction.SaveDraft, conversationId, conversationId)(Resources.formatDraftNotSaved(t)));
+    if (stale)
+      throw new DraftStaleException();
     return draft;
   }
 
@@ -719,10 +736,22 @@ export class ChatStoreService {
     };
   }
 
+  public messageControlsOf(conversationId: string, messageId: string): MessageControlState | null {
+    this.windowOf(conversationId)?.index();
+    return this.messageIndexes.get(conversationId)?.find(messageId)?.controls ?? null;
+  }
+
   public rememberMessageControls(messageId: string, controls: MessageControlState, conversationId: string | null = this.selectedConversationId()): void {
-    const entry = Object.isNull(conversationId) ? null : this.messageIndexes.get(conversationId)?.find(messageId) ?? null;
-    if (!Object.isNull(entry))
+    if (Object.isNull(conversationId))
+      return;
+    const entry = this.messageIndexes.get(conversationId)?.find(messageId) ?? null;
+    if (!Object.isNull(entry)) {
       entry.controls = controls.hasChanges ? controls : null;
+      return;
+    }
+    const message = this.windowOf(conversationId)?.history()?.find(messageId) ?? null;
+    if (!Object.isNull(message) && controls.hasChanges)
+      this.indexFor(conversationId).keep(message, controls);
   }
 
   public async showMessage(hit: ConversationSearchHit): Promise<void> {
@@ -938,9 +967,22 @@ export class ChatStoreService {
   }
 
   public isTeammateUnavailable(id: string): boolean {
-    const teammate = this.teammate(id);
-    const provider = this.providers().find(t => t.id === teammate?.providerId);
-    return Object.isUndefined(provider) || !provider.enabled || provider.authStatus === AuthStatus.LoggedOut || !this.hasKind(provider.kind);
+    return !Object.isNull(this.teammateStopReason(id));
+  }
+
+  public teammateStopReason(id: string): TeammateStopReason | null {
+    return this.providerStopReason(this.teammate(id)?.providerId ?? null);
+  }
+
+  public providerStopReason(providerId: string | null): TeammateStopReason | null {
+    const provider = this.providers().find(t => t.id === providerId);
+    if (Object.isUndefined(provider))
+      return TeammateStopReason.ProviderDeleted;
+    if (!provider.enabled)
+      return TeammateStopReason.ProviderTurnedOff;
+    if (provider.authStatus === AuthStatus.LoggedOut)
+      return TeammateStopReason.SignedOut;
+    return this.hasKind(provider.kind) ? null : TeammateStopReason.KindMissing;
   }
 
   public isTeammateProviderDisabled(id: string): boolean {
@@ -1185,6 +1227,20 @@ export class ChatStoreService {
       const conversation = Conversation.fromJson(await this.request(MethodName.ConversationMove, params.toJson()));
       this.storeConversation(conversation);
     }, this.actionFailed(ChatAction.MoveChat, conversationId, conversationId));
+  }
+
+  public attachFolder(conversationId: string, folder: string): Promise<boolean> {
+    return this.perform(async () => {
+      const conversation = Conversation.fromJson(await this.request(MethodName.ChatFolderAttach, new ChatFolderAttachParams(conversationId, folder).toJson()));
+      this.storeConversation(conversation);
+    }, this.actionFailed(ChatAction.AttachFolder, conversationId, conversationId));
+  }
+
+  public detachFolder(conversationId: string): Promise<boolean> {
+    return this.perform(async () => {
+      const conversation = Conversation.fromJson(await this.request(MethodName.ChatFolderDetach, new ConversationIdParams(conversationId).toJson()));
+      this.storeConversation(conversation);
+    }, this.actionFailed(ChatAction.DetachFolder, conversationId, conversationId));
   }
 
   public async renameConversation(conversationId: string, title: string): Promise<void> {
@@ -1554,7 +1610,8 @@ export class ChatStoreService {
   public async startSharedMcpSignIn(serverId: string, gesture: LinkGesture, report: (message: string) => void): Promise<boolean> {
     return this.perform(async () => {
       const started = SharedMcpSignInStarted.fromJson(await this.request(MethodName.SharedMcpSignInStart, new SharedMcpServerIdParams(serverId).toJson()));
-      await this.context.openLinkAsync(started.url, { gesture });
+      if (!Object.isNull(started.url))
+        await this.context.openLinkAsync(started.url, { gesture, place: LinkPlace.System });
     }, report);
   }
 
@@ -1677,6 +1734,11 @@ export class ChatStoreService {
   public async signInProvider(providerId: string, report: (message: string) => void = this.providerFailed(ChatAction.SignIn, providerId),
     opensTab: boolean = true): Promise<void> {
     const provider = this.providersSignal().find(t => t.id === providerId);
+    const refreshing = Object.isUndefined(provider) ? null : this.refreshProfileOf(provider);
+    if (!Object.isNull(refreshing) && !await refreshing.then(() => true, () => false)) {
+      report(Resources.signInKindsNotRead);
+      return;
+    }
     const launch = Object.isUndefined(provider) ? null : this.terminalLaunchOf(provider, opensTab);
     if (!Object.isNull(launch)) {
       await this.followSignInTerminal(providerId, () => this.signInLaunchOf(providerId, launch), report);
@@ -1697,11 +1759,15 @@ export class ChatStoreService {
       await this.followSignInTerminal(providerId, agentLaunch, report);
   }
 
+  public refreshProfileOf(provider: Provider): Promise<void> | null {
+    return (this.kindsSignal().find(t => t.id === provider.kind)?.profile?.personFolders.length ?? 0) > 0 ? this.loadKinds(true) : null;
+  }
+
   public async openSignInLink(providerId: string, gesture: LinkGesture = LinkGesture.Plain,
     report: (message: string) => void = this.actionFailed(ChatAction.OpenSignInPage, providerId)): Promise<void> {
     const url = this.signInLinksSignal().get(providerId);
     if (!Object.isUndefined(url))
-      await this.attempt(() => this.context.openLinkAsync(url, { gesture }), report);
+      await this.attempt(() => this.context.openLinkAsync(url, { gesture, place: LinkPlace.System }), report);
   }
 
   public async cancelSignIn(providerId: string, report: (message: string) => void = this.actionFailed(ChatAction.CancelSignIn, providerId)): Promise<void> {
@@ -1763,6 +1829,10 @@ export class ChatStoreService {
 
   public async openPage(url: string, gesture: LinkGesture, report: (message: string) => void = this.actionFailed(ChatAction.OpenPage, url)): Promise<void> {
     await this.attempt(() => this.context.openLinkAsync(url, { gesture }), report);
+  }
+
+  public async openSystemPage(url: string, gesture: LinkGesture, report: (message: string) => void): Promise<void> {
+    await this.attempt(() => this.context.openLinkAsync(url, { gesture, place: LinkPlace.System }), report);
   }
 
   public async refreshTools(report: (message: string, error: unknown) => void = this.loadFailed(Resources.toolsLoad, Resources.toolsNotLoaded, null,
@@ -1982,7 +2052,10 @@ export class ChatStoreService {
       case EventName.DetailUpdated: {
         const payload = DetailEventPayload.fromJson(event.payload);
         this.captureEvent(event, JSON.stringify([EventName.DetailUpdated, payload.messageId, payload.detail.sequence]));
+        this.captureEvent(new Event(EventName.ReplyCheckpointEnded, new MessageIdParams(payload.messageId).toJson()),
+          JSON.stringify([EventName.ReplyCheckpointStarted, payload.messageId]));
         this.stopThinking(payload.messageId);
+        this.stopSavingCheckpoint(payload.messageId);
         this.applyDetail(payload);
         break;
       }
@@ -1992,9 +2065,25 @@ export class ChatStoreService {
           this.thinkingSignal.update(t => new Set(t).add(messageId));
         break;
       }
-      case EventName.WaitingMessagesChanged:
-        this.setWaiting(WaitingMessagesPayload.fromJson(event.payload));
+      case EventName.ReplyCheckpointStarted: {
+        const messageId = MessageIdParams.fromJson(event.payload).messageId;
+        this.captureEvent(event, JSON.stringify([EventName.ReplyCheckpointStarted, messageId]));
+        if (this.workingSignal().has(messageId))
+          this.savingCheckpointSignal.update(t => new Set(t).add(messageId));
         break;
+      }
+      case EventName.ReplyCheckpointEnded: {
+        const messageId = MessageIdParams.fromJson(event.payload).messageId;
+        this.captureEvent(event, JSON.stringify([EventName.ReplyCheckpointStarted, messageId]));
+        this.stopSavingCheckpoint(messageId);
+        break;
+      }
+      case EventName.WaitingMessagesChanged: {
+        const payload = WaitingMessagesPayload.fromJson(event.payload);
+        this.captureEvent(event, JSON.stringify([EventName.WaitingMessagesChanged, payload.chatId]));
+        this.setWaiting(payload);
+        break;
+      }
       case EventName.ApprovalCreated:
       case EventName.ApprovalUpdated: {
         const approval = Approval.fromJson(event.payload);
@@ -2120,7 +2209,14 @@ export class ChatStoreService {
   }
 
   private async loadWaiting(conversationId: string): Promise<void> {
-    this.setWaiting(WaitingMessagesPayload.fromJson(await this.request(MethodName.WaitingMessageList, new ChatIdParams(conversationId).toJson())));
+    const events = this.beginSnapshot();
+    try {
+      this.setWaiting(WaitingMessagesPayload.fromJson(await this.request(MethodName.WaitingMessageList, new ChatIdParams(conversationId).toJson())));
+      this.replaySnapshot(events);
+    }
+    finally {
+      this.snapshots.delete(events);
+    }
   }
 
   private setWaiting(payload: WaitingMessagesPayload): void {
@@ -2237,8 +2333,9 @@ export class ChatStoreService {
       }));
       const open = ChatStoreService.readArray(await this.request(MethodName.MessageListOpen, null), Message.fromJson);
       const approvals = ChatStoreService.readArray(await this.request(MethodName.ApprovalListPending, null), Approval.fromJson);
-      const installations = this.loadedSignal() && !this.resyncRequested ? null
-        : ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationList, null), ProviderKindInstallation.fromJson);
+      const resyncing = !this.loadedSignal() || this.resyncRequested;
+      const installations = resyncing
+        ? ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationList, null), ProviderKindInstallation.fromJson) : null;
       if (this.disposed)
         return;
       this.setProviders(providers);
@@ -2257,6 +2354,7 @@ export class ChatStoreService {
       const checks = await Promise.all(dropped.map(t => this.confirmDropped(t.id).catch((u: unknown) => u)));
       this.setWorking(new Map(open.map(t => [t.id, t])));
       this.thinkingSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
+      this.savingCheckpointSignal.update(t => resyncing ? new Set() : new Set([...t].filter(u => this.workingSignal().has(u))));
       this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending));
       for (const approval of approvals)
         this.upsertApproval(approval);
@@ -2314,7 +2412,8 @@ export class ChatStoreService {
 
   private replaySnapshot(events: Map<string, Event>): void {
     this.snapshots.delete(events);
-    for (const event of events.values())
+    const checkpoint = (event: Event): boolean => event.name === EventName.ReplyCheckpointStarted || event.name === EventName.ReplyCheckpointEnded;
+    for (const event of [...events.values()].sort((left, right) => Number(checkpoint(left)) - Number(checkpoint(right))))
       this.apply(event);
   }
 
@@ -2344,10 +2443,22 @@ export class ChatStoreService {
     });
   }
 
+  private stopSavingCheckpoint(messageId: string): void {
+    if (!this.savingCheckpointSignal().has(messageId))
+      return;
+    this.savingCheckpointSignal.update(t => {
+      const next = new Set(t);
+      next.delete(messageId);
+      return next;
+    });
+  }
+
   private trackWorking(message: Message): void {
     const active = ChatStoreService.ACTIVE_STATUSES.includes(message.status);
-    if (!active)
+    if (!active) {
       this.stopThinking(message.id);
+      this.stopSavingCheckpoint(message.id);
+    }
     if (!active && !this.workingSignal().has(message.id))
       return;
     const next = new Map(this.workingSignal());
@@ -2372,17 +2483,30 @@ export class ChatStoreService {
       this.replyChatsSignal.update(t => new Map([...t, ...learned]));
   }
 
+  private learnTeammates(replies: readonly Message[]): void {
+    const learned = replies.filter(t => !this.replyTeammatesSignal().has(t.id));
+    if (learned.length > 0)
+      this.replyTeammatesSignal.update(t => new Map([...t, ...learned.map(u => [u.id, u.teammateId] as const)]));
+  }
+
   private resolveChat(messageId: string): void {
-    if (this.replyChatsSignal().has(messageId) || this.resolvingChats.has(messageId))
+    if ((this.replyChatsSignal().has(messageId) && this.replyTeammatesSignal().has(messageId)) || this.resolvingChats.has(messageId))
       return;
     this.resolvingChats.add(messageId);
     void this.request(MethodName.MessageSummary, new MessageIdParams(messageId).toJson())
-      .then(value => this.learnChats(Object.isNull(value) ? [] : [[messageId, ReplySummary.fromJson(value).preview.conversationId] as const]), () => undefined)
+      .then(value => {
+        if (Object.isNull(value))
+          return;
+        const preview = ReplySummary.fromJson(value).preview;
+        this.learnChats([[messageId, preview.conversationId]]);
+        this.learnTeammates([preview]);
+      }, () => undefined)
       .finally(() => this.resolvingChats.delete(messageId));
   }
 
   private setWorking(working: ReadonlyMap<string, Message>): void {
     this.learnChats([...working.values()].map(t => [t.id, t.conversationId] as const));
+    this.learnTeammates([...working.values()]);
     this.workingSignal.set(working);
     const conversationIds = new Set([...working.values()].map(t => t.conversationId));
     for (const [conversationId, clear] of this.workingTabs) {
@@ -2557,6 +2681,7 @@ export class ChatStoreService {
       this.markLoaded(Resources.formatNoticeKey(Resources.chatLoad, conversationId));
       const listed = ChatStoreService.readArray(listedApprovals, Approval.fromJson);
       this.learnChats(listed.map(t => [t.messageId, conversationId] as const));
+      this.learnTeammates(page.messages.filter(t => listed.some(u => u.messageId === t.id)));
       for (const approval of listed)
         this.upsertApproval(approval);
       for (const message of page.messages)
@@ -2663,6 +2788,8 @@ export class ChatStoreService {
 
   private applyDeleted(conversationId: string): void {
     this.forgetContexts(conversationId);
+    const chats = this.replyChatsSignal();
+    this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending || chats.get(u.messageId) !== conversationId));
     this.steersSignal.update(t => t.filter(u => u.conversationId !== conversationId));
     this.conversationsByProjectSignal.update(t => {
       const next = new Map(t);
@@ -2754,8 +2881,11 @@ export class ChatStoreService {
       ? t : ChatStoreService.upsert(t, approval));
     if (approval.status === ApprovalStatus.Pending)
       this.resolveChat(approval.messageId);
-    else
+    else {
       this.setAnswer(approval.id, null);
+      for (const index of this.messageIndexes.values())
+        index.find(approval.messageId)?.controls?.dropDraft(approval.id);
+    }
   }
 
   private applySendKey(value: JsonValue | undefined): void {
@@ -2959,7 +3089,7 @@ export class ChatStoreService {
   private static profileEnvironment(profile: ProviderProfile, folder: string): Record<string, string> {
     const separator = folder.includes(Resources.backslash) ? Resources.backslash : Resources.slash;
     const root = folder.endsWith(separator) ? folder.slice(0, -separator.length) : folder;
-    return { ...profile.personFolders.includes(folder) ? {} : { [profile.variable]: folder }, ...Object.fromEntries(Object.entries(profile.signInVariables)
+    return { ...profile.personFolders.some(t => ProfileFolderPath.isSame(t, folder)) ? {} : { [profile.variable]: folder }, ...Object.fromEntries(Object.entries(profile.signInVariables)
       .map(([name, path]) => [name, [root, ...path.split(Resources.slash)].join(separator)])), ...profile.signInValues };
   }
 

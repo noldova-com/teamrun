@@ -37,40 +37,72 @@ export class SharedMcpOauth implements ISharedMcpSignIn {
     this.deadline = deadline;
   }
 
-  public async startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string> {
-    const challenge = await SharedMcpOauth.challengeAsync(url);
+  public async startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null> {
+    const ended = Promise.withResolvers<SharedMcpAccess | null>();
+    let isLive = true;
+    const supersede = (): void => {
+      isLive = false;
+      ended.resolve(null);
+    };
+    this.attempts.get(reference)?.();
+    this.attempts.set(reference, supersede);
+    void ended.promise.then(() => {
+      if (this.attempts.get(reference) === supersede)
+        this.attempts.delete(reference);
+    });
+
     const server = createServer();
     const port = await SharedMcpOauth.listenAsync(server);
+    if (!isLive) {
+      SharedMcpOauth.close(server);
+      return null;
+    }
+    let challenge: ISharedMcpChallenge;
+    try {
+      challenge = await SharedMcpOauth.challengeAsync(url, this.deadline());
+    }
+    catch (error) {
+      SharedMcpOauth.close(server);
+      ended.resolve(null);
+      if (!isLive)
+        return null;
+      throw error;
+    }
+    if (!isLive) {
+      SharedMcpOauth.close(server);
+      return null;
+    }
     const flow = new SharedMcpOauthFlow(Resources.formatSharedMcpRedirectUrl(port), randomBytes(Resources.sharedMcpStateBytes).toString(Resources.hexEncoding));
     try {
       await auth(flow, this.optionsOf(url, challenge, null));
     }
     catch (error) {
       SharedMcpOauth.close(server);
+      ended.resolve(null);
+      if (!isLive)
+        return null;
       throw error;
     }
+    if (!isLive) {
+      SharedMcpOauth.close(server);
+      return null;
+    }
 
-    const ended = Promise.withResolvers<SharedMcpAccess | null>();
     const expiry = this.expiry();
     const expire = (): void => ended.resolve(SharedMcpAccess.refused(Resources.sharedMcpSignInTimedOut));
     expiry.addEventListener(Resources.abortEvent, expire, { once: true });
     if (expiry.aborted)
       expire();
-    const supersede = (): void => ended.resolve(null);
-    this.attempts.get(reference)?.();
-    this.attempts.set(reference, supersede);
     void ended.promise.then(access => {
       expiry.removeEventListener(Resources.abortEvent, expire);
       SharedMcpOauth.close(server);
-      if (this.attempts.get(reference) === supersede)
-        this.attempts.delete(reference);
       if (!Object.isNull(access))
         finished(access);
     });
     let answered = false;
     server.on(Resources.requestEvent, (request: IncomingMessage, response: ServerResponse) => {
-      const address = new URL(String(request.url), flow.redirectUrl);
-      if (address.pathname !== Resources.sharedMcpCallbackPath || answered) {
+      const address = URL.parse(String(request.url), flow.redirectUrl);
+      if (Object.isNull(address) || address.pathname !== Resources.sharedMcpCallbackPath || answered) {
         response.writeHead(Resources.notFoundStatus).end();
         return;
       }
@@ -172,9 +204,9 @@ export class SharedMcpOauth implements ISharedMcpSignIn {
     return SharedMcpAccess.granted(tokens.access_token, expiresAt);
   }
 
-  private static async challengeAsync(url: string): Promise<ISharedMcpChallenge> {
+  private static async challengeAsync(url: string, signal: AbortSignal): Promise<ISharedMcpChallenge> {
     const response = await fetch(url, { method: Resources.postMethod, headers: { [Resources.contentTypeHeader]: Resources.jsonContentType,
-      [Resources.acceptHeader]: Resources.mcpAcceptTypes }, body: Resources.sharedMcpProbeBody, redirect: Resources.manualRedirect });
+      [Resources.acceptHeader]: Resources.mcpAcceptTypes }, body: Resources.sharedMcpProbeBody, redirect: Resources.manualRedirect, signal });
     await response.body?.cancel();
     if (response.status !== Resources.unauthorizedStatus)
       return { resourceMetadataUrl: null, scope: null };

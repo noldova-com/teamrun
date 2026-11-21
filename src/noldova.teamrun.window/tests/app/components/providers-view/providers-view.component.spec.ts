@@ -2305,6 +2305,60 @@ describe("ProvidersViewComponent", () => {
     expect(context.count(MethodName.ProviderSignOut)).toBe(0);
   });
 
+  it("reads Claude Code's person folder again before warning about a sign-out, so the folder the environment names after the listing gets the warning, " +
+    "trailing separator and all", async () => {
+    let usual = "D:\\profiles\\claude-a15";
+    const claude = (): ProviderKind => new ProviderKind("claude", "Claude Code", true, false, null,
+      new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", usual, null, {}, {}, [usual]), true);
+    providers.push(signedIn("a15", "claude", "Usual"), signedIn("a16", "claude", "Added"));
+    await create(t => t.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson(), claude().toJson()]));
+    usual = "D:\\profiles\\claude-a16\\";
+    const message = async (label: string): Promise<string | undefined> => {
+      await choose(".nol-teamrun-sign-out", row(label));
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-confirm-dialog p")).not.toBeNull());
+      const text = document.querySelector("nol-teamrun-confirm-dialog p")?.textContent?.trim();
+      button(".nol-teamrun-cancel", document).click();
+      await settle();
+      return text;
+    };
+
+    expect(await message("Usual")).toBe(Resources.formatSignOut("Usual", "Claude Code"));
+    expect(await message("Added")).toBe(Resources.formatSignOutPersonal("Added", "Claude Code"));
+    expect(context.count(MethodName.ProviderSignOut)).toBe(0);
+  });
+
+  it("reports a sign-out whose read of the provider types fails, opening no dialog and signing nothing out", async () => {
+    const claude = new ProviderKind("claude", "Claude Code", true, false, null, new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login",
+      "D:\\profiles\\claude-a15", null, {}, {}, ["D:\\profiles\\claude-a15"]), true);
+    providers.push(signedIn("a15", "claude", "Usual"));
+    await create(t => t.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson(), claude.toJson()]));
+    context.fail(MethodName.ProviderKindList, "The runtime is restarting.");
+
+    await choose(".nol-teamrun-sign-out", row("Usual"));
+    await Wait.until(() => expect(texts(".nol-teamrun-error-text")).toEqual([Resources.signOutKindsNotRead, Resources.kindsUnavailableForProviders]));
+
+    expect(document.querySelector("nol-teamrun-confirm-dialog")).toBeNull();
+    expect(context.count(MethodName.ProviderSignOut)).toBe(0);
+  });
+
+  it("warns before signing Claude Code out in its usual folder that it signs the person's own Claude Code out too, and not for one with its own folder", async () => {
+    const claude = new ProviderKind("claude", "Claude Code", true, false, null, new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "D:\\profiles\\claude-a15",
+      null, {}, {}, ["D:\\profiles\\claude-a15"]), true);
+    providers.push(signedIn("a15", "claude", "Usual"), signedIn("a16", "claude", "Added"));
+    await create(t => t.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson(), claude.toJson()]));
+    const message = async (label: string): Promise<string | undefined> => {
+      await choose(".nol-teamrun-sign-out", row(label));
+      const text = document.querySelector("nol-teamrun-confirm-dialog p")?.textContent?.trim();
+      button(".nol-teamrun-cancel", document).click();
+      await settle();
+      return text;
+    };
+
+    expect(await message("Usual")).toBe(Resources.formatSignOutPersonal("Usual", "Claude Code"));
+    expect(await message("Added")).toBe(Resources.formatSignOut("Added", "Claude Code"));
+    expect(context.count(MethodName.ProviderSignOut)).toBe(0);
+  });
+
   it("warns before signing Grok out in the person's own Grok home that it signs their Grok CLI out too, and not for a Grok with its own folder", async () => {
     const grok = new ProviderKind("grok", "Grok", true, true, null, new ProviderProfile("GROK_HOME", null, "D:\\person\\.grok", null, {}, {},
       ["D:\\person\\.grok", "D:\\profiles\\grok-a12"]), true);
@@ -2582,6 +2636,38 @@ describe("ProvidersViewComponent", () => {
       AppearanceFixture.expectPixels(box(view).right - box(part(error, ".nol-teamrun-dismiss")).right, AppearanceFixture.measureLook("content-padding-inline"));
       expect(button(".nol-teamrun-dismiss").classList).toContain("nol-button-text");
       AppearanceFixture.expectPixels(box(button(".nol-teamrun-dismiss")).height, AppearanceFixture.measureLook("button-height"));
+    });
+
+    it("keeps Skip for now and Continue in a footer along the bottom of a short view, under the providers it scrolls, aligned with the welcome line", async () => {
+      await create();
+      store.welcome();
+      element().style.height = "20rem";
+      await settle();
+      const body = part(element(), ".nol-teamrun-providers-body");
+      const footer = part(element(), ".nol-teamrun-welcome-actions");
+      const [skip, next] = [button(".nol-teamrun-skip"), button(".nol-teamrun-continue")];
+      const border = Number.parseFloat(style(footer).borderTopWidth);
+
+      expect(body.scrollHeight).toBeGreaterThan(body.clientHeight);
+      expect([style(footer).borderTopStyle, border > 0]).toEqual(["solid", true]);
+      for (const scrolled of [body.scrollHeight, 0]) {
+        body.scrollTop = scrolled;
+        await settle();
+
+        expect(body.scrollTop > 0).toBe(scrolled > 0);
+        AppearanceFixture.expectPixels(box(footer).bottom, box(element()).bottom);
+        AppearanceFixture.expectPixels(box(footer).top, box(body).bottom);
+        AppearanceFixture.expectPixels(box(footer).left, box(element()).left);
+        AppearanceFixture.expectPixels(box(footer).right, box(element()).right);
+        AppearanceFixture.expectPixels(box(skip).top - box(footer).top - border, space(3));
+        AppearanceFixture.expectPixels(box(footer).bottom - box(next).bottom, space(3));
+        AppearanceFixture.expectPixels(box(next).height, AppearanceFixture.measureLook("button-height"));
+        AppearanceFixture.expectPixels(box(next).left - box(skip).right, space(2));
+        expect(Math.abs(box(skip).top - box(next).top)).toBeLessThanOrEqual(0.5);
+      }
+      body.scrollTop = 0;
+      await settle();
+      AppearanceFixture.expectPixels(box(next).right, box(part(element(), ".nol-teamrun-welcome")).right);
     });
 
     it("puts the line that the providers failed to load above the table, with Retry at its end as a text button", async () => {

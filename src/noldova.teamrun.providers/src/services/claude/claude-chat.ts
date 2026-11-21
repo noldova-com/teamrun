@@ -50,6 +50,7 @@ export class ClaudeChat {
   private applied: ClaudeTurn | null = null;
   private waking: boolean = false;
   private waker: { turn: ClaudeTurn; wake: WakeTurn } | null = null;
+  private rateLimit: Extract<SDKMessage, { type: "rate_limit_event" }> | null = null;
   private ended: TurnWake[] = [];
   private notified: boolean = false;
   private stamped: boolean = false;
@@ -144,6 +145,7 @@ export class ClaudeChat {
   public attach(query: IClaudeQuery, mode: PermissionMode): void {
     this.query = query;
     this.mode = mode;
+    this.rateLimit = null;
   }
 
   public async setPermissionMode(mode: PermissionMode): Promise<void> {
@@ -239,6 +241,7 @@ export class ClaudeChat {
     else {
       this.listener = turn.turnListener;
       this.applied = turn;
+      this.rateLimit = null;
       this.input.push(message);
       if (turn.isInterrupted)
         this.stopPending();
@@ -353,6 +356,14 @@ export class ClaudeChat {
       this.closeWhenIdle();
       return;
     }
+    if (message.type === Resources.rateLimitEventType) {
+      const bound = this.waking ? this.waker?.turn : this.replying;
+      if (Object.isNullOrUndefined(bound))
+        this.rateLimit = message;
+      else
+        await bound.handle(message, query);
+      return;
+    }
     if (message.type !== Resources.streamEventType && message.type !== Resources.assistantMessageType && message.type !== Resources.userMessageType
       && message.type !== Resources.resultMessageType)
       return;
@@ -369,6 +380,10 @@ export class ClaudeChat {
     else if (!Object.isNull(this.replying) && this.applied !== this.replying)
       await this.resume(query);
     const turn = this.replying ?? this.waker?.turn ?? null;
+    const rateLimit = this.rateLimit;
+    this.rateLimit = null;
+    if (!Object.isNull(turn) && !Object.isNull(rateLimit))
+      await turn.handle(rateLimit, query);
     if (!Object.isNull(turn))
       await turn.handle(message, query);
     if (message.type !== Resources.resultMessageType)
@@ -383,6 +398,7 @@ export class ClaudeChat {
     this.replying = null;
     this.waking = false;
     this.ended = [];
+    this.rateLimit = null;
     if (!Object.isNullOrUndefined(this.pending?.held))
       await this.release(query);
     this.closeWhenIdle();
@@ -519,6 +535,7 @@ export class ClaudeChat {
     this.listener = pending.turn.turnListener;
     this.applied = pending.turn;
     await this.applySender(query, pending.environment, pending.turn.turnListener);
+    this.rateLimit = null;
     if (!this.closed)
       this.input.push(message);
   }
@@ -567,6 +584,7 @@ export class ClaudeChat {
     if (Object.isNull(waker))
       return;
     this.waker = null;
+    this.rateLimit = null;
     if (!Object.isNull(failure))
       waker.turn.fail(failure);
     try {

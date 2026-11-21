@@ -7,13 +7,14 @@
  */
 
 import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
-import { NodeTimer } from "@noldova/teamrun.core";
-import { CommandRunner, NodeProcessStarter, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
+import { type ITimer, NodeTimer, TimeoutException } from "@noldova/teamrun.core";
+import { CommandRunner, type IPowershellSession, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
 
 import { FakeTaskTree, type FakeTaskTreeMode } from "../../fixtures/fake-task-tree.fixture.js";
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
 import { ListingCommandRunner } from "../../fixtures/listing-command-runner.fixture.js";
 import { ListingPowershellSession } from "../../fixtures/listing-powershell-session.fixture.js";
+import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 
@@ -22,6 +23,7 @@ export class ProcessTreeTests {
   private static readonly DAYS: readonly string[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   private static readonly MONTHS: readonly string[] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   private static readonly GONE: number = 2_147_483_644;
+  private static readonly ANCESTOR: number = 999;
 
   @Category("ProcessListing")
   @TestMethod
@@ -83,17 +85,19 @@ export class ProcessTreeTests {
   public async endsTheTreeOnWindowsInRoundsParentsFirstAndNotThroughAParentIdAnotherProcessHoldsNow(): Promise<void> {
     const start = Date.now() - 60_000;
     const [root, child, stale, late, impostorChild] = [1001, 1002, 1003, 1004, 1005];
-    const first = [[process.pid, 1, start], [root, process.pid, start + 10_000], [child, root, start + 20_000], [stale, child, start + 15_000]];
-    const next = [[process.pid, 1, start], [root, process.pid, start + 50_000], [impostorChild, root, start + 55_000], [late, child, start + 30_000]];
-    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", first), ProcessTreeTests.listing("win32", next)]);
+    const first = [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 10_000], [child, root, start + 20_000], [stale, child, start + 15_000]];
+    const next = [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 50_000], [impostorChild, root, start + 55_000], [late, child, start + 30_000]];
+    const gone = [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 50_000], [impostorChild, root, start + 55_000]];
+    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", first), ProcessTreeTests.listing("win32", next), ProcessTreeTests.listing("win32", gone)]);
 
-    const ended = await ProcessTreeTests.tree("win32", runner).endTree(root, Date.now(), process.pid);
+    const ended = await ProcessTreeTests.tree("win32", runner).endTree(root, Date.now(), ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(3, runner.calls);
     Assert.isTrue(runner.commands.every(t => t.executable === "powershell.exe"));
-    Assert.areEqual(JSON.stringify([`$ids = @(${String(root)}, ${String(child)}); $starts = @(${String(start + 10_000)}, ${String(start + 20_000)}); `,
-      `$ids = @(${String(late)}); $starts = @(${String(start + 30_000)}); `]),
+    const deadline = `$deadline = [DateTime]::UtcNow.AddMilliseconds(${String(Resources.processExitWait)}); `;
+    Assert.areEqual(JSON.stringify([`$ids = @(${String(root)}, ${String(child)}); $starts = @(${String(start + 10_000)}, ${String(start + 20_000)}); ${deadline}`,
+      `$ids = @(${String(late)}); $starts = @(${String(start + 30_000)}); ${deadline}`]),
       JSON.stringify(runner.commands.slice(1).map(t => t.arguments.at(-1)!.slice(0, t.arguments.at(-1)!.indexOf("for (")))));
   }
 
@@ -101,11 +105,11 @@ export class ProcessTreeTests {
   public async endsATreeItStartedUnderAnyParentButNotAProcessThatStartedLaterOrIsGone(): Promise<void> {
     const start = Date.now() - 60_000;
     const [own, child] = [1001, 1002];
-    const listing = [[process.pid, 1, start], [own, ProcessTreeTests.GONE, start + 10_000], [child, own, start + 20_000]];
+    const listing = [[ProcessTreeTests.ANCESTOR, 1, start], [own, ProcessTreeTests.GONE, start + 10_000], [child, own, start + 20_000]];
     const cases: readonly (readonly [number, number])[] = [[own, start + 30_000], [own, start + 5_000], [ProcessTreeTests.GONE, start + 30_000]];
     const results: [boolean, boolean][] = [];
     for (const [processId, startedBy] of cases) {
-      const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", listing), ProcessTreeTests.listing("win32", [[process.pid, 1, start]])]);
+      const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", listing), ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
       const ended = await ProcessTreeTests.tree("win32", runner).endOwnTree(processId, startedBy);
       results.push([ended, runner.commands.slice(1).some(t => t.arguments.at(-1)?.startsWith(`$ids = @(${String(own)}, ${String(child)}); `) === true)]);
     }
@@ -116,9 +120,9 @@ export class ProcessTreeTests {
   @TestMethod
   public async stopsEndingTheTreeOnWindowsWhenARoundCannotRun(): Promise<void> {
     const start = Date.now() - 60_000;
-    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", [[process.pid, 1, start], [1001, process.pid, start + 10_000]]), null]);
+    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [1001, ProcessTreeTests.ANCESTOR, start + 10_000]]), null]);
 
-    const ended = await ProcessTreeTests.tree("win32", runner).endTree(1001, Date.now(), process.pid);
+    const ended = await ProcessTreeTests.tree("win32", runner).endTree(1001, Date.now(), ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(2, runner.calls);
@@ -155,14 +159,14 @@ export class ProcessTreeTests {
   public async holdsTheTreeStillOutsideWindowsUntilNoNewProcessShowsAndHoldsItAgainToKillWhatOutlivesTheGrace(): Promise<void> {
     const [root, child, late, gone] = [2001, 2002, 2003, ProcessTreeTests.GONE];
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
-    const first = [[process.pid, 1, start], [root, process.pid, start + 10_000], [child, root, start + 20_000]];
+    const first = [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 10_000], [child, root, start + 20_000]];
     const grown = [...first, [gone, child, start + 30_000]];
     const after = [...first, [gone, child, start + 40_000], [late, child, start + 45_000]];
     const runner = new ListingCommandRunner([ProcessTreeTests.listing("linux", first), ProcessTreeTests.listing("linux", grown),
       ProcessTreeTests.listing("linux", grown), ProcessTreeTests.listing("linux", after)]);
     const signals = ProcessTreeTests.signals([root, child, late]);
 
-    const ended = await ProcessTreeTests.tree("linux", runner, signals.kill).endTree(root, Date.now(), process.pid);
+    const ended = await ProcessTreeTests.tree("linux", runner, signals.kill).endTree(root, Date.now(), ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(5, runner.calls);
@@ -181,26 +185,42 @@ export class ProcessTreeTests {
     FakeTaskTree.start(path, 2);
     await Wait.until(() => FakeTaskTree.read(path).length === 2, "The task tree did not get both processes.");
     const [root, child] = FakeTaskTree.read(path) as [number, number];
-    const tree = new ProcessTree(process.platform, new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform))), process.env,
-      Resources.processListTimeout, new NodeTimer(), 60_000);
+    const runner = new ListingCommandRunner([], new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform))));
+    const delays: number[] = [];
+    const real = new NodeTimer();
+    const timer: ITimer = {
+      now: () => real.now(),
+      delayAsync: (milliseconds, signal) => {
+        delays.push(milliseconds);
+        return real.delayAsync(milliseconds, signal);
+      }
+    };
+    const grace = 60_000;
+    const tree = new ProcessTree(process.platform, runner, process.env, Resources.processListTimeout, timer, grace);
 
-    const began = Date.now();
     const ended = await tree.endTree(root, Date.now(), process.pid);
+    const last = runner.outputs.at(-1) ?? "";
+    const left = [root, child].filter(t => ProcessTreeTests.runs(t))
+      .map(t => `${String(t)} ${last.split("\n").some(line => line.trim().split(" ")[0] === String(t)) ? "listed" : "not listed"}`);
 
+    const rounds = runner.commands.map(t => t.arguments.at(-1) ?? "").filter(t => t.startsWith("$ids = "));
     Assert.isTrue(ended);
-    Assert.isTrue(Date.now() - began < 30_000);
-    Assert.isFalse(ProcessTreeTests.runs(root) || ProcessTreeTests.runs(child));
+    Assert.areEqual("[]", JSON.stringify(left));
+    Assert.isTrue(rounds.length < Resources.processTreeFreezeRounds, JSON.stringify(rounds));
+    Assert.isTrue(delays.reduce((total, delay) => total + delay, 0) < grace, JSON.stringify(delays.length));
+    Assert.isTrue(runner.timeouts.length > 0 && runner.timeouts.every(t => t === Resources.processListTimeout), JSON.stringify(runner.timeouts));
   }
 
   @TestMethod
   public async stopsListingATreeThatKeepsGrowingAndSignalsNothingThatHadAlreadyEnded(): Promise<void> {
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
-    const listings = Array.from({ length: 12 }, (_, index) => ProcessTreeTests.listing("linux", [[process.pid, 1, start],
-      [ProcessTreeTests.GONE, process.pid, start + 10_000], ...Array.from({ length: index }, (_, t) => [ProcessTreeTests.GONE - 1 - t, ProcessTreeTests.GONE, start + 20_000])]));
+    const listings = Array.from({ length: 12 }, (_, index) => ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start],
+      [ProcessTreeTests.GONE, ProcessTreeTests.ANCESTOR, start + 10_000],
+      ...Array.from({ length: index }, (_, t) => [ProcessTreeTests.GONE - 1 - t, ProcessTreeTests.GONE, start + 20_000])]));
     const runner = new ListingCommandRunner(listings);
     const signals = ProcessTreeTests.signals([]);
 
-    const ended = await ProcessTreeTests.tree("linux", runner, signals.kill).endTree(ProcessTreeTests.GONE, Date.now(), process.pid);
+    const ended = await ProcessTreeTests.tree("linux", runner, signals.kill).endTree(ProcessTreeTests.GONE, Date.now(), ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(12, runner.calls);
@@ -210,9 +230,10 @@ export class ProcessTreeTests {
   @TestMethod
   public async signalsThroughProcessKillByDefaultAndSkipsAProcessThatHasEnded(): Promise<void> {
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
-    const runner = new ListingCommandRunner([ProcessTreeTests.listing("linux", [[process.pid, 1, start], [ProcessTreeTests.GONE, process.pid, start + 10_000]])]);
+    const runner = new ListingCommandRunner([ProcessTreeTests.listing("linux",
+      [[ProcessTreeTests.ANCESTOR, 1, start], [ProcessTreeTests.GONE, ProcessTreeTests.ANCESTOR, start + 10_000]])]);
 
-    const ended = await ProcessTreeTests.tree("linux", runner).endTree(ProcessTreeTests.GONE, Date.now(), process.pid);
+    const ended = await ProcessTreeTests.tree("linux", runner).endTree(ProcessTreeTests.GONE, Date.now(), ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(3, runner.calls);
@@ -222,10 +243,10 @@ export class ProcessTreeTests {
   public async endsWhatItHeldWhenTheProcessesCanNoLongerBeListed(): Promise<void> {
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
     const root = 2001;
-    const runner = new ListingCommandRunner([ProcessTreeTests.listing("linux", [[process.pid, 1, start], [root, process.pid, start + 10_000]]), null]);
+    const runner = new ListingCommandRunner([ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 10_000]]), null]);
     const signals = ProcessTreeTests.signals([root]);
 
-    const ended = await ProcessTreeTests.tree("linux", runner, signals.kill).endTree(root, Date.now(), process.pid);
+    const ended = await ProcessTreeTests.tree("linux", runner, signals.kill).endTree(root, Date.now(), ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(3, runner.calls);
@@ -236,9 +257,10 @@ export class ProcessTreeTests {
   public async endsEveryProcessUnderARunningProcessOutsideWindowsButThatProcessItself(): Promise<void> {
     const [root, child, grandchild] = [2001, 2002, 2003];
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
-    const listing = ProcessTreeTests.listing("linux", [[process.pid, 1, start], [root, process.pid, start + 10_000], [child, root, start + 20_000],
+    const listing = ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 10_000], [child, root, start + 20_000],
       [grandchild, child, start + 30_000]]);
-    const runner = new ListingCommandRunner([listing, listing, ProcessTreeTests.listing("linux", [[process.pid, 1, start], [root, process.pid, start + 10_000]])]);
+    const runner = new ListingCommandRunner([listing, listing,
+      ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 10_000]])]);
     const signals = ProcessTreeTests.signals([root, child, grandchild]);
 
     await ProcessTreeTests.tree("linux", runner, signals.kill).endDescendants(root);
@@ -251,8 +273,8 @@ export class ProcessTreeTests {
   public async endsATreeItStartedUnderAnyParentOutsideWindows(): Promise<void> {
     const [own, child] = [2001, 2002];
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
-    const listing = ProcessTreeTests.listing("linux", [[process.pid, 1, start], [own, ProcessTreeTests.GONE, start + 10_000], [child, own, start + 20_000]]);
-    const runner = new ListingCommandRunner([listing, listing, ProcessTreeTests.listing("linux", [[process.pid, 1, start]])]);
+    const listing = ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [own, ProcessTreeTests.GONE, start + 10_000], [child, own, start + 20_000]]);
+    const runner = new ListingCommandRunner([listing, listing, ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
     const signals = ProcessTreeTests.signals([own, child]);
 
     const ended = await ProcessTreeTests.tree("linux", runner, signals.kill).endOwnTree(own, start + 30_000);
@@ -282,8 +304,8 @@ export class ProcessTreeTests {
     const [root, early, later, earlier, stranger] = [2001, 2002, 2003, 2004, 2005];
     const second = Math.floor(Date.now() / 1000) * 1000 - 60_000;
     const launched = second + 500;
-    const groups = [[process.pid, process.pid, second - 60_000], [early, root, second - 1000], [later, root, second + 5000], [earlier, root, second - 2000],
-      [stranger, process.pid, second + 5000]];
+    const groups = [[ProcessTreeTests.ANCESTOR, ProcessTreeTests.ANCESTOR, second - 60_000], [early, root, second - 1000], [later, root, second + 5000], [earlier, root, second - 2000],
+      [stranger, ProcessTreeTests.ANCESTOR, second + 5000]];
     const runner = new ListingCommandRunner([ProcessTreeTests.listing("linux", groups)]);
     const signals = ProcessTreeTests.signals([early, later, earlier, stranger]);
 
@@ -331,7 +353,7 @@ export class ProcessTreeTests {
   public async endsOnWindowsWhatAnExitedProcessLeftUnderItsIdThatStartedSinceItAndNoLaterThanItsExitWithWhatThoseStartedSince(): Promise<void> {
     const launched = Date.now() - 60_000;
     const [root, left, older, reused, grandchild] = [1001, 1002, 1003, 1004, 1005];
-    const remaining = [[process.pid, 1, launched - 60_000], [older, root, launched - 10_000], [reused, root, launched + 30_000]];
+    const remaining = [[ProcessTreeTests.ANCESTOR, 1, launched - 60_000], [older, root, launched - 10_000], [reused, root, launched + 30_000]];
     const runner = new ListingCommandRunner([
       ProcessTreeTests.listing("win32", [...remaining, [left, root, launched + 10_000], [grandchild, left, launched + 40_000]]),
       ProcessTreeTests.listing("win32", remaining)]);
@@ -341,8 +363,8 @@ export class ProcessTreeTests {
     const script = runner.commands[1]?.arguments.at(-1);
     Assert.isDefined(script);
     Assert.areEqual(2, runner.calls);
-    Assert.areEqual(`$ids = @(${String(left)}, ${String(grandchild)}); $starts = @(${String(launched + 10_000)}, ${String(launched + 40_000)}); `,
-      script.slice(0, script.indexOf("for (")));
+    Assert.areEqual(`$ids = @(${String(left)}, ${String(grandchild)}); $starts = @(${String(launched + 10_000)}, ${String(launched + 40_000)}); ` +
+      `$deadline = [DateTime]::UtcNow.AddMilliseconds(${String(Resources.processExitWait)}); `, script.slice(0, script.indexOf("for (")));
   }
 
   @TestMethod
@@ -350,7 +372,7 @@ export class ProcessTreeTests {
   @TestData(false)
   public async endsNothingOnWindowsWhenOnlyProcessesStartedAfterTheExitAreListedUnderItsIdOrWhenItCannotList(listed: boolean): Promise<void> {
     const exited = Date.now() - 60_000;
-    const runner = new ListingCommandRunner([listed ? ProcessTreeTests.listing("win32", [[process.pid, 1, exited - 60_000], [1002, 1001, exited + 1]]) : null]);
+    const runner = new ListingCommandRunner([listed ? ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, exited - 60_000], [1002, 1001, exited + 1]]) : null]);
 
     await ProcessTreeTests.tree("win32", runner).endLeftovers(1001, exited - 10_000, exited);
 
@@ -392,23 +414,89 @@ export class ProcessTreeTests {
   public async endsATreeOnWindowsThroughItsSessionRatherThanANewPowershellForEachListing(): Promise<void> {
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
     const [task, child] = [ProcessTreeTests.GONE - 2, ProcessTreeTests.GONE - 1];
-    const session = new ListingPowershellSession([ProcessTreeTests.listing("win32", [[process.pid, 1, start], [task, process.pid, start + 10_000],
-      [child, task, start + 20_000]]), ProcessTreeTests.listing("win32", [[process.pid, 1, start]])]);
+    const session = new ListingPowershellSession([ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000],
+      [child, task, start + 20_000]]), ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
     const runner = new ListingCommandRunner([null]);
 
-    const ended = await new ProcessTree("win32", runner, process.env, 10_000, new NodeTimer(), 100, undefined, session).endTree(task, start + 30_000, process.pid);
+    const ended = await new ProcessTree("win32", runner, process.env, 10_000, new NodeTimer(), 100, undefined, session).endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(0, runner.calls);
-    Assert.areEqual(JSON.stringify([[Resources.powershellProcessListScript, 10_000],
-      [Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000]), 10_000]]), JSON.stringify(session.calls));
+    Assert.areEqual(JSON.stringify([[Resources.powershellProcessListScript, 5_000],
+      [Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000]), 5_000]]), JSON.stringify(session.calls));
   }
 
   @TestMethod
-  @TestData("win32", 1, 0)
+  public async endsAProcessOnWindowsAgainInTheNextRoundWhenTheListingStillShowsItAfterItsEnd(): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const [task, child] = [ProcessTreeTests.GONE - 2, ProcessTreeTests.GONE - 1];
+    const session = new ListingPowershellSession([
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000], [child, task, start + 20_000]]),
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]]),
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
+
+    const ended = await new ProcessTree("win32", new ListingCommandRunner([null]), process.env, 10_000, new NodeTimer(), 100, undefined, session)
+      .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000]),
+      Resources.formatProcessEndScript([task], [start + 10_000])]), JSON.stringify(session.calls.map(t => t[0])));
+  }
+
+  @TestMethod
+  public async endsAWindowsTreeInItsLastRoundAndReportsItEndedWhenEveryListingStillShowsAProcess(): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const task = ProcessTreeTests.GONE - 1;
+    const session = new ListingPowershellSession([
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]])]);
+    const log = new RecordingLog();
+
+    const ended = await new ProcessTree("win32", new ListingCommandRunner([null]), process.env, 10_000, new NodeTimer(), 100, undefined, session, undefined, log)
+      .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, ...Array.from({ length: Resources.processTreeFreezeRounds },
+      () => Resources.formatProcessEndScript([task], [start + 10_000]))]), JSON.stringify(session.calls.map(t => t[0])));
+    Assert.areEqual(JSON.stringify([Resources.formatTreeLeftListed([[task, start + 10_000]])]), JSON.stringify(log.lines));
+  }
+
+  @TestMethod
+  @TestData(true, "Error")
+  @TestData(false, "string")
+  public async writesTheRoundWhoseScriptFailsOnWindowsToItsLogAndEndsNoFurtherRound(throwsError: boolean, failure: string): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const task = ProcessTreeTests.GONE - 1;
+    const session = new ListingPowershellSession([
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]]), null]);
+    const runner = new ListingCommandRunner([null], null, throwsError ? new Error("The end failed.") : "The end failed.");
+    const log = new RecordingLog();
+
+    const ended = await new ProcessTree("win32", runner, process.env, 10_000, new NodeTimer(), 100, undefined, session, undefined, log)
+      .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, Resources.formatProcessEndScript([task], [start + 10_000])]),
+      JSON.stringify(session.calls.map(t => t[0])));
+    Assert.areEqual(1, runner.calls);
+    Assert.areEqual(JSON.stringify([Resources.formatTreeEndRoundFailed(1, failure)]), JSON.stringify(log.lines));
+  }
+
+  @TestMethod
+  public waitsForEachProcessTheEndScriptEndsToExitWithinTheScriptsDeadline(): void {
+    const script = Resources.formatProcessEndScript([1001], [5_000]);
+
+    Assert.areEqual(`$ids = @(1001); $starts = @(5000); $deadline = [DateTime]::UtcNow.AddMilliseconds(${String(Resources.processExitWait)}); ` +
+      "for ($i = 0; $i -lt $ids.Count; $i++) { try { $p = [System.Diagnostics.Process]::GetProcessById($ids[$i]); $null = $p.Handle; " +
+      "if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - $starts[$i]) -le 1) { $p.Kill(); " +
+      "$null = $p.WaitForExit([int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)) } } catch { } }; ",
+      script.slice(0, script.indexOf("}; ") + 3));
+  }
+
+  @TestMethod
+  @TestData("win32", 1, 1)
   @TestData("linux", 0, 1)
-  public async listsThroughItsSessionOnlyOnWindowsAndEndsNothingWhenTheSessionFails(platform: string, sessionCalls: number, runnerCalls: number)
-    : Promise<void> {
+  public async listsThroughItsSessionOnlyOnWindowsThenThroughANewPowershellAndEndsNothingWhenBothFail(platform: string, sessionCalls: number,
+    runnerCalls: number): Promise<void> {
     const session = new ListingPowershellSession([null]);
     const runner = new ListingCommandRunner([null]);
 
@@ -417,6 +505,79 @@ export class ProcessTreeTests {
 
     Assert.isFalse(ended);
     Assert.areEqual(JSON.stringify([sessionCalls, runnerCalls]), JSON.stringify([session.calls.length, runner.calls]));
+  }
+
+  @TestMethod
+  public async endsATreeOnWindowsThroughNewPowershellsForTheRestOfTheStopOnceItsSessionFailsTheFirstListing(): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const [task, child] = [ProcessTreeTests.GONE - 2, ProcessTreeTests.GONE - 1];
+    const session = new ListingPowershellSession([null]);
+    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000],
+      [child, task, start + 20_000]]), ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
+
+    const ended = await new ProcessTree("win32", runner, process.env, 10_000, new NodeTimer(), 100, undefined, session).endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    const scripts = [Resources.powershellProcessListScript, Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000])];
+    Assert.areEqual(JSON.stringify([[scripts[0], 5_000]]), JSON.stringify(session.calls));
+    Assert.areEqual(JSON.stringify(scripts.map(t => [Resources.powershellExecutable, ...Resources.powershellCommandArguments, t])),
+      JSON.stringify(runner.commands.map(t => [t.executable, ...t.arguments])));
+    Assert.areEqual(JSON.stringify([5_000, 10_000]), JSON.stringify(runner.timeouts));
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async endsARunningProcessWhoseSessionFailsEveryScript(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    const root = (await ProcessTreeTests.start(path, "stay"))[0] ?? ProcessTreeTests.GONE;
+    try {
+      const session = new ListingPowershellSession([null]);
+      const real = new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform)));
+
+      const ended = await new ProcessTree(process.platform, real, process.env, Resources.processListTimeout, new NodeTimer(), 100, undefined, session)
+        .endTree(root, Date.now(), process.pid);
+      await Wait.until(() => !ProcessTreeTests.runs(root), "The process still ran.");
+
+      Assert.isTrue(ended);
+      Assert.areEqual(process.platform === Resources.windowsPlatform, session.calls.length > 0);
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async endsARunningProcessWellInsideTheListingTimeWhenItsSessionNeverAnswers(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    const root = (await ProcessTreeTests.start(path, "stay"))[0] ?? ProcessTreeTests.GONE;
+    try {
+      const silent = new PowershellSession(process.execPath, ["-e", "process.stdin.resume()"], process.env, Resources.powershellSessionIdle);
+      const asked: [number, boolean][] = [];
+      const session: IPowershellSession = {
+        run: (script, timeout) => silent.run(script, timeout).catch((error: unknown) => {
+          asked.push([timeout, error instanceof TimeoutException]);
+          throw error;
+        })
+      };
+      const runner = new ListingCommandRunner([], new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform))));
+      const windows = process.platform === Resources.windowsPlatform;
+
+      const ended = await new ProcessTree(process.platform, runner, process.env, Resources.processListTimeout, new NodeTimer(), 100, undefined, session)
+        .endTree(root, Date.now(), process.pid);
+      await Wait.until(() => !ProcessTreeTests.runs(root), "The process still ran.");
+
+      Assert.isTrue(ended);
+      Assert.areEqual(JSON.stringify(windows ? [[Resources.powershellSessionAnswerLimit, true]] : []), JSON.stringify(asked));
+      Assert.isTrue(runner.timeouts.length > 0);
+      Assert.areEqual(JSON.stringify(runner.timeouts.map((_timeout, index) => windows && index === 0
+        ? Resources.processListTimeout - Resources.powershellSessionAnswerLimit : Resources.processListTimeout)), JSON.stringify(runner.timeouts));
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
   }
 
   @TestMethod
@@ -445,7 +606,7 @@ export class ProcessTreeTests {
   public async keepsListingUnderTwoRootsAfterTheFirstChildIsGoneAndEndsWhatEachLeft(): Promise<void> {
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
     const [before] = ProcessTreeTests.orphanListings(start);
-    const kept = [[process.pid, 1, start], [3001, process.pid, start + 10_000], [3004, 1, start + 40_000], [3005, 3004, start + 50_000],
+    const kept = [[ProcessTreeTests.ANCESTOR, 1, start], [3001, ProcessTreeTests.ANCESTOR, start + 10_000], [3004, 1, start + 40_000], [3005, 3004, start + 50_000],
       [3006, 3001, start + 15_000], [3007, 3001, start + 16_000]];
     const first = ProcessTreeTests.listing("linux", [...kept, [3009, 3001, start + 17_000], [3010, 3009, start + 18_000], [3011, 3010, start + 19_000]]);
     const both = ProcessTreeTests.listing("linux", [...kept, [3011, 1, start + 19_000]]);
@@ -463,10 +624,10 @@ export class ProcessTreeTests {
   public async sparesARootOfAnotherThreadThatEndsInTheWaitAndKeepsWaitingForItsOwn(): Promise<void> {
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
     const [before] = ProcessTreeTests.orphanListings(start);
-    const foreignGone = ProcessTreeTests.listing("linux", [[process.pid, 1, start], [3001, process.pid, start + 10_000], [3002, 3001, start + 20_000], [3003, 3002, start + 30_000],
-      [3004, 3003, start + 40_000], [3005, 3004, start + 50_000], [3006, 3001, start + 15_000], [3011, 1, start + 19_000]]);
-    const ownGone = ProcessTreeTests.listing("linux", [[process.pid, 1, start], [3001, process.pid, start + 10_000], [3004, 1, start + 40_000], [3005, 3004, start + 50_000],
-      [3006, 3001, start + 15_000], [3011, 1, start + 19_000]]);
+    const foreignGone = ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [3001, ProcessTreeTests.ANCESTOR, start + 10_000],
+      [3002, 3001, start + 20_000], [3003, 3002, start + 30_000], [3004, 3003, start + 40_000], [3005, 3004, start + 50_000], [3006, 3001, start + 15_000], [3011, 1, start + 19_000]]);
+    const ownGone = ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [3001, ProcessTreeTests.ANCESTOR, start + 10_000],
+      [3004, 1, start + 40_000], [3005, 3004, start + 50_000], [3006, 3001, start + 15_000], [3011, 1, start + 19_000]]);
     const runner = new ListingCommandRunner([before!, foreignGone, ownGone, ownGone, ""]);
     const signals = ProcessTreeTests.signals([3001, 3004, 3005, 3006, 3011]);
 
@@ -481,7 +642,8 @@ export class ProcessTreeTests {
   public async onlyRunsTheStopWhenAChildsEnvironmentCannotBeRead(): Promise<void> {
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
     const [before] = ProcessTreeTests.orphanListings(start);
-    const gone = ProcessTreeTests.listing("linux", [[process.pid, 1, start], [ProcessTreeTests.GONE, process.pid, start + 10_000], [ProcessTreeTests.GONE - 1, ProcessTreeTests.GONE, start + 20_000]]);
+    const gone = ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [ProcessTreeTests.GONE, ProcessTreeTests.ANCESTOR, start + 10_000],
+      [ProcessTreeTests.GONE - 1, ProcessTreeTests.GONE, start + 20_000]]);
     const runner = new ListingCommandRunner([gone, before!]);
     const signals = ProcessTreeTests.signals([]);
     let stops = 0;
@@ -520,9 +682,9 @@ export class ProcessTreeTests {
     scenario: number, calls: number): Promise<void> {
     const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
     const [before] = ProcessTreeTests.orphanListings(start);
-    const rootsGone = ProcessTreeTests.listing("linux", [[process.pid, 1, start], [3001, process.pid, start + 10_000], [3006, 3001, start + 15_000],
+    const rootsGone = ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [3001, ProcessTreeTests.ANCESTOR, start + 10_000], [3006, 3001, start + 15_000],
       [3009, 3001, start + 17_000], [3010, 3009, start + 18_000], [3011, 3010, start + 19_000]]);
-    const runner = new ListingCommandRunner([[null], [""], [before!, ProcessTreeTests.listing("linux", [[process.pid, 1, start]])],
+    const runner = new ListingCommandRunner([[null], [""], [before!, ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start]])],
       [before!, before!, before!], [before!, null], [before!, rootsGone], [before!], [before!], [before!]][scenario]!);
     const signals = ProcessTreeTests.signals([3001, 3002, 3003, 3004, 3005, 3006, 3007]);
     let stops = 0;
@@ -575,16 +737,16 @@ export class ProcessTreeTests {
   }
 
   private static orphanListings(start: number): string[] {
-    const before = [[process.pid, 1, start], [3001, process.pid, start + 10_000], [3002, 3001, start + 20_000], [3003, 3002, start + 30_000],
+    const before = [[ProcessTreeTests.ANCESTOR, 1, start], [3001, ProcessTreeTests.ANCESTOR, start + 10_000], [3002, 3001, start + 20_000], [3003, 3002, start + 30_000],
       [3004, 3003, start + 40_000], [3005, 3004, start + 50_000], [3006, 3001, start + 15_000], [3007, 3001, start + 16_000], [3009, 3001, start + 17_000],
       [3010, 3009, start + 18_000], [3011, 3010, start + 19_000]];
-    const after = [[process.pid, 1, start], [3001, process.pid, start + 10_000], [3004, 1, start + 40_000], [3005, 3004, start + 50_000],
+    const after = [[ProcessTreeTests.ANCESTOR, 1, start], [3001, ProcessTreeTests.ANCESTOR, start + 10_000], [3004, 1, start + 40_000], [3005, 3004, start + 50_000],
       [3006, 3001, start + 15_000], [3007, 1, start + 55_000], [3008, 1, start + 56_000], [3009, 3001, start + 17_000], [3011, 1, start + 19_000]];
     return [ProcessTreeTests.listing("linux", before), ProcessTreeTests.listing("linux", after), ProcessTreeTests.listing("linux", after)];
   }
 
   private static foreignOrphanListing(start: number): string {
-    return ProcessTreeTests.listing("linux", [[process.pid, 1, start], [3001, process.pid, start + 10_000], [3002, 3001, start + 20_000],
+    return ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [3001, ProcessTreeTests.ANCESTOR, start + 10_000], [3002, 3001, start + 20_000],
       [3003, 3002, start + 30_000], [3004, 3003, start + 40_000], [3005, 3004, start + 50_000], [3006, 3001, start + 15_000], [3007, 3001, start + 16_000],
       [3009, 3001, start + 17_000], [3011, 1, start + 19_000]]);
   }

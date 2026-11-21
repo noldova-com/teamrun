@@ -38,7 +38,7 @@ LICENSE file in the root directory of this source tree.
       [nolTooltip]="resources.showStatsLabel" [nolPopoverTrigger]="statsPanel" [nolPopoverSide]="below" [nolPopoverAlignment]="start"></button>
   }
   @if (canStop()) {
-    <button type="button" nol-button nolMessageFooterEnd class="cancel" [nolMessageFooterEndPlacement]="footerEnd" [variant]="secondary" [size]="compact" (click)="cancel()">
+    <button type="button" nol-button nolMessageFooterEnd class="cancel" [nolMessageFooterEndPlacement]="footerEnd" [variant]="secondary" [size]="compact" [attr.aria-disabled]="stopping() ? 'true' : null" (click)="cancel()">
       <span class="material-symbols-rounded" nolButtonIcon aria-hidden="true">{{ resources.stopGlyph }}</span>
       {{ resources.cancelReplyLabel }}
     </button>
@@ -55,6 +55,11 @@ LICENSE file in the root directory of this source tree.
         (auxclick)="openImageLink($event, src)">{{ alt || src }}</a>
     } @else {
       {{ alt }}
+    }
+  </ng-template>
+  <ng-template [nolMessageSlot]="resources.wakeReceivedSlot">
+    @if (wakeReceived(); as received) {
+      <nol-teamrun-wake-line [message]="message()" [received]="received" [state]="state()" />
     }
   </ng-template>
   <ng-template [nolMessageSlot]="resources.wakeNoteSlot">
@@ -220,7 +225,7 @@ LICENSE file in the root directory of this source tree.
   @for (group of approvalGroups(); track group[0]) {
     <ng-template [nolMessageSlot]="approvalsSlotOf(group[0])">
       @if (areSlotsShown()) {
-        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group[1]" (focused)="approachApproval($event)" />
+        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group[1]" [controls]="state()" (focused)="approachApproval($event)" />
       }
     </ng-template>
   }

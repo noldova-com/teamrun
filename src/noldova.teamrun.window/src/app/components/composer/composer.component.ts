@@ -204,6 +204,7 @@ export class ComposerComponent {
   protected readonly text: Signal<string> = computed(() => MentionValue.parse(this.value()).text);
   protected readonly attachments: WritableSignal<readonly ComposerAttachment[]> = signal([]);
   protected readonly attachmentError: WritableSignal<string | null> = signal(null);
+  protected readonly filesRefused: WritableSignal<boolean> = signal(false);
   protected readonly signOutNote: WritableSignal<string | null> = signal(null);
   protected readonly signOutFailure: WritableSignal<string | null> = signal(null);
   protected readonly preparing: WritableSignal<boolean> = signal(false);
@@ -565,6 +566,10 @@ export class ComposerComponent {
     };
     globalThis.addEventListener("focus", refocused);
     const unwatchDeletions = store.onConversationDeleted(t => this.drafts.drop(t));
+    const unwatchStale = this.drafts.onStale(t => {
+      if (t === this.conversationId())
+        void this.restore(t);
+    });
     const unwatchReplies = store.onReplyEnded(t => {
       if ((this.catalog().awaitsTurn || this.chosenDescriptor()?.followsOwnConfig === true) && t.provenance?.requested.kind === this.chosenKind() && t.provenance.providerId === this.chosenProvider())
         this.loadModels(true, true);
@@ -610,6 +615,7 @@ export class ComposerComponent {
       this.restorations++;
       removeSave();
       unwatchDeletions();
+      unwatchStale();
       unwatchReplies();
       void this.drafts.flush();
       for (const attachment of this.attachments())
@@ -645,7 +651,7 @@ export class ComposerComponent {
   }
 
   public stopOnEscape(event: KeyboardEvent): void {
-    if (event.key === Resources.escapeKey && !event.defaultPrevented && !Object.isNull(this.editing()) && event.target instanceof Element
+    if (event.key === Resources.escapeKey && !event.defaultPrevented && !event.isComposing && !Object.isNull(this.editing()) && event.target instanceof Element
       && this.card().nativeElement.contains(event.target) && !this.ownsEscape(event.target)) {
       event.preventDefault();
       this.cancelEditing();
@@ -721,6 +727,7 @@ export class ComposerComponent {
   }
 
   protected editWaiting(waiting: WaitingMessage): void {
+    this.filesRefused.set(false);
     this.editingSignal.set(waiting);
     this.value.set(waiting.message.text);
     this.box().nativeElement.focus();
@@ -730,6 +737,7 @@ export class ComposerComponent {
     this.editingSignal.set(null);
     this.value.set(String.empty);
     void this.drafts.discard(this.shownConversationId);
+    this.box().nativeElement.focus();
   }
 
   private editLastWaiting(event: KeyboardEvent): void {
@@ -780,6 +788,7 @@ export class ComposerComponent {
   }
 
   protected async stop(): Promise<void> {
+    this.box().nativeElement.focus();
     await this.store.stop(this.conversationId());
   }
 
@@ -790,7 +799,7 @@ export class ComposerComponent {
 
   protected paste(event: ClipboardEvent): void {
     const files = Array.from(event.clipboardData?.files ?? []);
-    if (files.length === 0)
+    if (files.length === 0 || !this.canCompose())
       return;
     event.preventDefault();
     this.addFiles(files);
@@ -800,7 +809,7 @@ export class ComposerComponent {
     if (!this.canCompose() || !Array.from(event.dataTransfer?.types ?? []).includes(Resources.filesTransferType))
       return;
     event.preventDefault();
-    this.dropping.set(true);
+    this.dropping.set(this.editingSignal() === null);
   }
 
   protected dragLeave(): void {
@@ -1023,6 +1032,10 @@ export class ComposerComponent {
   private addFiles(files: readonly File[]): void {
     if (!this.canCompose())
       return;
+    if (!Object.isNull(this.editing())) {
+      this.filesRefused.set(true);
+      return;
+    }
     const existing = this.attachments();
     if (existing.length + files.length > ProtocolResources.maximumAttachments
       || files.some(t => t.size > ProtocolResources.maximumAttachmentBytes
@@ -1124,6 +1137,7 @@ export class ComposerComponent {
 
   private show(conversationId: string, draft: Draft | null): void {
     this.shownConversationId = conversationId;
+    this.editingSignal.set(null);
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(draft?.text ?? String.empty);
@@ -1150,6 +1164,7 @@ export class ComposerComponent {
   }
 
   private take(offer: RewoundDraft): void {
+    this.editingSignal.set(null);
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(offer.text);
@@ -1214,6 +1229,7 @@ export class ComposerComponent {
     const settings = new ComposerSettings(kind, this.model(), this.effort(), this.ownProvider(), this.responderId(), this.speed(), this.mode());
     const mentions = MentionResolver.resolve(text, this.teammateMentions());
     const prepared: MessageAttachment[] = [];
+    const arrivals = this.drafts.arrivalsOf(conversationId);
     this.preparing.set(true);
     try {
       if (drafted.some(t => !t.isSaved))
@@ -1235,11 +1251,13 @@ export class ComposerComponent {
         }
         else if (conversationId === this.conversationId() && !settings.equals(this.currentSettings()))
           this.choices.remember(conversationId, this.currentSettings()!);
-        this.value.set(String.empty);
         for (const attachment of drafted)
           attachment.dispose();
-        this.attachments.set([]);
-        void this.drafts.discard(conversationId);
+        if (conversationId === this.shownConversationId) {
+          this.value.set(String.empty);
+          this.attachments.set([]);
+        }
+        void this.drafts.discard(conversationId, arrivals);
       }
     }
     catch {
@@ -1255,13 +1273,26 @@ export class ComposerComponent {
   private deliver(text: string, settings: ComposerSettings, conversationId: string, attachments: readonly AttachmentInput[],
     mentioned: readonly string[], delivery: MessageDelivery | null): Promise<boolean> {
     const editing = this.editing();
-    if (!Object.isNull(editing)) {
-      this.editingSignal.set(null);
-      return this.store.editWaiting(editing, text, editing.message.attachments);
-    }
+    if (!Object.isNull(editing))
+      return this.saveEdit(editing, text, conversationId);
     if (Object.isNull(this.runningReply()))
       return this.store.send(text, settings, conversationId, attachments, mentioned, this.activeResponderId());
     return this.store.addWaiting(text, settings, conversationId, delivery ?? this.store.whileReplying(), attachments, mentioned, this.activeResponderId());
+  }
+
+  private async saveEdit(editing: WaitingMessage, text: string, conversationId: string): Promise<boolean> {
+    const saved = await this.store.editWaiting(editing, text, editing.message.attachments);
+    if (saved && this.editingSignal() === editing)
+      this.editingSignal.set(null);
+    if (!saved && conversationId !== this.conversationId())
+      this.keepHiddenDraft(new ComposerDraft(conversationId, text, []));
+    return saved;
+  }
+
+  private keepHiddenDraft(draft: ComposerDraft): void {
+    void this.drafts.flush();
+    this.drafts.schedule(draft);
+    void this.drafts.flush();
   }
 
   private signOutProviderOf(): string | null | undefined {
@@ -1286,11 +1317,12 @@ export class ComposerComponent {
       this.signOutFailure.set(Resources.logoutUnavailable);
       return;
     }
-    if (!await ProviderSignOut.confirmAsync(this.dialogs, this.store, provider))
+    const report = (message: string): void => this.signOutFailure.set(message);
+    if (!await ProviderSignOut.confirmAsync(this.dialogs, this.store, provider, report))
       return;
     this.value.set(String.empty);
     void this.drafts.discard(conversationId);
-    const isSignedOut = await ProviderSignOut.signOutAsync(this.store, provider, t => this.signOutFailure.set(t));
+    const isSignedOut = await ProviderSignOut.signOutAsync(this.store, provider, report);
     if (Object.isNull(isSignedOut))
       this.signOutNote.set(Resources.formatSignOutUnknown(provider.label));
     else

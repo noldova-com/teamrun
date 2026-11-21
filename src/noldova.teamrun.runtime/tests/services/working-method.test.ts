@@ -6,7 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { RequestContext } from "@noldova/desktop.runtime";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { MethodFailureException, RequestContext } from "@noldova/desktop.runtime";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import type { JsonValue } from "@noldova/context.json";
 import { WorkingMethod } from "@noldova/teamrun.runtime";
@@ -61,6 +62,28 @@ export class WorkingMethodTests {
 
     Assert.isFalse(idleWithOneRunning);
     Assert.isTrue(idle);
+  }
+
+  @TestMethod
+  public async refusesANewRequestAsUnavailableOnceClosedAndStillWaitsForTheOneRunning(): Promise<void> {
+    using database = new MemoryModuleDatabase();
+    const context = new RecordingPartContext("module", database);
+    const answers: PromiseWithResolvers<JsonValue>[] = [];
+    const method = new WorkingMethod({ handleAsync: () => WorkingMethodTests.pending(answers) }, context, "A chat is rewinding.");
+    const running = method.handleAsync(WorkingMethodTests.request());
+
+    method.close();
+    const refused = await method.handleAsync(WorkingMethodTests.request()).then(() => null, (t: unknown) => t);
+    const waiting = method.whenIdle();
+    answers[0]!.resolve(null);
+    await running;
+    await waiting;
+
+    Assert.isInstanceOf(refused, MethodFailureException);
+    Assert.areEqual(FailureCode.Unavailable, (refused as MethodFailureException).failure.code);
+    Assert.areEqual(1, answers.length);
+    Assert.areEqual(1, context.beganWork);
+    Assert.areEqual(0, context.openWork.size);
   }
 
   private static pending(answers: PromiseWithResolvers<JsonValue>[]): Promise<JsonValue> {

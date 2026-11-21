@@ -13,9 +13,12 @@ import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { Resources, TeammateCommand, TurnOutcome } from "@noldova/teamrun.core";
 import {
+  ConversationIdParams,
   ConversationMemberParams,
   ConversationResponder,
   ConversationResponderParams,
+  DefaultTeammate,
+  DefaultTeammateSetParams,
   DetailKind,
   ErrorCode,
   EventName,
@@ -334,6 +337,40 @@ export class CrossChatMessagesTests {
   }
 
   @TestMethod
+  public async listsAReplyAnotherChatsTeammateSendsBetweenTwoStopsInOnlyOneOfThem(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const first = await host.createConversationAsync(project, "Plans");
+    const second = await host.createConversationAsync(project, "Fixes");
+    const [bob, carol, dana] = await CrossChatMessagesTests.teamAsync(host, "Bob", "Carol", "Dana");
+    const bobHeld = Promise.withResolvers<void>();
+    host.adapter.holdTurn = request => request === host.adapter.requests[0] ? bobHeld.promise : Promise.resolve();
+    const stops: Promise<readonly Message[]>[] = [];
+    const crossed: Promise<MessageSendResult>[] = [];
+    host.adapter.afterDetails = () => {
+      if (host.adapter.requests.length === 2 && crossed.length === 0)
+        crossed.push(host.engine.sendAsync(CrossChatMessagesTests.from(host, second.id, "@Carol help Bob", [carol!])).then(t => {
+          stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(second.id)));
+          return t;
+        }));
+      return crossed[0];
+    };
+
+    const started = await host.engine.sendAsync(new MessageSendParams(second.id, "@Bob start", null, null, [], [bob!.id]));
+    await host.adapter.requested(1);
+    stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(second.id)));
+    await host.engine.sendAsync(new MessageSendParams(first.id, "@Dana ask Carol", null, null, [], [dana!.id]));
+    await host.until("the second Stop", () => stops.length === 2, host.runs());
+    const carolReply = (await crossed[0]!).replies[0]!;
+    bobHeld.resolve();
+    const [before, after] = await Promise.all(stops);
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(carolReply.id))!.status);
+    Assert.areEqual(`${started.replies[0]!.id},${carolReply.id}|`, `${before!.map(t => t.id).join(",")}|${after!.map(t => t.id).join(",")}`);
+  }
+
+  @TestMethod
   public async queuesATeammatesMessageToItsBusyChatAfterTheRunningReplyAndStillRefusesThePersons(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
@@ -432,6 +469,67 @@ export class CrossChatMessagesTests {
     Assert.areEqual("fake,bypass", refused.info.arguments.join(","));
     Assert.areEqual(0, (await CrossChatMessagesTests.chatAsync(host, second.id)).length);
     Assert.areEqual("null,default", host.adapter.requests.map(t => String(t.requested.mode)).join(","));
+  }
+
+  @TestMethod
+  public async refusesAModeNoOneChoseWithNoTokenAndPassesTheChatsChosenModeTheDefaultTeammatesOrNone(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const other = await host.createConversationAsync();
+    const providerId = (await host.providerOfAsync()).id;
+    host.adapter.modeIds = ["default", "bypass"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const asking = (conversationId: string, mode: string | null): MessageSendParams =>
+      new MessageSendParams(conversationId, "Check the build", new RequestedSettings("fake", null, null, null, mode), providerId);
+    const passes = (params: MessageSendParams): Promise<boolean> => host.engine.refuseRaisedModeAsync(params).then(() => true, () => false);
+
+    const refused = await Assert.throwsAsync(() => host.engine.refuseRaisedModeAsync(asking(chat.id, "bypass")), ServiceException);
+    const restricted = [await passes(asking(chat.id, "default")), await passes(asking(chat.id, null))];
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(null, new RequestedSettings("fake", null, null, null, "bypass"),
+      providerId), true));
+    const chosen = [await passes(asking(chat.id, "bypass")), await passes(asking(other.id, "bypass"))];
+    await host.teammates.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(new RequestedSettings("fake", null, null, null, "bypass"), providerId)));
+    const byDefault = await passes(asking(other.id, "bypass"));
+
+    Assert.areEqual(ErrorCode.Unauthorized, refused.info.name);
+    Assert.areEqual(Resources.unchosenModeRefused, refused.message);
+    Assert.areEqual(JSON.stringify([false, true]), JSON.stringify(restricted));
+    Assert.areEqual(JSON.stringify([true, false]), JSON.stringify(chosen));
+    Assert.isTrue(byDefault);
+  }
+
+  @TestMethod
+  public async refusesAModeThatActsWithoutAskingWhenThePersonChoseOneThatAsks(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const providerId = (await host.providerOfAsync()).id;
+    host.adapter.modeIds = ["default", "acceptEdits", "bypass"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const manual = new RequestedSettings("fake", null, null, null, "default");
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(null, manual, providerId), true));
+    await host.teammates.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(manual, providerId)));
+
+    const refused = await Assert.throwsAsync(() => host.engine.refuseRaisedModeAsync(
+      new MessageSendParams(chat.id, "Edit the build", new RequestedSettings("fake", null, null, null, "acceptEdits"), providerId)), ServiceException);
+
+    Assert.areEqual(`${ErrorCode.Unauthorized} fake,acceptEdits`, `${refused.info.name} ${refused.info.arguments.join(",")}`);
+  }
+
+  @TestMethod
+  public async refusesAnUnrestrictedModeTheChatsChosenOrTheDefaultTeammatesModeNamesOnlyUnderAnotherKind(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const providerId = (await host.providerOfAsync()).id;
+    host.adapter.modeIds = ["default", "bypass"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const elsewhere = new RequestedSettings("other", null, null, null, "bypass");
+    await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(null, elsewhere, null), true));
+    await host.teammates.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(elsewhere, null)));
+
+    const refused = await Assert.throwsAsync(() => host.engine.refuseRaisedModeAsync(
+      new MessageSendParams(chat.id, "Check the build", new RequestedSettings("fake", null, null, null, "bypass"), providerId)), ServiceException);
+
+    Assert.areEqual(ErrorCode.Unauthorized, refused.info.name);
   }
 
   @TestMethod

@@ -12,7 +12,10 @@ export interface ICodexHold {
   revokes: (() => void)[];
   token: string | null;
   sender: string | null;
+  tools: readonly string[] | null;
   mode: string | null;
   model: string | null;
   effort: string | null;
+  cwd: string | null;
+  params: string | null;
 }

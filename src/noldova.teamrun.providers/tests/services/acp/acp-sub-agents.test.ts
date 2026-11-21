@@ -10,7 +10,7 @@ import { BackgroundTasksService, TurnOutcome, TurnRequest, TurnTools, WakeTurn }
 import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.json";
 import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { ApprovalKind, AuthStatus, BackgroundTaskStatus, DetailKind, ObservedSettings, Provider, RequestedSettings, SenderEnvironment, SubAgent, SubAgentStatus } from "@noldova/teamrun.protocol";
-import { AcpSubAgents, AcpTurn, Resources } from "@noldova/teamrun.providers";
+import { AcpSubAgents, AcpTurn, NodeProcessStarter, Resources } from "@noldova/teamrun.providers";
 import { AntigravitySubAgentRecording } from "../../fixtures/antigravity-sub-agent.recording.js";
 import { CopilotSubAgentEndsRecording } from "../../fixtures/copilot-sub-agent-ends.recording.js";
 import { CopilotSubAgentRecording } from "../../fixtures/copilot-sub-agent.recording.js";
@@ -18,6 +18,7 @@ import { FakeTaskTree } from "../../fixtures/fake-task-tree.fixture.js";
 import { GrokSubAgentEndsRecording } from "../../fixtures/grok-sub-agent-ends.recording.js";
 import { GrokSubAgentRecording } from "../../fixtures/grok-sub-agent.recording.js";
 import { GrokTestHost } from "../../fixtures/grok-test-host.fixture.js";
+import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -631,7 +632,10 @@ export class AcpSubAgentsTests {
     listener.wakeTurn = new WakeTurn({});
     const stop = new AbortController();
 
-    const running = host.createAdapter().runTurn(host.request("background-sub-agent-held"), listener, stop.signal);
+    const timings = host.heldGraceTimings;
+    const timer = new HeldDelayTimer(timings.interruptGrace, timings.stopGrace, timings.killWait);
+    const adapter = host.createAdapter(host.environment, host.command, host.terminator, timings, undefined, undefined, timer);
+    const running = adapter.runTurn(host.request("background-sub-agent-held"), listener, stop.signal);
     await Wait.until(() => listener.taskStarts.length === 1, "The listener did not see a task start.");
     stop.abort();
     await running;
@@ -641,6 +645,7 @@ export class AcpSubAgentsTests {
     Assert.areEqual(SubAgentStatus.Stopped, AcpSubAgentsTests.agentOf(listener).status);
     Assert.areEqual(`_x.ai/subagent/cancel {"subagentId":"grok-child"}\n`, readFileSync(AcpSubAgentsTests.pathOf(host, "sub-agent-cancels.txt"), "utf8"));
     Assert.areEqual(0, listener.wakes.length);
+    Assert.isTrue(timer.aborted.includes(timings.interruptGrace));
   }
 
   @TestMethod
@@ -752,7 +757,8 @@ export class AcpSubAgentsTests {
     const listener = new RecordingTurnListener();
     listener.wakeTurn = new WakeTurn({});
     const provider = new Provider("a", "grok", "Work", host.directory.resolve("added"), AuthStatus.LoggedIn, null, null, null, null, "t");
-    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_SUB_AGENT_TREE: "1" });
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_SUB_AGENT_TREE: "1" }, host.command, host.terminator, host.timings,
+      new NodeProcessStarter(host.terminator), host.realTree());
     const stop = new AbortController();
     const tree = AcpSubAgentsTests.pathOf(host, "sub-agent-tree.txt");
 

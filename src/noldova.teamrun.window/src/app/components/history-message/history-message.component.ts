@@ -69,6 +69,7 @@ import {
 } from "@noldova/ui.components.angular";
 
 import { ChatAction } from "../../enums/chat-action";
+import { ReplyActivity } from "../../enums/reply-activity";
 import { SegmentKind } from "../../enums/segment-kind";
 import { ActivityEntry } from "../../models/activity-entry";
 import type { IRowReveal } from "../../interfaces/i-row-reveal";
@@ -86,6 +87,7 @@ import type { ReplyStats } from "../../models/reply-stats";
 import type { SustainHandover } from "../../models/sustain-handover";
 import { TeammateColor } from "../../models/teammate-color";
 import { TitleReveal } from "../../models/title-reveal";
+import type { WakeReceived } from "../../models/wake-received";
 import { Resources } from "../../../resources";
 import { BackgroundTaskStoreService } from "../../services/background-task-store.service";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -112,13 +114,14 @@ import { ReplyApprovalsComponent } from "../reply-approvals/reply-approvals.comp
 import { ReplyStatsComponent } from "../reply-stats/reply-stats.component";
 import { RewindDialogComponent } from "../rewind-dialog/rewind-dialog.component";
 import { TeammateDialogComponent } from "../teammate-dialog/teammate-dialog.component";
+import { WakeLineComponent } from "../wake-line/wake-line.component";
 
 @Component({
   selector: "nol-teamrun-history-message",
   imports: [
     ActivityBlockComponent, ButtonComponent, ChipComponent, EditedFilesComponent, IconButtonComponent, ImagePreviewComponent, InlineTerminalComponent, MessageActionDirective, MessageComponent,
     MessageFooterEndDirective, MessageImageDirective, MessageSlotDirective, PageCardComponent, PlanCardComponent, PopoverTriggerDirective, ReplyApprovalsComponent,
-    ReplyStatsComponent, ShellRunOutputDirective, SpinnerComponent, TooltipDirective
+    ReplyStatsComponent, ShellRunOutputDirective, SpinnerComponent, TooltipDirective, WakeLineComponent
   ],
   providers: [ImageViewerService.provider, BackgroundTaskStoreService.provider, ReplyLinksService],
   host: { "[attr.data-message-id]": "message().id", "[class.inline]": "replyRow() !== null", "(focusin)": "followApproval()" },
@@ -180,7 +183,7 @@ export class HistoryMessageComponent implements OnInit {
     const source = this.referenceSource;
     return Object.isNull(source) ? null : source.readerFor(source.homeOf(this.store.folderOf(this.message().conversationId))());
   });
-  protected readonly state: Signal<MessageControlState> = computed(() => this.store.messageIndexOf(this.message().conversationId).find(t => t.id === this.message().id)?.controls ?? this.local);
+  protected readonly state: Signal<MessageControlState> = computed(() => this.store.messageControlsOf(this.message().conversationId, this.message().id) ?? this.local);
   protected readonly isPerson: Signal<boolean> = computed(() => this.message().author === MessageAuthor.User);
   protected readonly runsShell: Signal<boolean> = computed(() => !this.isPerson() && !Object.isNull(this.terminals));
   protected readonly terminalOwner: Signal<string> = computed(() => ChatTerminals.ownerFor(this.message().conversationId));
@@ -194,6 +197,7 @@ export class HistoryMessageComponent implements OnInit {
   protected readonly planRunStates: Signal<ReadonlyMap<number, ShellRunState>> = computed(() => this.runStates().get(Resources.runPlanSite) ?? new Map());
   protected readonly isActive: Signal<boolean> = computed(() => this.formatter.isActive(this.message()));
   protected readonly canStop: Signal<boolean> = computed(() => this.formatter.canStop(this.message()));
+  protected readonly stopping: Signal<boolean> = computed(() => this.store.isCancelling(this.message().id));
   protected readonly isAsking: Signal<boolean> = computed(() => this.formatter.waitsOn(this.message(), this.askers()) && this.store.isAsking(this.message().id));
   protected readonly askers: Signal<ReadonlySet<string | null> | null> = computed(() => {
     const pending = this.store.pendingApprovalsOf(this.message().id);
@@ -321,9 +325,12 @@ export class HistoryMessageComponent implements OnInit {
   protected readonly status: Signal<Status> = computed(() => HistoryMessageComponent.statusOf(this.message().status));
   protected readonly activityLabel: Signal<string> = computed(() => {
     const message = this.message();
-    return this.formatter.activityLabel(message, this.now(), this.store.thinkingReplies().has(message.id));
+    const activity = this.stopping() ? ReplyActivity.Stopping : this.store.savingCheckpointReplies().has(message.id) ? ReplyActivity.SavingCheckpoint
+      : this.store.thinkingReplies().has(message.id) ? ReplyActivity.Thinking : null;
+    return this.formatter.activityLabel(message, this.now(), activity);
   });
   protected readonly wakeNote: Signal<readonly string[] | null> = computed(() => this.formatter.wakeNoteOf(this.message()));
+  protected readonly wakeReceived: Signal<WakeReceived | null> = computed(() => FormatterService.wakeReceivedOf(this.message()));
   protected readonly resumeNote: Signal<string | null> = computed(() => this.message().details.find(t => this.formatter.isResumeNote(t))?.text ?? null);
   protected readonly sustainNotes: Signal<readonly { readonly sequence: number; readonly glyph: string; readonly text: string; readonly handover: SustainHandover | null }[]> =
     computed(() => this.message().details
@@ -641,7 +648,8 @@ export class HistoryMessageComponent implements OnInit {
       blocks.push(new MessageSlot(Resources.writtenImagesSlot));
     if (unplaced.has(latest))
       blocks.push(new MessageSlot(this.approvalsSlotOf(latest)));
-    const wake = Object.isNull(this.wakeNote()) ? [] : [new MessageSlot(Resources.wakeNoteSlot)];
+    const wake = [...Object.isNull(this.wakeReceived()) ? [] : [new MessageSlot(Resources.wakeReceivedSlot)],
+      ...Object.isNull(this.wakeNote()) ? [] : [new MessageSlot(Resources.wakeNoteSlot)]];
     const resume = Object.isNull(this.resumeNote()) ? [] : [new MessageSlot(Resources.resumeNoteSlot)];
     const sustain = this.sustainNotes().length === 0 ? [] : [new MessageSlot(Resources.sustainNoteSlot)];
     return [...wake, ...resume, ...sustain, ...blocks];

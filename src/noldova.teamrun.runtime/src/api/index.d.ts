@@ -78,6 +78,7 @@ import type {
   IMcpTransport,
   McpToolCallParams,
   McpToolListParams,
+  MessageSendParams,
   MethodName,
   OutsideConnection,
   PageAuthor,
@@ -1554,12 +1555,14 @@ export declare class SharedMcpOauth implements ISharedMcpSignIn {
    */
   public constructor(secrets: IModuleSecrets, expiry?: () => AbortSignal, now?: () => number, deadline?: () => AbortSignal);
   /**
-   * Asks the server for its 401, registers TeamRun as a client and returns the address of the authorization server's sign-in page. The listener
+   * Registers the sign-in under `reference` at once, ending an earlier one there without an answer, then asks the server for its 401, registers
+   * TeamRun as a client and returns the address of the authorization server's sign-in page, or `null` when a Sign out or a later start of the same
+   * reference ended it first. The listener
    * answers one request at its callback path, ending the sign-in: refused when its state isn't the one sent or it carries an error, otherwise the
    * code is exchanged for tokens, which are saved. A request at another path gets 404 and doesn't end it.
    * @throws The server's or the SDK's error when discovery or registration fails, or `RuntimePartException` when the server sends no sign-in page.
    */
-  public startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string>;
+  public startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null>;
   /**
    * Reads the access token; one that expires within a minute is refreshed first, and the new tokens are saved. Refused when no sign-in is saved,
    * none can renew it, or the refresh fails. Reads of the same reference share one refresh.
@@ -1997,6 +2000,32 @@ export declare class GrantedAttachmentMethod implements IMethodHandler {
 }
 
 /**
+ * A method that sends a message, whose requested mode a client other than the app's main process can't raise: before the method sees the request, Core
+ * refuses a mode that is neither the chat's chosen responder's mode nor the default teammate's, as `Unauthorized`.
+ */
+export declare class RequestedModeMethod implements IMethodHandler {
+  /**
+   * Initializes the method.
+   * @param method The method that sends the message.
+   * @param engine The engine that checks the requested mode.
+   * @param read Reads the message from the request's payload; a payload it can't read goes on unchecked, and is refused there.
+   * @param outside Answers a client other than the main process in the method's place, such as by marking a waiting message it adds as from
+   * outside; by default, the method answers every client.
+   */
+  public constructor(method: IMethodHandler, engine: Pick<IConversationEngine, "refuseRaisedModeAsync">, read: (payload: JsonValue) => MessageSendParams,
+    outside?: ((payload: JsonValue) => Promise<JsonValue>) | null);
+
+  /**
+   * Answers the request through the method at once for the main process, or once its requested mode passes through `outside` when given,
+   * else the method.
+   * @param request The request.
+   * @returns The answer.
+   * @throws MethodFailureException `Unauthorized` when Core refuses the mode, or the failure of `outside`.
+   */
+  public handleAsync(request: RequestContext): Promise<JsonValue>;
+}
+
+/**
  * A method only the app's main process may call, the client `ShellClients.mainProcess` that speaks for TeamRun's
  * window, so only the person answers through it: the command line, a module's own entry, and so a program a
  * teammate runs, can't. What the client's name proves on each platform is Noldova Desktop's, in its `RUNTIME.md`.
@@ -2005,8 +2034,9 @@ export declare class MainProcessMethod implements IMethodHandler {
   /**
    * Initializes the method.
    * @param method The method that answers the main process's requests.
+   * @param field The payload field that limits the method to the main process only when a request sets it, or `null` to limit every request.
    */
-  public constructor(method: IMethodHandler);
+  public constructor(method: IMethodHandler, field?: string | null);
 
   /**
    * Answers a request of the main process through the method.
@@ -2015,6 +2045,54 @@ export declare class MainProcessMethod implements IMethodHandler {
    * @throws MethodFailureException `Unauthorized`, with `Resources.mainProcessOnly` and the details
    * `{ error: "Unauthorized", arguments: [] }`, for a request from any other client, which the method never sees;
    * otherwise whatever the method throws.
+   */
+  public handleAsync(request: RequestContext): Promise<JsonValue>;
+}
+
+/**
+ * The `teamrun.providerCreate` method, which takes a new provider's profile folder only from the app's main process, since a
+ * provider such as Codex runs hooks and commands its profile folder names: another client may add a provider, which then gets a
+ * folder of its own in TeamRun's data folder, but not name its folder.
+ */
+export declare class ProviderCreateMethod implements IMethodHandler {
+  /**
+   * Initializes the method.
+   * @param method The method that creates the provider.
+   */
+  public constructor(method: IMethodHandler);
+
+  /**
+   * Answers the main process through the method; answers any other client through it too unless its request gives a profile folder.
+   * A payload it can't read goes on to the method, which refuses it.
+   * @param request The request.
+   * @returns The created provider.
+   * @throws MethodFailureException `Unauthorized`, with `Resources.mainProcessOnly` and the details `{ error: "Unauthorized", arguments: [] }`,
+   * for a profile folder from another client, which the method never sees; otherwise whatever the method throws.
+   */
+  public handleAsync(request: RequestContext): Promise<JsonValue>;
+}
+
+/**
+ * The `teamrun.providerUpdate` method, which takes a provider's profile folder and own MCP servers' switch only from the app's main
+ * process, since a provider such as Codex runs hooks and commands its profile folder names: another client may rename a provider, but
+ * not move it to another folder or switch its own servers.
+ */
+export declare class ProviderUpdateMethod implements IMethodHandler {
+  /**
+   * Initializes the method.
+   * @param method The method that updates the provider.
+   * @param providers Finds the stored provider the request names.
+   */
+  public constructor(method: IMethodHandler, providers: Pick<IProvidersService, "findAsync">);
+
+  /**
+   * Answers the main process through the method; answers any other client through it too unless its request names a stored provider
+   * and gives a profile folder that, resolved, differs from the stored one, or an own servers' switch that differs from the stored one.
+   * A payload it can't read goes on to the method, which refuses it.
+   * @param request The request.
+   * @returns The updated provider.
+   * @throws MethodFailureException `Unauthorized`, with `Resources.mainProcessOnly` and the details `{ error: "Unauthorized", arguments: [] }`,
+   * for such a change from another client, which the method never sees, or the failure of reading the stored provider.
    */
   public handleAsync(request: RequestContext): Promise<JsonValue>;
 }
@@ -2366,7 +2444,12 @@ export declare class RuntimePart implements IRuntimePart {
    * finishes the replies a stopped runtime left running, and registers its methods and events, and `TeamRunTools`' tools in
    * Noldova Desktop's tool registry, each running its command-line command in this process. Each teammate's turn opens its own agent
    * session of the registry, which every provider reaches through TeamRun's MCP endpoint.
-   * `teamrun.approvalDecide` answers only the app's main process, through `MainProcessMethod`. It registers `PermissionAnswerer` as the
+   * `teamrun.approvalDecide` answers only the app's main process, through `MainProcessMethod`, and so do
+   * `teamrun.acpLocalCommandAdd`, `teamrun.sharedMcpServerCreate`, `teamrun.sharedMcpServerUpdate`, `teamrun.sharedMcpProviderSet`,
+   * `teamrun.sharedMcpTeammateSet` and `teamrun.sharedMcpSecretSet`, while `teamrun.providerCreate` takes a profile folder only from it,
+   * through `ProviderCreateMethod`, and `teamrun.providerUpdate` takes a changed profile folder or own servers' switch only from it,
+   * through `ProviderUpdateMethod`, and a `binaryPath`, an empty one included, only from it, through `MainProcessMethod`, so only the
+   * person chooses what TeamRun runs. It registers `PermissionAnswerer` as the
    * app's answerer of permission requests, and answers `ComputerUseGrantList` and `ComputerUseGrantRevoke` through
    * `RuntimeRememberedAppGrants`; when Noldova Desktop refuses it, because the app names another permissions module, the part logs
    * `Resources.answererNotRegistered`, answers none and fails those two methods as `UnknownMethod`.
@@ -2497,9 +2580,15 @@ export declare class WorkingMethod implements IMethodHandler {
    * Answers a request through the method, holding a work item until it ends.
    * @param request The request.
    * @returns The method's payload.
+   * @throws MethodFailureException `Unavailable` once the method is closed, starting no work.
    * @throws Whatever the method throws, once the work item has ended.
    */
   public handleAsync(request: RequestContext): Promise<JsonValue>;
+
+  /**
+   * Closes the method, so it refuses every later request as `Unavailable`; the requests already running go on.
+   */
+  public close(): void;
 
   /**
    * Waits for the requests still running to end.

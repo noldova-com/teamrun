@@ -1,0 +1,44 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<p class="wake-line" [id]="labelId()">
+  @if (expandable()) {
+    <button type="button" class="wake-toggle" data-nol-resizes-row [attr.aria-expanded]="isOpen()" (click)="toggle()">{{ label() }}</button>
+  } @else {
+    <span class="wake-label">{{ label() }}</span>
+  }
+  @if (chat(); as shown) {
+    <button type="button" class="wake-chat" (click)="open(shown)">{{ shown.title }}</button>
+  } @else if (received().chatId !== null) {
+    <span class="wake-chat-gone">{{ resources.wakeChatGone }}</span>
+  }
+  @if (expandable()) {
+    <button type="button" class="wake-chevron material-symbols-rounded" tabindex="-1" aria-hidden="true" data-nol-resizes-row (click)="toggle()">{{ isOpen() ? resources.expandedIcon : resources.collapsedIcon }}</button>
+  }
+</p>
+@if (isOpen() && expandable()) {
+  <div class="wake-replies" role="region" [attr.aria-label]="regionLabel()">
+    @if (endText(); as text) {
+      <p class="wake-reply-text">{{ text }}</p>
+    }
+    @if (received().task; as task) {
+      @if (task.text; as text) {
+        <p class="wake-reply-text" [class.wake-command-text]="task.kind === commandTask">{{ text }}</p>
+      }
+    }
+    @for (reply of received().replies; track $index) {
+      <p class="wake-reply-heading">{{ headingOf(reply) }}</p>
+      @if (reply.text; as text) {
+        <p class="wake-reply-text">{{ text }}</p>
+      }
+    }
+  </div>
+}
+@for (note of notes(); track $index) {
+  <p class="wake-note">{{ note }}</p>
+}

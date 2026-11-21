@@ -18,6 +18,8 @@ export class EventNameTests {
     Assert.areEqual("DetailAppended", EventName.DetailAppended);
     Assert.areEqual("DetailUpdated", EventName.DetailUpdated);
     Assert.areEqual("ReplyThinking", EventName.ReplyThinking);
+    Assert.areEqual("ReplyCheckpointStarted", EventName.ReplyCheckpointStarted);
+    Assert.areEqual("ReplyCheckpointEnded", EventName.ReplyCheckpointEnded);
     Assert.areEqual("ApprovalCreated", EventName.ApprovalCreated);
     Assert.areEqual("ApprovalUpdated", EventName.ApprovalUpdated);
     Assert.areEqual("ProviderUpdated", EventName.ProviderUpdated);
@@ -37,6 +39,8 @@ export class EventNameTests {
     Assert.areEqual("WaitingMessagesChanged", EventName.WaitingMessagesChanged);
     Assert.areEqual("PlanUsageUpdated", EventName.PlanUsageUpdated);
     Assert.areEqual("ProviderKindsChanged", EventName.ProviderKindsChanged);
+    Assert.areEqual("OrganizationChanged", EventName.OrganizationChanged);
+    Assert.areEqual("OrganizationMessageUpdated", EventName.OrganizationMessageUpdated);
   }
 
   @TestMethod

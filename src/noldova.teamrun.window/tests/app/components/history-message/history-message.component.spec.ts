@@ -954,6 +954,47 @@ describe("HistoryMessageComponent", () => {
       return running;
     };
 
+    it("says a reply is stopping from the first Enter on its Stop, which keeps its focus, box and place, asks once, and drops the word when the stop fails", async () => {
+      AppearanceFixture.apply(DefaultTheme.theme, mode);
+      const running = SampleData.withStatus(SampleData.reply, MessageStatus.Running, steps.slice(0, 2));
+      let calls = 0;
+      const held = new DeferredResponse();
+      context.answer(MethodName.MessageListOpen, () => [running.toJson()]);
+      context.answer(MethodName.MessageCancel, () => {
+        calls += 1;
+        return held.promise;
+      });
+      render(running);
+      await Wait.until(() => expect(store().loaded()).toBe(true));
+      fixture.detectChanges();
+      const stop = (): HTMLButtonElement => {
+        const found = element().querySelector(".nol-message-footer .cancel");
+        if (!(found instanceof HTMLButtonElement))
+          throw new Error("Stop is not shown.");
+        return found;
+      };
+      const before = [box(".nol-message-footer .cancel"), box(".activity-line")] as const;
+
+      stop().focus();
+      await userEvent.keyboard("{Enter}");
+      await Wait.until(() => expect(calls).toBe(1));
+      fixture.detectChanges();
+      await userEvent.keyboard("{Enter}");
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect([textOf(".activity-text"), stop().getAttribute("aria-disabled"), stop().disabled, document.activeElement === stop(), calls])
+        .toEqual(["Stopping…", "true", false, true, 1]);
+      expect(textOf(".nol-message-footer .cancel")).toMatch(/Stop$/u);
+      for (const [earlier, after] of [[before[0], box(".nol-message-footer .cancel")], [before[1], box(".activity-line")]] as const)
+        for (const edge of ["left", "top", "width", "height"] as const)
+          AppearanceFixture.expectPixels(after[edge], earlier[edge]);
+      held.reject(new Error("The reply couldn't be stopped."));
+      await Wait.until(() => expect(stop().getAttribute("aria-disabled")).toBeNull());
+      fixture.detectChanges();
+      expect([textOf(".activity-text"), document.activeElement === stop()]).toEqual(["Working for 12s", true]);
+    });
+
     it("keeps a working reply's footer row as tall while its Stop shows as once the reply has finished, with the default theme, and Stop the row's height", async () => {
       AppearanceFixture.apply(DefaultTheme.theme, mode);
       const running = await working();
@@ -1241,6 +1282,28 @@ describe("HistoryMessageComponent", () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(textOf(".activity-text")).toBe("Thinking… 14s");
+  });
+
+  it("says a working reply is saving a checkpoint, timed from its start, in its activity's place, until the checkpoint ends", async () => {
+    const running = SampleData.withStatus(SampleData.reply, MessageStatus.Running, steps.slice(0, 1));
+    context.answer(MethodName.MessageListOpen, () => [running.toJson()]);
+    render(running);
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    fixture.detectChanges();
+    const before = box(".activity-text");
+
+    context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams(running.id).toJson());
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const saving = [textOf(".activity-text"), box(".activity-text")] as const;
+    clock.advance(2_000);
+    context.emit(EventName.ReplyCheckpointEnded, new MessageIdParams(running.id).toJson());
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect([saving[0], textOf(".activity-text")]).toEqual(["Saving a checkpoint… 12s", "Working for 14s"]);
+    AppearanceFixture.expectPixels(saving[1].left, before.left);
+    AppearanceFixture.expectPixels(saving[1].top, before.top);
   });
 
   it("shows a working reply's newest thought as its latest line, and its step title once a step or text follows it", async () => {
@@ -1619,6 +1682,41 @@ describe("HistoryMessageComponent", () => {
 
     await show(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "No mark")]));
     expect(element().querySelector(".wake-note")).toBeNull();
+  });
+
+  it("opens a reply that a chat's wake started with a closed row that names the chat and opens it, shows its replies opened, and shows no ID", async () => {
+    const replies = [{ name: "Bob", status: MessageStatus.Completed, text: "The login fix is in." }, { name: "Carol", status: MessageStatus.Failed, text: null }];
+    const woken = (chatId: string): Message => SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
+      detail(0, DetailKind.Note, `Received a message from "First".`, { source: "wakeReceived", wakeChatId: chatId, wakeReplies: replies }),
+      detail(1, DetailKind.Command, "> npm test\nok", { tool: "Bash" }),
+      detail(2, DetailKind.Text, "Thanks.")
+    ]);
+    const line = (): HTMLElement => one("nol-teamrun-wake-line");
+    const shown = (): string => [line().textContent ?? "", ...[line(), ...line().querySelectorAll("*")].flatMap(t => [...t.attributes].map(u => u.value))].join(" ");
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    render(woken("c1"));
+
+    expect([textOf(".wake-toggle"), textOf(".wake-chat"), one(".wake-toggle").getAttribute("aria-expanded")]).toEqual(["Received a message from", "First", "false"]);
+    expect(element().querySelector(".wake-replies")).toBeNull();
+    await click(one(".wake-toggle"));
+    expect(one(".wake-toggle").getAttribute("aria-expanded")).toBe("true");
+    expect([...element().querySelectorAll(".wake-reply-heading, .wake-reply-text")].map(t => t.textContent?.trim()))
+      .toEqual(["Bob replied:", "The login fix is in.", "Carol's reply failed."]);
+    expect(shown()).not.toMatch(/\bc1\b|teamrun_list_messages/);
+    await click(one(".wake-chevron"));
+    expect(element().querySelector(".wake-replies")).toBeNull();
+    await click(one(".activity-toggle"));
+    await Wait.until(() => expect(element().querySelector("nol-teamrun-activity-block")).not.toBeNull());
+    expect(element().querySelector("nol-teamrun-activity-block")?.textContent).not.toContain("Received");
+    await click(one(".wake-chat"));
+    expect(context.openedDocuments.at(-1)).toMatchObject({ name: Resources.conversationDocumentName, instance: "c1", title: "First" });
+
+    await show(woken("c-gone"));
+    expect([textOf(".wake-toggle"), textOf(".wake-chat-gone"), element().querySelector(".wake-chat")]).toEqual(["Received a message from", "a deleted chat", null]);
+    expect(shown()).not.toContain("c-gone");
+
+    await show(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "No wake")]));
+    expect(element().querySelector("nol-teamrun-wake-line")).toBeNull();
   });
 
   it("says a session that couldn't be resumed as a note about the chat, above the reply, and keeps it out of its Activity", async () => {
@@ -3183,6 +3281,32 @@ describe("HistoryMessageComponent", () => {
     expect(element().querySelector(".activity-toggle")?.getAttribute("aria-expanded")).toBe("true");
   });
 
+  it("keeps a question card's picks and typed text in the store's message index, so a row made again shows them", async () => {
+    const reply = awaiting();
+    const asking = new Approval("q1", "m2", ApprovalKind.Question, "AskUserQuestion", "Which platform?", null, SampleData.approval.options, ApprovalStatus.Pending, null,
+      SampleData.timestamp, null, [new ApprovalQuestion("platform", "Platform", "Which platform?", [new QuestionOption("Web", "A browser")], false, false, false),
+        new ApprovalQuestion("name", "Name", "Which name?", [], false, true, false)]);
+    context.answer(MethodName.MessagePage, () => SampleData.page([SampleData.userMessage, reply], false, false).toJson());
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    await store().selectConversation("c1");
+    await Wait.until(() => expect(store().history()?.held).toHaveLength(2));
+    render(reply);
+    context.emit(EventName.ApprovalCreated, asking.toJson());
+    await Wait.until(() => expect(element().querySelector("nol-teamrun-question-card")).not.toBeNull());
+    const choice = (): HTMLInputElement | null => element().querySelector<HTMLInputElement>("nol-teamrun-question-card .nol-choice-row input");
+    const typed = (): HTMLInputElement | null => element().querySelector<HTMLInputElement>(".nol-teamrun-question-other");
+
+    await click(choice());
+    Object.assign(one(".nol-teamrun-question-other"), { value: "Atlas" }).dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    fixture.destroy();
+    render(reply);
+    await Wait.until(() => expect(element().querySelector("nol-teamrun-question-card")).not.toBeNull());
+
+    expect([choice()?.checked, typed()?.value]).toEqual([true, "Atlas"]);
+    expect(store().messageIndex().find(t => t.id === reply.id)?.controls?.draftOf("q1")?.texts().get("name")).toBe("Atlas");
+  });
+
   it("offers no Run on a reply's shell code block in a window without chat terminals, and ignores a Run that comes anyway", async () => {
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "```bash\nls\n```")]));
     await Wait.until(() => expect(element().querySelector(".nol-code-block-copy")).not.toBeNull(), MarkdownWait.coldImport);
@@ -3483,10 +3607,10 @@ describe("HistoryMessageComponent", () => {
       await Wait.until(() => expect(fakes.opened).toHaveLength(1));
       fakes.opened[0]?.rowHeight.set(20);
       fakes.opened[0]?.element.style.setProperty("height", "20px");
-      await Wait.until(() => expect(fakes.opened[0]?.events.at(-1)).toBe("rows 5"));
-      view.style.height = "120px";
+      await Wait.until(() => expect(fakes.opened[0]?.events.at(-1)).toBe("rows 8"));
+      view.style.height = "400px";
 
-      await Wait.until(() => expect(fakes.opened[0]?.events.at(-1)).toBe("rows 3"));
+      await Wait.until(() => expect(fakes.opened[0]?.events.at(-1)).toBe("rows 10"));
     }
     finally {
       view.remove();
@@ -4166,6 +4290,68 @@ describe("HistoryMessageComponent", () => {
         .toEqual([tone("text-strong"), tone("text-muted"), tone("text")]);
       expect(Number.parseInt(getComputedStyle(heading).fontWeight, 10)).toBeGreaterThan(Number.parseInt(getComputedStyle(reads).fontWeight, 10));
       probe.remove();
+    });
+
+    it("shows a chat's wake as a closed row of one pointer target's height below the reply's header and above its Activity, from the answer's start edge, and its replies below it once opened", async () => {
+      await Wait.until(() => expect(store().loaded()).toBe(true));
+      render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
+        detail(0, DetailKind.Note, `Received a message from "First".`,
+          { source: "wakeReceived", wakeChatId: "c1", wakeReplies: [{ name: "Bob", status: MessageStatus.Completed, text: "The login fix is in." }] }),
+        detail(1, DetailKind.Command, "> npm test\nok", { tool: "Bash" }),
+        detail(2, DetailKind.Text, "The tests passed.")
+      ]));
+      await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view")).toHaveLength(1));
+      const rect = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      const middle = (selector: string): number => rect(selector).top + rect(selector).height / 2;
+      const target = AppearanceFixture.measureLook("pointer-target");
+      const closed = rect(".wake-line");
+
+      expect(one("nol-message").contains(one(".wake-line"))).toBe(true);
+      AppearanceFixture.expectPixels(closed.height, target);
+      expect(closed.top).toBeGreaterThanOrEqual(rect(".nol-message-header").bottom - 0.5);
+      expect(rect(".activity-toggle").top).toBeGreaterThanOrEqual(closed.bottom - 0.5);
+      AppearanceFixture.expectPixels(closed.left, rect(".nol-markdown-view").left);
+      AppearanceFixture.expectPixels(rect(".wake-toggle").left, closed.left);
+      expect(rect(".wake-chat").left).toBeGreaterThanOrEqual(rect(".wake-toggle").right);
+      expect(rect(".wake-chevron").left).toBeGreaterThanOrEqual(rect(".wake-chat").right);
+      for (const part of [".wake-chat", ".wake-chevron"])
+        AppearanceFixture.expectPixels(middle(part), middle(".wake-toggle"));
+      expect(getComputedStyle(one(".wake-chevron")).fontFamily).toBe(getComputedStyle(one(".activity-chevron")).fontFamily);
+      AppearanceFixture.expectPixels(rect(".wake-chevron").width, rect(".activity-chevron").width);
+
+      await click(one(".wake-toggle"));
+      await Wait.until(() => expect(element().querySelector(".wake-replies")).not.toBeNull());
+      AppearanceFixture.expectPixels(rect(".wake-line").height, target);
+      expect(rect(".wake-replies").top).toBeGreaterThanOrEqual(rect(".wake-line").bottom - 0.5);
+      AppearanceFixture.expectPixels(rect(".wake-replies").left, closed.left);
+      expect(rect(".wake-replies").height).toBeGreaterThan(0);
+      expect(rect(".activity-toggle").top).toBeGreaterThanOrEqual(rect(".wake-replies").bottom - 0.5);
+    });
+
+    it.each([
+      { kind: "subAgent", name: "x".repeat(200), ending: "ended as completed", text: "Found 3 files.", label: "The sub-agent's summary" },
+      { kind: "command", name: "Run the tests", ending: "exited with code 1", text: "1 failed\n2 passed", label: "The command's last lines" }
+    ])("shows a $kind's wake as a closed row at the top of the reply it started, within the answer's width, opening to its text in a region named for it", async ({ kind, name, ending, text, label }) => {
+      render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
+        detail(0, DetailKind.Note, "Woken when a sub-agent or background command of this chat ended.", { source: "wakeReceived", wakeTask: { kind, name, ending, text } }),
+        detail(1, DetailKind.Text, "The tests passed.")
+      ]));
+      await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view")).toHaveLength(1));
+      const rect = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      const right = rect(".nol-markdown-view").right;
+
+      expect(one("nol-message").contains(one(".wake-line"))).toBe(true);
+      expect(one(".wake-toggle").textContent?.trim()).toBe(Resources.formatTaskWakeLabel(kind, name, ending));
+      expect(rect(".wake-line").top).toBeGreaterThanOrEqual(rect(".nol-message-header").bottom - 0.5);
+      AppearanceFixture.expectPixels(rect(".wake-toggle").left, rect(".nol-markdown-view").left);
+      for (const part of [".wake-line", ".wake-toggle", ".wake-chevron"])
+        expect(rect(part).right).toBeLessThanOrEqual(right + 0.5);
+      expect(element().textContent).not.toContain("Woken when");
+
+      await click(one(".wake-toggle"));
+      await Wait.until(() => expect(element().querySelector(".wake-replies")).not.toBeNull());
+      expect([one(".wake-replies").getAttribute("aria-label"), one(".wake-reply-text").textContent]).toEqual([label, text]);
+      expect(rect(".wake-replies").right).toBeLessThanOrEqual(right + 0.5);
     });
 
     it("shows a woken reply's mark as its first muted line, below its header and above its Activity and answer, in the answer's size, from its start edge, with the command in the code font", async () => {

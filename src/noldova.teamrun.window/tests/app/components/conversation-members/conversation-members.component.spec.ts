@@ -7,14 +7,15 @@
  */
 
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  AuthStatus, ConversationMember, DefaultTeammate, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, ObservedSettings, PlanUsage, PlanWindow,
+  AuthStatus, ChatFolderAttachParams, ConversationMember, DefaultTeammate, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, ObservedSettings, PlanUsage, PlanWindow,
   PlanWindowName, Provenance, Provider, ProviderKind, ProviderModel, ProviderProfile, RequestedSettings, Teammate
 } from "@noldova/teamrun.protocol";
-import { DefaultTheme, ThemeMode } from "@noldova/ui.components.angular";
+import { DefaultTheme, ThemeMode, TooltipDirective } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
 
@@ -425,6 +426,43 @@ describe("ConversationMembersComponent", () => {
       const offline = menuItem(Resources.formatUnavailable("Offline")).querySelector<HTMLElement>(".nol-menu-item-label")!;
       AppearanceFixture.expectPixels(box(offline).height, box(bob).height);
       expect(offline.scrollWidth).toBeLessThanOrEqual(offline.clientWidth);
+    });
+
+    it("names an attached folder at its end, a rem inside it and centred, with the folder's path in its tooltip, cutting a long name inside the row, and drops it on a detach", async () => {
+      const long = `/home/ada/${"a-very-long-folder-name-".repeat(8)}end`;
+      await create(t => t.answer(MethodName.ChatFolderAttach, u => SampleData.conversation.withAttachedFolder(ChatFolderAttachParams.fromJson(u).folder, SampleData.timestamp).toJson())
+        .answer(MethodName.ChatFolderDetach, () => SampleData.conversation.toJson()));
+      const note = (): HTMLElement | null => element().querySelector<HTMLElement>(".nol-teamrun-attached-folder");
+      const shown = (): HTMLElement => {
+        const found = note();
+        if (Object.isNull(found))
+          throw new Error("No attached folder is shown.");
+        return found;
+      };
+      const before = note();
+      await store.attachFolder(SampleData.conversation.id, "/work/site");
+      await settle();
+      const row = box(element());
+      const folder = box(shown());
+      const glyph = box(shown().querySelector(".nol-teamrun-attached-folder-glyph") ?? shown());
+      const name = shown().querySelector<HTMLElement>(".nol-teamrun-attached-folder-name");
+      const tooltip = fixture.debugElement.query(By.css(".nol-teamrun-attached-folder")).injector.get(TooltipDirective).text();
+
+      expect(before).toBeNull();
+      expect([name?.textContent?.trim(), tooltip, shown().getAttribute("role"), shown().getAttribute("aria-label")])
+        .toEqual(["site", "/work/site", "note", Resources.formatAttachedFolderNote("/work/site")]);
+      AppearanceFixture.expectPixels(row.right - folder.right, AppearanceFixture.measureLook("space-4"));
+      AppearanceFixture.expectPixels(folder.top + folder.height / 2, row.top + row.height / 2);
+      AppearanceFixture.expectPixels(glyph.top + glyph.height / 2, row.top + row.height / 2);
+      expect(folder.left - box(addButton()).right).toBeGreaterThanOrEqual(AppearanceFixture.measureLook("space-2") - 0.5);
+      await store.attachFolder(SampleData.conversation.id, long);
+      await settle();
+      const cut = shown().querySelector<HTMLElement>(".nol-teamrun-attached-folder-name");
+      expect(box(shown()).right).toBeLessThanOrEqual(box(element()).right - AppearanceFixture.measureLook("space-4") + 0.5);
+      expect([(cut?.scrollWidth ?? 0) > (cut?.clientWidth ?? 0), element().scrollWidth <= element().clientWidth]).toEqual([true, true]);
+      await store.detachFolder(SampleData.conversation.id);
+      await settle();
+      expect(note()).toBeNull();
     });
 
     it("sets its avatars and Add half a rem apart, a rem inside its start, Add half a rem inside its top and bottom, all centred, with no rule under them", async () => {

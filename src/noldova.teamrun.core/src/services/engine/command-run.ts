@@ -66,10 +66,14 @@ export class CommandRun {
     return this.exit?.code ?? null;
   }
 
-  public wakeTextOf(exit: CommandExit): string {
+  public get lastLines(): string {
     const lines = this.tail.split(Resources.commandLinePattern);
     const written = lines.slice(0, lines.findLastIndex(t => !String.isNullOrWhitespace(t)) + 1);
-    return Resources.formatCommandWake(this.description, this.taskId, exit, written.slice(-Resources.commandWakeLines).join(Resources.lineSeparator));
+    return written.slice(-Resources.commandWakeLines).join(Resources.lineSeparator);
+  }
+
+  public wakeTextOf(exit: CommandExit): string {
+    return Resources.formatCommandWake(this.description, this.taskId, exit, this.lastLines);
   }
 
   public begin(taskId: string, running: IRunningCommand): void {

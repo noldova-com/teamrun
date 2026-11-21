@@ -36,6 +36,8 @@ export { MainProcessMethod } from "../services/main-process-method.js";
 export { MethodFailures } from "../services/method-failures.js";
 export { MethodTool } from "../services/method-tool.js";
 export { PanelTool } from "../services/panel-tool.js";
+export { ProviderCreateMethod } from "../services/provider-create-method.js";
+export { ProviderUpdateMethod } from "../services/provider-update-method.js";
 export { ModuleDatabaseConnection } from "../services/module-database-connection.js";
 export { ModuleDatabaseSession } from "../services/module-database-session.js";
 export { ModuleDatabaseProvider } from "../services/module-database-provider.js";
@@ -45,6 +47,7 @@ export { RuntimeRememberedAppGrants } from "../services/runtime-remembered-app-g
 export { ProviderKindRegistryFactory } from "../services/provider-kind-registry-factory.js";
 export { ReplyFailureNotices } from "../services/reply-failure-notices.js";
 export { ReplyWork } from "../services/reply-work.js";
+export { RequestedModeMethod } from "../services/requested-mode-method.js";
 export { RuntimePart } from "../services/runtime-part.js";
 export { RuntimeProcessStarter } from "../services/runtime-process-starter.js";
 export { RuntimeCommandStarter } from "../services/runtime-command-starter.js";

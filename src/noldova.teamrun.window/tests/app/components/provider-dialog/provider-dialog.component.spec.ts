@@ -10,6 +10,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
+import { LinkPlace } from "@noldova/desktop.window";
 import {
   AcpAgentEntry,
   AcpAgentIdParams,
@@ -831,6 +832,20 @@ describe("ProviderDialogComponent", () => {
     field<HTMLButtonElement>(".nol-teamrun-subscribe").click();
     await settle();
     expect(context.links).toEqual(["https://example.com/pricing"]);
+  });
+
+  it("opens a subscription's page in the system's browser while the in-app browser places links in the app", async () => {
+    await create(t => t.answer(MethodName.ProviderToolList, () => [new ProviderTool("claude", true, "2.1.211", null, "https://example.com/pricing").toJson()]));
+    const browser = { placeFor: (): LinkPlace => LinkPlace.InApp, openAsync: (): Promise<void> => Promise.resolve() };
+    context.registerInAppBrowser(browser);
+    await store.refreshTools(() => undefined);
+    kind().valueChange.emit("claude");
+    await settle();
+
+    field<HTMLButtonElement>(".nol-teamrun-subscribe").click();
+    await settle();
+
+    expect([context.links, context.linkPlaces.map(t => t ?? browser.placeFor())]).toEqual([["https://example.com/pricing"], [LinkPlace.System]]);
   });
 
   it("opens a subscription's page with how the person opened it, a click, Ctrl+click or a middle click, and not with the right button", async () => {

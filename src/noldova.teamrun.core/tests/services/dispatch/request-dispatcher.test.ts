@@ -18,7 +18,7 @@ import { AppLook, ApprovalAsk, type IAcpAgentsService, type ITurnListener, PlanR
 import { AcpAgentIdParams, AcpAgentListing, AcpLocalCommandAddParams, ComputerUseGrant, ComputerUseGrantIdParams, ProviderContextWindows, ProviderSignInCommand,
   type ITeammateChanges, TeammateFallback } from "@noldova/teamrun.protocol";
 import { ConversationPosition, ObservedSettings, PanelAnsweredParams, PanelName, PanelOutcome, PanelRequestedPayload, PlanUsage, PlanUsageParams, PlanWindow,
-  PlanWindowName, Provenance, ReadingPositionSaveParams, ReplyUsage, RunOutput, TeammateUsage, WindowFocusedParams, WindowIdParams } from "@noldova/teamrun.protocol";
+  PlanWindowName, Provenance, ReadingPositionSaveParams, ReplyUsage, RunOutput, TeammateLastReply, TeammateUsage, WindowFocusedParams, WindowIdParams } from "@noldova/teamrun.protocol";
 import { SharedMcpProviderSetParams, SharedMcpSecretSetParams, SharedMcpServer, SharedMcpServerDefinition, SharedMcpServerIdParams, SharedMcpServerListing,
   SharedMcpServerUpdateParams, SharedMcpSetting, SharedMcpSignInStarted, SharedMcpTeammateSetParams, SharedMcpTransport } from "@noldova/teamrun.protocol";
 import { SqlQuery } from "@noldova/context.data.sql";
@@ -27,6 +27,9 @@ import { MessageDelivery, WaitingMessage, WaitingMessageAddParams, WaitingMessag
 import { ChatMemberModeParams, ChatMemberSettings, ChatMemberSettingsParams, ChatPlanFirstParams, ConversationMember, ConversationMemberParams, EventName, Harness,
   Teammate, TeammateCreateParams, TeammateUpdateParams, TeammateIdParams, DefaultTeammate, DefaultTeammateSetParams, ProjectsLayoutSaveParams,
   ComposerDefaultSaveParams } from "@noldova/teamrun.protocol";
+import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization }
+  from "@noldova/teamrun.protocol";
+import { OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget } from "@noldova/teamrun.protocol";
 import { SenderEnvironment, SubAgent, SubAgentStartParams, SubAgentStatus, SubAgentStopParams, SubAgentWaitParams, SubAgentWaitResult } from "@noldova/teamrun.protocol";
 import {
   AttachmentContent,
@@ -169,6 +172,87 @@ export class RequestDispatcherTests {
       { name: "bad  name", providerId: provider.id, harness: "provider", role: null, model: null, effort: null }));
     Assert.isTrue(invalid.hasErrors);
     Assert.areEqual(8, host.listener.count(EventName.StateInvalidated));
+  }
+
+  @TestMethod
+  public async routesOrganizationMethodsAndPublishesTheWholeOrganizationAfterEachChangeWithoutInvalidatingTheCatalog(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const provider = await host.createProviderAsync();
+    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
+    const changes = (): readonly Organization[] => host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload));
+
+    const design = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams("Design", null).toJson()));
+    const web = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams("Web", null).toJson()));
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMemberSet, new DepartmentMemberSetParams(ada.id, design.id).toJson()));
+    const led = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentUpdate,
+      new DepartmentUpdateParams(design.id, "Product", ada.id).toJson()));
+    const moved = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMove, new DepartmentMoveParams(web.id, design.id, 0).toJson()));
+    const listed = Organization.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationList, null));
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentDelete, new DepartmentIdParams(web.id).toJson()));
+    const refused = await host.dispatcher.dispatch(new Request("r", MethodName.DepartmentUpdate, new DepartmentUpdateParams(design.id, undefined, bob.id).toJson()));
+
+    Assert.areEqual(`Product,${ada.id},${design.id}`, `${led.name},${led.leaderId},${moved.parentId}`);
+    Assert.areEqual(JSON.stringify(listed.toJson()), JSON.stringify(changes()[4]?.toJson()));
+    Assert.areEqual(6, changes().length);
+    Assert.areEqual(1, changes().at(-1)?.departments.length);
+    Assert.areEqual(ErrorCode.InvalidParams, refused.info?.name);
+    Assert.areEqual(0, host.listener.count(EventName.StateInvalidated));
+  }
+
+  @TestMethod
+  public async publishesTheOrganizationWhenADeletedTeammateLeavesItsDepartmentAndKnowsNoOrganizationMethodWithoutIt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const provider = await host.createProviderAsync();
+    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
+    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", null));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, design.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, ada.id));
+
+    await RequestDispatcherTests.succeed(host, MethodName.TeammateDelete, new TeammateIdParams(bob.id).toJson());
+    const outside = host.listener.count(EventName.OrganizationChanged);
+    await RequestDispatcherTests.succeed(host, MethodName.TeammateDelete, new TeammateIdParams(ada.id).toJson());
+    const published = host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload));
+    const without = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
+      host.approvals, host.engine, host.teammates, host.events);
+    const unknown = await without.dispatch(new Request("r", MethodName.OrganizationList, null));
+    const carol = await host.teammates.createAsync(new TeammateCreateParams("Carol", null, provider.id, Harness.Provider, null, null));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(carol.id, design.id));
+    const deleted = await without.dispatch(new Request("r", MethodName.TeammateDelete, new TeammateIdParams(carol.id).toJson()));
+
+    Assert.areEqual(0, outside);
+    Assert.areEqual(1, published.length);
+    Assert.isNull(published[0]?.departments[0]?.leaderId);
+    Assert.areEqual(0, published[0]?.members.length);
+    Assert.areEqual(ErrorCode.UnknownMethod, unknown.info?.name);
+    Assert.isFalse(deleted.hasErrors);
+    Assert.areEqual(1, host.listener.count(EventName.OrganizationChanged));
+  }
+
+  @TestMethod
+  public async sendsStopsAndListsOrganizationMessagesAndKnowsNoneOfTheirMethodsWithoutThem(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const provider = await host.createProviderAsync();
+    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
+
+    const sent = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageSend,
+      new OrganizationMessageSendParams(OrganizationTarget.teammate(ada.id), "Hi").toJson()));
+    await host.engine.waitForIdle();
+    const stopped = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageStop, new MessageIdParams(sent.id).toJson()));
+    const listed = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageList, null);
+    const replies = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageReplyList, new MessageIdParams(sent.id).toJson());
+    const without = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
+      host.approvals, host.engine, host.teammates, host.events);
+    const unknown = await Promise.all([MethodName.OrganizationMessageSend, MethodName.OrganizationMessageStop, MethodName.OrganizationMessageList,
+      MethodName.OrganizationMessageReplyList].map(t => without.dispatch(new Request("r", t, null))));
+
+    Assert.areEqual(`${ada.id}:Started`, sent.recipients.map(t => `${t.teammateId}:${t.state}`).join());
+    Assert.areEqual(JSON.stringify(sent.toJson()), JSON.stringify(stopped.toJson()));
+    Assert.areEqual(JSON.stringify([stopped.toJson()]), JSON.stringify(listed));
+    Assert.areEqual(JSON.stringify((await host.organizationMessages.listRepliesAsync(new MessageIdParams(sent.id))).map(t => t.toJson())), JSON.stringify(replies));
+    Assert.areEqual(1, Array.isArray(replies) ? replies.length : 0);
+    Assert.areEqual("UnknownMethod,UnknownMethod,UnknownMethod,UnknownMethod", unknown.map(t => t.info?.name).join());
   }
 
   @TestMethod
@@ -423,6 +507,30 @@ export class RequestDispatcherTests {
     const listed = RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.ProviderToolList, null));
 
     Assert.areEqual(JSON.stringify([tool.toJson()]), JSON.stringify(listed.map(t => ProviderTool.fromJson(t.toJson()).toJson())));
+  }
+
+  @TestMethod
+  public async listsEachKindAsItsRefreshedDescriptorSaysAndItsLastOneWhenTheRefreshFailsWritingTheFailureToTheLog(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const refreshed = new FakeProviderAdapter("refreshed");
+    refreshed.refreshDescriptorAsync = () => {
+      refreshed.descriptor = new ProviderKind("refreshed", "Refreshed provider", true, false, null);
+      return Promise.resolve();
+    };
+    const failing = new FakeProviderAdapter("failing");
+    failing.refreshDescriptorAsync = () => Promise.reject(new Error("The environment couldn't be read."));
+    const refusing = new FakeProviderAdapter("refusing");
+    refusing.refreshDescriptorAsync = () => Promise.reject("refused");
+    host.registry.register(refreshed);
+    host.registry.register(failing);
+    host.registry.register(refusing);
+
+    const kinds = await RequestDispatcherTests.succeed(host, MethodName.ProviderKindList, null);
+
+    Assert.areEqual("fake:Fake provider,refreshed:Refreshed provider,failing:Fake provider,refusing:Fake provider",
+      RequestDispatcherTests.objects(kinds).map(t => ProviderKind.fromJson(t.toJson())).map(t => `${t.id}:${t.displayName}`).join(","));
+    Assert.areEqual(JSON.stringify([Resources.formatDescriptorNotRefreshed("failing", "Error"), Resources.formatDescriptorNotRefreshed("refusing", "string")]),
+      JSON.stringify(host.log.lines));
   }
 
   @TestMethod
@@ -1358,6 +1466,22 @@ export class RequestDispatcherTests {
     Assert.areEqual(invalidated, host.listener.count(EventName.StateInvalidated));
     Assert.areEqual(ErrorCode.UnknownMethod, unsupported.info?.name);
     Assert.areEqual(MethodName.WindowFocused, unsupported.info?.arguments[0]);
+  }
+
+  @TestMethod
+  public async listsEachTeammatesLastReply(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, (await host.createProviderAsync()).id, Harness.Provider, null, null));
+    const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
+
+    const empty = await RequestDispatcherTests.succeed(host, MethodName.TeammateLastReplyList, null);
+    await host.messages.insertAsync(new Message("reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Completed,
+      [new MessageDetail(0, DetailKind.Text, "Done.", null, "t")], provenance, "t", "t", "t2", [], ada.id, "Ada"));
+    const listed = await RequestDispatcherTests.succeed(host, MethodName.TeammateLastReplyList, null);
+
+    Assert.areEqual("[]", JSON.stringify(empty));
+    Assert.areEqual(JSON.stringify([new TeammateLastReply(ada.id, conversation.id, "reply", "Done.", "t2").toJson()]), JSON.stringify(listed));
   }
 
   @TestMethod

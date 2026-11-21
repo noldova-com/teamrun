@@ -51,6 +51,7 @@ import type {
   ConversationSearchParams,
   ConversationSearchResult,
   ChatFindParams,
+  ChatFolderAttachParams,
   ChatFindResult,
   MessageSearchResult,
   DataFolder,
@@ -135,6 +136,7 @@ import type {
   TeammateFallback,
   TeammateIdParams,
   TeammateUpdateParams,
+  TeammateLastReply,
   TeammateUsage,
   SubAgent,
   SubAgentStartParams,
@@ -146,7 +148,16 @@ import type {
   WindowFocusedParams,
   WindowIdParams,
   WrittenImageReadParams,
-  LinkedPaths
+  LinkedPaths,
+  Department,
+  DepartmentCreateParams,
+  DepartmentIdParams,
+  DepartmentMemberSetParams,
+  DepartmentMoveParams,
+  DepartmentUpdateParams,
+  Organization,
+  OrganizationMessage,
+  OrganizationMessageSendParams
 } from "@noldova/teamrun.protocol";
 
 /**
@@ -191,7 +202,13 @@ export declare enum ChangeEntity {
   SharedMcpServer = "SharedMcpServer",
 
   /** An added ACP agent or a local ACP command. */
-  AcpAgent = "AcpAgent"
+  AcpAgent = "AcpAgent",
+  /** A `Department`. */
+  Department = "Department",
+  /** A `DepartmentMember`: a teammate in a department, keyed by the teammate's id. */
+  DepartmentMember = "DepartmentMember",
+  /** An `OrganizationMessage` with each recipient's state. */
+  OrganizationMessage = "OrganizationMessage"
 }
 
 /**
@@ -513,6 +530,13 @@ export interface IProviderAdapter {
    * @returns The check's outcome.
    */
   checkFoundSignIn?(provider: Provider): Promise<SignInCheck>;
+
+  /**
+   * Rebuilds the descriptor from the environment the provider's tooling is given, such as the login shell's, when what it says depends on
+   * that environment; absent for a kind whose descriptor never changes. `IProviderKindsService.listAsync` awaits it before listing.
+   * @returns A promise that resolves once the descriptor is current.
+   */
+  refreshDescriptorAsync?(): Promise<void>;
 
   /**
    * Readies a provider's empty profile folder before anything can sign in to it, such as claiming the folder as TeamRun's and making the
@@ -1345,6 +1369,28 @@ export interface IConversationsService {
   countFolderFilesAsync(params: ConversationIdParams): Promise<number>;
 
   /**
+   * Attaches an existing folder to a chat without a project, or replaces the one attached, so that its teammates work in it, in place,
+   * from the next turn; nothing is copied, and the chat's own folder stays for a detach. The chat's replies keep no checkpoint, since
+   * theirs were taken of the folder before, so a rewind to one of them restores no files.
+   * @param params The chat and the folder's absolute path, kept resolved.
+   * @param check Checks the folder, as the projects service checks a project's folder.
+   * @returns The chat, whose `folder` is the attached folder.
+   * @throws ServiceException named `ErrorCode.InvalidParams` when the path isn't absolute or the folder isn't present,
+   * `ErrorCode.NotFound` for an unknown chat, and `ErrorCode.Conflict` for a chat in a project, while a reply runs in the chat, or while
+   * the folder is held.
+   */
+  attachFolderAsync(params: ChatFolderAttachParams, check: (path: string) => Promise<FolderState>): Promise<Conversation>;
+
+  /**
+   * Detaches a chat's attached folder, leaving its files as they are, so that its teammates work in the chat's own folder again from the
+   * next turn, and its replies keep no checkpoint, as with an attach; a chat with none attached comes back as it is.
+   * @param params The chat id.
+   * @returns The chat, whose `folder` is its own folder again.
+   * @throws ServiceException named `ErrorCode.NotFound` for an unknown chat, and `ErrorCode.Conflict` while a reply runs in the chat.
+   */
+  detachFolderAsync(params: ConversationIdParams): Promise<Conversation>;
+
+  /**
    * Removes a conversation's messages from a sequence on, with their approvals.
    * @param conversationId The conversation id.
    * @param fromSequence The sequence of the first message to remove.
@@ -1500,7 +1546,7 @@ export interface IMessagesService {
    */
   findAttachmentAsync(conversationId: string, path: string, transaction?: SqlTransaction): Promise<MessageAttachment | null>;
   /**
-   * Reads the id of the checkpoint taken of the project's folder before a reply.
+   * Reads the id of the checkpoint taken of the reply's folder before a reply.
    * @param messageId The reply's id.
    * @param transaction The transaction to read in, or none.
    * @returns The checkpoint's id, or `null` when none was taken or the reply is gone.
@@ -1508,9 +1554,28 @@ export interface IMessagesService {
   findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
 
   /**
+   * Reads the id of the folder a reply's turn ran in, as `WorkFolder.id` named it.
+   * @param messageId The reply's id.
+   * @param transaction The transaction to read in, or none.
+   * @returns The folder's id, or `null` when the turn never started, ran before the folder was kept, or the reply is gone.
+   */
+  findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
+
+  /**
    * Lists, for each teammate in each conversation, its latest reply that reports usage, while that reply is in the teammate's current session there.
    */
   listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
+
+  /**
+   * Lists the replies in the sent message's chat that answer it, in chat order, walking the chat's messages after it.
+   * @param sent The message the replies answer.
+   */
+  listRepliesToAsync(sent: Message): Promise<readonly Message[]>;
+
+  /**
+   * Lists each teammate's latest completed reply that has text, in any chat.
+   */
+  listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
 
   /**
    * Lists every reply still pending, running, or awaiting an approval, across conversations.
@@ -1544,12 +1609,20 @@ export interface IMessagesService {
    */
   updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   /**
-   * Records the id of the checkpoint taken of the project's folder before a reply.
+   * Records the id of the checkpoint taken of the reply's folder before a reply.
    * @param messageId The reply's id.
    * @param checkpointId The checkpoint's id.
    * @param transaction The transaction to work in, or none.
    */
   setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+
+  /**
+   * Records the id of the folder a reply's turn runs in, at the turn's start, whether or not its checkpoint is then taken.
+   * @param messageId The reply's id.
+   * @param folderId The folder's `WorkFolder.id`.
+   * @param transaction The transaction to work in, or none.
+   */
+  setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }
 
 /**
@@ -1820,10 +1893,12 @@ export interface IProvidersService {
    * Changes a provider's label and profile directory, and switches its own MCP servers when the parameters say so, keeps its
    * id and provider so its teammates keep it, and publishes `ProviderUpdated`; a new profile directory clears the last
    * sign-in check and forgets the provider sessions kept in the old one; a new directory that is empty gets the kind's `prepareProfile`.
-   * @param params The provider id, the label, the absolute profile directory, and the own servers' switch or `null`.
+   * It also sets or clears the server path the parameters name, which the runtime takes only from the app's main process.
+   * @param params The provider id, the label, the absolute profile directory, the own servers' switch or `null`, and the server path or `null`.
    * @returns The updated provider.
    * @throws ServiceException named `ErrorCode.NotFound` when the provider does not exist,
-   * `ErrorCode.InvalidParams` when the directory is not absolute or the switch turns on the servers of a kind whose
+   * `ErrorCode.InvalidParams` when the directory or a server path is not absolute, a server path names a kind without
+   * `choosesServerPath`, or the switch turns on the servers of a kind whose
    * `ownMcpServersUnavailable` says why they can't be, with that reason as the message, and `ErrorCode.Conflict` when the
    * directory changes while a reply on the provider is open, or, with the directory as its argument, when another provider already uses
    * the directory, compared as `ProfileFolderPath` compares folders; and whatever the kind's `prepareProfile` throws, with the provider
@@ -1950,6 +2025,13 @@ export interface IProviderKindsService {
   list(): readonly ProviderKind[];
 
   /**
+   * Lists the registered kinds as `list` does, once each adapter's `refreshDescriptorAsync` has run; the kind list the window reads. A kind
+   * whose refresh fails keeps its last descriptor, and the failure is written to the log.
+   * @returns Their descriptors.
+   */
+  listAsync(): Promise<readonly ProviderKind[]>;
+
+  /**
    * Lists the models a provider reports, optionally through a provider of that provider.
    * @param params The kind and the optional provider id.
    * @returns The model names.
@@ -2024,6 +2106,14 @@ export interface IConversationEngine {
    * @returns The prepared attachment's metadata.
    */
   prepareOpenedAttachmentAsync(input: AttachmentInput, source: IOpenedFile): Promise<MessageAttachment>;
+
+  /**
+   * Refuses a send's requested mode unless the same kind and mode are the chat's chosen responder's or the default teammate's, so a client
+   * other than TeamRun's window can't choose the mode a reply runs in; a send that asks for no mode passes.
+   * @param params The send, as a client other than the window's process sent it.
+   * @throws ServiceException `Unauthorized` when the mode is refused, with `Resources.unchosenModeRefused` and the kind and mode.
+   */
+  refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
 
   /**
    * Deletes only a transient preparation; never deletes a committed message attachment.
@@ -2148,11 +2238,11 @@ export interface IConversationEngine {
    * Cancels every open reply of the conversation's active send: the working reply stops and the
    * waiting ones are cancelled before they start.
    * @param params The conversation.
-   * @returns The replies this cancel stopped, after the send has settled: those still open when it
-   * started, a hand-off's among them, that ended cancelled. A reply that had already ended, that a
-   * Stop is still ending, its own or an earlier chat Stop, or that completed before the stop reached
-   * it, is left out; so of two chat Stops that overlap, such as the window's and `teamrun cancel`, the
-   * second answers with none of the replies the first is ending.
+   * @returns After the send has settled, the replies still open when this Stop began, or that joined the send after it began, such as
+   * a hand-off's or another chat's teammate's, that ended cancelled and that no Stop which settled earlier has listed. A reply that
+   * had already ended, that an earlier Stop is still ending, or that completed before the Stop reached it is left out, so each
+   * reply is listed by one Stop at most; of two chat Stops that overlap, such as the window's and `teamrun cancel`, the second
+   * answers with none of the replies the first is ending.
    * @throws ServiceException named `ErrorCode.Conflict` when the conversation has no active send.
    */
   cancelConversationAsync(params: ConversationIdParams): Promise<readonly Message[]>;
@@ -2167,11 +2257,14 @@ export interface IConversationEngine {
    * the reply of a teammate it names, or any running reply when it names none. Taken, it leaves the waiting messages and is kept in the
    * chat as a person's message whose `Text` detail names that reply in `Resources.steeredIntoField`, with its files copied as a sent
    * message's; refused, or with a file that can't be copied, it waits as Queue. Until a reply offers a steer, it waits like Queue.
+   * A message from outside goes only after `refuseRaisedModeAsync` passes its send again, so a mode the person changed since it was
+   * added refuses it, kept with that failure.
    * @param params The send and how it goes.
+   * @param fromOutside Whether a client other than TeamRun's window added it; by default, it didn't.
    * @returns The waiting message, as added.
    * @throws ServiceException named `ErrorCode.NotFound` for an unknown chat.
    */
-  addWaitingAsync(params: WaitingMessageAddParams): Promise<WaitingMessage>;
+  addWaitingAsync(params: WaitingMessageAddParams, fromOutside?: boolean): Promise<WaitingMessage>;
 
   /**
    * Lists the chat's waiting messages in the order they go.
@@ -2185,11 +2278,13 @@ export interface IConversationEngine {
    * Replaces a waiting message's send, keeping its place and clearing its failure, publishes `WaitingMessagesChanged`, and sends the
    * chat's waiting messages when it has no running reply.
    * @param params The waiting message and its new send.
+   * @param fromOutside Whether a client other than TeamRun's window edited it, which makes it a message from outside, as
+   * `addWaitingAsync` says; by default, the window did, and a message from outside stays one, since the edit keeps its mode.
    * @returns The edited waiting message.
    * @throws ServiceException named `ErrorCode.NotFound` for an unknown waiting message, or `ErrorCode.InvalidParams` for a send to
    * another chat.
    */
-  editWaitingAsync(params: WaitingMessageEditParams): Promise<WaitingMessage>;
+  editWaitingAsync(params: WaitingMessageEditParams, fromOutside?: boolean): Promise<WaitingMessage>;
 
   /**
    * Removes a waiting message and publishes `WaitingMessagesChanged`.
@@ -2273,9 +2368,10 @@ export interface IConversationEngine {
 
   /**
    * Releases, as `releaseFolderAsync` does, every own folder in the data folder whose conversation is gone or now has a project; the
-   * runtime runs it at its start. Never rejects.
+   * runtime runs it at its start. It releases no further folder once the signal aborts. Never rejects.
+   * @param signal Aborts when the sweep should stop, such as when the runtime part deactivates.
    */
-  sweepFoldersAsync(): Promise<void>;
+  sweepFoldersAsync(signal: AbortSignal): Promise<void>;
 
   /**
    * Lists the tools of a running turn, for TeamRun's MCP endpoint: a provider session's token reaches only the turn it was issued for.
@@ -2587,6 +2683,11 @@ export declare class Resources {
    */
   public static readonly unrestrictedModeRefused: string;
   /**
+   * The refusal of a send, from a client other than TeamRun's window, that asks for a mode the person chose neither for the chat nor for the
+   * default teammate.
+   */
+  public static readonly unchosenModeRefused: string;
+  /**
    * The agent a turn names to start a Helper sub-agent: `helper`.
    */
   public static readonly helperAgent: string;
@@ -2846,6 +2947,7 @@ export declare class Resources {
    * @returns The note.
    */
   public static formatCompactRefused(provider: string, reason: string): string;
+  public static formatDescriptorNotRefreshed(kind: string, failure: string): string;
   public static formatAcpAgentNotOpened(kind: string, reason: string): string;
   public static formatAcpAgentAlreadyAdded(id: string): string;
   public static formatAcpAgentNotListed(id: string): string;
@@ -2897,6 +2999,51 @@ export declare class Resources {
    * Adds the provider kind that wrote each handover summary, empty for one written before it.
    */
   public static readonly addHandoverSummaryKind: string;
+  public static readonly checkpointFoldersMigrationId: string;
+  public static readonly addMessageCheckpointFolder: string;
+  public static readonly checkpointFolderIdColumn: string;
+  /** The departments migration's fixed id: `20261120120000_Departments`. */
+  public static readonly departmentsMigrationId: string;
+  /** The departments table. */
+  public static readonly departmentsTable: string;
+  /** The table of which teammate is in which department; a teammate has at most one row. */
+  public static readonly departmentMembersTable: string;
+  /** The department id column of `departmentMembers`. */
+  public static readonly departmentIdColumn: string;
+  /** Selects every department's JSON. */
+  public static readonly selectDepartments: string;
+  /** Selects every teammate's department. */
+  public static readonly selectDepartmentMembers: string;
+  /** Inserts a department. */
+  public static readonly insertDepartment: string;
+  /** Updates a department's parent and JSON. */
+  public static readonly updateDepartment: string;
+  /** Deletes a department. */
+  public static readonly deleteDepartment: string;
+  /** Puts a teammate in a department. */
+  public static readonly insertDepartmentMember: string;
+  /** Takes a teammate out of its department. */
+  public static readonly deleteDepartmentMember: string;
+  /** The organization messages migration's fixed id: `20261121090000_OrganizationMessages`. */
+  public static readonly organizationMessagesMigrationId: string;
+  /** The organization messages table. */
+  public static readonly organizationMessagesTable: string;
+  /** The teammate last replies migration's fixed id: `20261122090000_TeammateLastReplies`. */
+  public static readonly teammateLastRepliesMigrationId: string;
+  /** Indexes the Completed provider replies by their teammate and end time. */
+  public static readonly createTeammateLastReplyIndex: string;
+  /** Lists every organization message, the oldest first. */
+  public static readonly selectOrganizationMessages: string;
+  /** Reads one organization message by id. */
+  public static readonly selectOrganizationMessage: string;
+  /** Adds an organization message. */
+  public static readonly insertOrganizationMessage: string;
+  /** Replaces an organization message's JSON. */
+  public static readonly updateOrganizationMessage: string;
+  /** The label an organization message's text carries in each recipient's outside chat. */
+  public static readonly organizationMessageLabel: string;
+  /** Why a recipient still queued when TeamRun stopped failed. */
+  public static readonly organizationSendInterrupted: string;
   public static readonly selectHandoverSummary: string;
   public static readonly upsertHandoverSummary: string;
   public static readonly deleteHandoverSummaries: string;
@@ -3004,6 +3151,8 @@ export declare class Resources {
   public static readonly runOutputsKeptCharacters: number;
   public static formatWaitingMessageNotFound(waitingId: string): string;
   public static formatWaitingMessageOtherChat(waitingId: string, chatId: string): string;
+  /** The log line for a chat's waiting messages that couldn't be read to show them once one was taken off to send or steer; that one still sends or steers. */
+  public static formatWaitingMessagesNotShown(chatId: string, reason: string): string;
   public static formatWaitingMessageNotSent(chatId: string, reason: string): string;
   /** The log line for a chat's background sending that failed; the chat sends again at its next reply's end. */
   public static formatChatSendingStopped(chatId: string, reason: string): string;
@@ -3581,6 +3730,8 @@ export declare class Resources {
    * Selects a conversation's messages' JSON after a sequence, in sequence order: `conversationId`, `sequence`.
    */
   public static readonly selectMessagesByConversation: string;
+  /** Reads the messages after a sent one in its chat that answer it: its chat, its sequence and its id. */
+  public static readonly selectRepliesTo: string;
   /**
    * Selects one row when a conversation has an ended reply that ran a command: `conversationId`.
    */
@@ -3609,6 +3760,14 @@ export declare class Resources {
    * Selects every reply still pending, running, or awaiting an approval, oldest first.
    */
   public static readonly selectOpenReplies: string;
+  /** The characters JavaScript's trim removes, which the last-reply query trims, so a reply of only line breaks has no text. */
+  public static readonly textBlanks: string;
+  /**
+   * Each teammate's latest completed reply with text, its text from `messageText`: for each teammate it walks the last-reply index down from the last
+   * ended, so it reads no other message; it compares `+tm.id`, without the column's text affinity, which would keep SQLite off the expression index.
+   * Its one parameter is `textBlanks`.
+   */
+  public static readonly selectTeammateLastReplies: string;
   /**
    * Selects every message with a sub-agent still running, oldest first; the text search only narrows the rows the details are read from.
    */
@@ -3858,11 +4017,6 @@ export declare class Resources {
    * The note at the top of the reply that compacts an idle chat before its prompt cache expires.
    */
   public static readonly idleCompactionNote: string;
-  /**
-   * The `source` of a chat wake's message, with its `wakeId`: the message that tells a turn the work it sent to another chat, or its
-   * sub-agent, has ended.
-   */
-  public static readonly chatWakeSource: string;
   public static readonly addKind: string;
   public static readonly updateKind: string;
   public static readonly deleteKind: string;
@@ -3898,6 +4052,10 @@ export declare class Resources {
    * Why a rewind restored no files when no checkpoint was taken before the reply.
    */
   public static readonly noCheckpointRefusal: string;
+  /**
+   * Why a rewind restored no files when the reply's checkpoint was taken of a folder the chat no longer works in.
+   */
+  public static readonly checkpointFolderChangedRefusal: string;
   /**
    * Why a rewind restored no files, in plain words, by the checkpoints module's outcome.
    */
@@ -3947,6 +4105,11 @@ export declare class Resources {
   public static readonly chatIdRowTables: readonly string[];
   public static readonly updateMessageCheckpoint: string;
   public static readonly selectMessageCheckpoint: string;
+  /**
+   * Reads the id of the folder a reply's turn ran in, `null` for a turn from before the folder was kept.
+   */
+  public static readonly selectMessageCheckpointFolder: string;
+  public static readonly updateMessageCheckpointFolder: string;
   /**
    * Bytes above which an added file gets no diff.
    */
@@ -4304,6 +4467,28 @@ export declare class Resources {
   public static formatWakeNote(command: string | null): string;
 
   /**
+   * The note at the top of a reply that a chat's wake started: the chat the work went to, with no ID.
+   * @param title The chat's title, or `null` when the chat is gone.
+   */
+  public static formatWakeReceived(title: string | null): string;
+
+  /**
+   * How a sub-agent ended, in words for its wake: `ended as <status>`.
+   */
+  public static formatSubAgentEnding(status: string): string;
+  /**
+   * How a background command ended, in words for its wake: its error, signal or exit code.
+   */
+  public static formatCommandEnding(exit: CommandExit): string;
+  /**
+   * A background command's last lines for its wake, cut to their last 2,000 characters, or `null` when it wrote none.
+   */
+  public static formatCommandQuote(lastLines: string): string | null;
+  /**
+   * The note at the top of a reply that a sub-agent's or background command's wake started.
+   */
+  public static readonly taskWakeReceived: string;
+  /**
    * The text of the message that wakes a chat whose sub-agent ended after the turn that started it: the sub-agent, how it ended, and its summary cut
    * at 2,000 characters.
    * @param status The sub-agent's status as it ended.
@@ -4385,6 +4570,16 @@ export declare class Resources {
   public static formatSubAgentNotFound(subAgentId: string): string;
 
   /**
+   * Composes the log line for a sub-agent whose end couldn't be saved.
+   */
+  public static formatSubAgentNotSaved(subAgentId: string, reason: string): string;
+
+  /**
+   * Composes the log line for a sub-agent whose stop failed, logged so the other stops go on.
+   */
+  public static formatSubAgentNotStopped(subAgentId: string, reason: string): string;
+
+  /**
    * The note after a sub-agent's result that was cut, with how many characters were left out.
    * @param left How many characters were cut.
    */
@@ -4403,6 +4598,21 @@ export declare class Resources {
    * Missing teammate diagnostic.
    */
   public static formatTeammateNotFound(id: string): string;
+
+  /** Missing department diagnostic. */
+  public static formatDepartmentNotFound(id: string): string;
+
+  /** Missing organization message diagnostic. */
+  public static formatOrganizationMessageNotFound(id: string): string;
+
+  /** Why a teammate whose account can't reply, or is deleted, gets no outside message. */
+  public static formatAccountCannotReply(teammate: string, account: string | null): string;
+
+  /** Why a teammate outside a department can't lead it. */
+  public static formatDepartmentLeaderNotMember(teammate: string, department: string): string;
+
+  /** Why a department can't move under itself or one of its own departments. */
+  public static formatDepartmentUnderItself(department: string): string;
 
   /**
    * Unknown shared MCP server diagnostic.
@@ -4905,6 +5115,11 @@ export declare class Resources {
   public static formatDraftFileNotFound(name: string): string;
 
   /**
+   * Composes the refusal of a draft save whose revision is no longer the draft's.
+   */
+  public static formatDraftStale(conversationId: string): string;
+
+  /**
    * Composes the log line for a draft's files that could not be removed, naming the conversation by its id's last
    * `loggedIdLength` characters.
    */
@@ -4921,6 +5136,11 @@ export declare class Resources {
    * value's type; never its message, which a provider may fill with what it was sent.
    */
   public static formatFailureKind(error: unknown): string;
+
+  /**
+   * Names a file removal's failure for a log line: the error's code when it has one, else its name, or the thrown value's type.
+   */
+  public static formatFailureReason(error: unknown): string;
 
   /**
    * Names a provider for a log line by its id's last `loggedIdLength` characters, or `noLoggedProvider` without
@@ -5027,6 +5247,37 @@ export declare class Resources {
   public static formatProviderDisabled(label: string): string;
 
   /**
+   * Composes the checkpoints id of a folder attached to a chat, from a hash of its path, so every chat attached to one folder shares its
+   * checkpoints as a project's chats do.
+   */
+  public static formatAttachedFolderId(hash: string): string;
+
+  /**
+   * Composes the reply's note when the folder attached to its chat is missing or can't be read, so the provider didn't start.
+   */
+  public static formatAttachedFolderMissing(path: string): string;
+
+  /**
+   * Composes the reply's note when the folder attached to its chat didn't answer in time, so the provider didn't start.
+   */
+  public static formatAttachedFolderUnreachable(path: string): string;
+
+  /**
+   * Composes the refusal of a folder to attach that is missing, can't be read or didn't answer in time.
+   */
+  public static formatFolderNotAttached(path: string): string;
+
+  /**
+   * Composes the refusal of a folder to attach whose path isn't absolute.
+   */
+  public static formatFolderNotAbsolute(path: string): string;
+
+  /**
+   * Composes the refusal to attach a folder to a chat in a project.
+   */
+  public static formatChatInProject(conversationId: string): string;
+
+  /**
    * Composes the reply's note when the project's folder is missing, so the provider didn't start.
    */
   public static formatWorkFolderMissing(path: string): string;
@@ -5129,6 +5380,14 @@ export declare class Resources {
    * @returns The pattern.
    */
   public static formatLikePattern(query: string): string;
+
+  /**
+   * Renders the SQL condition for a Completed provider reply with valid JSON, the condition the last-reply index covers, so `json_extract` never reads
+   * a row whose JSON isn't valid.
+   * @param row The message row's name in the statement, or null for the table's own columns.
+   * @returns The condition.
+   */
+  public static formatFinishedReply(row: string | null): string;
 
   /**
    * Renders the SQL expression for a message row's text details joined by spaces, or null when its JSON isn't valid.
@@ -6774,6 +7033,25 @@ export declare class ProjectActivity {
   public enterTurn(rootPath: string): string;
 
   /**
+   * Registers a provider turn as `enterTurn` does, unless an overlapping root is being rewound.
+   * @param rootPath The project's filesystem path.
+   * @returns A unique activity key to pass to `leave`, or null while an overlapping root is being rewound.
+   * @throws Error when resolving an existing filesystem path fails.
+   */
+  public tryEnterTurn(rootPath: string): string | null;
+
+  /**
+   * Waits for the next rewind to end, on any root, or for `releaseWaiting`.
+   * @returns A promise that resolves once it has.
+   */
+  public whenReleasedAsync(): Promise<void>;
+
+  /**
+   * Ends every current wait of `whenReleasedAsync`, such as at shutdown.
+   */
+  public releaseWaiting(): void;
+
+  /**
    * Claims an idle root exclusively for a rewind.
    * @param rootPath The project's filesystem path.
    * @returns A unique activity key to pass to `leave`.
@@ -7078,6 +7356,16 @@ export declare class ConversationsService implements IConversationsService {
   public countFolderFilesAsync(params: ConversationIdParams): Promise<number>;
 
   /**
+   * @inheritdoc
+   */
+  public attachFolderAsync(params: ChatFolderAttachParams, check: (path: string) => Promise<FolderState>): Promise<Conversation>;
+
+  /**
+   * @inheritdoc
+   */
+  public detachFolderAsync(params: ConversationIdParams): Promise<Conversation>;
+
+  /**
    * Removes a conversation's messages from a sequence on, with their approvals, logging every deletion.
    * @param conversationId The conversation id.
    * @param fromSequence The sequence of the first message to remove.
@@ -7216,6 +7504,7 @@ export declare class MessagesService implements IMessagesService {
    */
   public findAttachmentAsync(conversationId: string, path: string, transaction?: SqlTransaction): Promise<MessageAttachment | null>;
   public findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
+  public findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
 
   /**
    * Lists, for each teammate in each conversation, its latest reply that reports usage, by conversation and then oldest first.
@@ -7224,6 +7513,16 @@ export declare class MessagesService implements IMessagesService {
    * @remarks Queries the database directly without loading transcripts.
    */
   public listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
+
+  /** @inheritdoc */
+  public listRepliesToAsync(sent: Message): Promise<readonly Message[]>;
+
+  /**
+   * Lists each teammate's latest completed reply that has text, in any chat, by the end of the reply and then the latest saved.
+   * @returns One entry per teammate that has such a reply, by teammate id.
+   * @remarks One query over `messages`, reading each reply's text from the `messageText` index rather than its JSON.
+   */
+  public listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
 
   /**
    * Lists every reply still pending, running, or awaiting an approval, across conversations, oldest first.
@@ -7254,6 +7553,7 @@ export declare class MessagesService implements IMessagesService {
    */
   public updateAsync(message: Message, transaction?: SqlTransaction): Promise<void>;
   public setCheckpointAsync(messageId: string, checkpointId: string, transaction?: SqlTransaction): Promise<void>;
+  public setCheckpointFolderAsync(messageId: string, folderId: string, transaction?: SqlTransaction): Promise<void>;
 }
 
 /**
@@ -7489,15 +7789,21 @@ export declare class ProviderKindsService implements IProviderKindsService {
    * @param events Where `ProviderKindInstallationChanged` is published.
    * @param planUsage Where `readPlanUsageAsync` keeps what it reads; a `PlanUsageService` on `events` by default.
    * @param teammates Whose speeds `modelCatalogAsync` clears when the catalog no longer lists them; none by default.
+   * @param log Where `listAsync` writes a kind whose `refreshDescriptorAsync` failed, with the kind of failure; none by default.
    */
   public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink, planUsage?: IPlanUsageService,
-    teammates?: ITeammatesService | null);
+    teammates?: ITeammatesService | null, log?: ILog | null);
 
   /**
    * Lists the registered kinds, each saying whether it can name a chat: whether its adapter has `askIsolated`.
    * @returns Their descriptors.
    */
   public list(): readonly ProviderKind[];
+
+  /**
+   * @inheritdoc
+   */
+  public listAsync(): Promise<readonly ProviderKind[]>;
 
   /**
    * @inheritdoc
@@ -8152,7 +8458,8 @@ export declare class ReplyEvidence {
 }
 
 /**
- * The folder a reply works in: its project's root, named by the project's id, or a chat's own folder, named by the conversation's id.
+ * The folder a reply works in: its project's root, named by the project's id, a folder attached to its chat, named by its path, or a
+ * chat's own folder, named by the conversation's id.
  */
 export declare class WorkFolder {
   /**
@@ -8169,6 +8476,14 @@ export declare class WorkFolder {
    * @param path The folder's absolute path.
    */
   public constructor(id: string, path: string);
+
+  /**
+   * The work folder of a folder attached to a chat, named by a hash of its path, compared without case on Windows.
+   * @param path The attached folder's absolute path.
+   * @param platform The platform the folder is on, as `process.platform` names it, which it is by default.
+   * @returns The work folder.
+   */
+  public static attached(path: string, platform?: string): WorkFolder;
 }
 
 /**
@@ -8437,10 +8752,11 @@ export declare class ReplyCheckpoints {
   /**
    * Deletes all of the work folder's checkpoints.
    * @param folder The work folder.
+   * @param signal Ends the delete when it aborts, as the checkpoints module's `DeleteFolder` does.
    * @returns Whether they are deleted; `false` while an interrupted restore of the folder holds them up.
-   * @throws {Error} When the system refuses to move the folder's store aside.
+   * @throws {Error} When the system refuses to move the folder's store aside, or the signal aborts the delete.
    */
-  public deleteAsync(folder: WorkFolder): Promise<boolean>;
+  public deleteAsync(folder: WorkFolder, signal?: AbortSignal): Promise<boolean>;
 }
 
 /**
@@ -8946,7 +9262,7 @@ export declare class ReplyRun implements ITurnListener {
  * the replies already queued, in mention order, until the chain reaches the hop limit. A failed or
  * cancelled reply, or one after a stop, hands off to no one, and a stop cancels every reply of the chain.
  */
-export declare class ConversationEngine implements IConversationEngine, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
+export declare class ConversationEngine implements IConversationEngine, IOrganizationSender, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
   /**
    * Initializes the engine.
    * @param context The context of the data directory, for the transaction that records a send.
@@ -9022,6 +9338,11 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * @inheritdoc
    */
+  public refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
+
+  /**
+   * @inheritdoc
+   */
   public discardAttachment(attachment: MessageAttachment): void;
 
   /**
@@ -9093,6 +9414,11 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * @inheritdoc
    */
+  public startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult>;
+
+  /**
+   * @inheritdoc
+   */
   public listOutsideChatsAsync(): Promise<readonly JsonObject[]>;
 
   /**
@@ -9132,7 +9458,7 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * @inheritdoc
    */
-  public addWaitingAsync(params: WaitingMessageAddParams): Promise<WaitingMessage>;
+  public addWaitingAsync(params: WaitingMessageAddParams, fromOutside?: boolean): Promise<WaitingMessage>;
 
   /**
    * @inheritdoc
@@ -9142,7 +9468,7 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * @inheritdoc
    */
-  public editWaitingAsync(params: WaitingMessageEditParams): Promise<WaitingMessage>;
+  public editWaitingAsync(params: WaitingMessageEditParams, fromOutside?: boolean): Promise<WaitingMessage>;
 
   /**
    * @inheritdoc
@@ -9200,7 +9526,7 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
   /**
    * See {@link IConversationEngine.sweepFoldersAsync}.
    */
-  public sweepFoldersAsync(): Promise<void>;
+  public sweepFoldersAsync(signal: AbortSignal): Promise<void>;
 
   /**
    * See {@link IConversationEngine.listMcpToolsAsync}.
@@ -9291,6 +9617,8 @@ export declare class RequestDispatcher {
    * @param windows The open windows; without them `WindowFocused`, `WindowClosed` and `PanelAnswered` are unknown.
    * @param sharedServers The shared MCP server methods; without them the `SharedMcp` methods are unknown.
    * @param acpAgents The added ACP agents' methods; without them the `AcpAgent` and `AcpLocalCommand` methods are unknown.
+   * @param organization The organization's methods; without them `OrganizationList` and the `Department` methods are unknown.
+   * @param organizationMessages The organization's messages; without them the `OrganizationMessage` methods are unknown.
    */
   public constructor(
     kinds: IProviderKindsService,
@@ -9310,7 +9638,9 @@ export declare class RequestDispatcher {
     windows?: IWindowsService | null,
     sharedServers?: ISharedMcpServersService | null,
     computerUseGrants?: IComputerUseGrantsService | null,
-    acpAgents?: IAcpAgentsService | null);
+    acpAgents?: IAcpAgentsService | null,
+    organization?: IOrganizationService | null,
+    organizationMessages?: IOrganizationMessagesService | null);
 
   /**
    * Answers one request; never throws.
@@ -9498,6 +9828,20 @@ export declare class AttachmentStore {
   public discard(attachments: readonly MessageAttachment[]): void;
 
   /**
+   * Removes the sent files of messages that are gone, leaving any path that isn't directly in the store's folder.
+   * @param paths The removed messages' attachment paths.
+   * @throws Error on filesystem failure.
+   */
+  public removeSent(paths: readonly string[]): void;
+
+  /**
+   * Lists the files directly in the store's folder, where sent messages' files are saved.
+   * @returns Their paths, or none when the folder is missing.
+   * @throws Error on filesystem failure.
+   */
+  public listSent(): readonly string[];
+
+  /**
    * Reads a saved attachment's bytes, after checking that its file is still the one saved.
    * The file must resolve inside the store before and after the read, be a regular file of the recorded size on the open handle,
    * and give exactly that many bytes.
@@ -9594,6 +9938,174 @@ export declare class AttachmentStore {
 /**
  * Catalog operations for named participants.
  */
+/** The organization under the person: departments, their leaders and their members. */
+export interface IOrganizationService {
+  /**
+   * Returns the organization: every department, and which teammate is in which.
+   * @param transaction The transaction to read in, or none.
+   */
+  listAsync(transaction?: SqlTransaction): Promise<Organization>;
+
+  /**
+   * Creates a department last among its siblings and records it in the change feed.
+   * @throws ServiceException `NotFound` when the parent isn't a department.
+   */
+  createAsync(params: DepartmentCreateParams): Promise<Department>;
+
+  /**
+   * Renames a department or sets or clears its leader, and records it in the change feed.
+   * @throws ServiceException `NotFound` for an unknown department or leader, `InvalidParams` when the leader isn't one of its members.
+   */
+  updateAsync(params: DepartmentUpdateParams): Promise<Department>;
+
+  /**
+   * Moves a department under another parent or to another place among its siblings, numbering the siblings it left and joined
+   * from 0 again, and records each change in the change feed; a place past the last puts it last.
+   * @throws ServiceException `NotFound` for an unknown department or parent, `InvalidParams` when the parent is the department or under it.
+   */
+  moveAsync(params: DepartmentMoveParams): Promise<Department>;
+
+  /**
+   * Deletes a department in one transaction: its departments take its place under its parent, and its members move to its parent,
+   * or to no department when it sits under the person; its leadership goes with it.
+   * @throws ServiceException `NotFound` for an unknown department.
+   */
+  deleteAsync(params: DepartmentIdParams): Promise<void>;
+
+  /**
+   * Puts a teammate in a department or in none; a teammate who leads its department stops leading it.
+   * @throws ServiceException `NotFound` for an unknown teammate or department.
+   */
+  setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+
+  /**
+   * Takes a teammate being deleted out of its department and clears its leadership, in the deleting transaction.
+   * @param teammateId The teammate's id.
+   * @param transaction The deleting transaction.
+   * @returns Whether the teammate was in a department.
+   */
+  removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
+}
+
+/** Starts a teammate's reply to a message from outside its chats, and stops a reply. */
+export interface IOrganizationSender {
+  /**
+   * Sends the text to the teammate's outside chat and starts its replies without waiting for them; while the chat answers an earlier
+   * message, the new replies wait as Pending behind it and start when it ends.
+   * @throws ServiceException `NotFound` for a teammate that no longer exists, `Conflict` with `Resources.formatAccountCannotReply` when its account
+   * can't reply.
+   */
+  startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult>;
+
+  /** Stops a reply that hasn't finished. */
+  cancelAsync(params: MessageIdParams): Promise<Message>;
+}
+
+/** Messages the person sends to a teammate, a department, the leaders or everyone, with each recipient's state. */
+export interface IOrganizationMessagesService {
+  /** Returns every organization message, the oldest first. */
+  listAsync(): Promise<readonly OrganizationMessage[]>;
+
+  /**
+   * Stores the message with its recipients queued, then starts every recipient at once and returns the message with their states.
+   * A department goes to its leader and direct members; a recipient that is gone by its turn is `Removed`, and one whose send fails is `Failed`.
+   * @throws ServiceException `NotFound` for an unknown teammate or department.
+   */
+  sendAsync(params: OrganizationMessageSendParams): Promise<OrganizationMessage>;
+
+  /**
+   * Stops the recipients not yet started and the replies still waiting to start when Stop arrives, cancelling those replies together,
+   * and marks them `Stopped`.
+   * @throws ServiceException `NotFound` for an unknown message.
+   */
+  stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+
+  /**
+   * Lists the replies to the message: for each recipient its message reached, the replies in its chat that answer the message it was sent, in chat order.
+   * @throws ServiceException `NotFound` for an unknown message.
+   */
+  listRepliesAsync(params: MessageIdParams): Promise<readonly Message[]>;
+
+  /**
+   * After a restart, marks every recipient still `Queued` `Failed` with `Resources.organizationSendInterrupted`; run once the engine has reconciled.
+   */
+  reconcileAsync(): Promise<void>;
+}
+
+/** Keeps organization messages in the `organizationMessages` table, recording each change in the change feed and publishing it. */
+export declare class OrganizationMessagesService implements IOrganizationMessagesService {
+  /** Creates the service over the database, the organization, the teammates, their messages, the sender and the event sink. */
+  public constructor(context: DatabaseContext, organization: IOrganizationService, teammates: ITeammatesService, messages: IMessagesService,
+    sender: IOrganizationSender, events: IEventSink);
+
+  /** @inheritdoc */
+  public listAsync(): Promise<readonly OrganizationMessage[]>;
+
+  /** @inheritdoc */
+  public sendAsync(params: OrganizationMessageSendParams): Promise<OrganizationMessage>;
+
+  /** @inheritdoc */
+  public stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+
+  /** @inheritdoc */
+  public listRepliesAsync(params: MessageIdParams): Promise<readonly Message[]>;
+
+  /** @inheritdoc */
+  public reconcileAsync(): Promise<void>;
+}
+
+/** Keeps the organization in the `departments` and `departmentMembers` tables, recording each change in the change feed. */
+export declare class OrganizationService implements IOrganizationService {
+  /** Creates the service over the database. */
+  public constructor(context: DatabaseContext);
+
+  /**
+   * Returns the organization: every department, and which teammate is in which.
+   * @param transaction The transaction to read in, or none.
+   */
+  public listAsync(transaction?: SqlTransaction): Promise<Organization>;
+
+  /**
+   * Creates a department last among its siblings and records it in the change feed.
+   * @throws ServiceException `NotFound` when the parent isn't a department.
+   */
+  public createAsync(params: DepartmentCreateParams): Promise<Department>;
+
+  /**
+   * Renames a department or sets or clears its leader, and records it in the change feed.
+   * @throws ServiceException `NotFound` for an unknown department or leader, `InvalidParams` when the leader isn't one of its members.
+   */
+  public updateAsync(params: DepartmentUpdateParams): Promise<Department>;
+
+  /**
+   * Moves a department under another parent or to another place among its siblings, numbering the siblings it left and joined
+   * from 0 again, and records each change in the change feed; a place past the last puts it last.
+   * @throws ServiceException `NotFound` for an unknown department or parent, `InvalidParams` when the parent is the department or under it.
+   */
+  public moveAsync(params: DepartmentMoveParams): Promise<Department>;
+
+  /**
+   * Deletes a department in one transaction: its departments take its place under its parent, and its members move to its parent,
+   * or to no department when it sits under the person; its leadership goes with it.
+   * @throws ServiceException `NotFound` for an unknown department.
+   */
+  public deleteAsync(params: DepartmentIdParams): Promise<void>;
+
+  /**
+   * Puts a teammate in a department or in none; a teammate who leads its department stops leading it.
+   * @throws ServiceException `NotFound` for an unknown teammate or department.
+   */
+  public setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+
+  /**
+   * Takes a teammate being deleted out of its department and clears its leadership, in the deleting transaction.
+   * @param teammateId The teammate's id.
+   * @param transaction The deleting transaction.
+   * @returns Whether the teammate was in a department.
+   */
+  public removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
+}
+
 export interface ITeammatesService {
   /**
    * Lists participants by name, in `NameOrder`; ties keep creation order.
@@ -9632,9 +10144,9 @@ export interface ITeammatesService {
   clearUnlistedAsync(providerId: string, list: ProviderModelList): Promise<readonly Teammate[]>;
 
   /**
-   * Deletes memberships while retaining historical messages and mentions.
+   * Deletes memberships while retaining historical messages and mentions, and answers whether the teammate left a department.
    */
-  deleteAsync(params: TeammateIdParams): Promise<void>;
+  deleteAsync(params: TeammateIdParams): Promise<boolean>;
 
   /**
    * Reads the default teammate set in Settings, or `null` when none is set.
@@ -9673,9 +10185,9 @@ export interface ITeammatesService {
  */
 export declare class TeammatesService implements ITeammatesService {
   /**
-   * Creates the service with its database, provider and membership owners.
+   * Creates the service with its database, provider and membership owners, and the organization a deleted teammate leaves.
    */
-  public constructor(context: DatabaseContext, providers: IProvidersService, conversations: IConversationsService);
+  public constructor(context: DatabaseContext, providers: IProvidersService, conversations: IConversationsService, organization: IOrganizationService);
 
   /**
    * Lists participants by name, in `NameOrder`; ties keep creation order.
@@ -9703,9 +10215,10 @@ export declare class TeammatesService implements ITeammatesService {
   public clearUnlistedAsync(providerId: string, list: ProviderModelList): Promise<readonly Teammate[]>;
 
   /**
-   * Deletes memberships while retaining historical messages and mentions.
+   * Deletes memberships while retaining historical messages and mentions; the teammate leaves its department, and a department
+   * it led has no leader, in the same transaction; it answers whether the teammate left a department.
    */
-  public deleteAsync(params: TeammateIdParams): Promise<void>;
+  public deleteAsync(params: TeammateIdParams): Promise<boolean>;
 
   /**
    * Reads the default teammate from the `preferences` table, or `null` when none is set.
@@ -9811,6 +10324,11 @@ export interface IDraftsService {
    * Removes a deleted conversation's draft files and its waiting messages' files, after its rows are gone.
    */
   removeChatFiles(conversationId: string): void;
+
+  /**
+   * Removes the sent files of a deleted conversation's messages, or of the messages a rewind removed, after their rows are gone.
+   */
+  removeSentFiles(conversationId: string, paths: readonly string[]): void;
 }
 
 /**
@@ -9855,8 +10373,14 @@ export declare class DraftsService implements IDraftsService {
   public removeChatFiles(conversationId: string): void;
 
   /**
-   * Removes, at start-up, the draft files no draft holds: what a failed removal or a crash after a commit left; a draft that
-   * cannot be read keeps its files. A draft it cannot read, like any removal that fails, writes a line to the log.
+   * Removes the sent files the paths name; a failure is logged, and the files are swept at the next start.
+   */
+  public removeSentFiles(conversationId: string, paths: readonly string[]): void;
+
+  /**
+   * Removes, at start-up, the draft files no draft holds and the sent files no message names: what a failed removal or a crash
+   * after a save or a commit left; a draft that cannot be read keeps its files. A draft it cannot read, like any removal that fails,
+   * writes a line to the log.
    */
   public sweepAsync(): Promise<void>;
 }
@@ -10049,11 +10573,12 @@ export interface ISharedMcpAccounts {
  */
 export interface ISharedMcpSignIn {
   /**
-   * Starts a sign-in in the browser and returns the address to open; `finished` is called once, when the sign-in ends, fails or times out.
+   * Starts a sign-in in the browser and returns the address to open, or `null` when a Sign out or a later start of the same reference ended it before it
+   * had one; `finished` is called once, when the sign-in ends, fails or times out, and never for one that ended without an answer.
    * @param url The server's address, where discovery starts from its refusal.
    * @param reference Where the tokens are saved.
    */
-  startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string>;
+  startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null>;
   /**
    * Reads the access token, refreshed first when it expires soon; refused when there is none or the refresh fails.
    * @throws Error with the store's reason when it can't read the tokens.
@@ -10669,6 +11194,48 @@ export declare class HandoverSummaryKindsMigration extends SqlMigration {
 
   /**
    * Adds the column with `Resources.addHandoverSummaryKind`.
+   */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/** Indexes the Completed provider replies by their teammate and end time, which the last-reply query walks. */
+export declare class TeammateLastRepliesMigration extends SqlMigration {
+  /** Uses the fixed teammate last replies migration id. */
+  public constructor();
+
+  /** Creates the partial index. */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/** Adds the `organizationMessages` table, each message kept as its JSON. */
+export declare class OrganizationMessagesMigration extends SqlMigration {
+  /** Uses the fixed organization messages migration id. */
+  public constructor();
+
+  /** Creates the table keyed by the message's id. */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/** Adds the `departments` and `departmentMembers` tables; a teammate has at most one membership row. */
+export declare class DepartmentsMigration extends SqlMigration {
+  /** Uses the fixed departments migration id. */
+  public constructor();
+
+  /** Creates both tables, keyed to `teammates` and to each other, with an index on each parent column. */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/**
+ * Keeps the id of the folder each reply's turn ran in, so a rewind restores from that folder's own checkpoints after the chat's folder changes and back.
+ */
+export declare class CheckpointFoldersMigration extends SqlMigration {
+  /**
+   * Uses the fixed checkpoint folders migration id.
+   */
+  public constructor();
+
+  /**
+   * Adds the column with `Resources.addMessageCheckpointFolder`; an earlier checkpoint's folder stays empty.
    */
   public override apply(builder: MigrationBuilder): void;
 }

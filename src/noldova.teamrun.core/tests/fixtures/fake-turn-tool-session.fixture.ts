@@ -18,16 +18,21 @@ export class FakeTurnToolSession implements ITurnToolSession {
   public ends: number = 0;
   public listed: readonly JsonObject[] | null = null;
   public listFailure: Error | null = null;
+  public listHold: { readonly reached: () => void; readonly released: Promise<void> } | null = null;
 
   public constructor(id: string, scope: string) {
     this.id = id;
     this.scope = scope;
   }
 
-  public listToolsAsync(): Promise<readonly JsonObject[]> {
+  public async listToolsAsync(): Promise<readonly JsonObject[]> {
+    if (!Object.isNull(this.listHold)) {
+      this.listHold.reached();
+      await this.listHold.released;
+    }
     if (!Object.isNull(this.listFailure))
-      return Promise.reject(this.listFailure);
-    return Promise.resolve(this.listed ?? [{ name: "teamrun_list_chats", description: this.scope }]);
+      throw this.listFailure;
+    return this.listed ?? [{ name: "teamrun_list_chats", description: this.scope }];
   }
 
   public callToolAsync(name: string, input: JsonObject, signal: AbortSignal): Promise<JsonObject> {

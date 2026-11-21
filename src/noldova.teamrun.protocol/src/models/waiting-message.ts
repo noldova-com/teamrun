@@ -20,8 +20,10 @@ export class WaitingMessage {
   public readonly message: MessageSendParams;
   public readonly createdAt: string;
   public readonly failure: string | null;
+  public readonly fromOutside: boolean;
 
-  public constructor(id: string, delivery: MessageDelivery, message: MessageSendParams, createdAt: string, failure: string | null = null) {
+  public constructor(id: string, delivery: MessageDelivery, message: MessageSendParams, createdAt: string, failure: string | null = null,
+    fromOutside: boolean = false) {
     ArgumentException.throwIfNullOrWhitespace(id, Resources.idField);
     ArgumentException.throwIfNullOrWhitespace(createdAt, Resources.createdAtField);
     if (!Object.isNull(message.senderToken))
@@ -34,6 +36,7 @@ export class WaitingMessage {
     this.message = message;
     this.createdAt = createdAt;
     this.failure = failure;
+    this.fromOutside = fromOutside;
   }
 
   public get chatId(): string {
@@ -41,15 +44,15 @@ export class WaitingMessage {
   }
 
   public withDelivery(delivery: MessageDelivery): WaitingMessage {
-    return new WaitingMessage(this.id, delivery, this.message, this.createdAt, this.failure);
+    return new WaitingMessage(this.id, delivery, this.message, this.createdAt, this.failure, this.fromOutside);
   }
 
-  public withMessage(message: MessageSendParams): WaitingMessage {
-    return new WaitingMessage(this.id, this.delivery, message, this.createdAt);
+  public withMessage(message: MessageSendParams, fromOutside: boolean = this.fromOutside): WaitingMessage {
+    return new WaitingMessage(this.id, this.delivery, message, this.createdAt, null, fromOutside);
   }
 
   public withFailure(failure: string): WaitingMessage {
-    return new WaitingMessage(this.id, this.delivery, this.message, this.createdAt, failure);
+    return new WaitingMessage(this.id, this.delivery, this.message, this.createdAt, failure, this.fromOutside);
   }
 
   public static fromJson(value: unknown, path?: string): WaitingMessage {
@@ -60,7 +63,8 @@ export class WaitingMessage {
       reader.readOneOf(Resources.deliveryField, Object.values(MessageDelivery)),
       MessageSendParams.fromJson(message.toJson(), message.path),
       reader.readNonBlankString(Resources.createdAtField),
-      reader.hasField(Resources.failureField) ? reader.readNonBlankString(Resources.failureField) : null);
+      reader.hasField(Resources.failureField) ? reader.readNonBlankString(Resources.failureField) : null,
+      reader.hasField(Resources.fromOutsideField) && reader.readBoolean(Resources.fromOutsideField));
   }
 
   public toJson(): JsonObject {
@@ -70,7 +74,8 @@ export class WaitingMessage {
       [Resources.deliveryField]: this.delivery,
       [Resources.messageField]: this.message.toJson(),
       [Resources.createdAtField]: this.createdAt,
-      ...(Object.isNull(this.failure) ? {} : { [Resources.failureField]: this.failure })
+      ...(Object.isNull(this.failure) ? {} : { [Resources.failureField]: this.failure }),
+      ...(this.fromOutside ? { [Resources.fromOutsideField]: true } : {})
     };
   }
 }

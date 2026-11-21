@@ -23,6 +23,7 @@ import { WorkFolder } from "../../models/work-folder.js";
 import { Resources } from "../../resources.js";
 import type { DatabaseContext } from "../database-context.js";
 import type { ProviderKindRegistry } from "../provider-kinds/provider-kind-registry.js";
+import type { AttachmentStore } from "./attachment-store.js";
 import type { EngineServices } from "./engine-services.js";
 import type { ReplyCheckpoints } from "./reply-checkpoints.js";
 import { ReplyRun } from "./reply-run.js";
@@ -36,6 +37,7 @@ export class KeptSessions {
   private readonly events: IEventSink;
   private readonly log: ILog | null;
   private readonly checkpoints: ReplyCheckpoints | null;
+  private readonly attachments: AttachmentStore;
   private readonly nativeSessions: Map<string, Map<string, Set<string>>> = new Map();
   private readonly forgotten: Set<string> = new Set();
   private readonly requireConversationAsync: IEngineCallbacks["requireConversationAsync"];
@@ -51,6 +53,7 @@ export class KeptSessions {
     this.events = services.events;
     this.log = services.log;
     this.checkpoints = services.checkpoints;
+    this.attachments = services.attachments;
     this.requireConversationAsync = callbacks.requireConversationAsync;
     this.requireMessageAsync = callbacks.requireMessageAsync;
     this.requireWorkFolderAsync = callbacks.requireWorkFolderAsync;
@@ -88,6 +91,7 @@ export class KeptSessions {
           ? await this.conversations.setSessionResetAsync(conversation.id, true, transaction)
           : await this.conversations.setForkedSessionAsync(conversation.id, forked, transaction)];
       });
+      this.removeSentFiles(conversation.id, removed.filter(t => t.id !== target.id || t.author !== MessageAuthor.User));
       this.events.publish(new Event(EventName.ConversationRewound, new ConversationRewoundPayload(conversation.id, target.sequence).toJson()));
       this.events.publish(new Event(EventName.StateInvalidated, null));
 
@@ -98,13 +102,13 @@ export class KeptSessions {
     }
   }
 
-  public async releaseFolderAsync(conversationId: string): Promise<void> {
+  public async releaseFolderAsync(conversationId: string, signal?: AbortSignal): Promise<void> {
     const folders = this.context.chatFolders;
-    const conversation = await this.conversations.findAsync(conversationId);
-    if (!folders.exists(conversationId) || (!Object.isNull(conversation) && Object.isNull(conversation.projectId)))
-      return;
     try {
-      if (!Object.isNull(this.checkpoints) && !await this.checkpoints.deleteAsync(new WorkFolder(conversationId, folders.pathOf(conversationId)))) {
+      const conversation = await this.conversations.findAsync(conversationId);
+      if (!folders.exists(conversationId) || (!Object.isNull(conversation) && Object.isNull(conversation.projectId)))
+        return;
+      if (!Object.isNull(this.checkpoints) && !await this.checkpoints.deleteAsync(new WorkFolder(conversationId, folders.pathOf(conversationId)), signal)) {
         this.log?.write(Resources.formatChatFolderKept(conversationId, Resources.checkpointsHeldUp));
         return;
       }
@@ -115,7 +119,7 @@ export class KeptSessions {
     }
   }
 
-  public async sweepFoldersAsync(): Promise<void> {
+  public async sweepFoldersAsync(signal: AbortSignal): Promise<void> {
     let conversationIds: readonly string[];
     try {
       conversationIds = this.context.chatFolders.list();
@@ -124,8 +128,11 @@ export class KeptSessions {
       this.log?.write(Resources.formatChatFoldersNotSwept(Resources.formatFailureKind(error)));
       return;
     }
-    for (const conversationId of conversationIds)
-      await this.releaseFolderAsync(conversationId);
+    for (const conversationId of conversationIds) {
+      if (signal.aborted)
+        return;
+      await this.releaseFolderAsync(conversationId, signal);
+    }
   }
 
   public forget(conversationId: string): void {
@@ -157,19 +164,26 @@ export class KeptSessions {
   }
 
   private async restoreAsync(folder: WorkFolder, reply: Message, going: readonly Message[]): Promise<CheckpointRestore> {
+    if (!KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(reply.id)))
+      return CheckpointRestore.refused(Resources.checkpointFolderChangedRefusal);
     const checkpoint = await this.messages.findCheckpointAsync(reply.id);
     if (Object.isNull(checkpoint) || Object.isNull(this.checkpoints))
       return CheckpointRestore.refused(Resources.noCheckpointRefusal);
     const replies: Message[] = [];
-    for (const t of going.filter(u => u.author === MessageAuthor.Provider))
-      replies.push(await this.requireMessageAsync(t.id));
     let isPartial = false;
-    for (const t of replies)
-      if (Object.isNull(await this.messages.findCheckpointAsync(t.id)) || ReplyRun.hasPartialEvidence(t.details)) {
+    for (const t of going.filter(u => u.author === MessageAuthor.Provider)) {
+      const message = await this.requireMessageAsync(t.id);
+      if (Object.isNull(message.startedAt) || !KeptSessions.ranIn(folder, await this.messages.findCheckpointFolderAsync(t.id)))
+        continue;
+      if (Object.isNull(await this.messages.findCheckpointAsync(t.id)) || ReplyRun.hasPartialEvidence(message.details))
         isPartial = true;
-        break;
-      }
+      replies.push(message);
+    }
     return await this.checkpoints.restoreAsync(folder, checkpoint, isPartial ? null : replies.flatMap(t => ReplyRun.reportedFiles(t.details)));
+  }
+
+  private static ranIn(folder: WorkFolder, folderId: string | null): boolean {
+    return Object.isNull(folderId) || folderId === folder.id;
   }
 
   private async tryForkAsync(workingDirectory: string, kept: Message | undefined, removed: readonly Message[]): Promise<ForkedSession | null> {
@@ -190,6 +204,15 @@ export class KeptSessions {
     }
     catch {
       return null;
+    }
+  }
+
+  private removeSentFiles(conversationId: string, removed: readonly Message[]): void {
+    try {
+      this.attachments.removeSent(removed.flatMap(t => t.attachments.map(u => u.path)));
+    }
+    catch (error) {
+      this.log?.write(Resources.formatSentFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
     }
   }
 }

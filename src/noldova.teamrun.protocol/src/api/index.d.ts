@@ -554,6 +554,53 @@ export declare enum MethodName {
    */
   TeammateDelete = "TeammateDelete",
   /**
+   * Lists the organization: its departments and which teammate is in which. Parameters: `null`. Result: `Organization`.
+   */
+  OrganizationList = "OrganizationList",
+  /**
+   * Creates a department, last among its siblings, and publishes `OrganizationChanged`. Parameters: `DepartmentCreateParams`.
+   * Result: `Department`; a parent that isn't a department fails with `NotFound`.
+   */
+  DepartmentCreate = "DepartmentCreate",
+  /**
+   * Renames a department or sets or clears its leader, and publishes `OrganizationChanged`. Parameters: `DepartmentUpdateParams`.
+   * Result: `Department`; a leader who isn't a member of the department fails with `InvalidParams`.
+   */
+  DepartmentUpdate = "DepartmentUpdate",
+  /**
+   * Moves a department under another parent, or to another place among its siblings, and publishes `OrganizationChanged`.
+   * Parameters: `DepartmentMoveParams`. Result: `Department`; a move under itself or one of its own departments fails with `InvalidParams`.
+   */
+  DepartmentMove = "DepartmentMove",
+  /**
+   * Deletes a department, moving its members and departments to its parent, and publishes `OrganizationChanged`.
+   * Parameters: `DepartmentIdParams`. Result: `null`.
+   */
+  DepartmentDelete = "DepartmentDelete",
+  /**
+   * Puts a teammate in a department, or in none, and publishes `OrganizationChanged`; a leader who leaves stops leading.
+   * Parameters: `DepartmentMemberSetParams`. Result: `null`.
+   */
+  DepartmentMemberSet = "DepartmentMemberSet",
+  /**
+   * Sends a message to one teammate, a department's leader and members, every department's leader, or every teammate, starting
+   * each at once in its own chat, and publishes `OrganizationMessageUpdated` as each starts. Parameters:
+   * `OrganizationMessageSendParams`. Result: `OrganizationMessage`.
+   */
+  OrganizationMessageSend = "OrganizationMessageSend",
+  /**
+   * Stops an organization message: each recipient not yet started is Stopped, and a reply still pending is cancelled.
+   * Parameters: `MessageIdParams`, the organization message's id. Result: `OrganizationMessage`.
+   */
+  OrganizationMessageStop = "OrganizationMessageStop",
+  /** Lists the organization messages, oldest first. Result: `OrganizationMessage[]`. */
+  OrganizationMessageList = "OrganizationMessageList",
+  /**
+   * Lists the replies to one organization message: for each recipient its message reached, the replies in its chat that answer the message it was
+   * sent, in chat order. Parameters: `MessageIdParams`, the organization message's id. Result: `Message[]`.
+   */
+  OrganizationMessageReplyList = "OrganizationMessageReplyList",
+  /**
    * Adds a teammate to a chat. Parameters: `ChatMemberParams`. Result: `ChatMember`.
    */
   ConversationAddMember = "ConversationAddMember",
@@ -889,6 +936,19 @@ export declare enum MethodName {
    */
   ConversationFolderCount = "ConversationFolderCount",
   /**
+   * Attaches an existing folder to a chat without a project, or replaces the one attached: its teammates work in it, in place, from the
+   * next turn, and nothing is copied; the chat's own folder stays for a detach. Refused with `Conflict` while a reply runs in the chat or
+   * for a chat in a project, `NotFound` for an unknown chat, and `InvalidParameters` when the folder isn't an absolute path to a folder
+   * TeamRun can read. Parameters: `ChatFolderAttachParams`. Result: the `Chat`.
+   */
+  ChatFolderAttach = "ChatFolderAttach",
+  /**
+   * Detaches a chat's attached folder, leaving its files as they are, so that its teammates work in the chat's own folder again from
+   * the next turn. Refused with `Conflict` while a reply runs in the chat, `NotFound` for an unknown chat. Parameters: `ChatIdParams`.
+   * Result: the `Chat`.
+   */
+  ChatFolderDetach = "ChatFolderDetach",
+  /**
    * Removes a message and everything after it, marks the chat so that its next reply starts a fresh provider
    * session fed with the kept transcript, and optionally restores the project's files to the snapshot taken before the
    * removed reply started (git projects). Parameters: `ChatRewindParams`. Result:
@@ -965,6 +1025,11 @@ export declare enum MethodName {
    * report none or whose latest such reply is from a session since reset, such as by a provider change.
    */
   TeammateUsageList = "TeammateUsageList",
+  /**
+   * Lists each teammate's latest completed reply that has text, in any chat. Parameters: none. Result: an array of `TeammateLastReply`,
+   * one per teammate that has one.
+   */
+  TeammateLastReplyList = "TeammateLastReplyList",
   /**
    * Lists a page of a chat's background tasks: every running one on the first page, then its
    * finished commands, newest first and at most `limit` a page, each with its output left out and
@@ -1071,8 +1136,8 @@ export declare enum MethodName {
   SharedMcpSecretSet = "SharedMcpSecretSet",
   /**
    * Starts the OAuth sign-in of a shared HTTP MCP server that signs in: TeamRun finds the server's authorization server from its `401`, registers
-   * itself there when it has no client yet, and answers the address the person opens in the browser, with PKCE and a one-use local redirect; the
-   * server's `signIn` changes once the browser comes back. Parameters: `SharedMcpServerIdParams`. Result: `SharedMcpSignInStarted`; an unknown
+   * itself there when it has no client yet, and answers the address the person opens in the browser, with PKCE and a one-use local redirect, or no address
+   * when a Sign out or a later start ended it first; the server's `signIn` changes once the browser comes back. Parameters: `SharedMcpServerIdParams`. Result: `SharedMcpSignInStarted`; an unknown
    * server is `NotFound`, and one that doesn't sign in is `InvalidArgument`.
    */
   SharedMcpSignInStart = "SharedMcpSignInStart",
@@ -1170,6 +1235,15 @@ export declare enum EventName {
    */
   ReplyThinking = "ReplyThinking",
   /**
+   * A running reply started taking its folder's checkpoint, before its provider starts. Sent before the checkpoint and never stored, so a
+   * reloaded window does not see it. Payload: `MessageIdParams`.
+   */
+  ReplyCheckpointStarted = "ReplyCheckpointStarted",
+  /**
+   * A running reply's checkpoint ended, taken, not taken, failed or stopped. Never stored. Payload: `MessageIdParams`.
+   */
+  ReplyCheckpointEnded = "ReplyCheckpointEnded",
+  /**
    * A provider asked for permission. Payload: `Approval`.
    */
   ApprovalCreated = "ApprovalCreated",
@@ -1252,7 +1326,14 @@ export declare enum EventName {
    * A chat's waiting messages changed: one was added, edited, removed, sent, failed or moved to go next. Payload:
    * `WaitingMessagesPayload`, with all of the chat's waiting messages in the order they go.
    */
-  WaitingMessagesChanged = "WaitingMessagesChanged"
+  WaitingMessagesChanged = "WaitingMessagesChanged",
+  /**
+   * The organization changed: a department was created, renamed, moved or deleted, a leader was set or cleared, a teammate
+   * changed department, or a deleted teammate left its department. Payload: `Organization`, the whole organization after the change.
+   */
+  OrganizationChanged = "OrganizationChanged",
+  /** An organization message or one of its recipients changed. Payload: `OrganizationMessage`, the whole message. */
+  OrganizationMessageUpdated = "OrganizationMessageUpdated"
 }
 
 /**
@@ -1518,6 +1599,8 @@ export declare class Resources {
   public static readonly approvedResponderPlanField: string;
   /** Name of a chat's field saying a person chose its title. */
   public static readonly titleChosenField: string;
+  /** Name of a chat's field for the existing folder a person attached to it: `attachedFolder`. */
+  public static readonly attachedFolderField: string;
   /** Name of a teammate update's field for the provider its sender read: `expectedProviderId`. */
   public static readonly expectedProviderIdField: string;
   /** Name of a provider mode's field saying it lifts the provider's restrictions: `unrestricted`. */
@@ -1554,6 +1637,10 @@ export declare class Resources {
    * Invalid draft revision diagnostic.
    */
   public static readonly draftRevisionInvalid: string;
+  /**
+   * Invalid draft save revision diagnostic.
+   */
+  public static readonly draftBaseRevisionInvalid: string;
   /**
    * A reading position save that names a chat twice diagnostic.
    */
@@ -1640,6 +1727,71 @@ export declare class Resources {
    * The usageHandOffSource protocol value: the `source` of the note that ends a reply that ran no turn because its teammate was out of usage, handed off or not.
    */
   public static readonly usageHandOffSource: string;
+  /**
+   * The chatWakeSource protocol value: the `source` of the message a chat's wake posts when the work it sent to another chat ends, whose text is what its teammate reads.
+   */
+  public static readonly chatWakeSource: string;
+  /**
+   * The wakeReceivedSource protocol value: the `source` of the note at the top of a reply that a chat's wake started, which names the chat and its replies for the person.
+   */
+  public static readonly wakeReceivedSource: string;
+  /**
+   * Name of the field carrying the ID of the chat a wake came from: `wakeChatId`.
+   */
+  public static readonly wakeChatField: string;
+  /**
+   * Name of the field carrying a wake's replies for the person, each with its teammate's `name`, its `status` and its `text` or null: `wakeReplies`.
+   */
+  public static readonly wakeRepliesField: string;
+  /**
+   * Name of the field carrying the ID of the reply a chat's wake started: `wakeReplyId`.
+   */
+  public static readonly wakeReplyField: string;
+  /**
+   * Name of the field saying why a chat's wake brought no replies back, `lost` or `chatDeleted`, absent when they came back: `wakeEnd`.
+   */
+  public static readonly wakeEndField: string;
+  /**
+   * Name of the field carrying, for a sub-agent's or background command's wake, what the person sees of it: its `kind`, `subAgent` or
+   * `command`, its `name`, how it `ending`, in words without IDs, or null while it never ended, and its result `text` or null: `wakeTask`.
+   */
+  public static readonly wakeTaskField: string;
+  /**
+   * The `kind` of a sub-agent's wake in `wakeTask`: `subAgent`.
+   */
+  public static readonly wakeSubAgentTask: string;
+  /**
+   * The `kind` of a background command's wake in `wakeTask`: `command`.
+   */
+  public static readonly wakeCommandTask: string;
+  /**
+   * Name of the field carrying how a sub-agent or background command ended, in words: `ending`.
+   */
+  public static readonly endingField: string;
+  /**
+   * The `wakeEnd` of a wake TeamRun lost by restarting before the work it sent ended: `lost`.
+   */
+  public static readonly wakeLostEnd: string;
+  /**
+   * The `wakeEnd` of a wake whose chat was deleted before the work sent there ended: `chatDeleted`.
+   */
+  public static readonly wakeChatDeletedEnd: string;
+  /**
+   * The fixed opening of the text of a chat's wake TeamRun lost by restarting, which tells such a wake stored without a `wakeEnd` apart.
+   */
+  public static readonly wakeLostOpening: string;
+  /**
+   * The fixed opening of the text of a chat's wake whose chat was deleted, which tells such a wake stored without a `wakeEnd` apart.
+   */
+  public static readonly wakeChatDeletedOpening: string;
+  /**
+   * The fixed opening of the text of a background command's wake TeamRun lost by restarting, which tells such a wake stored without a view apart.
+   */
+  public static readonly wakeCommandLostOpening: string;
+  /**
+   * The fixed opening of the text of a sub-agent's wake TeamRun lost by restarting, which tells such a wake stored without a view apart.
+   */
+  public static readonly wakeSubAgentLostOpening: string;
   /**
    * The resumeSource protocol value: the `source` of the note that a provider could not resume a chat's native session and started a fresh one.
    */
@@ -2016,6 +2168,36 @@ export declare class Resources {
    * Name of the last-update timestamp field of a model: `updatedAt`.
    */
   public static readonly updatedAtField: string;
+  /** Name of a department's parent field: `parentId`. */
+  public static readonly parentIdField: string;
+  /** Name of a department's leader field: `leaderId`. */
+  public static readonly leaderIdField: string;
+  /** Name of a department's order field among its siblings: `order`. */
+  public static readonly orderField: string;
+  /** Name of a department id field: `departmentId`. */
+  public static readonly departmentIdField: string;
+  /** Name of an organization's departments field: `departments`. */
+  public static readonly departmentsField: string;
+  /** Name of an organization's members field: `members`. */
+  public static readonly membersField: string;
+  /** What a department name may be: 1 to 100 characters with no line break or other control character. */
+  public static readonly departmentNamePattern: RegExp;
+  /** Why a department name is refused: it is blank, longer than 100 characters, or holds a line break or other control character. */
+  public static readonly invalidDepartmentName: string;
+  /** Why a department's order is refused: it isn't a whole number from 0. */
+  public static readonly invalidDepartmentOrder: string;
+  /** Why a department naming itself as its parent is refused. */
+  public static readonly departmentOwnParent: string;
+  /** Why a department update that changes nothing is refused. */
+  public static readonly emptyDepartmentUpdate: string;
+  /** Why an organization with two departments of one id is refused. */
+  public static readonly duplicateDepartment: string;
+  /** Why an organization with a department whose parent isn't one of its departments is refused. */
+  public static readonly unknownParentDepartment: string;
+  /** Why an organization with a teammate in a department that isn't one of its departments is refused. */
+  public static readonly unknownMemberDepartment: string;
+  /** Why an organization with a teammate in two departments is refused. */
+  public static readonly teammateInTwoDepartments: string;
   /**
    * Name of a draft's revision field: `revision`.
    */
@@ -2986,6 +3168,7 @@ export declare class Resources {
   public static readonly agentsField: string;
   public static readonly localCommandsField: string;
   public static readonly failureField: string;
+  public static readonly fromOutsideField: string;
   public static readonly failureCodeField: string;
   public static readonly failureModuleCodeField: string;
   /** Name of a Browser step's field for the permission request that decided its call: `permission`, with `risk`, `decision`, `isRemembered` and `isAsked`. */
@@ -4257,7 +4440,7 @@ export declare class Chat {
    */
   public readonly edited: boolean;
   /**
-   * The chat's own folder, for a chat without a project; `null` in a project. The runtime sets it from its data folder
+   * The folder a chat without a project works in, its attached folder or else its own folder; `null` in a project. The runtime sets it
    * each time it reads the chat, so a stored value never counts.
    */
   public readonly folder: string | null;
@@ -4283,6 +4466,12 @@ export declare class Chat {
   public readonly titleChosen: boolean;
 
   /**
+   * The existing folder a person attached to a chat without a project, which its teammates work in, in place, instead of its own
+   * folder; `null` when none is attached, and always in a project. Written only when set.
+   */
+  public readonly attachedFolder: string | null;
+
+  /**
    * Initializes the chat.
    * @param id Unique identifier.
    * @param projectId The `Project` id, or `null` for a chat without a project.
@@ -4299,7 +4488,9 @@ export declare class Chat {
    * @param approvedPlanTeammates The teammates whose plan was approved since Plan first turned on; none by default.
    * @param approvedResponderPlan Whether the chat's own provider's plan was approved since Plan first turned on; `false` by default.
    * @param titleChosen Whether a person chose the title; `false` by default.
-   * @throws ArgumentException when the id, a given project id, the title, a timestamp, a given folder or an approved teammate is blank.
+   * @param attachedFolder The folder a person attached, or `null` (the default).
+   * @throws ArgumentException when the id, a given project id, the title, a timestamp, a given folder, a given attached folder or an
+   * approved teammate is blank.
    */
   public constructor(
     id: string,
@@ -4315,7 +4506,8 @@ export declare class Chat {
     planFirst?: boolean,
     approvedPlanTeammates?: readonly string[],
     approvedResponderPlan?: boolean,
-    titleChosen?: boolean);
+    titleChosen?: boolean,
+    attachedFolder?: string | null);
 
   /**
    * Reads a chat from untrusted JSON.
@@ -4411,6 +4603,15 @@ export declare class Chat {
    * @throws ArgumentException when the folder is blank.
    */
   public withFolder(folder: string | null): Chat;
+
+  /**
+   * A copy with an attached folder set or cleared, keeping everything else.
+   * @param attachedFolder The folder a person attached, or `null` to detach it.
+   * @param updatedAt ISO 8601 timestamp of the change.
+   * @returns The copy.
+   * @throws ArgumentException when the attached folder or the timestamp is blank.
+   */
+  public withAttachedFolder(attachedFolder: string | null, updatedAt: string): Chat;
 
   /**
    * Returns a copy with the session-reset mark changed.
@@ -6779,13 +6980,19 @@ export declare class DraftSaveParams {
    */
   public readonly attachments: readonly AttachmentInput[];
   /**
+   * The revision of the draft this one replaces, 0 when it replaces none, or `null` to replace whatever the draft holds;
+   * a save whose revision is no longer the draft's is refused with `Conflict`, and the draft and its files stay.
+   */
+  public readonly revision: number | null;
+  /**
    * Initializes the parameters.
    * @param chatId Nonblank chat id.
    * @param text The text.
    * @param attachments The files; none by default.
-   * @throws ArgumentException when the id is blank or there are more than 10 files.
+   * @param revision Non-negative safe integer revision, or `null`, the default.
+   * @throws ArgumentException when the id is blank, there are more than 10 files or the revision is not a non-negative safe integer.
    */
-  public constructor(chatId: string, text: string, attachments?: readonly AttachmentInput[]);
+  public constructor(chatId: string, text: string, attachments?: readonly AttachmentInput[], revision?: number | null);
 
   /**
    * The chat's id, by its earlier name.
@@ -6794,7 +7001,7 @@ export declare class DraftSaveParams {
   public get conversationId(): string;
   /**
    * Decodes the parameters.
-   * @param value Object with conversationId, text and attachments.
+   * @param value Object with conversationId, text, attachments and an optional nullable revision.
    * @param path Diagnostic field path; defaults to the JSON root.
    * @returns The parameters.
    * @throws JsonException for missing or incorrectly typed fields.
@@ -6803,7 +7010,7 @@ export declare class DraftSaveParams {
   public static fromJson(value: unknown, path?: string): DraftSaveParams;
   /**
    * Encodes the parameters.
-   * @returns The conversationId, text and attachments wire fields.
+   * @returns The conversationId, text, attachments and revision wire fields.
    */
   public toJson(): JsonObject;
 }
@@ -8290,6 +8497,46 @@ export declare class ChatMoveParams {
   /**
    * Renders the wire shape.
    * @returns An object with `conversationId`, `projectId`.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * Parameters of `ChatFolderAttach`: the chat and the existing folder it works in from then on.
+ * @remarks
+ * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
+ * path; `toJson` renders the canonical wire shape.
+ */
+export declare class ChatFolderAttachParams {
+  /**
+   * The `Chat` id.
+   */
+  public readonly chatId: string;
+  /**
+   * The folder's absolute path; must not be blank.
+   */
+  public readonly folder: string;
+
+  /**
+   * Initializes the parameters.
+   * @param chatId The `Chat` id.
+   * @param folder The folder's absolute path.
+   * @throws ArgumentException when `chatId`, `folder` are blank.
+   */
+  public constructor(chatId: string, folder: string);
+
+  /**
+   * Reads the parameters from untrusted JSON.
+   * @param value The untrusted value, expected to carry `chatId`, `folder`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The parameters.
+   * @throws JsonException when a field is missing or blank, naming its path.
+   */
+  public static fromJson(value: unknown, path?: string): ChatFolderAttachParams;
+
+  /**
+   * Renders the wire shape.
+   * @returns An object with `chatId`, `folder`.
    */
   public toJson(): JsonObject;
 }
@@ -9939,7 +10186,8 @@ export declare class ProviderUpdateParams {
    */
   public readonly ownMcpServers: boolean | null;
   /**
-   * Absolute path of the server the person chose, an empty string to choose none, or `null` to leave the choice as it is.
+   * Absolute path of the server the person chose, an empty string to choose none, or `null` to leave the choice as it is; the runtime takes
+   * a path or an empty string only from the app's main process, TeamRun's window.
    */
   public readonly binaryPath: string | null;
 
@@ -11520,6 +11768,342 @@ export declare class TeammateIdParams {
   public toJson(): JsonObject;
 }
 
+/** A department of the organization: it has a name, an optional leader, and sits under the person or another department. */
+export declare class Department {
+  /** id. */
+  public readonly id: string;
+  /** The name, 1 to 100 characters on one line. */
+  public readonly name: string;
+  /** The department it sits under, or null when it sits under the person. */
+  public readonly parentId: string | null;
+  /** The teammate who leads it, always one of its members, or null. */
+  public readonly leaderId: string | null;
+  /** Its place among its siblings, from 0. */
+  public readonly order: number;
+  /** When it was created, as ISO 8601 text. */
+  public readonly createdAt: string;
+  /** When it last changed, as ISO 8601 text. */
+  public readonly updatedAt: string;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when a field is blank, the name is invalid, the department is its own parent, or the order isn't a whole number from 0.
+   */
+  public constructor(
+    id: string,
+    name: string,
+    parentId: string | null,
+    leaderId: string | null,
+    order: number,
+    createdAt: string,
+    updatedAt: string);
+  /**
+   * Checks a department name.
+   * @param name The name.
+   * @throws ArgumentException when it is blank, longer than 100 characters, or holds a line break or other control character.
+   */
+  public static validateName(name: string): void;
+  /**
+   * Reads a department name from its `name` field.
+   * @param reader The reader of the object holding it.
+   * @returns The name.
+   * @throws JsonException at the field's path when it isn't a valid name.
+   */
+  public static readName(reader: JsonReader): string;
+  /**
+   * Checks a department's order among its siblings.
+   * @param order The order.
+   * @throws ArgumentException when it isn't a whole number from 0.
+   */
+  public static validateOrder(order: number): void;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): Department;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A teammate's place in a department; a teammate is in at most one. */
+export declare class DepartmentMember {
+  /** teammate Id. */
+  public readonly teammateId: string;
+  /** department Id. */
+  public readonly departmentId: string;
+  /** Creates a validated immutable value. */
+  public constructor(
+    teammateId: string,
+    departmentId: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentMember;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** The organization under the person: its departments, and the teammates in them; a teammate in none shows under "No department". */
+export declare class Organization {
+  /** The organization with no departments. */
+  public static readonly empty: Organization;
+  /** The departments, by their order among their siblings, then by when they were created. */
+  public readonly departments: readonly Department[];
+  /** The teammates in a department. */
+  public readonly members: readonly DepartmentMember[];
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when two departments share an id, a parent or a member's department isn't one of the departments,
+   * or a teammate is in two departments.
+   */
+  public constructor(
+    departments: readonly Department[],
+    members: readonly DepartmentMember[]);
+  /**
+   * Returns the departments under a parent, in their order.
+   * @param parentId The parent department's id, or null for those under the person.
+   * @returns The departments.
+   */
+  public childrenOf(parentId: string | null): readonly Department[];
+  /**
+   * Returns the department a teammate is in.
+   * @param teammateId The teammate's id.
+   * @returns The department's id, or null when the teammate is in none.
+   */
+  public departmentOf(teammateId: string): string | null;
+  /**
+   * Returns the teammates a message to a target goes to, each once.
+   * @param target The target.
+   * @param teammateIds Every teammate's id, in the order to list everyone.
+   * @returns The ids: the teammate when it's one of them; a department's leader, then its other direct members; each
+   * department's leader, in the departments' order; or every teammate.
+   */
+  public recipientsOf(target: OrganizationTarget, teammateIds: readonly string[]): readonly string[];
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): Organization;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Whom an organization message goes to. */
+export declare enum OrganizationTargetKind {
+  /** One teammate. */
+  Teammate = "Teammate",
+  /** A department's leader and its direct members. */
+  Department = "Department",
+  /** Every department's leader. */
+  Leaders = "Leaders",
+  /** Every teammate, in a department or not. */
+  Everyone = "Everyone"
+}
+
+/** Where an organization message stands for one recipient. */
+export declare enum OrganizationRecipientState {
+  /** Not started yet. */
+  Queued = "Queued",
+  /** Its chat has the message and its reply started. */
+  Started = "Started",
+  /** The person stopped the message before it started. */
+  Stopped = "Stopped",
+  /** The teammate was deleted before it started. */
+  Removed = "Removed",
+  /** It couldn't start; the reason says why. */
+  Failed = "Failed"
+}
+
+/** Whom an organization message goes to. */
+export declare class OrganizationTarget {
+  /** Every department's leader. */
+  public static readonly leaders: OrganizationTarget;
+  /** Every teammate. */
+  public static readonly everyone: OrganizationTarget;
+  /** The kind. */
+  public readonly kind: OrganizationTargetKind;
+  /** The teammate's or department's id, or null for leaders and everyone. */
+  public readonly id: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when a teammate or department target has no id, or leaders or everyone has one.
+   */
+  public constructor(kind: OrganizationTargetKind, id: string | null);
+  /** The target of one teammate. */
+  public static teammate(teammateId: string): OrganizationTarget;
+  /** The target of a department. */
+  public static department(departmentId: string): OrganizationTarget;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationTarget;
+  /** Whether both name the same kind and id. */
+  public equals(other: OrganizationTarget): boolean;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** One teammate an organization message goes to, and where it stands. */
+export declare class OrganizationRecipient {
+  /** The teammate's id. */
+  public readonly teammateId: string;
+  /** The teammate's name when the message was sent. */
+  public readonly teammateName: string;
+  /** Where it stands. */
+  public readonly state: OrganizationRecipientState;
+  /** The chat it went to, once started. */
+  public readonly chatId: string | null;
+  /** The message in that chat, once started; its reply answers it. */
+  public readonly messageId: string | null;
+  /** Why it failed, or null. */
+  public readonly reason: string | null;
+  /** Creates a validated immutable value. */
+  public constructor(
+    teammateId: string,
+    teammateName: string,
+    state: OrganizationRecipientState,
+    chatId?: string | null,
+    messageId?: string | null,
+    reason?: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationRecipient;
+  /** Returns a copy in another state, keeping the fields not given. */
+  public with(state: OrganizationRecipientState, chatId?: string | null, messageId?: string | null, reason?: string | null): OrganizationRecipient;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A message sent from the organization view, and each of its recipients. */
+export declare class OrganizationMessage {
+  /** The id. */
+  public readonly id: string;
+  /** Whom it went to. */
+  public readonly target: OrganizationTarget;
+  /** The text. */
+  public readonly text: string;
+  /** When it was sent. */
+  public readonly createdAt: string;
+  /** The teammates it went to, in the order the target lists them. */
+  public readonly recipients: readonly OrganizationRecipient[];
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the text is blank or a teammate is a recipient twice.
+   */
+  public constructor(
+    id: string,
+    target: OrganizationTarget,
+    text: string,
+    createdAt: string,
+    recipients: readonly OrganizationRecipient[]);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationMessage;
+  /** Returns a copy with one recipient replaced, by its teammate. */
+  public withRecipient(recipient: OrganizationRecipient): OrganizationMessage;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for sending an organization message. */
+export declare class OrganizationMessageSendParams {
+  /** Whom it goes to. */
+  public readonly target: OrganizationTarget;
+  /** The text. */
+  public readonly text: string;
+  /** Creates a validated immutable value. */
+  public constructor(
+    target: OrganizationTarget,
+    text: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationMessageSendParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for creating a department. */
+export declare class DepartmentCreateParams {
+  /** The name. */
+  public readonly name: string;
+  /** The department it goes under, or null for the person. */
+  public readonly parentId: string | null;
+  /** Creates a validated immutable value. */
+  public constructor(
+    name: string,
+    parentId: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentCreateParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for renaming a department or setting or clearing its leader; an omitted field stays. */
+export declare class DepartmentUpdateParams {
+  /** department Id. */
+  public readonly departmentId: string;
+  /** The new name, or undefined to keep it. */
+  public readonly name: string | undefined;
+  /** The new leader, null to clear it, or undefined to keep it. */
+  public readonly leaderId: string | null | undefined;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when it changes nothing or a field is invalid.
+   */
+  public constructor(
+    departmentId: string,
+    name: string | undefined,
+    leaderId: string | null | undefined);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentUpdateParams;
+  /**
+   * Returns the department with this update's changes.
+   * @param department The department as it is.
+   * @param updatedAt The change's time, as ISO 8601 text.
+   * @returns The changed department.
+   */
+  public applyTo(department: Department, updatedAt: string): Department;
+  /** Returns the wire representation, without the omitted fields. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for moving a department under another parent or to another place among its siblings. */
+export declare class DepartmentMoveParams {
+  /** department Id. */
+  public readonly departmentId: string;
+  /** The department it goes under, or null for the person. */
+  public readonly parentId: string | null;
+  /** Its place among its new siblings, from 0; a place past the last puts it last. */
+  public readonly order: number;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when a field is blank, the department is its own parent, or the order isn't a whole number from 0.
+   */
+  public constructor(
+    departmentId: string,
+    parentId: string | null,
+    order: number);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentMoveParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters naming one department. */
+export declare class DepartmentIdParams {
+  /** department Id. */
+  public readonly departmentId: string;
+  /** Creates a validated immutable value. */
+  public constructor(
+    departmentId: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentIdParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for putting a teammate in a department, or in none. */
+export declare class DepartmentMemberSetParams {
+  /** teammate Id. */
+  public readonly teammateId: string;
+  /** The department, or null for none. */
+  public readonly departmentId: string | null;
+  /** Creates a validated immutable value. */
+  public constructor(
+    teammateId: string,
+    departmentId: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): DepartmentMemberSetParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
 /** Parameters for chat member. */
 export declare class ChatMemberParams {
   /** chat Id. */
@@ -12036,10 +12620,10 @@ export declare class SharedMcpSignIn {
 
 /** Where the person goes to sign a shared MCP server in: the authorization server's address, with TeamRun's client, PKCE challenge and redirect. */
 export declare class SharedMcpSignInStarted {
-  /** The http or https address to open in the browser. */
-  public readonly url: string;
+  /** The http or https address to open in the browser, or `null` when a Sign out or a later start ended the sign-in before it had one. */
+  public readonly url: string | null;
   /** Creates a validated immutable value; throws `ArgumentException` for an address that isn't http or https. */
-  public constructor(url: string);
+  public constructor(url: string | null);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): SharedMcpSignInStarted;
   /** Returns the wire representation, with `url`. */
@@ -12232,21 +12816,26 @@ export declare class WaitingMessage {
   /** Why its send failed, when it did; a failed message stays, and the ones after it go. */
   public readonly failure: string | null;
   /**
+   * Whether a client other than TeamRun's window added it or has edited it, so its requested mode is checked again when it is sent; a
+   * message kept before this field existed reads as `false`.
+   */
+  public readonly fromOutside: boolean;
+  /**
    * Initializes the waiting message.
    * @throws ArgumentException when `id`, `createdAt` or a given `failure` is blank, or `message` has a sender token.
    */
-  public constructor(id: string, delivery: MessageDelivery, message: MessageSendParams, createdAt: string, failure?: string | null);
+  public constructor(id: string, delivery: MessageDelivery, message: MessageSendParams, createdAt: string, failure?: string | null, fromOutside?: boolean);
   /** The `Chat` id, the message's. */
   public get chatId(): string;
-  /** The waiting message with another delivery, keeping its failure. */
+  /** The waiting message with another delivery, keeping its failure and whether it is from outside. */
   public withDelivery(delivery: MessageDelivery): WaitingMessage;
-  /** The waiting message with another send, and no failure. */
-  public withMessage(message: MessageSendParams): WaitingMessage;
-  /** The waiting message with the failure of its send. */
+  /** The waiting message with another send and no failure, from outside when `fromOutside` says so, by default as it was. */
+  public withMessage(message: MessageSendParams, fromOutside?: boolean): WaitingMessage;
+  /** The waiting message with the failure of its send, keeping whether it is from outside. */
   public withFailure(failure: string): WaitingMessage;
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): WaitingMessage;
-  /** Returns the wire representation, with `id`, `chatId`, `delivery`, `message`, `createdAt` and, when it failed, `failure`. */
+  /** Returns the wire representation, with `id`, `chatId`, `delivery`, `message`, `createdAt`, `failure` when it failed and `fromOutside` when it is. */
   public toJson(): JsonObject;
 }
 
@@ -12718,6 +13307,63 @@ export declare class ContextUsage {
    * @throws ArgumentException when the count isn't a non-negative safe integer.
    */
   public static throwIfNotCount(value: number, name: string): void;
+}
+
+/**
+ * What a teammate last said: its latest completed reply that has text, in any chat, as `TeammateLastReplyList` returns it.
+ */
+export declare class TeammateLastReply {
+  /**
+   * The `Teammate` id.
+   */
+  public readonly teammateId: string;
+  /**
+   * The reply's chat id.
+   */
+  public readonly chatId: string;
+  /**
+   * The reply's message id.
+   */
+  public readonly messageId: string;
+  /**
+   * The reply's Text details, joined by spaces.
+   */
+  public readonly text: string;
+  /**
+   * ISO 8601 timestamp of the reply's end.
+   */
+  public readonly endedAt: string;
+
+  /**
+   * Initializes the teammate's last reply.
+   * @throws ArgumentException when a field is blank.
+   */
+  public constructor(teammateId: string, chatId: string, messageId: string, text: string, endedAt: string);
+
+  /**
+   * Reads the teammate's last reply from untrusted JSON.
+   * @param value The untrusted value, with `teammateId`, `chatId`, `messageId`, `text` and `endedAt`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @throws JsonException when a field is missing or blank.
+   */
+  public static fromJson(value: unknown, path?: string): TeammateLastReply;
+
+  /**
+   * The last reply a message makes for its teammate, or `null` unless it is a teammate's completed reply whose Text details hold more than whitespace.
+   * @param message The message.
+   */
+  public static of(message: Message): TeammateLastReply | null;
+
+  /**
+   * Whether the other last reply has the same fields.
+   * @param other The other last reply.
+   */
+  public equals(other: TeammateLastReply): boolean;
+
+  /**
+   * Writes the last reply as JSON.
+   */
+  public toJson(): JsonObject;
 }
 
 /**

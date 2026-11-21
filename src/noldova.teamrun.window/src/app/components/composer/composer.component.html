@@ -75,13 +75,16 @@ LICENSE file in the root directory of this source tree.
         <span class="nol-teamrun-composer-note">{{ resources.editingWaitingNote }}</span>
         <button type="button" nol-button class="nol-teamrun-composer-cancel-edit" [variant]="variants.Text" (click)="cancelEditing()">{{ resources.cancelEditingLabel }}</button>
       </div>
+      @if (filesRefused()) {
+        <nol-field-message class="nol-teamrun-composer-files-refused">{{ resources.editingFilesRefused }}</nol-field-message>
+      }
     }
     <textarea #box class="nol-teamrun-composer-text" name="text" rows="1" [nolMentionField]="candidates()"
       [nolMentionFieldLabel]="resources.mentionListLabel" [nolMentionValue]="value()" [placeholder]="resources.composerPlaceholder"
       [attr.aria-label]="resources.composerLabel" [readonly]="!canCompose()" (nolMentionValueChange)="edit($event)" (keydown)="onKeyDown($event)"></textarea>
     <div #bar class="nol-teamrun-composer-bar">
-      <button #add type="button" nol-icon-button [icon]="resources.addGlyph" [label]="resources.addFilesLabel" [nolTooltip]="resources.addFilesLabel"
-        [disabled]="!canCompose()" (click)="filePicker.click()"></button>
+      <button #add type="button" nol-icon-button class="nol-teamrun-composer-add" [icon]="resources.addGlyph" [label]="resources.addFilesLabel" [nolTooltip]="resources.addFilesLabel"
+        [disabled]="!canCompose() || editing() !== null" (click)="filePicker.click()"></button>
       <button #access type="button" nol-button class="nol-teamrun-composer-access" [class.nol-teamrun-composer-folded]="fold() >= folds.accessIcon"
         [class.nol-teamrun-composer-in-menu]="fold() >= folds.accessInMenu" [variant]="variants.Outlined" [nolMenuTriggerFor]="permissionsMenu"
         [nolTooltip]="resources.chatPermissionsLabel" [attr.aria-label]="resources.formatChatPermissions(accessName())" [disabled]="catalog().modes.length === 0">
@@ -114,8 +117,9 @@ LICENSE file in the root directory of this source tree.
         </span>
       </button>
       @if (runningReply(); as reply) {
-        <button type="button" nol-icon-button class="nol-teamrun-composer-stop" [icon]="resources.stopGlyph" [label]="resources.stopLabel"
-          [nolTooltip]="resources.stopLabel" [disabled]="stopping()" (click)="stop()"></button>
+        <button type="button" nol-icon-button class="nol-teamrun-composer-stop" [icon]="resources.stopGlyph"
+          [label]="stopping() ? resources.stoppingLabel : resources.stopLabel" [nolTooltip]="stopping() ? resources.stoppingLabel : resources.stopLabel"
+          [disabled]="stopping()" (click)="stop()"></button>
         @let chosen = editing() !== null ? null : store.whileReplying();
         <nol-split-button #end class="nol-teamrun-composer-deliver" [icon]="chosen === null ? resources.sendGlyph : resources.deliveryGlyphs[chosen]"
           [label]="chosen === null ? resources.saveWaitingLabel : resources.deliveryLabels[chosen]" [menuLabel]="resources.deliveryMenuLabel" [menu]="deliveryMenu"

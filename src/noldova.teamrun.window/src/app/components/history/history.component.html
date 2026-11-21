@@ -18,9 +18,11 @@ LICENSE file in the root directory of this source tree.
 } @else if (source(); as source) {
   <nol-virtual-list [source]="source" [label]="resources.historyLabel" [kind]="feed" [position]="position()" [busy]="isBusy()" [readAhead]="resources.historyReadAhead"
     (positionChange)="remember($event)" (jumped)="jumpToLatest($event)">
-    <ng-template [nolVirtualRow]="source" [nolVirtualRowHidden]="isSteered" let-item let-labelId="labelId">
+    <ng-template [nolVirtualRow]="source" [nolVirtualRowHidden]="isHidden" let-item let-labelId="labelId">
       @if (usageHandOffOf(item); as note) {
         <nol-teamrun-usage-hand-off-line [note]="note" [labelId]="labelId" />
+      } @else if (wakeOf(item); as received) {
+        <nol-teamrun-wake-line [message]="item" [received]="received" [alone]="true" [labelId]="labelId" />
       } @else {
         <nol-teamrun-history-message [message]="item" [labelId]="labelId" [flashStart]="item.id === flashRowId() ? flashStart() : null"
           [revealsPlan]="item.id === flashRowId() && flashesPlan()" [revealsStep]="item.id === flashRowId() ? flashStep() : null"

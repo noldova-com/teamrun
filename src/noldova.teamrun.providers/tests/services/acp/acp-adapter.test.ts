@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import { JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import {
-  type ITimer, Resources as CoreResources, McpEndpoint, SessionTokens, SharedMcpFailureKind, SharedMcpRefusal, SharedMcpValues, TimeoutException, TurnOutcome, TurnRequest, type TurnResult,
+  type ITimer, Resources as CoreResources, McpEndpoint, NodeTimer, SessionTokens, SharedMcpFailureKind, SharedMcpRefusal, SharedMcpValues, TimeoutException, TurnOutcome, TurnRequest, type TurnResult,
   TurnTools
 } from "@noldova/teamrun.core";
 import { AuthStatus, MessageAttachment, Provider, ProviderMode, ReplyAction, RequestedSettings, SenderEnvironment, SharedMcpHeader, SharedMcpServerDefinition,
@@ -120,7 +120,7 @@ export class AcpAdapterTests {
   public async asksForATitleWithNoServersOutsideAChatTurnAndKeepsTheAnswersText(): Promise<void> {
     await using host = new GrokTestHost();
     const agent = new TestAcpAgent(host.command, host.environment, host.directory.path);
-    const answer = await TitleAsks.askAsync(host.createAcpAdapter(agent), AcpAdapterTests.isolated(host, "titled"));
+    const answer = await TitleAsks.askAsync(host.createAcpAdapter(agent, undefined, undefined, null, new NodeTimer()), AcpAdapterTests.isolated(host, "titled"));
     Assert.areEqual("The answered title", answer);
     Assert.areEqual("[]", readFileSync(host.directory.resolve("mcp-servers.txt"), "utf8").trimEnd());
     Assert.areEqual("[false]", JSON.stringify(agent.launchChatTurns));
@@ -263,6 +263,28 @@ export class AcpAdapterTests {
     Assert.areEqual(JSON.stringify([TurnOutcome.Completed, TurnOutcome.Completed, TurnOutcome.Completed]), JSON.stringify([first, second, third].map(t => t.outcome)));
     Assert.areEqual(JSON.stringify([opened, ["sender-1"]]), JSON.stringify([kept, adopted]));
     Assert.areEqual(kept[0]! + 1, host.programs.started.length);
+  }
+
+  @TestMethod
+  public async startsANewProcessForTheChatsNextTurnWhenTheServedToolsChangedSinceTheKeptSessionListedThem(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = AcpAdapterTests.adapter(host, [], { agentCapabilities: { loadSession: true, mcpCapabilities: { http: true } } }, {}, host.idleTimer);
+    const tokens = new SessionTokens();
+    tokens.open("session-1", "c1/t1");
+    const served = ["terminal_run"];
+    const tools = new TurnTools({ listToolsAsync: () => Promise.resolve(served.map(t => ({ name: t }))), callToolAsync: () => Promise.resolve({}) }, [],
+      new McpEndpoint("http://127.0.0.1:4711/mcp", tokens, "session-1"));
+    const request = (resume: string | null): TurnRequest => new TurnRequest(null, host.directory.path, "methods", new RequestedSettings("grok", null, null), resume,
+      [], null, null, {}, false, tools);
+    const first = await AcpAdapterTests.run(adapter, request(null));
+    const opened = host.programs.started.length;
+    await AcpAdapterTests.run(adapter, request(first.nativeSessionId));
+    const kept = host.programs.started.length - opened;
+    served.push("computer_click");
+    const changed = await AcpAdapterTests.run(adapter, request(first.nativeSessionId));
+
+    Assert.areEqual(TurnOutcome.Completed, changed.outcome);
+    Assert.areEqual(JSON.stringify([0, 1]), JSON.stringify([kept, host.programs.started.length - opened]));
   }
 
   @TestMethod

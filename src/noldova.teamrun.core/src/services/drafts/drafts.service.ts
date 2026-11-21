@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { basename } from "node:path";
+
 import "@noldova/context.core";
 import { type DataRecord } from "@noldova/context.data";
 import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
@@ -39,6 +41,8 @@ export class DraftsService implements IDraftsService {
       draft = await this.context.database.connection.runInTransactionAsync(async transaction => {
         await this.requireConversationAsync(params.conversationId, transaction);
         const current = await this.findAsync(params.conversationId, transaction);
+        if (!Object.isNull(params.revision) && params.revision !== (current?.revision ?? 0))
+          throw new ServiceException(ErrorCode.Conflict, Resources.formatDraftStale(params.conversationId), [params.conversationId]);
         const revision = await this.revisionOfAsync(params.conversationId, transaction) + 1;
         const files = this.attachments.saveDraft(params.conversationId, params.attachments);
         restore = current?.attachments ?? [];
@@ -95,17 +99,37 @@ export class DraftsService implements IDraftsService {
       this.attachments.removeWaitingFiles(conversationId);
     }
     catch (error) {
-      this.log.write(Resources.formatChatWaitingFilesNotRemoved(conversationId, DraftsService.reasonOf(error)));
+      this.log.write(Resources.formatChatWaitingFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
+    }
+  }
+
+  public removeSentFiles(conversationId: string, paths: readonly string[]): void {
+    try {
+      this.attachments.removeSent(paths);
+    }
+    catch (error) {
+      this.log.write(Resources.formatSentFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
     }
   }
 
   public async sweepAsync(): Promise<void> {
     for (const conversationId of this.attachments.listDraftFolders())
-      await this.context.database.connection.runInTransactionAsync(async transaction => {
-        const held = await this.heldFilesAsync(conversationId, transaction);
-        if (!Object.isNull(held))
-          this.removeFilesExcept(conversationId, held);
-      });
+      try {
+        await this.context.database.connection.runInTransactionAsync(async transaction =>
+          this.removeFilesExcept(conversationId, (await this.findAsync(conversationId, transaction))?.attachments ?? []));
+      }
+      catch (error) {
+        this.log.write(Resources.formatDraftNotRead(conversationId, Resources.formatFailureReason(error)));
+      }
+    try {
+      const files = this.attachments.listSent();
+      const named = new Set((await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectAttachmentPaths)))
+        .map(t => basename(t.readString(Resources.pathColumn))));
+      this.attachments.removeSent(files.filter(t => !named.has(basename(t))));
+    }
+    catch (error) {
+      this.log.write(Resources.formatSentFilesNotSwept(Resources.formatFailureReason(error)));
+    }
   }
 
   private removeFilesExcept(conversationId: string, keep: readonly MessageAttachment[]): boolean {
@@ -114,18 +138,8 @@ export class DraftsService implements IDraftsService {
       return true;
     }
     catch (error) {
-      this.log.write(Resources.formatDraftFilesNotRemoved(conversationId, DraftsService.reasonOf(error)));
+      this.log.write(Resources.formatDraftFilesNotRemoved(conversationId, Resources.formatFailureReason(error)));
       return false;
-    }
-  }
-
-  private async heldFilesAsync(conversationId: string, transaction: SqlTransaction): Promise<readonly MessageAttachment[] | null> {
-    try {
-      return (await this.findAsync(conversationId, transaction))?.attachments ?? [];
-    }
-    catch (error) {
-      this.log.write(Resources.formatDraftNotRead(conversationId, DraftsService.reasonOf(error)));
-      return null;
     }
   }
 
@@ -147,9 +161,5 @@ export class DraftsService implements IDraftsService {
     const [record] = await (transaction ?? this.context.database.connection).queryAsync(new SqlQuery(Resources.selectConversationById, [conversationId]));
     if (Object.isUndefined(record))
       throw new ServiceException(ErrorCode.NotFound, Resources.formatConversationNotFound(conversationId), [conversationId]);
-  }
-
-  private static reasonOf(error: unknown): string {
-    return error instanceof Error ? (error as NodeJS.ErrnoException).code ?? error.name : typeof error;
   }
 }

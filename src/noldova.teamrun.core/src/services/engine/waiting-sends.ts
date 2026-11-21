@@ -41,6 +41,7 @@ export class WaitingSends {
   private lastWaitingTime: number = 0;
   private readonly requireConversationAsync: IEngineCallbacks["requireConversationAsync"];
   private readonly sendMessageAsync: IEngineCallbacks["sendMessageAsync"];
+  private readonly refuseRaisedModeAsync: IEngineCallbacks["refuseRaisedModeAsync"];
   private readonly findGroup: IEngineCallbacks["findGroup"];
   private readonly stopAsync: IEngineCallbacks["stopAsync"];
   private readonly isIdleAsync: IEngineCallbacks["isIdleAsync"];
@@ -60,6 +61,7 @@ export class WaitingSends {
     this.waiting = new WaitingMessages(services.context, services.log);
     this.requireConversationAsync = callbacks.requireConversationAsync;
     this.sendMessageAsync = callbacks.sendMessageAsync;
+    this.refuseRaisedModeAsync = callbacks.refuseRaisedModeAsync;
     this.findGroup = callbacks.findGroup;
     this.stopAsync = callbacks.stopAsync;
     this.isIdleAsync = callbacks.isIdleAsync;
@@ -69,10 +71,11 @@ export class WaitingSends {
     this.settleSafelyAsync = callbacks.settleSafelyAsync;
   }
 
-  public async addWaitingAsync(params: WaitingMessageAddParams): Promise<WaitingMessage> {
+  public async addWaitingAsync(params: WaitingMessageAddParams, fromOutside: boolean): Promise<WaitingMessage> {
     const conversation = await this.requireConversationAsync(params.message.chatId);
     this.lastWaitingTime = Math.max(Date.now(), this.lastWaitingTime + 1);
-    const checked = new WaitingMessage(Guid.createVersion7().toString(), params.delivery, params.message, new Date(this.lastWaitingTime).toISOString());
+    const checked = new WaitingMessage(Guid.createVersion7().toString(), params.delivery, params.message, new Date(this.lastWaitingTime).toISOString(), null,
+      fromOutside);
     const added = checked.withMessage(this.keepWaitingFiles(checked.id, params.message)[0]);
     await this.waiting.addAsync(added);
     await this.publishWaitingAsync(conversation.id);
@@ -85,7 +88,7 @@ export class WaitingSends {
     return new WaitingMessagesPayload(conversation.id, await this.waiting.listAsync(conversation.id));
   }
 
-  public async editWaitingAsync(params: WaitingMessageEditParams): Promise<WaitingMessage> {
+  public async editWaitingAsync(params: WaitingMessageEditParams, fromOutside: boolean): Promise<WaitingMessage> {
     const [current, edited, kept] = await this.context.database.connection.runInTransactionAsync(async (transaction)
       : Promise<readonly [WaitingMessage, WaitingMessage, readonly MessageAttachment[]]> => {
       const found = await this.requireWaitingAsync(params.id, transaction);
@@ -93,7 +96,7 @@ export class WaitingSends {
         throw new ServiceException(ErrorCode.InvalidParams, Resources.formatWaitingMessageOtherChat(found.id, params.message.chatId),
           [found.id, params.message.chatId]);
       const [message, files] = this.keepWaitingFiles(found.id, params.message);
-      const changed = found.withMessage(message);
+      const changed = found.withMessage(message, found.fromOutside || fromOutside);
       await this.waiting.updateAsync(changed, transaction);
       return [found, changed, files];
     });
@@ -138,6 +141,7 @@ export class WaitingSends {
     if (this.state.closing || this.steering.has(chatId) || !this.beginSending(chatId))
       return;
     let idle = false;
+    let shown = true;
     let taken: WaitingMessage | undefined;
     try {
       idle = await this.isIdleAsync(chatId, true);
@@ -149,7 +153,7 @@ export class WaitingSends {
           return found;
         });
       if (!Object.isUndefined(taken))
-        await this.publishWaitingAsync(chatId);
+        shown = await this.showWaitingAsync(chatId);
     }
     catch (error) {
       this.endSending(chatId);
@@ -162,8 +166,10 @@ export class WaitingSends {
       return;
     }
     const next = taken;
-    this.track(chatId, this.sendMessageAsync(next.message, null, null, undefined).finally(() => this.endSending(chatId)).then(async () => {
+    this.track(chatId, this.sendNextAsync(next).finally(() => this.endSending(chatId)).then(async () => {
       this.removeWaitingFiles(next.id, () => this.attachments.removeWaitingFiles(chatId, next.id));
+      if (!shown)
+        await this.showWaitingAsync(chatId);
       await this.sendWaitingAsync(chatId);
     }, async (error: unknown) => {
       this.log?.write(Resources.formatWaitingMessageNotSent(chatId, Resources.formatFailureKind(error)));
@@ -173,6 +179,12 @@ export class WaitingSends {
         await this.sendWaitingAsync(chatId);
       });
     }));
+  }
+
+  private async sendNextAsync(next: WaitingMessage): Promise<void> {
+    if (next.fromOutside)
+      await this.refuseRaisedModeAsync(next.message);
+    await this.sendMessageAsync(next.message, null, null, undefined);
   }
 
   private removeWaitingFiles(waitingId: string, remove: () => void): void {
@@ -195,6 +207,13 @@ export class WaitingSends {
     if (Object.isNull(found))
       throw new ServiceException(ErrorCode.NotFound, Resources.formatWaitingMessageNotFound(id), [id]);
     return found;
+  }
+
+  private showWaitingAsync(chatId: string): Promise<boolean> {
+    return this.publishWaitingAsync(chatId).then(() => true, (error: unknown) => {
+      this.log?.write(Resources.formatWaitingMessagesNotShown(chatId, Resources.formatFailureKind(error)));
+      return false;
+    });
   }
 
   private async publishWaitingAsync(chatId: string): Promise<void> {
@@ -240,7 +259,7 @@ export class WaitingSends {
     });
     if (Object.isNull(waiting))
       return;
-    await this.publishWaitingAsync(chatId);
+    const shown = await this.showWaitingAsync(chatId);
     let saved: readonly MessageAttachment[] = [];
     let steered = false;
     try {
@@ -268,6 +287,8 @@ export class WaitingSends {
       return inserted;
     });
     this.events.publish(new Event(EventName.MessageCreated, message.toJson()));
+    if (!shown)
+      await this.showWaitingAsync(chatId);
   }
 
   private static steersInto(message: MessageSendParams, reply: Message): boolean {
