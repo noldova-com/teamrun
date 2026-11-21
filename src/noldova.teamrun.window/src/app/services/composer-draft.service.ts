@@ -113,6 +113,10 @@ export class ComposerDraftService {
         kept = await this.store.readDraft(draft.conversationId);
       }
       catch {
+        if (this.store.isDeleted(draft.conversationId)) {
+          this.unreadable.delete(draft.conversationId);
+          return true;
+        }
         this.keep(draft);
         return false;
       }

@@ -9,7 +9,7 @@
 import { TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
-import { AttachmentInput, Draft, DraftSaveParams, ErrorCode, MessageAttachment, MethodName } from "@noldova/teamrun.protocol";
+import { AttachmentInput, ConversationIdParams, Draft, DraftSaveParams, ErrorCode, EventName, MessageAttachment, MethodName } from "@noldova/teamrun.protocol";
 
 import { DraftNotSavedException } from "../../../src/app/exceptions/draft-not-saved.exception";
 import { ComposerAttachment } from "../../../src/app/models/composer-attachment";
@@ -359,6 +359,26 @@ describe("ComposerDraftService", () => {
     drafts.schedule(draft("ok again"));
     await drafts.save();
     expect([saved().map(t => [t.conversationId, t.text, t.revision]), context.count(MethodName.DraftRead)]).toEqual([[["c1", "ok again", 4]], 4]);
+  });
+
+  it("keeps nothing for a chat deleted while a save's read after a failed one is under way, so later saves go on", async () => {
+    answerSaves();
+    await store.initialize();
+    context.fail(MethodName.DraftRead, "unreadable");
+    await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
+    const response = new DeferredResponse();
+    context.answer(MethodName.DraftRead, () => response.promise);
+    drafts.schedule(draft("gone"));
+    const saving = drafts.save();
+    await Wait.until(() => expect(context.count(MethodName.DraftRead)).toBe(2));
+
+    context.emit(EventName.ConversationDeleted, new ConversationIdParams("c1").toJson());
+    response.reject(new Error("The chat was not found."));
+    await saving;
+    drafts.schedule(draft("other", "c2"));
+    await drafts.save();
+
+    expect([saved().map(t => [t.conversationId, t.text]), context.count(MethodName.DraftRead)]).toEqual([[["c2", "other"]], 2]);
   });
 
   it("keeps a chat's draft pending while its read keeps failing and another chat's draft is typed and saved, and saves it once its read answers", async () => {
