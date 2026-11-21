@@ -44,7 +44,7 @@ LICENSE file in the root directory of this source tree.
       @for (listing of shared() ?? []; track listing.server.id) {
         @let ready = isReady(listing);
         @let canCount = canCountOf(listing);
-        <button type="button" class="nol-teamrun-mcp-row nol-teamrun-shared-mcp-row" [class.nol-teamrun-mcp-row-chosen]="isChosen(listing)"
+        <button type="button" class="nol-teamrun-mcp-row nol-teamrun-shared-mcp-row" [attr.data-server]="listing.server.id" [class.nol-teamrun-mcp-row-chosen]="isChosen(listing)"
           [attr.aria-current]="isChosen(listing)" [attr.aria-controls]="resources.sharedMcpDetailsId" [attr.aria-label]="rowLabelOf(listing)" (click)="choose(listing)">
           <span class="nol-teamrun-status-dot" [class.nol-teamrun-status-dot-connected]="ready" [class.nol-teamrun-status-dot-warning]="!ready" aria-hidden="true"></span>
           <span class="nol-teamrun-shared-mcp-server">

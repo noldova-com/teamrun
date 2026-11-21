@@ -31,6 +31,7 @@ import {
 import { Resources } from "../../../resources";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { FocusAfterDelete } from "../../models/focus-after-delete";
 import { ModelCatalog } from "../../models/model-catalog";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
@@ -60,6 +61,7 @@ export class TeammatesViewComponent {
   private readonly choices: ComposerChoicesService = inject(ComposerChoicesService);
   private readonly defaults: ComposerDefaultService = inject(ComposerDefaultService);
   private readonly injector: Injector = inject(Injector);
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly changeDefaultButton: Signal<ElementRef<HTMLButtonElement> | undefined> = viewChild("changeDefaultButton", { read: ElementRef });
   private readonly clearDefaultButton: Signal<ElementRef<HTMLButtonElement> | undefined> = viewChild("clearDefaultButton", { read: ElementRef });
   private readonly formatter: FormatterService = inject(FormatterService);
@@ -181,14 +183,25 @@ export class TeammatesViewComponent {
   }
 
   protected remove(teammate: Teammate): void {
+    const control = document.activeElement;
     const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
     dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.deleteTeammateLabel, Resources.formatDeleteTeammate(teammate.name), Resources.deleteTeammateLabel,
       null, true));
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
       if (confirmed)
-        void this.store.deleteTeammate(teammate, this.report);
+        void this.delete(teammate, control);
     });
+  }
+
+  private async delete(teammate: Teammate, control: Element | null): Promise<void> {
+    const ids = [...this.host.querySelectorAll<HTMLElement>(".nol-teamrun-item[data-teammate]")].map(t => t.dataset["teammate"]);
+    const at = ids.indexOf(teammate.id);
+    const neighbour = ids[at + 1] ?? ids[at - 1];
+    if (await this.store.deleteTeammate(teammate, this.report))
+      FocusAfterDelete.later(this.injector, control,
+        () => Object.isUndefined(neighbour) ? null : this.host.querySelector<HTMLElement>(`.nol-teamrun-item[data-teammate="${CSS.escape(neighbour)}"] .nol-teamrun-delete`),
+        () => this.host.querySelector<HTMLElement>(".nol-teamrun-add"));
   }
 
   private connectionName(kind: string, provider: Provider): string {
