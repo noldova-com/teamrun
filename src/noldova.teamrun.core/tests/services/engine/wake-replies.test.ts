@@ -47,6 +47,7 @@ import {
 import { BoundingWork } from "../../fixtures/bounding-work.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
+import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
 export class WakeRepliesTests {
@@ -315,6 +316,24 @@ export class WakeRepliesTests {
   }
 
   @TestMethod
+  public async failsAWakeReplyAndClosesItsToolsWhenHandingThemToTheProviderFails(): Promise<void> {
+    const tools = new FakeTurnToolSessions();
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, undefined, tools);
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await wake?.onToolsAsync(() => Promise.reject(new RangeError("The provider refused its tools.")));
+    await host.engine.waitForIdle();
+    const woken = (await WakeRepliesTests.afterAsync(host, conversation.id, 0)).at(-1);
+
+    Assert.areEqual(2, tools.opened.length);
+    Assert.areEqual(1, tools.opened[1]?.ends);
+    Assert.areEqual(MessageStatus.Failed, (await host.messages.findAsync(woken?.id ?? String.empty))?.status);
+  }
+
+  @TestMethod
   public async startsNoReplyForAWakeUpAfterShutdown(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
@@ -446,6 +465,57 @@ export class WakeRepliesTests {
     await host.engine.waitForIdle();
 
     Assert.areEqual("bypass", wake?.mode);
+  }
+
+  @TestMethod
+  public async failsAWakeReplyWhoseStartFailsToWriteWithTheTurnsFailure(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const started: string[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
+        if (message?.status === MessageStatus.Running && started.push(message.id) === 1)
+          throw new RangeError("The window is gone.");
+      }
+    });
+
+    await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await host.engine.waitForIdle();
+    const woken = await host.messages.findAsync(started[0] ?? String.empty);
+    const last = woken?.details.at(-1);
+
+    Assert.areEqual(1, started.length);
+    Assert.areEqual(MessageStatus.Failed, woken?.status);
+    Assert.areEqual(`${DetailKind.Error} ${Resources.formatTurnFailed("The window is gone.")}`, `${last?.kind} ${last?.text}`);
+  }
+
+  @TestMethod
+  public async cancelsAStoppedWakeReplyWhoseStartFailsToWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const stops: Promise<Message>[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
+        if (message?.status === MessageStatus.Running && stops.length === 0) {
+          stops.push(host.engine.cancelAsync(new MessageIdParams(message.id)));
+          throw new RangeError("The window is gone.");
+        }
+      }
+    });
+
+    await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await host.engine.waitForIdle();
+    const stopped = await Promise.all(stops);
+
+    Assert.areEqual(1, stopped.length);
+    Assert.areEqual(MessageStatus.Cancelled, stopped[0]?.status);
+    Assert.isFalse(stopped[0]?.details.some(t => t.kind === DetailKind.Error) ?? true);
   }
 
   @TestMethod

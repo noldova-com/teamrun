@@ -664,6 +664,7 @@ export class Resources {
   public static readonly wakeOldTaskLabel: string = "A sub-agent or background command of this chat ended";
   public static readonly wakeChatGone: string = "a deleted chat";
   public static readonly wakeRepliesLabel: string = "The message received";
+  public static readonly wakeNoReplyLabel: string = "Why no reply came back";
   public static readonly wakeCommandOutputLabel: string = "The command's last lines";
   public static readonly wakeSubAgentResultLabel: string = "The sub-agent's summary";
   public static readonly wakeTaskLostLabel: string = "Why it didn't end";
