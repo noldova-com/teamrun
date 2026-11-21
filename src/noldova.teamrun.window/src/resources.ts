@@ -1197,7 +1197,9 @@ export class Resources {
   public static readonly organizationDetailsNoUsage: string = "Not reported";
   public static readonly organizationDetailsNothingSaid: string = "Nothing yet";
   public static readonly organizationMessagesLabel: string = "Messages";
-  public static readonly organizationCardControls: string = "button, input, select, nol-select";
+  public static readonly organizationMessageButton: string = "Message";
+  public static readonly organizationMessageIcon: string = "chat";
+  public static readonly organizationToLabel: string = "To";
   public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
@@ -1952,6 +1954,18 @@ export class Resources {
 
   public static formatOrganizationEveryoneNote(count: number): string {
     return `Every teammate (${count})`;
+  }
+
+  public static formatOrganizationMessageNamed(name: string): string {
+    return `Message ${name}`;
+  }
+
+  public static formatOrganizationDepartmentOption(name: string): string {
+    return `${name} (department)`;
+  }
+
+  public static formatOrganizationLeaderOption(name: string, department: string): string {
+    return `${name} (leads ${department})`;
   }
 
   public static formatOrganizationPlaceholder(title: string): string {

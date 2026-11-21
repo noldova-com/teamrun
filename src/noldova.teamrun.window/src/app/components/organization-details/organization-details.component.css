@@ -61,6 +61,18 @@
   overflow-wrap: anywhere;
 }
 
+.last {
+  display: flex;
+  flex-direction: column;
+}
+
+.said {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .ago {
   color: var(--nol-text-muted);
 }

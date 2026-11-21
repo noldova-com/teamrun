@@ -78,6 +78,10 @@
   font-size: var(--nol-text-small);
 }
 
+.message {
+  align-self: flex-start;
+}
+
 .hidden {
   padding: var(--nol-space-2) 0 0 var(--nol-space-4);
 }

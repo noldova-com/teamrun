@@ -28,7 +28,7 @@ LICENSE file in the root directory of this source tree.
     <dt>{{ resources.organizationDetailsLastSaid }}</dt>
     <dd class="last">
       @if (last(); as said) {
-        {{ said.text }} <span class="ago">{{ said.ago }}</span>
+        <span class="said">{{ said.text }}</span> <span class="ago">{{ said.ago }}</span>
       } @else {
         {{ resources.organizationDetailsNothingSaid }}
       }

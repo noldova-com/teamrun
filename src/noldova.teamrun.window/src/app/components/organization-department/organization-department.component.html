@@ -27,21 +27,26 @@ LICENSE file in the root directory of this source tree.
   @if (summary(); as text) {
     <span class="department-summary">{{ text }}</span>
   }
+  @if (!editing()) {
+    <button type="button" nol-button class="message" [variant]="textVariant" [attr.aria-label]="resources.formatOrganizationMessageNamed(node().department.name)"
+      (click)="chosen.emit(target.department(node().department.id))"><span nolButtonIcon class="material-symbols-rounded"
+      aria-hidden="true">{{ resources.organizationMessageIcon }}</span>{{ resources.organizationMessageButton }}</button>
+  }
 </div>
 @if (node().leader; as leader) {
   <div class="stem"></div>
-  <nol-teamrun-organization-card class="leader" nolCanvasItem data-nol-canvas-no-pan tabindex="0" role="group" [attr.aria-label]="leader.name" [teammate]="leader"
+  <nol-teamrun-organization-card class="leader" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="leader.name" [teammate]="leader"
     [editing]="editing()" [nolPopoverTrigger]="leaderDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
-    [nolPopoverAlignment]="detailsAlignment" (click)="choose(leader.id, $event)" (keydown.enter)="choose(leader.id, $event)" />
+    [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(target.teammate(leader.id))" />
   <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" [department]="node().department" /></ng-template>
 }
 @if (isOpen()) {
   @if (node().members.length > 0 || editing()) {
     <div class="reports">
       @for (member of node().members; track member.id) {
-        <nol-teamrun-organization-card nolCanvasItem data-nol-canvas-no-pan tabindex="0" role="group" [attr.aria-label]="member.name" [teammate]="member" [editing]="editing()"
+        <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="member.name" [teammate]="member" [editing]="editing()"
           [department]="node().department" [nolPopoverTrigger]="memberDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
-          [nolPopoverAlignment]="detailsAlignment" (click)="choose(member.id, $event)" (keydown.enter)="choose(member.id, $event)" />
+          [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(target.teammate(member.id))" />
         <ng-template #memberDetails><nol-teamrun-organization-details [teammate]="member" [department]="node().department" /></ng-template>
       }
       @if (editing()) {

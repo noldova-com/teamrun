@@ -6,13 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
   PlanUsage, PlanWindow, PlanWindowName, TeammateLastReply } from "@noldova/teamrun.protocol";
-import { ThemeMode } from "@noldova/ui.components.angular";
+import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { page, userEvent } from "vitest/browser";
 
@@ -379,18 +380,42 @@ describe("OrganizationViewComponent", () => {
 
     afterEach(() => AppearanceFixture.reset());
 
-    it("talks to the first department until a card is chosen, by a click on the card or Enter on it, but not by its own buttons or while editing", async () => {
+    const select = (): HTMLElement => one("aside.messages .to-choice");
+    const optionTexts = (): string[] => [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
+    const pickAsync = async (label: string): Promise<string[]> => {
+      await userEvent.click(one(".nol-select-button", select()));
+      await Wait.until(() => expect(optionTexts().length).toBeGreaterThan(0));
+      const shown = optionTexts();
+      const option = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].find(t => t.textContent?.trim() === label);
+      if (Object.isUndefined(option))
+        throw new Error(`No option reads ${label}.`);
+      await userEvent.click(option);
+      await settle();
+      return shown;
+    };
+    const chosenLabel = (): string => one(".nol-select-button", select()).textContent?.trim() ?? "";
+
+    it("talks to the first department until a teammate's name or a department's Message is chosen, but not by the rest of a card, Enter on it, its own buttons or while editing", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
       await create();
       const first = [one("aside.messages").getAttribute("aria-label"), heading()];
+      const names = ["Alice", "Bob"].map(t => [one(".name", card(t)).tagName, one(".name", card(t)).getAttribute("aria-label")]);
 
       await userEvent.click(one(".name", card("Bob")));
       await settle();
       const clicked = heading();
+      one(".status", card("Alice")).click();
       card("Alice").focus();
       await userEvent.keyboard("{Enter}");
       await settle();
+      const rest = heading();
+      one(".name", card("Alice")).focus();
+      await userEvent.keyboard("{Enter}");
+      await settle();
       const entered = heading();
+      await userEvent.click(one(":scope > .department .message", department("Build")));
+      await settle();
+      const build = [one(":scope > .department .message", department("Build")).getAttribute("aria-label"), heading()];
       await userEvent.keyboard("{Escape}");
       one(".tune", card("Bob")).click();
       await settle();
@@ -402,17 +427,62 @@ describe("OrganizationViewComponent", () => {
       card("Code Reviewer").click();
       await settle();
 
-      expect([first, clicked, entered, tuned, heading()]).toEqual([["Messages", ["Chat with Design"]], ["Chat with Bob"], ["Chat with Alice"],
-        ["Chat with Alice"], ["Chat with Alice"]]);
+      expect([first, names, clicked, rest, entered, build, tuned, heading(), all(".message").length, all("button.name").length]).toEqual([
+        ["Messages", ["Chat with Design"]], [["BUTTON", "Message Alice"], ["BUTTON", "Message Bob"]], ["Chat with Bob"], ["Chat with Bob"], ["Chat with Alice"],
+        ["Message Build", ["Chat with Build"]], ["Chat with Build"], ["Chat with Build"], 0, 0]);
     });
 
     it("chooses a teammate in a nested department too", async () => {
       await create();
 
-      card("Code Reviewer").click();
+      one(".name", card("Code Reviewer")).click();
       await settle();
 
       expect(heading()).toEqual(["Chat with Code Reviewer"]);
+    });
+
+    it("pans the canvas when a card is dragged", async () => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+      await create();
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const before = box(card("Bob"));
+      const from = box(one(".status", card("Bob")));
+      const to = box(card("Offline"));
+
+      await userEvent.dragAndDrop(one(".status", card("Bob")), card("Offline"));
+      await settle();
+      const after = box(card("Bob"));
+
+      AppearanceFixture.expectPixels(after.left - before.left, to.left + to.width / 2 - (from.left + from.width / 2));
+      AppearanceFixture.expectPixels(after.top - before.top, to.top + to.height / 2 - (from.top + from.height / 2));
+      expect(heading()).toEqual(["Chat with Design"]);
+    });
+
+    it("offers whom to talk to under To: all leaders, everyone, then each department with its leader and members in the tree's order, and follows the choice", async () => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+      await create();
+      const shown = [one("aside.messages .to-label").textContent?.trim(), select().querySelector(".nol-select-button")?.getAttribute("aria-label"), chosenLabel()];
+
+      const offered = await pickAsync("UI (department)");
+      const ui = [heading(), chosenLabel()];
+      await pickAsync("All leaders");
+      const leaders = [heading(), chosenLabel()];
+      await userEvent.click(one(".name", card("Offline")));
+      await settle();
+
+      expect([shown, offered, ui, leaders, [heading(), chosenLabel()]]).toEqual([["To", "To", "Design (department)"],
+        ["All leaders", "Everyone", "Design (department)", "Alice (leads Design)", "Bob", "UI (department)", "Code Reviewer (leads UI)", "Build (department)", "Offline"],
+        [["Chat with UI"], "UI (department)"], [["Chat with all leaders"], "All leaders"], [["Chat with Offline"], "Offline"]]);
+    });
+
+    it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
+      await create();
+      await pickAsync("Bob");
+
+      fixture.debugElement.query(By.directive(SelectComponent)).injector.get(SelectComponent).valueChange.emit("teammate:gone");
+      await settle();
+
+      expect([heading(), chosenLabel()]).toEqual([["Chat with Bob"], "Bob"]);
     });
 
     it("asks whom to message while there is no department to talk to", async () => {

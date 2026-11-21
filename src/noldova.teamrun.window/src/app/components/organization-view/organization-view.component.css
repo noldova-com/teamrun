@@ -133,6 +133,28 @@
   min-height: 0;
 }
 
+.to {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  padding: var(--nol-space-3) var(--nol-space-3) 0;
+}
+
+.to-label {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}
+
+.to-choice {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.messages .thread {
+  flex: 1 1 0;
+  height: auto;
+}
+
 .tree {
   display: flex;
   flex-direction: column;

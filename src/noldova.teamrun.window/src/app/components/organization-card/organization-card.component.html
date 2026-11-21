@@ -13,7 +13,7 @@ LICENSE file in the root directory of this source tree.
       <input #nameField nol-text-field class="name-field" [attr.aria-label]="resources.formatOrganizationRenameLabel(teammate().name)" [value]="teammate().name"
         (change)="rename()">
     } @else {
-      <span class="name">{{ teammate().name }}</span>
+      <button type="button" class="name" [attr.aria-label]="resources.formatOrganizationMessageNamed(teammate().name)" (click)="message.emit()">{{ teammate().name }}</button>
     }
     @if (teammate().role; as role) {
       <span class="role">{{ role }}</span>

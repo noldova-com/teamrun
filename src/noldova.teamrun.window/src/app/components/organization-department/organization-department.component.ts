@@ -48,6 +48,8 @@ export class OrganizationDepartmentComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
+  protected readonly textVariant: ButtonVariant = ButtonVariant.Text;
+  protected readonly target: typeof OrganizationTarget = OrganizationTarget;
   protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
   protected readonly detailsSide: OverlaySide = OverlaySide.below;
   protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
@@ -102,12 +104,5 @@ export class OrganizationDepartmentComponent {
       if (confirmed)
         void this.organization.deleteDepartment(department.id);
     });
-  }
-
-  protected choose(teammateId: string, event: Event): void {
-    const inner = event.target instanceof Element && event.target !== event.currentTarget ? event.target : null;
-    if (this.editing() || !Object.isNull(inner?.closest(Resources.organizationCardControls) ?? null))
-      return;
-    this.chosen.emit(OrganizationTarget.teammate(teammateId));
   }
 }

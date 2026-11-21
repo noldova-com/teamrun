@@ -292,6 +292,23 @@ describe("OrganizationDetailsComponent", () => {
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(firstValue).overflowWrap]).toEqual(["nowrap", "anywhere"]);
     });
 
+    it("cuts long last words to three lines, with the time since them on a line of its own under them", async () => {
+      const words = Array.from({ length: 40 }, (_, i) => `Step ${i} of the header is done.`).join(" ");
+      await create(context => context
+        .answer(MethodName.TeammateLastReplyList, () => [new TeammateLastReply("alice", "c1", "r0", words, SampleData.timestamp).toJson()]));
+      const details = await focus("Alice");
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const [said, ago] = [one(".said", details), one(".ago", details)];
+      const line = Number.parseFloat(getComputedStyle(said).lineHeight);
+
+      expect(said.textContent).toBe(words);
+      AppearanceFixture.expectPixels(box(said).height, 3 * line);
+      expect(said.scrollHeight).toBeGreaterThan(said.clientHeight);
+      AppearanceFixture.expectPixels(box(ago).top, box(said).bottom);
+      AppearanceFixture.expectPixels(box(ago).height, line);
+      expect(box(ago).bottom).toBeLessThanOrEqual(box(details).bottom);
+    });
+
     it("rings a card the keyboard reached in the accent's colour, inside its edge", async () => {
       await create();
       const alice = card("Alice");

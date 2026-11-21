@@ -6,7 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, ElementRef, computed, effect, inject, type InputSignal, input, type Signal, signal, untracked, viewChild, type WritableSignal } from "@angular/core";
+import { Component, ElementRef, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, viewChild,
+  type WritableSignal } from "@angular/core";
 
 import { type Department, type Teammate, type TeammateLastReply, TeammateUpdateParams } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
@@ -51,6 +52,7 @@ export class OrganizationCardComponent {
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
   public readonly editing: InputSignal<boolean> = input(false);
   public readonly department: InputSignal<Department | null> = input<Department | null>(null);
+  public readonly message: OutputEmitterRef<void> = output<void>();
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly fieldNames: typeof OrganizationCardField = OrganizationCardField;
