@@ -31,6 +31,8 @@ export class SharedMcpLauncher {
   public static readonly withheldVariables: readonly string[] = ["TEAMRUN_SENDER_TOKEN"];
   public static readonly forwardedSignals: readonly NodeJS.Signals[] = ["SIGTERM", "SIGINT", "SIGHUP"];
   public static readonly graceMilliseconds: number = 2000;
+  public static readonly powershellAnswerMilliseconds: number = 10_000;
+  public static readonly windowsEndMilliseconds: number = 20_000;
 
   private static readonly WINDOWS: string = "win32";
   private static readonly PATH_VARIABLE: string = "PATH";
@@ -56,6 +58,10 @@ export class SharedMcpLauncher {
   private static readonly FIELD_SEPARATOR: string = " ";
   private static readonly LINE_END: string = "\n";
   private static readonly WATCH_FIELDS: number = 3;
+  private static readonly POWERSHELL_SLOW_MILLISECONDS: number = 2000;
+  private static readonly POWERSHELL_ANSWERED: string = "ended";
+  private static readonly POWERSHELL_FAILED: string = "failed to start";
+  private static readonly POWERSHELL_STALLED: string = "didn't end and was ended";
   private static readonly HOLD_SHELL: string = "/bin/sh";
   private static readonly HOLD_SCRIPT: string = "IFS= read -r go <&3 || exit 1; case $0 in */*) found=$0; [ -e \"$found\" ];; *) found=$(command -v \"$0\" 2>/dev/null);; esac "
     + "|| { echo missing >&3; exit 127; }; case $found in */*) [ -f \"$found\" ] && [ -x \"$found\" ] || { echo denied >&3; exit 126; };; esac; exec 3<&-; "
@@ -83,11 +89,13 @@ export class SharedMcpLauncher {
   private readonly host: ISharedMcpLauncherHost;
   private readonly start: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
   private readonly isFile: (file: string) => boolean;
-  private readonly delayAsync: (milliseconds: number) => Promise<unknown>;
+  private readonly delayAsync: (milliseconds: number, signal?: AbortSignal) => Promise<unknown>;
+  private readonly now: () => number;
 
   public constructor(platform: string, environment: NodeJS.ProcessEnv, program: string, script: string, host: ISharedMcpLauncherHost = process,
     start: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess = spawn, isFile: (file: string) => boolean = SharedMcpLauncher.fileExists,
-    delayAsync: (milliseconds: number) => Promise<unknown> = delay) {
+    delayAsync: (milliseconds: number, signal?: AbortSignal) => Promise<unknown> = (milliseconds, signal) => delay(milliseconds, undefined, { signal }),
+    now: () => number = () => performance.now()) {
     this.platform = platform;
     this.environment = environment;
     this.program = program;
@@ -96,6 +104,7 @@ export class SharedMcpLauncher {
     this.start = start;
     this.isFile = isFile;
     this.delayAsync = delayAsync;
+    this.now = now;
   }
 
   private get isWindows(): boolean {
@@ -147,7 +156,7 @@ export class SharedMcpLauncher {
     const environment = this.environmentOf(String(names).split(SharedMcpLauncher.nameSeparator).filter(t => t.length > 0));
     const target = this.commandOf(command, rest, environment);
     const watch = this.start(this.program, [this.script, SharedMcpLauncher.watchOption],
-      { env: this.environment, stdio: ["pipe", "ignore", "ignore"], detached: true, windowsHide: true }).on("error", () => undefined);
+      { env: this.environment, stdio: ["pipe", "ignore", this.isWindows ? "inherit" : "ignore"], detached: true, windowsHide: true }).on("error", () => undefined);
     watch.stdin?.on("error", () => undefined);
     const script = [SharedMcpLauncher.HOLD_SCRIPT, ...SharedMcpLauncher.HOLD_SHELL_VARIABLES.filter(t => environment[t] === undefined)
       .flatMap(t => [SharedMcpLauncher.HOLD_UNSET, t]), SharedMcpLauncher.HOLD_COMMAND].join(" ");
@@ -201,6 +210,7 @@ export class SharedMcpLauncher {
       return;
     }
 
+    this.host.stderr.on("error", () => undefined);
     const input = this.host.stdin;
     let text = String();
     await new Promise<void>(resolve => {
@@ -249,11 +259,28 @@ export class SharedMcpLauncher {
     return this.runPowerShellAsync(script);
   }
 
-  private runPowerShellAsync(script: string): Promise<void> {
-    return new Promise(resolve => {
-      this.start(SharedMcpLauncher.POWERSHELL, [...SharedMcpLauncher.POWERSHELL_ARGUMENTS, Buffer.from(script, "utf16le").toString("base64")],
-        { env: this.environment, stdio: "ignore", windowsHide: true }).once("exit", () => resolve()).once("error", () => resolve());
+  private async runPowerShellAsync(script: string): Promise<void> {
+    if (!await this.runPowerShellOnceAsync(script, SharedMcpLauncher.powershellAnswerMilliseconds, 1))
+      await this.runPowerShellOnceAsync(script, SharedMcpLauncher.windowsEndMilliseconds - SharedMcpLauncher.powershellAnswerMilliseconds, 2);
+  }
+
+  private async runPowerShellOnceAsync(script: string, limit: number, attempt: number): Promise<boolean> {
+    const started = this.now();
+    const powershell = this.start(SharedMcpLauncher.POWERSHELL, [...SharedMcpLauncher.POWERSHELL_ARGUMENTS, Buffer.from(script, "utf16le").toString("base64")],
+      { env: this.environment, stdio: "ignore", windowsHide: true });
+    const ended = new Promise<string>(resolve => {
+      powershell.once("exit", () => resolve(SharedMcpLauncher.POWERSHELL_ANSWERED)).once("error", () => resolve(SharedMcpLauncher.POWERSHELL_FAILED));
     });
+    const timer = new AbortController();
+    const outcome = await Promise.race([ended, this.delayAsync(limit, timer.signal).then(() => SharedMcpLauncher.POWERSHELL_STALLED,
+      () => SharedMcpLauncher.POWERSHELL_STALLED)]);
+    timer.abort();
+    const elapsed = Math.round(this.now() - started);
+    if (outcome === SharedMcpLauncher.POWERSHELL_STALLED)
+      powershell.kill();
+    if (outcome !== SharedMcpLauncher.POWERSHELL_ANSWERED || elapsed > SharedMcpLauncher.POWERSHELL_SLOW_MILLISECONDS)
+      this.host.stderr.write(`TeamRun's MCP watch: PowerShell ${attempt} of 2 ${outcome} after ${elapsed} ms.\n`);
+    return outcome !== SharedMcpLauncher.POWERSHELL_STALLED;
   }
 
   private refuse(message: string, code: number): number {

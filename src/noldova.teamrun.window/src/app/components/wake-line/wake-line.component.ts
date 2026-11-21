@@ -65,7 +65,7 @@ export class WakeLineComponent {
   protected readonly regionLabel: Signal<string> = computed(() => {
     const { end, task } = this.received();
     if (Object.isNull(task))
-      return Resources.wakeRepliesLabel;
+      return Object.isNull(end) ? Resources.wakeRepliesLabel : Resources.wakeNoReplyLabel;
     if (end === ProtocolResources.wakeLostEnd)
       return Resources.wakeTaskLostLabel;
     return task.kind === ProtocolResources.wakeCommandTask ? Resources.wakeCommandOutputLabel : Resources.wakeSubAgentResultLabel;
