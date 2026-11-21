@@ -7,11 +7,11 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChangeEntity, OrganizationMessagesService, Resources } from "@noldova/teamrun.core";
+import { ChangeEntity, OrganizationMessagesService, Resources, SignInCheck } from "@noldova/teamrun.core";
 import {
-  type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, ErrorCode, EventName, Harness, MessageAuthor, MessageIdParams,
-  MessageListParams, MessageStatus, type OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget, ProviderEnabledParams, type Teammate,
-  TeammateCreateParams
+  AuthStatus, type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, ErrorCode, EventName, Harness, MessageAuthor,
+  MessageIdParams, MessageListParams, MessageStatus, type OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget, ProviderIdParams,
+  type Teammate, TeammateCreateParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -121,9 +121,10 @@ export class OrganizationMessagesServiceTests {
   public async failsARecipientWhoseAccountCantReplyNamingTheAccountAndSendsItNothing(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
-    const off = await host.createProviderAsync("fake", "Spare");
-    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, off.id, Harness.Provider, null, null));
-    await host.providers.setEnabledAsync(new ProviderEnabledParams(off.id, false));
+    const out = await host.createProviderAsync("fake", "Spare");
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, out.id, Harness.Provider, null, null));
+    host.adapter.signInCheck = new SignInCheck(AuthStatus.LoggedOut, null, null, null);
+    await host.providers.checkAsync(new ProviderIdParams(out.id));
 
     const sent = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.everyone, "Status?"));
     await host.engine.waitForIdle();
