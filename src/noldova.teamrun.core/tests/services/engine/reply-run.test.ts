@@ -23,8 +23,10 @@ import { Approval, ApprovalDecideParams, ApprovalKind, ApprovalOption, ApprovalO
   SubAgentStatus, SubAgentWaitParams, type Teammate, TeammateCreateParams } from "@noldova/teamrun.protocol";
 
 import { AfterStatusMessages } from "../../fixtures/after-status-messages.fixture.js";
+import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { FailingMessages } from "../../fixtures/failing-messages.fixture.js";
+import { HeldMessages } from "../../fixtures/held-messages.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
@@ -355,6 +357,42 @@ export class ReplyRunTests {
     Assert.areEqual("null,null,set", (await Promise.all(ids.map(t => host.messages.findCheckpointAsync(t)))).map(t => Object.isNull(t) ? "null" : "set").join(","));
     Assert.areEqual(1, host.checkpoints.compares.length);
     Assert.areEqual(MessageStatus.Completed, (await host.messages.findAsync(ids[2]!))?.status);
+  }
+
+  @TestMethod
+  public async abortsTheCompareOfAReplyStoppedAfterItsTurnReturnedWhileItsLastToolCallsAreStored(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    mkdirSync(project.rootPath, { recursive: true });
+    const conversation = await host.createConversationAsync(project);
+    const reply = new Message("stopped-reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Pending, [], ReplyRunTests.provenance, "t", null,
+      null, [], "alice", "Alice");
+    await host.messages.insertAsync(reply);
+    const active = new ActiveRun(reply.id);
+    const messages = new HeldMessages(host.context, message => JSON.stringify(message.details).includes(ReplyRunTests.cart.url));
+    const run = new ReplyRun(reply, ReplyRunTests.provenance, active, messages, host.approvals, host.events, host.directory.path,
+      null, null, null, null, null, new ReplyCheckpoints(host.checkpoints), new WorkFolder(project.id, project.rootPath));
+    host.adapter.steps = [new TurnDetail(DetailKind.Note, "Console", { servedTool: "browser_console", servedInput: {} }, "k1"),
+      (): void => run.noteToolCall(new ToolCallRecord("browser_console", {}, { page: ReplyRunTests.cart }))];
+    const afterTurn = active.afterTurn.bind(active);
+    let turnEnded = false;
+    active.afterTurn = (): AbortSignal => {
+      turnEnded = true;
+      ChangeSignal.notify();
+      return afterTurn();
+    };
+    const executed = run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+    await messages.reached.promise;
+    await host.until("the turn's end", () => turnEnded);
+
+    active.cancel();
+    messages.released.resolve();
+    await executed;
+
+    const stored = await host.messages.findAsync(reply.id);
+    Assert.isTrue(host.checkpoints.signals.at(-1)?.aborted ?? false);
+    Assert.areEqual(MessageStatus.Cancelled, stored?.status);
+    Assert.isTrue(stored?.details.some(t => t.text === Resources.incompleteWorkingTreeEvidence) ?? false);
   }
 
   @TestMethod

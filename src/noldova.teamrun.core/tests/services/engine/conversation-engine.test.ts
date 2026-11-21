@@ -1433,10 +1433,9 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
-  @TestData("capture", 0, MessageStatus.Cancelled)
-  @TestData("compare", 1, MessageStatus.Completed)
-  public async stopsAReplyBeforeItsTurnWhileTheModuleCapturesAndKeepsTheFinishedTurnWhileItCompares(held: "capture" | "compare", turns: number,
-    status: MessageStatus): Promise<void> {
+  @TestData("capture", 0)
+  @TestData("compare", 1)
+  public async stopsAReplyBeforeItsTurnWhileTheModuleCapturesAndAfterItWhileItCompares(held: "capture" | "compare", turns: number): Promise<void> {
     await using host = await CoreHost.createAsync();
     ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
@@ -1447,7 +1446,7 @@ export class ConversationEngineTests {
 
     const stopped = await host.engine.cancelAsync(new MessageIdParams(sent.replies[0]!.id));
 
-    Assert.areEqual(status, stopped.status);
+    Assert.areEqual(MessageStatus.Cancelled, stopped.status);
     Assert.isTrue(host.checkpoints.signals.at(-1)?.aborted ?? false);
     Assert.areEqual(turns, host.adapter.requests.length);
     Assert.areEqual(turns === 1, !Object.isNullOrUndefined(stopped.provenance?.nativeTurnId));
