@@ -123,7 +123,7 @@ export class AcpAgentsDialogComponent implements OnInit {
   }
 
   protected async add(agent: AcpAgentEntry): Promise<void> {
-    await this.work(agent.id, () => this.store().addAcpAgent(agent.id, this.reportOf(ChatAction.AddAcpAgent, agent.id)));
+    await this.work(agent.id, () => this.store().addAcpAgent(agent.id, this.reportOf(ChatAction.AddAcpAgent, agent.id, agent.name)));
     this.added.set(agent.id);
   }
 
@@ -138,7 +138,7 @@ export class AcpAgentsDialogComponent implements OnInit {
   }
 
   protected async remove(agent: AcpAgentEntry): Promise<void> {
-    await this.work(agent.id, () => this.store().removeAcpAgent(agent.id, this.reportOf(ChatAction.RemoveAcpAgent, agent.id)));
+    await this.work(agent.id, () => this.store().removeAcpAgent(agent.id, this.reportOf(ChatAction.RemoveAcpAgent, agent.id, agent.name)));
     this.keepFocus(agent.id);
   }
 
@@ -169,7 +169,7 @@ export class AcpAgentsDialogComponent implements OnInit {
     }
     const args = this.argumentLines().split(Resources.acpArgumentLineSeparator).map(t => t.trim()).filter(t => t.length > 0);
     await this.work(Resources.acpLocalFormKey, async () => {
-      if (await this.store().addLocalAcpCommand(this.name().trim(), this.command().trim(), args, this.variables(), this.reportOf(ChatAction.AddAcpAgent, this.name().trim())))
+      if (await this.store().addLocalAcpCommand(this.name().trim(), this.command().trim(), args, this.variables(), this.reportOf(ChatAction.AddAcpAgent, this.name().trim(), this.name().trim())))
         this.closeForm();
     });
   }
@@ -186,8 +186,8 @@ export class AcpAgentsDialogComponent implements OnInit {
     this.closed.emit();
   }
 
-  private reportOf(action: ChatAction.AddAcpAgent | ChatAction.RemoveAcpAgent, target: string): (message: string) => void {
-    const later = this.store().acpAgentFailed(action, target);
+  private reportOf(action: ChatAction.AddAcpAgent | ChatAction.RemoveAcpAgent, target: string, name: string): (message: string) => void {
+    const later = this.store().acpAgentFailed(action, target, name);
     return message => this.destroyRef.destroyed ? later(message) : this.error.set(message);
   }
 

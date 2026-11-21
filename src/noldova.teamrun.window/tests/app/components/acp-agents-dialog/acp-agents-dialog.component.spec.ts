@@ -25,7 +25,6 @@ import { AppearanceFixture } from "@noldova/ui.components.angular/testing";
 import { page } from "vitest/browser";
 
 import { AcpAgentsDialogComponent } from "../../../../src/app/components/acp-agents-dialog/acp-agents-dialog.component";
-import { ChatAction } from "../../../../src/app/enums/chat-action";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
@@ -255,7 +254,7 @@ describe("AcpAgentsDialogComponent", () => {
     await click(".nol-teamrun-acp-add", row("droid"));
 
     await Wait.until(() => expect(texts(".nol-teamrun-acp-error")).toEqual(["Droid can't be added."]));
-    expect(context.count(MethodName.ProviderKindInstall)).toBe(0);
+    expect([context.count(MethodName.ProviderKindInstall), context.noticeText()]).toEqual([0, null]);
     await Wait.until(() => expect(part(".nol-teamrun-acp-add", row("droid")).getAttribute("aria-busy")).toBeNull());
     expect(part<HTMLButtonElement>(".nol-teamrun-acp-add", row("droid")).disabled).toBe(false);
     await click(".nol-teamrun-acp-add", row("droid"));
@@ -380,9 +379,26 @@ describe("AcpAgentsDialogComponent", () => {
     await dialog.settled();
 
     await Wait.until(() => expect(context.shownNotices(Resources.chatActionFailedNotice).map(t => [t.title, t.text])).toEqual([
-      [Resources.chatActionTitles[ChatAction.AddAcpAgent], "Droid can't be added."],
-      [Resources.chatActionTitles[ChatAction.RemoveAcpAgent], "A provider still uses Devin."]
+      ["Couldn't add Droid", "Droid can't be added."],
+      ["Couldn't remove Devin", "A provider still uses Devin."]
     ]));
+  });
+
+  it("shows a local command whose add fails after the dialog has closed in a notice named after it", async () => {
+    const adding = new DeferredResponse();
+    await create(t => t.answer(MethodName.AcpLocalCommandAdd, () => adding.promise));
+    await fillForm();
+
+    await submit();
+    await Wait.until(() => expect(context.count(MethodName.AcpLocalCommandAdd)).toBe(1));
+    const dialog = fixture.componentInstance;
+    element().remove();
+    fixture.destroy();
+    adding.reject(new Error("The command can't be added."));
+    await dialog.settled();
+
+    await Wait.until(() => expect(context.shownNotices(Resources.chatActionFailedNotice).map(t => [t.title, t.text]))
+      .toEqual([["Couldn't add Tool", "The command can't be added."]]));
   });
 
   it("removes an agent and a local command, and clears an old error when it tries again", async () => {

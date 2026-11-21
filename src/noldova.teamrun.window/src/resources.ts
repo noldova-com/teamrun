@@ -2114,6 +2114,10 @@ export class Resources {
     return `@${name}: ${error}`;
   }
 
+  public static formatAcpAgentActionTitle(action: ChatAction.AddAcpAgent | ChatAction.RemoveAcpAgent, name: string): string {
+    return action === ChatAction.AddAcpAgent ? `Couldn't add ${name}` : `Couldn't remove ${name}`;
+  }
+
   public static formatProviderActionTitle(action: ProviderAction, name: string | null): string {
     return Object.isNull(name) ? Resources.chatActionTitles[action] : Resources.providerActionTitles[action](name);
   }
