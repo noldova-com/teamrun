@@ -1735,8 +1735,10 @@ export class ChatStoreService {
     opensTab: boolean = true): Promise<void> {
     const provider = this.providersSignal().find(t => t.id === providerId);
     const refreshing = Object.isUndefined(provider) ? null : this.refreshProfileOf(provider);
-    if (!Object.isNull(refreshing))
-      await refreshing;
+    if (!Object.isNull(refreshing) && !await refreshing.then(() => true, () => false)) {
+      report(Resources.signInKindsNotRead);
+      return;
+    }
     const launch = Object.isUndefined(provider) ? null : this.terminalLaunchOf(provider, opensTab);
     if (!Object.isNull(launch)) {
       await this.followSignInTerminal(providerId, () => this.signInLaunchOf(providerId, launch), report);

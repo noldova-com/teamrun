@@ -16,10 +16,13 @@ import { ConfirmRequest } from "../models/confirm-request";
 import type { ChatStoreService } from "./chat-store.service";
 
 export class ProviderSignOut {
-  public static confirmAsync(dialogs: DialogService, store: ChatStoreService, provider: Provider): Promise<boolean> {
+  public static confirmAsync(dialogs: DialogService, store: ChatStoreService, provider: Provider, report: (message: string) => void): Promise<boolean> {
     const refreshing = store.refreshProfileOf(provider);
     return Object.isNull(refreshing) ? ProviderSignOut.ask(dialogs, store, provider)
-      : refreshing.then(() => ProviderSignOut.ask(dialogs, store, provider));
+      : refreshing.then(() => ProviderSignOut.ask(dialogs, store, provider), () => {
+        report(Resources.signOutKindsNotRead);
+        return false;
+      });
   }
 
   public static async signOutAsync(store: ChatStoreService, provider: Provider, report: (message: string) => void): Promise<boolean | null> {

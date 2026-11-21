@@ -37,6 +37,8 @@ export class Resources {
   public static readonly retryLabel: string = "Retry";
   public static readonly kindsUnavailableForProviders: string = "The provider types couldn't be loaded, so providers can't be edited or checked.";
   public static readonly kindsUnavailableForMcpServers: string = "The provider types couldn't be loaded, so their MCP servers can't be shown.";
+  public static readonly signInKindsNotRead: string = "The provider types couldn't be read again, so the sign-in didn't start.";
+  public static readonly signOutKindsNotRead: string = "The provider types couldn't be read again, so the sign-out didn't start.";
   public static readonly nullKind: string = "null";
   public static readonly modelCatalogUnavailable: string = "Models could not be refreshed. Previously loaded choices are kept.";
   public static readonly errorCodeField: string = "code";

@@ -3492,6 +3492,20 @@ describe("ChatStoreService", () => {
       expect(terminals.launches.map(({ request }) => request.environment)).toEqual([{ CLAUDE_CONFIG_DIR: "/person/.claude" }, {}]);
     });
 
+    it("reports a sign-in whose read of the provider types fails, opening no terminal", async () => {
+      context.answer(MethodName.ProviderKindList, () => [new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"])).toJson()]);
+      context.answer(MethodName.ProviderList, () => [provider("c1", "claude", "/person/.claude").toJson()]);
+      await store.initialize();
+      context.fail(MethodName.ProviderKindList, "The runtime is restarting.");
+      const reported: string[] = [];
+
+      await store.signInProvider("c1", t => reported.push(t));
+
+      expect(reported).toEqual([Resources.signInKindsNotRead]);
+      expect(terminals.launches).toHaveLength(0);
+    });
+
     it("signs Claude Code in its usual folder in with the person's own environment, and one with its own folder with its folder named", async () => {
       const usual = new ProviderKind("claude", "Claude Code", true, false, null,
         new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"]));

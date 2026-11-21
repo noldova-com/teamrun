@@ -2327,6 +2327,20 @@ describe("ProvidersViewComponent", () => {
     expect(context.count(MethodName.ProviderSignOut)).toBe(0);
   });
 
+  it("reports a sign-out whose read of the provider types fails, opening no dialog and signing nothing out", async () => {
+    const claude = new ProviderKind("claude", "Claude Code", true, false, null, new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login",
+      "D:\\profiles\\claude-a15", null, {}, {}, ["D:\\profiles\\claude-a15"]), true);
+    providers.push(signedIn("a15", "claude", "Usual"));
+    await create(t => t.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson(), claude.toJson()]));
+    context.fail(MethodName.ProviderKindList, "The runtime is restarting.");
+
+    await choose(".nol-teamrun-sign-out", row("Usual"));
+    await Wait.until(() => expect(texts(".nol-teamrun-error-text")).toEqual([Resources.signOutKindsNotRead, Resources.kindsUnavailableForProviders]));
+
+    expect(document.querySelector("nol-teamrun-confirm-dialog")).toBeNull();
+    expect(context.count(MethodName.ProviderSignOut)).toBe(0);
+  });
+
   it("warns before signing Claude Code out in its usual folder that it signs the person's own Claude Code out too, and not for one with its own folder", async () => {
     const claude = new ProviderKind("claude", "Claude Code", true, false, null, new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "D:\\profiles\\claude-a15",
       null, {}, {}, ["D:\\profiles\\claude-a15"]), true);
