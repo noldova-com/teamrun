@@ -92,7 +92,8 @@ export class KeptSessions {
           : await this.conversations.setForkedSessionAsync(conversation.id, forked, transaction)];
       }).catch((error: unknown) => {
         throw Object.isNullOrUndefined(restored?.files) ? error
-          : new ServiceException(ErrorCode.Internal, Resources.rewindNotSavedAfterRestore, [], { cause: error });
+          : new ServiceException(ErrorCode.Internal,
+            Resources.formatRewindNotSavedAfterRestore(error instanceof Error ? error.message : String(error)), [], { cause: error });
       });
       this.removeSentFiles(conversation.id, removed.filter(t => t.id !== target.id || t.author !== MessageAuthor.User));
       this.events.publish(new Event(EventName.ConversationRewound, new ConversationRewoundPayload(conversation.id, target.sequence).toJson()));

@@ -832,8 +832,6 @@ export class Resources {
   public static readonly checkpointPathSeparator: string = "/";
   public static readonly noCheckpointRefusal: string = "No checkpoint was taken before that reply, so no files were restored.";
   public static readonly checkpointFolderChangedRefusal: string = "The chat's folder has changed since that reply, so no files were restored.";
-  public static readonly rewindNotSavedAfterRestore: string =
-    "The files were restored to before that reply, but its messages couldn't be removed, so the chat still shows them. Rewind again to remove them.";
   public static readonly restoreRefusals: ReadonlyMap<string, string> = new Map([
     ["CheckpointMissing", "The checkpoint taken before that reply is gone, so no files were restored."],
     ["FolderMissing", "The project's folder is missing, so no files were restored."],
@@ -937,6 +935,10 @@ export class Resources {
     `EXISTS (SELECT 1 FROM json_each(m.json, '$.details') d WHERE json_extract(d.value, '$.kind') = '${DetailKind.Plan}' `
     + "AND json_type(d.value, '$.parentSequence') IS NULL AND (json_array_length(d.value, '$.payload.steps') > 0 "
     + "OR (json_type(d.value, '$.payload.text') = 'text' AND length(trim(json_extract(d.value, '$.payload.text'))) > 0)))";
+
+  public static formatRewindNotSavedAfterRestore(reason: string): string {
+    return `The files were restored to before that reply, but its messages couldn't be removed, so the chat still shows them: ${reason} Rewind again to remove them.`;
+  }
 
   public static formatCompactRefused(provider: string, reason: string): string {
     return `${provider} can't compact its context here: ${reason}.`;

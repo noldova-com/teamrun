@@ -15,7 +15,7 @@ import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { CaptureOutcome, ChangeStatus, CompareOutcome, PreviewOutcome, RestoreOutcome } from "@noldova/checkpoints.protocol";
-import { ApprovalAsk, ConversationEngine, QuestionAsk, Resources, TurnDetail, TurnOutcome } from "@noldova/teamrun.core";
+import { ApprovalAsk, ConversationEngine, QuestionAsk, RequestDispatcher, Resources, TurnDetail, TurnOutcome } from "@noldova/teamrun.core";
 import {
   Approval,
   AttachmentInput,
@@ -1785,14 +1785,16 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
-  public async saysTheFilesWereRestoredWhenARewindCantRemoveItsMessagesAndRemovesThemOnASecondRewind(): Promise<void> {
+  @TestData("error")
+  @TestData("text")
+  public async saysTheFilesWereRestoredAndWhyWhenARewindCantRemoveItsMessagesAndRemovesThemOnASecondRewind(thrownAs: "error" | "text"): Promise<void> {
     await using host = await CoreHost.createAsync();
     const folder = ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
     host.adapter.writeFiles = { "base.txt": "reply\n" };
     const sent = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Change"));
     await host.engine.waitForIdle();
-    const failure = new Error("The disk is full.");
+    const failure: unknown = thrownAs === "error" ? new Error("The disk is full.") : "The disk is full.";
     const connection = host.context.database.connection;
     const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
     let failures = 1;
@@ -1808,7 +1810,9 @@ export class ConversationEngineTests {
     const restored = readFileSync(join(folder, "base.txt"), "utf8");
     const again = await host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, true));
 
-    Assert.areEqual(`${ErrorCode.Internal}:${Resources.rewindNotSavedAfterRestore}:true`, `${thrown.info.name}:${thrown.message}:${thrown.cause === failure}`);
+    const described = RequestDispatcher.describe(thrown);
+    Assert.areEqual(`${ErrorCode.Internal}:${Resources.formatRewindNotSavedAfterRestore("The disk is full.")}:true`,
+      `${described.name}:${described.message}:${thrown.cause === failure}`);
     Assert.areEqual("2:one\n", `${kept}:${restored}`);
     Assert.areEqual(2, again.removedMessageIds.length);
     Assert.areEqual(0, (await host.messages.listAsync(new MessageListParams(conversation.id, null))).length);

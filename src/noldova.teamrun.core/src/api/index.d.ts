@@ -2962,6 +2962,12 @@ export declare class Resources {
    * @returns The note.
    */
   public static formatCompactRefused(provider: string, reason: string): string;
+  /**
+   * Refusal of a rewind that restored the files but couldn't remove the messages, saying the files were restored and why the messages stay.
+   * @param reason The error's message.
+   * @returns The refusal.
+   */
+  public static formatRewindNotSavedAfterRestore(reason: string): string;
   public static formatDescriptorNotRefreshed(kind: string, failure: string): string;
   public static formatAcpAgentNotOpened(kind: string, reason: string): string;
   public static formatAcpAgentAlreadyAdded(id: string): string;
@@ -4081,10 +4087,6 @@ export declare class Resources {
    * Why a rewind restored no files when the reply's checkpoint was taken of a folder the chat no longer works in.
    */
   public static readonly checkpointFolderChangedRefusal: string;
-  /**
-   * Refusal of a rewind that restored the files but couldn't remove the messages, saying the files were restored.
-   */
-  public static readonly rewindNotSavedAfterRestore: string;
   /**
    * Why a rewind restored no files, in plain words, by the checkpoints module's outcome.
    */
