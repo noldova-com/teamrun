@@ -1299,10 +1299,10 @@ export interface IConversationsService {
   /**
    * Finds a teammate's Organization chat in an organization.
    * @param chat The organization and the teammate.
-   * @param transaction The transaction to read in, or none.
+   * @param transaction The transaction to read in.
    * @returns The first such chat, or `null` when there is none.
    */
-  findOrganizationChatAsync(chat: OrganizationChat, transaction?: SqlTransaction): Promise<Conversation | null>;
+  findOrganizationChatAsync(chat: OrganizationChat, transaction: SqlTransaction): Promise<Conversation | null>;
 
   /**
    * Renames a conversation and marks it edited.
@@ -7406,7 +7406,7 @@ export declare class ConversationsService implements IConversationsService {
   /**
    * @inheritdoc
    */
-  public findOrganizationChatAsync(chat: OrganizationChat, transaction?: SqlTransaction): Promise<Conversation | null>;
+  public findOrganizationChatAsync(chat: OrganizationChat, transaction: SqlTransaction): Promise<Conversation | null>;
 
   /**
    * @inheritdoc

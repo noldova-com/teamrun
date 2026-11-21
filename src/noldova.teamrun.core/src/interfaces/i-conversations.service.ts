@@ -56,7 +56,7 @@ export interface IConversationsService {
   setResponderAsync(params: ConversationResponderParams, transaction?: SqlTransaction): Promise<Conversation>;
   moveProviderlessAsync(providerOf: (kind: string) => string | null, transaction?: SqlTransaction): Promise<readonly Conversation[]>;
   findAsync(conversationId: string, transaction?: SqlTransaction): Promise<Conversation | null>;
-  findOrganizationChatAsync(chat: OrganizationChat, transaction?: SqlTransaction): Promise<Conversation | null>;
+  findOrganizationChatAsync(chat: OrganizationChat, transaction: SqlTransaction): Promise<Conversation | null>;
   createAsync(params: ConversationCreateParams, transaction?: SqlTransaction, organizationChat?: OrganizationChat | null): Promise<Conversation>;
   renameAsync(params: ConversationRenameParams, transaction?: SqlTransaction): Promise<Conversation>;
   giveTitleAsync(conversationId: string, title: string, transaction?: SqlTransaction): Promise<Conversation | null>;

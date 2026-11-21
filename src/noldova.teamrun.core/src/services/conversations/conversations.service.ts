@@ -99,8 +99,8 @@ export class ConversationsService implements IConversationsService {
     return this.read(record);
   }
 
-  public async findOrganizationChatAsync(chat: OrganizationChat, transaction?: SqlTransaction): Promise<Conversation | null> {
-    const [record] = await (transaction ?? this.context.database.connection).queryAsync(new SqlQuery(Resources.selectOrganizationChat,
+  public async findOrganizationChatAsync(chat: OrganizationChat, transaction: SqlTransaction): Promise<Conversation | null> {
+    const [record] = await transaction.queryAsync(new SqlQuery(Resources.selectOrganizationChat,
       [chat.organizationId, chat.teammateId]));
     return Object.isUndefined(record) ? null : this.read(record);
   }
