@@ -47,6 +47,7 @@ import { SubAgentsBadge } from "./services/sub-agents-badge";
 import { TitleModelOptions } from "./services/title-model-options";
 import { TimeFormatService } from "./services/time-format.service";
 import { TeamRunSearchSources } from "./services/teamrun-search-sources";
+import { TeammateStatusStoreService } from "./services/teammate-status-store.service";
 import { TeamRunCommands } from "./teamrun-commands";
 
 export class TeamRunWindowPart implements IWindowPart {
@@ -167,6 +168,7 @@ export class TeamRunWindowPart implements IWindowPart {
       BackgroundTaskStoreService.release(this.activeContext);
       OrganizationStoreService.release(this.activeContext);
       OrganizationLayoutService.release(this.activeContext);
+      TeammateStatusStoreService.release(this.activeContext);
       ProjectsLayoutService.release(this.activeContext);
       ComposerDefaultService.release(this.activeContext);
       ChatStoreService.release(this.activeContext);

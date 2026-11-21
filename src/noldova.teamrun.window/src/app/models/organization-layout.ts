@@ -11,6 +11,7 @@ import type { JsonObject } from "@noldova/context.json";
 
 import { Resources } from "../../resources";
 import { OrganizationCardField } from "../enums/organization-card-field";
+import { OrganizationViewMode } from "../enums/organization-view-mode";
 
 export class OrganizationLayout {
   public static readonly defaultCardsShow: ReadonlySet<OrganizationCardField> = new Set([OrganizationCardField.Status, OrganizationCardField.Now]);
@@ -18,12 +19,16 @@ export class OrganizationLayout {
   public readonly collapsedDepartments: readonly string[];
   public readonly cardsShow: ReadonlySet<OrganizationCardField>;
   public readonly cards: ReadonlyMap<string, ReadonlySet<OrganizationCardField>>;
+  public readonly view: OrganizationViewMode;
+  public readonly focus: string | null;
 
   public constructor(collapsedDepartments: readonly string[] = [], cardsShow: ReadonlySet<OrganizationCardField> = OrganizationLayout.defaultCardsShow,
-    cards: ReadonlyMap<string, ReadonlySet<OrganizationCardField>> = new Map()) {
+    cards: ReadonlyMap<string, ReadonlySet<OrganizationCardField>> = new Map(), view: OrganizationViewMode = OrganizationViewMode.Tree, focus: string | null = null) {
     this.collapsedDepartments = [...new Set(collapsedDepartments.filter(t => !String.isNullOrWhitespace(t)))];
     this.cardsShow = new Set(cardsShow);
     this.cards = new Map([...cards].filter(([teammateId]) => !String.isNullOrWhitespace(teammateId)).map(([teammateId, fields]) => [teammateId, new Set(fields)]));
+    this.view = view;
+    this.focus = focus === null || String.isNullOrWhitespace(focus) ? null : focus;
   }
 
   public static fromJson(value: unknown): OrganizationLayout {
@@ -33,7 +38,16 @@ export class OrganizationLayout {
     const cards = OrganizationLayout.readRecord(record[Resources.organizationCardsField]);
     return new OrganizationLayout(OrganizationLayout.readIds(record[Resources.collapsedDepartmentsField]),
       Resources.organizationCardsShowField in record ? OrganizationLayout.readFields(record[Resources.organizationCardsShowField]) : OrganizationLayout.defaultCardsShow,
-      new Map(Object.entries(cards).map(([teammateId, fields]) => [teammateId, OrganizationLayout.readFields(fields)])));
+      new Map(Object.entries(cards).map(([teammateId, fields]) => [teammateId, OrganizationLayout.readFields(fields)])),
+      OrganizationLayout.viewOf(record[Resources.organizationViewField]), OrganizationLayout.readFocus(record[Resources.organizationFocusField]));
+  }
+
+  public static viewOf(value: unknown): OrganizationViewMode {
+    return Object.values(OrganizationViewMode).find(t => t === value) ?? OrganizationViewMode.Tree;
+  }
+
+  private static readFocus(value: unknown): string | null {
+    return Object.isString(value) ? value : null;
   }
 
   private static readRecord(value: unknown): Record<string, unknown> {
@@ -58,7 +72,9 @@ export class OrganizationLayout {
     return {
       [Resources.collapsedDepartmentsField]: [...this.collapsedDepartments],
       [Resources.organizationCardsShowField]: OrganizationLayout.writeFields(this.cardsShow),
-      [Resources.organizationCardsField]: Object.fromEntries([...this.cards].map(([teammateId, fields]) => [teammateId, OrganizationLayout.writeFields(fields)]))
+      [Resources.organizationCardsField]: Object.fromEntries([...this.cards].map(([teammateId, fields]) => [teammateId, OrganizationLayout.writeFields(fields)])),
+      [Resources.organizationViewField]: this.view,
+      [Resources.organizationFocusField]: this.focus
     };
   }
 
@@ -68,7 +84,15 @@ export class OrganizationLayout {
 
   public toggleDepartment(departmentId: string): OrganizationLayout {
     const others = this.collapsedDepartments.filter(t => t !== departmentId);
-    return new OrganizationLayout(this.isCollapsed(departmentId) ? others : [...others, departmentId], this.cardsShow, this.cards);
+    return new OrganizationLayout(this.isCollapsed(departmentId) ? others : [...others, departmentId], this.cardsShow, this.cards, this.view, this.focus);
+  }
+
+  public withView(view: OrganizationViewMode): OrganizationLayout {
+    return new OrganizationLayout(this.collapsedDepartments, this.cardsShow, this.cards, view, this.focus);
+  }
+
+  public withFocus(focus: string | null): OrganizationLayout {
+    return new OrganizationLayout(this.collapsedDepartments, this.cardsShow, this.cards, this.view, focus);
   }
 
   public fieldsOf(teammateId: string): ReadonlySet<OrganizationCardField> {
@@ -80,20 +104,20 @@ export class OrganizationLayout {
   }
 
   public withCardsShow(field: OrganizationCardField, shown: boolean): OrganizationLayout {
-    return new OrganizationLayout(this.collapsedDepartments, OrganizationLayout.switched(this.cardsShow, field, shown), this.cards);
+    return new OrganizationLayout(this.collapsedDepartments, OrganizationLayout.switched(this.cardsShow, field, shown), this.cards, this.view, this.focus);
   }
 
   public withCardField(teammateId: string, field: OrganizationCardField, shown: boolean): OrganizationLayout {
     return new OrganizationLayout(this.collapsedDepartments, this.cardsShow,
-      new Map([...this.cards, [teammateId, OrganizationLayout.switched(this.fieldsOf(teammateId), field, shown)]]));
+      new Map([...this.cards, [teammateId, OrganizationLayout.switched(this.fieldsOf(teammateId), field, shown)]]), this.view, this.focus);
   }
 
   public withoutCardFields(teammateId: string): OrganizationLayout {
-    return new OrganizationLayout(this.collapsedDepartments, this.cardsShow, new Map([...this.cards].filter(([id]) => id !== teammateId)));
+    return new OrganizationLayout(this.collapsedDepartments, this.cardsShow, new Map([...this.cards].filter(([id]) => id !== teammateId)), this.view, this.focus);
   }
 
   public withoutAnyCardFields(): OrganizationLayout {
-    return new OrganizationLayout(this.collapsedDepartments, this.cardsShow);
+    return new OrganizationLayout(this.collapsedDepartments, this.cardsShow, new Map(), this.view, this.focus);
   }
 
   private static switched(fields: ReadonlySet<OrganizationCardField>, field: OrganizationCardField, shown: boolean): ReadonlySet<OrganizationCardField> {

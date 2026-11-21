@@ -302,6 +302,8 @@ export class Resources {
   public static readonly departmentIdField: string = "departmentId";
   public static readonly departmentsField: string = "departments";
   public static readonly membersField: string = "members";
+  public static readonly targetField: string = "target";
+  public static readonly recipientsField: string = "recipients";
   public static readonly revisionField: string = "revision";
   public static readonly missingField: string = "missing";
   public static readonly stateField: string = "state";
@@ -563,6 +565,8 @@ export class Resources {
   public static readonly unknownParentDepartment: string = "A department's parent is a department of the same organization.";
   public static readonly unknownMemberDepartment: string = "A teammate's department is a department of the same organization.";
   public static readonly teammateInTwoDepartments: string = "A teammate is in at most one department.";
+  public static readonly targetIdRequired: string = "A teammate or department target names its id; leaders and everyone name none.";
+  public static readonly recipientTwice: string = "A teammate is a recipient of a message at most once.";
   public static readonly usageHandOffRepeated: string = "A teammate's usage hand-offs name each teammate once.";
   public static readonly modeRepeated: string = "Each of a provider's modes has its own id.";
   public static readonly modeNotListed: string = "A provider's default mode is among its modes.";

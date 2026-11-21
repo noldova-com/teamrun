@@ -15,6 +15,7 @@ import { EventName, MethodName, OrganizationLayoutSaveParams } from "@noldova/te
 
 import { Resources } from "../../resources";
 import type { OrganizationCardField } from "../enums/organization-card-field";
+import type { OrganizationViewMode } from "../enums/organization-view-mode";
 import { OrganizationLayout } from "../models/organization-layout";
 
 export class OrganizationLayoutService {
@@ -82,6 +83,14 @@ export class OrganizationLayoutService {
 
   public clearEveryCard(): void {
     this.update(t => t.withoutAnyCardFields());
+  }
+
+  public showView(view: OrganizationViewMode): void {
+    this.update(t => t.withView(view));
+  }
+
+  public focusOn(id: string | null): void {
+    this.update(t => t.withFocus(id));
   }
 
   private update(change: (layout: OrganizationLayout) => OrganizationLayout): void {

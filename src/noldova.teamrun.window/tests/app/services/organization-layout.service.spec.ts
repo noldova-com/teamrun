@@ -9,6 +9,7 @@ import type { JsonValue } from "@noldova/context.json";
 import { EventName, MethodName, OrganizationLayoutSaveParams } from "@noldova/teamrun.protocol";
 
 import { OrganizationCardField } from "../../../src/app/enums/organization-card-field";
+import { OrganizationViewMode } from "../../../src/app/enums/organization-view-mode";
 import { OrganizationLayout } from "../../../src/app/models/organization-layout";
 import { OrganizationLayoutService } from "../../../src/app/services/organization-layout.service";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
@@ -17,6 +18,7 @@ import { Wait } from "../../fixtures/wait.fixture";
 
 describe("OrganizationLayoutService", () => {
   const collapsed = (...ids: string[]): JsonValue => new OrganizationLayout(ids).toJson();
+  const tree = OrganizationViewMode.Tree;
   let context: FakeWindowPartContext;
   let saves: JsonValue[];
 
@@ -63,7 +65,7 @@ describe("OrganizationLayoutService", () => {
     expect((await open()).layout().toJson()).toEqual(new OrganizationLayout().toJson());
   });
 
-  it("saves each change in turn, each card's own choice, every card's and their clearing", async () => {
+  it("saves each change in turn, each card's own choice, every card's and their clearing, the view and what Focus shows", async () => {
     const layout = await open();
     layout.toggleDepartment("d1");
     layout.showOnEveryCard(OrganizationCardField.Usage, true);
@@ -71,10 +73,14 @@ describe("OrganizationLayoutService", () => {
     layout.clearCard("t1");
     layout.showOnCard("t2", OrganizationCardField.Model, true);
     layout.clearEveryCard();
+    layout.showView(OrganizationViewMode.Focus);
+    layout.focusOn("d1");
 
-    await Wait.until(() => expect(saves).toHaveLength(6));
-    expect(saves.map(t => OrganizationLayout.fromJson(t)).map(t => [t.collapsedDepartments, t.cardsShow.has(OrganizationCardField.Usage), [...t.cards.keys()]]))
-      .toEqual([[["d1"], false, []], [["d1"], true, []], [["d1"], true, ["t1"]], [["d1"], true, []], [["d1"], true, ["t2"]], [["d1"], true, []]]);
+    await Wait.until(() => expect(saves).toHaveLength(8));
+    expect(saves.map(t => OrganizationLayout.fromJson(t)).map(t => [t.collapsedDepartments, t.cardsShow.has(OrganizationCardField.Usage), [...t.cards.keys()], t.view, t.focus]))
+      .toEqual([[["d1"], false, [], tree, null], [["d1"], true, [], tree, null], [["d1"], true, ["t1"], tree, null], [["d1"], true, [], tree, null], [["d1"], true, ["t2"], tree, null],
+        [["d1"], true, [], tree, null], [["d1"], true, [], OrganizationViewMode.Focus, null], [["d1"], true, [], OrganizationViewMode.Focus, "d1"]]);
+    expect([layout.layout().view, layout.layout().focus]).toEqual([OrganizationViewMode.Focus, "d1"]);
   });
 
   it("holds changes made before the layout is read and saves them over the layout kept", async () => {

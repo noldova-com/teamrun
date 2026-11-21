@@ -7,14 +7,14 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DepartmentsMigration, InitialMigration, MigrationCatalog, Resources } from "@noldova/teamrun.core";
+import { InitialMigration, MigrationCatalog, OrganizationMessagesMigration, Resources } from "@noldova/teamrun.core";
 
 @TestClass
 export class MigrationCatalogTests {
   @TestMethod
-  public startsWithTheInitialSchemaAndEndsWithTheDepartments(): void {
-    Assert.areEqual(28, MigrationCatalog.all.length);
-    Assert.isInstanceOf(MigrationCatalog.all.at(-1), DepartmentsMigration);
+  public startsWithTheInitialSchemaAndEndsWithTheOrganizationMessages(): void {
+    Assert.areEqual(29, MigrationCatalog.all.length);
+    Assert.isInstanceOf(MigrationCatalog.all.at(-1), OrganizationMessagesMigration);
     Assert.isInstanceOf(MigrationCatalog.all[0], InitialMigration);
     Assert.areEqual(Resources.initialMigrationId, MigrationCatalog.all[0]?.id);
   }
