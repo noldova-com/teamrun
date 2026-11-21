@@ -619,6 +619,14 @@ export class ChatStoreService {
     return this.conversationsOf(null).find(t => t.organizationChat?.teammateId === teammateId) ?? null;
   }
 
+  public organizationChats(): readonly Conversation[] {
+    return this.conversationsOf(null).filter(t => !Object.isNull(t.organizationChat));
+  }
+
+  public async latestMessageOf(conversationId: string): Promise<Message | null> {
+    return (await this.fetchPage(conversationId, null, null, 1)).messages.at(-1) ?? null;
+  }
+
   public newestConversationsOf(projectId: string | null): readonly Conversation[] {
     return ChatStoreService.newestFirst(this.conversationsOf(projectId));
   }
