@@ -153,7 +153,7 @@ describe("TeamRun's window part", () => {
     await createPart().activateAsync(context);
 
     expect(context.commands.map(t => t.name)).toEqual(declaration.contributes.commands);
-    expect(context.commands.slice(5).map(t => [t.name, t.title, t.icon, t.defaultKey?.text])).toEqual([
+    expect(context.commands.slice(6).map(t => [t.name, t.title, t.icon, t.defaultKey?.text])).toEqual([
       ["teamrun.newConversation", "New chat", "edit_square", "Mod+N"],
       ["teamrun.openProject", "Open folder", "folder_open", "Mod+O"],
       ["teamrun.openBrowser", "Open browser", "language", undefined],

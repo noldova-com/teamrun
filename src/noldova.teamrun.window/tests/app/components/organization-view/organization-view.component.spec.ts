@@ -67,7 +67,7 @@ describe("OrganizationViewComponent", () => {
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     await fixture.whenStable();
   };
-  const create = async (configure: (context: FakeWindowPartContext) => void = () => undefined): Promise<void> => {
+  const create = async (configure: (context: FakeWindowPartContext) => void = () => undefined, showsDepartments: boolean = true): Promise<void> => {
     organization = sample;
     saves = [];
     context = SampleData.createContext()
@@ -83,7 +83,9 @@ describe("OrganizationViewComponent", () => {
     fixture = TestBed.createComponent(OrganizationViewComponent);
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
-    await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(1));
+    await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
+    if (showsDepartments)
+      await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(1));
     await settle();
   };
 
@@ -158,7 +160,7 @@ describe("OrganizationViewComponent", () => {
       if (fails)
         throw new Error("The database is locked.");
       return sample.toJson();
-    }));
+    }), false);
     await Wait.until(() => expect(texts(".failure .error")).toHaveLength(1));
 
     expect(one(".failure .error").getAttribute("role")).toBe("alert");
@@ -189,7 +191,7 @@ describe("OrganizationViewComponent", () => {
       element().style.width = "60rem";
       element().style.height = "40rem";
       await settle();
-      const rem = AppearanceFixture.measureLook("space-4");
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const line = (view: Element, pseudo: string): CSSStyleDeclaration => getComputedStyle(view, pseudo);
