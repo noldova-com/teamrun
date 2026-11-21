@@ -209,20 +209,20 @@ describe("ProjectsLayoutService", () => {
     await Wait.until(() => expect(saves).toEqual([kept(["c1", "c2"])]));
   });
 
-  it("keeps a change made before a failed first read, logs the failure, and saves it with a reorder on the layout the next read returns, never on the stored one", async () => {
+  it("keeps a change made while a first read fails, logs that read and the one it asks again, and saves the change with a reorder on the layout the next read returns, never on the stored one", async () => {
     localStorage.setItem(key, JSON.stringify(kept(["c9"])));
     context = contextKeeping(null).fail(MethodName.ProjectsLayoutRead, "The runtime is gone.");
     const layout = ProjectsLayoutService.of(context);
 
     layout.togglePin("c1");
-    await Wait.until(() => expect(context.lines).toEqual([Resources.formatProjectsLayoutNotRead("Error")]));
+    await Wait.until(() => expect(context.lines).toEqual([Resources.formatProjectsLayoutNotRead("Error"), Resources.formatProjectsLayoutNotRead("Error")]));
     await settle();
-    expect([layout.pinnedConversations(), saves]).toEqual([["c9", "c1"], []]);
+    expect([layout.pinnedConversations(), saves, context.count(MethodName.ProjectsLayoutRead)]).toEqual([["c9", "c1"], [], 2]);
     context.answer(MethodName.ProjectsLayoutRead, () => kept(["c5"]));
     layout.orderPins(["c1", "c5"]);
 
     await Wait.until(() => expect(saves.map(t => ProjectsLayout.fromJson(t).pinnedConversations)).toEqual([["c1", "c5"]]));
-    expect([layout.pinnedConversations(), context.count(MethodName.ProjectsLayoutRead), localStorage.getItem(key)]).toEqual([["c1", "c5"], 2, null]);
+    expect([layout.pinnedConversations(), context.count(MethodName.ProjectsLayoutRead), localStorage.getItem(key)]).toEqual([["c1", "c5"], 3, null]);
   });
 
   it("reads the kept layout again at a resync after a first read refused with a value that isn't an error, logging its type and saving nothing", async () => {
