@@ -32,7 +32,7 @@ export class SharedMcpLaunchTests {
     + "setInterval(() => undefined, 1000);\n";
   private static readonly ARGUMENTS: readonly string[] = ["a b", "x&y", "say \"hi\"", "a\"b", "&echo injected", "50%", "%PATH%", "a^b", "(paren)", "<in>|out",
     "back\\"];
-  private static readonly END_DEADLINE: number = 30_000;
+  private static readonly END_DEADLINE: number = 25_000;
   private static readonly POLL: number = 50;
 
   @TestMethod
@@ -97,7 +97,8 @@ export class SharedMcpLaunchTests {
     launcher.stdin?.end("{\"jsonrpc\":\"2.0\"}\n");
     const [code, output] = await SharedMcpLaunchTests.finishAsync(launcher);
 
-    Assert.areEqual(JSON.stringify([7, "echo:{\"jsonrpc\":\"2.0\"}\n", "errors"]), JSON.stringify([code, output, errors]));
+    Assert.areEqual(JSON.stringify([7, "echo:{\"jsonrpc\":\"2.0\"}\n", "errors"]),
+      JSON.stringify([code, output, errors.replace(/TeamRun's MCP watch: [^\n]*\n/gu, "")]));
   }
 
   @TestMethod

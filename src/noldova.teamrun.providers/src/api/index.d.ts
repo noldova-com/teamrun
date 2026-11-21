@@ -10968,7 +10968,9 @@ export declare class SharedMcpLaunch {
  * it still runs and each process under it that started no earlier than its parent; when another process holds the server's id, one that started
  * outside those times, it ends nothing. A watch on Windows whose pipe ends without that line ends, the same way, each process its launcher
  * started after it, other than itself and before any later process took the launcher's id, with what those started, and none while the launcher
- * still runs. A PowerShell that hasn't ended within `powershellAnswerMilliseconds` is ended, and the same run starts once more in a new one.
+ * still runs. A PowerShell that hasn't ended within `powershellAnswerMilliseconds` is ended, and the same run starts once more in a new one with the
+ * rest of `windowsEndMilliseconds`, which is ended too if it hasn't ended by then. The watch on Windows gets the launcher's errors and writes there a
+ * line with a PowerShell's time and outcome when it takes over 2 seconds, doesn't end or can't start, and nothing otherwise.
  */
 export declare class SharedMcpLauncher {
   /**
@@ -11025,10 +11027,15 @@ export declare class SharedMcpLauncher {
   public static readonly graceMilliseconds: number;
 
   /**
-   * How long the watch on Windows waits for its PowerShell to end before it ends it and runs the same script once more in a new one, without a
-   * limit, in milliseconds.
+   * How long the watch on Windows waits for its PowerShell to end before it ends it and runs the same script once more in a new one, in
+   * milliseconds.
    */
   public static readonly powershellAnswerMilliseconds: number;
+
+  /**
+   * How long the watch on Windows gives its PowerShells in all, the first and the one that runs once more, in milliseconds.
+   */
+  public static readonly windowsEndMilliseconds: number;
 
   /**
    * @param platform The platform, as `process.platform`.
@@ -11039,10 +11046,11 @@ export declare class SharedMcpLauncher {
    * @param start Starts a process; `spawn` by default.
    * @param isFile Whether a path is a file; by default, whether it exists and is one.
    * @param delayAsync Waits a number of milliseconds, until the signal aborts; `setTimeout` of `node:timers/promises` by default.
+   * @param now The time, in milliseconds, for a PowerShell's time; `performance.now` by default.
    */
   public constructor(platform: string, environment: NodeJS.ProcessEnv, program: string, script: string, host?: ISharedMcpLauncherHost,
     start?: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess, isFile?: (file: string) => boolean,
-    delayAsync?: (milliseconds: number, signal?: AbortSignal) => Promise<unknown>);
+    delayAsync?: (milliseconds: number, signal?: AbortSignal) => Promise<unknown>, now?: () => number);
 
   /**
    * Runs the launcher or, after `watchOption`, the watch, and exits through the host; wrong arguments write their usage to the errors and exit

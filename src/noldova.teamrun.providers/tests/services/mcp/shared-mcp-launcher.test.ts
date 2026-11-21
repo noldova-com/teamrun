@@ -13,7 +13,7 @@ import { constants } from "node:os";
 import path from "node:path";
 import { Duplex, PassThrough, Writable } from "node:stream";
 
-import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 import { SharedMcpLauncher } from "@noldova/teamrun.providers";
 
@@ -380,6 +380,7 @@ export class SharedMcpLauncherTests {
     await running;
 
     Assert.areEqual(JSON.stringify([0]), JSON.stringify(host.codes));
+    Assert.areEqual(JSON.stringify(["pipe", "ignore", "inherit"]), JSON.stringify(recorder.starts[0]?.options.stdio));
     Assert.areEqual(JSON.stringify({ command: path.join("C:\\tools\\server.exe"), args: ["--stdio"], options: { env: { Path: "C:\\Windows", SystemRoot: "C:\\Windows",
       search_key: "s1" }, stdio: "inherit", windowsHide: true, windowsVerbatimArguments: false, detached: false } }), JSON.stringify(recorder.starts[1]));
     Assert.areEqual(JSON.stringify([[recorder.children[1]?.pid, "SIGTERM"]]), JSON.stringify(host.signals));
@@ -535,17 +536,57 @@ export class SharedMcpLauncherTests {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.waiting(), SharedMcpLauncherTests.exiting(0));
     const limits: number[] = [];
-    const delayAsync = async (milliseconds: number): Promise<void> => {
+    const delayAsync = async (milliseconds: number, signal?: AbortSignal): Promise<void> => {
       limits.push(milliseconds);
+      if (limits.length > 1)
+        await new Promise((_, reject) => signal?.addEventListener("abort", () => reject(new Error("aborted"))));
     };
 
-    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, delayAsync).runAsync(true, ["--watch"]);
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, delayAsync,
+      SharedMcpLauncherTests.clock(0, 10_000, 10_000, 10_400)).runAsync(true, ["--watch"]);
     host.stdin.end(SharedMcpLauncherTests.HANDED);
     await running;
     const [stalled, second] = recorder.starts;
 
-    Assert.areEqual(JSON.stringify([2, "powershell.exe", true, [SharedMcpLauncher.powershellAnswerMilliseconds], true, [0]]),
-      JSON.stringify([recorder.starts.length, second?.command, second?.args[3] === stalled?.args[3], limits, recorder.children[0]?.killed, host.codes]));
+    Assert.areEqual(JSON.stringify([2, "powershell.exe", true, [SharedMcpLauncher.powershellAnswerMilliseconds,
+      SharedMcpLauncher.windowsEndMilliseconds - SharedMcpLauncher.powershellAnswerMilliseconds], [true, false], [0],
+    "TeamRun's MCP watch: PowerShell 1 of 2 didn't end and was ended after 10000 ms.\n"]),
+    JSON.stringify([recorder.starts.length, second?.command, second?.args[3] === stalled?.args[3], limits, recorder.children.map(t => t.killed), host.codes,
+      host.errors]));
+  }
+
+  @TestMethod
+  public async endsTheRetrysPowershellTooWhenItDoesntAnswerWithinTheRestOfTheEndsTimeOnWindows(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.waiting(), SharedMcpLauncherTests.waiting());
+    const limits: number[] = [];
+    const delayAsync = async (milliseconds: number): Promise<void> => {
+      limits.push(milliseconds);
+    };
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, delayAsync,
+      SharedMcpLauncherTests.clock(0, 10_000, 10_000, 20_000)).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    Assert.areEqual(JSON.stringify([2, SharedMcpLauncher.windowsEndMilliseconds, [true, true], [0],
+      "TeamRun's MCP watch: PowerShell 1 of 2 didn't end and was ended after 10000 ms.\nTeamRun's MCP watch: PowerShell 2 of 2 didn't end and was ended after 10000 ms.\n"]),
+    JSON.stringify([recorder.starts.length, limits.reduce((total, t) => total + t, 0), recorder.children.map(t => t.killed), host.codes, host.errors]));
+  }
+
+  @TestMethod
+  @TestData(2000, "")
+  @TestData(2001, "TeamRun's MCP watch: PowerShell 1 of 2 ended after 2001 ms.\n")
+  public async writesAPowershellsTimeOnWindowsOnlyWhenItTakesOverTwoSeconds(elapsed: number, written: string): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, undefined, SharedMcpLauncherTests.clock(0, elapsed))
+      .runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    Assert.areEqual(JSON.stringify([[0], 1, written]), JSON.stringify([host.codes, recorder.starts.length, host.errors]));
   }
 
   @TestMethod
@@ -553,11 +594,13 @@ export class SharedMcpLauncherTests {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.failing());
 
-    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, undefined, SharedMcpLauncherTests.clock(0, 5))
+      .runAsync(true, ["--watch"]);
     host.stdin.end(SharedMcpLauncherTests.HANDED);
     await running;
 
-    Assert.areEqual(JSON.stringify([[0], 1]), JSON.stringify([host.codes, recorder.starts.length]));
+    Assert.areEqual(JSON.stringify([[0], 1, "TeamRun's MCP watch: PowerShell 1 of 2 failed to start after 5 ms.\n"]),
+      JSON.stringify([host.codes, recorder.starts.length, host.errors]));
   }
 
   @TestMethod
@@ -660,6 +703,10 @@ export class SharedMcpLauncherTests {
       child.stdin = input;
       return child;
     };
+  }
+
+  private static clock(...times: number[]): () => number {
+    return () => times.shift() ?? 0;
   }
 
   private static waiting(): () => ChildProcess {
