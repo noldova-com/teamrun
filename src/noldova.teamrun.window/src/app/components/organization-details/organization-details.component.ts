@@ -85,11 +85,11 @@ export class OrganizationDetailsComponent {
   private static leaderAbove(organization: Organization, teammates: readonly Teammate[], department: Department, teammateId: string): Teammate | null {
     let current: Department | undefined = department;
     while (!Object.isUndefined(current)) {
-      const leaderId = current.leaderId;
+      const leaderId: string | null = current.leaderId;
       const leader = leaderId === teammateId ? undefined : teammates.find(t => t.id === leaderId);
       if (!Object.isUndefined(leader))
         return leader;
-      const parentId = current.parentId;
+      const parentId: string | null = current.parentId;
       current = organization.departments.find(t => t.id === parentId);
     }
     return null;
