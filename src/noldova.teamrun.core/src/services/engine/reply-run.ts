@@ -750,7 +750,7 @@ export class ReplyRun implements ITurnListener {
       await this.approvals.updateAsync(approval.withCancellation(ReplyRun.now()));
       return await decision;
     }
-    if (!this.finished)
+    if (this.isTurnOpen)
       await this.updateAsync(this.message.withStatus(MessageStatus.AwaitingApproval, null));
     this.events.publish(new Event(EventName.ApprovalCreated, approval.toJson()));
     const withdrawals: Promise<void>[] = [];
@@ -769,7 +769,7 @@ export class ReplyRun implements ITurnListener {
       signal?.removeEventListener(Resources.abortEvent, withdraw);
       await Promise.all(withdrawals);
     }
-    if (!this.finished && !this.run.isAwaitingDecision)
+    if (this.isTurnOpen && !this.run.isAwaitingDecision)
       await this.updateAsync(this.message.withStatus(MessageStatus.Running, null));
     return decided;
   }
@@ -780,8 +780,12 @@ export class ReplyRun implements ITurnListener {
     const cancelled = approval.withCancellation(ReplyRun.now());
     await this.approvals.updateAsync(cancelled);
     this.events.publish(new Event(EventName.ApprovalUpdated, cancelled.toJson()));
-    if (!this.finished && !this.run.isAwaitingDecision)
+    if (this.isTurnOpen && !this.run.isAwaitingDecision)
       await this.updateAsync(this.message.withStatus(MessageStatus.Running, null));
+  }
+
+  private get isTurnOpen(): boolean {
+    return !this.finished && Object.isNull(this.message.endedAt);
   }
 
   private async endAsync(): Promise<void> {
