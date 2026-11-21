@@ -11,7 +11,7 @@ LICENSE file in the root directory of this source tree.
     <span class="title">{{ resources.organizationFocusStructure }}</span>
     <span class="spacer"></span>
     @if (editing()) {
-      <button type="button" nol-icon-button class="add-department" [icon]="resources.organizationBoardAddDepartmentIcon" [label]="resources.organizationBoardAddDepartment"
+      <button type="button" nol-icon-button class="add-department" [icon]="resources.organizationAddDepartmentIcon" [label]="resources.organizationAddDepartment"
         (click)="addDepartment()"></button>
     }
   </div>
@@ -33,7 +33,7 @@ LICENSE file in the root directory of this source tree.
         }
         <nol-chip>{{ row.node.headcount }}</nol-chip></button>
       @if (editing()) {
-        <button type="button" nol-icon-button class="add-member" [icon]="resources.organizationBoardAddMemberIcon"
+        <button type="button" nol-icon-button class="add-member" [icon]="resources.organizationAddMemberIcon"
           [label]="resources.formatOrganizationFocusAddMember(row.node.department.name)" [disabled]="addable(row).length === 0" [nolMenuTriggerFor]="addMenu"></button>
         <ng-template #addMenu>
           <nol-menu>
@@ -59,39 +59,33 @@ LICENSE file in the root directory of this source tree.
   }
 </nav>
 <main class="focus" [attr.aria-label]="resources.organizationFocusUnitLabel">
-  <div class="crumbs">
-    @for (crumb of crumbs(); track $index) {
-      @if (!$first) {
-        <span class="material-symbols-rounded icon note" aria-hidden="true">{{ resources.organizationFocusCrumbIcon }}</span>
-      }
-      <button type="button" class="crumb" [class.here]="crumb.isHere" [attr.aria-current]="crumb.isHere" (click)="go(crumb.target)">{{ crumb.label }}</button>
-    }
-  </div>
-  <div class="unit-head">
-    @if (editing() && unit(); as unit) {
-      <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="unit.department.name" (change)="rename(unit, $event)" />
-      <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationBoardDeleteIcon"
-        [label]="resources.formatOrganizationBoardDelete(unit.department.name)" (click)="deleteDepartment(unit)"></button>
-    } @else {
-      <h2 class="unit-name">{{ unitName() }}</h2>
-    }
-    <span class="note unit-summary">{{ unitSummary() }}</span>
-  </div>
-  <div class="grid" [class.one]="cards().length === 1">
-    @for (card of cards(); track card.id) {
-      <div class="unit-card">
-        <nol-teamrun-organization-card nolCanvasItem [teammate]="card" [shape]="fluid" />
-        @if (editing() && memberOf(card); as node) {
-          <div class="member-edit">
-            <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(card.name)" [options]="departmentOptions()" [value]="node.department.id"
-              (valueChange)="move(card, $event)" />
-            <button type="button" nol-icon-button class="remove-member" [icon]="resources.organizationBoardRemoveIcon"
-              [label]="resources.formatOrganizationBoardRemove(card.name, node.department.name)" (click)="removeMember(card, node)"></button>
-          </div>
+  <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
+    <div class="focus-plane">
+      <div class="crumbs">
+        @for (crumb of crumbs(); track $index) {
+          @if (!$first) {
+            <span class="material-symbols-rounded icon note" aria-hidden="true">{{ resources.organizationFocusCrumbIcon }}</span>
+          }
+          <button type="button" class="crumb" [class.here]="crumb.isHere" [attr.aria-current]="crumb.isHere" (click)="go(crumb.target)">{{ crumb.label }}</button>
         }
       </div>
-    } @empty {
-      <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
-    }
-  </div>
+      <div class="unit-head">
+        @if (editing() && unit(); as unit) {
+          <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="unit.department.name" (change)="rename(unit, $event)" />
+          <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationDeleteIcon"
+            [label]="resources.formatOrganizationDeleteNamed(unit.department.name)" (click)="deleteDepartment(unit)"></button>
+        } @else {
+          <h2 class="unit-name">{{ unitName() }}</h2>
+        }
+        <span class="note unit-summary">{{ unitSummary() }}</span>
+      </div>
+      <div class="grid" [class.one]="cards().length === 1">
+        @for (card of cards(); track card.id) {
+          <nol-teamrun-organization-card nolCanvasItem [teammate]="card" [shape]="fluid" [editing]="editing()" [department]="departmentOf(card)" />
+        } @empty {
+          <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
+        }
+      </div>
+    </div>
+  </nol-canvas>
 </main>

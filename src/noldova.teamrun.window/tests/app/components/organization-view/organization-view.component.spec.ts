@@ -274,7 +274,7 @@ describe("OrganizationViewComponent", () => {
     await Wait.until(() => expect(saves).toHaveLength(1));
     await settle();
 
-    expect([pills()[2], saves[0], texts(".chart nol-canvas nol-teamrun-organization-focus .unit-name")])
+    expect([pills()[2], saves[0], texts(".chart > nol-teamrun-organization-focus .unit-name")])
       .toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null }), ["Organization"]]);
   });
 

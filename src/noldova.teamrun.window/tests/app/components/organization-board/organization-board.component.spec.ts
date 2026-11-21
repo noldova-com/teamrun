@@ -6,13 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
-import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization,
   Teammate } from "@noldova/teamrun.protocol";
-import { DialogService, SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
+import { DialogService, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
@@ -157,7 +156,7 @@ describe("OrganizationBoardComponent", () => {
     await Wait.until(() => expect(dialogs.isOpen).toBe(false));
   });
 
-  it("edits the structure in edit mode: renames a department, moves a member, adds one from outside it and adds a department", async () => {
+  it("edits the structure in edit mode: renames a department, adds a member from outside it and a department, and lets each member's card move or remove it", async () => {
     const at = <T>(items: readonly T[], index: number): T => {
       const found = items[index];
       if (found === undefined)
@@ -167,21 +166,22 @@ describe("OrganizationBoardComponent", () => {
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
     const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
     await create();
-    expect([all(".lane-rename").length, all(".member-move").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
+    expect([all(".lane-rename").length, all("nol-teamrun-organization-card .move-choice").length, all(".add-member").length, all(".add-department").length])
+      .toEqual([0, 0, 0, 0]);
 
     fixture.componentRef.setInput("editing", true);
     await settle();
     const fields = (): HTMLInputElement[] => [...element().querySelectorAll<HTMLInputElement>(".lane-rename")];
     expect([fields().map(t => t.value), all(".lane-rename").map(t => t.getAttribute("aria-label")), all(".lane-name").length,
       all(".message-department").length]).toEqual([["Design", "UI", "Build"], ["Department name", "Department name", "Department name"], 0, 0]);
+    expect([all(".lanes nol-teamrun-organization-card").map(t => [texts(".name", t).join(), all(".move-choice, .remove", t).length]),
+      all(".leaders nol-teamrun-organization-card .move-choice, .leaders nol-teamrun-organization-card .remove").length])
+      .toEqual([[["Bob", 2], ["Offline", 2], ["Carol", 2]], 0]);
     for (const value of ["  Craft  ", "   ", "UI"]) {
       const field = at(fields(), value === "UI" ? 1 : 0);
       field.value = value;
       field.dispatchEvent(new Event("change"));
     }
-    const moves = fixture.debugElement.queryAll(By.css("nol-select.member-move")).map(t => t.injector.get(SelectComponent));
-    expect(moves.map(t => [t.label(), t.value()])).toEqual([["Bob's department", "design"], ["Offline's department", "build"], ["Carol's department", "build"]]);
-    at(moves, 0).valueChange.emit("build");
     one(".lane:nth-child(1) .add-member").click();
     await settle();
     await Wait.until(() => expect(menuItems().map(t => t.textContent?.trim())).toEqual(["Carol", "Code Reviewer", "Offline"]));
@@ -190,13 +190,18 @@ describe("OrganizationBoardComponent", () => {
 
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { departmentId: "design", name: "Craft" }],
-      ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: "build" }],
       ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
       ["teamrun.departmentCreate", { name: "New department", parentId: null }]
     ]));
   });
 
-  it("asks before deleting a department or taking a member out of one, and does neither when the question is closed", async () => {
+  it("asks before deleting a department, and deletes nothing when the question is closed", async () => {
+    const at = <T>(items: readonly T[], index: number): T => {
+      const found = items[index];
+      if (found === undefined)
+        throw new Error(`Nothing at ${index}.`);
+      return found;
+    };
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
     const dialog = (): string[] => [...document.querySelectorAll("nol-teamrun-confirm-dialog .nol-dialog-title, nol-teamrun-confirm-dialog p, nol-teamrun-confirm-dialog .nol-dialog-actions button")]
       .map(t => t.textContent?.trim() ?? "");
@@ -212,40 +217,17 @@ describe("OrganizationBoardComponent", () => {
     await settle();
     const deletes = (): HTMLElement[] => all(".delete-department");
 
-    expect([deletes().map(t => t.getAttribute("aria-label")), all(".remove-member").map(t => t.getAttribute("aria-label"))]).toEqual([
-      ["Delete Design", "Delete UI", "Delete Build"], ["Remove Bob from Design", "Remove Offline from Build", "Remove Carol from Build"]
-    ]);
-    deletes()[1]?.click();
+    expect(deletes().map(t => t.getAttribute("aria-label"))).toEqual(["Delete Design", "Delete UI", "Delete Build"]);
+    at(deletes(), 1).click();
     await settle();
     expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
     await answer(".nol-teamrun-cancel");
-    deletes()[0]?.click();
+    at(deletes(), 0).click();
     await settle();
     expect(dialog()).toContain("Delete Design? Its departments move up to report to you, and its members leave every department.");
     await answer(".nol-teamrun-confirm");
-    one(".remove-member").click();
-    await settle();
-    expect(dialog()).toEqual(["Remove from department", "Remove Bob from Design? Bob stays on the team, in no department.", "Close", "Remove"]);
-    await answer(".nol-teamrun-confirm");
 
-    await Wait.until(() => expect(edits()).toEqual([
-      ["teamrun.departmentDelete", { departmentId: "design" }],
-      ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: null }]
-    ]));
-  });
-
-  it("says why an edit failed until it's dismissed", async () => {
-    await create();
-    context.fail(MethodName.DepartmentCreate, "No room for another department.");
-    fixture.componentRef.setInput("editing", true);
-    await settle();
-
-    one(".add-department").click();
-    await Wait.until(() => expect(texts(".action-error [role=alert]")).toEqual(["No room for another department."]));
-    expect(one(".dismiss-error").getAttribute("aria-label")).toBe("Dismiss");
-    one(".dismiss-error").click();
-    await settle();
-    expect(all(".action-error")).toEqual([]);
+    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { departmentId: "design" }]]));
   });
 
   it("asks to message all leaders, or one department by its id", async () => {

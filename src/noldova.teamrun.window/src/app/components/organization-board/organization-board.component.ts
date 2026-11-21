@@ -11,7 +11,7 @@ import { Component, computed, inject, type InputSignal, input, output, type Outp
 import { WindowPartTokens } from "@noldova/desktop.window";
 import type { Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
-  SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+  SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationBoardSort } from "../../enums/organization-board-sort";
@@ -33,7 +33,7 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 @Component({
   selector: "nol-teamrun-organization-board",
   imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
+    TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   templateUrl: "./organization-board.component.html",
   styleUrl: "./organization-board.component.css"
@@ -58,7 +58,6 @@ export class OrganizationBoardComponent {
   protected readonly sortOptions: readonly SelectOption[] = Object.values(OrganizationBoardSort).map(t => new SelectOption(t, Resources.organizationBoardSortLabels[t]));
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
-  protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() => OrganizationEdits.departmentOptions(this.departments()));
   protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus(this.departments()
     .flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.department.name, this.status(t))))
     .filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
@@ -97,16 +96,12 @@ export class OrganizationBoardComponent {
       void this.organization.renameDepartment(node.department.id, name);
   }
 
-  protected move(teammate: Teammate, departmentId: string): void {
-    void this.organization.setMember(teammate.id, departmentId);
-  }
-
   protected addMember(node: OrganizationNode, teammate: Teammate): void {
     void this.organization.setMember(teammate.id, node.department.id);
   }
 
   protected addDepartment(): void {
-    void this.organization.createDepartment(Resources.organizationBoardNewDepartment, null);
+    void this.organization.createDepartment(Resources.organizationNewDepartment, null);
   }
 
   protected answer(ask: OrganizationBoardAsk): void {
@@ -123,10 +118,6 @@ export class OrganizationBoardComponent {
 
   protected deleteDepartment(node: OrganizationNode): void {
     this.confirm(OrganizationEdits.deleteRequest(node, this.departments()), () => void this.organization.deleteDepartment(node.department.id));
-  }
-
-  protected removeMember(teammate: Teammate, node: OrganizationNode): void {
-    this.confirm(OrganizationEdits.removeRequest(teammate, node), () => void this.organization.setMember(teammate.id, null));
   }
 
   private confirm(request: ConfirmRequest, action: () => void): void {

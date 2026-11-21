@@ -9,8 +9,8 @@
 import { Component, computed, inject, type InputSignal, input, type Signal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
-import { CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, SelectComponent, type SelectOption,
+import { type Department, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
+import { CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
   TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
@@ -32,7 +32,8 @@ import { OrganizationCardComponent } from "../organization-card/organization-car
 
 @Component({
   selector: "nol-teamrun-organization-focus",
-  imports: [CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent, SelectComponent, TextFieldComponent],
+  imports: [CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
+    TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"
@@ -48,12 +49,12 @@ export class OrganizationFocusComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly fluid: OrganizationCardShape = OrganizationCardShape.Fluid;
+  protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly rows: Signal<readonly OrganizationOutlineRow[]> = computed(() => OrganizationFocusComponent.flatten(this.tree(), 0));
   protected readonly headcount: Signal<number> = computed(() => this.rows().reduce((total, t) => total + t.node.headcount, 0));
   protected readonly focus: Signal<OrganizationFocus> = computed(() => OrganizationFocus.resolve(this.tree(), this.layout.layout().focus));
-  protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() => OrganizationEdits.departmentOptions(this.rows().map(t => t.node)));
   protected readonly unit: Signal<OrganizationNode | null> = computed(() => Object.isNull(this.focus().teammate) ? this.focus().department : null);
   protected readonly key: Signal<string> = computed(() => OrganizationFocus.keyOf(this.focus().target));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.rows().flatMap(t => Object.isNull(t.node.leader) ? [] : [t.node.leader]));
@@ -90,7 +91,7 @@ export class OrganizationFocusComponent {
   }
 
   protected addDepartment(): void {
-    void this.organization.createDepartment(Resources.organizationBoardNewDepartment, null);
+    void this.organization.createDepartment(Resources.organizationNewDepartment, null);
   }
 
   protected rename(node: OrganizationNode, event: Event): void {
@@ -99,21 +100,13 @@ export class OrganizationFocusComponent {
       void this.organization.renameDepartment(node.department.id, name);
   }
 
-  protected memberOf(teammate: Teammate): OrganizationNode | null {
+  protected departmentOf(teammate: Teammate): Department | null {
     const node = this.focus().department;
-    return !Object.isNull(node) && node.members.some(t => t.id === teammate.id) ? node : null;
-  }
-
-  protected move(teammate: Teammate, departmentId: string): void {
-    void this.organization.setMember(teammate.id, departmentId);
+    return !Object.isNull(node) && node.members.some(t => t.id === teammate.id) ? node.department : null;
   }
 
   protected deleteDepartment(node: OrganizationNode): void {
     this.confirm(OrganizationEdits.deleteRequest(node, this.rows().map(t => t.node)), () => void this.organization.deleteDepartment(node.department.id));
-  }
-
-  protected removeMember(teammate: Teammate, node: OrganizationNode): void {
-    this.confirm(OrganizationEdits.removeRequest(teammate, node), () => void this.organization.setMember(teammate.id, null));
   }
 
   private confirm(request: ConfirmRequest, action: () => void): void {

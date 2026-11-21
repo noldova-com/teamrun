@@ -6,13 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
-import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
   Teammate } from "@noldova/teamrun.protocol";
-import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
+import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationFocusComponent } from "../../../../src/app/components/organization-focus/organization-focus.component";
@@ -174,47 +173,44 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(saves).toHaveLength(2));
   });
 
-  it("edits the structure in edit mode: renames the focused department, moves its members, adds one from outside it and adds a department", async () => {
+  it("edits the structure in edit mode: renames the focused department, adds a member from outside a department and a department, and lets its members' cards move or remove them", async () => {
+    const at = <T>(items: readonly T[], index: number): T => {
+      const found = items[index];
+      if (found === undefined)
+        throw new Error(`Nothing at ${index}.`);
+      return found;
+    };
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
     const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
-    const moves = (): SelectComponent[] => fixture.debugElement.queryAll(By.css("nol-select.member-move")).map(t => t.injector.get(SelectComponent));
+    const cardEdits = (): unknown[] => all(".grid nol-teamrun-organization-card").map(t => [texts(".name", t).join(), all(".move-choice, .remove", t).length]);
     await create("Department:design");
-    expect([all(".unit-rename").length, all(".member-move").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
+    expect([all(".unit-rename").length, all(".grid .move-choice").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
 
     fixture.componentRef.setInput("editing", true);
     await settle();
-    expect([all(".add-member").map(t => t.getAttribute("aria-label")), texts(".unit-name"), one(".unit-rename").getAttribute("aria-label")]).toEqual([
-      ["Add a member to Design", "Add a member to UI", "Add a member to Build"], [], "Department name"
+    expect([all(".add-member").map(t => t.getAttribute("aria-label")), texts(".unit-name"), one(".unit-rename").getAttribute("aria-label"), cardEdits()]).toEqual([
+      ["Add a member to Design", "Add a member to UI", "Add a member to Build"], [], "Department name", [["Alice", 0], ["Bob", 2]]
     ]);
-    expect(moves().map(t => [t.label(), t.value()])).toEqual([["Bob's department", "design"]]);
-    const field = one(".unit-rename").querySelector("input") ?? one(".unit-rename");
+    const field = one(".unit-rename");
     if (!(field instanceof HTMLInputElement))
       throw new Error("The rename field is no input.");
     for (const value of ["   ", "Design", "  Craft  "]) {
       field.value = value;
       field.dispatchEvent(new Event("change"));
     }
-    const [move] = moves();
-    if (Object.isUndefined(move))
-      throw new Error("No move select.");
-    move.valueChange.emit("build");
     await click(one(".add-member", row("Design")));
     await Wait.until(() => expect(menuItems().map(t => t.textContent?.trim())).toEqual(["Carol", "Code Reviewer", "Offline"]));
-    const [first] = menuItems();
-    if (Object.isUndefined(first))
-      throw new Error("No menu item.");
-    first.click();
+    at(menuItems(), 0).click();
     one(".add-department").click();
 
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { departmentId: "design", name: "Craft" }],
-      ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: "build" }],
       ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
       ["teamrun.departmentCreate", { name: "New department", parentId: null }]
     ]));
   });
 
-  it("asks before deleting the focused department or taking a member out of it", async () => {
+  it("asks before deleting the focused department, and deletes nothing when the question is closed", async () => {
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
     const dialog = (): string[] => [...document.querySelectorAll("nol-teamrun-confirm-dialog .nol-dialog-title, nol-teamrun-confirm-dialog p, nol-teamrun-confirm-dialog .nol-dialog-actions button")]
       .map(t => t.textContent?.trim() ?? "");
@@ -229,31 +225,25 @@ describe("OrganizationFocusComponent", () => {
     fixture.componentRef.setInput("editing", true);
     await settle();
 
-    expect([one(".delete-department").getAttribute("aria-label"), all(".remove-member").length]).toEqual(["Delete UI", 0]);
+    expect(one(".delete-department").getAttribute("aria-label")).toBe("Delete UI");
     await click(one(".delete-department"));
     expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
     await answer(".nol-teamrun-cancel");
     await click(one(".obtn", row("Design")));
-    expect(all(".remove-member").map(t => t.getAttribute("aria-label"))).toEqual(["Remove Bob from Design"]);
-    await click(one(".remove-member"));
-    expect(dialog()).toEqual(["Remove from department", "Remove Bob from Design? Bob stays on the team, in no department.", "Close", "Remove"]);
-    await answer(".nol-teamrun-confirm");
     await click(one(".delete-department"));
+    expect(dialog()).toContain("Delete Design? Its departments move up to report to you, and its members leave every department.");
     await answer(".nol-teamrun-confirm");
 
-    await Wait.until(() => expect(edits()).toEqual([
-      ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: null }],
-      ["teamrun.departmentDelete", { departmentId: "design" }]
-    ]));
+    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { departmentId: "design" }]]));
   });
 
-  it("renames no unit when a teammate or the leaders are focused, and moves a focused member only", async () => {
+  it("renames no unit when a teammate or the leaders are focused, and lets a focused member's card move it", async () => {
     await create("Teammate:bob");
     fixture.componentRef.setInput("editing", true);
     await settle();
-    expect([all(".unit-rename").length, texts(".unit-name"), all(".member-move").length]).toEqual([0, ["Bob"], 1]);
+    expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Bob"], 1]);
     await click(one(".crumb"));
-    expect([all(".unit-rename").length, texts(".unit-name"), all(".member-move").length]).toEqual([0, ["Organization"], 0]);
+    expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Organization"], 0]);
   });
 
   describe.each([
@@ -269,29 +259,36 @@ describe("OrganizationFocusComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
-    it("sets the outline beside the 60rem focus, the unit's cards in columns of at least 18rem, and one card at up to 36rem", async () => {
+    it("sets the 16rem outline beside the focus, whose canvas holds the 60rem unit: its cards in columns of at least 18rem, one card at up to 36rem", async () => {
       await create();
       element().style.width = "90rem";
       element().style.height = "40rem";
       await settle();
+      await click(one(".focus .nol-canvas-actual"));
       const host = box(element());
       const outline = box(one(".outline"));
       const focus = box(one(".focus"));
+      const canvas = box(one(".focus > nol-canvas"));
+      const plane = box(one(".focus-plane"));
       const cards = all(".grid nol-teamrun-organization-card").map(box);
-      const columns = Math.floor((focus.width + space(3)) / (18 * rem() + space(3)));
-      const width = (focus.width - (columns - 1) * space(3)) / columns;
+      const columns = Math.floor((plane.width + space(3)) / (18 * rem() + space(3)));
+      const width = (plane.width - (columns - 1) * space(3)) / columns;
 
+      expect(texts(".focus .nol-canvas-zoom")).toEqual(["100%"]);
       AppearanceFixture.expectPixels(outline.left, host.left);
       AppearanceFixture.expectPixels(outline.height, host.height);
+      AppearanceFixture.expectPixels(outline.width, 16 * rem() + (host.width - 51 * rem() - space(4)) / 1000);
       AppearanceFixture.expectPixels(focus.left - outline.right, space(4));
       AppearanceFixture.expectPixels(focus.right, host.right);
-      AppearanceFixture.expectPixels(focus.width, 60 * rem());
+      for (const edge of ["left", "top", "right", "bottom"] as const)
+        AppearanceFixture.expectPixels(canvas[edge], focus[edge]);
+      AppearanceFixture.expectPixels(plane.width, 60 * rem());
       expect(getComputedStyle(one(".outline")).borderTopWidth).toBe("1px");
       AppearanceFixture.expectPixels(box(one(".orow.root")).left - outline.left, space(1) + 1);
       AppearanceFixture.expectPixels(box(one(".orow.root")).height, 1.625 * rem());
       for (const [index, card] of cards.entries()) {
         AppearanceFixture.expectPixels(card.width, width);
-        AppearanceFixture.expectPixels(card.left - focus.left, index * (width + space(3)));
+        AppearanceFixture.expectPixels(card.left - plane.left, index * (width + space(3)));
       }
       AppearanceFixture.expectPixels(box(one(".unit-head")).top - box(one(".crumbs")).bottom, space(4));
       AppearanceFixture.expectPixels(box(one(".grid")).top - box(one(".unit-head")).bottom, space(4));

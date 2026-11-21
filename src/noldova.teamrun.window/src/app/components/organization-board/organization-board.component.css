@@ -160,35 +160,9 @@
   min-width: 0;
 }
 
-.member-edit {
-  display: flex;
-  align-items: center;
-  gap: var(--nol-space-1);
-  margin-bottom: var(--nol-space-1);
-}
-
-.member-move {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .add-member,
 .add-department {
   align-self: flex-start;
-}
-
-.action-error {
-  display: flex;
-  align-items: center;
-  gap: var(--nol-space-1);
-}
-
-.error {
-  flex: auto;
-  min-width: 0;
-  margin: 0;
-  color: var(--nol-error);
-  overflow-wrap: anywhere;
 }
 
 .lane-empty {
