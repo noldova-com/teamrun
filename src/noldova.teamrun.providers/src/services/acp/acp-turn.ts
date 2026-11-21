@@ -151,6 +151,10 @@ export class AcpTurn implements IAcpClientListener {
     return this.subAgents.isKeeping;
   }
 
+  public get subAgentStates(): string {
+    return this.subAgents.states;
+  }
+
   public keepSubAgents(cancel: (subAgentId: string) => Promise<boolean>, ended: (wake: TurnWake | null) => void): void {
     this.subAgents.keep(cancel, ended);
   }

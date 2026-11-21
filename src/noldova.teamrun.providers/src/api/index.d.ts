@@ -1819,6 +1819,10 @@ export declare class ProviderTimings {
    * How long a kept process with no session left stays open, in milliseconds: a Codex app-server with no thread.
    */
   public readonly idleLimit: number;
+  /**
+   * How long a stopped ACP turn may take to settle before the session log names the step it still waits on, in milliseconds.
+   */
+  public readonly stopReportWait: number;
 
   /**
    * Initializes the timings.
@@ -1840,9 +1844,10 @@ export declare class ProviderTimings {
    * @param modelListTimeout How long a model listing waits for an agent's `modelList` method, in milliseconds.
    * @param silenceLimit How long a session held open only by its background work stays open while that work is silent, in milliseconds.
    * @param idleLimit How long a kept session with no turn, or a kept process with no session left, stays open, in milliseconds.
+   * @param stopReportWait How long a stopped ACP turn may take to settle before the session log names the step it still waits on, in milliseconds.
    * @throws ArgumentOutOfRangeException when a value is not a positive integer.
    */
-  public constructor(versionTimeout: number, signInCheckTimeout: number, initializeTimeout: number, requestTimeout: number, interruptTimeout: number, interruptGrace: number, stopGrace: number, killWait: number, abortGrace: number, streamInterval: number, resumeRetryDelay: number, wakeGrace?: number, taskOutputInterval?: number, accountTimeout?: number, modelListTimeout?: number, silenceLimit?: number, idleLimit?: number);
+  public constructor(versionTimeout: number, signInCheckTimeout: number, initializeTimeout: number, requestTimeout: number, interruptTimeout: number, interruptGrace: number, stopGrace: number, killWait: number, abortGrace: number, streamInterval: number, resumeRetryDelay: number, wakeGrace?: number, taskOutputInterval?: number, accountTimeout?: number, modelListTimeout?: number, silenceLimit?: number, idleLimit?: number, stopReportWait?: number);
 
   /**
    * Returns the production timings.
@@ -3757,6 +3762,7 @@ export declare class Resources {
   public static readonly modelListTimeoutParameterName: string;
   public static readonly silenceLimitParameterName: string;
   public static readonly idleLimitParameterName: string;
+  public static readonly stopReportWaitParameterName: string;
   /**
    * Codex local-image input discriminator.
    */
@@ -4840,6 +4846,10 @@ export declare class Resources {
    * Milliseconds a kept process with no session left stays open: 30 minutes.
    */
   public static readonly idleLimit: number;
+  /**
+   * Milliseconds a stopped ACP turn may take to settle before the session log names the step it still waits on: a minute, past the interrupt grace.
+   */
+  public static readonly stopReportWait: number;
   /**
    * Milliseconds after its last turn that a Claude chat which may compact while idle does so: 54 minutes, inside Claude's one-hour prompt cache.
    */
@@ -6915,6 +6925,35 @@ export declare class Resources {
    * @returns The text.
    */
   public static formatBlockedServersUnnoted(kind: string, reason: string): string;
+  /**
+   * The steps a stopped ACP turn waits on, as its stop's log line names them.
+   */
+  public static readonly turnStepStart: string;
+  public static readonly turnStepPrompt: string;
+  public static readonly turnStepAnswer: string;
+  public static readonly turnStepHandled: string;
+  public static readonly turnStepBlockedServers: string;
+  public static readonly turnStepFinish: string;
+  public static readonly turnStepCompaction: string;
+  public static readonly turnStepSteers: string;
+  public static readonly turnStepRelease: string;
+  /**
+   * Formats the log line for a stopped ACP turn that hasn't settled within `ProviderTimings.stopReportWait`.
+   * @param kind The provider kind's id.
+   * @param step The step it still waits on.
+   * @param subAgents Its sub-agents' states when it was stopped, from {@link Resources.formatSubAgentState}, or empty for none.
+   * @returns The text.
+   */
+  public static formatTurnStopStuck(kind: string, step: string, subAgents: string): string;
+  /**
+   * Formats a sub-agent's state for a stopped turn's log line.
+   * @param toolCallId The tool call that started it.
+   * @param status Its status.
+   * @param background Whether it runs in the background.
+   * @param kept Whether the turn keeps it past its end.
+   * @returns The text.
+   */
+  public static formatSubAgentState(toolCallId: string, status: import("@noldova/teamrun.protocol").SubAgentStatus, background: boolean, kept: boolean): string;
   /**
    * Formats the log line for a read of Claude's shared MCP server states that stopped on an error.
    * @param reason Why it stopped.
@@ -15564,6 +15603,10 @@ export declare class AcpSubAgents {
    * Whether a background sub-agent it keeps past its turn still runs, or the agent hasn't yet answered the cancel of one the person's Stop ended.
    */
   public get isKeeping(): boolean;
+  /**
+   * Each sub-agent's state, from {@link Resources.formatSubAgentState}, joined by {@link Resources.listSeparator}; empty for none.
+   */
+  public get states(): string;
 
   /**
    * Keeps its background sub-agents running past the turn: the turn's end stops only the others, each kept one is a task, named by its Grok id, whose
@@ -16185,6 +16228,10 @@ export declare class AcpTurn implements IAcpClientListener {
    * Whether a background sub-agent it keeps past its end still runs.
    */
   public get keepsSubAgents(): boolean;
+  /**
+   * Its sub-agents' states, as {@link AcpSubAgents.states} gives them.
+   */
+  public get subAgentStates(): string;
 
   /**
    * Keeps its background sub-agents running past its end, as `AcpSubAgents.keep` says.
