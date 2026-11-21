@@ -910,6 +910,10 @@ export class Resources {
     return `${provider} can't compact its context here: ${reason}.`;
   }
 
+  public static formatDescriptorNotRefreshed(kind: string, failure: string): string {
+    return `The ${kind} kind's descriptor couldn't be rebuilt from the environment its tooling is given, so it keeps the last one: ${failure}.`;
+  }
+
   public static formatAcpAgentNotOpened(kind: string, reason: string): string {
     return `The ACP agent ${kind} couldn't be opened: ${reason}`;
   }

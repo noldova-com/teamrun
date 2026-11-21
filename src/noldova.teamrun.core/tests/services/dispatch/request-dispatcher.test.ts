@@ -507,7 +507,7 @@ export class RequestDispatcherTests {
   }
 
   @TestMethod
-  public async listsEachKindAsItsRefreshedDescriptorSaysAndItsLastOneWhenTheRefreshFails(): Promise<void> {
+  public async listsEachKindAsItsRefreshedDescriptorSaysAndItsLastOneWhenTheRefreshFailsWritingTheFailureToTheLog(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const refreshed = new FakeProviderAdapter("refreshed");
     refreshed.refreshDescriptorAsync = () => {
@@ -523,6 +523,7 @@ export class RequestDispatcherTests {
 
     Assert.areEqual("fake:Fake provider,refreshed:Refreshed provider,failing:Fake provider",
       RequestDispatcherTests.objects(kinds).map(t => ProviderKind.fromJson(t.toJson())).map(t => `${t.id}:${t.displayName}`).join(","));
+    Assert.areEqual(JSON.stringify([Resources.formatDescriptorNotRefreshed("failing", "Error")]), JSON.stringify(host.log.lines));
   }
 
   @TestMethod

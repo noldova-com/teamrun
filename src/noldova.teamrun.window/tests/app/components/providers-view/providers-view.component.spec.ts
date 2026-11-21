@@ -2305,6 +2305,28 @@ describe("ProvidersViewComponent", () => {
     expect(context.count(MethodName.ProviderSignOut)).toBe(0);
   });
 
+  it("reads Claude Code's person folder again before warning about a sign-out, so the folder the environment names after the listing gets the warning, " +
+    "trailing separator and all", async () => {
+    let usual = "D:\\profiles\\claude-a15";
+    const claude = (): ProviderKind => new ProviderKind("claude", "Claude Code", true, false, null,
+      new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", usual, null, {}, {}, [usual]), true);
+    providers.push(signedIn("a15", "claude", "Usual"), signedIn("a16", "claude", "Added"));
+    await create(t => t.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson(), claude().toJson()]));
+    usual = "D:\\profiles\\claude-a16\\";
+    const message = async (label: string): Promise<string | undefined> => {
+      await choose(".nol-teamrun-sign-out", row(label));
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-confirm-dialog p")).not.toBeNull());
+      const text = document.querySelector("nol-teamrun-confirm-dialog p")?.textContent?.trim();
+      button(".nol-teamrun-cancel", document).click();
+      await settle();
+      return text;
+    };
+
+    expect(await message("Usual")).toBe(Resources.formatSignOut("Usual", "Claude Code"));
+    expect(await message("Added")).toBe(Resources.formatSignOutPersonal("Added", "Claude Code"));
+    expect(context.count(MethodName.ProviderSignOut)).toBe(0);
+  });
+
   it("warns before signing Claude Code out in its usual folder that it signs the person's own Claude Code out too, and not for one with its own folder", async () => {
     const claude = new ProviderKind("claude", "Claude Code", true, false, null, new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "D:\\profiles\\claude-a15",
       null, {}, {}, ["D:\\profiles\\claude-a15"]), true);

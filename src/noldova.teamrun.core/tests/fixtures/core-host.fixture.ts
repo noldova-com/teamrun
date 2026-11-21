@@ -146,7 +146,7 @@ export class CoreHost implements AsyncDisposable {
     this.windows = new WindowsService(this.events, this.conversations, 50);
     this.computerUseGrants = new ComputerUseGrantsService(this.rememberedGrants, this.conversations, this.teammates, this.appDescriptions,
       new ComputerUseGrantTimings(1_000, 60_000), this.timer);
-    this.kinds = new ProviderKindsService(this.registry, this.providers, this.events, this.planUsage, this.teammates);
+    this.kinds = new ProviderKindsService(this.registry, this.providers, this.events, this.planUsage, this.teammates, this.log);
     this.engine = new ConversationEngine(this.context, this.projects, this.conversations, this.messages, this.approvals,
       this.providers, this.teammates, this.registry, this.events, this.attachments, readHopLimit, this.log, readCommand, this.tasks, this.planUsage, tools,
       this.checkpoints, this.sharedServers, null, runsCommands ? this.commands : null, readTitleModel, readIdleCompaction, this.timer);
