@@ -234,7 +234,8 @@ describe("OrganizationViewComponent", () => {
     const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
     TestBed.overrideProvider(ClockService, { useValue: clock });
     const reply = (id: string, chatId: string, started: string, status: MessageStatus): Message =>
-      new Message(id, chatId, 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, started, started, null, [], "alice", "alice");
+      new Message(id, chatId, 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, started, started,
+        status === MessageStatus.Running ? null : started, [], "alice", "alice");
     const now = (name: string): string[] => [...texts(".now-icon", card(name)), ...texts(".now-text", card(name)), ...texts(".now-for", card(name))];
     await create();
     const idle = [now("Alice"), now("Offline"), clock.running];
