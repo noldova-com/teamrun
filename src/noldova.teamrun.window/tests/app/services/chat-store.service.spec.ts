@@ -4425,10 +4425,10 @@ describe("ChatStoreService", () => {
       await store.initialize();
       await store.selectConversation("c1");
 
-      expect(await store.editWaiting(kept, "Changed", [])).toBe(true);
+      expect(await store.editWaiting(kept, "Changed", [], ["bob"])).toBe(true);
       const edited = WaitingMessageEditParams.fromJson(context.parametersOf(MethodName.WaitingMessageEdit));
       expect([edited.id, edited.message.text, edited.message.providerId, edited.message.responderTeammateId, ...edited.message.mentionedTeammateIds])
-        .toEqual(["w1", "Changed", settings.providerId, "alice", "alice"]);
+        .toEqual(["w1", "Changed", settings.providerId, "alice", "bob"]);
       expect(await store.removeWaiting(kept)).toBe(true);
       expect(WaitingMessageIdParams.fromJson(context.parametersOf(MethodName.WaitingMessageRemove)).id).toBe("w1");
       expect(await store.sendWaitingNow(kept)).toBe(true);
@@ -4440,7 +4440,7 @@ describe("ChatStoreService", () => {
         return `${done}|${context.shownNotices(Resources.chatActionFailedNotice).at(-1)?.title}|${context.noticeText()}`;
       };
       expect([
-        await failed(MethodName.WaitingMessageEdit, () => store.editWaiting(kept, "Again", [])),
+        await failed(MethodName.WaitingMessageEdit, () => store.editWaiting(kept, "Again", [], [])),
         await failed(MethodName.WaitingMessageRemove, () => store.removeWaiting(kept)),
         await failed(MethodName.WaitingMessageSendNow, () => store.sendWaitingNow(kept))
       ]).toEqual([ChatAction.EditWaiting, ChatAction.RemoveWaiting, ChatAction.SendWaitingNow].map(t => `false|${Resources.chatActionTitles[t]}|It already went.`));
