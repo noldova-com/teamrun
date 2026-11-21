@@ -110,6 +110,18 @@
   white-space: nowrap;
 }
 
+.last {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .model {
   color: var(--nol-text-muted);
   font-size: var(--nol-text-small);

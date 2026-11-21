@@ -1171,7 +1171,8 @@ export class Resources {
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
   public static readonly organizationRemoveLabel: string = "Remove";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
-    [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Model];
+    [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Last,
+      OrganizationCardField.Model];
   public static readonly organizationFieldLabels: Readonly<Record<OrganizationCardField, string>> = {
     [OrganizationCardField.Status]: "Status",
     [OrganizationCardField.Now]: "Current activity",

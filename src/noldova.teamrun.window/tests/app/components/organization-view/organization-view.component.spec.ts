@@ -10,8 +10,8 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams, PlanUsage, PlanWindow,
-  PlanWindowName } from "@noldova/teamrun.protocol";
+import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
+  PlanUsage, PlanWindow, PlanWindowName, TeammateLastReply } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
@@ -213,8 +213,8 @@ describe("OrganizationViewComponent", () => {
     expect([shows("Alice"), shows("Bob")]).toEqual([["Idle"], ["Idle"]]);
 
     await openMenu(one(".top .cards-show"));
-    expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Model and effort", "false"],
-      ["Clear every card's own choice", null]]);
+    expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Last message", "false"],
+      ["Model and effort", "false"], ["Clear every card's own choice", null]]);
     expect(menuItem("Clear every card's own choice").getAttribute("aria-disabled")).toBe("true");
     menuItem("Usage today").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
@@ -265,6 +265,26 @@ describe("OrganizationViewComponent", () => {
     await settle();
 
     expect([all(".now", card("Alice")), now("Bob"), clock.running]).toEqual([[], ["pause_circle", "Nothing running"], 0]);
+  });
+
+  it("says on a card the last thing its teammate said, in at most two lines, and follows each reply it finishes", async () => {
+    const said = "Linux passes; macOS and Windows are still running, and the review waits on both of them before it starts again tonight.";
+    await create(context => context
+      .answer(MethodName.OrganizationLayoutRead, () => ({ cardsShow: { Last: true } }))
+      .answer(MethodName.TeammateLastReplyList, () => [new TeammateLastReply("alice", "c1", "r0", said, SampleData.timestamp).toJson()]));
+    card("Alice").style.width = "12rem";
+    await Wait.until(() => expect(texts(".last", card("Alice"))).toEqual([said]));
+    const before = texts(".last", card("Bob"));
+    context.emit(EventName.MessageUpdated, new Message("r1", "c1", 1, MessageAuthor.Provider, null, MessageStatus.Completed,
+      [SampleData.detail(0, DetailKind.Text, "Done: the header.")], SampleData.provenance, SampleData.timestamp, SampleData.timestamp, SampleData.timestamp, [],
+      "bob", "bob").toJson());
+    await settle();
+    const last = one(".last", card("Alice"));
+    const height = AppearanceFixture.measureLook("line-label");
+
+    expect([before, texts(".last", card("Bob"))]).toEqual([[], ["Done: the header."]]);
+    AppearanceFixture.expectPixels(last.getBoundingClientRect().height, 2 * height);
+    expect([getComputedStyle(last).webkitLineClamp, last.scrollHeight > last.clientHeight]).toEqual(["2", true]);
   });
 
   it("lets a card choose its own fields over every card's, until it or every card's choice is cleared", async () => {
