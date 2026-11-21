@@ -7,8 +7,8 @@
  */
 
 import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
-import { NodeTimer } from "@noldova/teamrun.core";
-import { CommandRunner, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
+import { NodeTimer, TimeoutException } from "@noldova/teamrun.core";
+import { CommandRunner, type IPowershellSession, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
 
 import { FakeTaskTree, type FakeTaskTreeMode } from "../../fixtures/fake-task-tree.fixture.js";
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
@@ -463,7 +463,6 @@ export class ProcessTreeTests {
     }
   }
 
-
   @Category("ProcessListing")
   @TestMethod
   public async endsARunningProcessWellInsideTheListingTimeWhenItsSessionNeverAnswers(): Promise<void> {
@@ -471,17 +470,26 @@ export class ProcessTreeTests {
     const path = directory.resolve("tree.txt");
     const root = (await ProcessTreeTests.start(path, "stay"))[0] ?? ProcessTreeTests.GONE;
     try {
-      const session = new PowershellSession(process.execPath, ["-e", "process.stdin.resume()"], process.env, Resources.powershellSessionIdle);
-      const real = new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform)));
-      const started = performance.now();
+      const silent = new PowershellSession(process.execPath, ["-e", "process.stdin.resume()"], process.env, Resources.powershellSessionIdle);
+      const asked: [number, boolean][] = [];
+      const session: IPowershellSession = {
+        run: (script, timeout) => silent.run(script, timeout).catch((error: unknown) => {
+          asked.push([timeout, error instanceof TimeoutException]);
+          throw error;
+        })
+      };
+      const runner = new ListingCommandRunner([], new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform))));
+      const windows = process.platform === Resources.windowsPlatform;
 
-      const ended = await new ProcessTree(process.platform, real, process.env, Resources.processListTimeout, new NodeTimer(), 100, undefined, session)
+      const ended = await new ProcessTree(process.platform, runner, process.env, Resources.processListTimeout, new NodeTimer(), 100, undefined, session)
         .endTree(root, Date.now(), process.pid);
-      const took = performance.now() - started;
       await Wait.until(() => !ProcessTreeTests.runs(root), "The process still ran.");
 
       Assert.isTrue(ended);
-      Assert.isTrue(took < Resources.processListTimeout / 2, String(took));
+      Assert.areEqual(JSON.stringify(windows ? [[Resources.powershellSessionAnswerLimit, true]] : []), JSON.stringify(asked));
+      Assert.isTrue(runner.timeouts.length > 0);
+      Assert.areEqual(JSON.stringify(runner.timeouts.map((_timeout, index) => windows && index === 0
+        ? Resources.processListTimeout - Resources.powershellSessionAnswerLimit : Resources.processListTimeout)), JSON.stringify(runner.timeouts));
     }
     finally {
       FakeTaskTree.endAll(path);
