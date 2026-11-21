@@ -27,6 +27,7 @@ import { Resources } from "../resources";
 import { PagesViewComponent } from "./components/pages/pages-view/pages-view.component";
 import { AbilitySettingsRows } from "./services/ability-settings-rows";
 import { BackgroundTaskStoreService } from "./services/background-task-store.service";
+import { OrganizationLayoutService } from "./services/organization-layout.service";
 import { OrganizationMessagesStoreService } from "./services/organization-messages-store.service";
 import { OrganizationStoreService } from "./services/organization-store.service";
 import { BrowserAvailability } from "./services/browser-availability";
@@ -94,6 +95,8 @@ export class TeamRunWindowPart implements IWindowPart {
       () => import("./components/activity-view/activity-view.component").then(t => t.ActivityViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
     context.registerView(new ViewContribution(Resources.changesViewName, Resources.changesTitle, Resources.changesViewIcon, DockSide.Bottom, true,
       () => import("./components/changes-view/changes-view.component").then(t => t.ChangesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 20 }));
+    context.registerCommand(TeamRunWindowPart.opening(context, Resources.showOrganizationCommand, Resources.showOrganizationTitle, Resources.organizationViewIcon,
+      Resources.organizationDocumentName, Resources.organizationDocumentInstance, Resources.organizationTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showTeammatesCommand, Resources.showTeammatesTitle, Resources.teammatesViewIcon,
       Resources.teammatesDocumentName, Resources.teammatesDocumentInstance, Resources.teammatesTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showProvidersCommand, Resources.showProvidersTitle, Resources.providersViewIcon,
@@ -114,6 +117,8 @@ export class TeamRunWindowPart implements IWindowPart {
       context.registerSearchSource(source);
     context.registerDocument(new DocumentContribution(Resources.conversationDocumentName, () => import("./components/conversation/conversation.component").then(t => t.ConversationComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.imageDocumentName, () => import("./components/image-document/image-document.component").then(t => t.ImageDocumentComponent), ContentPadding.None));
+    context.registerDocument(new DocumentContribution(Resources.organizationDocumentName,
+      () => import("./components/organization-view/organization-view.component").then(t => t.OrganizationViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.teammatesDocumentName, () => import("./components/teammates-view/teammates-view.component").then(t => t.TeammatesViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.providersDocumentName, () => import("./components/providers-view/providers-view.component").then(t => t.ProvidersViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.mcpServersDocumentName, () => import("./components/mcp-servers-view/mcp-servers-view.component").then(t => t.McpServersViewComponent), ContentPadding.None));
@@ -164,6 +169,7 @@ export class TeamRunWindowPart implements IWindowPart {
       BackgroundTaskStoreService.release(this.activeContext);
       OrganizationMessagesStoreService.release(this.activeContext);
       OrganizationStoreService.release(this.activeContext);
+      OrganizationLayoutService.release(this.activeContext);
       TeammateStatusStoreService.release(this.activeContext);
       ProjectsLayoutService.release(this.activeContext);
       ComposerDefaultService.release(this.activeContext);

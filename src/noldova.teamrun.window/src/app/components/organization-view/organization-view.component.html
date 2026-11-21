@@ -1,0 +1,80 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<header class="top">
+  <div class="heading">
+    <h1 class="title">{{ resources.organizationTitle }}</h1>
+    <span class="headcount">{{ headcount() }}</span>
+  </div>
+  <span class="spacer"></span>
+  <div class="tools">
+    <div class="status-key" role="group" [attr.aria-label]="resources.organizationStatusKeyLabel">
+      @for (status of resources.organizationStatusKey; track status) {
+        <nol-teamrun-teammate-status [status]="status" />
+      }
+    </div>
+    <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
+      aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
+    <button type="button" nol-button class="edit" [variant]="editing() ? primary : secondary" [attr.aria-pressed]="editing()" (click)="toggleEditing()"><span
+      nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationEditIcon }}</span>{{ editing() ? resources.organizationDoneEditing
+      : resources.organizationEditStructure }}</button>
+  </div>
+</header>
+<ng-template #cardsShowMenu>
+  <nol-menu>
+    <nol-menu-group [label]="resources.organizationEveryCardShows">
+      @for (field of resources.organizationOfferedFields; track field) {
+        <button nol-menu-item [label]="resources.organizationFieldLabels[field]" [checkbox]="true" [checked]="layout.layout().cardsShow.has(field)"
+          (triggered)="layout.showOnEveryCard(field, !layout.layout().cardsShow.has(field))"></button>
+      }
+    </nol-menu-group>
+    <nol-menu-separator />
+    <button nol-menu-item class="clear-every-card" [label]="resources.organizationClearEveryCard" [icon]="resources.organizationResetIcon"
+      [disabled]="layout.layout().cards.size === 0" (triggered)="layout.clearEveryCard()"></button>
+  </nol-menu>
+</ng-template>
+@if (organization.loadError(); as error) {
+  <div class="failure">
+    <p class="error" role="alert">{{ error }}</p>
+    <button type="button" nol-button [variant]="text" (click)="organization.reload()">{{ resources.replyHistoryRetry }}</button>
+  </div>
+}
+@if (organization.actionError(); as error) {
+  <div class="failure">
+    <p class="error action-error" role="alert">{{ error }}</p>
+    <button type="button" nol-button class="dismiss" [variant]="text" (click)="organization.clearActionError()">{{ resources.dismissLabel }}</button>
+  </div>
+}
+<main class="chart">
+  <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
+    <div class="tree">
+      <div class="owner" nolCanvasItem>
+        <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
+        <div class="who">
+          <span class="name">{{ resources.organizationOwnerName }}</span>
+          <span class="role">{{ ownerRole() }}</span>
+        </div>
+      </div>
+      @if (tree().length > 0 || editing()) {
+        <div class="kids">
+          @for (node of tree(); track node.department.id) {
+            <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" />
+          }
+          @if (editing()) {
+            <div class="kid">
+              <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
+                class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="empty">{{ resources.organizationEmpty }}</p>
+      }
+    </div>
+  </nol-canvas>
+</main>

@@ -134,7 +134,7 @@ export class TeamRunApiTests {
       ["teamrun.start", "teamrun.chats", ["teamrun.newConversation", "teamrun.openProject"]],
       ["teamrun.move", "teamrun.chats", ["teamrun.searchConversations", "teamrun.previousConversation", "teamrun.nextConversation"]],
       ["teamrun.reply", "teamrun.chats", ["teamrun.focusComposer", "teamrun.stopReply"]],
-      ["teamrun.manage", "desktop.view", ["teamrun.showTeammates", "teamrun.showProviders", "teamrun.showMcpServers", "teamrun.showComputerUseGrants"]],
+      ["teamrun.manage", "desktop.view", ["teamrun.showOrganization", "teamrun.showTeammates", "teamrun.showProviders", "teamrun.showMcpServers", "teamrun.showComputerUseGrants"]],
       ["teamrun.terminals", "terminal.shellMenu", ["teamrun.newChatTerminal"]]
     ]), JSON.stringify(menus.groups.map(t => [t.name, t.place, t.items.map(u => u.command)])));
   }

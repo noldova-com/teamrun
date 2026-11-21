@@ -9,11 +9,11 @@
 import "@noldova/context.core";
 import { ChangeOperation, type DataRecord } from "@noldova/context.data";
 import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
-import { JsonReader } from "@noldova/context.json";
+import { JsonReader, type JsonObject } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import {
   Department, type DepartmentCreateParams, type DepartmentIdParams, DepartmentMember, type DepartmentMemberSetParams, type DepartmentMoveParams,
-  type DepartmentUpdateParams, ErrorCode, Organization, Teammate
+  type DepartmentUpdateParams, ErrorCode, Organization, type OrganizationLayoutSaveParams, Teammate
 } from "@noldova/teamrun.protocol";
 
 import { ChangeEntity } from "../../enums/change-entity.js";
@@ -103,6 +103,22 @@ export class OrganizationService implements IOrganizationService {
       await transaction.executeAsync(new SqlQuery(Resources.deleteDepartment, [department.id]));
       await this.context.database.changeFeed.appendAsync(ChangeEntity.Department, department.id, ChangeOperation.Delete,
         JSON.stringify(department.toJson()), transaction);
+    });
+  }
+
+  public async readLayoutAsync(transaction?: SqlTransaction): Promise<JsonObject | null> {
+    const [record] = await (transaction ?? this.context.database.connection).queryAsync(new SqlQuery(Resources.selectPreference, [Resources.organizationLayoutPreference]));
+    return Object.isUndefined(record) ? null : JsonReader.parse(record.readString(Resources.jsonColumn)).toJson();
+  }
+
+  public async saveLayoutAsync(params: OrganizationLayoutSaveParams): Promise<JsonObject> {
+    return await this.context.database.connection.runInTransactionAsync(async transaction => {
+      const previous = await this.readLayoutAsync(transaction);
+      const json = JSON.stringify(params.layout);
+      await transaction.executeAsync(new SqlQuery(Resources.upsertPreference, [Resources.organizationLayoutPreference, json, new Date().toISOString()]));
+      await this.context.database.changeFeed.appendAsync(ChangeEntity.Preference, Resources.organizationLayoutPreference,
+        Object.isNull(previous) ? ChangeOperation.Insert : ChangeOperation.Update, json, transaction);
+      return params.layout;
     });
   }
 

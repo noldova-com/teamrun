@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { computed, type Signal, signal, type WritableSignal } from "@angular/core";
+import { computed, type FactoryProvider, inject, type Signal, signal, type WritableSignal } from "@angular/core";
 
 import "@noldova/context.core";
-import type { IWindowPartContext } from "@noldova/desktop.window";
+import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 import { ChatIdParams, ChatRewoundPayload, EventName, Message, MethodName, type Teammate, TeammateLastReply } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
@@ -20,6 +20,9 @@ import { TeammateActivity } from "../models/teammate-activity";
 import { ChatStoreService } from "./chat-store.service";
 
 export class TeammateStatusStoreService {
+  public static readonly provider: FactoryProvider =
+    { provide: TeammateStatusStoreService, useFactory: (): TeammateStatusStoreService => TeammateStatusStoreService.of(inject(WindowPartTokens.context)) };
+
   private static readonly stores: WeakMap<IWindowPartContext, TeammateStatusStoreService> = new WeakMap();
 
   private readonly chats: ChatStoreService;
