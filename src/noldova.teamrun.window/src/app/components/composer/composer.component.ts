@@ -96,6 +96,7 @@ import { CommandTargetsService } from "../../services/command-targets.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
 import { ComposerDefaultService } from "../../services/composer-default.service";
 import { ComposerDraftService } from "../../services/composer-draft.service";
+import { EngineResync } from "../../services/engine-resync";
 import { ImageViewerService } from "../../services/image-viewer.service";
 import { PlanUsageStatus } from "../../services/plan-usage-status";
 import { ProviderSignOut } from "../../services/provider-sign-out";
@@ -176,6 +177,8 @@ export class ComposerComponent {
   private readonly ownChoice: Signal<ComposerSettings | null>;
   private readonly keptChoice: Signal<ConversationResponder | null | undefined>;
   private catalogGeneration: number = 0;
+  private readonly resynced: WritableSignal<number> = signal(0);
+  private catalogsResynced: number = 0;
   private reconcileProvider: string | null = null;
   private keptConversationId: string | null = null;
   private lastKept: ConversationResponder | null | undefined = undefined;
@@ -385,9 +388,12 @@ export class ComposerComponent {
         .map((t): [string, string | null] => [store.providers().find(u => u.id === t.providerId)!.kind, t.providerId]);
       const wanted: readonly [string, string | null][] = Object.isNull(this.responder()) ? teammates : [...teammates, [this.kind()!, this.ownProvider()]];
       const loaded = untracked(() => this.catalogs());
+      const resynced = this.resynced();
+      const fresh = resynced !== this.catalogsResynced;
+      this.catalogsResynced = resynced;
       for (const [kind, provider] of wanted) {
         const key = ComposerComponent.catalogKey(kind, provider);
-        if (!loaded.has(key))
+        if (fresh || !loaded.has(key))
           void store.modelCatalogs.load(kind, provider).then(t => this.catalogs.update(u => new Map(u).set(key, t)));
       }
     });
@@ -575,6 +581,10 @@ export class ComposerComponent {
       if ((this.catalog().awaitsTurn || this.chosenDescriptor()?.followsOwnConfig === true) && t.provenance?.requested.kind === this.chosenKind() && t.provenance.providerId === this.chosenProvider())
         this.loadModels(true, true);
     });
+    const unwatchResync = EngineResync.on(this.context, () => {
+      this.loadModels(true, true);
+      this.resynced.update(t => t + 1);
+    });
     const status = PlanUsageStatus.of(this.context);
     effect(() => {
       const conversationId = this.conversationId();
@@ -618,6 +628,7 @@ export class ComposerComponent {
       unwatchDeletions();
       unwatchStale();
       unwatchReplies();
+      unwatchResync();
       void this.drafts.flush();
       for (const attachment of this.attachments())
         attachment.dispose();

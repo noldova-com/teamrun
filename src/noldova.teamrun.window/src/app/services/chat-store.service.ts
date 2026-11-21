@@ -2152,6 +2152,8 @@ export class ChatStoreService {
       case EventName.StateInvalidated:
       case EventName.StateResyncRequested:
         this.resyncRequested ||= event.name === EventName.StateResyncRequested;
+        if (event.name === EventName.StateResyncRequested)
+          this.modelCatalogs.expire();
         this.invalidationsSignal.update(t => t + 1);
         void this.reloadCatalog();
         break;

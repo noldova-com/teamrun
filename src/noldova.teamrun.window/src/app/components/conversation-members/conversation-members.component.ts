@@ -6,10 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, type InputSignal, type Signal, type WritableSignal, computed, effect, inject, input, signal, untracked }
+import { Component, DestroyRef, type InputSignal, type Signal, type WritableSignal, computed, effect, inject, input, signal, untracked }
   from "@angular/core";
 
 import "@noldova/context.core";
+import { WindowPartTokens } from "@noldova/desktop.window";
 import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
 import { IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, TooltipDirective } from "@noldova/ui.components.angular";
 
@@ -20,6 +21,7 @@ import { ChatStoreService } from "../../services/chat-store.service";
 import { ConversationActions } from "../../services/conversation-actions";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
 import { ComposerDefaultService } from "../../services/composer-default.service";
+import { EngineResync } from "../../services/engine-resync";
 import { FormatterService } from "../../services/formatter.service";
 import { UsageFormatterService } from "../../services/usage-formatter.service";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
@@ -66,7 +68,10 @@ export class ConversationMembersComponent {
   });
 
   public constructor() {
+    const resynced: WritableSignal<number> = signal(0);
+    inject(DestroyRef).onDestroy(EngineResync.on(inject(WindowPartTokens.context), () => resynced.update(t => t + 1)));
     effect(() => {
+      resynced();
       const kind = this.defaultKind();
       const teammates = this.store.teammates().filter(t => !this.store.isTeammateUnavailable(t.id))
         .map((t): [string, string | null] => [this.store.providers().find(u => u.id === t.providerId)!.kind, t.providerId]);
