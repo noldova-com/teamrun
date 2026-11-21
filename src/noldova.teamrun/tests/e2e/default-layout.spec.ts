@@ -54,7 +54,19 @@ function groupOf(places: readonly IGroupPlace[], key: string): IGroupPlace {
   return found;
 }
 
-test("a fresh install opens Explorer on the left, Background tasks, Git and Pages above Plans and Sub-agents on the right, and Activity and Changes along the bottom under both, each group showing its first tab, and Reset the layout returns to it", async ({ app }, testInfo) => {
+async function dragAsync(page: Page, key: string, after: string): Promise<void> {
+  const from = await page.locator(`nol-tab[data-tab-key='${key}']`).boundingBox();
+  const to = await page.locator(`nol-tab[data-tab-key='${after}']`).boundingBox();
+  if (from === null || to === null)
+    throw new Error(`${key} or ${after} isn't shown.`);
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 12, from.y + from.height / 2 + 12, { steps: 3 });
+  await page.mouse.move(to.x + to.width - 4, to.y + to.height / 2, { steps: 6 });
+  await page.mouse.up();
+}
+
+test("a fresh install opens Explorer on the left, Background tasks, Git and Pages above Plans and Sub-agents on the right, and Activity and Changes along the bottom under both, each group showing its first tab, and Reset the layout returns to it after a view moves group, another tab shows and the dock is resized", async ({ app }, testInfo) => {
   const page = await app.startAsync();
   await expect(page.locator("nol-tab[data-tab-key='view/teamrun.projects']")).toBeVisible({ timeout: 60_000 });
 
@@ -75,11 +87,15 @@ test("a fresh install opens Explorer on the left, Background tasks, Git and Page
   await page.emulateMedia({ colorScheme: null });
 
   await page.locator("nol-tab[data-tab-key='view/teamrun.pages']").click();
-  await page.locator("nol-tab[data-tab-key='view/teamrun.changes']").click();
+  await dragAsync(page, "view/teamrun.changes", "view/teamrun.subAgents");
   const sash = page.getByRole("separator", { name: "Resize the right dock" });
   await sash.focus();
   await page.keyboard.press("ArrowLeft");
-  await expect.poll(() => placesAsync(page), TeamRunApp.pollOf(30_000)).not.toEqual(fresh);
+  await expect.poll(async () => {
+    const moved = await placesAsync(page);
+    return [groupOf(moved, "view/teamrun.pages").shown, groupOf(moved, "view/teamrun.changes").side, groupOf(moved, "view/teamrun.changes").tabs, groupOf(moved, "view/teamrun.activity").tabs,
+      groupOf(moved, "view/teamrun.plan").left < lower.left];
+  }, TeamRunApp.pollOf(30_000)).toEqual(["view/teamrun.pages", "Right", ["view/teamrun.plan", "view/teamrun.subAgents", "view/teamrun.changes"], ["view/teamrun.activity"], true]);
   await page.keyboard.press("ControlOrMeta+Shift+KeyP");
   const search = page.getByRole("combobox", { name: /^Search / });
   await expect(search).toBeFocused();
