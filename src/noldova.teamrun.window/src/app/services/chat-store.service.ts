@@ -615,6 +615,10 @@ export class ChatStoreService {
     return this.conversationsByProjectSignal().get(projectId) ?? [];
   }
 
+  public organizationChatOf(teammateId: string): Conversation | null {
+    return this.conversationsOf(null).find(t => t.organizationChat?.teammateId === teammateId) ?? null;
+  }
+
   public newestConversationsOf(projectId: string | null): readonly Conversation[] {
     return ChatStoreService.newestFirst(this.conversationsOf(projectId));
   }
