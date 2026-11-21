@@ -16,6 +16,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Moving a chat, or attaching or detaching its folder, while its work runs:** the change is refused with a message naming each background command and helper of the chat still running, or a teammate's background work, rather than moving the folder from under it, which left that work writing in the old folder (#139).
 - **The focus after a delete:** deleting a teammate, a chat or a shared MCP server moves the keyboard focus to the next row, or the one before for the last, and to Add, or New chat for a chat whose group is gone, once none is left or the next row went meanwhile, rather than dropping it to the window; a focus the person moved while the delete ran stays where it is (#155).
 - **A reply's approvals:** an approval decided, withdrawn or asked just as a teammate's reply ends no longer puts the ended reply back to Running for good (#143).
 - **A chat tab's place:** a chat moved to another project, or from Chats into one, now shows its new project in its tab's breadcrumb, rather than the old one (#152).
