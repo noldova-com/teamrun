@@ -304,8 +304,6 @@ export class Resources {
   public static readonly departmentIdField: string = "departmentId";
   public static readonly departmentsField: string = "departments";
   public static readonly membersField: string = "members";
-  public static readonly targetField: string = "target";
-  public static readonly recipientsField: string = "recipients";
   public static readonly revisionField: string = "revision";
   public static readonly missingField: string = "missing";
   public static readonly stateField: string = "state";

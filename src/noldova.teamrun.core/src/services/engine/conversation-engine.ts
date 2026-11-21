@@ -90,7 +90,6 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { ILog } from "../../interfaces/i-log.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
 import type { IEngineCallbacks } from "../../interfaces/i-engine-callbacks.js";
-import type { IOrganizationSender } from "../../interfaces/i-organization-sender.js";
 import type { IOutsideMessages } from "../../interfaces/i-outside-messages.js";
 import type { IPermissionAsker } from "../../interfaces/i-permission-asker.js";
 import type { ISenderSends } from "../../interfaces/i-sender-sends.js";
@@ -154,7 +153,7 @@ import { CommandRun } from "./command-run.js";
 import { StoppedCommands } from "./stopped-commands.js";
 import { SubAgentRun } from "./sub-agent-run.js";
 
-export class ConversationEngine implements IConversationEngine, IOrganizationSender, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
+export class ConversationEngine implements IConversationEngine, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
   private readonly adoptedSenders: Map<ReplyWork, string> = new Map();
   private readonly teammates: ITeammatesService;
   private readonly sharedFailures: ReportedSharedMcpFailures = new ReportedSharedMcpFailures();
@@ -268,7 +267,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       requireConversationAsync: (id, transaction) => this.requireConversationAsync(id, transaction),
       requireTeammateAsync: (id, transaction) => this.requireTeammateAsync(id, transaction),
       capEndsTasksAsync: (teammate, chatId) => this.capEndsTasksAsync(teammate, chatId),
-      sendMessageAsync: (params, prompt, allowed, signal, outside, queues) => this.sendMessageAsync(params, prompt, allowed, signal, outside, queues),
+      sendMessageAsync: (params, prompt, allowed, signal, outside) => this.sendMessageAsync(params, prompt, allowed, signal, outside),
       refuseRaisedModeAsync: params => this.refuseRaisedModeAsync(params),
       toolModeOfAsync: open => this.toolModeOfAsync(open),
       modeIn: requested => this.modeIn(requested),
@@ -418,15 +417,6 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return this.outside.sendOutsideAsync(teammateId, text, label, chatId);
   }
 
-  public async startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult> {
-    const teammate = await this.requireTeammateAsync(chat.teammateId);
-    const provider = await this.providers.findAsync(teammate.providerId);
-    if (!this.canReply(provider))
-      throw new ServiceException(ErrorCode.Conflict, Resources.formatAccountCannotReply(teammate.name, provider?.label ?? null), [teammate.id]);
-    const opened = await this.openOrganizationChatAsync(chat);
-    return this.sendMessageAsync(new MessageSendParams(opened.id, text, null, null, [], [], teammate.id), null, null, undefined, null, true);
-  }
-
   public async openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation> {
     const teammate = await this.requireTeammateAsync(chat.teammateId);
     const [opened, made] = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<readonly [Conversation, boolean]> => {
@@ -471,12 +461,12 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null,
-    signal: AbortSignal | undefined, outside: MessageSender | null = null, queues: boolean = false): Promise<MessageSendResult> {
+    signal: AbortSignal | undefined, outside: MessageSender | null = null): Promise<MessageSendResult> {
     if (!Object.isNull(params.senderToken) && !Object.isNull(params.requested) && !Object.isNull(params.requested.mode)) {
       this.requireTurn(params.senderToken);
       await this.refuseUnrestrictedAsync(params.requested, params.requested.mode, params.providerId);
     }
-    let plan = await this.planSendAsync(params, true, null, outside, queues);
+    let plan = await this.planSendAsync(params, true, null, outside);
     if (!Object.isNull(plan.origin)) {
       const shown = Object.isNull(allowed) ? await this.permissions.askSendAsync(plan.origin, await this.askOfAsync(plan), params.text, signal) : allowed.starts;
       plan = await this.planSendAsync(params, true, plan.origin);
@@ -496,12 +486,12 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       const { message, pending, wake, opening, joined, joining } = await this.context.database.connection.runInTransactionAsync(async transaction => {
         await this.requireUnmovedAsync(conversation, transaction);
         const busy = !Object.isNull(await this.messages.findOpenReplyAsync(conversation.id, transaction)) || !Object.isNull(this.findGroup(conversation.id));
-        const joining = Object.isNull(sender) && !queues ? null : this.findGroup(conversation.id);
+        const joining = Object.isNull(sender) ? null : this.findGroup(conversation.id);
         if (busy && Object.isNull(joining))
           throw new ServiceException(ErrorCode.Conflict, Resources.formatReplyInProgress(conversation.id), [conversation.id]);
         if (!Object.isNull(origin) && (Object.isNull(params.senderToken) || this.state.turns.get(params.senderToken) !== origin))
           throw new ServiceException(ErrorCode.Unauthorized, Resources.senderTurnEnded, []);
-        if (!Object.isNull(group) && joining !== group && !queues)
+        if (!Object.isNull(group) && joining !== group)
           throw new ServiceException(ErrorCode.Conflict, Resources.replyEndedWhileSent, [conversation.id]);
         const sequence = await this.messages.nextSequenceAsync(conversation.id, transaction);
         const opening = ConversationEngine.openingOf(conversation, sequence, params.text, attachments);
@@ -1007,15 +997,15 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return Object.isUndefined(item) || Object.isNull(provenance) ? null : new TitleModel(item.provider, provenance.requested.kind, provenance.requested.model);
   }
 
-  private async planSendAsync(params: MessageSendParams, prepare: boolean, allowedFor: ReplyWork | null = null, outside: MessageSender | null = null,
-    queues: boolean = false): Promise<SendPlan> {
+  private async planSendAsync(params: MessageSendParams, prepare: boolean, allowedFor: ReplyWork | null = null,
+    outside: MessageSender | null = null): Promise<SendPlan> {
     const conversation = await this.requireConversationAsync(params.conversationId);
     const folder = await this.requireWorkFolderAsync(conversation, prepare);
     const origin = Object.isNull(params.senderToken) ? null : allowedFor ?? this.requireTurn(params.senderToken);
     const sender = Object.isNull(origin) ? null : await this.senderOfAsync(origin);
     const group = this.findGroup(conversation.id);
     const busy = !Object.isNull(await this.messages.findOpenReplyAsync(conversation.id)) || !Object.isNull(group);
-    if (busy && (Object.isNull(group) || (Object.isNull(sender) && !queues)))
+    if (busy && (Object.isNull(group) || Object.isNull(sender)))
       throw new ServiceException(ErrorCode.Conflict, Resources.formatReplyInProgress(conversation.id), [conversation.id]);
 
     const mentions: Teammate[] = [];

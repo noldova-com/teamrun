@@ -36,11 +36,7 @@ export class ProtocolApiTests {
     Assert.isDefined(api.DepartmentIdParams);
     Assert.isDefined(api.DepartmentMemberSetParams);
     Assert.isDefined(api.OrganizationTargetKind);
-    Assert.isDefined(api.OrganizationRecipientState);
     Assert.isDefined(api.OrganizationTarget);
-    Assert.isDefined(api.OrganizationRecipient);
-    Assert.isDefined(api.OrganizationMessage);
-    Assert.isDefined(api.OrganizationMessageSendParams);
     Assert.isDefined(api.ChatMemberParams);
     Assert.isDefined(api.ChatMember);
     Assert.isDefined(api.TeammateMention);

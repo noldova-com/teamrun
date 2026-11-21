@@ -128,10 +128,6 @@ export class MethodNameTests {
     Assert.areEqual("OrganizationLayoutRead", MethodName.OrganizationLayoutRead);
     Assert.areEqual("OrganizationLayoutSave", MethodName.OrganizationLayoutSave);
     Assert.areEqual("TeammateWorkRead", MethodName.TeammateWorkRead);
-    Assert.areEqual("OrganizationMessageSend", MethodName.OrganizationMessageSend);
-    Assert.areEqual("OrganizationMessageStop", MethodName.OrganizationMessageStop);
-    Assert.areEqual("OrganizationMessageList", MethodName.OrganizationMessageList);
-    Assert.areEqual("OrganizationMessageReplyList", MethodName.OrganizationMessageReplyList);
   }
 
   @TestMethod
