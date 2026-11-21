@@ -965,7 +965,8 @@ export class WaitingSendsTests {
     await host.engine.waitForIdle();
     const described = RequestDispatcher.describe(refused);
 
-    Assert.areEqual(`${ErrorCode.InvalidParams}:${ProtocolResources.waitingFromPersonOnly}:0`, `${described.name}:${described.message}:${listed}`);
+    Assert.areEqual(`${ErrorCode.InvalidParams}:${ProtocolResources.waitingFromPersonOnly} (Parameter '${ProtocolResources.messageField}'):0`,
+      `${described.name}:${described.message}:${listed}`);
   }
 
   @TestMethod
