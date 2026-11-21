@@ -10,6 +10,7 @@ LICENSE file in the root directory of this source tree.
   <h1 class="title">{{ resources.organizationTitle }}</h1>
   <span class="headcount">{{ headcount() }}</span>
   <span class="spacer"></span>
+  <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
   <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
     aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
 </header>
@@ -33,22 +34,26 @@ LICENSE file in the root directory of this source tree.
   </div>
 }
 <main class="chart" [attr.aria-label]="resources.organizationStructureLabel">
-  <div class="tree">
-    <div class="owner">
-      <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
-      <div class="who">
-        <span class="name">{{ resources.organizationOwnerName }}</span>
-        <span class="role">{{ ownerRole() }}</span>
-      </div>
-    </div>
-    @if (tree().length > 0) {
-      <div class="kids">
-        @for (node of tree(); track node.department.id) {
-          <nol-teamrun-organization-department class="kid" [node]="node" />
+  @switch (mode()) {
+    @default {
+      <div class="tree">
+        <div class="owner">
+          <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
+          <div class="who">
+            <span class="name">{{ resources.organizationOwnerName }}</span>
+            <span class="role">{{ ownerRole() }}</span>
+          </div>
+        </div>
+        @if (tree().length > 0) {
+          <div class="kids">
+            @for (node of tree(); track node.department.id) {
+              <nol-teamrun-organization-department class="kid" [node]="node" />
+            }
+          </div>
+        } @else {
+          <p class="empty">{{ resources.organizationEmpty }}</p>
         }
       </div>
-    } @else {
-      <p class="empty">{{ resources.organizationEmpty }}</p>
     }
-  </div>
+  }
 </main>

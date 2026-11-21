@@ -16,6 +16,7 @@ import { BrowserStepPhase } from "./app/enums/browser-step-phase";
 import { ChatAction } from "./app/enums/chat-action";
 import { ImageOpenMode } from "./app/enums/image-open-mode";
 import { OrganizationCardField } from "./app/enums/organization-card-field";
+import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
 import type { ProviderAction } from "./app/types/provider-action";
 
@@ -345,6 +346,8 @@ export class Resources {
   public static readonly collapsedDepartmentsField: string = "collapsedDepartments";
   public static readonly organizationCardsShowField: string = "cardsShow";
   public static readonly organizationCardsField: string = "cards";
+  public static readonly organizationViewField: string = "view";
+  public static readonly organizationFocusField: string = "focus";
   public static readonly legacyPinnedChatsField: string = "pinnedConversations";
   public static readonly legacyChatOrderField: string = "conversationOrder";
   public static readonly conversationListIdPrefix: string = "teamrun-conversations-";
@@ -1151,6 +1154,12 @@ export class Resources {
     [OrganizationCardField.Usage]: "Usage today",
     [OrganizationCardField.Last]: "Last message",
     [OrganizationCardField.Model]: "Model and effort"
+  };
+  public static readonly organizationViewLabel: string = "View";
+  public static readonly organizationViewLabels: Readonly<Record<OrganizationViewMode, string>> = {
+    [OrganizationViewMode.Tree]: "Tree",
+    [OrganizationViewMode.Board]: "Board",
+    [OrganizationViewMode.Focus]: "Focus"
   };
   public static readonly teammatesHint: string = "Create and configure teammates here. Add them to a chat using its member strip or an @mention.";
   public static readonly defaultTeammateHint: string = "The provider, model and effort a new chat starts with. Chats you already have keep their own.";

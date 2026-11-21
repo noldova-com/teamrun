@@ -36,6 +36,7 @@ import {
   DepartmentIdParams,
   DepartmentMemberSetParams,
   OrganizationLayoutSaveParams,
+  OrganizationMessageSendParams,
   DepartmentMoveParams,
   DepartmentUpdateParams,
   WaitingMessageAddParams,
@@ -115,6 +116,7 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { IAcpAgentsService } from "../../interfaces/i-acp-agents.service.js";
 import type { ISharedMcpServersService } from "../../interfaces/i-shared-mcp-servers.service.js";
 import type { ITeammatesService } from "../../interfaces/i-teammates.service.js";
+import type { IOrganizationMessagesService } from "../../interfaces/i-organization-messages.service.js";
 import type { IOrganizationService } from "../../interfaces/i-organization.service.js";
 import type { IWindowsService } from "../../interfaces/i-windows.service.js";
 import { Resources } from "../../resources.js";
@@ -149,6 +151,7 @@ export class RequestDispatcher {
   private readonly sharedServers: ISharedMcpServersService | null;
   private readonly acpAgents: IAcpAgentsService | null;
   private readonly organization: IOrganizationService | null;
+  private readonly organizationMessages: IOrganizationMessagesService | null;
   private readonly computerUseGrants: IComputerUseGrantsService | null;
 
   public constructor(
@@ -170,9 +173,10 @@ export class RequestDispatcher {
     sharedServers: ISharedMcpServersService | null = null,
     computerUseGrants: IComputerUseGrantsService | null = null,
     acpAgents: IAcpAgentsService | null = null,
-    organization: IOrganizationService | null = null) {
+    organization: IOrganizationService | null = null, organizationMessages: IOrganizationMessagesService | null = null) {
     this.acpAgents = acpAgents;
     this.organization = organization;
+    this.organizationMessages = organizationMessages;
     this.events = events;
     this.kinds = kinds;
     this.providers = providers;
@@ -255,6 +259,12 @@ export class RequestDispatcher {
       case MethodName.OrganizationLayoutRead:
       case MethodName.OrganizationLayoutSave:
         return await this.organizeAsync(RequestDispatcher.require(this.organization, method), method, payload);
+      case MethodName.OrganizationMessageSend:
+        return (await RequestDispatcher.require(this.organizationMessages, method).sendAsync(OrganizationMessageSendParams.fromJson(payload))).toJson();
+      case MethodName.OrganizationMessageStop:
+        return (await RequestDispatcher.require(this.organizationMessages, method).stopAsync(MessageIdParams.fromJson(payload))).toJson();
+      case MethodName.OrganizationMessageList:
+        return (await RequestDispatcher.require(this.organizationMessages, method).listAsync()).map(t => t.toJson());
       case MethodName.SharedMcpServerList:
         return (await RequestDispatcher.require(this.sharedServers, method).listAsync()).map(t => t.toJson());
       case MethodName.SharedMcpServerCreate:
