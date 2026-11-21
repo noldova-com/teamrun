@@ -39,10 +39,10 @@ export class OrganizationLayout {
     return new OrganizationLayout(OrganizationLayout.readIds(record[Resources.collapsedDepartmentsField]),
       Resources.organizationCardsShowField in record ? OrganizationLayout.readFields(record[Resources.organizationCardsShowField]) : OrganizationLayout.defaultCardsShow,
       new Map(Object.entries(cards).map(([teammateId, fields]) => [teammateId, OrganizationLayout.readFields(fields)])),
-      OrganizationLayout.readView(record[Resources.organizationViewField]), OrganizationLayout.readFocus(record[Resources.organizationFocusField]));
+      OrganizationLayout.viewOf(record[Resources.organizationViewField]), OrganizationLayout.readFocus(record[Resources.organizationFocusField]));
   }
 
-  private static readView(value: unknown): OrganizationViewMode {
+  public static viewOf(value: unknown): OrganizationViewMode {
     return Object.values(OrganizationViewMode).find(t => t === value) ?? OrganizationViewMode.Tree;
   }
 

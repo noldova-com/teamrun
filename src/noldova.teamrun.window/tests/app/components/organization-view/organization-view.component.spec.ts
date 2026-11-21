@@ -257,6 +257,22 @@ describe("OrganizationViewComponent", () => {
     expect([shows("Alice"), saves[3]]).toEqual([["gpt-5 · high"], expect.objectContaining({ cards: {} })]);
   });
 
+  it("shows the kept view checked among Tree, Board and Focus, and keeps the one chosen on the server", async () => {
+    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
+    const pills = (): string[][] => [...element().querySelectorAll<HTMLElement>(".top .views [role=radio]")]
+      .map(t => [t.textContent?.trim() ?? "", t.getAttribute("aria-checked") ?? ""]);
+
+    expect([one(".top .views [role=radiogroup]").getAttribute("aria-label"), pills()])
+      .toEqual(["View", [["Tree", "false"], ["Board", "true"], ["Focus", "false"]]]);
+    expect(element().querySelectorAll(".chart > .tree")).toHaveLength(1);
+
+    [...element().querySelectorAll<HTMLElement>(".top .views [role=radio]")][2].click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    expect([pills()[2], saves[0]]).toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null })]);
+  });
+
   describe.each([
     { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
     { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
@@ -310,6 +326,19 @@ describe("OrganizationViewComponent", () => {
         AppearanceFixture.expectPixels(Number.parseFloat(length), expected);
       expect(getComputedStyle(one(":scope > .department .department-name", design)).fontWeight)
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
+    });
+
+    it("puts the view pills on the right of the header, before Cards show and centred with it", async () => {
+      await create();
+      element().style.width = "60rem";
+      await settle();
+      const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      const [top, views, cards] = [box(".top"), box(".top .views"), box(".top .cards-show")];
+
+      AppearanceFixture.expectPixels(cards.left - views.right, AppearanceFixture.measureLook("space-4"));
+      AppearanceFixture.expectPixels(top.right - cards.right, AppearanceFixture.measureLook("space-6"));
+      AppearanceFixture.expectPixels(views.top + views.height / 2, cards.top + cards.height / 2);
+      expect(views.left).toBeGreaterThan(box(".top .headcount").right);
     });
   });
 });

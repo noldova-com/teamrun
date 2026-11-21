@@ -10,6 +10,7 @@ LICENSE file in the root directory of this source tree.
   <h1 class="title">{{ resources.organizationTitle }}</h1>
   <span class="headcount">{{ headcount() }}</span>
   <span class="spacer"></span>
+  <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
   <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
     aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
 </header>

@@ -8,11 +8,12 @@
 
 import { Component, computed, inject, type Signal } from "@angular/core";
 
-import { AvatarComponent, ButtonComponent, ButtonVariant, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective }
-  from "@noldova/ui.components.angular";
+import { AvatarComponent, ButtonComponent, ButtonVariant, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent,
+  MenuTriggerDirective, SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
-import type { OrganizationViewMode } from "../../enums/organization-view-mode";
+import { OrganizationViewMode } from "../../enums/organization-view-mode";
+import { OrganizationLayout } from "../../models/organization-layout";
 import { OrganizationNode } from "../../models/organization-node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
@@ -21,7 +22,7 @@ import { OrganizationDepartmentComponent } from "../organization-department/orga
 
 @Component({
   selector: "nol-teamrun-organization-view",
-  imports: [AvatarComponent, ButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
+  imports: [AvatarComponent, ButtonComponent, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
     OrganizationDepartmentComponent],
   providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
@@ -40,4 +41,9 @@ export class OrganizationViewComponent {
   protected readonly tree: Signal<readonly OrganizationNode[]> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
   protected readonly headcount: Signal<string> = computed(() => Resources.formatOrganizationHeadcount(this.store.teammates().length));
   protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length));
+  protected readonly viewOptions: readonly SelectOption[] = Object.values(OrganizationViewMode).map(t => new SelectOption(t, Resources.organizationViewLabels[t]));
+
+  protected showView(value: string): void {
+    this.layout.showView(OrganizationLayout.viewOf(value));
+  }
 }
