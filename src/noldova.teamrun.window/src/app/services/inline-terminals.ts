@@ -261,9 +261,11 @@ export class InlineTerminals {
     }
     if (output.lines.length === 0 || !this.terminals.has(owner) || this.isLiveAt(owner, place))
       return;
+    await this.kept?.save(owner, { place, output });
+    if (!this.terminals.has(owner) || this.isLiveAt(owner, place))
+      return;
     const kept = (this.stored().get(owner) ?? []).filter(t => !InlineTerminals.isSame(t.place, place));
     this.stored.set(new Map([...this.stored(), [owner, [...kept, { place, output }]]]));
-    this.kept?.save(owner, { place, output });
   }
 
   private async loadAsync(owner: string): Promise<void> {
