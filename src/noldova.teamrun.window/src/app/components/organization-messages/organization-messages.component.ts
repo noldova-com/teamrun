@@ -60,7 +60,7 @@ export class OrganizationMessagesComponent {
   protected readonly rows: Signal<readonly IOrganizationConversationRow[]> = computed(() => this.store.conversations().map(t => {
     const shown = this.store.repliesOf(t.last.id)().flatMap(u => {
       const text = OrganizationMessagesComponent.textOf(u);
-      return Object.isUndefined(text) ? [] : [{ reply: u, text }];
+      return Object.isUndefined(text) || OrganizationMessagesComponent.statusOf(u.status) === Status.Streaming ? [] : [{ reply: u, text }];
     }).at(-1);
     return {
       conversation: t,

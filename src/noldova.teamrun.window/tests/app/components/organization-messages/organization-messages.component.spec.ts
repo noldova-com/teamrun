@@ -124,9 +124,9 @@ describe("OrganizationMessagesComponent", () => {
     await create(null);
     const times = TestBed.inject(TimeFormatService);
 
-    await Wait.until(() => expect(texts(".nol-teamrun-organization-conversation-line")).toEqual(["Alice: Working", "You: Ship it", "Alice: Hi from Alice"]));
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-conversation-line")).toEqual(["You: Status?", "You: Ship it", "Alice: Hi from Alice"]));
     expect(texts(".nol-teamrun-organization-conversation-title")).toEqual(["Everyone", "Design", "Alice"]);
-    expect(texts(".nol-teamrun-organization-conversation-time")).toEqual([times.shortDateTime("2026-11-20T09:31:00.000Z"),
+    expect(texts(".nol-teamrun-organization-conversation-time")).toEqual([times.shortDateTime(everyoneMessage.createdAt),
       times.shortDateTime(designMessage.createdAt), times.shortDateTime(aliceReply.createdAt)]);
     expect(texts(".nol-teamrun-organization-group-icon")).toEqual([Resources.organizationGroupIcon, Resources.organizationDepartmentIcon]);
     expect(all(".nol-teamrun-organization-conversation nol-teamrun-teammate-avatar")).toHaveLength(1);
@@ -306,6 +306,7 @@ describe("OrganizationMessagesComponent", () => {
     expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(1);
     await update("r2", MessageStatus.Running, "Working");
     expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(1);
+    expect(texts(".nol-teamrun-organization-conversation-line")).toEqual(["You: Status?"]);
     await update("r3", MessageStatus.Cancelled);
     expect(one(".nol-teamrun-organization-replying").textContent?.trim()).toBe(Resources.formatOrganizationReplying(["Alice"]));
     expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(2);
