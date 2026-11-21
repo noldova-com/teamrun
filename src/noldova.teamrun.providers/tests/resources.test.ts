@@ -7,6 +7,7 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
+import { SubAgentStatus } from "@noldova/teamrun.protocol";
 import { Resources } from "@noldova/teamrun.providers";
 
 @TestClass
@@ -50,6 +51,14 @@ export class ResourcesTests {
     Assert.areEqual("Listed a", Resources.formatListedTitle("a"));
     Assert.areEqual("Listed a and its subfolders", Resources.formatListedTreeTitle("a"));
     Assert.areEqual("Changed to a", Resources.formatChangedFolderTitle("a"));
+  }
+
+  @TestMethod
+  public namesAStoppedTurnsStepAndEachSubAgentsStateOrNone(): void {
+    Assert.areEqual("t1 Running", Resources.formatSubAgentState("t1", SubAgentStatus.Running, false, false));
+    Assert.areEqual("t2 Stopped in the background, kept", Resources.formatSubAgentState("t2", SubAgentStatus.Stopped, true, true));
+    Assert.areEqual("grok: a stopped turn still waits on the turn's finish; its sub-agents at the stop: none",
+      Resources.formatTurnStopStuck("grok", Resources.turnStepFinish, ""));
   }
 
   @TestMethod
