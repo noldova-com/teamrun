@@ -9,6 +9,6 @@
 import type { Message, MessageIdParams, MessageSendResult, OrganizationChat } from "@noldova/teamrun.protocol";
 
 export interface IOrganizationSender {
-  startAsPersonAsync(chat: OrganizationChat, text: string, prompt: string): Promise<MessageSendResult>;
+  startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult>;
   cancelAsync(params: MessageIdParams): Promise<Message>;
 }

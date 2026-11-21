@@ -138,6 +138,7 @@ import { SustainRouter } from "../sustain/sustain-router.js";
 import { SustainAttempts } from "../sustain/sustain-attempts.js";
 import { HandoverSummaries } from "../sustain/handover-summaries.js";
 import { ProjectActivity } from "../projects/project-activity.js";
+import { OrganizationService } from "../organization/organization.service.js";
 import { EngineServices } from "./engine-services.js";
 import { KeptSessions } from "./kept-sessions.js";
 import { McpToolCalls } from "./mcp-tool-calls.js";
@@ -191,6 +192,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   private readonly commandStarter: ICommandStarter | null;
   private readonly titles: ChatTitles;
   private readonly outside: OutsideMessages;
+  private readonly organization: OrganizationService;
   private readonly toolCalls: McpToolCalls;
   private readonly permissions: PermissionAsks;
   private readonly keptSessions: KeptSessions;
@@ -284,6 +286,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       track: (chatId, work) => this.track(chatId, work),
       settleSafelyAsync: (conversationId, settleAsync) => this.settleSafelyAsync(conversationId, settleAsync)
     };
+    this.organization = new OrganizationService(context);
     this.outside = new OutsideMessages(services, callbacks);
     this.toolCalls = new McpToolCalls(services, this.state, callbacks);
     this.permissions = new PermissionAsks(services, this.state, callbacks);
@@ -415,13 +418,13 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return this.outside.sendOutsideAsync(teammateId, text, label, chatId);
   }
 
-  public async startAsPersonAsync(chat: OrganizationChat, text: string, prompt: string): Promise<MessageSendResult> {
+  public async startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult> {
     const teammate = await this.requireTeammateAsync(chat.teammateId);
     const provider = await this.providers.findAsync(teammate.providerId);
     if (!this.canReply(provider))
       throw new ServiceException(ErrorCode.Conflict, Resources.formatAccountCannotReply(teammate.name, provider?.label ?? null), [teammate.id]);
     const opened = await this.openOrganizationChatAsync(chat);
-    return this.sendMessageAsync(new MessageSendParams(opened.id, text, null, null, [], [], teammate.id), prompt, null, undefined, null, true);
+    return this.sendMessageAsync(new MessageSendParams(opened.id, text, null, null, [], [], teammate.id), null, null, undefined, null, true);
   }
 
   public async openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation> {
@@ -450,6 +453,21 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
 
   public forgetOutsideAsync(): Promise<void> {
     return this.outside.forgetOutsideAsync();
+  }
+
+  private async organizationPromptAsync(conversation: Conversation, sender: MessageSender | null, text: string,
+    transaction: SqlTransaction): Promise<string | null> {
+    const chat = conversation.organizationChat;
+    if (Object.isNull(chat) || !Object.isNull(sender))
+      return null;
+    const organization = await this.organization.listAsync(transaction);
+    const teammates = await this.teammates.listAsync(transaction);
+    const department = organization.departments.find(t => t.id === organization.departmentOf(chat.teammateId));
+    const place = Object.isUndefined(department) ? Resources.organizationNoDepartment
+      : department.leaderId === chat.teammateId ? Resources.formatOrganizationLeader(department.name) : Resources.formatOrganizationMember(department.name);
+    const managerId = organization.managerOf(chat.teammateId);
+    const manager = teammates.find(t => t.id === managerId)?.name ?? Resources.organizationReportsToPerson;
+    return Resources.formatOrganizationMessagePrompt(place, manager, text);
   }
 
   private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null,
@@ -487,7 +505,8 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
           throw new ServiceException(ErrorCode.Conflict, Resources.replyEndedWhileSent, [conversation.id]);
         const sequence = await this.messages.nextSequenceAsync(conversation.id, transaction);
         const opening = ConversationEngine.openingOf(conversation, sequence, params.text, attachments);
-        const question = new MessageDetail(0, DetailKind.Text, params.text, Object.isNull(prompt) ? null : { [Resources.promptField]: prompt }, now);
+        const told = prompt ?? await this.organizationPromptAsync(conversation, sender ?? outside, params.text, transaction);
+        const question = new MessageDetail(0, DetailKind.Text, params.text, Object.isNull(told) ? null : { [Resources.promptField]: told }, now);
         const details = String.isNullOrEmpty(params.text) ? [] : [question];
         const note = new MessageDetail(details.length, DetailKind.Note, Resources.formatChainStopped(limit), { source: Resources.handOffSource }, now);
         const message = new Message(Guid.createVersion7().toString(), conversation.id, sequence, MessageAuthor.User, null,

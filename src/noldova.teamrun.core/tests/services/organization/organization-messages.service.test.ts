@@ -10,7 +10,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity, OrganizationMessagesService, Resources, SignInCheck } from "@noldova/teamrun.core";
 import {
   AuthStatus, Chat, ConversationIdParams, type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, DetailKind, ErrorCode,
-  EventName, Harness, MessageAuthor, MessageIdParams, MessageListParams, MessageStatus, MethodName, type OrganizationMessage, OrganizationMessageSendParams,
+  EventName, Harness, MessageAuthor, MessageIdParams, MessageListParams, MessageSendParams, MessageStatus, MethodName, type OrganizationMessage, OrganizationMessageSendParams,
   OrganizationTarget, ProviderIdParams, Request, type Teammate, TeammateCreateParams, TeammateIdParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
@@ -21,7 +21,7 @@ import { FakeOrganizationSender } from "../../fixtures/fake-organization-sender.
 @TestClass
 export class OrganizationMessagesServiceTests {
   @TestMethod
-  public async opensATeammatesOrganizationChatOnceWithoutSendingAndSendsTheNextMessageThere(): Promise<void> {
+  public async opensATeammatesOrganizationChatOnceWithoutSendingAndTellsTheTeammateItsPlaceWithEachOfThePersonsMessagesThere(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const grok = await OrganizationMessagesServiceTests.teammateAsync(host, "Grok");
     const invalidated = host.listener.count(EventName.StateInvalidated);
@@ -34,13 +34,18 @@ export class OrganizationMessagesServiceTests {
     const unknown = await open("gone");
     const sent = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate(grok.id), "Hi"));
     await host.engine.waitForIdle();
+    await host.engine.sendAsync(new MessageSendParams(opened.id, "Direct", null, null, [], [], grok.id));
+    await host.engine.waitForIdle();
     const members = await host.conversations.listMembersAsync(new ConversationIdParams(opened.id));
+    const told = (text: string): boolean => host.adapter.requests.some(t =>
+      t.prompt.includes(Resources.formatOrganizationMessagePrompt(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, text)));
 
     Assert.areEqual(JSON.stringify([Resources.formatOrganizationChatTitle("Grok"), null, Resources.defaultOrganizationId, grok.id, [grok.id]]),
       JSON.stringify([opened.title, opened.projectId, opened.organizationChat?.organizationId, opened.organizationChat?.teammateId, members.map(t => t.teammateId)]));
     Assert.areEqual(`${opened.id} ${opened.id}`, `${again.id} ${sent.recipients[0]?.chatId}`);
     Assert.areEqual(invalidated + 1, made);
     Assert.areEqual(ErrorCode.NotFound, unknown.info?.name);
+    Assert.areEqual("true true 2", `${told("Hi")} ${told("Direct")} ${host.adapter.requests.length}`);
   }
 
   @TestMethod
@@ -94,10 +99,8 @@ export class OrganizationMessagesServiceTests {
 
     Assert.areEqual("Bob:Started|Ada:Started|Ada:Started,Bob:Started,Carol:Started|",
       [one, leaders, everyone, nobody].map(t => OrganizationMessagesServiceTests.states(t)).join("|"));
-    Assert.areEqual(`${Resources.defaultOrganizationId}:${bob.id}:One:${Resources.formatOrganizationMessagePrompt(Resources.formatOrganizationMember("Design"), "Ada", "One")}`,
-      sender.sends[0]);
-    Assert.areEqual(`${carol.id}:All:${Resources.formatOrganizationMessagePrompt(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, "All")}`,
-      sender.sends.find(t => t.includes(`:${carol.id}:`))?.slice(Resources.defaultOrganizationId.length + 1));
+    Assert.areEqual(`${Resources.defaultOrganizationId}:${bob.id}:One ${Resources.defaultOrganizationId}:${carol.id}:All`,
+      `${sender.sends[0]} ${sender.sends.find(t => t.includes(`:${carol.id}:`))}`);
     Assert.areEqual(5, sender.sends.length);
     await OrganizationMessagesServiceTests.failsAsync(() => service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate("gone"), "Hi")));
     await OrganizationMessagesServiceTests.failsAsync(() => service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.department("gone"), "Hi")));

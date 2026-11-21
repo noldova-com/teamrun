@@ -2209,6 +2209,8 @@ export interface IConversationEngine {
    * Otherwise the message is posted and no one starts. A default teammate's send has a `MessageSender` with no teammate id, under its
    * provider's display name. A teammate's reply runs in the permission mode its membership of the chat chose, when its provider lists it,
    * and in the teammate's own mode otherwise, a hand-off's reply included.
+   * The person's message to a teammate's Organization chat reaches the teammate after a line, built from the organization in the send's
+   * transaction with `Resources.formatOrganizationMessagePrompt`, naming its place in the organization and who it reports to.
    * @param params The message, attachment inputs, resolved mentions and responder selection.
    * @returns The stored message and zero or more pending replies, updated through events.
    * @throws ServiceException named `ErrorCode.NotFound` when the conversation, its project, the
@@ -9522,7 +9524,7 @@ export declare class ConversationEngine implements IConversationEngine, IOrganiz
   /**
    * @inheritdoc
    */
-  public startAsPersonAsync(chat: OrganizationChat, text: string, prompt: string): Promise<MessageSendResult>;
+  public startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult>;
 
   /**
    * @inheritdoc
@@ -10117,15 +10119,14 @@ export interface IOrganizationSender {
   /**
    * Sends the text as the person's own message to the teammate's Organization chat, made with
    * `Resources.formatOrganizationChatTitle` when the organization has none for it yet, and starts its replies without waiting for
-   * them; the teammate reads the prompt in place of the text. While the chat answers an earlier message, the new replies wait as
+   * them; the teammate reads it after its place in the organization, as every send of the person there does. While the chat answers an earlier message, the new replies wait as
    * Pending behind it and start when it ends.
    * @param chat The organization and the teammate.
-   * @param text The text the chat shows.
-   * @param prompt The text the teammate reads.
+   * @param text The text.
    * @throws ServiceException `NotFound` for a teammate that no longer exists, `Conflict` with `Resources.formatAccountCannotReply` when its account
    * can't reply.
    */
-  startAsPersonAsync(chat: OrganizationChat, text: string, prompt: string): Promise<MessageSendResult>;
+  startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult>;
 
   /** Stops a reply that hasn't finished. */
   cancelAsync(params: MessageIdParams): Promise<Message>;

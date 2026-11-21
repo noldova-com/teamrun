@@ -27,9 +27,9 @@ export class FakeOrganizationSender implements IOrganizationSender {
     this.chatIds = chatIds;
   }
 
-  public async startAsPersonAsync(chat: OrganizationChat, text: string, prompt: string): Promise<MessageSendResult> {
+  public async startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult> {
     const teammateId = chat.teammateId;
-    this.sends.push(`${chat.organizationId}:${teammateId}:${text}:${prompt}`);
+    this.sends.push(`${chat.organizationId}:${teammateId}:${text}`);
     ChangeSignal.notify();
     await (this.holds.get(teammateId) ?? Promise.resolve());
     if (this.failures.has(teammateId))
