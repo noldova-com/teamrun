@@ -8,7 +8,7 @@
 
 import type { SqlTransaction } from "@noldova/context.data.sql";
 import type { Message, MessageAttachment, MessageListParams, MessagePage, MessagePageParams, ReplyPage, ReplyPanel,
-  TeammateUsage } from "@noldova/teamrun.protocol";
+  TeammateLastReply, TeammateUsage } from "@noldova/teamrun.protocol";
 
 export interface IMessagesService {
   listAsync(params: MessageListParams, transaction?: SqlTransaction): Promise<readonly Message[]>;
@@ -24,6 +24,7 @@ export interface IMessagesService {
   findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
   listRepliesToAsync(sent: Message): Promise<readonly Message[]>;
   listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
+  listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
   listOpenAsync(transaction?: SqlTransaction): Promise<readonly Message[]>;
   listWithRunningSubAgentsAsync(transaction?: SqlTransaction): Promise<readonly Message[]>;
   nextSequenceAsync(conversationId: string, transaction?: SqlTransaction): Promise<number>;
