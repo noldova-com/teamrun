@@ -14,11 +14,11 @@ import type { Writable } from "node:stream";
 import { setTimeout as delayAsync } from "node:timers/promises";
 
 export class RootInstall {
-  public static readonly ARGUMENTS: readonly string[] = ["ci", "--ignore-scripts", "--no-audit", "--no-fund"];
-  public static readonly WITH_SCRIPTS_ARGUMENTS: readonly string[] = ["ci", "--no-audit", "--no-fund"];
   public static readonly WITH_SCRIPTS_OPTION: string = "--with-scripts";
-  public static readonly RETRY_PAUSE: number = 5000;
 
+  private static readonly ARGUMENTS: readonly string[] = ["ci", "--ignore-scripts", "--no-audit", "--no-fund"];
+  private static readonly WITH_SCRIPTS_ARGUMENTS: readonly string[] = ["ci", "--no-audit", "--no-fund"];
+  private static readonly RETRY_PAUSE: number = 5000;
   private static readonly MODULES_FOLDER: string = "node_modules";
   private static readonly NPM_VARIABLE: string = "npm_execpath";
   private static readonly LOGS_VARIABLE: string = "npm_config_logs_dir";
@@ -49,7 +49,7 @@ export class RootInstall {
     this.waitAsync = waitAsync;
   }
 
-  public static isNetworkFailure(log: string): boolean {
+  private static isNetworkFailure(log: string): boolean {
     return RootInstall.ERROR_CODE_PATTERN.test(log) && RootInstall.NETWORK_PATTERN.test(log);
   }
 

@@ -100,8 +100,8 @@ describe("RootInstall", () => {
     const { exitCode, text, waits } = await runAsync(root, { ...process.env, npm_execpath: npm, FAKE_NPM_RESULTS: results({ exitCode: 1, log: STALLED }, { exitCode: 0 }) });
 
     const calls = readCalls(record);
-    assert.deepEqual([exitCode, calls.length, waits], [0, 2, [RootInstall.RETRY_PAUSE]]);
-    assert.deepEqual(calls.map(t => t.values), [RootInstall.ARGUMENTS, RootInstall.ARGUMENTS]);
+    assert.deepEqual([exitCode, calls.length, waits], [0, 2, [5000]]);
+    assert.deepEqual(calls.map(t => t.values), [["ci", "--ignore-scripts", "--no-audit", "--no-fund"], ["ci", "--ignore-scripts", "--no-audit", "--no-fund"]]);
     assert.equal(text, "The root has no node_modules, so npm ci installs the root's and src/'s packages first, with install scripts off.\n"
       + "npm ci stopped on a read that stalled or a connection that was reset, which npm doesn't retry, so it runs once more in 5 seconds. Its last requests:\n"
       + REQUESTS.slice(-5).map(t => `${t}\n`).join(""));
@@ -112,7 +112,7 @@ describe("RootInstall", () => {
 
     const { exitCode, waits } = await runAsync(root, { ...process.env, npm_execpath: npm, FAKE_NPM_RESULTS: results({ exitCode: 1, log: ABORTED }, { exitCode: 2, log: STALLED }, { exitCode: 0 }) });
 
-    assert.deepEqual([exitCode, readCalls(record).length, waits], [2, 2, [RootInstall.RETRY_PAUSE]]);
+    assert.deepEqual([exitCode, readCalls(record).length, waits], [2, 2, [5000]]);
   });
 
   it("runs npm ci with install scripts on for install:root, though the root has node_modules, and says nothing first", async () => {
@@ -130,8 +130,8 @@ describe("RootInstall", () => {
 
     const { exitCode, text, waits } = await runAsync(root, { ...process.env, npm_execpath: npm, FAKE_NPM_RESULTS: results({ exitCode: 1, log: ABORTED }, { exitCode: 0 }) }, true);
 
-    assert.deepEqual([exitCode, waits], [0, [RootInstall.RETRY_PAUSE]]);
-    assert.deepEqual(readCalls(record).map(t => t.values), [RootInstall.WITH_SCRIPTS_ARGUMENTS, RootInstall.WITH_SCRIPTS_ARGUMENTS]);
+    assert.deepEqual([exitCode, waits], [0, [5000]]);
+    assert.deepEqual(readCalls(record).map(t => t.values), [["ci", "--no-audit", "--no-fund"], ["ci", "--no-audit", "--no-fund"]]);
     assert.equal(text.startsWith("npm ci stopped on a read that stalled or a connection that was reset"), true);
   });
 
