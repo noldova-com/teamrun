@@ -200,9 +200,13 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     : Promise<ReadonlyMap<number, { readonly parent: number; readonly start: number }>> {
     const windows = this.platform === Resources.windowsPlatform;
     const script = endScript ?? Resources.powershellProcessListScript;
-    const stdout = windows && !Object.isNull(this.session) ? await this.session.run(script, this.timeout)
-      : (await this.runner.run(windows ? new ProcessCommand(Resources.powershellExecutable, [...Resources.powershellCommandArguments, script])
-        : new ProcessCommand(Resources.psExecutable, listArguments), { ...this.environment, ...Resources.processListEnvironment }, this.timeout)).stdout;
+    const fresh = async (): Promise<string> => {
+      const command = windows ? new ProcessCommand(Resources.powershellExecutable, [...Resources.powershellCommandArguments, script])
+        : new ProcessCommand(Resources.psExecutable, listArguments);
+      return (await this.runner.run(command, { ...this.environment, ...Resources.processListEnvironment }, this.timeout)).stdout;
+    };
+    const session = this.session;
+    const stdout = windows && !Object.isNull(session) ? await session.run(script, this.timeout).catch(async () => fresh()) : await fresh();
     return new Map([...stdout.matchAll(Resources.processParentPattern)]
       .map(t => [Number(t[1]), { parent: Number(t[2]), start: windows ? Number(t[3]) : Date.parse(t[3]!) }]));
   }

@@ -409,10 +409,10 @@ export class ProcessTreeTests {
   }
 
   @TestMethod
-  @TestData("win32", 1, 0)
+  @TestData("win32", 1, 1)
   @TestData("linux", 0, 1)
-  public async listsThroughItsSessionOnlyOnWindowsAndEndsNothingWhenTheSessionFails(platform: string, sessionCalls: number, runnerCalls: number)
-    : Promise<void> {
+  public async listsThroughItsSessionOnlyOnWindowsThenThroughANewPowershellAndEndsNothingWhenBothFail(platform: string, sessionCalls: number,
+    runnerCalls: number): Promise<void> {
     const session = new ListingPowershellSession([null]);
     const runner = new ListingCommandRunner([null]);
 
@@ -421,6 +421,45 @@ export class ProcessTreeTests {
 
     Assert.isFalse(ended);
     Assert.areEqual(JSON.stringify([sessionCalls, runnerCalls]), JSON.stringify([session.calls.length, runner.calls]));
+  }
+
+  @TestMethod
+  public async endsATreeOnWindowsThroughNewPowershellsWhenItsSessionFailsTheFirstListingAndEachRound(): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const [task, child] = [ProcessTreeTests.GONE - 2, ProcessTreeTests.GONE - 1];
+    const session = new ListingPowershellSession([null]);
+    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000],
+      [child, task, start + 20_000]]), ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
+
+    const ended = await new ProcessTree("win32", runner, process.env, 10_000, new NodeTimer(), 100, undefined, session).endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    const scripts = [Resources.powershellProcessListScript, Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000])];
+    Assert.areEqual(JSON.stringify(scripts.map(t => [t, 10_000])), JSON.stringify(session.calls));
+    Assert.areEqual(JSON.stringify(scripts.map(t => [Resources.powershellExecutable, ...Resources.powershellCommandArguments, t])),
+      JSON.stringify(runner.commands.map(t => [t.executable, ...t.arguments])));
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async endsARunningProcessWhoseSessionFailsEveryScript(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    const root = (await ProcessTreeTests.start(path, "stay"))[0] ?? ProcessTreeTests.GONE;
+    try {
+      const session = new ListingPowershellSession([null]);
+      const real = new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform)));
+
+      const ended = await new ProcessTree(process.platform, real, process.env, Resources.processListTimeout, new NodeTimer(), 100, undefined, session)
+        .endTree(root, Date.now(), process.pid);
+      await Wait.until(() => !ProcessTreeTests.runs(root), "The process still ran.");
+
+      Assert.isTrue(ended);
+      Assert.areEqual(process.platform === Resources.windowsPlatform, session.calls.length > 0);
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
   }
 
   @TestMethod

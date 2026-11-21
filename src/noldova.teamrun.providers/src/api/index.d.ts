@@ -4170,20 +4170,8 @@ export declare class Resources {
   public static readonly powershellExecutable: string;
   public static readonly powershellCommandArguments: readonly string[];
   /**
-   * The Windows Management listing of the processes with their parents and starts, which `powershellProcessListScript` falls back to.
-   */
-  public static readonly powershellCimProcessListScript: string;
-  /**
-   * The C# type `powershellProcessListScript` adds to its PowerShell once, and the type's source: it lists the processes from the system's process
-   * snapshot, each with the start it reads through the process's handle. A process gets `unknown` as its start when it can't be opened, such as
-   * another user's, or when a second snapshot, taken after the starts, doesn't show its id under the same parent, so a start read from a process
-   * that took a listed id meanwhile is never paired with the earlier parent. It throws when the system gives no snapshot.
-   */
-  public static readonly powershellProcessListType: string;
-  public static readonly powershellProcessListSource: string;
-  /**
-   * The processes on Windows with their parents and starts, a line each: through `powershellProcessListType`, which answers in milliseconds
-   * where a Windows Management listing takes a few hundred, or through `powershellCimProcessListScript` where PowerShell can't add the type, or its listing fails or is empty.
+   * The processes on Windows with their parents and starts, a line each, through one Windows Management listing, with `unknown` as the start
+   * of a process Windows Management gives none for.
    */
   public static readonly powershellProcessListScript: string;
   public static readonly powershellProcessListArguments: readonly string[];
@@ -10764,7 +10752,8 @@ export declare class ProcessTerminator {
  * it, and not through a parent id the listing shows another process holding now.
  * On Windows it ends the tree in rounds, each one PowerShell script that opens each listed process by id, ends it through that handle only when it
  * started when the listing said, parents first, and lists again, until no new process shows under the tree, at most `processTreeFreezeRounds`
- * rounds; its listings and rounds run in its `IPowershellSession` when it has one, and otherwise each in a new PowerShell.
+ * rounds; its listings and rounds run in its `IPowershellSession` when it has one, and otherwise each in a new PowerShell, and a script the session
+ * fails or runs out of time on runs once more in a new PowerShell, so a stalled session doesn't leave the tree running.
  * Elsewhere it sends `SIGSTOP` to each process of the tree and lists again until no new process shows under it, at most `processTreeFreezeRounds`
  * listings, so a parent can't start its next process meanwhile; then `SIGTERM` and `SIGCONT` to each it stopped. Once those have ended, or after
  * the grace, it holds what is left still the same way, new children included, and sends `SIGKILL` to each. A process whose signal fails, such as
