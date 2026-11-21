@@ -7,8 +7,8 @@
  */
 
 import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
-import { NodeTimer } from "@noldova/teamrun.core";
-import { CommandRunner, NodeProcessStarter, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
+import { NodeTimer, TimeoutException } from "@noldova/teamrun.core";
+import { CommandRunner, type IPowershellSession, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
 
 import { FakeTaskTree, type FakeTaskTreeMode } from "../../fixtures/fake-task-tree.fixture.js";
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
@@ -404,15 +404,15 @@ export class ProcessTreeTests {
 
     Assert.isTrue(ended);
     Assert.areEqual(0, runner.calls);
-    Assert.areEqual(JSON.stringify([[Resources.powershellProcessListScript, 10_000],
-      [Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000]), 10_000]]), JSON.stringify(session.calls));
+    Assert.areEqual(JSON.stringify([[Resources.powershellProcessListScript, 5_000],
+      [Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000]), 5_000]]), JSON.stringify(session.calls));
   }
 
   @TestMethod
-  @TestData("win32", 1, 0)
+  @TestData("win32", 1, 1)
   @TestData("linux", 0, 1)
-  public async listsThroughItsSessionOnlyOnWindowsAndEndsNothingWhenTheSessionFails(platform: string, sessionCalls: number, runnerCalls: number)
-    : Promise<void> {
+  public async listsThroughItsSessionOnlyOnWindowsThenThroughANewPowershellAndEndsNothingWhenBothFail(platform: string, sessionCalls: number,
+    runnerCalls: number): Promise<void> {
     const session = new ListingPowershellSession([null]);
     const runner = new ListingCommandRunner([null]);
 
@@ -421,6 +421,79 @@ export class ProcessTreeTests {
 
     Assert.isFalse(ended);
     Assert.areEqual(JSON.stringify([sessionCalls, runnerCalls]), JSON.stringify([session.calls.length, runner.calls]));
+  }
+
+  @TestMethod
+  public async endsATreeOnWindowsThroughNewPowershellsForTheRestOfTheStopOnceItsSessionFailsTheFirstListing(): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const [task, child] = [ProcessTreeTests.GONE - 2, ProcessTreeTests.GONE - 1];
+    const session = new ListingPowershellSession([null]);
+    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000],
+      [child, task, start + 20_000]]), ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
+
+    const ended = await new ProcessTree("win32", runner, process.env, 10_000, new NodeTimer(), 100, undefined, session).endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    const scripts = [Resources.powershellProcessListScript, Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000])];
+    Assert.areEqual(JSON.stringify([[scripts[0], 5_000]]), JSON.stringify(session.calls));
+    Assert.areEqual(JSON.stringify(scripts.map(t => [Resources.powershellExecutable, ...Resources.powershellCommandArguments, t])),
+      JSON.stringify(runner.commands.map(t => [t.executable, ...t.arguments])));
+    Assert.areEqual(JSON.stringify([5_000, 10_000]), JSON.stringify(runner.timeouts));
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async endsARunningProcessWhoseSessionFailsEveryScript(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    const root = (await ProcessTreeTests.start(path, "stay"))[0] ?? ProcessTreeTests.GONE;
+    try {
+      const session = new ListingPowershellSession([null]);
+      const real = new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform)));
+
+      const ended = await new ProcessTree(process.platform, real, process.env, Resources.processListTimeout, new NodeTimer(), 100, undefined, session)
+        .endTree(root, Date.now(), process.pid);
+      await Wait.until(() => !ProcessTreeTests.runs(root), "The process still ran.");
+
+      Assert.isTrue(ended);
+      Assert.areEqual(process.platform === Resources.windowsPlatform, session.calls.length > 0);
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async endsARunningProcessWellInsideTheListingTimeWhenItsSessionNeverAnswers(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    const root = (await ProcessTreeTests.start(path, "stay"))[0] ?? ProcessTreeTests.GONE;
+    try {
+      const silent = new PowershellSession(process.execPath, ["-e", "process.stdin.resume()"], process.env, Resources.powershellSessionIdle);
+      const asked: [number, boolean][] = [];
+      const session: IPowershellSession = {
+        run: (script, timeout) => silent.run(script, timeout).catch((error: unknown) => {
+          asked.push([timeout, error instanceof TimeoutException]);
+          throw error;
+        })
+      };
+      const runner = new ListingCommandRunner([], new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform))));
+      const windows = process.platform === Resources.windowsPlatform;
+
+      const ended = await new ProcessTree(process.platform, runner, process.env, Resources.processListTimeout, new NodeTimer(), 100, undefined, session)
+        .endTree(root, Date.now(), process.pid);
+      await Wait.until(() => !ProcessTreeTests.runs(root), "The process still ran.");
+
+      Assert.isTrue(ended);
+      Assert.areEqual(JSON.stringify(windows ? [[Resources.powershellSessionAnswerLimit, true]] : []), JSON.stringify(asked));
+      Assert.isTrue(runner.timeouts.length > 0);
+      Assert.areEqual(JSON.stringify(runner.timeouts.map((_timeout, index) => windows && index === 0
+        ? Resources.processListTimeout - Resources.powershellSessionAnswerLimit : Resources.processListTimeout)), JSON.stringify(runner.timeouts));
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
   }
 
   @TestMethod
