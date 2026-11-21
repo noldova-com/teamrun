@@ -263,7 +263,7 @@ describe("OrganizationViewComponent", () => {
 
     expect([one(".top .views [role=radiogroup]").getAttribute("aria-label"), pills()])
       .toEqual(["View", [["Tree", "false"], ["Board", "true"], ["Focus", "false"]]]);
-    expect(element().querySelectorAll(".chart > .tree")).toHaveLength(1);
+    expect([all(".chart > .tree").length, texts(".chart > nol-teamrun-organization-board .lane-name")]).toEqual([0, ["Design", "UI", "Build"]]);
 
     one(".top .views [role=radio]:last-of-type").click();
     await Wait.until(() => expect(saves).toHaveLength(1));

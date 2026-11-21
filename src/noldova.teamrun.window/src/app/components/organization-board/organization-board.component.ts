@@ -6,24 +6,37 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, type InputSignal, input, output, type OutputEmitterRef, type Signal } from "@angular/core";
+import { Component, computed, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, type WritableSignal } from "@angular/core";
 
+import { WindowPartTokens } from "@noldova/desktop.window";
 import type { Teammate } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, ChipComponent, IconButtonComponent } from "@noldova/ui.components.angular";
+import { ButtonComponent, ButtonVariant, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { OrganizationBoardSort } from "../../enums/organization-board-sort";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
+import { TeammateStatus } from "../../enums/teammate-status";
+import { OrganizationBoardAsk } from "../../models/organization-board-ask";
 import type { OrganizationNode } from "../../models/organization-node";
+import { ChatStoreService } from "../../services/chat-store.service";
+import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
+import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
+import { TeammateDialogComponent } from "../teammate-dialog/teammate-dialog.component";
 
 @Component({
   selector: "nol-teamrun-organization-board",
-  imports: [ButtonComponent, ChipComponent, IconButtonComponent, OrganizationCardComponent],
+  imports: [ButtonComponent, ChipComponent, ChoicePillsComponent, IconButtonComponent, OrganizationCardComponent, TeammateAvatarComponent],
   host: { class: "nol-teamrun-organization-board" },
   templateUrl: "./organization-board.component.html",
   styleUrl: "./organization-board.component.css"
 })
 export class OrganizationBoardComponent {
+  private readonly chats: ChatStoreService = inject(ChatStoreService);
+  private readonly statuses: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
+  private readonly dialogs: DialogService = inject(DialogService);
+  private readonly sorts: WritableSignal<ReadonlyMap<string, OrganizationBoardSort>> = signal(new Map());
+
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
   public readonly messageLeaders: OutputEmitterRef<void> = output<void>();
   public readonly messageDepartment: OutputEmitterRef<string> = output<string>();
@@ -31,8 +44,49 @@ export class OrganizationBoardComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly row: OrganizationCardShape = OrganizationCardShape.Row;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
+  protected readonly primary: ButtonVariant = ButtonVariant.Primary;
+  protected readonly sortOptions: readonly SelectOption[] = Object.values(OrganizationBoardSort).map(t => new SelectOption(t, Resources.organizationBoardSortLabels[t]));
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
+  protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus(this.departments()
+    .flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.department.name, this.status(t))))
+    .filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
+
+  protected status(teammate: Teammate): TeammateStatus {
+    return this.statuses.statusOf(teammate.id)();
+  }
+
+  protected sortOf(node: OrganizationNode): OrganizationBoardSort {
+    return this.sorts().get(node.department.id) ?? OrganizationBoardSort.Status;
+  }
+
+  protected sort(node: OrganizationNode, value: string): void {
+    const sort = Object.values(OrganizationBoardSort).find(t => t === value) ?? OrganizationBoardSort.Status;
+    this.sorts.update(t => new Map([...t, [node.department.id, sort]]));
+  }
+
+  protected membersOf(node: OrganizationNode): readonly Teammate[] {
+    return this.sortOf(node) === OrganizationBoardSort.Name ? node.members : OrganizationBoardAsk.byStatus(node.members, t => this.status(t));
+  }
+
+  protected summaryOf(node: OrganizationNode): string {
+    const counts = new Map<TeammateStatus, number>();
+    for (const teammate of [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members])
+      counts.set(this.status(teammate), (counts.get(this.status(teammate)) ?? 0) + 1);
+    return Resources.formatOrganizationBoardSummary(node.leader?.name ?? null, counts);
+  }
+
+  protected answer(ask: OrganizationBoardAsk): void {
+    const chatId = ask.isAnswer ? this.statuses.activitiesOf(ask.teammate.id)().at(0)?.chatId : undefined;
+    if (Object.isString(chatId)) {
+      this.chats.showChatPage(chatId);
+      return;
+    }
+    const dialog = this.dialogs.open(TeammateDialogComponent, ".nol-teamrun-teammate-name");
+    dialog.componentRef?.setInput("store", this.chats);
+    dialog.componentRef?.setInput("teammate", ask.teammate);
+    dialog.componentInstance?.closed.subscribe(() => dialog.close());
+  }
 
   private static flatten(nodes: readonly OrganizationNode[]): readonly OrganizationNode[] {
     return nodes.flatMap(t => [t, ...OrganizationBoardComponent.flatten(t.children)]);

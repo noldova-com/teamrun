@@ -15,6 +15,7 @@ import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
 import { BrowserStepPhase } from "./app/enums/browser-step-phase";
 import { ChatAction } from "./app/enums/chat-action";
 import { ImageOpenMode } from "./app/enums/image-open-mode";
+import { OrganizationBoardSort } from "./app/enums/organization-board-sort";
 import { OrganizationCardField } from "./app/enums/organization-card-field";
 import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
@@ -1636,6 +1637,15 @@ export class Resources {
   public static readonly organizationBoardDepartmentsNote: string = "Each column's members, sorted by who needs you first.";
   public static readonly organizationBoardMessageIcon: string = "chat";
   public static readonly organizationBoardNoMembers: string = "No members yet.";
+  public static readonly organizationBoardNeedsTitle: string = "Needs you";
+  public static readonly organizationBoardNeedsIcon: string = "pan_tool";
+  public static readonly organizationBoardNobodyWaiting: string = "Nobody is waiting for you.";
+  public static readonly organizationBoardAnswer: string = "Answer";
+  public static readonly organizationBoardOpen: string = "Open";
+  public static readonly organizationBoardSortLabels: Readonly<Record<OrganizationBoardSort, string>> = {
+    [OrganizationBoardSort.Status]: "Status",
+    [OrganizationBoardSort.Name]: "Name"
+  };
 
   public static formatSustainUnavailable(kind: string): string {
     return `TeamRun can't read ${kind}'s usage limits yet, so neither Sustain nor a hand-off can start for this teammate.`;
@@ -2877,6 +2887,19 @@ export class Resources {
 
   public static formatOrganizationBoardMessage(name: string): string {
     return `Message ${name}`;
+  }
+
+  public static formatOrganizationBoardAnswer(isAnswer: boolean, name: string): string {
+    return `${isAnswer ? Resources.organizationBoardAnswer : Resources.organizationBoardOpen} ${name}`;
+  }
+
+  public static formatOrganizationBoardSort(name: string): string {
+    return `Sort ${name} by`;
+  }
+
+  public static formatOrganizationBoardSummary(leader: string | null, counts: ReadonlyMap<TeammateStatus, number>): string {
+    const parts = Object.values(TeammateStatus).flatMap(t => (counts.get(t) ?? 0) > 0 ? [`${counts.get(t)} ${Resources.teammateStatusLabels[t].toLowerCase()}`] : []);
+    return [...Object.isNull(leader) ? [] : [`Led by ${leader}`], ...parts].join(" · ");
   }
 
   private static browserStep(words: readonly [string, string, string], phase: BrowserStepPhase, notes: readonly (string | null)[]): string {

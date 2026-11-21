@@ -35,6 +35,9 @@ LICENSE file in the root directory of this source tree.
 }
 <main class="chart" [attr.aria-label]="resources.organizationStructureLabel">
   @switch (mode()) {
+    @case (modes.Board) {
+      <nol-teamrun-organization-board [tree]="tree()" />
+    }
     @default {
       <div class="tree">
         <div class="owner">

@@ -9,29 +9,36 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, Organization } from "@noldova/teamrun.protocol";
-import { ThemeMode } from "@noldova/ui.components.angular";
+import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization,
+  Teammate } from "@noldova/teamrun.protocol";
+import { DialogService, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
 import { OrganizationNode } from "../../../../src/app/models/organization-node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
+import { Wait } from "../../../fixtures/wait.fixture";
 
 describe("OrganizationBoardComponent", () => {
+  const started = "2026-09-10T08:00:00.000Z";
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<OrganizationBoardComponent>;
 
+  const carol = new Teammate("carol", "Carol", null, "a1", Harness.Provider, null, null, "t", "t");
   const sample = new Organization([
     new Department("design", "Design", null, "alice", 0, "c", "u"),
     new Department("build", "Build", null, null, 1, "c", "u"),
     new Department("ui", "UI", "design", "reviewer", 0, "c", "u")
   ], [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design"), new DepartmentMember("offline", "build"),
-    new DepartmentMember("reviewer", "ui")]);
+    new DepartmentMember("carol", "build"), new DepartmentMember("reviewer", "ui")]);
+  const reply = (status: MessageStatus): Message => new Message("r1", "c9", 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, started, started,
+    null, [], "bob", "bob");
   const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const all = (selector: string, root: ParentNode = element()): HTMLElement[] => [...root.querySelectorAll<HTMLElement>(selector)];
   const one = (selector: string, root: ParentNode = element()): HTMLElement => {
@@ -56,35 +63,89 @@ describe("OrganizationBoardComponent", () => {
     await fixture.whenStable();
   };
   const create = async (): Promise<void> => {
-    context = SampleData.createContext();
+    context = SampleData.createContext().answer(MethodName.MessageListOpen, () => [reply(MessageStatus.AwaitingApproval).toJson()]);
     const data = new TeammateFixture(context);
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
+    data.teammates = [...data.teammates, data.reviewer, carol];
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider] });
     fixture = TestBed.createComponent(OrganizationBoardComponent);
-    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer]));
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer, carol]));
     fixture.autoDetectChanges();
+    await Wait.until(() => expect(texts(".ask .name")).toEqual(["Bob", "Offline"]));
     await settle();
   };
 
   afterEach(() => {
+    TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     ChatStoreService.release(context);
   });
 
-  it("strips the leaders across the top, then gives every department, nested ones too, a column of its members", async () => {
+  it("queues who needs you, waiting first, then strips the leaders across the top and gives every department, nested ones too, a column", async () => {
     await create();
 
+    expect([texts(".needs-section .title"), texts(".needs-count"), all(".ask").map(t => [texts(".name", t), texts(".department", t), texts(".status", t),
+      texts(".answer", t), one(".answer", t).getAttribute("aria-label")]), texts(".needs-empty")]).toEqual([
+      ["Needs you"], ["2"], [[["Bob"], ["Design"], ["Waiting for you"], ["Answer"], "Answer Bob"], [["Offline"], ["Build"], ["Stopped"], ["Open"], "Open Offline"]], []
+    ]);
     expect([texts(".leaders-section .title"), texts(".leaders-section .note"), texts(".message-leaders"), texts(".leaders > .leader .name")]).toEqual([
       ["Leaders"], ["They talk across departments; you lead them."], ["forumMessage all leaders"], ["Alice", "Code Reviewer"]
     ]);
     expect([texts(".departments-section > .section-head .title"), texts(".departments-section > .section-head .note")])
       .toEqual([["Departments"], ["Each column's members, sorted by who needs you first."]]);
-    expect(all(".lane").map(t => [texts(".lane-name", t), texts(".lane-count", t), texts(".lane-summary", t),
+    expect(all(".lane").map(t => [texts(".lane-name", t), texts(".lane-count", t), texts(".lane-summary", t), all(".lane-sort", t).length,
       texts("nol-teamrun-organization-card .name", t), texts(".lane-empty", t), one(".message-department", t).getAttribute("aria-label")])).toEqual([
-      [["Design"], ["2"], ["Led by Alice · 1 member"], ["Bob"], [], "Message Design"],
-      [["UI"], ["1"], ["Led by Code Reviewer · 0 members"], [], ["No members yet."], "Message UI"],
-      [["Build"], ["1"], ["1 member"], ["Offline"], [], "Message Build"]
+      [["Design"], ["2"], ["Led by Alice · 1 waiting for you · 1 idle"], 1, ["Bob"], [], "Message Design"],
+      [["UI"], ["1"], ["Led by Code Reviewer · 1 idle"], 0, [], ["No members yet."], "Message UI"],
+      [["Build"], ["2"], ["1 idle · 1 stopped"], 1, ["Offline", "Carol"], [], "Message Build"]
     ]);
     expect(all("nol-teamrun-organization-card").every(t => t.classList.contains("row"))).toBe(true);
+  });
+
+  it("sorts a column by name, and by status again, on its own", async () => {
+    await create();
+    const build = (): HTMLElement => one(".lane:nth-child(3)");
+
+    expect([texts(".lane-name", build()), one(".lane-sort [role=radiogroup]", build()).getAttribute("aria-label"), texts(".lane-sort [role=radio]", build()),
+      one(".lane-sort [role=radio][aria-checked=true]", build()).textContent?.trim()]).toEqual([["Build"], "Sort Build by", ["Status", "Name"], "Status"]);
+    one(".lane-sort [role=radio]:nth-child(2)", build()).click();
+    await settle();
+    expect([texts("nol-teamrun-organization-card .name", build()), texts("nol-teamrun-organization-card .name", one(".lane"))]).toEqual([["Carol", "Offline"], ["Bob"]]);
+
+    one(".lane-sort [role=radio]:nth-child(1)", build()).click();
+    await settle();
+    expect(texts("nol-teamrun-organization-card .name", build())).toEqual(["Offline", "Carol"]);
+  });
+
+  it("follows the statuses: an answered teammate leaves the queue, and an empty queue says nobody is waiting", async () => {
+    await create();
+
+    context.emit(EventName.MessageUpdated, reply(MessageStatus.Running).toJson());
+    await Wait.until(() => expect(texts(".ask .name")).toEqual(["Offline"]));
+    expect([texts(".needs-count"), texts(".lane-summary", one(".lane"))]).toEqual([["1"], ["Led by Alice · 1 working · 1 idle"]]);
+
+    fixture.componentRef.setInput("tree", []);
+    await settle();
+    expect([all(".ask").length, texts(".needs-count"), texts(".needs-empty"), all(".leaders > .leader").length, all(".lane").length])
+      .toEqual([0, ["0"], ["Nobody is waiting for you."], 0, 0]);
+  });
+
+  it("answers in the chat where the teammate waits, and opens a stopped teammate's settings", async () => {
+    await create();
+    const chats = ChatStoreService.of(context);
+    const shown: string[] = [];
+    vi.spyOn(chats, "showChatPage").mockImplementation(t => {
+      shown.push(t);
+    });
+    const dialogs = TestBed.inject(DialogService);
+
+    one(".ask .answer").click();
+    expect([shown, dialogs.isOpen]).toEqual([["c9"], false]);
+
+    one(".ask:nth-child(2) .answer").click();
+    await Wait.until(() => expect(document.querySelector("nol-teamrun-teammate-dialog")).not.toBeNull());
+    expect([shown, dialogs.isOpen]).toEqual([["c9"], true]);
+    one("nol-teamrun-teammate-dialog .nol-teamrun-cancel", document).click();
+    await Wait.until(() => expect(dialogs.isOpen).toBe(false));
   });
 
   it("asks to message all leaders, or one department by its id", async () => {
@@ -100,14 +161,6 @@ describe("OrganizationBoardComponent", () => {
     expect(asked).toEqual(["leaders", "design", "ui", "build"]);
   });
 
-  it("follows a new tree", async () => {
-    await create();
-    fixture.componentRef.setInput("tree", []);
-    await settle();
-
-    expect([all(".leaders > .leader").length, all(".lane").length]).toEqual([0, 0]);
-  });
-
   describe.each([
     { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
     { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
@@ -121,21 +174,35 @@ describe("OrganizationBoardComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
-    it("lays the board out at 76rem, the leaders at up to 20rem on one line, and the departments in columns of at least 16rem", async () => {
+    it("lays the board out at 76rem: the queue in columns of at least 17rem, the leaders at up to 20rem on one line, the departments in columns of at least 16rem", async () => {
       await create();
       const host = box(element());
+      const asks = all(".ask").map(box);
+      const ask = one(".ask");
       const leaders = all(".leaders > .leader").map(box);
       const strip = one(".leaders");
       const lanes = all(".lane").map(box);
       const lane = one(".lane");
       const head = box(one(".lane-head", lane));
       const summary = box(one(".lane-summary", lane));
+      const sort = box(one(".lane-sort", lane));
       const member = box(one("nol-teamrun-organization-card", lane));
-      const columns = Math.floor((host.width + space(4)) / (16 * rem() + space(4)));
-      const width = (host.width - (columns - 1) * space(4)) / columns;
+      const columns = (min: number, gap: number): number => Math.floor((host.width + gap) / (min * rem() + gap));
+      const width = (min: number, gap: number): number => (host.width - (columns(min, gap) - 1) * gap) / columns(min, gap);
+      const first = nth(lanes, 0);
 
       AppearanceFixture.expectPixels(host.width, 76 * rem());
+      AppearanceFixture.expectPixels(box(one(".needs-section")).top, host.top);
+      AppearanceFixture.expectPixels(box(one(".leaders-section")).top - box(one(".needs-section")).bottom, space(6));
       AppearanceFixture.expectPixels(box(one(".departments-section")).top - box(one(".leaders-section")).bottom, space(6));
+      for (const [index, item] of asks.entries()) {
+        AppearanceFixture.expectPixels(item.width, width(17, space(2)));
+        AppearanceFixture.expectPixels(item.left - host.left, index * (width(17, space(2)) + space(2)));
+      }
+      AppearanceFixture.expectPixels(box(one("nol-teamrun-teammate-avatar > *", ask)).left - nth(asks, 0).left, space(3) + 1);
+      AppearanceFixture.expectPixels(box(one("nol-teamrun-teammate-avatar > *", ask)).top - nth(asks, 0).top, space(3) + 1);
+      AppearanceFixture.expectPixels(nth(asks, 0).right - box(one(".answer", ask)).right, space(3) + 1);
+      expect(getComputedStyle(ask).borderTopWidth).toBe("1px");
       AppearanceFixture.expectPixels(box(strip).top - box(one(".leaders-section > .section-head")).bottom, space(3));
       for (const leader of leaders)
         AppearanceFixture.expectPixels(leader.width, 20 * rem());
@@ -145,14 +212,15 @@ describe("OrganizationBoardComponent", () => {
       AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(strip, "::before").top), 1.625 * rem());
       AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(strip, "::before").left), space(4));
       for (const [index, column] of lanes.entries()) {
-        AppearanceFixture.expectPixels(column.width, width);
-        AppearanceFixture.expectPixels(column.left - host.left, index * (width + space(4)));
+        AppearanceFixture.expectPixels(column.width, width(16, space(4)));
+        AppearanceFixture.expectPixels(column.left - host.left, index * (width(16, space(4)) + space(4)));
       }
-      const first = nth(lanes, 0);
       AppearanceFixture.expectPixels(head.left - first.left, space(3) + 1);
       AppearanceFixture.expectPixels(head.top - first.top, space(3) + 1);
       AppearanceFixture.expectPixels(summary.top - head.bottom, space(1) * 2);
-      AppearanceFixture.expectPixels(member.top - summary.bottom, space(1));
+      AppearanceFixture.expectPixels(sort.top - summary.bottom, space(1));
+      AppearanceFixture.expectPixels(sort.left - first.left, space(3) + 1);
+      AppearanceFixture.expectPixels(member.top - sort.bottom, space(1) * 2);
       AppearanceFixture.expectPixels(member.left - first.left, space(3) + 1);
       AppearanceFixture.expectPixels(first.right - member.right, space(3) + 1);
       AppearanceFixture.expectPixels(first.bottom - member.bottom, space(3) + 1);

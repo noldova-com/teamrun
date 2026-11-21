@@ -18,12 +18,13 @@ import { OrganizationNode } from "../../models/organization-node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
+import { OrganizationBoardComponent } from "../organization-board/organization-board.component";
 import { OrganizationDepartmentComponent } from "../organization-department/organization-department.component";
 
 @Component({
   selector: "nol-teamrun-organization-view",
   imports: [AvatarComponent, ButtonComponent, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
-    OrganizationDepartmentComponent],
+    OrganizationBoardComponent, OrganizationDepartmentComponent],
   providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",
@@ -37,6 +38,7 @@ export class OrganizationViewComponent {
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
+  protected readonly modes: typeof OrganizationViewMode = OrganizationViewMode;
   protected readonly mode: Signal<OrganizationViewMode> = computed(() => this.layout.layout().view);
   protected readonly tree: Signal<readonly OrganizationNode[]> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
   protected readonly headcount: Signal<string> = computed(() => Resources.formatOrganizationHeadcount(this.store.teammates().length));

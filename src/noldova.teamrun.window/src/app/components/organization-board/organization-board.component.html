@@ -6,6 +6,31 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
+<section class="section needs-section" aria-labelledby="organization-board-needs">
+  <div class="section-head">
+    <span class="material-symbols-rounded icon" aria-hidden="true">{{ resources.organizationBoardNeedsIcon }}</span>
+    <span id="organization-board-needs" class="title">{{ resources.organizationBoardNeedsTitle }}</span>
+    <nol-chip class="needs-count">{{ asks().length }}</nol-chip>
+  </div>
+  <div class="queue">
+    @for (ask of asks(); track ask.teammate.id) {
+      <div class="ask">
+        <nol-teamrun-teammate-avatar [teammate]="ask.teammate" [decorative]="true" />
+        <div class="ask-body">
+          <div class="name-line">
+            <span class="name">{{ ask.teammate.name }}</span>
+            <span class="note department">{{ ask.department }}</span>
+          </div>
+          <span class="note status">{{ resources.teammateStatusLabels[ask.status] }}</span>
+        </div>
+        <button type="button" nol-button class="answer" [variant]="primary" [attr.aria-label]="resources.formatOrganizationBoardAnswer(ask.isAnswer, ask.teammate.name)"
+          (click)="answer(ask)">{{ ask.isAnswer ? resources.organizationBoardAnswer : resources.organizationBoardOpen }}</button>
+      </div>
+    } @empty {
+      <span class="note needs-empty">{{ resources.organizationBoardNobodyWaiting }}</span>
+    }
+  </div>
+</section>
 <section class="section leaders-section" aria-labelledby="organization-board-leaders">
   <div class="section-head">
     <span id="organization-board-leaders" class="title">{{ resources.organizationBoardLeadersTitle }}</span>
@@ -35,8 +60,14 @@ LICENSE file in the root directory of this source tree.
           <button type="button" nol-icon-button class="message-department" [icon]="resources.organizationBoardMessageIcon"
             [label]="resources.formatOrganizationBoardMessage(node.department.name)" (click)="messageDepartment.emit(node.department.id)"></button>
         </div>
-        <span class="note lane-summary">{{ resources.formatOrganizationDepartmentSummary(node.leader?.name ?? null, node.members.length) }}</span>
-        @for (member of node.members; track member.id) {
+        @if (summaryOf(node); as summary) {
+          <span class="note lane-summary">{{ summary }}</span>
+        }
+        @if (node.members.length > 0) {
+          <nol-choice-pills class="lane-sort" [options]="sortOptions" [value]="sortOf(node)" [label]="resources.formatOrganizationBoardSort(node.department.name)"
+            (valueChange)="sort(node, $event)" />
+        }
+        @for (member of membersOf(node); track member.id) {
           <nol-teamrun-organization-card [teammate]="member" [shape]="row" />
         } @empty {
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>
