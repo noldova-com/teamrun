@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, inject, type Signal } from "@angular/core";
+import { Component, computed, inject, signal, type Signal, type WritableSignal } from "@angular/core";
 
 import { AvatarComponent, ButtonComponent, ButtonVariant, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent,
   MenuTriggerDirective, SelectOption } from "@noldova/ui.components.angular";
@@ -35,13 +35,19 @@ export class OrganizationViewComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
+  protected readonly primary: ButtonVariant = ButtonVariant.Primary;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
+  protected readonly editing: WritableSignal<boolean> = signal(false);
   protected readonly mode: Signal<OrganizationViewMode> = computed(() => this.layout.layout().view);
   protected readonly tree: Signal<readonly OrganizationNode[]> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
   protected readonly headcount: Signal<string> = computed(() => Resources.formatOrganizationHeadcount(this.store.teammates().length));
   protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length));
   protected readonly viewOptions: readonly SelectOption[] = Object.values(OrganizationViewMode).map(t => new SelectOption(t, Resources.organizationViewLabels[t]));
+
+  protected toggleEditing(): void {
+    this.editing.update(t => !t);
+  }
 
   protected showView(value: string): void {
     this.layout.showView(OrganizationLayout.viewOf(value));

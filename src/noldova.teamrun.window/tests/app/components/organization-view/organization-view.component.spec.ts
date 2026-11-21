@@ -272,6 +272,21 @@ describe("OrganizationViewComponent", () => {
     expect([pills()[2], saves[0]]).toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null })]);
   });
 
+  it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
+    await create();
+    const edit = (): HTMLElement => one(".top .edit");
+    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-primary"), edit().classList.contains("nol-button-outlined")];
+    const before = looks();
+
+    edit().click();
+    await settle();
+    const editing = looks();
+    edit().click();
+    await settle();
+
+    expect([before, editing, looks(), saves]).toEqual([["editEdit structure", false, true], ["checkDone editing", true, false], ["editEdit structure", false, true], []]);
+  });
+
   describe.each([
     { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
     { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
@@ -327,16 +342,18 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("puts the view pills on the right of the header, before Cards show and centred with it", async () => {
+    it("puts the view pills on the right of the header, then Cards show and Edit structure, all centred on one line", async () => {
       await create();
-      element().style.width = "60rem";
+      element().style.width = "72rem";
       await settle();
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
-      const [top, views, cards] = [box(".top"), box(".top .views"), box(".top .cards-show")];
+      const [top, views, cards, edit] = [box(".top"), box(".top .views"), box(".top .cards-show"), box(".top .edit")];
 
       AppearanceFixture.expectPixels(cards.left - views.right, AppearanceFixture.measureLook("space-4"));
-      AppearanceFixture.expectPixels(top.right - cards.right, AppearanceFixture.measureLook("space-6"));
+      AppearanceFixture.expectPixels(edit.left - cards.right, AppearanceFixture.measureLook("space-4"));
+      AppearanceFixture.expectPixels(top.right - edit.right, AppearanceFixture.measureLook("space-6"));
       AppearanceFixture.expectPixels(views.top + views.height / 2, cards.top + cards.height / 2);
+      AppearanceFixture.expectPixels(edit.top + edit.height / 2, cards.top + cards.height / 2);
       expect(views.left).toBeGreaterThan(box(".top .headcount").right);
     });
   });
