@@ -127,7 +127,7 @@ test("computer use starts off and offers a teammate no computer tools, and turne
 
     const setting = await settingOf(page);
     await expect(setting).not.toBeChecked();
-    await setting.check();
+    await setting.click();
     await expect(setting).toBeChecked();
     await openChatAsync(page);
     await expectComputerToolsAsync(app);
