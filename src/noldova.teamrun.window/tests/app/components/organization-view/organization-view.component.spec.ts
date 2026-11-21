@@ -230,6 +230,18 @@ describe("OrganizationViewComponent", () => {
     expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
   });
 
+  it("shows no usage on a card whose provider's plan has no window with a percent, such as an unlimited one", async () => {
+    await create(context => context.answer(MethodName.PlanUsageList, () =>
+      [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, null, null, null, null, true)], "2026-10-22T09:00:00.000Z").toJson()]));
+
+    await openMenu(one(".top .cards-show"));
+    menuItem("Usage today").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    expect([shows("Alice"), shows("Bob"), all(".usage")]).toEqual([["Idle"], ["Idle"], []]);
+  });
+
   it("says on each card what its teammate runs now, the earliest first with for how long and how many more, ticking each second", async () => {
     const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
     TestBed.overrideProvider(ClockService, { useValue: clock });
