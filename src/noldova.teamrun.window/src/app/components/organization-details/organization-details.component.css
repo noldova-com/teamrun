@@ -65,7 +65,7 @@
   color: var(--nol-text-muted);
 }
 
-.label {
+.now-label {
   color: var(--nol-text-strong);
   font-size: var(--nol-text-small);
   font-weight: var(--nol-weight-emphasis);

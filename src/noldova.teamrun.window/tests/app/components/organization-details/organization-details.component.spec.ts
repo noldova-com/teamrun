@@ -117,7 +117,7 @@ describe("OrganizationDetailsComponent", () => {
     expect([details.getAttribute("role"), details.getAttribute("aria-label"), card("Alice").getAttribute("aria-haspopup"),
       card("Alice").getAttribute("aria-expanded"), card("Alice").getAttribute("role"), card("Alice").getAttribute("aria-label"), document.activeElement === card("Alice")])
       .toEqual(["dialog", "Alice's details", "dialog", "true", "group", "Alice", true]);
-    expect([texts(".head .name", details), texts(".head .place", details), facts(), texts(".label", details), texts(".act", details)]).toEqual([
+    expect([texts(".head .name", details), texts(".head .place", details), facts(), texts(".now-label", details), texts(".act", details)]).toEqual([
       ["Alice"], ["Review · Design"],
       [["Status", "Idle"], ["Reports to", "You"], ["Model", "gpt-5 · high"], ["Usage", "40% used · 5h"], ["Last said", "The header is done. 5 min ago"]],
       ["Now"], ["Nothing running"]]);
@@ -157,22 +157,26 @@ describe("OrganizationDetailsComponent", () => {
     context.emit(EventName.MessageCreated, reply("r2", "c1", "2026-09-10T08:04:20.000Z", MessageStatus.Running).toJson());
     await settle();
     const details = await focus("Alice");
-    const running = texts(".act", details);
+    const acts = (): string[][] => all(".act", details).map(t => [...texts(".act-text", t), ...texts(".act-for", t)]);
+    const running = acts();
     const ticking = clock.running;
     clock.advance(Resources.clockIntervalMilliseconds);
     await settle();
-    const ticked = texts(".act", details);
+    const ticked = acts();
     context.emit(EventName.MessageUpdated, reply("r1", "c9", "2026-09-10T08:04:30.000Z", MessageStatus.Completed).toJson());
     context.emit(EventName.MessageUpdated, reply("r2", "c1", "2026-09-10T08:04:20.000Z", MessageStatus.Completed).toJson());
     await settle();
 
-    expect([running, ticked, texts(".act-for", details).length]).toEqual([["First 40 s", "Replying 30 s"], ["First 41 s", "Replying 31 s"], 0]);
+    expect([running, ticked, texts(".act-for", details).length]).toEqual([[["First", "40 s"], ["Replying", "30 s"]], [["First", "41 s"], ["Replying", "31 s"]], 0]);
     expect(ticking).toBeGreaterThan(clock.running);
     expect(texts(".act", details)).toEqual(["Nothing running"]);
   });
 
   it("opens the details once the pointer rests on a card, and closes them when it leaves the card and them", async () => {
     await create();
+    element().style.width = "60rem";
+    element().style.height = "60rem";
+    await settle();
 
     await userEvent.hover(card("Bob"));
     await Wait.until(() => expect(popovers()).toHaveLength(1));
@@ -232,7 +236,7 @@ describe("OrganizationDetailsComponent", () => {
       const left = inner.left + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth);
       const right = inner.right - Number.parseFloat(style.paddingRight) - Number.parseFloat(style.borderRightWidth);
       const top = inner.top + Number.parseFloat(style.paddingTop) + Number.parseFloat(style.borderTopWidth);
-      const [head, dl, label, list] = [one(".head", details), one(".facts", details), one(".label", details), one(".running", details)];
+      const [head, dl, label, list] = [one(".head", details), one(".facts", details), one(".now-label", details), one(".running", details)];
       const [firstTerm, secondTerm] = all("dt", details);
       const [firstValue] = all("dd", details);
       const [text, lasted] = [one(".act-text", details), one(".act-for", details)];

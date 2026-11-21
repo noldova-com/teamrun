@@ -486,9 +486,16 @@ describe("OrganizationViewComponent", () => {
       await answerAsync(".nol-teamrun-cancel");
       const cancelled = asked.length;
       one(".remove", card("Bob")).click();
+      console.log("PROBE", "clicked", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
       const asking = await dialogAsync();
+      console.log("PROBE", "dialog", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
       await answerAsync(".nol-teamrun-confirm");
+      console.log("PROBE", "answered", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
       const departments = await optionsAsync(one(".move-choice", card("Bob")));
+      console.log("PROBE", "options", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      console.log("PROBE", "escaped", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
       await closeOptionsAsync();
       await chooseAsync(one(".move-choice", card("Bob")), "Build");
       const label = one(".remove", card("Bob")).getAttribute("aria-label");
