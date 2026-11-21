@@ -105,62 +105,15 @@ describe("OrganizationDetailsComponent", () => {
     await settle();
   };
 
+  beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light));
+
   afterEach(() => {
+    AppearanceFixture.reset();
     OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
     ChatStoreService.release(context);
-  });
-
-  it("PROBE", async () => {
-    await create();
-    const tag = (e: EventTarget | null): string => e instanceof Element ? `${e.tagName.toLowerCase()}.${[...e.classList].slice(0, 3).join(".")}` : String(e);
-    const wait = (ms: number): Promise<void> => new Promise<void>(resolve => setTimeout(resolve, ms));
-    const log: string[] = [];
-    const t0 = performance.now();
-    const note = (s: string): void => { log.push(`${(performance.now() - t0).toFixed(0)} ${s}`); };
-    for (const type of ["pointerdown", "pointerup", "mousedown", "click", "focusin", "focusout", "pointerenter"])
-      document.addEventListener(type, e => note(`${type} ${tag(e.target)}${e.defaultPrevented ? " prevented" : ""}`), { capture: true });
-    new MutationObserver(() => note(`dom menu=${document.querySelectorAll("button[nol-menu-item]").length} pops=${popovers().length}`))
-      .observe(document.body, { childList: true, subtree: true });
-    note("A fresh click on Alice's tune");
-    await userEvent.click(one(".tune", card("Alice")));
-    await wait(400); await settle();
-    note(`A after menu=${document.querySelectorAll("button[nol-menu-item]").length}`);
-    await userEvent.keyboard("{Escape}");
-    await wait(300); await settle();
-    note(`A escaped menu=${document.querySelectorAll("button[nol-menu-item]").length} active=${tag(document.activeElement)}`);
-    await userEvent.unhover(card("Alice"));
-    await wait(300);
-    note("B keyboard focus on Alice, then click its tune");
-    await focus("Alice");
-    note("B focused");
-    await userEvent.click(one(".tune", card("Alice")));
-    await wait(400); await settle();
-    note(`B after menu=${document.querySelectorAll("button[nol-menu-item]").length} active=${tag(document.activeElement)}`);
-    await userEvent.keyboard("{Escape}");
-    await wait(300); await settle();
-    note("C real click on Bob's name, then programmatic tune click, then a document Escape");
-    await userEvent.click(one(".name", card("Bob")));
-    await wait(300); await settle();
-    one(".tune", card("Bob")).click();
-    await wait(300); await settle();
-    note(`C menu=${document.querySelectorAll("button[nol-menu-item]").length} active=${tag(document.activeElement)}`);
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await wait(300); await settle();
-    note(`C doc-escape menu=${document.querySelectorAll("button[nol-menu-item]").length}`);
-    await userEvent.keyboard("{Escape}");
-    await wait(300); await settle();
-    note(`C key-escape menu=${document.querySelectorAll("button[nol-menu-item]").length}`);
-    note("D programmatic tune click on Alice, no pointer on the cards first, then a document Escape");
-    await userEvent.unhover(card("Bob"));
-    one(".tune", card("Alice")).click();
-    await wait(300); await settle();
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await wait(300); await settle();
-    note(`D doc-escape menu=${document.querySelectorAll("button[nol-menu-item]").length}`);
-    console.log(log.map(t => `PROBE ${t}`).join("\n"));
   });
 
   it("opens a card's details when the card takes the keyboard focus: its status, whom it reports to, its model, usage and last words, and what runs now", async () => {

@@ -387,7 +387,8 @@ describe("OrganizationViewComponent", () => {
       await userEvent.keyboard("{Escape}");
       one(".tune", card("Bob")).click();
       await settle();
-      await closeMenu();
+      await userEvent.keyboard("{Escape}");
+      await Wait.until(() => expect(menuItems()).toEqual([]));
       const tuned = heading();
       one(".top .edit").click();
       await settle();
