@@ -98,7 +98,7 @@ describe("OrganizationMessagesComponent", () => {
     element().style.height = "40rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).teammates()).toHaveLength(3));
-    await Wait.until(() => expect(OrganizationStoreService.of(context).organization().departments).toHaveLength(1));
+    await Wait.until(() => expect(OrganizationStoreService.of(context).organization().departments).toHaveLength(organization.departments.length));
     await settle();
   };
 
