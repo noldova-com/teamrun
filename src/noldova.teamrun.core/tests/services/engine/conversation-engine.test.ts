@@ -15,7 +15,7 @@ import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { CaptureOutcome, ChangeStatus, CompareOutcome, PreviewOutcome, RestoreOutcome } from "@noldova/checkpoints.protocol";
-import { ApprovalAsk, ConversationEngine, QuestionAsk, Resources, TurnDetail, TurnOutcome } from "@noldova/teamrun.core";
+import { ApprovalAsk, ConversationEngine, QuestionAsk, RequestDispatcher, Resources, TurnDetail, TurnOutcome } from "@noldova/teamrun.core";
 import {
   Approval,
   AttachmentInput,
@@ -1347,10 +1347,9 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
-  @TestData("capture", 0, MessageStatus.Cancelled)
-  @TestData("compare", 1, MessageStatus.Completed)
-  public async stopsAReplyBeforeItsTurnWhileTheModuleCapturesAndKeepsTheFinishedTurnWhileItCompares(held: "capture" | "compare", turns: number,
-    status: MessageStatus): Promise<void> {
+  @TestData("capture", 0)
+  @TestData("compare", 1)
+  public async stopsAReplyBeforeItsTurnWhileTheModuleCapturesAndAfterItWhileItCompares(held: "capture" | "compare", turns: number): Promise<void> {
     await using host = await CoreHost.createAsync();
     ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
@@ -1361,7 +1360,7 @@ export class ConversationEngineTests {
 
     const stopped = await host.engine.cancelAsync(new MessageIdParams(sent.replies[0]!.id));
 
-    Assert.areEqual(status, stopped.status);
+    Assert.areEqual(MessageStatus.Cancelled, stopped.status);
     Assert.isTrue(host.checkpoints.signals.at(-1)?.aborted ?? false);
     Assert.areEqual(turns, host.adapter.requests.length);
     Assert.areEqual(turns === 1, !Object.isNullOrUndefined(stopped.provenance?.nativeTurnId));
@@ -1782,6 +1781,64 @@ export class ConversationEngineTests {
       Assert.areEqual(0, host.listener.count(EventName.ConversationRewound));
       Assert.areEqual("reply\n", readFileSync(join(folder, "base.txt"), "utf8"));
     }
+  }
+
+  @TestMethod
+  @TestData("error")
+  @TestData("text")
+  public async saysTheFilesWereRestoredAndWhyWhenARewindCantRemoveItsMessagesAndRemovesThemOnASecondRewind(thrownAs: "error" | "text"): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const folder = ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
+    const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
+    host.adapter.writeFiles = { "base.txt": "reply\n" };
+    const sent = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Change"));
+    await host.engine.waitForIdle();
+    const reason = thrownAs === "error" ? "The disk is full." : "database or disk is full";
+    const failure: unknown = thrownAs === "error" ? new Error(reason) : reason;
+    const connection = host.context.database.connection;
+    const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
+    let failures = 1;
+    connection.runInTransactionAsync = async work => failures-- > 0
+      ? await runInTransactionAsync(async transaction => {
+        await work(transaction);
+        throw failure;
+      })
+      : await runInTransactionAsync(work);
+
+    const thrown = await Assert.throwsAsync(() => host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, true)), ServiceException);
+    const kept = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).length;
+    const restored = readFileSync(join(folder, "base.txt"), "utf8");
+    const again = await host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, true));
+
+    const described = RequestDispatcher.describe(thrown);
+    Assert.areEqual(`${ErrorCode.Internal}:${Resources.formatRewindNotSavedAfterRestore(reason)}:true:true`,
+      `${described.name}:${described.message}:${described.message.endsWith(`Rewind again to remove them. They couldn't be removed: ${reason}`)}:${thrown.cause === failure}`);
+    Assert.areEqual("2:one\n", `${kept}:${restored}`);
+    Assert.areEqual(2, again.removedMessageIds.length);
+    Assert.areEqual(0, (await host.messages.listAsync(new MessageListParams(conversation.id, null))).length);
+    Assert.areEqual(1, host.listener.count(EventName.ConversationRewound));
+  }
+
+  @TestMethod
+  public async failsARewindThatRestoresNoFilesWithItsOwnErrorWhenItsMessagesCantBeRemoved(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const folder = ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
+    const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
+    host.adapter.writeFiles = { "base.txt": "reply\n" };
+    const sent = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Change"));
+    await host.engine.waitForIdle();
+    const failure = new Error("The disk is full.");
+    const connection = host.context.database.connection;
+    const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
+    connection.runInTransactionAsync = async work => await runInTransactionAsync(async transaction => {
+      await work(transaction);
+      throw failure;
+    });
+
+    const thrown = await Assert.throwsAsync(() => host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, false)), Error);
+
+    Assert.areEqual(failure, thrown);
+    Assert.areEqual("2:reply\n", `${(await host.messages.listAsync(new MessageListParams(conversation.id, null))).length}:${readFileSync(join(folder, "base.txt"), "utf8")}`);
   }
 
   @TestMethod

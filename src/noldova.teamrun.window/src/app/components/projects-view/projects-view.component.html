@@ -147,7 +147,7 @@ LICENSE file in the root directory of this source tree.
             <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.detachFolderLabel" (triggered)="detachFolder(conversation)"></button>
           }
         }
-        <button nol-menu-item [icon]="resources.forgetIcon" [label]="resources.deleteConversationLabel" (triggered)="remove(conversation)"></button>
+        <button nol-menu-item [icon]="resources.forgetIcon" [label]="resources.deleteConversationLabel" (triggered)="remove(conversation, tree)"></button>
       </nol-menu>
     </ng-template>
     <ng-template #moveMenu>

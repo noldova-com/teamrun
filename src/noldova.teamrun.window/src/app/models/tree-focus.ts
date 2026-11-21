@@ -59,6 +59,19 @@ export class TreeFocus {
     afterNextRender(() => this.items().find(t => t.treeKey() === key)?.focus(), { injector: this.injector });
   }
 
+  public neighbourOf(key: string): string | undefined {
+    const keys = this.items().map(t => t.treeKey());
+    const at = keys.indexOf(key);
+    return keys[at + 1] ?? keys[at - 1];
+  }
+
+  public focusIfLostLater(key: string | undefined, fallback: () => HTMLElement | null): void {
+    afterNextRender(() => {
+      if (document.activeElement === document.body)
+        (this.items().find(t => t.treeKey() === key)?.element ?? fallback())?.focus();
+    }, { injector: this.injector });
+  }
+
   public keepFocusLater(key: string, left: Element | null): void {
     const focused = document.activeElement;
     if (this.items().some(t => t.treeKey() === key && (focused === document.body || t.element.contains(focused)) && focused === left))

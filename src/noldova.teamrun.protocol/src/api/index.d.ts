@@ -964,7 +964,7 @@ export declare enum MethodName {
    * session fed with the kept transcript, and optionally restores the project's files to the snapshot taken before the
    * removed reply started (git projects). Parameters: `ChatRewindParams`. Result:
    * `ChatRewindResult`. Fails with `Conflict` while a reply is open, `NotFound` for an unknown chat
-   * or message.
+   * or message, and `Internal` when the messages can't be removed; after files were restored, that refusal says so, with the error's message.
    */
   ConversationRewind = "ConversationRewind",
   /**

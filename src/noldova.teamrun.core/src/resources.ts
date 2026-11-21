@@ -936,6 +936,10 @@ export class Resources {
     + "AND json_type(d.value, '$.parentSequence') IS NULL AND (json_array_length(d.value, '$.payload.steps') > 0 "
     + "OR (json_type(d.value, '$.payload.text') = 'text' AND length(trim(json_extract(d.value, '$.payload.text'))) > 0)))";
 
+  public static formatRewindNotSavedAfterRestore(reason: string): string {
+    return `The files were restored to before that reply, but the chat still shows its messages. Rewind again to remove them. They couldn't be removed: ${reason}`;
+  }
+
   public static formatCompactRefused(provider: string, reason: string): string {
     return `${provider} can't compact its context here: ${reason}.`;
   }
@@ -1735,6 +1739,10 @@ export class Resources {
 
   public static formatTurnStopped(reason: string): string {
     return `The turn was stopped: ${reason}`;
+  }
+
+  public static formatHandOffStopped(names: readonly string[]): string {
+    return `Stopped before handing off to ${names.join(", ")}.`;
   }
 
   public static formatChainStopped(limit: number): string {

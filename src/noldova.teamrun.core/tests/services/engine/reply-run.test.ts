@@ -22,7 +22,10 @@ import { Approval, ApprovalDecideParams, ApprovalKind, ApprovalOption, ApprovalO
   SenderEnvironment, SharedMcpProviderSetParams, SharedMcpSecretSetParams, SharedMcpServerDefinition, SharedMcpTransport, SubAgent, SubAgentStartParams,
   SubAgentStatus, SubAgentWaitParams, type Teammate, TeammateCreateParams } from "@noldova/teamrun.protocol";
 
+import { AfterStatusMessages } from "../../fixtures/after-status-messages.fixture.js";
+import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { HeldMessages } from "../../fixtures/held-messages.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
@@ -332,6 +335,42 @@ export class ReplyRunTests {
   }
 
   @TestMethod
+  public async abortsTheCompareOfAReplyStoppedAfterItsTurnReturnedWhileItsLastToolCallsAreStored(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    mkdirSync(project.rootPath, { recursive: true });
+    const conversation = await host.createConversationAsync(project);
+    const reply = new Message("stopped-reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Pending, [], ReplyRunTests.provenance, "t", null,
+      null, [], "alice", "Alice");
+    await host.messages.insertAsync(reply);
+    const active = new ActiveRun(reply.id);
+    const messages = new HeldMessages(host.context, message => JSON.stringify(message.details).includes(ReplyRunTests.cart.url));
+    const run = new ReplyRun(reply, ReplyRunTests.provenance, active, messages, host.approvals, host.events, host.directory.path,
+      null, null, null, null, null, new ReplyCheckpoints(host.checkpoints), new WorkFolder(project.id, project.rootPath));
+    host.adapter.steps = [new TurnDetail(DetailKind.Note, "Console", { servedTool: "browser_console", servedInput: {} }, "k1"),
+      (): void => run.noteToolCall(new ToolCallRecord("browser_console", {}, { page: ReplyRunTests.cart }))];
+    const afterTurn = active.afterTurn.bind(active);
+    let turnEnded = false;
+    active.afterTurn = (): AbortSignal => {
+      turnEnded = true;
+      ChangeSignal.notify();
+      return afterTurn();
+    };
+    const executed = run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+    await messages.reached.promise;
+    await host.until("the turn's end", () => turnEnded);
+
+    active.cancel();
+    messages.released.resolve();
+    await executed;
+
+    const stored = await host.messages.findAsync(reply.id);
+    Assert.isTrue(host.checkpoints.signals.at(-1)?.aborted ?? false);
+    Assert.areEqual(MessageStatus.Cancelled, stored?.status);
+    Assert.isTrue(stored?.details.some(t => t.text === Resources.incompleteWorkingTreeEvidence) ?? false);
+  }
+
+  @TestMethod
   public async announcesItsCheckpointAndItsEndOnlyWhenItTakesOne(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
@@ -435,6 +474,53 @@ export class ReplyRunTests {
     Assert.isFalse(active.isAwaitingDecision);
     active.cancel();
     await executed;
+  }
+
+  @TestMethod
+  public async keepsAReplyCompletedWhenItsApprovalIsDecidedRightAfterTheCompletionWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    let asked: Promise<string> = Promise.resolve("not asked");
+    const reply = await ReplyRunTests.completeAsync(host, async ({ active, replyId }) => {
+      Assert.isTrue(active.decide(new ApprovalDecideParams((await host.approvals.listPendingAsync(replyId))[0]?.id ?? "", "yes")));
+      Assert.areEqual("yes", await asked);
+    }, async listener => {
+      ({ asked } = await ReplyRunTests.askAsync(host, listener));
+    });
+
+    Assert.areEqual(MessageStatus.Completed, reply.stored?.status);
+    Assert.isFalse(Object.isNullOrUndefined(reply.stored?.endedAt));
+    Assert.areEqual(MessageStatus.Completed, reply.statuses.at(-1));
+  }
+
+  @TestMethod
+  public async keepsAReplyCompletedWhenItsApprovalIsWithdrawnRightAfterTheCompletionWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const controller = new AbortController();
+    let asked: Promise<string> = Promise.resolve("not asked");
+    const reply = await ReplyRunTests.completeAsync(host, async () => {
+      controller.abort();
+      await Assert.throwsAsync(() => asked, ServiceException);
+    }, async listener => {
+      ({ asked } = await ReplyRunTests.askAsync(host, listener, controller.signal));
+    });
+
+    Assert.areEqual(MessageStatus.Completed, reply.stored?.status);
+    Assert.isFalse(Object.isNullOrUndefined(reply.stored?.endedAt));
+    Assert.areEqual(MessageStatus.Completed, reply.statuses.at(-1));
+  }
+
+  @TestMethod
+  public async keepsAReplyCompletedWhenItsTurnAsksRightAfterTheCompletionWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    let asked: Promise<string> = Promise.resolve("not asked");
+    const reply = await ReplyRunTests.completeAsync(host, async ({ listener }) => {
+      ({ asked } = await ReplyRunTests.askAsync(host, listener));
+    });
+
+    await Assert.throwsAsync(() => asked, ServiceException);
+    Assert.areEqual(MessageStatus.Completed, reply.stored?.status);
+    Assert.isFalse(Object.isNullOrUndefined(reply.stored?.endedAt));
+    Assert.areEqual(MessageStatus.Completed, reply.statuses.at(-1));
   }
 
   @TestMethod
@@ -568,6 +654,39 @@ export class ReplyRunTests {
         false, false, false),
       new ApprovalQuestion("token", "Token", "Which token?", [], false, true, true)
     ], subAgent);
+  }
+
+  private static async completeAsync(host: CoreHost, after: (turn: { listener: ITurnListener; active: ActiveRun; replyId: string }) => Promise<void>,
+    during: (listener: ITurnListener) => Promise<void> = (): Promise<void> => Promise.resolve()): Promise<{ stored: Message | null; statuses: readonly MessageStatus[] }> {
+    const project = await host.openProjectAsync();
+    const conversation = await host.createConversationAsync(project);
+    const reply = new Message("raced-reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Pending, [], ReplyRunTests.provenance, "t", null,
+      null, [], "alice", "Alice");
+    await host.messages.insertAsync(reply);
+    const active = new ActiveRun(reply.id);
+    let listener: ITurnListener | null = null;
+    const messages = new AfterStatusMessages(host.context, MessageStatus.Completed, async () => {
+      if (!Object.isNull(listener))
+        await after({ listener, active, replyId: reply.id });
+    });
+    host.adapter.holdTurn = async (): Promise<void> => {
+      listener = host.adapter.lastListener;
+      if (!Object.isNull(listener))
+        await during(listener);
+    };
+    const run = new ReplyRun(reply, ReplyRunTests.provenance, active, messages, host.approvals, host.events, host.directory.path);
+
+    await run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+
+    return { stored: await host.messages.findAsync(reply.id), statuses: messages.statuses };
+  }
+
+  private static async askAsync(host: CoreHost, listener: ITurnListener, signal?: AbortSignal): Promise<{ asked: Promise<string> }> {
+    const created = host.listener.next(EventName.ApprovalCreated);
+    const asked = listener.onApprovalRequested(ReplyRunTests.ask("late"), signal);
+    void asked.catch(() => undefined);
+    await created;
+    return { asked };
   }
 
   private static async hold(host: CoreHost): Promise<{ reply: Message; active: ActiveRun; listener: ITurnListener; executed: Promise<void> }> {
