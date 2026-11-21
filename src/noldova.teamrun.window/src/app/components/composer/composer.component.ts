@@ -531,7 +531,8 @@ export class ComposerComponent {
         const found = own ?? fresh ?? carried?.withMode(null) ?? null;
         const opens = Object.isNull(own) && Object.isNullOrUndefined(kept) && (!Object.isNull(found) || Object.isNull(this.kind()));
         const local = opens ? this.store.startingChoiceOf(this.store.membersOf(conversationId).map(t => t.teammateId), found) : found;
-        const base = local ?? this.currentSettings() ?? new ComposerSettings(first.id, null, null, null);
+        const listed = Object.isNull(local) || !kinds.some(t => t.id === local.kind) ? null : local;
+        const base = listed ?? this.currentSettings() ?? new ComposerSettings(first.id, null, null, null);
         const remembered = follows ? base.following(kept!) : local;
         const applies = !Object.isNull(remembered) && kinds.some(t => t.id === remembered.kind);
         if (applies) {
@@ -1191,11 +1192,6 @@ export class ComposerComponent {
     if (Object.isNull(settings) || Object.isNull(conversation))
       return;
     const responder = settings.toResponder();
-    const held = conversation.responder?.teammateId ?? null;
-    if (!chosen && Object.isNull(responder.teammateId) && !Object.isNull(held) && this.store.membersOf(conversationId).some(t => t.teammateId === held)) {
-      this.responderId.set(held);
-      return;
-    }
     if (!ComposerComponent.sameResponder(responder, conversation.responder))
       void this.store.setResponder(conversationId, responder, chosen, !chosen && Object.isNull(conversation.responder));
   }

@@ -1264,7 +1264,7 @@ export class ChatStoreService {
       let stored: ConversationResponder | null = responder;
       const kept = await this.attempt(async () => {
         const chat = await this.request(MethodName.ConversationResponderSet, new ConversationResponderParams(conversationId, responder, chosen, start).toJson());
-        if (start)
+        if (!chosen)
           stored = Conversation.fromJson(chat).responder;
       }, this.actionFailed(ChatAction.SetResponder, conversationId, conversationId));
       return kept ? stored : held;

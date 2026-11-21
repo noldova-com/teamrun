@@ -511,6 +511,34 @@ export class ConversationsServiceTests {
   }
 
   @TestMethod
+  public async keepsAChatsTeammateAgainstAResponderThePersonDidNotChooseWithoutOneWhileTheTeammateIsInTheChat(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const provider = await host.createProviderAsync();
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", "Reviews", provider.id, Harness.Provider, null, null));
+    const joined = await host.conversations.createAsync(new ConversationCreateParams(project.id, null));
+    const outside = await host.conversations.createAsync(new ConversationCreateParams(project.id, null));
+    const picked = await host.conversations.createAsync(new ConversationCreateParams(project.id, null));
+    await host.conversations.addMemberAsync(new ConversationMemberParams(joined.id, bob.id));
+    await host.conversations.addMemberAsync(new ConversationMemberParams(picked.id, bob.id));
+    for (const chat of [joined, outside, picked])
+      await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(bob.id)));
+    const fallback = new ConversationResponder(null, new RequestedSettings("fake", "m1", null), provider.id);
+    const feed = (await host.context.database.changeFeed.readAfterAsync(0)).length;
+
+    const kept = await host.conversations.setResponderAsync(new ConversationResponderParams(joined.id, fallback));
+    const cleared = await host.conversations.setResponderAsync(new ConversationResponderParams(joined.id, null));
+    const unchanged = (await host.context.database.changeFeed.readAfterAsync(0)).length;
+    const replaced = await host.conversations.setResponderAsync(new ConversationResponderParams(outside.id, fallback));
+    const chosen = await host.conversations.setResponderAsync(new ConversationResponderParams(picked.id, fallback, true));
+
+    Assert.areEqual([bob.id, bob.id, bob.id, "null", "null"].join(","), [kept.responder?.teammateId, cleared.responder?.teammateId,
+      (await host.conversations.findAsync(joined.id))?.responder?.teammateId, String(replaced.responder?.teammateId), String(chosen.responder?.teammateId)].join(","));
+    Assert.areEqual(feed, unchanged);
+    Assert.areEqual("fake", (await host.conversations.findAsync(outside.id))?.responder?.requested?.kind);
+  }
+
+  @TestMethod
   public async dropsAReadingPositionAtOrAfterTheRewoundSequenceAndKeepsAnEarlierOne(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const [rewound, kept] = [await host.createConversationAsync(), await host.createConversationAsync()];

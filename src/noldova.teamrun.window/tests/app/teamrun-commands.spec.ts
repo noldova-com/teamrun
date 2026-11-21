@@ -180,7 +180,7 @@ describe("TeamRun's commands", () => {
         await held.promise;
       else
         chosen.add(params.conversationId);
-      return null;
+      return first.withResponder(params.responder).toJson();
     });
 
     const kept = store.setResponder(first.id, new ConversationResponder("alice"));
