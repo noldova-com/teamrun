@@ -1196,6 +1196,7 @@ export class Resources {
   public static readonly organizationStructureLabel: string = "Organization structure";
   public static readonly organizationOwnerName: string = "You";
   public static readonly organizationEmpty: string = "No departments yet.";
+  public static readonly organizationNoDepartment: string = "No department";
   public static readonly organizationCardsShowLabel: string = "Cards show";
   public static readonly organizationCardsShowIcon: string = "tune";
   public static readonly organizationEveryCardShows: string = "Every card shows";

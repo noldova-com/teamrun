@@ -120,6 +120,23 @@ describe("OrganizationBoardComponent", () => {
       ["nol-teamrun-organization-card", "Carol"]]);
   });
 
+  it("gives the teammates in no department a No department column, last, with no message, rename, delete or add, and counts them on its head", async () => {
+    await create();
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+      ChatStoreService.of(context).teammates()));
+    await settle();
+    const none = (): HTMLElement => one(".lane:nth-child(4)");
+
+    expect([all(".lane").length, texts(".lane-name", none()), texts(".lane-count", none()), texts("nol-teamrun-organization-card .name", none()),
+      all(".message-department", none()).length, all(".message-department").length]).toEqual([4, ["No department"], ["1"], ["Carol"], 0, 3]);
+
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+
+    expect([[...element().querySelectorAll<HTMLInputElement>(".lane-rename")].map(t => t.value), all(".delete-department").length, all(".add-member").length,
+      texts(".lane-name", none()), all(".move-choice, .remove", none()).length]).toEqual([["Design", "UI", "Build"], 3, 3, ["No department"], 0]);
+  });
+
   it("sorts a column by name, and by status again, on its own, and by status for a sort it doesn't know", async () => {
     await create();
     const build = (): HTMLElement => one(".lane:nth-child(3)");

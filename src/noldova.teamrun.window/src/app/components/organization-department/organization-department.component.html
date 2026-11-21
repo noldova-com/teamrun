@@ -7,29 +7,31 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <div class="department" nolCanvasItem>
-  @if (editing()) {
+  @if (editing() && node().department; as department) {
     <div class="department-row">
-      <input #name nol-text-field class="department-field" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node().department.name"
-        (change)="rename()">
+      <input #name nol-text-field class="department-field" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node().name"
+        (change)="rename(department)">
       <button type="button" nol-icon-button class="delete" [icon]="resources.organizationDeleteIcon"
-        [label]="resources.formatOrganizationDeleteNamed(node().department.name)" (click)="confirmDelete()"></button>
+        [label]="resources.formatOrganizationDeleteNamed(node().name)" (click)="confirmDelete(department)"></button>
     </div>
     <nol-select class="leader-choice" [label]="resources.organizationLeaderLabel" [options]="leaderOptions()" [value]="node().leader?.id ?? ''"
       (valueChange)="setLeader($event)" />
   } @else {
     <div class="department-row">
       <button type="button" nol-icon-button class="department-toggle" [icon]="isOpen() ? resources.expandedIcon : resources.collapsedIcon"
-        [label]="resources.formatOrganizationCollapseLabel(node().department.name, isOpen())" [attr.aria-expanded]="isOpen()" (click)="toggle()"></button>
-      <span class="department-name">{{ node().department.name }}</span>
+        [label]="resources.formatOrganizationCollapseLabel(node().name, isOpen())" [attr.aria-expanded]="isOpen()" (click)="toggle()"></button>
+      <span class="department-name">{{ node().name }}</span>
       <span class="department-count">{{ node().headcount }}</span>
     </div>
   }
   @if (summary(); as text) {
     <span class="department-summary">{{ text }}</span>
   }
-  <button type="button" nol-button class="message" [variant]="textVariant" [attr.aria-label]="resources.formatOrganizationMessageNamed(node().department.name)"
-    (click)="chosen.emit(target.department(node().department.id))"><span nolButtonIcon class="material-symbols-rounded"
-    aria-hidden="true">{{ resources.organizationMessageIcon }}</span>{{ resources.organizationMessageButton }}</button>
+  @if (!node().isUnplaced) {
+    <button type="button" nol-button class="message" [variant]="textVariant" [attr.aria-label]="resources.formatOrganizationMessageNamed(node().name)"
+      (click)="chosen.emit(target.department(node().id))"><span nolButtonIcon class="material-symbols-rounded"
+      aria-hidden="true">{{ resources.organizationMessageIcon }}</span>{{ resources.organizationMessageButton }}</button>
+  }
 </div>
 @if (node().leader; as leader) {
   <div class="stem"></div>
@@ -39,7 +41,7 @@ LICENSE file in the root directory of this source tree.
   <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" [department]="node().department" /></ng-template>
 }
 @if (isOpen()) {
-  @if (node().members.length > 0 || editing()) {
+  @if (node().members.length > 0 || (editing() && !node().isUnplaced)) {
     <div class="reports">
       @for (member of node().members; track member.id) {
         <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="member.name" [teammate]="member" [editing]="editing()"
@@ -47,7 +49,7 @@ LICENSE file in the root directory of this source tree.
           [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(target.teammate(member.id))" />
         <ng-template #memberDetails><nol-teamrun-organization-details [teammate]="member" [department]="node().department" /></ng-template>
       }
-      @if (editing()) {
+      @if (editing() && !node().isUnplaced) {
         <button type="button" nol-button class="add-member" [variant]="outlined" [disabled]="candidates().length === 0" [nolMenuTriggerFor]="candidatesMenu"><span
           nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddMember }}</button>
       }
@@ -55,7 +57,7 @@ LICENSE file in the root directory of this source tree.
   }
   @if (node().children.length > 0) {
     <div class="kids">
-      @for (child of node().children; track child.department.id) {
+      @for (child of node().children; track child.id) {
         <nol-teamrun-organization-department class="kid" [node]="child" [editing]="editing()" (chosen)="chosen.emit($event)" />
       }
     </div>

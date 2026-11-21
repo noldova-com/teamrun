@@ -158,12 +158,44 @@ describe("OrganizationViewComponent", () => {
       [new DepartmentMember("offline", "build")]).toJson());
     await settle();
 
-    expect([tree(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Owner · 1 leader reports to you"]]);
+    expect([tree(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []],
+      ["No department", "3", "3 idle", [], ["Alice", "Bob", "Code Reviewer"], [], []]], ["Owner · 1 leader reports to you"]]);
 
     context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
     await settle();
 
-    expect([tree(), texts(".empty"), texts(".owner .role")]).toEqual([[], ["No departments yet."], ["Owner · 0 leaders report to you"]]);
+    expect([tree(), texts(".empty"), texts(".owner .role")]).toEqual([[["No department", "4", "3 idle · 1 stopped", [], ["Alice", "Bob", "Code Reviewer", "Offline"],
+      [], []]], [], ["Owner · 0 leaders report to you"]]);
+  });
+
+  it("shows the teammates in no department last, under No department, so the headcount counts what the tree shows, with no department's own controls", async () => {
+    await create(() => {
+      organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
+        [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design")]);
+    });
+    const none = (): HTMLElement => department("No department");
+    const controls = (view: HTMLElement): number[] => [".department-field", ".delete", ".leader-choice", ".message"].map(t => own(view, `.department ${t}`).length);
+
+    expect([texts(".top .headcount"), tree(), all(".chart nol-teamrun-organization-card").length, controls(none())]).toEqual([
+      ["4 teammates in 2 departments"],
+      [["Design", "2", "2 idle", ["Alice"], ["Bob"], [], []], ["Build", "0", undefined, [], [], [], []],
+        ["No department", "2", "1 idle · 1 stopped", [], ["Code Reviewer", "Offline"], [], []]],
+      4, [0, 0, 0, 0]
+    ]);
+    await userEvent.click(one("aside.messages .to-choice .nol-select-button"));
+    await Wait.until(() => expect(document.querySelectorAll(".nol-select-option").length).toBeGreaterThan(0));
+    const offered = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
+    await userEvent.keyboard("{Escape}");
+    await settle();
+    expect(offered.slice(-2)).toEqual(["Code Reviewer", "Offline"]);
+    expect(offered.some(t => t.includes("No department"))).toBe(false);
+
+    one(".top .edit").click();
+    await settle();
+
+    expect([controls(department("Design")), controls(none()), all(":scope > .reports > .add-member", none()).length,
+      ["Code Reviewer", "Offline"].map(t => all(".move-choice, .remove", card(t)).length), texts(":scope > .department .department-name", none())])
+      .toEqual([[1, 1, 1, 1], [0, 0, 0, 0], 0, [0, 0], ["No department"]]);
   });
 
   it("collapses a department to a count of the members and nested departments' people it hides, keeps that on the server, and opens it again", async () => {

@@ -8,13 +8,14 @@
 import { Department, DepartmentMember, Harness, Organization, Teammate } from "@noldova/teamrun.protocol";
 
 import { OrganizationNode } from "../../../src/app/models/organization.node";
+import { Resources } from "../../../src/resources";
 
 describe("OrganizationNode", () => {
   const teammate = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
   const [ada, bea, cy, dee, eve, fay] = [teammate("ada", "Ada"), teammate("bea", "Bea"), teammate("cy", "Cy"), teammate("dee", "Dee"), teammate("eve", "Eve"),
     teammate("fay", "Fay")];
   const shape = (nodes: readonly OrganizationNode[]): unknown[] =>
-    nodes.map(t => [t.department.id, t.leader?.id ?? null, t.members.map(u => u.id), t.headcount, t.total, t.hidden, shape(t.children)]);
+    nodes.map(t => [t.id, t.leader?.id ?? null, t.members.map(u => u.id), t.headcount, t.total, t.hidden, shape(t.children)]);
 
   it("nests departments in their order, each with its leader apart from its members in name order, and counts what collapsing it hides, its nested departments' people too", () => {
     const organization = new Organization([
@@ -50,5 +51,18 @@ describe("OrganizationNode", () => {
       [new DepartmentMember("gone", "design"), new DepartmentMember("lost", "design"), new DepartmentMember("ada", "design")]);
 
     expect(shape(OrganizationNode.treeOf(organization, [ada]))).toEqual([["design", null, ["ada"], 1, 1, 1, []]]);
+  });
+
+  it("puts the teammates in no department last, under No department in name order, and leaves it out once every teammate is placed", () => {
+    const organization = new Organization([new Department("design", "Design", null, "ada", 0, "c", "u"), new Department("ui", "UI", "design", null, 0, "c", "u")],
+      [new DepartmentMember("ada", "design"), new DepartmentMember("bea", "ui")]);
+    const tree = OrganizationNode.treeOf(organization, [fay, ada, dee, bea, cy]);
+
+    expect([shape(tree), tree.map(t => [t.name, t.isUnplaced, t.department?.id ?? null])]).toEqual([
+      [["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]], ["no-department", null, ["cy", "dee", "fay"], 3, 3, 3, []]],
+      [["Design", false, "design"], [Resources.organizationNoDepartment, true, null]]
+    ]);
+    expect(shape(OrganizationNode.treeOf(organization, [ada, bea]))).toEqual([["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]]);
+    expect(shape(OrganizationNode.treeOf(Organization.empty, [bea, ada]))).toEqual([["no-department", null, ["ada", "bea"], 2, 2, 2, []]]);
   });
 });

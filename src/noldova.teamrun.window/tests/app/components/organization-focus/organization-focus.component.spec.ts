@@ -123,6 +123,28 @@ describe("OrganizationFocusComponent", () => {
     expect([indent("Design"), indent("UI"), indent("Build"), indent("Alice"), indent("Code Reviewer")]).toEqual([0.25, 1.75, 0.25, 2.25, 3.75]);
   });
 
+  it("outlines the teammates in no department under No department, last, which opens and closes but isn't a unit, and focuses each of them", async () => {
+    await create();
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+      ChatStoreService.of(context).teammates()));
+    await settle();
+
+    expect([texts(".orow.root nol-chip"), all(".orow.department").map(t => text(one(".label", t))), texts("nol-chip", row("No department")), all(".orow.person").at(-1)?.textContent?.includes("Carol")])
+      .toEqual([["5"], ["Design", "UI", "Build", "No department"], ["1"], true]);
+
+    await click(one(".obtn", row("Carol")));
+    const carol = unit();
+    expect([carol.slice(0, 3), texts(".unit-summary")[0]?.includes("No department"), carol.slice(4)]).toEqual([[["Organization", "Carol"], ["Carol"], ["Carol"]], true,
+      [["Carol"], true, ["Carol"]]]);
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+    expect([all(".unit-rename").length, all(".remove-teammate").length, all(".add-member", row("No department")).length, all(".orow.department .add-member").length])
+      .toEqual([1, 0, 0, 3]);
+
+    await click(one(".obtn", row("No department")));
+    expect([texts(".orow.person .label").includes("Carol"), saves.at(-1)?.isCollapsed("no-department"), texts(".crumb")]).toEqual([false, true, ["Organization", "Carol"]]);
+  });
+
   it("opens on the leaders when nothing is focused", async () => {
     await create();
     expect(unit()).toEqual([["Organization"], ["Organization"], ["Organization"], ["Your 2 leaders · 2 idle"], ["Alice", "Code Reviewer"], false, ["Organization"]]);

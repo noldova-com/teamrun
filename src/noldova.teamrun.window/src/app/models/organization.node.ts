@@ -9,8 +9,12 @@
 import "@noldova/context.core";
 import { type Department, NameOrder, type Organization, type Teammate } from "@noldova/teamrun.protocol";
 
+import { Resources } from "../../resources";
+
 export class OrganizationNode {
-  public readonly department: Department;
+  public static readonly unplacedId: string = "no-department";
+
+  public readonly department: Department | null;
   public readonly leader: Teammate | null;
   public readonly members: readonly Teammate[];
   public readonly children: readonly OrganizationNode[];
@@ -18,7 +22,7 @@ export class OrganizationNode {
   public readonly total: number;
   public readonly hidden: number;
 
-  public constructor(department: Department, leader: Teammate | null, members: readonly Teammate[], children: readonly OrganizationNode[]) {
+  public constructor(department: Department | null, leader: Teammate | null, members: readonly Teammate[], children: readonly OrganizationNode[]) {
     this.department = department;
     this.leader = leader;
     this.members = members;
@@ -29,6 +33,18 @@ export class OrganizationNode {
     this.hidden = members.length + nested;
   }
 
+  public get id(): string {
+    return this.department?.id ?? OrganizationNode.unplacedId;
+  }
+
+  public get name(): string {
+    return this.department?.name ?? Resources.organizationNoDepartment;
+  }
+
+  public get isUnplaced(): boolean {
+    return Object.isNull(this.department);
+  }
+
   public static treeOf(organization: Organization, teammates: readonly Teammate[]): readonly OrganizationNode[] {
     const byId = new Map(teammates.map(t => [t.id, t]));
     const nodesOf = (parentId: string | null): readonly OrganizationNode[] => organization.childrenOf(parentId).map(department => {
@@ -37,7 +53,9 @@ export class OrganizationNode {
         .flatMap(t => byId.get(t.teammateId) ?? []);
       return new OrganizationNode(department, leader, NameOrder.sort(members, t => t.name), nodesOf(department.id));
     });
-    return nodesOf(null);
+    const placed = new Set(organization.members.map(t => t.teammateId));
+    const unplaced = NameOrder.sort(teammates.filter(t => !placed.has(t.id)), t => t.name);
+    return [...nodesOf(null), ...unplaced.length === 0 ? [] : [new OrganizationNode(null, null, unplaced, [])]];
   }
 
   public static departmentsOf(organization: Organization, parentId: string | null = null): readonly Department[] {
