@@ -187,16 +187,13 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
 
   private async endOnWindows(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, known: ReadonlyMap<number, number>,
     stop: StopSession): Promise<void> {
-    const ended = new Map<number, number>();
     let tree = new Map(known);
     let current: ReadonlyMap<number, { readonly parent: number; readonly start: number }> | null = listing;
     for (let round = 0; !Object.isNull(current) && round < Resources.processTreeFreezeRounds; round++) {
       tree = ProcessTree.treeOf(current, tree);
-      const found: [number, number][] = ProcessTree.listed(current, tree).filter(([id, started]) => ended.get(id) !== started);
+      const found: [number, number][] = ProcessTree.listed(current, tree);
       if (found.length === 0)
         return;
-      for (const [id, started] of found)
-        ended.set(id, started);
       current = await this.run(Resources.formatProcessEndScript(found.map(t => t[0]), found.map(t => t[1])), Resources.psProcessListArguments, stop)
         .catch(() => null);
     }

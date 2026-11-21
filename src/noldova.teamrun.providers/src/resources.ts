@@ -1174,6 +1174,7 @@ export class Resources {
   public static readonly continueSignal: NodeJS.Signals = "SIGCONT";
   public static readonly killSignal: NodeJS.Signals = "SIGKILL";
   public static readonly processTreeFreezeRounds: number = 10;
+  public static readonly processExitWait: number = 2_000;
   public static readonly processListTimeout: number = 30_000;
   public static readonly powershellSessionAnswerLimit: number = 5_000;
   public static readonly psExecutable: string = "ps";
@@ -3520,8 +3521,10 @@ export class Resources {
 
   public static formatProcessEndScript(processIds: readonly number[], starts: readonly number[]): string {
     return `$ids = @(${processIds.join(", ")}); $starts = @(${starts.join(", ")}); ` +
+      `$deadline = [DateTime]::UtcNow.AddMilliseconds(${Resources.processExitWait}); ` +
       "for ($i = 0; $i -lt $ids.Count; $i++) { try { $p = [System.Diagnostics.Process]::GetProcessById($ids[$i]); $null = $p.Handle; " +
-      "if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - $starts[$i]) -le 1) { $p.Kill() } } catch { } }; " +
+      "if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - $starts[$i]) -le 1) { $p.Kill(); " +
+      "$null = $p.WaitForExit([int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)) } } catch { } }; " +
       Resources.powershellProcessListScript;
   }
 

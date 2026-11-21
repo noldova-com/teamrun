@@ -15,6 +15,7 @@ export class ListingCommandRunner extends CommandRunner {
 
   public readonly commands: ProcessCommand[] = [];
   public readonly timeouts: number[] = [];
+  public readonly outputs: string[] = [];
   public calls: number = 0;
 
   public constructor(listings: readonly (string | null)[], then: CommandRunner | null = null) {
@@ -28,7 +29,10 @@ export class ListingCommandRunner extends CommandRunner {
     this.timeouts.push(timeoutMilliseconds);
     if (this.calls >= this.listings.length && !Object.isNull(this.then)) {
       this.calls++;
-      return this.then.run(command, environment, timeoutMilliseconds);
+      return this.then.run(command, environment, timeoutMilliseconds).then(t => {
+        this.outputs.push(t.stdout);
+        return t;
+      });
     }
     const listing = this.listings[Math.min(this.calls++, this.listings.length - 1)]!;
     return Object.isNull(listing) ? Promise.reject(new Error("The listing failed.")) : Promise.resolve(new CommandResult(0, null, listing, "", false));

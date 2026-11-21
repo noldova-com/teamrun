@@ -4145,6 +4145,10 @@ export declare class Resources {
    */
   public static readonly processTreeFreezeRounds: number;
   /**
+   * How long `formatProcessEndScript` waits, in all, for the processes it ends to exit, in milliseconds: 2000.
+   */
+  public static readonly processExitWait: number;
+  /**
    * How often `ProcessTree` looks whether a tree it sent `SIGTERM` has ended, so the grace ends early once it has, in milliseconds: 100.
    */
   public static readonly processTreeGracePoll: number;
@@ -6229,7 +6233,8 @@ export declare class Resources {
   /**
    * The PowerShell script that ends a round of a tree on Windows, then lists the processes again: it opens each process by its id and takes its handle
    * before it reads the start, and ends it through that same handle, which keeps its id from being reused, only when the process started when the
-   * listing said, to the millisecond.
+   * listing said, to the millisecond. After each end it waits for the process to exit, all of them within `processExitWait` of the script's start,
+   * so the listing that follows doesn't show a process still exiting.
    * @param processIds The processes, parents first.
    * @param starts Their starts, in milliseconds since the epoch, as the listing gave them.
    */
@@ -10756,8 +10761,8 @@ export declare class ProcessTerminator {
  * Lists processes with their parents and starts, and ends a tree. A process counts as the tree's only through a parent that started no later than
  * it, and not through a parent id the listing shows another process holding now.
  * On Windows it ends the tree in rounds, each one PowerShell script that opens each listed process by id, ends it through that handle only when it
- * started when the listing said, parents first, and lists again, until no new process shows under the tree, at most `processTreeFreezeRounds`
- * rounds; its listings and rounds run in its `IPowershellSession` when it has one, and otherwise each in a new PowerShell, and a script the session
+ * started when the listing said, parents first, waits for it to exit, and lists again, until no process of the tree shows, at most
+ * `processTreeFreezeRounds` rounds, so one whose end failed is ended again in the next round; its listings and rounds run in its `IPowershellSession` when it has one, and otherwise each in a new PowerShell, and a script the session
  * fails or runs out of time on runs once more in a new PowerShell, so a stalled session doesn't leave the tree running.
  * Elsewhere it sends `SIGSTOP` to each process of the tree and lists again until no new process shows under it, at most `processTreeFreezeRounds`
  * listings, so a parent can't start its next process meanwhile; then `SIGTERM` and `SIGCONT` to each it stopped. Once those have ended, or after
