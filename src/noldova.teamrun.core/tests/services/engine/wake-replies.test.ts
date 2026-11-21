@@ -20,6 +20,7 @@ import {
   ApprovalScope,
   ChatMemberModeParams,
   ChatPlanFirstParams,
+  CommandStartParams,
   ConversationIdParams,
   ConversationMemberParams,
   ConversationMoveParams,
@@ -368,6 +369,40 @@ export class WakeRepliesTests {
 
     Assert.areEqual("ask", wake?.mode);
     Assert.areEqual("ask", woken?.provenance?.requested.mode);
+  }
+
+  @TestMethod
+  public async wakesTheDefaultResponderAfterItsOwnCommandInTheModeTheChatHoldsWhenTheCommandEnds(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    host.adapter.turnTexts = [["Started."], ["Thanks."]];
+    const conversation = await host.createConversationAsync();
+    const provider = (await host.providerOfAsync()).id;
+    const choose = async (mode: string): Promise<void> => {
+      await host.engine.setResponderAsync(new ConversationResponderParams(conversation.id, new ConversationResponder(null,
+        new RequestedSettings("fake", null, null, null, mode), provider), true));
+    };
+    await choose("bypass");
+    let started = false;
+    host.adapter.holdTurn = async request => {
+      const token = SenderEnvironment.read(request.environment);
+      if (started || Object.isNull(token))
+        return;
+      started = true;
+      await host.engine.startCommandAsync(new CommandStartParams(token, "npm test", "Test"));
+    };
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Test it", new RequestedSettings("fake", null, null, null, "bypass"), provider));
+    await host.engine.waitForIdle();
+    await choose("ask");
+
+    host.commands.started[0]?.end(0);
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+    const [first, woken] = host.adapter.requests;
+    const reply = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+
+    Assert.areEqual("bypass,ask,ask", [first?.requested.mode, woken?.requested.mode, reply?.provenance?.requested.mode].join());
   }
 
   @TestMethod

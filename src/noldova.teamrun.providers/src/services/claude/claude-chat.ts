@@ -476,7 +476,8 @@ export class ClaudeChat {
       return;
     }
     const planning = this.isPlanning;
-    const left = wake.planFirst ? planning ? this.leaveTo : this.mode ?? this.leaveTo : null;
+    const asked = Object.isNull(wake.mode) ? null : ClaudeModes.of(wake.mode);
+    const left = wake.planFirst ? asked ?? (planning ? this.leaveTo : this.mode ?? this.leaveTo) : null;
     const turn = this.beginWake(wake, Object.isNull(left) ? null : () => this.setPermissionMode(left));
     const token = this.token;
     if (!Object.isNull(token))
@@ -488,7 +489,7 @@ export class ClaudeChat {
     if (wake.planFirst && !planning)
       await this.planWake(turn, wake);
     else if (!wake.planFirst)
-      await this.ensureMode(Object.isNull(wake.mode) ? this.leaveTo : ClaudeModes.of(wake.mode), wake);
+      await this.ensureMode(asked ?? this.leaveTo, wake);
     await this.applySender(query, wake.environment, wake);
     if (!Object.isNull(this.init))
       await turn.handle(this.init, query);

@@ -1001,6 +1001,30 @@ export class CodexSubAgentsTests {
   }
 
   @TestMethod
+  public async keepsAPlanFirstWakeInThePlanModesReadOnlySandbox(): Promise<void> {
+    using host = new CodexTestHost();
+    const adapter = host.createAdapter({ ...CodexSubAgentsTests.endsOnSignal(host), TEAMRUN_FAKE_CODEX_WAKE: "policy" });
+    const listener = new RecordingTurnListener();
+    const reply = new RecordingTurnListener();
+    listener.wakeTurn = new WakeTurn({}, true, undefined, Resources.codexFullAccessMode);
+    const wake = listener.wakeTurn.follow(reply, new AbortController().signal);
+    try {
+      const running = adapter.runTurn(new TurnRequest(null, host.directory.path, "subAgentWakesLate",
+        new RequestedSettings("codex", null, null, null, Resources.codexFullAccessMode), null), listener, new AbortController().signal);
+      await Wait.until(() => listener.texts.includes("Spawned."), "The listener did not see 'Spawned.'");
+      writeFileSync(host.directory.resolve("sub-agent-end"), "completed");
+      const result = await running;
+      const ended = await wake;
+      const policy = JsonReader.parse(reply.texts.join()).toJson();
+
+      Assert.areEqual(TurnOutcome.Completed, result.outcome);
+      Assert.areEqual(TurnOutcome.Completed, ended.outcome);
+      Assert.areEqual(Resources.readOnlyPolicy, JsonReader.fromValue(policy["sandboxPolicy"] ?? null).toJson()["type"]);
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
   public async wakesWithTheSubAgentsResultWhenTheFakeSeesItsEndSignalBeforeTheSignalIsWritten(): Promise<void> {
     using host = new CodexTestHost();
     const adapter = host.createAdapter(CodexSubAgentsTests.endsOnSignal(host));
