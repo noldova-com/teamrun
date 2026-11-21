@@ -8,8 +8,9 @@
 
 import type { JsonValue } from "@noldova/context.json";
 import { ChangeOperation } from "@noldova/context.data";
+import { SqlQuery } from "@noldova/context.data.sql";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChangeEntity } from "@noldova/teamrun.core";
+import { ChangeEntity, Resources } from "@noldova/teamrun.core";
 import {
   ContextUsage,
   ConversationMemberParams,
@@ -398,6 +399,64 @@ export class MessagesServiceTests {
       usage: latest.toJson() }), JSON.stringify(mine?.toJson()));
     Assert.areEqual(JSON.stringify(first.toJson()), JSON.stringify(theirs?.usage.toJson()));
     Assert.isNull(theirs?.endedAt);
+  }
+
+  @TestMethod
+  public async listsEachTeammatesLatestCompletedReplyWithTextInAnyChatAndSkipsRepliesWithoutText(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const other = await host.createConversationAsync(await host.openProjectAsync("beta"));
+    const provider = await host.createProviderAsync();
+    const names = new Map<string, string>();
+    const teammate = async (name: string): Promise<string> => {
+      const id = (await host.teammates.createAsync(new TeammateCreateParams(name, null, provider.id, Harness.Provider, null, null))).id;
+      names.set(id, name);
+      return id;
+    };
+    const [ada, bob, cyd, dee] = [await teammate("Ada"), await teammate("Bob"), await teammate("Cyd"), await teammate("Dee")];
+    const text = (value: string): MessageDetail => new MessageDetail(0, DetailKind.Text, value, null, "t");
+    const reasoning = new MessageDetail(1, DetailKind.Reasoning, "thinking", null, "t");
+    for (const message of [
+      MessagesServiceTests.said(conversation.id, 1, ada, MessageStatus.Completed, "2026-11-20T10:00:00.000Z", [text("Old")]),
+      MessagesServiceTests.said(other.id, 2, ada, MessageStatus.Completed, "2026-11-20T11:00:00.000Z", [text("Shipped"), reasoning, text("it.")]),
+      MessagesServiceTests.said(conversation.id, 3, ada, MessageStatus.Completed, "2026-11-20T12:00:00.000Z", [reasoning]),
+      MessagesServiceTests.said(conversation.id, 4, ada, MessageStatus.Completed, "2026-11-20T12:30:00.000Z", [text(" ")]),
+      MessagesServiceTests.said(conversation.id, 5, ada, MessageStatus.Completed, "2026-11-20T12:40:00.000Z", [text("\n\n")]),
+      MessagesServiceTests.said(conversation.id, 6, ada, MessageStatus.Completed, "2026-11-20T12:50:00.000Z", [text("\u00a0\t\r\n\u3000")]),
+      MessagesServiceTests.said(conversation.id, 7, ada, MessageStatus.Failed, "2026-11-20T13:00:00.000Z", [text("Broke")]),
+      MessagesServiceTests.said(conversation.id, 8, bob, MessageStatus.Completed, "2026-11-20T09:00:00.000Z", [text("First")]),
+      MessagesServiceTests.said(other.id, 9, bob, MessageStatus.Completed, "2026-11-20T09:00:00.000Z", [text("Second")]),
+      MessagesServiceTests.said(conversation.id, 10, cyd, MessageStatus.Running, null, [text("Working")]),
+      MessagesServiceTests.said(conversation.id, 11, dee, MessageStatus.Completed, "2026-11-20T14:00:00.000Z", [text("\t")]),
+      MessagesServiceTests.said(conversation.id, 12, "gone", MessageStatus.Completed, "2026-11-20T14:00:00.000Z", [text("Deleted teammate")]),
+      MessagesServiceTests.said(conversation.id, 13, null, MessageStatus.Completed, "2026-11-20T14:00:00.000Z", [text("No teammate")]),
+      MessagesServiceTests.userMessage(conversation.id, 14, "Hello")
+    ])
+      await host.messages.insertAsync(message);
+
+    const listed = await host.messages.listTeammateLastRepliesAsync();
+
+    Assert.areEqual(`Ada ${other.id} reply-2 Shipped it. 2026-11-20T11:00:00.000Z|Bob ${other.id} reply-9 Second 2026-11-20T09:00:00.000Z`,
+      listed.map(t => `${names.get(t.teammateId)} ${t.chatId} ${t.messageId} ${t.text} ${t.endedAt}`).sort().join("|"));
+  }
+
+  @TestMethod
+  public async walksTheLastReplyIndexForEachTeammateWithoutScanningMessages(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+
+    const plan = (await host.context.database.connection.queryAsync(new SqlQuery(`EXPLAIN QUERY PLAN ${Resources.selectTeammateLastReplies}`,
+      [Resources.textBlanks]))).map(t => t.readString("detail"));
+
+    Assert.isTrue(plan.includes("SEARCH r USING INDEX IX_messages_teammateId_endedAt (<expr>=?)"), plan.join("; "));
+    Assert.isTrue(plan.some(t => t.startsWith("SEARCH m USING INTEGER PRIMARY KEY")), plan.join("; "));
+    Assert.isFalse(plan.some(t => /^SCAN (messages|m|r)\b/u.test(t) || t.includes("TEMP B-TREE")), plan.join("; "));
+  }
+
+  private static said(conversationId: string, sequence: number, teammateId: string | null, status: MessageStatus, endedAt: string | null,
+    details: readonly MessageDetail[]): Message {
+    const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
+    return new Message(`reply-${sequence}`, conversationId, sequence, MessageAuthor.Provider, null, status, details, provenance, "t", "t", endedAt, [],
+      teammateId, teammateId);
   }
 
   private static teammateReply(conversationId: string, sequence: number, teammateId: string, usage: ReplyUsage | null,
