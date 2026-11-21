@@ -2265,7 +2265,9 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       work = await this.prepareReplyAsync(teammate, provenance.requested, provenance.providerId, trigger, sequence, createdAt, hop, null, null, transaction);
     }
     catch (error) {
-      return Resources.formatWakeProviderRefused((error as Error).message);
+      if (!(error instanceof ServiceException))
+        throw error;
+      return Resources.formatWakeProviderRefused(error.message);
     }
     if (Object.isNull(work))
       return Resources.wakeProviderUnavailable;

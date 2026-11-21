@@ -783,6 +783,39 @@ describe("ChatStoreService", () => {
     });
   });
 
+  it("keeps the responder the runtime holds when a starting choice finds the chat already answered", async () => {
+    await store.initialize();
+    const alice = new ConversationResponder("alice");
+    context.answer(MethodName.ConversationResponderSet, () => SampleData.conversation.withResponder(alice).toJson());
+    const responder = new ConversationResponder(null, new RequestedSettings("claude", "sonnet", null), "a1");
+
+    await store.setResponder("c1", responder, false, true);
+
+    expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
+    expect(JSON.stringify(context.parametersOf(MethodName.ConversationResponderSet))).toBe(JSON.stringify(new ConversationResponderParams("c1", responder, false, true).toJson()));
+    expect(context.noticeText()).toBeNull();
+  });
+
+  it("takes the responder the runtime holds for every write the person didn't choose, so one queued behind a held starting write doesn't keep its own", async () => {
+    await store.initialize();
+    const start = new DeferredResponse();
+    const alice = new ConversationResponder("alice");
+    let call = 0;
+    context.answer(MethodName.ConversationResponderSet, () => call++ === 0 ? start.promise : SampleData.conversation.withResponder(alice).toJson());
+    const fallback = (model: string): ConversationResponder => new ConversationResponder(null, new RequestedSettings("claude", model, null), "a1");
+
+    const first = store.setResponder("c1", fallback("sonnet"), false, true);
+    const second = store.setResponder("c1", fallback("opus"));
+    await Wait.until(() => expect(context.count(MethodName.ConversationResponderSet)).toBe(1));
+    expect(store.conversation("c1")?.responder?.requested?.model).toBe("opus");
+    start.resolve(SampleData.conversation.withResponder(alice).toJson());
+    await Promise.all([first, second]);
+
+    expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
+    expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationResponderSet))
+      .map(t => ConversationResponderParams.fromJson(t.parameters).start)).toEqual([true, false]);
+  });
+
   it("shows a chat's new chosen responder at once, while the runtime keeps it, and leaves an unknown chat alone", async () => {
     await store.initialize();
     const kept = new DeferredResponse();
@@ -805,12 +838,12 @@ describe("ChatStoreService", () => {
     const answers = [new DeferredResponse(), new DeferredResponse(), new DeferredResponse(), new DeferredResponse()];
     const refused = [true, false, false, true];
     let call = 0;
-    context.answer(MethodName.ConversationResponderSet, () => {
+    context.answer(MethodName.ConversationResponderSet, t => {
       const index = call++;
-      return answers[index]!.promise.then(t => {
+      return answers[index]!.promise.then(() => {
         if (refused[index])
           throw new Error("Refused");
-        return t;
+        return SampleData.conversation.withResponder(ConversationResponderParams.fromJson(t).responder).toJson();
       });
     });
     const [alice, bob, carol, dave] = ["alice", "bob", "carol", "dave"].map(t => new ConversationResponder(t));
