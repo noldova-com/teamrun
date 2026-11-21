@@ -102,6 +102,7 @@
 
 .messages {
   display: flex;
+  box-sizing: border-box;
   flex: 1 1 22rem;
   flex-direction: column;
   min-width: 0;

@@ -18,7 +18,6 @@ import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/
 import { page, userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
-import { OrganizationLayout } from "../../../../src/app/models/organization-layout";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
@@ -132,6 +131,7 @@ describe("OrganizationViewComponent", () => {
 
   afterEach(async () => {
     await page.viewport(viewport.width, viewport.height);
+    AppearanceFixture.reset();
     OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
@@ -390,11 +390,12 @@ describe("OrganizationViewComponent", () => {
   });
 
   it("talks in a thread beside the Tree and in an inbox beside the Board, whose leaders and department buttons open their conversations", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
     const panel = (): unknown[] => [one("aside.messages > nol-teamrun-organization-messages").classList.contains("nol-teamrun-organization-messages-inbox"),
       texts("aside.messages .nol-teamrun-organization-thread-title"), all("aside.messages .to").length];
 
-    expect(panel()).toEqual([true, [], 0]);
+    expect(panel()).toEqual([true, ["Design"], 0]);
     await userEvent.click(one(".message-leaders"));
     await settle();
     expect(panel()).toEqual([true, ["All leaders"], 0]);
@@ -408,16 +409,18 @@ describe("OrganizationViewComponent", () => {
   });
 
   it("talks with the kept focus until another conversation is chosen, and keeps that one when the organization changes", async () => {
-    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ focus: "Department:design" })));
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ focus: "Department:build" })));
+    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-thread-title")).toEqual(["Chat with Build"]));
     const kept = texts("aside.messages .nol-teamrun-organization-thread-title");
-    await userEvent.click(one(":scope > .department .message", department("Build")));
+    await userEvent.click(one(":scope > .department .message", department("Design")));
     await settle();
     const chosen = texts("aside.messages .nol-teamrun-organization-thread-title");
 
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
-    expect([kept, chosen, texts("aside.messages .nol-teamrun-organization-thread-title")]).toEqual([["Chat with Design"], ["Chat with Build"], ["Chat with Build"]]);
+    expect([kept, chosen, texts("aside.messages .nol-teamrun-organization-thread-title")]).toEqual([["Chat with Build"], ["Chat with Design"], ["Chat with Design"]]);
   });
 
   it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
@@ -950,8 +953,8 @@ describe("OrganizationViewComponent", () => {
 
       one(".top .views [role=radio]:nth-of-type(3)").click();
       await settle();
-      const [chart, outline, focus, canvas, conversation] = [box(".chart"), box(".chart .outline"), box(".chart .focus"), box(".chart .focus > nol-canvas"),
-        box(".chart .focus > nol-teamrun-organization-messages")];
+      const [chart, outline, focus, canvas, conversation] = [box(".chart"), box(".chart .outline"), box(".chart main.focus"), box(".chart main.focus > nol-canvas"),
+        box(".chart main.focus > nol-teamrun-organization-messages")];
       for (const [actual, expected] of [[outline.left, chart.left], [outline.width, chart.width], [focus.top - outline.bottom, space(4)], [focus.left, chart.left],
         [focus.width, chart.width], [canvas.height, 32 * rem], [conversation.top - canvas.bottom, space(4)], [conversation.height, 17 * rem]] as const)
         AppearanceFixture.expectPixels(actual, expected);

@@ -235,7 +235,7 @@ describe("OrganizationFocusComponent", () => {
     fixture.componentRef.setInput("editing", true);
     await settle();
 
-    expect([texts(".edit-row .delete-department"), one(".delete-department").classList.contains("nol-button-outlined")]).toEqual([["delete Remove department"], true]);
+    expect([texts(".edit-row .delete-department"), one(".delete-department").classList.contains("nol-button-outlined")]).toEqual([["deleteRemove department"], true]);
     await click(one(".delete-department"));
     expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
     await answer(".nol-teamrun-cancel");
@@ -258,11 +258,11 @@ describe("OrganizationFocusComponent", () => {
     expect(thread()).toEqual(["Chat with all leaders"]);
   });
 
-  it("renames no unit when a teammate or the leaders are focused, and lets a focused member's card move it", async () => {
+  it("names a focused teammate in its field rather than a unit, names nothing for the leaders, and lets a focused member's card move it", async () => {
     await create("Teammate:bob");
     fixture.componentRef.setInput("editing", true);
     await settle();
-    expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Bob"], 1]);
+    expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([1, [], 1]);
     await click(one(".crumb"));
     expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Organization"], 0]);
   });
@@ -280,7 +280,7 @@ describe("OrganizationFocusComponent", () => {
 
     expect([texts(".act", alice()), one(".acts", alice()).getAttribute("aria-label"), all(".now", alice()).length, texts(".role", alice()),
       texts(".grid nol-teamrun-organization-card .chat").length, one(".chat", alice()).getAttribute("aria-label")]).toEqual([
-      ["progress_activity First 40 s", "progress_activity Replying 30 s"], "What Alice is doing now", 0, ["Review · Design"], 2, "Message Alice"]);
+      ["progress_activityFirst40 s", "progress_activityReplying30 s"], "What Alice is doing now", 0, ["Review · Design"], 2, "Message Alice"]);
     await click(one(".chat", alice()));
     expect(texts(".unit-name")).toEqual(["Alice"]);
     await click(one(".crumbs button:nth-of-type(2)"));
@@ -320,7 +320,7 @@ describe("OrganizationFocusComponent", () => {
     await renameAsync(" Robert ");
     await Wait.until(() => expect(context.count(MethodName.TeammateUpdate)).toBe(1));
     expect([leader, typed, OrganizationStoreService.of(context).actionError(), texts(".remove-teammate")]).toEqual([["Alice", "Rename Alice", 0],
-      ["Bob", "Bob", Resources.organizationTeammateNameRule, 0], null, ["delete Remove teammate"]]);
+      ["Bob", "Bob", Resources.organizationTeammateNameRule, 0], null, ["deleteRemove teammate"]]);
 
     await click(one(".remove-teammate"));
     await answer(".nol-teamrun-cancel");

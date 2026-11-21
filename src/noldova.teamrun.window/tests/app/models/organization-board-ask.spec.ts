@@ -5,8 +5,9 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import { Harness, Teammate, TeammateStatus } from "@noldova/teamrun.protocol";
+import { Harness, Teammate } from "@noldova/teamrun.protocol";
 
+import { TeammateStatus } from "../../../src/app/enums/teammate-status";
 import { OrganizationBoardAsk } from "../../../src/app/models/organization-board-ask";
 
 describe("OrganizationBoardAsk", () => {

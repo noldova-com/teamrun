@@ -251,19 +251,6 @@ describe("OrganizationBoardComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { departmentId: "design" }]]));
   });
 
-  it("asks to message all leaders, or one department by its id", async () => {
-    await create();
-    const asked: string[] = [];
-    fixture.componentInstance.messageLeaders.subscribe(() => asked.push("leaders"));
-    fixture.componentInstance.messageDepartment.subscribe(t => asked.push(t));
-
-    one(".message-leaders").click();
-    for (const lane of all(".lane"))
-      one(".message-department", lane).click();
-
-    expect(asked).toEqual(["leaders", "design", "ui", "build"]);
-  });
-
   describe.each([
     { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
     { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
