@@ -179,6 +179,37 @@ export class McpHttpEndpointTests {
     }
   }
 
+  @TestMethod
+  public async abortsAToolCallWhoseConnectionDropsBeforeItAnswers(): Promise<void> {
+    const endpoint = new McpHttpEndpoint(new RecordingLines());
+    const host = new FakeMcpEndpointHost();
+    host.holdsCalls = true;
+    try {
+      const url = await endpoint.listenAsync();
+      endpoint.serve(host);
+      const sent = request(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream",
+        authorization: "Bearer session-token" } });
+      const dropped = new Promise<void>(resolve => sent.on("error", () => resolve()));
+      sent.end(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "teamrun_open_panel", arguments: { panel: "teammates" } } }));
+      await host.called.promise;
+
+      sent.destroy();
+
+      const guard = Promise.withResolvers<string>();
+      const timer = setTimeout(() => guard.reject(new Error("The host call wasn't aborted after its connection dropped.")), 5_000);
+      try {
+        Assert.areEqual("teamrun_open_panel", await Promise.race([host.aborted.promise, guard.promise]));
+      }
+      finally {
+        clearTimeout(timer);
+      }
+      await dropped;
+    }
+    finally {
+      await endpoint.closeAsync();
+    }
+  }
+
   private static post(url: string, message: object): Promise<Answer> {
     return McpHttpEndpointTests.send(url, "POST", { authorization: "Bearer session-token" }, JSON.stringify(message));
   }
