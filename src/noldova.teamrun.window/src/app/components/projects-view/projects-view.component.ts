@@ -9,7 +9,7 @@
 import type { DialogRef } from "@angular/cdk/dialog";
 import { CdkDrag, type CdkDragDrop, CdkDragHandle, CdkDropList, moveItemInArray } from "@angular/cdk/drag-drop";
 import { NgTemplateOutlet } from "@angular/common";
-import { Component, DestroyRef, Injector, type Signal, type WritableSignal, computed, inject, signal, viewChildren } from "@angular/core";
+import { Component, DestroyRef, ElementRef, Injector, type Signal, type WritableSignal, computed, inject, signal, viewChildren } from "@angular/core";
 
 import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
@@ -64,6 +64,7 @@ export class ProjectsViewComponent {
   private readonly unfoldedProjects: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly announcer: Announcer = inject(Announcer);
   private readonly injector: Injector = inject(Injector);
+  private readonly host: ElementRef<HTMLElement> = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly treeItems: Signal<readonly TreeItemDirective[]> = viewChildren(TreeItemDirective);
 
   protected readonly pinsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
@@ -246,7 +247,7 @@ export class ProjectsViewComponent {
     });
   }
 
-  protected async remove(conversation: Conversation): Promise<void> {
+  protected async remove(conversation: Conversation, tree: TreeFocus): Promise<void> {
     const count = Object.isNull(conversation.projectId) ? await this.store.countFolderFilesAsync(conversation.id, ChatAction.DeleteChat) : 0;
     if (Object.isNull(count))
       return;
@@ -256,7 +257,11 @@ export class ProjectsViewComponent {
       ? new ConfirmRequest(Resources.deleteTitle, `${Resources.formatDeleteText(conversation.title)}${kept}`, Resources.deleteConversationLabel, null, true)
       : new ConfirmRequest(Resources.deleteTitle, `${Resources.formatDeleteWithFilesText(conversation.title, count)}${kept}`, Resources.deleteConversationLabel,
         Resources.moveToFolderLabel, true);
-    const dialog = this.confirm(request, () => this.store.deleteConversation(conversation.id));
+    const dialog = this.confirm(request, async () => {
+      const neighbour = tree.neighbourOf(conversation.id);
+      await this.store.deleteConversation(conversation.id);
+      tree.focusIfLostLater(neighbour, () => this.host.nativeElement.querySelector<HTMLElement>(".nol-teamrun-action"));
+    });
     dialog.componentInstance?.other.subscribe(() => {
       dialog.close();
       void this.moveToFolder(conversation);
