@@ -195,7 +195,14 @@ export class McpHttpEndpointTests {
 
       sent.destroy();
 
-      Assert.areEqual("teamrun_open_panel", await host.aborted.promise);
+      const guard = Promise.withResolvers<string>();
+      const timer = setTimeout(() => guard.reject(new Error("The host call wasn't aborted after its connection dropped.")), 5_000);
+      try {
+        Assert.areEqual("teamrun_open_panel", await Promise.race([host.aborted.promise, guard.promise]));
+      }
+      finally {
+        clearTimeout(timer);
+      }
       await dropped;
     }
     finally {
