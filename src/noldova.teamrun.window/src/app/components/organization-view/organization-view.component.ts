@@ -20,11 +20,12 @@ import { OrganizationLayoutService } from "../../services/organization-layout.se
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { OrganizationBoardComponent } from "../organization-board/organization-board.component";
 import { OrganizationDepartmentComponent } from "../organization-department/organization-department.component";
+import { OrganizationFocusComponent } from "../organization-focus/organization-focus.component";
 
 @Component({
   selector: "nol-teamrun-organization-view",
   imports: [AvatarComponent, ButtonComponent, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
-    OrganizationBoardComponent, OrganizationDepartmentComponent],
+    OrganizationBoardComponent, OrganizationDepartmentComponent, OrganizationFocusComponent],
   providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",

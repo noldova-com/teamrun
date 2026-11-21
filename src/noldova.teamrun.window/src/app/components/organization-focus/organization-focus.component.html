@@ -1,0 +1,65 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nav class="outline" [attr.aria-label]="resources.organizationFocusOutlineLabel">
+  <div class="outline-head"><span class="title">{{ resources.organizationFocusStructure }}</span></div>
+  <div class="orow root" [class.selected]="isHere(rootTarget())">
+    <span class="twist"></span>
+    <button type="button" class="obtn" [attr.aria-current]="isHere(rootTarget())" (click)="go(rootTarget())"><span class="material-symbols-rounded icon"
+      aria-hidden="true">{{ resources.organizationFocusRootIcon }}</span><span class="label strong">{{ resources.organizationTitle }}</span><span
+      class="spacer"></span><nol-chip>{{ headcount() }}</nol-chip></button>
+  </div>
+  @for (row of rows(); track row.node.department.id) {
+    <div class="orow department" [class.selected]="isHere(department(row))" [style.padding-inline-start.rem]="0.25 + row.depth * 1.5">
+      <button type="button" nol-icon-button class="twist" [icon]="layout.layout().isCollapsed(row.node.department.id) ? resources.organizationFocusShowIcon : resources.organizationFocusHideIcon"
+        [label]="resources.formatOrganizationFocusToggle(!layout.layout().isCollapsed(row.node.department.id), row.node.department.name)"
+        [attr.aria-expanded]="!layout.layout().isCollapsed(row.node.department.id)" (click)="layout.toggleDepartment(row.node.department.id)"></button>
+      <button type="button" class="obtn" [attr.aria-current]="isHere(department(row))" (click)="go(department(row))"><span class="material-symbols-rounded icon"
+        aria-hidden="true">{{ resources.organizationFocusDepartmentIcon }}</span><span class="label">{{ row.node.department.name }}</span><span class="spacer"></span>
+        @if (asksIn(row) > 0) {
+          <span class="asks note"><span class="dot waiting" aria-hidden="true"></span>{{ resources.formatOrganizationFocusAsks(asksIn(row)) }}</span>
+        }
+        <nol-chip>{{ row.node.headcount }}</nol-chip></button>
+    </div>
+    @if (!layout.layout().isCollapsed(row.node.department.id)) {
+      @for (person of row.people; track person.id) {
+        <div class="orow person" [class.selected]="isHere(teammate(person))" [style.padding-inline-start.rem]="2.25 + row.depth * 1.5">
+          <button type="button" class="obtn" [attr.aria-current]="isHere(teammate(person))" (click)="go(teammate(person))"><span class="dot" [attr.data-status]="status(person)"
+            aria-hidden="true"></span><span class="label">{{ person.name }}</span>
+            @if (person.id === row.node.leader?.id) {
+              <span class="note tag">{{ resources.organizationFocusLeads }}</span>
+            }
+            <span class="spacer"></span><span class="note short">{{ resources.organizationFocusStatusShort[status(person)] }}</span></button>
+        </div>
+      }
+    }
+  }
+</nav>
+<main class="focus" [attr.aria-label]="resources.organizationFocusUnitLabel">
+  <div class="focus-plane">
+    <div class="crumbs">
+      @for (crumb of crumbs(); track $index) {
+        @if (!$first) {
+          <span class="material-symbols-rounded icon note" aria-hidden="true">{{ resources.organizationFocusCrumbIcon }}</span>
+        }
+        <button type="button" class="crumb" [class.here]="crumb.isHere" [attr.aria-current]="crumb.isHere" (click)="go(crumb.target)">{{ crumb.label }}</button>
+      }
+    </div>
+    <div class="unit-head">
+      <h2 class="unit-name">{{ unitName() }}</h2>
+      <span class="note unit-summary">{{ unitSummary() }}</span>
+    </div>
+    <div class="grid" [class.one]="cards().length === 1">
+      @for (card of cards(); track card.id) {
+        <nol-teamrun-organization-card [teammate]="card" [shape]="fluid" />
+      } @empty {
+        <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
+      }
+    </div>
+  </div>
+</main>

@@ -1646,6 +1646,23 @@ export class Resources {
     [OrganizationBoardSort.Status]: "Status",
     [OrganizationBoardSort.Name]: "Name"
   };
+  public static readonly organizationFocusOutlineLabel: string = "Organization outline";
+  public static readonly organizationFocusStructure: string = "Structure";
+  public static readonly organizationFocusRootIcon: string = "domain";
+  public static readonly organizationFocusDepartmentIcon: string = "groups";
+  public static readonly organizationFocusShowIcon: string = "chevron_right";
+  public static readonly organizationFocusHideIcon: string = "expand_more";
+  public static readonly organizationFocusCrumbIcon: string = "chevron_right";
+  public static readonly organizationFocusLeads: string = "leads";
+  public static readonly organizationFocusUnitLabel: string = "Focused unit";
+  public static readonly organizationFocusNobody: string = "Nobody here yet.";
+  public static readonly organizationFocusStatusShort: Readonly<Record<TeammateStatus, string>> = {
+    [TeammateStatus.Working]: "Working",
+    [TeammateStatus.WaitingForYou]: "Waiting",
+    [TeammateStatus.Idle]: "Idle",
+    [TeammateStatus.UsageLimit]: "Limit",
+    [TeammateStatus.Stopped]: "Stopped"
+  };
 
   public static formatSustainUnavailable(kind: string): string {
     return `TeamRun can't read ${kind}'s usage limits yet, so neither Sustain nor a hand-off can start for this teammate.`;
@@ -2898,8 +2915,31 @@ export class Resources {
   }
 
   public static formatOrganizationBoardSummary(leader: string | null, counts: ReadonlyMap<TeammateStatus, number>): string {
-    const parts = Object.values(TeammateStatus).flatMap(t => (counts.get(t) ?? 0) > 0 ? [`${counts.get(t)} ${Resources.teammateStatusLabels[t].toLowerCase()}`] : []);
-    return [...Object.isNull(leader) ? [] : [`Led by ${leader}`], ...parts].join(" · ");
+    return [...Object.isNull(leader) ? [] : [`Led by ${leader}`], ...Resources.statusCountParts(counts)].join(" · ");
+  }
+
+  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
+    return [`Your ${count} ${count === 1 ? "leader" : "leaders"}`, ...Resources.statusCountParts(counts)].join(" · ");
+  }
+
+  public static formatOrganizationFocusDepartment(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
+    return [`${count} ${count === 1 ? "teammate" : "teammates"}`, ...Resources.statusCountParts(counts)].join(" · ");
+  }
+
+  public static formatOrganizationFocusTeammate(role: string | null, department: string, model: string | null): string {
+    return [Object.isNull(role) ? department : `${role} in ${department}`, ...Object.isNull(model) ? [] : [model]].join(" · ");
+  }
+
+  public static formatOrganizationFocusAsks(count: number): string {
+    return `${count} need you`;
+  }
+
+  public static formatOrganizationFocusToggle(isOpen: boolean, name: string): string {
+    return `${isOpen ? "Hide" : "Show"} ${name}'s teammates`;
+  }
+
+  private static statusCountParts(counts: ReadonlyMap<TeammateStatus, number>): readonly string[] {
+    return Object.values(TeammateStatus).flatMap(t => (counts.get(t) ?? 0) > 0 ? [`${counts.get(t)} ${Resources.teammateStatusLabels[t].toLowerCase()}`] : []);
   }
 
   private static browserStep(words: readonly [string, string, string], phase: BrowserStepPhase, notes: readonly (string | null)[]): string {
