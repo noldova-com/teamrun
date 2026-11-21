@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChangeDetectionStrategy, Component, computed, inject, input } from "@angular/core";
+import { Component, computed, inject, input } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
@@ -18,7 +18,7 @@ import { TeammateStatus } from "../../../src/app/enums/teammate-status";
 import { TeammateStopReason } from "../../../src/app/enums/teammate-stop-reason";
 import { TeammateActivity } from "../../../src/app/models/teammate-activity";
 import { ChatStoreService } from "../../../src/app/services/chat-store.service";
-import { TeammateStatusStore } from "../../../src/app/services/teammate-status-store.service";
+import { TeammateStatusStoreService } from "../../../src/app/services/teammate-status-store.service";
 import type { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../fixtures/teammate.fixture";
@@ -26,13 +26,12 @@ import { Wait } from "../../fixtures/wait.fixture";
 
 @Component({
   selector: "nol-teamrun-status-probe",
-  template: "{{ rendered() }}{{ status() }} {{ activities().length }}",
-  changeDetection: ChangeDetectionStrategy.OnPush
+  template: "{{ rendered() }}{{ status() }} {{ activities().length }}"
 })
 class StatusProbeComponent {
   public readonly teammateId = input.required<string>();
   public renders: number = 0;
-  private readonly store: TeammateStatusStore = TeammateStatusStore.of(inject(WindowPartTokens.context));
+  private readonly store: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
   protected readonly status = computed(() => this.store.statusOf(this.teammateId())());
   protected readonly activities = computed(() => this.store.activitiesOf(this.teammateId())());
 
@@ -49,12 +48,12 @@ class StatusProbeComponent {
 class StatusHostComponent {
 }
 
-describe("TeammateStatusStore", () => {
+describe("TeammateStatusStoreService", () => {
   const earlier = "2026-09-10T08:00:00.000Z";
   const later = "2026-09-10T09:00:00.000Z";
   let context: FakeWindowPartContext;
   let open: readonly Message[];
-  let store: TeammateStatusStore;
+  let store: TeammateStatusStoreService;
 
   const reply = (id: string, chatId: string, teammateId: string | null, status: MessageStatus, startedAt: string | null = earlier): Message =>
     new Message(id, chatId, 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, earlier, status === MessageStatus.Pending ? null : startedAt,
@@ -70,7 +69,7 @@ describe("TeammateStatusStore", () => {
     context = SampleData.createContext().answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()));
     new TeammateFixture(context);
     const chats = ChatStoreService.of(context);
-    store = TeammateStatusStore.of(context);
+    store = TeammateStatusStoreService.of(context);
     await Wait.until(() => expect(chats.teammates()).toHaveLength(3));
     await Wait.until(() => expect(chats.providers()).toHaveLength(1));
   };
@@ -80,7 +79,7 @@ describe("TeammateStatusStore", () => {
   });
 
   afterEach(() => {
-    TeammateStatusStore.release(context);
+    TeammateStatusStoreService.release(context);
     ChatStoreService.release(context);
     TestBed.resetTestingModule();
   });
@@ -93,11 +92,11 @@ describe("TeammateStatusStore", () => {
   it("is one store per window part, and a new one once released", async () => {
     await create();
 
-    expect(TeammateStatusStore.of(context)).toBe(store);
+    expect(TeammateStatusStoreService.of(context)).toBe(store);
     expect(store.statusOf("alice")).toBe(store.statusOf("alice"));
     expect(store.activitiesOf("alice")).toBe(store.activitiesOf("alice"));
-    TeammateStatusStore.release(context);
-    expect(TeammateStatusStore.of(context)).not.toBe(store);
+    TeammateStatusStoreService.release(context);
+    expect(TeammateStatusStoreService.of(context)).not.toBe(store);
   });
 
   it("starts from the replies the runtime lists as open in every chat", async () => {

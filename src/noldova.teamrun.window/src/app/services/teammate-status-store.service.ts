@@ -17,8 +17,8 @@ import type { TeammateStopReason } from "../enums/teammate-stop-reason";
 import { TeammateActivity } from "../models/teammate-activity";
 import { ChatStoreService } from "./chat-store.service";
 
-export class TeammateStatusStore {
-  private static readonly stores: WeakMap<IWindowPartContext, TeammateStatusStore> = new WeakMap();
+export class TeammateStatusStoreService {
+  private static readonly stores: WeakMap<IWindowPartContext, TeammateStatusStoreService> = new WeakMap();
 
   private readonly chats: ChatStoreService;
   private readonly statuses: Map<string, Signal<TeammateStatus>> = new Map();
@@ -39,17 +39,17 @@ export class TeammateStatusStore {
     this.askingReplies = computed(() => new Set(chats.pendingApprovals().map(t => t.messageId)));
   }
 
-  public static of(context: IWindowPartContext): TeammateStatusStore {
-    const found = TeammateStatusStore.stores.get(context);
+  public static of(context: IWindowPartContext): TeammateStatusStoreService {
+    const found = TeammateStatusStoreService.stores.get(context);
     if (!Object.isUndefined(found))
       return found;
-    const store = new TeammateStatusStore(ChatStoreService.of(context));
-    TeammateStatusStore.stores.set(context, store);
+    const store = new TeammateStatusStoreService(ChatStoreService.of(context));
+    TeammateStatusStoreService.stores.set(context, store);
     return store;
   }
 
   public static release(context: IWindowPartContext): void {
-    TeammateStatusStore.stores.delete(context);
+    TeammateStatusStoreService.stores.delete(context);
   }
 
   public statusOf(teammateId: string): Signal<TeammateStatus> {
