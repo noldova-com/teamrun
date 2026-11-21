@@ -1485,18 +1485,18 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
             }
           }
           finally {
+            this.state.turns.delete(token);
             try {
-              this.state.turns.delete(token);
-              this.releaseAdopted(item);
-              await this.noteLimitAsync(item.provider, run);
-              this.keptSessions.noteSession(reply.conversationId, requested.kind, (await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId);
+              this.toolCalls.closeTools(tools);
             }
             finally {
               try {
-                await this.forgetChildrenAsync(item);
+                this.releaseAdopted(item);
+                await this.noteLimitAsync(item.provider, run);
+                this.keptSessions.noteSession(reply.conversationId, requested.kind, (await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId);
               }
               finally {
-                this.toolCalls.closeTools(tools);
+                await this.forgetChildrenAsync(item);
               }
             }
           }
@@ -1516,8 +1516,15 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
           this.followed.delete(item);
           this.releaseWake(item);
           failures.push(error);
-          await this.failPendingRepliesAsync([item], error);
-          item.end();
+          try {
+            await this.failPendingRepliesAsync([item], error);
+          }
+          catch (unwritten) {
+            failures.push(unwritten);
+          }
+          finally {
+            item.end();
+          }
         }
       }
       if (failures.length > 0)
@@ -1966,14 +1973,18 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     this.state.replyRuns.set(item, run);
     for (const resume of this.state.runWaits.get(item) ?? [])
       resume();
-    await wake.useToolsAsync(tools);
     try {
+      await wake.useToolsAsync(tools);
       await this.messages.setCheckpointFolderAsync(item.message.id, folder.id);
       await run.followAsync(wake);
     }
     finally {
-      await this.forgetChildrenAsync(item);
-      this.toolCalls.closeTools(tools);
+      try {
+        this.toolCalls.closeTools(tools);
+      }
+      finally {
+        await this.forgetChildrenAsync(item);
+      }
     }
   }
 

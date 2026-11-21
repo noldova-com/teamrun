@@ -222,10 +222,16 @@ export class ReplyRun implements ITurnListener {
     }
     catch (error) {
       await this.toolCalls;
-      if (this.run.isCancelled)
-        await this.completeAsync(new TurnResult(TurnOutcome.Interrupted, null, this.provenance.observed, null));
-      else
-        await this.failAsync(Resources.formatTurnFailed(ReplyRun.describe(error)), Resources.formatFailureKind(error));
+      try {
+        await this.reportCommandWritesAsync();
+        await this.reportCommandNotesAsync(false);
+      }
+      finally {
+        if (this.run.isCancelled)
+          await this.completeAsync(new TurnResult(TurnOutcome.Interrupted, null, this.provenance.observed, null));
+        else
+          await this.failAsync(Resources.formatTurnFailed(ReplyRun.describe(error)), Resources.formatFailureKind(error));
+      }
     }
     finally {
       await this.endAsync();

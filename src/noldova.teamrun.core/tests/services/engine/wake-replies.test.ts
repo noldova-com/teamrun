@@ -43,6 +43,7 @@ import {
 import { BoundingWork } from "../../fixtures/bounding-work.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
+import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
 export class WakeRepliesTests {
@@ -308,6 +309,24 @@ export class WakeRepliesTests {
     await host.engine.planFirstAsync(conversation.id);
 
     Assert.areEqual(JSON.stringify([["session-2"]]), JSON.stringify(host.adapter.plannedSessions));
+  }
+
+  @TestMethod
+  public async failsAWakeReplyAndClosesItsToolsWhenHandingThemToTheProviderFails(): Promise<void> {
+    const tools = new FakeTurnToolSessions();
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, undefined, tools);
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await wake?.onToolsAsync(() => Promise.reject(new RangeError("The provider refused its tools.")));
+    await host.engine.waitForIdle();
+    const woken = (await WakeRepliesTests.afterAsync(host, conversation.id, 0)).at(-1);
+
+    Assert.areEqual(2, tools.opened.length);
+    Assert.areEqual(1, tools.opened[1]?.ends);
+    Assert.areEqual(MessageStatus.Failed, (await host.messages.findAsync(woken?.id ?? String.empty))?.status);
   }
 
   @TestMethod

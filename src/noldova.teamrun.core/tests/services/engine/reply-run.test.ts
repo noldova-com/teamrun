@@ -15,7 +15,7 @@ import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ActiveRun, ApprovalAsk, ConversationEngine, HandoverNote, type ITurnListener, PermissionAsk, QuestionAsk, ReplyCheckpoints, ReplyRun, Resources,
   SharedMcpFailure, SharedMcpFailureKind, TaskEnd, TaskStart, ToolCallRecord, TurnDetail, TurnOutcome, TurnRequest, TurnStart, TurnSteer,
-  TurnWake, WorkFolder } from "@noldova/teamrun.core";
+  TurnWake, WakeTurn, WorkFolder } from "@noldova/teamrun.core";
 import { Approval, ApprovalDecideParams, ApprovalKind, ApprovalOption, ApprovalOutcome, ApprovalQuestion, ApprovalScope, ApprovalStatus, BackgroundTaskStatus,
   ContextUsage, ConversationIdParams, DetailKind, ErrorCode, EventName, Harness, Message, MessageAuthor, MessageDetail, MessageIdParams, MessageSendParams,
   MessageStatus, ObservedSettings, PlanWindow, PlanWindowName, Provenance, type Provider, QuestionAnswer, QuestionOption, ReplyAction, ReplyUsage, RequestedSettings,
@@ -91,6 +91,27 @@ export class ReplyRunTests {
 
     Assert.areEqual(full, thrown);
     Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(reply.id))?.status);
+  }
+
+  @TestMethod
+  public async notesTheUncomparedFolderOfAFailedWakeReplyThatRanACommand(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const conversation = await host.createConversationAsync(project);
+    const reply = new Message("woken-reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Pending, [], ReplyRunTests.provenance, "t", null,
+      null, []);
+    await host.messages.insertAsync(reply);
+    const messages = new FailingMessages(host.context, message => message.details.some(t => t.text === "> npm run build"), new RangeError("The disk is full."));
+    const run = new ReplyRun(reply, ReplyRunTests.provenance, new ActiveRun(reply.id), messages, host.approvals, host.events, host.directory.path);
+    const wake = new WakeTurn({});
+    await wake.onDetailAsync(new TurnDetail(DetailKind.Command, "> npm test", null, "c1"));
+    await wake.onDetailAsync(new TurnDetail(DetailKind.Command, "> npm run build", null, "c2"));
+
+    await run.followAsync(wake);
+    const woken = await host.messages.findAsync(reply.id);
+
+    Assert.areEqual(MessageStatus.Failed, woken?.status);
+    Assert.areEqual(Resources.uncomparedWorkingTree, woken?.details.filter(t => t.kind === DetailKind.Note).map(t => t.text).join("|"));
   }
 
   @TestMethod

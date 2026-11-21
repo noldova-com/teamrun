@@ -576,12 +576,14 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
-  public async closesAReplysToolsWhenNotingItsUsageLimitFails(): Promise<void> {
+  public async closesAReplysToolsBeforeNotingItsUsageLimitAndWhenThatFails(): Promise<void> {
     const tools = new FakeTurnToolSessions();
     await using host = await CoreHost.createAsync(false, false, undefined, undefined, undefined, tools);
     const conversation = await host.createConversationAsync();
     host.adapter.limits.set((await host.providerOfAsync()).id, new UsageLimit(null));
+    const endsWhenNoted: number[] = [];
     host.planUsage.list = (): never => {
+      endsWhenNoted.push(tools.opened[0]?.ends ?? 0);
       throw new RangeError("The plan usage is unreadable.");
     };
 
@@ -589,7 +591,36 @@ export class ConversationEngineTests {
     await Assert.throwsAsync(() => host.engine.waitForIdle(), RangeError);
 
     Assert.areEqual(1, tools.opened.length);
+    Assert.areEqual(1, endsWhenNoted.at(-1));
     Assert.areEqual(1, tools.opened[0]?.ends);
+  }
+
+  @TestMethod
+  public async runsTheGroupsOtherRepliesWhenWritingOneReplysFailureAlsoFails(): Promise<void> {
+    let reads = 0;
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, () => {
+      reads += 1;
+      return reads === 1 ? Promise.reject(new TypeError("The command settings are locked.")) : Promise.resolve(null);
+    });
+    const conversation = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const ana = await host.teammates.createAsync(new TeammateCreateParams("Ana", null, provider.id, Harness.Provider, null, null));
+    const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, provider.id, Harness.Provider, null, null));
+    host.events.subscribe({
+      onEvent: event => {
+        if (event.name === EventName.MessageUpdated && Message.fromJson(event.payload).status === MessageStatus.Failed)
+          throw new RangeError("The window is gone.");
+      }
+    });
+
+    const result = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Ana @Ben go", null, null, [], [ana.id, ben.id]));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), TypeError);
+    const [failed, answered] = await Promise.all(result.replies.map(t => host.messages.findAsync(t.id)));
+
+    Assert.areEqual(1, host.adapter.requests.length);
+    Assert.areEqual([ana.id, ben.id].join(), [failed?.teammateId, answered?.teammateId].join());
+    Assert.areEqual(MessageStatus.Failed, failed?.status);
+    Assert.areEqual(MessageStatus.Completed, answered?.status);
   }
 
   @TestMethod
