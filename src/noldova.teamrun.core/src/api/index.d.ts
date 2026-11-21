@@ -6605,6 +6605,27 @@ export declare class ForkRequest {
 }
 
 /**
+ * A teammate's Organization chat as the engine found or made it.
+ */
+export declare class OrganizationChatOpening {
+  /**
+   * The chat.
+   */
+  public readonly conversation: Conversation;
+  /**
+   * Whether the engine made the chat rather than finding it.
+   */
+  public readonly made: boolean;
+
+  /**
+   * Initializes the opening.
+   * @param conversation The chat.
+   * @param made Whether the engine made it.
+   */
+  public constructor(conversation: Conversation, made: boolean);
+}
+
+/**
  * The reply to an outside message, as the outside session reads it.
  */
 export declare class OutsideReply {

@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
 import { MessageStatus, OrganizationRecipientState, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
 
 import { ChatAction } from "../src/app/enums/chat-action";
@@ -37,11 +38,11 @@ describe("Resources", () => {
   });
 
   const texts = (value: unknown): readonly string[] => {
-    if (typeof value === "string" || typeof value === "function")
+    if (Object.isString(value) || Object.isFunction(value))
       return [String(value)];
     if (value instanceof Map)
       return [...value.values()].flatMap(t => texts(t));
-    if (typeof value === "object" && value !== null)
+    if (Object.isObject(value))
       return Object.values(value).flatMap(t => texts(t));
     return [];
   };
@@ -121,8 +122,7 @@ describe("Resources", () => {
   });
 
   it("counts the organization's teammates and departments, one in the singular", () => {
-    const counts: readonly (readonly [number, number])[] = [[0, 0], [1, 1], [2, 3]];
-    expect(counts.map(([teammates, departments]) => Resources.formatOrganizationHeadcount(teammates, departments)))
+    expect([Resources.formatOrganizationHeadcount(0, 0), Resources.formatOrganizationHeadcount(1, 1), Resources.formatOrganizationHeadcount(2, 3)])
       .toEqual(["0 teammates in 0 departments", "1 teammate in 1 department", "2 teammates in 3 departments"]);
   });
 
@@ -162,8 +162,8 @@ describe("Resources", () => {
   });
 
   it("says chat, never conversation, in every text it holds", () => {
-    const values = Object.values(Resources).flatMap((t: unknown) => t instanceof Map ? [...t.values()] : typeof t === "object" && t !== null ? Object.values(t) : [t]);
-    const texts = values.filter((t): t is string => typeof t === "string" && t.includes(" "));
+    const values = Object.values(Resources).flatMap((t: unknown) => t instanceof Map ? [...t.values()] : Object.isObject(t) ? Object.values(t) : [t]);
+    const texts = values.filter((t): t is string => Object.isString(t) && t.includes(" "));
 
     expect(texts).toContain(Resources.newConversationLabel);
     expect(texts.filter(t => /conversation/i.test(t))).toEqual([]);

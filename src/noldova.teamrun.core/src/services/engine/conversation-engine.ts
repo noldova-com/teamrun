@@ -139,6 +139,7 @@ import { SustainAttempts } from "../sustain/sustain-attempts.js";
 import { HandoverSummaries } from "../sustain/handover-summaries.js";
 import { ProjectActivity } from "../projects/project-activity.js";
 import { OrganizationService } from "../organization/organization.service.js";
+import { OrganizationChatOpening } from "../../models/organization-chat-opening.js";
 import { EngineServices } from "./engine-services.js";
 import { KeptSessions } from "./kept-sessions.js";
 import { McpToolCalls } from "./mcp-tool-calls.js";
@@ -429,14 +430,14 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
 
   public async openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation> {
     const teammate = await this.requireTeammateAsync(chat.teammateId);
-    const [opened, made] = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<readonly [Conversation, boolean]> => {
+    const opening = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const known = await this.conversations.findOrganizationChatAsync(chat, transaction);
-      return Object.isNull(known) ? [await this.conversations.createAsync(new ConversationCreateParams(null, Resources.formatOrganizationChatTitle(teammate.name),
-        teammate.id), transaction, chat), true] : [known, false];
+      return Object.isNull(known) ? new OrganizationChatOpening(await this.conversations.createAsync(new ConversationCreateParams(null,
+        Resources.formatOrganizationChatTitle(teammate.name), teammate.id), transaction, chat), true) : new OrganizationChatOpening(known, false);
     });
-    if (made)
+    if (opening.made)
       this.events.publish(new Event(EventName.StateInvalidated, null));
-    return opened;
+    return opening.conversation;
   }
 
   public listOutsideChatsAsync(): Promise<readonly JsonObject[]> {
