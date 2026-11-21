@@ -7,33 +7,55 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <div class="department" nolCanvasItem>
-  <div class="department-row">
-    <button type="button" nol-icon-button class="department-toggle" [icon]="isOpen() ? resources.expandedIcon : resources.collapsedIcon"
-      [label]="resources.formatOrganizationCollapseLabel(node().department.name, isOpen())" [attr.aria-expanded]="isOpen()" (click)="toggle()"></button>
-    <span class="department-name">{{ node().department.name }}</span>
-    <nol-chip class="department-count">{{ node().headcount }}</nol-chip>
-  </div>
+  @if (editing()) {
+    <div class="department-row">
+      <input #name nol-text-field class="department-field" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node().department.name"
+        (change)="rename(name)">
+      <button type="button" nol-icon-button class="delete" [icon]="resources.organizationDeleteIcon"
+        [label]="resources.formatOrganizationDeleteNamed(node().department.name)" (click)="confirmDelete()"></button>
+    </div>
+    <nol-select class="leader-choice" [label]="resources.organizationLeaderLabel" [options]="leaderOptions()" [value]="node().leader?.id ?? ''"
+      (valueChange)="setLeader($event)" />
+  } @else {
+    <div class="department-row">
+      <button type="button" nol-icon-button class="department-toggle" [icon]="isOpen() ? resources.expandedIcon : resources.collapsedIcon"
+        [label]="resources.formatOrganizationCollapseLabel(node().department.name, isOpen())" [attr.aria-expanded]="isOpen()" (click)="toggle()"></button>
+      <span class="department-name">{{ node().department.name }}</span>
+      <nol-chip class="department-count">{{ node().headcount }}</nol-chip>
+    </div>
+  }
   <span class="department-summary">{{ summary() }}</span>
 </div>
 @if (node().leader; as leader) {
   <div class="stem"></div>
-  <nol-teamrun-organization-card class="leader" nolCanvasItem [teammate]="leader" />
+  <nol-teamrun-organization-card class="leader" nolCanvasItem [teammate]="leader" [editing]="editing()" [department]="node().department" />
 }
 @if (isOpen()) {
-  @if (node().members.length > 0) {
+  @if (node().members.length > 0 || editing()) {
     <div class="reports">
       @for (member of node().members; track member.id) {
-        <nol-teamrun-organization-card nolCanvasItem [teammate]="member" />
+        <nol-teamrun-organization-card nolCanvasItem [teammate]="member" [editing]="editing()" [department]="node().department" />
+      }
+      @if (editing()) {
+        <button type="button" nol-button class="add-member" [variant]="outlined" [disabled]="candidates().length === 0" [nolMenuTriggerFor]="candidatesMenu"><span
+          nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddMember }}</button>
       }
     </div>
   }
   @if (node().children.length > 0) {
     <div class="kids">
       @for (child of node().children; track child.department.id) {
-        <nol-teamrun-organization-department class="kid" [node]="child" />
+        <nol-teamrun-organization-department class="kid" [node]="child" [editing]="editing()" />
       }
     </div>
   }
 } @else if (node().headcount > 0) {
   <span class="hidden">{{ resources.formatOrganizationHidden(node().headcount) }}</span>
 }
+<ng-template #candidatesMenu>
+  <nol-menu>
+    @for (teammate of candidates(); track teammate.id) {
+      <button nol-menu-item [label]="teammate.name" (triggered)="add(teammate.id)"></button>
+    }
+  </nol-menu>
+</ng-template>

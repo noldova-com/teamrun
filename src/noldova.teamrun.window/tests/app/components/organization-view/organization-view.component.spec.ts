@@ -14,6 +14,7 @@ import { Department, DepartmentMember, EventName, MethodName, Organization, Orga
   from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import { userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
@@ -278,7 +279,7 @@ describe("OrganizationViewComponent", () => {
   it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
     await create();
     const edit = (): HTMLElement => one(".top .edit");
-    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-outlined")];
+    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-secondary")];
     const before = looks();
 
     edit().click();
@@ -288,6 +289,167 @@ describe("OrganizationViewComponent", () => {
     await settle();
 
     expect([before, editing, looks(), saves]).toEqual([["editEdit structure", true], ["checkDone editing", false], ["editEdit structure", true], []]);
+  });
+
+  describe("while its structure is edited", () => {
+    const changes = [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet];
+    let asked: [string, JsonValue][];
+
+    const editAsync = async (answer: () => unknown = () => null): Promise<void> => {
+      asked = [];
+      await create(context => {
+        for (const method of changes)
+          context.answer(method, t => {
+            asked.push([method, t]);
+            return answer();
+          });
+      });
+      one(".top .edit").click();
+      await settle();
+    };
+    const inDialog = (selector: string): HTMLElement => {
+      const found = document.querySelector<HTMLElement>(`nol-dialog ${selector}`);
+      if (Object.isNull(found))
+        throw new Error(`No dialog shows ${selector}.`);
+      return found;
+    };
+    const dialogAsync = async (): Promise<string[]> => {
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-confirm")).not.toBeNull());
+      return [inDialog(".nol-dialog-title").textContent?.trim() ?? "", inDialog("[nolDialogDescription]").textContent?.trim() ?? "",
+        inDialog(".nol-teamrun-confirm").textContent?.trim() ?? ""];
+    };
+    const answerAsync = async (selector: string): Promise<void> => {
+      inDialog(selector).click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog")).toBeNull());
+      await settle();
+    };
+    const optionsAsync = async (select: HTMLElement): Promise<string[]> => {
+      await userEvent.click(one(".nol-select-button", select));
+      await Wait.until(() => expect(document.querySelector(".nol-select-option")).not.toBeNull());
+      return [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
+    };
+    const closeOptionsAsync = async (): Promise<void> => {
+      await userEvent.keyboard("{Escape}");
+      await Wait.until(() => expect(document.querySelector(".nol-select-option")).toBeNull());
+    };
+    const chooseAsync = async (select: HTMLElement, label: string): Promise<void> => {
+      await optionsAsync(select);
+      const option = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].find(t => t.textContent?.trim() === label);
+      if (Object.isUndefined(option))
+        throw new Error(`No option reads ${label}.`);
+      await userEvent.click(option);
+      await settle();
+    };
+    const field = (name: string): HTMLInputElement => {
+      const found = department(name).querySelector<HTMLInputElement>(":scope > .department .department-field");
+      if (Object.isNull(found))
+        throw new Error(`${name} has no name field.`);
+      return found;
+    };
+    const rename = async (name: string, value: string): Promise<void> => {
+      field(name).value = value;
+      field(name).dispatchEvent(new Event("change"));
+      await settle();
+    };
+
+    it("names a department in a field in place of its toggle, renames it once the field changes, and puts back a blank or unchanged name", async () => {
+      await editAsync();
+      const shown = [own(department("Design"), ".department .department-toggle").length, field("Design").value, field("Design").getAttribute("aria-label")];
+
+      await rename("Design", "  ");
+      const blank = field("Design").value;
+      await rename("Design", "Design");
+      await rename("Design", " Craft ");
+
+      expect([shown, blank, asked]).toEqual([[0, "Design", "Department name"], "Design", [[MethodName.DepartmentUpdate, { departmentId: "design", name: "Craft" }]]]);
+    });
+
+    it("chooses a department's leader among its members in name order, or none", async () => {
+      await editAsync();
+      const leader = (): HTMLElement => one(":scope > .department .leader-choice", department("Design"));
+
+      const options = await optionsAsync(leader());
+      await closeOptionsAsync();
+      await chooseAsync(leader(), "Bob");
+      await chooseAsync(leader(), "No leader");
+
+      expect([options, asked]).toEqual([["No leader", "Alice", "Bob"], [
+        [MethodName.DepartmentUpdate, { departmentId: "design", leaderId: "bob" }],
+        [MethodName.DepartmentUpdate, { departmentId: "design", leaderId: null }]
+      ]]);
+    });
+
+    it("deletes a department only once you confirm, saying where what it held goes", async () => {
+      await editAsync();
+      const remove = (name: string): HTMLElement => one(":scope > .department .delete", department(name));
+
+      remove("UI").click();
+      const nested = await dialogAsync();
+      await answerAsync(".nol-teamrun-cancel");
+      const cancelled = asked.length;
+      remove("Build").click();
+      const top = await dialogAsync();
+      await answerAsync(".nol-teamrun-confirm");
+
+      expect([remove("Build").getAttribute("aria-label"), nested, cancelled, top, asked]).toEqual(["Delete Build",
+        ["Delete department", "Delete UI? Its departments and members move to Design.", "Delete"], 0,
+        ["Delete department", "Delete Build? Its departments move up to report to you, and its members leave every department.", "Delete"],
+        [[MethodName.DepartmentDelete, { departmentId: "build" }]]]);
+    });
+
+    it("removes a member from its card once you confirm, moves it to another department, and shows neither once editing is done", async () => {
+      await editAsync();
+
+      one(".remove", card("Bob")).click();
+      const asking = await dialogAsync();
+      await answerAsync(".nol-teamrun-confirm");
+      const departments = await optionsAsync(one(".move-choice", card("Bob")));
+      await closeOptionsAsync();
+      await chooseAsync(one(".move-choice", card("Bob")), "Build");
+      const label = one(".remove", card("Bob")).getAttribute("aria-label");
+      one(".top .edit").click();
+      await settle();
+
+      expect([asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([
+        ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob", ["Design", "UI", "Build"], 0]);
+      expect(asked).toEqual([[MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: null }],
+        [MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: "build" }]]);
+    });
+
+    it("adds a member from the teammates not yet in the department, in name order", async () => {
+      await editAsync();
+
+      await openMenu(one(":scope > .reports > .add-member", department("Build")));
+      const offered = menuItems().map(t => t.querySelector(".nol-menu-item-label")?.textContent?.trim());
+      menuItem("Alice").click();
+      await Wait.until(() => expect(asked).toHaveLength(1));
+
+      expect([offered, asked]).toEqual([["Alice", "Bob", "Code Reviewer"], [[MethodName.DepartmentMemberSet, { teammateId: "alice", departmentId: "build" }]]]);
+    });
+
+    it("adds a department under you, even when there is none yet", async () => {
+      await editAsync();
+      context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
+      await settle();
+
+      const empty = texts(".empty");
+      one(".chart .add-department").click();
+      await Wait.until(() => expect(asked).toHaveLength(1));
+
+      expect([empty, asked]).toEqual([[], [[MethodName.DepartmentCreate, { name: "New department", parentId: null }]]]);
+    });
+
+    it("says why a change failed until it is dismissed", async () => {
+      await editAsync(() => Promise.reject(new Error("The runtime is busy.")));
+
+      one(".chart .add-department").click();
+      await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
+      const role = one(".action-error").getAttribute("role");
+      one(".dismiss").click();
+      await settle();
+
+      expect([role, texts(".action-error")]).toEqual(["alert", []]);
+    });
   });
 
   describe.each([
@@ -359,7 +521,31 @@ describe("OrganizationViewComponent", () => {
       expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
     });
 
-  it("puts the view pills on the right of the header, then Cards show and Edit structure, all centred on one line", async () => {
+    it("keeps the cards at their widths while editing, with their fields, choices and buttons inside the cards' padding", async () => {
+      await create();
+      element().style.width = "72rem";
+      element().style.height = "60rem";
+      one(".top .edit").click();
+      await settle();
+      one(".chart .nol-canvas-actual").click();
+      await settle();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const inset = AppearanceFixture.measureLook("space-3") + 1;
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const design = department("Design");
+      const [unit, name, remove, leader] = [":scope > .department", ":scope > .department .department-field", ":scope > .department .delete",
+        ":scope > .department .leader-choice"].map(t => box(one(t, design)));
+      const bob = box(card("Bob"));
+      const [move, drop, tune] = [".move", ".remove", ".tune"].map(t => box(one(t, card("Bob"))));
+
+      for (const [actual, expected] of [[unit.width, 15 * rem], [bob.width, 13.25 * rem], [name.left, unit.left + inset], [remove.right, unit.right - inset],
+        [leader.left, unit.left + inset], [leader.right, unit.right - inset], [move.left, bob.left + inset], [move.right, bob.right - inset],
+        [tune.right, bob.right - inset]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
+      expect([name.right <= remove.left, drop.right <= tune.left, texts(".chart .nol-canvas-zoom")]).toEqual([true, true, ["100%"]]);
+    });
+
+    it("puts the view pills on the right of the header, then Cards show and Edit structure, all centred on one line", async () => {
       await create();
       element().style.width = "72rem";
       await settle();

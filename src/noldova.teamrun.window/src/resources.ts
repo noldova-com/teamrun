@@ -1151,6 +1151,21 @@ export class Resources {
   public static readonly organizationDoneEditing: string = "Done editing";
   public static readonly organizationEditIcon: string = "edit";
   public static readonly organizationDoneIcon: string = "check";
+  public static readonly organizationDepartmentNameLabel: string = "Department name";
+  public static readonly organizationLeaderLabel: string = "Leader";
+  public static readonly organizationNoLeader: string = "No leader";
+  public static readonly organizationMemberIn: string = "In";
+  public static readonly organizationAddMember: string = "Add member";
+  public static readonly organizationAddMemberIcon: string = "person_add";
+  public static readonly organizationAddDepartment: string = "Add department";
+  public static readonly organizationAddDepartmentIcon: string = "add";
+  public static readonly organizationNewDepartment: string = "New department";
+  public static readonly organizationDeleteIcon: string = "delete";
+  public static readonly organizationRemoveIcon: string = "person_remove";
+  public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
+  public static readonly organizationDeleteLabel: string = "Delete";
+  public static readonly organizationRemoveMemberTitle: string = "Remove member";
+  public static readonly organizationRemoveLabel: string = "Remove";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
     [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Model];
   public static readonly organizationFieldLabels: Readonly<Record<OrganizationCardField, string>> = {
@@ -1680,6 +1695,18 @@ export class Resources {
   public static formatOrganizationDeleteDepartment(name: string, parent: string | null): string {
     return Object.isNull(parent) ? `Delete ${name}? Its departments move up to report to you, and its members leave every department.`
       : `Delete ${name}? Its departments and members move to ${parent}.`;
+  }
+
+  public static formatOrganizationDeleteNamed(name: string): string {
+    return `Delete ${name}`;
+  }
+
+  public static formatOrganizationRemoveNamed(name: string): string {
+    return `Remove ${name}`;
+  }
+
+  public static formatOrganizationMoveLabel(name: string): string {
+    return `Department of ${name}`;
   }
 
   public static formatOrganizationRemoveMember(teammate: string, department: string): string {
