@@ -28,6 +28,10 @@ export class OrganizationFocus {
     return this.path.at(-1) ?? null;
   }
 
+  public get departmentName(): string {
+    return this.department?.department.name ?? String.empty;
+  }
+
   public static keyOf(target: OrganizationTarget): string {
     return Object.isNull(target.id) ? target.kind : `${target.kind}${OrganizationFocus.separator}${target.id}`;
   }

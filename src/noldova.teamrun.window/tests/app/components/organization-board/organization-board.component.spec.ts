@@ -6,12 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization,
   Teammate } from "@noldova/teamrun.protocol";
-import { DialogService, ThemeMode } from "@noldova/ui.components.angular";
+import { ChoicePillsComponent, DialogService, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
@@ -109,7 +110,7 @@ describe("OrganizationBoardComponent", () => {
       ["nol-teamrun-organization-card", "Carol"]]);
   });
 
-  it("sorts a column by name, and by status again, on its own", async () => {
+  it("sorts a column by name, and by status again, on its own, and by status for a sort it doesn't know", async () => {
     await create();
     const build = (): HTMLElement => one(".lane:nth-child(3)");
 
@@ -120,6 +121,12 @@ describe("OrganizationBoardComponent", () => {
     expect([texts("nol-teamrun-organization-card .name", build()), texts("nol-teamrun-organization-card .name", one(".lane"))]).toEqual([["Carol", "Offline"], ["Bob"]]);
 
     one(".lane-sort [role=radio]:nth-child(1)", build()).click();
+    await settle();
+    expect(texts("nol-teamrun-organization-card .name", build())).toEqual(["Offline", "Carol"]);
+
+    one(".lane-sort [role=radio]:nth-child(2)", build()).click();
+    await settle();
+    fixture.debugElement.query(By.css(".lane:nth-child(3) .lane-sort")).injector.get(ChoicePillsComponent).valueChange.emit("unknown");
     await settle();
     expect(texts("nol-teamrun-organization-card .name", build())).toEqual(["Offline", "Carol"]);
   });

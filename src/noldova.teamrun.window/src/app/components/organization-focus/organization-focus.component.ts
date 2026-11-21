@@ -80,7 +80,7 @@ export class OrganizationFocusComponent {
     const focus = this.focus();
     const department = focus.department;
     if (!Object.isNull(focus.teammate))
-      return Resources.formatOrganizationFocusTeammate(focus.teammate.role, department?.department.name ?? String.empty, focus.teammate.model);
+      return Resources.formatOrganizationFocusTeammate(focus.teammate.role, focus.departmentName, focus.teammate.model);
     const counts = this.countsOf(this.cards());
     return Object.isNull(department) ? Resources.formatOrganizationFocusLeaders(this.cards().length, counts) : Resources.formatOrganizationFocusDepartment(this.cards().length, counts);
   });
@@ -136,10 +136,6 @@ export class OrganizationFocusComponent {
 
   protected go(target: OrganizationTarget): void {
     this.layout.focusOn(OrganizationFocus.keyOf(target));
-  }
-
-  protected talkTo(target: OrganizationTarget | null): void {
-    this.layout.focusOn(Object.isNull(target) ? null : OrganizationFocus.keyOf(target));
   }
 
   protected department(row: OrganizationOutlineRow): OrganizationTarget {
