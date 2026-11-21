@@ -241,15 +241,18 @@ export class RequestDispatcherTests {
     await host.engine.waitForIdle();
     const stopped = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageStop, new MessageIdParams(sent.id).toJson()));
     const listed = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageList, null);
+    const replies = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageReplyList, new MessageIdParams(sent.id).toJson());
     const without = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
       host.approvals, host.engine, host.teammates, host.events);
-    const unknown = await Promise.all([MethodName.OrganizationMessageSend, MethodName.OrganizationMessageStop, MethodName.OrganizationMessageList]
-      .map(t => without.dispatch(new Request("r", t, null))));
+    const unknown = await Promise.all([MethodName.OrganizationMessageSend, MethodName.OrganizationMessageStop, MethodName.OrganizationMessageList,
+      MethodName.OrganizationMessageReplyList].map(t => without.dispatch(new Request("r", t, null))));
 
     Assert.areEqual(`${ada.id}:Started`, sent.recipients.map(t => `${t.teammateId}:${t.state}`).join());
     Assert.areEqual(JSON.stringify(sent.toJson()), JSON.stringify(stopped.toJson()));
     Assert.areEqual(JSON.stringify([stopped.toJson()]), JSON.stringify(listed));
-    Assert.areEqual("UnknownMethod,UnknownMethod,UnknownMethod", unknown.map(t => t.info?.name).join());
+    Assert.areEqual(JSON.stringify((await host.organizationMessages.listRepliesAsync(new MessageIdParams(sent.id))).map(t => t.toJson())), JSON.stringify(replies));
+    Assert.areEqual(1, Array.isArray(replies) ? replies.length : 0);
+    Assert.areEqual("UnknownMethod,UnknownMethod,UnknownMethod,UnknownMethod", unknown.map(t => t.info?.name).join());
   }
 
   @TestMethod
