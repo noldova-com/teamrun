@@ -18,6 +18,7 @@ import type { TeammateStopReason } from "../enums/teammate-stop-reason";
 import { ListNotArrayException } from "../exceptions/list-not-array.exception";
 import { TeammateActivity } from "../models/teammate-activity";
 import { ChatStoreService } from "./chat-store.service";
+import { EngineResync } from "./engine-resync";
 
 export class TeammateStatusStoreService {
   public static readonly provider: FactoryProvider =
@@ -54,7 +55,8 @@ export class TeammateStatusStoreService {
       context.onEvent(Resources.formatQualifiedName(EventName.MessageUpdated), t => this.applyUpdated(Message.fromJson(t))),
       context.onEvent(Resources.formatQualifiedName(EventName.ConversationRewound), t => this.reloadIfIn(ChatRewoundPayload.fromJson(t).chatId)),
       context.onEvent(Resources.formatQualifiedName(EventName.ConversationDeleted), t => this.reloadIfIn(ChatIdParams.fromJson(t).chatId)),
-      ...[EventName.StateInvalidated, EventName.StateResyncRequested].map(t => context.onEvent(Resources.formatQualifiedName(t), () => void this.reloadLastReplies()))
+      context.onEvent(Resources.formatQualifiedName(EventName.StateInvalidated), () => void this.reloadLastReplies()),
+      EngineResync.on(context, () => void this.reloadLastReplies())
     ];
     void this.reloadLastReplies();
   }

@@ -15,6 +15,7 @@ import { DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, 
   from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
+import { EngineResync } from "./engine-resync";
 
 export class OrganizationStoreService {
   public static readonly provider: FactoryProvider =
@@ -37,7 +38,7 @@ export class OrganizationStoreService {
     this.context = context;
     this.subscriptions = [
       context.onEvent(Resources.formatQualifiedName(EventName.OrganizationChanged), t => this.apply(Organization.fromJson(t))),
-      context.onEvent(Resources.formatQualifiedName(EventName.StateResyncRequested), () => void this.reload())
+      EngineResync.on(context, () => void this.reload())
     ];
     void this.reload();
   }
