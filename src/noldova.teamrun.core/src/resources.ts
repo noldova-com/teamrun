@@ -637,6 +637,13 @@ export class Resources {
     + "ORDER BY chatId, sequence";
   public static readonly selectOpenReplyByConversation: string =
     `SELECT json FROM messages WHERE chatId = ? AND status IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}') ORDER BY sequence LIMIT 1`;
+  public static readonly selectTeammateLastReplies: string =
+    "SELECT teammateId, chatId, id, text, endedAt FROM (SELECT m.id, m.chatId, t.text, json_extract(m.json, '$.teammateId') AS teammateId, "
+    + "json_extract(m.json, '$.endedAt') AS endedAt, ROW_NUMBER() OVER (PARTITION BY json_extract(m.json, '$.teammateId') "
+    + "ORDER BY json_extract(m.json, '$.endedAt') DESC, m.rowid DESC) AS position FROM messages m JOIN messageText t ON t.rowid = m.rowid "
+    + `WHERE m.status = '${MessageStatus.Completed}' AND json_extract(m.json, '$.author') = '${MessageAuthor.Provider}' `
+    + "AND json_extract(m.json, '$.teammateId') IS NOT NULL AND json_extract(m.json, '$.endedAt') IS NOT NULL AND trim(t.text) <> '') "
+    + "WHERE position = 1 ORDER BY teammateId";
   public static readonly selectTeammateUsage: string =
     "SELECT u.id, u.chatId, u.teammateId, u.startedAt, u.endedAt, u.usage FROM (SELECT id, chatId, sequence, "
     + "json_extract(json, '$.teammateId') AS teammateId, json_extract(json, '$.startedAt') AS startedAt, "

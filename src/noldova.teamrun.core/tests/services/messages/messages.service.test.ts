@@ -400,6 +400,40 @@ export class MessagesServiceTests {
     Assert.isNull(theirs?.endedAt);
   }
 
+  @TestMethod
+  public async listsEachTeammatesLatestCompletedReplyWithTextInAnyChatAndSkipsRepliesWithoutText(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const other = await host.createConversationAsync(await host.openProjectAsync("beta"));
+    const text = (value: string): MessageDetail => new MessageDetail(0, DetailKind.Text, value, null, "t");
+    const reasoning = new MessageDetail(1, DetailKind.Reasoning, "thinking", null, "t");
+    for (const message of [
+      MessagesServiceTests.said(conversation.id, 1, "ada", MessageStatus.Completed, "2026-11-20T10:00:00.000Z", [text("Old")]),
+      MessagesServiceTests.said(other.id, 2, "ada", MessageStatus.Completed, "2026-11-20T11:00:00.000Z", [text("Shipped"), reasoning, text("it.")]),
+      MessagesServiceTests.said(conversation.id, 3, "ada", MessageStatus.Completed, "2026-11-20T12:00:00.000Z", [reasoning]),
+      MessagesServiceTests.said(conversation.id, 4, "ada", MessageStatus.Completed, "2026-11-20T12:30:00.000Z", [text(" ")]),
+      MessagesServiceTests.said(conversation.id, 5, "ada", MessageStatus.Failed, "2026-11-20T13:00:00.000Z", [text("Broke")]),
+      MessagesServiceTests.said(conversation.id, 6, "bob", MessageStatus.Completed, "2026-11-20T09:00:00.000Z", [text("First")]),
+      MessagesServiceTests.said(other.id, 7, "bob", MessageStatus.Completed, "2026-11-20T09:00:00.000Z", [text("Second")]),
+      MessagesServiceTests.said(conversation.id, 8, "cyd", MessageStatus.Running, null, [text("Working")]),
+      MessagesServiceTests.said(conversation.id, 9, null, MessageStatus.Completed, "2026-11-20T14:00:00.000Z", [text("No teammate")]),
+      MessagesServiceTests.userMessage(conversation.id, 10, "Hello")
+    ])
+      await host.messages.insertAsync(message);
+
+    const listed = await host.messages.listTeammateLastRepliesAsync();
+
+    Assert.areEqual(`ada ${other.id} reply-2 Shipped it. 2026-11-20T11:00:00.000Z|bob ${other.id} reply-7 Second 2026-11-20T09:00:00.000Z`,
+      listed.map(t => `${t.teammateId} ${t.chatId} ${t.messageId} ${t.text} ${t.endedAt}`).join("|"));
+  }
+
+  private static said(conversationId: string, sequence: number, teammateId: string | null, status: MessageStatus, endedAt: string | null,
+    details: readonly MessageDetail[]): Message {
+    const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
+    return new Message(`reply-${sequence}`, conversationId, sequence, MessageAuthor.Provider, null, status, details, provenance, "t", "t", endedAt, [],
+      teammateId, teammateId);
+  }
+
   private static teammateReply(conversationId: string, sequence: number, teammateId: string, usage: ReplyUsage | null,
     nativeSessionId: string | null = null): Message {
     const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null),

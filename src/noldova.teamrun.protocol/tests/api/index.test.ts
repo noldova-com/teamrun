@@ -21,6 +21,7 @@ export class ProtocolApiTests {
     Assert.isDefined(api.ProviderSignInCommand);
     Assert.isDefined(api.Teammate);
     Assert.isDefined(api.TeammateUsage);
+    Assert.isDefined(api.TeammateLastReply);
     Assert.isDefined(api.TeammateCreateParams);
     Assert.isDefined(api.TeammateUpdateParams);
     Assert.isDefined(api.TeammateIdParams);

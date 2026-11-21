@@ -136,6 +136,7 @@ import type {
   TeammateFallback,
   TeammateIdParams,
   TeammateUpdateParams,
+  TeammateLastReply,
   TeammateUsage,
   SubAgent,
   SubAgentStartParams,
@@ -1553,6 +1554,11 @@ export interface IMessagesService {
    * Lists, for each teammate in each conversation, its latest reply that reports usage, while that reply is in the teammate's current session there.
    */
   listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
+
+  /**
+   * Lists each teammate's latest completed reply that has text, in any chat.
+   */
+  listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
 
   /**
    * Lists every reply still pending, running, or awaiting an approval, across conversations.
@@ -3707,6 +3713,8 @@ export declare class Resources {
    * Selects every reply still pending, running, or awaiting an approval, oldest first.
    */
   public static readonly selectOpenReplies: string;
+  /** Each teammate's latest completed reply with text, its text from `messageText`. */
+  public static readonly selectTeammateLastReplies: string;
   /**
    * Selects every message with a sub-agent still running, oldest first; the text search only narrows the rows the details are read from.
    */
@@ -7438,6 +7446,13 @@ export declare class MessagesService implements IMessagesService {
    * @remarks Queries the database directly without loading transcripts.
    */
   public listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
+
+  /**
+   * Lists each teammate's latest completed reply that has text, in any chat, by the end of the reply and then the latest saved.
+   * @returns One entry per teammate that has such a reply, by teammate id.
+   * @remarks One query over `messages`, reading each reply's text from the `messageText` index rather than its JSON.
+   */
+  public listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
 
   /**
    * Lists every reply still pending, running, or awaiting an approval, across conversations, oldest first.

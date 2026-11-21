@@ -1008,6 +1008,11 @@ export declare enum MethodName {
    */
   TeammateUsageList = "TeammateUsageList",
   /**
+   * Lists each teammate's latest completed reply that has text, in any chat. Parameters: none. Result: an array of `TeammateLastReply`,
+   * one per teammate that has one.
+   */
+  TeammateLastReplyList = "TeammateLastReplyList",
+  /**
    * Lists a page of a chat's background tasks: every running one on the first page, then its
    * finished commands, newest first and at most `limit` a page, each with its output left out and
    * its command cut to `Resources.maximumListedCommand` characters. A finished sub-agent is not listed.
@@ -13145,6 +13150,63 @@ export declare class ContextUsage {
    * @throws ArgumentException when the count isn't a non-negative safe integer.
    */
   public static throwIfNotCount(value: number, name: string): void;
+}
+
+/**
+ * What a teammate last said: its latest completed reply that has text, in any chat, as `TeammateLastReplyList` returns it.
+ */
+export declare class TeammateLastReply {
+  /**
+   * The `Teammate` id.
+   */
+  public readonly teammateId: string;
+  /**
+   * The reply's chat id.
+   */
+  public readonly chatId: string;
+  /**
+   * The reply's message id.
+   */
+  public readonly messageId: string;
+  /**
+   * The reply's Text details, joined by spaces.
+   */
+  public readonly text: string;
+  /**
+   * ISO 8601 timestamp of the reply's end.
+   */
+  public readonly endedAt: string;
+
+  /**
+   * Initializes the teammate's last reply.
+   * @throws ArgumentException when a field is blank.
+   */
+  public constructor(teammateId: string, chatId: string, messageId: string, text: string, endedAt: string);
+
+  /**
+   * Reads the teammate's last reply from untrusted JSON.
+   * @param value The untrusted value, with `teammateId`, `chatId`, `messageId`, `text` and `endedAt`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @throws JsonException when a field is missing or blank.
+   */
+  public static fromJson(value: unknown, path?: string): TeammateLastReply;
+
+  /**
+   * The last reply a message makes for its teammate, or `null` unless it is a teammate's completed reply whose Text details hold more than whitespace.
+   * @param message The message.
+   */
+  public static of(message: Message): TeammateLastReply | null;
+
+  /**
+   * Whether the other last reply has the same fields.
+   * @param other The other last reply.
+   */
+  public equals(other: TeammateLastReply): boolean;
+
+  /**
+   * Writes the last reply as JSON.
+   */
+  public toJson(): JsonObject;
 }
 
 /**
