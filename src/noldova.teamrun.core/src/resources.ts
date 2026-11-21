@@ -487,6 +487,10 @@ export class Resources {
   public static readonly organizationMessagesMigrationId: string = "20261121090000_OrganizationMessages";
   public static readonly organizationMessagesTable: string = "organizationMessages";
   public static readonly selectOrganizationMessages: string = "SELECT json FROM organizationMessages ORDER BY createdAt, rowid";
+  public static readonly teammateLastRepliesMigrationId: string = "20261122090000_TeammateLastReplies";
+  public static readonly createTeammateLastReplyIndex: string =
+    "CREATE INDEX IX_messages_teammateId_endedAt ON messages (json_extract(json, '$.teammateId'), json_extract(json, '$.endedAt')) "
+    + `WHERE ${Resources.formatFinishedReply(null)}`;
   public static readonly selectOrganizationMessage: string = "SELECT json FROM organizationMessages WHERE id = ?";
   public static readonly insertOrganizationMessage: string = "INSERT INTO organizationMessages (id, json, createdAt) VALUES (?, ?, ?)";
   public static readonly updateOrganizationMessage: string = "UPDATE organizationMessages SET json = ? WHERE id = ?";
@@ -646,6 +650,13 @@ export class Resources {
     + "ORDER BY chatId, sequence";
   public static readonly selectOpenReplyByConversation: string =
     `SELECT json FROM messages WHERE chatId = ? AND status IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}') ORDER BY sequence LIMIT 1`;
+  public static readonly textBlanks: string = " \t\n\v\f\r\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
+  public static readonly selectTeammateLastReplies: string =
+    "SELECT l.teammateId, m.chatId, m.id, t.text, json_extract(m.json, '$.endedAt') AS endedAt FROM (SELECT tm.id AS teammateId, "
+    + `(SELECT r.rowid FROM messages r CROSS JOIN messageText x ON x.rowid = r.rowid WHERE ${Resources.formatFinishedReply("r")} `
+    + "AND json_extract(r.json, '$.teammateId') = +tm.id AND json_extract(r.json, '$.endedAt') IS NOT NULL AND trim(x.text, ?) <> '' "
+    + "ORDER BY json_extract(r.json, '$.endedAt') DESC, r.rowid DESC LIMIT 1) AS lastRowid FROM teammates tm) l "
+    + "CROSS JOIN messages m ON m.rowid = l.lastRowid CROSS JOIN messageText t ON t.rowid = m.rowid ORDER BY l.teammateId";
   public static readonly selectTeammateUsage: string =
     "SELECT u.id, u.chatId, u.teammateId, u.startedAt, u.endedAt, u.usage FROM (SELECT id, chatId, sequence, "
     + "json_extract(json, '$.teammateId') AS teammateId, json_extract(json, '$.startedAt') AS startedAt, "
@@ -1285,6 +1296,11 @@ export class Resources {
 
   public static formatSettled(row: string): string {
     return `${row}.status NOT IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}')`;
+  }
+
+  public static formatFinishedReply(row: string | null): string {
+    const prefix = Object.isNull(row) ? "" : `${row}.`;
+    return `${prefix}status = '${MessageStatus.Completed}' AND json_valid(${prefix}json) AND json_extract(${prefix}json, '$.author') = '${MessageAuthor.Provider}'`;
   }
 
   public static formatMessageText(row: string): string {

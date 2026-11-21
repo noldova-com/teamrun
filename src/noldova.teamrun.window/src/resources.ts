@@ -1163,6 +1163,10 @@ export class Resources {
   public static readonly organizationNewDepartment: string = "New department";
   public static readonly organizationDeleteIcon: string = "delete";
   public static readonly organizationRemoveIcon: string = "person_remove";
+  public static readonly organizationNowRunningIcon: string = "progress_activity";
+  public static readonly organizationNowIdleIcon: string = "pause_circle";
+  public static readonly organizationNothingRunning: string = "Nothing running";
+  public static readonly organizationNowReplying: string = "Replying";
   public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
@@ -1751,6 +1755,10 @@ export class Resources {
 
   public static formatOrganizationChooseFields(name: string): string {
     return `Choose what ${name}'s card shows`;
+  }
+
+  public static formatOrganizationNowFor(milliseconds: number, more: number): string {
+    return more > 0 ? `${Resources.formatDuration(milliseconds)} +${more}` : Resources.formatDuration(milliseconds);
   }
 
   public static formatOrganizationModel(model: string, effort: string | null): string {

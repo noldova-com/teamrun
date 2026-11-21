@@ -81,6 +81,35 @@
   font-size: var(--nol-text-small);
 }
 
+.now {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nol-space-1);
+  min-width: 0;
+  font-size: var(--nol-text-small);
+}
+
+.now-icon {
+  flex: none;
+  width: var(--nol-icon);
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-icon);
+}
+
+.now-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.now-for {
+  flex: none;
+  color: var(--nol-text-muted);
+  font-family: var(--nol-font-mono);
+  white-space: nowrap;
+}
+
 .model {
   color: var(--nol-text-muted);
   font-size: var(--nol-text-small);

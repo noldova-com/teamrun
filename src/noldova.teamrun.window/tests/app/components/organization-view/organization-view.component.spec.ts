@@ -10,18 +10,21 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, MethodName, Organization, OrganizationLayoutSaveParams, PlanUsage, PlanWindow, PlanWindowName }
-  from "@noldova/teamrun.protocol";
+import { Department, DepartmentMember, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams, PlanUsage, PlanWindow,
+  PlanWindowName } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
+import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
+import { Resources } from "../../../../src/resources";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
+import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -225,6 +228,43 @@ describe("OrganizationViewComponent", () => {
     expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "60% left", "gpt-5 · high"], ["Idle", "60% left"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
     expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
+  });
+
+  it("says on each card what its teammate runs now, the earliest first with for how long and how many more, ticking each second", async () => {
+    const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
+    TestBed.overrideProvider(ClockService, { useValue: clock });
+    const reply = (id: string, chatId: string, started: string, status: MessageStatus): Message =>
+      new Message(id, chatId, 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, started, started,
+        status === MessageStatus.Running ? null : started, [], "alice", "alice");
+    const now = (name: string): string[] => [...texts(".now-icon", card(name)), ...texts(".now-text", card(name)), ...texts(".now-for", card(name))];
+    await create();
+    const idle = [now("Alice"), now("Offline"), clock.running];
+    context.emit(EventName.MessageCreated, reply("r1", "c9", "2026-09-10T08:00:00.000Z", MessageStatus.Running).toJson());
+    await settle();
+    const single = now("Alice");
+    context.emit(EventName.MessageCreated, reply("r2", "c1", "2026-09-10T07:59:00.000Z", MessageStatus.Running).toJson());
+    await settle();
+    const two = now("Alice");
+    clock.advance(Resources.clockIntervalMilliseconds);
+    await settle();
+    const ticked = [now("Alice"), clock.intervals];
+    context.emit(EventName.MessageUpdated, reply("r1", "c9", "2026-09-10T08:00:00.000Z", MessageStatus.Completed).toJson());
+    context.emit(EventName.MessageUpdated, reply("r2", "c1", "2026-09-10T07:59:00.000Z", MessageStatus.Completed).toJson());
+    await settle();
+
+    expect(idle).toEqual([["pause_circle", "Nothing running"], ["pause_circle", "Stopped"], 0]);
+    expect([single, two, ticked]).toEqual([["progress_activity", "Replying", "5m 0s"], ["progress_activity", "First", "6m 0s +1"],
+      [["progress_activity", "First", "6m 1s +1"], [Resources.clockIntervalMilliseconds]]]);
+    expect([now("Alice"), clock.running]).toEqual([["pause_circle", "Nothing running"], 0]);
+    expect(card("Alice").querySelector(".now-icon")?.getAttribute("aria-hidden")).toBe("true");
+
+    context.emit(EventName.MessageCreated, reply("r3", "c1", "2026-09-10T08:04:00.000Z", MessageStatus.Running).toJson());
+    await openMenu(one(".tune", card("Alice")));
+    menuItem("Current activity").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    expect([all(".now", card("Alice")), now("Bob"), clock.running]).toEqual([[], ["pause_circle", "Nothing running"], 0]);
   });
 
   it("lets a card choose its own fields over every card's, until it or every card's choice is cleared", async () => {
@@ -477,6 +517,26 @@ describe("OrganizationViewComponent", () => {
     afterEach(() => AppearanceFixture.reset());
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
+
+    it("lines a card's current activity up inside its padding: the icon, its text a small space after, and the time at the end", async () => {
+      await create();
+      context.emit(EventName.MessageCreated, new Message("r1", "c9", 1, MessageAuthor.Provider, null, MessageStatus.Running, [], SampleData.provenance,
+        SampleData.timestamp, SampleData.timestamp, null, [], "alice", "alice").toJson());
+      await settle();
+      const alice = card("Alice");
+      const [icon, text, lasted] = [one(".now-icon", alice), one(".now-text", alice), one(".now-for", alice)];
+      const style = getComputedStyle(alice);
+      const inner = alice.getBoundingClientRect();
+      const left = inner.left + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth);
+      const right = inner.right - Number.parseFloat(style.paddingRight) - Number.parseFloat(style.borderRightWidth);
+
+      AppearanceFixture.expectPixels(icon.getBoundingClientRect().left, left);
+      AppearanceFixture.expectPixels(icon.getBoundingClientRect().width, AppearanceFixture.measureLook("icon"));
+      AppearanceFixture.expectPixels(text.getBoundingClientRect().left - icon.getBoundingClientRect().right, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(lasted.getBoundingClientRect().right, right);
+      AppearanceFixture.expectPixels(icon.getBoundingClientRect().top, text.getBoundingClientRect().top);
+      expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
+    });
 
     it("sizes the cards, hangs each leader under its department, the members off one line, and joins the departments to you through one bar", async () => {
       await create();
