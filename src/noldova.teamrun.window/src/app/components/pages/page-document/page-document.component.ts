@@ -23,6 +23,7 @@ import { Page, PageEventName, PageMethodName, PageRequest, type PageVersion, Pag
 
 import { PageSaveException } from "../../../exceptions/pages/page-save.exception";
 import { PageDocumentResources } from "../../../services/pages/page-document-resources";
+import { PageDocuments } from "../../../services/pages/page-documents";
 import { PageKeys } from "../../../services/pages/page-keys";
 
 @Component({
@@ -98,6 +99,7 @@ export class PageDocumentComponent {
     });
     releases.push(this.context.onEvent(PageDocumentResources.formatMethod(PageEventName.PageUpdated), t => this.onUpdated(t)));
     releases.push(this.context.onEvent(PageDocumentResources.formatMethod(PageEventName.PageShown), t => this.onUpdated(t)));
+    releases.push(PageDocuments.onResync(this.context, () => void this.resyncAsync()));
     const onLine = (): void => this.isOffline.set(!navigator.onLine);
     window.addEventListener("online", onLine);
     window.addEventListener("offline", onLine);
@@ -341,6 +343,20 @@ export class PageDocumentComponent {
       this.updatedBy.set(page);
     }
     void this.loadAsync(null, true);
+  }
+
+  private async resyncAsync(): Promise<void> {
+    const before = this.view()?.page.version ?? Number.POSITIVE_INFINITY;
+    if (Object.isNull(this.handle())) {
+      await this.openOnceAsync(this.instance());
+      return;
+    }
+    await this.loadAsync(null, true);
+    const page = this.view()?.page;
+    if (!Object.isUndefined(page) && page.version > before && page.version !== this.restored) {
+      this.replaced = this.updatedBy();
+      this.updatedBy.set(page);
+    }
   }
 
   private pageIdOf(payload: unknown): string | null {

@@ -141,6 +141,26 @@ describe("TitleModelOptions", () => {
     expect(pairs(read())).toEqual([["", "Same as the chat"], ["p1/opus", "Home: Opus"], ["p2/gpt", "Work: GPT"]]);
   });
 
+  it("loads its lists again for the providers the store reads again once the runtime starts again", async () => {
+    await open([provider("p1", "Home")]);
+    expect(read()).toBeNull();
+    await Wait.until(() => expect(catalogs.size).toBe(1));
+    found(catalogs.get("p1"), "p1 list").resolve(list(model("gpt", "GPT")));
+    await Wait.until(() => expect(pairs(read())).toEqual([["", "Same as the chat"], ["p1/gpt", "Home: GPT"]]));
+    const refreshed = context.refreshedSettings.length;
+    context.answer(MethodName.ProviderList, () => [provider("p1", "Home"), provider("p2", "Work")].map(t => t.toJson()));
+    await expect(ChatStoreService.resync(context)).resolves.toBe(true);
+
+    TitleModelOptions.reload(context);
+
+    expect(context.refreshedSettings).toHaveLength(refreshed + 1);
+    expect(read()).toBeNull();
+    await Wait.until(() => expect(refreshes).toEqual(["p1:false", "p1:false", "p2:false"]));
+    found(catalogs.get("p1"), "p1 list").resolve(list(model("gpt-5", "GPT 5")));
+    found(catalogs.get("p2"), "p2 list").resolve(list(model("opus", "Opus")));
+    await Wait.until(() => expect(pairs(read())).toEqual([["", "Same as the chat"], ["p1/gpt-5", "Home: GPT 5"], ["p2/opus", "Work: Opus"]]));
+  });
+
   it("stops supplying options when asked", async () => {
     await open([]);
     expect(context.settingOptions.has(Resources.titleModelSetting)).toBe(true);

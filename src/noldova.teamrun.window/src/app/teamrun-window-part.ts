@@ -36,6 +36,7 @@ import { ChatStoreService } from "./services/chat-store.service";
 import { ChatTerminals } from "./services/chat-terminals";
 import { ComputerUseBorder } from "./services/computer-use-border";
 import { ComposerDefaultService } from "./services/composer-default.service";
+import { EngineResync } from "./services/engine-resync";
 import { GitHubReferenceSource } from "./services/github-reference-source";
 import { ImageViewerService } from "./services/image-viewer.service";
 import { InlineTerminals } from "./services/inline-terminals";
@@ -135,12 +136,19 @@ export class TeamRunWindowPart implements IWindowPart {
   }
 
   public reconnectAsync(): Promise<boolean> {
-    if (Object.isNull(this.activeContext))
+    const context = this.activeContext;
+    if (Object.isNull(context))
       return Promise.resolve(false);
-    PanelRequests.reportAgain(this.activeContext);
-    SubAgentsBadge.reload(this.activeContext);
-    ComputerUseBorder.reload(this.activeContext);
-    return ChatStoreService.resync(this.activeContext);
+    PanelRequests.reportAgain(context);
+    SubAgentsBadge.reload(context);
+    ComputerUseBorder.reload(context);
+    EngineResync.request(context);
+    PagesViewComponent.resync(context);
+    return ChatStoreService.resync(context).then(t => {
+      if (t)
+        TitleModelOptions.reload(context);
+      return t;
+    });
   }
 
   public async deactivateAsync(): Promise<void> {
