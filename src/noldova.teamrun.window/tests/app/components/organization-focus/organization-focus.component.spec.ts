@@ -182,7 +182,7 @@ describe("OrganizationFocusComponent", () => {
     };
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
     const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
-    const cardEdits = (): unknown[] => all(".grid nol-teamrun-organization-card").map(t => [texts(".name", t).join(), all(".move-choice, .remove", t).length]);
+    const cardEdits = (): unknown[] => all(".grid nol-teamrun-organization-card").map(t => [t.querySelector<HTMLInputElement>(".name-field")?.value, all(".move-choice, .remove", t).length]);
     await create("Department:design");
     expect([all(".unit-rename").length, all(".grid .move-choice").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
 

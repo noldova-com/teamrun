@@ -174,7 +174,7 @@ describe("OrganizationBoardComponent", () => {
     const fields = (): HTMLInputElement[] => [...element().querySelectorAll<HTMLInputElement>(".lane-rename")];
     expect([fields().map(t => t.value), all(".lane-rename").map(t => t.getAttribute("aria-label")), all(".lane-name").length,
       all(".message-department").length]).toEqual([["Design", "UI", "Build"], ["Department name", "Department name", "Department name"], 0, 0]);
-    expect([all(".lanes nol-teamrun-organization-card").map(t => [texts(".name", t).join(), all(".move-choice, .remove", t).length]),
+    expect([all(".lanes nol-teamrun-organization-card").map(t => [t.querySelector<HTMLInputElement>(".name-field")?.value, all(".move-choice, .remove", t).length]),
       all(".leaders nol-teamrun-organization-card .move-choice, .leaders nol-teamrun-organization-card .remove").length])
       .toEqual([[["Bob", 2], ["Offline", 2], ["Carol", 2]], 0]);
     for (const value of ["  Craft  ", "   ", "UI"]) {
