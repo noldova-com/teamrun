@@ -241,15 +241,18 @@ export class RequestDispatcherTests {
     await host.engine.waitForIdle();
     const stopped = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageStop, new MessageIdParams(sent.id).toJson()));
     const listed = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageList, null);
+    const replies = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageReplyList, new MessageIdParams(sent.id).toJson());
     const without = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
       host.approvals, host.engine, host.teammates, host.events);
-    const unknown = await Promise.all([MethodName.OrganizationMessageSend, MethodName.OrganizationMessageStop, MethodName.OrganizationMessageList]
-      .map(t => without.dispatch(new Request("r", t, null))));
+    const unknown = await Promise.all([MethodName.OrganizationMessageSend, MethodName.OrganizationMessageStop, MethodName.OrganizationMessageList,
+      MethodName.OrganizationMessageReplyList].map(t => without.dispatch(new Request("r", t, null))));
 
     Assert.areEqual(`${ada.id}:Started`, sent.recipients.map(t => `${t.teammateId}:${t.state}`).join());
     Assert.areEqual(JSON.stringify(sent.toJson()), JSON.stringify(stopped.toJson()));
     Assert.areEqual(JSON.stringify([stopped.toJson()]), JSON.stringify(listed));
-    Assert.areEqual("UnknownMethod,UnknownMethod,UnknownMethod", unknown.map(t => t.info?.name).join());
+    Assert.areEqual(JSON.stringify((await host.organizationMessages.listRepliesAsync(new MessageIdParams(sent.id))).map(t => t.toJson())), JSON.stringify(replies));
+    Assert.areEqual(1, Array.isArray(replies) ? replies.length : 0);
+    Assert.areEqual("UnknownMethod,UnknownMethod,UnknownMethod,UnknownMethod", unknown.map(t => t.info?.name).join());
   }
 
   @TestMethod
@@ -520,6 +523,30 @@ export class RequestDispatcherTests {
     const listed = RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.ProviderToolList, null));
 
     Assert.areEqual(JSON.stringify([tool.toJson()]), JSON.stringify(listed.map(t => ProviderTool.fromJson(t.toJson()).toJson())));
+  }
+
+  @TestMethod
+  public async listsEachKindAsItsRefreshedDescriptorSaysAndItsLastOneWhenTheRefreshFailsWritingTheFailureToTheLog(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const refreshed = new FakeProviderAdapter("refreshed");
+    refreshed.refreshDescriptorAsync = () => {
+      refreshed.descriptor = new ProviderKind("refreshed", "Refreshed provider", true, false, null);
+      return Promise.resolve();
+    };
+    const failing = new FakeProviderAdapter("failing");
+    failing.refreshDescriptorAsync = () => Promise.reject(new Error("The environment couldn't be read."));
+    const refusing = new FakeProviderAdapter("refusing");
+    refusing.refreshDescriptorAsync = () => Promise.reject("refused");
+    host.registry.register(refreshed);
+    host.registry.register(failing);
+    host.registry.register(refusing);
+
+    const kinds = await RequestDispatcherTests.succeed(host, MethodName.ProviderKindList, null);
+
+    Assert.areEqual("fake:Fake provider,refreshed:Refreshed provider,failing:Fake provider,refusing:Fake provider",
+      RequestDispatcherTests.objects(kinds).map(t => ProviderKind.fromJson(t.toJson())).map(t => `${t.id}:${t.displayName}`).join(","));
+    Assert.areEqual(JSON.stringify([Resources.formatDescriptorNotRefreshed("failing", "Error"), Resources.formatDescriptorNotRefreshed("refusing", "string")]),
+      JSON.stringify(host.log.lines));
   }
 
   @TestMethod

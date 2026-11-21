@@ -17,13 +17,15 @@ export class ChatResponderParams {
   public readonly chatId: string;
   public readonly responder: ChatResponder | null;
   public readonly chosen: boolean;
+  public readonly start: boolean;
 
-  public constructor(chatId: string, responder: ChatResponder | null, chosen: boolean = false) {
+  public constructor(chatId: string, responder: ChatResponder | null, chosen: boolean = false, start: boolean = false) {
     ArgumentException.throwIfNullOrWhitespace(chatId, Resources.chatIdField);
 
     this.chatId = chatId;
     this.responder = responder;
     this.chosen = chosen;
+    this.start = start;
   }
 
   public get conversationId(): string {
@@ -35,14 +37,16 @@ export class ChatResponderParams {
     const responder = reader.readNullableObject(Resources.responderField);
     return new ChatResponderParams(reader.readNonBlankString(Resources.chatIdField),
       Object.isNull(responder) ? null : ChatResponder.fromJson(responder.toJson(), responder.path),
-      reader.hasField(Resources.chosenField) ? reader.readBoolean(Resources.chosenField) : false);
+      reader.hasField(Resources.chosenField) ? reader.readBoolean(Resources.chosenField) : false,
+      reader.hasField(Resources.startField) ? reader.readBoolean(Resources.startField) : false);
   }
 
   public toJson(): JsonObject {
     return {
       [Resources.chatIdField]: this.chatId,
       [Resources.responderField]: Object.isNull(this.responder) ? null : this.responder.toJson(),
-      [Resources.chosenField]: this.chosen
+      [Resources.chosenField]: this.chosen,
+      [Resources.startField]: this.start
     };
   }
 }

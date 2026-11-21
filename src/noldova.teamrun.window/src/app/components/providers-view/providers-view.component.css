@@ -6,6 +6,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+:host {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nol-teamrun-providers-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 .nol-teamrun-providers-parts {
   display: flex;
   flex-direction: column;
@@ -65,8 +78,12 @@
 
 .nol-teamrun-welcome-actions {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--nol-space-2);
-  margin-block-start: var(--nol-space-4);
+  overflow: hidden;
+  scrollbar-gutter: stable;
+  padding: var(--nol-space-3) var(--nol-content-padding-inline);
+  border-block-start: var(--nol-border-width) solid var(--nol-card-border);
 }

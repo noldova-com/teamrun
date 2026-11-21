@@ -531,7 +531,8 @@ export class ComposerComponent {
         const found = own ?? fresh ?? carried?.withMode(null) ?? null;
         const opens = Object.isNull(own) && Object.isNullOrUndefined(kept) && (!Object.isNull(found) || Object.isNull(this.kind()));
         const local = opens ? this.store.startingChoiceOf(this.store.membersOf(conversationId).map(t => t.teammateId), found) : found;
-        const base = local ?? this.currentSettings() ?? new ComposerSettings(first.id, null, null, null);
+        const listed = Object.isNull(local) || !kinds.some(t => t.id === local.kind) ? null : local;
+        const base = listed ?? this.currentSettings() ?? new ComposerSettings(first.id, null, null, null);
         const remembered = follows ? base.following(kept!) : local;
         const applies = !Object.isNull(remembered) && kinds.some(t => t.id === remembered.kind);
         if (applies) {
@@ -1192,7 +1193,7 @@ export class ComposerComponent {
       return;
     const responder = settings.toResponder();
     if (!ComposerComponent.sameResponder(responder, conversation.responder))
-      void this.store.setResponder(conversationId, responder, chosen);
+      void this.store.setResponder(conversationId, responder, chosen, !chosen && Object.isNull(responder.teammateId) && Object.isNull(conversation.responder));
   }
 
   private static sameResponder(a: ConversationResponder | null | undefined, b: ConversationResponder | null | undefined): boolean {
@@ -1317,11 +1318,12 @@ export class ComposerComponent {
       this.signOutFailure.set(Resources.logoutUnavailable);
       return;
     }
-    if (!await ProviderSignOut.confirmAsync(this.dialogs, this.store, provider))
+    const report = (message: string): void => this.signOutFailure.set(message);
+    if (!await ProviderSignOut.confirmAsync(this.dialogs, this.store, provider, report))
       return;
     this.value.set(String.empty);
     void this.drafts.discard(conversationId);
-    const isSignedOut = await ProviderSignOut.signOutAsync(this.store, provider, t => this.signOutFailure.set(t));
+    const isSignedOut = await ProviderSignOut.signOutAsync(this.store, provider, report);
     if (Object.isNull(isSignedOut))
       this.signOutNote.set(Resources.formatSignOutUnknown(provider.label));
     else

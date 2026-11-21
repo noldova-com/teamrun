@@ -265,6 +265,8 @@ export class RequestDispatcher {
         return (await RequestDispatcher.require(this.organizationMessages, method).stopAsync(MessageIdParams.fromJson(payload))).toJson();
       case MethodName.OrganizationMessageList:
         return (await RequestDispatcher.require(this.organizationMessages, method).listAsync()).map(t => t.toJson());
+      case MethodName.OrganizationMessageReplyList:
+        return (await RequestDispatcher.require(this.organizationMessages, method).listRepliesAsync(MessageIdParams.fromJson(payload))).map(t => t.toJson());
       case MethodName.SharedMcpServerList:
         return (await RequestDispatcher.require(this.sharedServers, method).listAsync()).map(t => t.toJson());
       case MethodName.SharedMcpServerCreate:
@@ -378,7 +380,7 @@ export class RequestDispatcher {
       case MethodName.FirstLaunchFinish:
         return (await this.providers.finishFirstLaunchAsync()).toJson();
       case MethodName.ProviderKindList:
-        return this.kinds.list().map(t => t.toJson());
+        return (await this.kinds.listAsync()).map(t => t.toJson());
       case MethodName.ProviderListModels:
         return [...await this.kinds.listModelsAsync(ProviderListModelsParams.fromJson(payload))];
       case MethodName.ProviderModelCatalog:

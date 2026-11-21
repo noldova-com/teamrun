@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
+import { Assert, Category, TestClass, TestMethod } from "@noldova/context.testing";
 import { TimeoutException } from "@noldova/teamrun.core";
 import { PowershellSession, Resources } from "@noldova/teamrun.providers";
 
@@ -115,31 +115,12 @@ export class PowershellSessionTests {
     const session = new PowershellSession(Resources.powershellExecutable, Resources.powershellSessionArguments, process.env, 1);
 
     const answers = [await session.run(Resources.powershellProcessListScript, Resources.processListTimeout),
-      await session.run("throw 'refused'", Resources.processListTimeout), await session.run(Resources.powershellCimProcessListScript, Resources.processListTimeout)];
+      await session.run("throw 'refused'", Resources.processListTimeout), await session.run(Resources.powershellProcessListScript, Resources.processListTimeout)];
 
     const entries = answers.map(t => [...t.matchAll(Resources.processParentPattern)].find(u => Number(u[1]) === process.pid)?.slice(2, 4));
     Assert.areEqual(String(process.ppid), entries[0]?.[0]);
     Assert.isTrue(Number(entries[0]?.[1]) > 0);
     Assert.areEqual(JSON.stringify([entries[0], undefined, entries[0]]), JSON.stringify(entries));
-  }
-
-  @Category("ProcessListing")
-  @TestMethod
-  @TestData("throw new System.InvalidOperationException();")
-  @TestData(`return "";`)
-  public async listsThisProcessThroughWindowsManagementWhenItsTypeFailsOrListsNothingOnWindows(body: string): Promise<void> {
-    if (process.platform !== Resources.windowsPlatform)
-      return;
-    const session = new PowershellSession(Resources.powershellExecutable, Resources.powershellSessionArguments, process.env, 1);
-
-    await session.run(`Add-Type -TypeDefinition 'public static class ${Resources.powershellProcessListType} { public static string List() { ${body} } }'`,
-      Resources.processListTimeout);
-    const answers = [await session.run(Resources.powershellProcessListScript, Resources.processListTimeout),
-      await session.run(Resources.powershellCimProcessListScript, Resources.processListTimeout)];
-
-    const entries = answers.map(t => [...t.matchAll(Resources.processParentPattern)].find(u => Number(u[1]) === process.pid)?.slice(2, 4));
-    Assert.areEqual(String(process.ppid), entries[0]?.[0]);
-    Assert.areEqual(JSON.stringify([entries[1], entries[1]]), JSON.stringify(entries));
   }
 
   @Category("ProcessListing")

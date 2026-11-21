@@ -468,6 +468,7 @@ export class Resources {
   public static readonly sessionResetField: string = "sessionReset";
   public static readonly editedField: string = "edited";
   public static readonly chosenField: string = "chosen";
+  public static readonly startField: string = "start";
   public static readonly forkedSessionField: string = "forkedSession";
   public static readonly sessionKeptField: string = "sessionKept";
   public static readonly restoreRefusalField: string = "restoreRefusal";

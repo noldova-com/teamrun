@@ -85,7 +85,8 @@ describe("OrganizationViewComponent", () => {
     await Wait.until(() => expect(menuItems()).toEqual([]));
   };
   const card = (name: string): HTMLElement => {
-    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name);
+    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name
+      || t.querySelector<HTMLInputElement>(".name-field")?.value === name);
     if (Object.isUndefined(found))
       throw new Error(`No card is named ${name}.`);
     return found;
@@ -132,10 +133,10 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart > nol-canvas").getAttribute("aria-label"),
       all(".chart [nolCanvasItem]").filter(t => t.matches(".owner, .department, nol-teamrun-organization-card")).length])
-      .toEqual([["Organization"], ["4 teammates"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure", 8]);
+      .toEqual([["Organization"], ["4 teammates in 3 departments"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure", 8]);
     expect(tree()).toEqual([
-      ["Design", "2", "Led by Alice · 1 member", ["Alice"], ["Bob"], [["UI", "1", "Led by Code Reviewer · 0 members", ["Code Reviewer"], [], [], []]], []],
-      ["Build", "1", "1 member", [], ["Offline"], [], []]
+      ["Design", "2", "2 idle", ["Alice"], ["Bob"], [["UI", "1", "1 idle", ["Code Reviewer"], [], [], []]], []],
+      ["Build", "1", "1 stopped", [], ["Offline"], [], []]
     ]);
     expect(texts(".role", department("Design"))).toEqual(["Review"]);
   });
@@ -146,7 +147,7 @@ describe("OrganizationViewComponent", () => {
       [new DepartmentMember("offline", "build")]).toJson());
     await settle();
 
-    expect([tree(), texts(".owner .role")]).toEqual([[["Build", "1", "Led by Offline · 0 members", ["Offline"], [], [], []]], ["Owner · 1 leader reports to you"]]);
+    expect([tree(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Owner · 1 leader reports to you"]]);
 
     context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
     await settle();
@@ -154,18 +155,18 @@ describe("OrganizationViewComponent", () => {
     expect([tree(), texts(".empty"), texts(".owner .role")]).toEqual([[], ["No departments yet."], ["Owner · 0 leaders report to you"]]);
   });
 
-  it("collapses a department to a count of who it hides, keeps that on the server, and opens it again", async () => {
+  it("collapses a department to a count of the members and nested departments' people it hides, keeps that on the server, and opens it again", async () => {
     await create();
-    const toggle = (): HTMLButtonElement => one(":scope > .department .department-toggle", department("Design")) as HTMLButtonElement;
+    const toggle = (): HTMLElement => one(":scope > .department .department-toggle", department("Design"));
 
-    expect([toggle().getAttribute("aria-expanded"), toggle().getAttribute("aria-label")]).toEqual(["true", "Collapse Design"]);
+    expect([toggle().getAttribute("aria-expanded"), toggle().getAttribute("aria-label")]).toEqual(["true", "Hide Design's members"]);
 
     toggle().click();
     await Wait.until(() => expect(saves).toHaveLength(1));
     await settle();
 
     expect([toggle().getAttribute("aria-expanded"), toggle().getAttribute("aria-label"), shape(department("Design"))])
-      .toEqual(["false", "Expand Design", ["Design", "2", "Led by Alice · 1 member", ["Alice"], [], [], ["2 teammates hidden"]]]);
+      .toEqual(["false", "Show Design's members", ["Design", "2", "2 idle", ["Alice"], [], [], ["2 members hidden"]]]);
     expect(saves[0]).toEqual(expect.objectContaining({ collapsedDepartments: ["design"] }));
 
     toggle().click();
@@ -175,16 +176,24 @@ describe("OrganizationViewComponent", () => {
     expect(shape(department("Design"))[4]).toEqual(["Bob"]);
   });
 
-  it("says how many a collapsed department hides, and nothing when it holds no one", async () => {
-    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ collapsedDepartments: ["ui"] })));
+  it("says how many a collapsed department hides: its members, or its nested departments' people, and nothing when only its leader or no one is there", async () => {
+    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ collapsedDepartments: ["ui", "build", "top"] })));
 
-    expect(shape(department("UI"))).toEqual(["UI", "1", "Led by Code Reviewer · 0 members", ["Code Reviewer"], [], [], ["1 teammate hidden"]]);
+    expect([shape(department("UI")), shape(department("Build"))])
+      .toEqual([["UI", "1", "1 idle", ["Code Reviewer"], [], [], []], ["Build", "1", "1 stopped", [], [], [], ["1 member hidden"]]]);
+
+    organization = new Organization([new Department("top", "Top", null, null, 0, "c", "u"), new Department("ui", "UI", "top", "reviewer", 0, "c", "u")],
+      [new DepartmentMember("reviewer", "ui")]);
+    context.emit(EventName.OrganizationChanged, organization.toJson());
+    await settle();
+
+    expect(shape(department("Top"))).toEqual(["Top", "0", undefined, [], [], [], ["1 member hidden"]]);
 
     organization = new Organization([new Department("ui", "UI", null, null, 0, "c", "u")], []);
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
-    expect(shape(department("UI"))).toEqual(["UI", "0", "0 members", [], [], [], []]);
+    expect(shape(department("UI"))).toEqual(["UI", "0", undefined, [], [], [], []]);
   });
 
   it("says when the organization can't be read, and reads it again on Retry", async () => {
@@ -226,7 +235,7 @@ describe("OrganizationViewComponent", () => {
     await Wait.until(() => expect(saves).toHaveLength(2));
     await settle();
 
-    expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "60% left", "gpt-5 · high"], ["Idle", "60% left"]]);
+    expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "40%", "gpt-5 · high"], ["Idle", "40%"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
     expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true, Git: false, PullRequests: false, Documents: false,
       Artifacts: false } }));
@@ -249,6 +258,18 @@ describe("OrganizationViewComponent", () => {
       .toEqual([4, cards, cards, expect.objectContaining({ cardsShow: expect.objectContaining({ Git: true }) })]);
   });
 
+  it("shows no usage on a card whose provider's plan has no window with a percent, such as an unlimited one", async () => {
+    await create(context => context.answer(MethodName.PlanUsageList, () =>
+      [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, null, null, null, null, true)], "2026-10-22T09:00:00.000Z").toJson()]));
+
+    await openMenu(one(".top .cards-show"));
+    menuItem("Usage today").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    expect([shows("Alice"), shows("Bob"), all(".usage")]).toEqual([["Idle"], ["Idle"], []]);
+  });
+
   it("says on each card what its teammate runs now, the earliest first with for how long and how many more, ticking each second", async () => {
     const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
     TestBed.overrideProvider(ClockService, { useValue: clock });
@@ -258,22 +279,22 @@ describe("OrganizationViewComponent", () => {
     const now = (name: string): string[] => [...texts(".now-icon", card(name)), ...texts(".now-text", card(name)), ...texts(".now-for", card(name))];
     await create();
     const idle = [now("Alice"), now("Offline"), clock.running];
-    context.emit(EventName.MessageCreated, reply("r1", "c9", "2026-09-10T08:00:00.000Z", MessageStatus.Running).toJson());
+    context.emit(EventName.MessageCreated, reply("r1", "c9", "2026-09-10T08:04:30.000Z", MessageStatus.Running).toJson());
     await settle();
     const single = now("Alice");
-    context.emit(EventName.MessageCreated, reply("r2", "c1", "2026-09-10T07:59:00.000Z", MessageStatus.Running).toJson());
+    context.emit(EventName.MessageCreated, reply("r2", "c1", "2026-09-10T08:04:20.000Z", MessageStatus.Running).toJson());
     await settle();
     const two = now("Alice");
     clock.advance(Resources.clockIntervalMilliseconds);
     await settle();
     const ticked = [now("Alice"), clock.intervals];
-    context.emit(EventName.MessageUpdated, reply("r1", "c9", "2026-09-10T08:00:00.000Z", MessageStatus.Completed).toJson());
-    context.emit(EventName.MessageUpdated, reply("r2", "c1", "2026-09-10T07:59:00.000Z", MessageStatus.Completed).toJson());
+    context.emit(EventName.MessageUpdated, reply("r1", "c9", "2026-09-10T08:04:30.000Z", MessageStatus.Completed).toJson());
+    context.emit(EventName.MessageUpdated, reply("r2", "c1", "2026-09-10T08:04:20.000Z", MessageStatus.Completed).toJson());
     await settle();
 
     expect(idle).toEqual([["pause_circle", "Nothing running"], ["pause_circle", "Stopped"], 0]);
-    expect([single, two, ticked]).toEqual([["progress_activity", "Replying", "5m 0s"], ["progress_activity", "First", "6m 0s +1"],
-      [["progress_activity", "First", "6m 1s +1"], [Resources.clockIntervalMilliseconds]]]);
+    expect([single, two, ticked]).toEqual([["progress_activity", "Replying", "30 s"], ["progress_activity", "First", "40 s +1"],
+      [["progress_activity", "First", "41 s +1"], [Resources.clockIntervalMilliseconds]]]);
     expect([now("Alice"), clock.running]).toEqual([["pause_circle", "Nothing running"], 0]);
     expect(card("Alice").querySelector(".now-icon")?.getAttribute("aria-hidden")).toBe("true");
 
@@ -341,25 +362,16 @@ describe("OrganizationViewComponent", () => {
     expect([shows("Alice"), saves[3]]).toEqual([["gpt-5 · high"], expect.objectContaining({ cards: {} })]);
   });
 
-  it("shows the kept view checked among Tree, Board and Focus, and keeps the one chosen on the server", async () => {
+  it("offers no Board or Focus before they are built, and draws the tree whatever view is kept", async () => {
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
-    const pills = (): string[][] => all(".top .views [role=radio]").map(t => [t.textContent?.trim() ?? "", t.getAttribute("aria-checked") ?? ""]);
 
-    expect([one(".top .views [role=radiogroup]").getAttribute("aria-label"), pills()])
-      .toEqual(["View", [["Tree", "false"], ["Board", "true"], ["Focus", "false"]]]);
-    expect(element().querySelectorAll(".chart .tree")).toHaveLength(1);
-
-    one(".top .views [role=radio]:last-of-type").click();
-    await Wait.until(() => expect(saves).toHaveLength(1));
-    await settle();
-
-    expect([pills()[2], saves[0]]).toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null })]);
+    expect([all(".top [role=radio]"), all(".chart .tree")]).toEqual([[], [one(".chart .tree")]]);
   });
 
   it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
     await create();
     const edit = (): HTMLElement => one(".top .edit");
-    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-secondary")];
+    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-secondary"), edit().getAttribute("aria-pressed")];
     const before = looks();
 
     edit().click();
@@ -368,7 +380,8 @@ describe("OrganizationViewComponent", () => {
     edit().click();
     await settle();
 
-    expect([before, editing, looks(), saves]).toEqual([["editEdit structure", true], ["checkDone editing", false], ["editEdit structure", true], []]);
+    expect([before, editing, looks(), saves]).toEqual([["account_treeEdit structure", true, "false"], ["account_treeDone editing", false, "true"],
+      ["account_treeEdit structure", true, "false"], []]);
   });
 
   describe("while its structure is edited", () => {
@@ -501,10 +514,37 @@ describe("OrganizationViewComponent", () => {
       one(".top .edit").click();
       await settle();
 
+      expect(all(".remove, .move", card("Alice"))).toEqual([]);
       expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
         ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob", ["Design", "UI", "Build"], 0]);
       expect(asked).toEqual([[MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: null }],
         [MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: "build" }]]);
+    });
+
+    it("renames a teammate from its card's field, and puts the name back with why when the name can't be taken", async () => {
+      await editAsync();
+      const field = card("Bob").querySelector<HTMLInputElement>(".name-field");
+      if (Object.isNull(field))
+        throw new Error("Bob's card has no name field.");
+      const named = (): HTMLInputElement => field;
+      const renameAsync = async (value: string): Promise<void> => {
+        named().value = value;
+        named().dispatchEvent(new Event("change"));
+        await settle();
+      };
+      const label = named().getAttribute("aria-label");
+
+      await renameAsync("Bob!!");
+      const refused = [named().value, texts(".action-error"), context.count(MethodName.TeammateUpdate)];
+      await renameAsync(" Robert ");
+      await Wait.until(() => expect(named().value).toBe("Robert"));
+      const renamed = [texts(".name, .name-field", card("Robert")).length, texts(".action-error"), all(".name-field", card("Alice")).length];
+      context.fail(MethodName.TeammateUpdate, "That name is taken.");
+      await renameAsync("Alice");
+      await Wait.until(() => expect(texts(".action-error")).toHaveLength(1));
+
+      expect([label, refused, renamed, named().value, texts(".action-error")[0]?.includes("That name is taken."), texts(".name", card("Robert"))]).toEqual([
+        "Rename Bob", ["Bob", [Resources.organizationTeammateNameRule], 0], [1, [], 1], "Robert", true, []]);
     });
 
     it("adds a member from the teammates not yet in the department, in name order", async () => {
@@ -562,6 +602,7 @@ describe("OrganizationViewComponent", () => {
         SampleData.timestamp, SampleData.timestamp, null, [], "alice", "alice").toJson());
       await settle();
       const alice = card("Alice");
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const [icon, text, lasted] = [one(".now-icon", alice), one(".now-text", alice), one(".now-for", alice)];
       const style = getComputedStyle(alice);
       const inner = alice.getBoundingClientRect();
@@ -570,9 +611,12 @@ describe("OrganizationViewComponent", () => {
 
       AppearanceFixture.expectPixels(icon.getBoundingClientRect().left, left);
       AppearanceFixture.expectPixels(icon.getBoundingClientRect().width, AppearanceFixture.measureLook("icon"));
-      AppearanceFixture.expectPixels(text.getBoundingClientRect().left - icon.getBoundingClientRect().right, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(text.getBoundingClientRect().left - icon.getBoundingClientRect().right,
+        AppearanceFixture.measureLook("space-1") + AppearanceFixture.measureLook("space-half"));
       AppearanceFixture.expectPixels(lasted.getBoundingClientRect().right, right);
-      AppearanceFixture.expectPixels(icon.getBoundingClientRect().top, text.getBoundingClientRect().top);
+      AppearanceFixture.expectPixels(icon.getBoundingClientRect().top - text.getBoundingClientRect().top, 0.0625 * rem);
+      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(text).fontSize), AppearanceFixture.measureLook("text-panel"));
+      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(lasted).fontSize), AppearanceFixture.measureLook("text-code"));
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
     });
 
@@ -618,7 +662,7 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("fills the space under the header with one canvas, and fits the chart at 100% to its top, under the canvas's tools", async () => {
+    it("fills the space under the header with one canvas inside the view's padding, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
       element().style.width = "60rem";
       element().style.height = "60rem";
@@ -627,7 +671,9 @@ describe("OrganizationViewComponent", () => {
       const [host, top, canvas] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas")];
       const [tools, tree] = [box(".chart .nol-canvas-tools"), box(".chart .tree")];
 
-      for (const [actual, expected] of [[canvas.top, top.bottom], [canvas.left, host.left], [canvas.right, host.right], [canvas.bottom, host.bottom]] as const)
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.right, host.right - space(6)],
+        [canvas.bottom, host.bottom - space(6)]] as const)
         AppearanceFixture.expectPixels(actual, expected);
       expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
     });
@@ -660,19 +706,122 @@ describe("OrganizationViewComponent", () => {
       expect([name.right <= remove.left, drop.right <= tune.left, texts(".chart .nol-canvas-zoom")]).toEqual([true, true, ["100%"]]);
     });
 
-    it("puts the view pills on the right of the header, then Cards show and Edit structure, all centred on one line", async () => {
+    it("joins Add department to the bar over the departments while editing, as it joins a department", async () => {
       await create();
       element().style.width = "72rem";
+      element().style.height = "60rem";
+      one(".top .edit").click();
       await settle();
-      const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
-      const [top, views, cards, edit] = [box(".top"), box(".top .views"), box(".top .cards-show"), box(".top .edit")];
+      one(".chart .nol-canvas-actual").click();
+      await settle();
+      const kid = one(".chart .tree > .kids > .kid:last-child");
+      const [box, button] = [kid.getBoundingClientRect(), one(".add-department", kid).getBoundingClientRect()];
+      const [bar, drop] = [getComputedStyle(kid, "::before"), getComputedStyle(kid, "::after")];
 
-      AppearanceFixture.expectPixels(cards.left - views.right, AppearanceFixture.measureLook("space-4"));
-      AppearanceFixture.expectPixels(edit.left - cards.right, AppearanceFixture.measureLook("space-4"));
-      AppearanceFixture.expectPixels(top.right - edit.right, AppearanceFixture.measureLook("space-6"));
-      AppearanceFixture.expectPixels(views.top + views.height / 2, cards.top + cards.height / 2);
-      AppearanceFixture.expectPixels(edit.top + edit.height / 2, cards.top + cards.height / 2);
-      expect(views.left).toBeGreaterThan(box(".top .headcount").right);
+      expect([getComputedStyle(kid).position, bar.borderTopStyle, drop.borderLeftStyle]).toEqual(["relative", "solid", "solid"]);
+      AppearanceFixture.expectPixels(Number.parseFloat(bar.right), box.width / 2);
+      AppearanceFixture.expectPixels(box.left + Number.parseFloat(drop.left), box.left + box.width / 2);
+      AppearanceFixture.expectPixels(box.top + Number.parseFloat(drop.height), button.top);
+      expect(button.left <= box.left + box.width / 2 && box.left + box.width / 2 <= button.right).toBe(true);
+    });
+
+    describe.each([
+      { size: "the narrowest a document gets", width: 13.75, wraps: true },
+      { size: "a wide window", width: 72, wraps: false }
+    ])("at $size", ({ width, wraps }) => {
+      it("heads the view with its title over its headcount on the left, then the status key, Cards show and Edit structure half a step apart, wrapping under it when narrow, and fits the tree on the canvas under its tools", async () => {
+        await create();
+        element().style.width = `${width}rem`;
+        element().style.height = "40rem";
+        await settle();
+        one(".chart .nol-canvas-fit").click();
+        await settle();
+        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+        const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+        const [top, title, headcount, tools, key, cards, edit] = [box(".top"), box(".top .title"), box(".top .headcount"), box(".top .tools"),
+          box(".top .status-key"), box(".top .cards-show"), box(".top .edit")];
+        const [canvas, bar, owner] = [box(".chart > nol-canvas"), box(".chart .nol-canvas-tools"), box(".owner")];
+        const heading = getComputedStyle(one(".top .title"));
+
+        AppearanceFixture.expectPixels(title.left, top.left + space(6));
+        AppearanceFixture.expectPixels(headcount.left, title.left);
+        AppearanceFixture.expectPixels(headcount.top, title.bottom);
+        AppearanceFixture.expectPixels(Number.parseFloat(heading.fontSize), AppearanceFixture.measureLook("text-heading"));
+        AppearanceFixture.expectPixels(Number.parseFloat(heading.lineHeight), 2 * rem);
+        expect(tools.right).toBeLessThanOrEqual(top.right - space(6) + 0.5);
+        AppearanceFixture.expectPixels(canvas.top, top.bottom + space(4));
+        AppearanceFixture.expectPixels(canvas.left, top.left + space(6));
+        expect([owner.top >= bar.bottom, owner.left >= canvas.left, all(".top .status-key nol-teamrun-teammate-status").length]).toEqual([true, true, 4]);
+        if (wraps) {
+          AppearanceFixture.expectPixels(tools.left, title.left);
+          expect(tools.top).toBeGreaterThanOrEqual(headcount.bottom);
+          return;
+        }
+        AppearanceFixture.expectPixels(edit.right, tools.right);
+        AppearanceFixture.expectPixels(cards.left - key.right, space(2));
+        AppearanceFixture.expectPixels(edit.left - cards.right, space(2));
+        AppearanceFixture.expectPixels(tools.right, top.right - space(6));
+        for (const view of [key, cards, edit])
+          expect(Math.abs(view.top + view.height / 2 - (top.top + top.height / 2))).toBeLessThanOrEqual(0.5);
+        expect(tools.left).toBeGreaterThan(headcount.right);
+      });
+    });
+  });
+
+  describe.each([
+    { look: "the fixture theme", mode: ThemeMode.Light, surface: "panel" },
+    { look: "dark", mode: ThemeMode.Dark, surface: "raised" }
+  ])("in $look's colours", ({ mode, surface }) => {
+    beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, mode));
+
+    afterEach(() => AppearanceFixture.reset());
+
+    it("draws the cards, departments and you on the panel's colour in light and the raised colour in dark, off the canvas's, a department's count on a filled badge, and a status's word in its colour", async () => {
+      await create();
+      const colour = (name: string): string => {
+        const probe = document.createElement("span");
+        probe.style.color = `var(--nol-${name})`;
+        element().append(probe);
+        const value = getComputedStyle(probe).color;
+        probe.remove();
+        return value;
+      };
+      const count = one(":scope > .department .department-count", department("Design"));
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+
+      expect([one(".owner"), one(":scope > .department", department("Design")), card("Alice")].map(t => getComputedStyle(t).backgroundColor))
+        .toEqual(Array.from({ length: 3 }, () => colour(surface)));
+      expect([getComputedStyle(count).backgroundColor, getComputedStyle(count).color]).toEqual([colour("badge"), colour("badge-text")]);
+      AppearanceFixture.expectPixels(count.getBoundingClientRect().height, 1.25 * rem);
+      expect(all(".top .status-key nol-teamrun-teammate-status").map(t => [t.textContent?.trim(), getComputedStyle(t).color])).toEqual([
+        ["Working", colour("text")], ["Waiting for you", colour("warning")], ["Idle", colour("text")], ["Stopped", colour("status-failed")]]);
+    });
+
+    it.each([
+      { used: 79, fill: "text-muted" },
+      { used: 80, fill: "warning" }
+    ])("draws a card's usage at $used% used as a bar across the card a step high, filled in $fill, half a step before its figure", async ({ used, fill }) => {
+      await create(context => context
+        .answer(MethodName.OrganizationLayoutRead, () => ({ cardsShow: { Usage: true } }))
+        .answer(MethodName.PlanUsageList, () => [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, used, null)], "2026-10-22T09:00:00.000Z").toJson()]));
+      const probe = document.createElement("span");
+      probe.style.color = `var(--nol-${fill})`;
+      element().append(probe);
+      const expected = getComputedStyle(probe).color;
+      probe.remove();
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const meter = one(".usage", card("Alice"));
+      const [box, track, text] = [card("Alice").getBoundingClientRect(), one(".nol-meter-track", meter).getBoundingClientRect(),
+        one(".nol-meter-text", meter).getBoundingClientRect()];
+      const inset = Number.parseFloat(getComputedStyle(card("Alice")).borderLeftWidth) + space(3);
+
+      expect([meter.textContent?.trim(), getComputedStyle(one(".nol-meter-fill", meter)).backgroundColor]).toEqual([`${used}%`, expected]);
+      AppearanceFixture.expectPixels(track.left, box.left + inset);
+      AppearanceFixture.expectPixels(track.height, space(1));
+      AppearanceFixture.expectPixels(text.left - track.right, space(2));
+      expect(text.right).toBeLessThanOrEqual(box.right - inset + 0.5);
+      expect(track.width).toBeGreaterThan(box.width - 2 * inset - 2 * space(6));
     });
   });
 });

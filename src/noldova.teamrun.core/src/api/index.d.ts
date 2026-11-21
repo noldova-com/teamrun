@@ -534,6 +534,13 @@ export interface IProviderAdapter {
   checkFoundSignIn?(provider: Provider): Promise<SignInCheck>;
 
   /**
+   * Rebuilds the descriptor from the environment the provider's tooling is given, such as the login shell's, when what it says depends on
+   * that environment; absent for a kind whose descriptor never changes. `IProviderKindsService.listAsync` awaits it before listing.
+   * @returns A promise that resolves once the descriptor is current.
+   */
+  refreshDescriptorAsync?(): Promise<void>;
+
+  /**
    * Readies a provider's empty profile folder before anything can sign in to it, such as claiming the folder as TeamRun's and making the
    * folders its sign-in terminal gets: one TeamRun just made for a new provider, or an empty one the person chose for a new or moved
    * provider; absent for a kind whose folder needs nothing first.
@@ -1562,6 +1569,12 @@ export interface IMessagesService {
   listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
 
   /**
+   * Lists the replies in the sent message's chat that answer it, in chat order, walking the chat's messages after it.
+   * @param sent The message the replies answer.
+   */
+  listRepliesToAsync(sent: Message): Promise<readonly Message[]>;
+
+  /**
    * Lists each teammate's latest completed reply that has text, in any chat.
    */
   listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
@@ -2017,6 +2030,13 @@ export interface IProviderKindsService {
    * @returns Their descriptors.
    */
   list(): readonly ProviderKind[];
+
+  /**
+   * Lists the registered kinds as `list` does, once each adapter's `refreshDescriptorAsync` has run; the kind list the window reads. A kind
+   * whose refresh fails keeps its last descriptor, and the failure is written to the log.
+   * @returns Their descriptors.
+   */
+  listAsync(): Promise<readonly ProviderKind[]>;
 
   /**
    * Lists the models a provider reports, optionally through a provider of that provider.
@@ -2938,6 +2958,7 @@ export declare class Resources {
    * @returns The note.
    */
   public static formatCompactRefused(provider: string, reason: string): string;
+  public static formatDescriptorNotRefreshed(kind: string, failure: string): string;
   public static formatAcpAgentNotOpened(kind: string, reason: string): string;
   public static formatAcpAgentAlreadyAdded(id: string): string;
   public static formatAcpAgentNotListed(id: string): string;
@@ -3720,6 +3741,8 @@ export declare class Resources {
    * Selects a conversation's messages' JSON after a sequence, in sequence order: `conversationId`, `sequence`.
    */
   public static readonly selectMessagesByConversation: string;
+  /** Reads the messages after a sent one in its chat that answer it: its chat, its sequence and its id. */
+  public static readonly selectRepliesTo: string;
   /**
    * Selects one row when a conversation has an ended reply that ran a command: `conversationId`.
    */
@@ -7512,6 +7535,9 @@ export declare class MessagesService implements IMessagesService {
    */
   public listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
 
+  /** @inheritdoc */
+  public listRepliesToAsync(sent: Message): Promise<readonly Message[]>;
+
   /**
    * Lists each teammate's latest completed reply that has text, in any chat, by the end of the reply and then the latest saved.
    * @returns One entry per teammate that has such a reply, by teammate id.
@@ -7793,15 +7819,21 @@ export declare class ProviderKindsService implements IProviderKindsService {
    * @param events Where `ProviderKindInstallationChanged` is published.
    * @param planUsage Where `readPlanUsageAsync` keeps what it reads; a `PlanUsageService` on `events` by default.
    * @param teammates Whose speeds `modelCatalogAsync` clears when the catalog no longer lists them; none by default.
+   * @param log Where `listAsync` writes a kind whose `refreshDescriptorAsync` failed, with the kind of failure; none by default.
    */
   public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink, planUsage?: IPlanUsageService,
-    teammates?: ITeammatesService | null);
+    teammates?: ITeammatesService | null, log?: ILog | null);
 
   /**
    * Lists the registered kinds, each saying whether it can name a chat: whether its adapter has `askIsolated`.
    * @returns Their descriptors.
    */
   public list(): readonly ProviderKind[];
+
+  /**
+   * @inheritdoc
+   */
+  public listAsync(): Promise<readonly ProviderKind[]>;
 
   /**
    * @inheritdoc
@@ -10031,6 +10063,12 @@ export interface IOrganizationMessagesService {
   stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
 
   /**
+   * Lists the replies to the message: for each recipient its message reached, the replies in its chat that answer the message it was sent, in chat order.
+   * @throws ServiceException `NotFound` for an unknown message.
+   */
+  listRepliesAsync(params: MessageIdParams): Promise<readonly Message[]>;
+
+  /**
    * After a restart, marks every recipient still `Queued` `Failed` with `Resources.organizationSendInterrupted`; run once the engine has reconciled.
    */
   reconcileAsync(): Promise<void>;
@@ -10050,6 +10088,9 @@ export declare class OrganizationMessagesService implements IOrganizationMessage
 
   /** @inheritdoc */
   public stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+
+  /** @inheritdoc */
+  public listRepliesAsync(params: MessageIdParams): Promise<readonly Message[]>;
 
   /** @inheritdoc */
   public reconcileAsync(): Promise<void>;

@@ -120,6 +120,11 @@ export class MessagesService implements IMessagesService {
     return Object.isUndefined(record) ? null : record.readNullableString(Resources.checkpointFolderIdColumn);
   }
 
+  public async listRepliesToAsync(sent: Message): Promise<readonly Message[]> {
+    const rows = await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectRepliesTo, [sent.chatId, sent.sequence, sent.id]));
+    return rows.map(t => MessagesService.read(t));
+  }
+
   public async listTeammateUsageAsync(): Promise<readonly TeammateUsage[]> {
     return (await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectTeammateUsage, []))).map(t => new TeammateUsage(
       t.readString(Resources.teammateIdColumn), t.readString(Resources.conversationIdColumn), t.readString(Resources.idColumn),

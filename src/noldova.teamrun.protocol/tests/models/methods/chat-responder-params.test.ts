@@ -18,8 +18,8 @@ export class ChatResponderParamsTests {
   public roundTripsAChoiceAndAClearedOneThroughJson(): void {
     const teammate = { teammateId: "bob", requested: null, providerId: null };
     const fallback = { teammateId: null, requested: { kind: "codex", model: null, effort: null, speed: null, mode: null }, providerId: "a1" };
-    for (const json of [{ chatId: "conv-1", responder: teammate, chosen: true }, { chatId: "conv-1", responder: fallback, chosen: false },
-      { chatId: "conv-1", responder: null, chosen: false }])
+    for (const json of [{ chatId: "conv-1", responder: teammate, chosen: true, start: false }, { chatId: "conv-1", responder: fallback, chosen: false, start: true },
+      { chatId: "conv-1", responder: null, chosen: false, start: false }])
       Assert.areEqual(JSON.stringify(json), JSON.stringify(ChatResponderParams.fromJson(json).toJson()));
   }
 
@@ -28,6 +28,14 @@ export class ChatResponderParamsTests {
     Assert.isFalse(ChatResponderParams.fromJson({ chatId: "conv-1", responder: null }).chosen);
     Assert.isFalse(new ChatResponderParams("conv-1", null).chosen);
     Assert.isTrue(new ChatResponderParams("conv-1", null, true).chosen);
+  }
+
+  @TestMethod
+  public readsAResponderAsSetWhateverTheChatHoldsWhenItDoesNotAskToStartOne(): void {
+    Assert.isFalse(ChatResponderParams.fromJson({ chatId: "conv-1", responder: null, chosen: true }).start);
+    Assert.isFalse(new ChatResponderParams("conv-1", null, true).start);
+    Assert.isTrue(new ChatResponderParams("conv-1", null, false, true).start);
+    Assert.isTrue(ChatResponderParams.fromJson({ chatId: "conv-1", responder: null, start: true }).start);
   }
 
   @TestMethod
@@ -42,5 +50,6 @@ export class ChatResponderParamsTests {
       responder: { teammateId: null, requested: {}, providerId: null } }), JsonException).path);
     Assert.areEqual("$.chatId", Assert.throws(() => ChatResponderParams.fromJson({ responder: null }), JsonException).path);
     Assert.areEqual("$.chosen", Assert.throws(() => ChatResponderParams.fromJson({ chatId: "conv-1", responder: null, chosen: 1 }), JsonException).path);
+    Assert.areEqual("$.start", Assert.throws(() => ChatResponderParams.fromJson({ chatId: "conv-1", responder: null, start: 1 }), JsonException).path);
   }
 }

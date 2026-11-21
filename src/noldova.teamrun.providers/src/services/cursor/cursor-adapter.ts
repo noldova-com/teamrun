@@ -20,8 +20,6 @@ import type { ProviderTimings } from "../../models/provider-timings.js";
 import { Resources } from "../../resources.js";
 import { AcpAdapter } from "../acp/acp-adapter.js";
 import { CommandRunner } from "../process/command-runner.js";
-import { PowershellSession } from "../process/powershell-session.js";
-import { ProcessTree } from "../process/process-tree.js";
 import { CursorAboutReader } from "./cursor-about.reader.js";
 import { CursorAgent } from "./cursor-agent.js";
 import { CursorImageReader } from "./cursor-image.reader.js";
@@ -35,8 +33,7 @@ export class CursorAdapter extends AcpAdapter {
 
   public constructor(command: ProcessCommand | null, environment: NodeJS.ProcessEnv, defaultProfileDirectory: string, clientInfo: AppServerClientInfo,
     starter: IProcessStarter, timings: ProviderTimings, timer: ITimer = new NodeTimer(),
-    processTree: IProcessTree = new ProcessTree(process.platform, new CommandRunner(starter), process.env, Resources.processListTimeout, timer, timings.stopGrace,
-      undefined, PowershellSession.shared),
+    processTree?: IProcessTree,
     locate: () => ProcessCommand | null = CommandSource.none, log: ILog | null = null, platform: string = process.platform,
     installation: IProviderKindInstallation | null = null) {
     const agent = new CursorAgent(command, environment, defaultProfileDirectory, locate, platform);

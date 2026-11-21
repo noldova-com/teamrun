@@ -869,6 +869,30 @@ export class ChatWakesTests {
   }
 
   @TestMethod
+  public async failsAWakesDeliveryWithTheFailureOfAReadForItsTurnRatherThanNotingTheProviderRefused(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const chat = await host.createConversationAsync(project, "Asked");
+    const alice = await host.teammates.createAsync(new TeammateCreateParams("Alice", "Alice's role", (await host.createProviderAsync()).id, Harness.Provider,
+      null, null));
+    const source = await ChatWakesTests.ask(host, chat.id, alice);
+    await ChatWakesTests.insertAsync(host, "w1", "Reply", chat.id, source.id, chat.id, ["r"], "Ready", "Done.", 1);
+    await host.context.database.connection.executeAsync(new SqlQuery("DROP TABLE preferences"));
+    const failure = await host.context.database.connection.queryAsync(new SqlQuery("SELECT json FROM preferences")).then(() => null, (error: unknown) => error);
+    const messages = (await ChatWakesTests.chatAsync(host, chat.id)).length;
+    const requests = host.adapter.requests.length;
+
+    await host.engine.reconcileAsync();
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(JSON.stringify([`The wakes waiting on chat ${chat.id} weren't settled: ${Resources.formatFailureKind(failure)}`]),
+      JSON.stringify(host.log.lines.filter(t => t.startsWith(`The wakes waiting on chat ${chat.id} weren't settled: `))), host.log.lines.join("\n"));
+    Assert.areEqual(messages, (await ChatWakesTests.chatAsync(host, chat.id)).length);
+    Assert.areEqual(requests, host.adapter.requests.length);
+    Assert.areEqual("Ready", await ChatWakesTests.statesAsync(host));
+  }
+
+  @TestMethod
   public async deletesAChatsOwnWakesAndNotesEachWaitingWakeWatchingItInItsChatWithNoTurnButKeepsAReadyOne(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();

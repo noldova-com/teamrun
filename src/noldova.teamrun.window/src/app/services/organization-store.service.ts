@@ -93,6 +93,10 @@ export class OrganizationStoreService {
     return this.act(MethodName.DepartmentMemberSet, new DepartmentMemberSetParams(teammateId, departmentId).toJson());
   }
 
+  public fail(error: unknown): void {
+    this.actionErrorSignal.set(OrganizationStoreService.messageOf(error));
+  }
+
   public clearActionError(): void {
     this.actionErrorSignal.set(null);
   }

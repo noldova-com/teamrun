@@ -9,9 +9,9 @@
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity, OrganizationMessagesService, Resources, SignInCheck } from "@noldova/teamrun.core";
 import {
-  AuthStatus, type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, ErrorCode, EventName, Harness, MessageAuthor,
-  MessageIdParams, MessageListParams, MessageStatus, type OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget, ProviderIdParams,
-  type Teammate, TeammateCreateParams
+  AuthStatus, type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, DetailKind, ErrorCode, EventName, Harness,
+  MessageAuthor, MessageIdParams, MessageListParams, MessageStatus, type OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget,
+  ProviderIdParams, type Teammate, TeammateCreateParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -204,6 +204,33 @@ export class OrganizationMessagesServiceTests {
 
     Assert.areEqual("Removed:null,Failed:Signed out,Failed:Boom", sent.recipients.map(t => `${t.state}:${t.reason}`).join());
     Assert.isTrue(sent.recipients.every(t => Object.isNull(t.chatId) && Object.isNull(t.messageId)));
+  }
+
+  @TestMethod
+  public async listsTheRepliesToEachRecipientsMessageInItsChatAndNoneForARecipientItNeverReachedOrAnUnknownMessage(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
+    const out = await host.createProviderAsync("fake", "Spare");
+    await host.teammates.createAsync(new TeammateCreateParams("Bob", null, out.id, Harness.Provider, null, null));
+    host.adapter.signInCheck = new SignInCheck(AuthStatus.LoggedOut, null, null, null);
+    await host.providers.checkAsync(new ProviderIdParams(out.id));
+    const send = async (target: OrganizationTarget, text: string, answer: string): Promise<OrganizationMessage> => {
+      host.adapter.detailTexts = [answer];
+      const sent = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(target, text));
+      await host.engine.waitForIdle();
+      return sent;
+    };
+    const first = await send(OrganizationTarget.everyone, "Status?", "Ada here.");
+    const second = await send(OrganizationTarget.teammate(ada.id), "Again?", "Still here.");
+    const said = async (message: OrganizationMessage): Promise<string> => (await host.organizationMessages.listRepliesAsync(new MessageIdParams(message.id)))
+      .map(t => `${t.teammateName}:${t.status}:${t.details.filter(u => u.kind === DetailKind.Text).map(u => u.text).join(" ")}`).join("|");
+
+    Assert.areEqual("Ada:Started,Bob:Failed", OrganizationMessagesServiceTests.states(first));
+    Assert.areEqual(first.recipients[0]?.chatId, second.recipients[0]?.chatId);
+    Assert.areEqual(`Ada:${MessageStatus.Completed}:Ada here.`, await said(first));
+    Assert.areEqual(`Ada:${MessageStatus.Completed}:Still here.`, await said(second));
+    const unknown = await Assert.throwsAsync(() => host.organizationMessages.listRepliesAsync(new MessageIdParams("missing")), ServiceException);
+    Assert.areEqual(ErrorCode.NotFound, unknown.info.name);
   }
 
   private static service(host: CoreHost, sender: FakeOrganizationSender): OrganizationMessagesService {
