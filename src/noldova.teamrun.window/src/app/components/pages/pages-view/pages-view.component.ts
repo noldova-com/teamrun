@@ -16,6 +16,7 @@ import { ButtonComponent, ButtonVariant, ClipboardWriter, ContextMenuTriggerDire
 
 import { ChatPages } from "../../../services/pages/chat-pages";
 import { ChatPagesResources } from "../../../services/pages/chat-pages-resources";
+import { PageDocuments } from "../../../services/pages/page-documents";
 import { PagesClock } from "../../../services/pages/pages-clock";
 import { ContextMenuStateDirective } from "./context-menu-state.directive";
 
@@ -54,6 +55,7 @@ export class PagesViewComponent {
 
   public static resync(context: IWindowPartContext): void {
     ChatPages.of(context).resync();
+    PageDocuments.resync(context);
   }
 
   protected metaOf(page: Page): string {

@@ -136,14 +136,19 @@ export class TeamRunWindowPart implements IWindowPart {
   }
 
   public reconnectAsync(): Promise<boolean> {
-    if (Object.isNull(this.activeContext))
+    const context = this.activeContext;
+    if (Object.isNull(context))
       return Promise.resolve(false);
-    PanelRequests.reportAgain(this.activeContext);
-    SubAgentsBadge.reload(this.activeContext);
-    ComputerUseBorder.reload(this.activeContext);
-    EngineResync.request(this.activeContext);
-    PagesViewComponent.resync(this.activeContext);
-    return ChatStoreService.resync(this.activeContext);
+    PanelRequests.reportAgain(context);
+    SubAgentsBadge.reload(context);
+    ComputerUseBorder.reload(context);
+    EngineResync.request(context);
+    PagesViewComponent.resync(context);
+    return ChatStoreService.resync(context).then(t => {
+      if (t)
+        TitleModelOptions.reload(context);
+      return t;
+    });
   }
 
   public async deactivateAsync(): Promise<void> {
