@@ -154,22 +154,22 @@ describe("OrganizationStoreService", () => {
   });
 
   it("says why a change failed, in its own words or not, and forgets it on the next change or when cleared", async () => {
-    let failure: unknown = new Error("A department can't hold itself.");
+    let failure: unknown = new Error("A department can't move under one of its own.");
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => Organization.empty.toJson())
       .answer(MethodName.DepartmentMove, () => Promise.reject(failure))
       .answer(MethodName.DepartmentDelete, () => null);
     const store = OrganizationStoreService.of(context);
 
-    const moved = await store.moveDepartment("d1", "d1", 0);
+    const moved = await store.moveDepartment("d1", "d2", 0);
     const said = store.actionError();
     failure = "Busy";
-    await store.moveDepartment("d1", "d1", 0);
+    await store.moveDepartment("d1", "d2", 0);
     const plain = store.actionError();
     const deleted = await store.deleteDepartment("d1");
     const afterSuccess = store.actionError();
-    await store.moveDepartment("d1", "d1", 0);
+    await store.moveDepartment("d1", "d2", 0);
     store.clearActionError();
 
-    expect([moved, said, plain, deleted, afterSuccess, store.actionError()]).toEqual([false, "A department can't hold itself.", "Busy", true, null, null]);
+    expect([moved, said, plain, deleted, afterSuccess, store.actionError()]).toEqual([false, "A department can't move under one of its own.", "Busy", true, null, null]);
   });
 });
