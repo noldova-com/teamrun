@@ -1149,6 +1149,8 @@ export class Resources {
     [ChatAction.CancelInstall]: "Couldn't cancel the install",
     [ChatAction.RemoveProvider]: "Couldn't remove the provider",
     [ChatAction.InstallTool]: "Couldn't install the provider's tool",
+    [ChatAction.AddAcpAgent]: "Couldn't add the ACP agent",
+    [ChatAction.RemoveAcpAgent]: "Couldn't remove the ACP agent",
     [ChatAction.OpenPage]: "Couldn't open the page",
     [ChatAction.OpenBrowser]: "Couldn't open the Browser",
     [ChatAction.SaveTeammate]: "Couldn't save the teammate",
@@ -2142,6 +2144,10 @@ export class Resources {
 
   public static formatTeammateError(name: string, error: string): string {
     return `@${name}: ${error}`;
+  }
+
+  public static formatAcpAgentActionTitle(action: ChatAction.AddAcpAgent | ChatAction.RemoveAcpAgent, name: string): string {
+    return action === ChatAction.AddAcpAgent ? `Couldn't add ${name}` : `Couldn't remove ${name}`;
   }
 
   public static formatProviderActionTitle(action: ProviderAction, name: string | null): string {
