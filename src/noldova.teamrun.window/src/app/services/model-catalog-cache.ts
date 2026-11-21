@@ -20,6 +20,7 @@ export class ModelCatalogCache {
   private readonly expired: WeakSet<ModelCatalog> = new WeakSet();
   private readonly loads: WritableSignal<number> = signal(0);
   private readonly now: () => number;
+  private generation: number = 0;
 
   public constructor(fetchModels: (kind: string, providerId: string | null, refresh: boolean, workingDirectory: string | null) => Promise<ProviderModelList>, now: () => number) {
     this.fetchModels = fetchModels;
@@ -36,11 +37,15 @@ export class ModelCatalogCache {
       return pending;
     if (this.pending.size >= Resources.maximumModelCatalogs)
       return Promise.resolve(ModelCatalogCache.failed(cached, this.now()));
+    const generation = this.generation;
     const request = this.fetch(kind, providerId, refresh, workingDirectory, cached).then(t => {
+      if (generation !== this.generation)
+        return t;
       this.cached.delete(key);
       this.cached.set(key, t);
-      if (this.cached.size > Resources.maximumModelCatalogs)
-        this.cached.delete(this.cached.keys().next().value!);
+      const oldest = this.cached.keys().next();
+      if (this.cached.size > Resources.maximumModelCatalogs && !oldest.done)
+        this.cached.delete(oldest.value);
       this.pending.delete(key);
       this.loads.update(u => u + 1);
       return t;
@@ -50,6 +55,8 @@ export class ModelCatalogCache {
   }
 
   public expire(): void {
+    this.generation++;
+    this.pending.clear();
     for (const catalog of this.cached.values())
       this.expired.add(catalog);
   }

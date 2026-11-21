@@ -90,6 +90,7 @@ import { CommandTargetsService } from "../../../../src/app/services/command-targ
 import { ComposerChoicesService } from "../../../../src/app/services/composer-choices.service";
 import { ComposerDefaultService } from "../../../../src/app/services/composer-default.service";
 import { ComposerDraftService } from "../../../../src/app/services/composer-draft.service";
+import { EngineResync } from "../../../../src/app/services/engine-resync";
 import { ImageViewerService } from "../../../../src/app/services/image-viewer.service";
 import { PlanUsageStatus } from "../../../../src/app/services/plan-usage-status";
 import { TimeFormatService } from "../../../../src/app/services/time-format.service";
@@ -775,6 +776,73 @@ describe("ComposerComponent", () => {
     models.resolve(SampleData.catalog([new ProviderModel("gpt-5", "GPT-5 Astra", "", ["high"], true, null, true),
       new ProviderModel("gpt-5-mini", "GPT-5 Mini", "", ["high"], false, null, true)]));
     await Wait.until(() => expect(buttonLabel()).toBe("Codex · GPT-5 Mini · High"));
+  });
+
+  it.each([
+    { cause: "the runtime asks for a resync", resync: (): void => context.emit(EventName.StateResyncRequested, null) },
+    { cause: "the window reconnects", resync: (): void => {
+      EngineResync.request(context);
+      void ChatStoreService.resync(context);
+    } }
+  ])("asks the provider for its models again after $cause, and names the model as the new list does", async ({ resync }) => {
+    let name = "GPT-5 Mini";
+    context.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog([new ProviderModel("gpt-5-mini", name, "", ["high"], true, null, true)]));
+    await prepare();
+    remember(new ComposerSettings("codex", "gpt-5-mini", "high", "a1"));
+    await render();
+    await Wait.until(() => expect(buttonLabel()).toBe("Codex · GPT-5 Mini · High"));
+    const asked = context.count(MethodName.ProviderModelCatalog);
+    name = "GPT-5 Mini Next";
+
+    resync();
+
+    await Wait.until(() => expect(buttonLabel()).toBe("Codex · GPT-5 Mini Next · High"));
+    expect(context.count(MethodName.ProviderModelCatalog)).toBeGreaterThan(asked);
+  });
+
+  it.each([
+    { cause: "the runtime asks for a resync", resync: (): void => context.emit(EventName.StateResyncRequested, null) },
+    { cause: "the window reconnects", resync: (): void => {
+      EngineResync.request(context);
+      void ChatStoreService.resync(context);
+    } }
+  ])("asks a member teammate's provider for its models again after $cause, while the providers are still being read", async ({ resync }) => {
+    const teammates = new TeammateFixture(context);
+    const personal = new Provider("a3", "codex", "Personal", "D:/personal", AuthStatus.LoggedIn, null, null, null, null, "t");
+    teammates.teammates.push(new Teammate("erin", "Erin", null, "a3", Harness.Provider, null, null, "t", "t"));
+    teammates.members.push(new ConversationMember("c1", "erin", "t", null, false));
+    context.answer(MethodName.ProviderList, () => [SampleData.provider.toJson(), personal.toJson()]);
+    const personalReads = (): number => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ProviderModelCatalog)
+      && ProviderListModelsParams.fromJson(t.parameters).providerId === "a3").length;
+    await prepare();
+    remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+    await render();
+    await Wait.until(() => expect(personalReads()).toBe(1));
+    const providers = new DeferredResponse();
+    context.answer(MethodName.ProviderList, () => providers.promise);
+
+    resync();
+
+    await Wait.until(() => expect(personalReads()).toBe(2));
+    providers.resolve([SampleData.provider.toJson(), personal.toJson()]);
+    await fixture.whenStable();
+  });
+
+  it("asks no provider for its models at a resync once the composer is gone", async () => {
+    await prepare();
+    remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+    await render();
+    await ready();
+    const asked = context.count(MethodName.ProviderModelCatalog);
+    const providers = new DeferredResponse();
+    context.answer(MethodName.ProviderList, () => providers.promise);
+    fixture.destroy();
+
+    context.emit(EventName.StateResyncRequested, null);
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+    expect(context.count(MethodName.ProviderModelCatalog)).toBe(asked);
+    providers.resolve([SampleData.provider.toJson()]);
   });
 
   it("sorts each section of the mention completions and the kind's providers by name, ignoring case with an accented name beside its letter", async () => {

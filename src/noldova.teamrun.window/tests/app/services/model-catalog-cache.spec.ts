@@ -57,6 +57,24 @@ describe("ModelCatalogCache", () => {
     expect([held, read.map(t => t.models[0]?.id), again.models[0]?.id, fetchModels.mock.calls.length]).toEqual(["codex-1", ["codex-3", "claude-4"], "codex-3", 4]);
   });
 
+  it("asks again rather than joining a read that was out when the lists expired, and keeps the new answer when the old one comes after it", async () => {
+    const answers: ((list: ProviderModelList) => void)[] = [];
+    const fetchModels = vi.fn(() => new Promise<ProviderModelList>(resolve => answers.push(resolve)));
+    const list = (id: string): ProviderModelList => new ProviderModelList([new ProviderModel(id, id, "", [], true, null, null)], null);
+    const cache = new ModelCatalogCache(fetchModels, clock);
+    const old = cache.load("codex", "a");
+
+    cache.expire();
+    const fresh = cache.load("codex", "a");
+    answers[1]?.(list("new"));
+    const shown = (await fresh).models[0]?.id;
+    answers[0]?.(list("old"));
+    const late = (await old).models[0]?.id;
+
+    expect([fetchModels.mock.calls.length, shown, late, cache.loadedOf("codex", "a")?.models[0]?.id, (await cache.load("codex", "a")).models[0]?.id])
+      .toEqual([2, "new", "old", "new", "new"]);
+  });
+
   it("keeps a list for each folder apart, and asks for it with its folder", async () => {
     const fetchModels = vi.fn((_kind: string, _providerId: string | null, _refresh: boolean, _workingDirectory: string | null) => Promise.resolve(new ProviderModelList([], null)));
     const cache = new ModelCatalogCache(fetchModels, () => 0);
