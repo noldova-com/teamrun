@@ -21,6 +21,10 @@ import { OrganizationCardField } from "./app/enums/organization-card-field";
 import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
 import { TeammateStatus } from "./app/enums/teammate-status";
+import { BrowserStepWords } from "./app/models/browser-step-words";
+import { GrantColumnShares } from "./app/models/grant-column-shares";
+import { LowRiskReadWords } from "./app/models/low-risk-read-words";
+import { TeammateColumnShares } from "./app/models/teammate-column-shares";
 import type { ProviderAction } from "./app/types/provider-action";
 
 export class Resources {
@@ -779,11 +783,11 @@ export class Resources {
   public static readonly browserKeyField: string = "key";
   public static readonly browserActionField: string = "action";
   public static readonly browserTextField: string = "text";
-  public static readonly browserLineReads: ReadonlyMap<string, readonly [string, string]> = new Map([
-    ["browser_snapshot", ["read", "read the page"]],
-    ["browser_screenshot", ["took a screenshot of", "took a screenshot"]],
-    ["browser_console", ["read the console of", "read the console"]],
-    ["browser_wait_for", ["waited on", "waited"]]
+  public static readonly browserLineReads: ReadonlyMap<string, LowRiskReadWords> = new Map([
+    ["browser_snapshot", new LowRiskReadWords("read", "read the page")],
+    ["browser_screenshot", new LowRiskReadWords("took a screenshot of", "took a screenshot")],
+    ["browser_console", new LowRiskReadWords("read the console of", "read the console")],
+    ["browser_wait_for", new LowRiskReadWords("waited on", "waited")]
   ]);
   public static readonly staleFailureCode: string = "Stale";
   public static readonly deniedFailureCode: string = "Denied";
@@ -1369,8 +1373,7 @@ export class Resources {
   public static readonly computerUseGrantsTableTitle: string = "What chats may control";
   public static readonly computerUseGrantsHint: string =
     "Each app, and the screen, you allowed in a chat, which the chat uses without asking again. Revoke an app, and the chat's next input to it is refused; revoke the screen, and the chat's next session asks for it again.";
-  public static readonly computerUseGrantColumnShares: { readonly app: number; readonly chat: number; readonly granted: number; readonly actions: number } =
-    { app: 3, chat: 4, granted: 3, actions: 2 };
+  public static readonly computerUseGrantColumnShares: GrantColumnShares = new GrantColumnShares(3, 4, 3, 2);
   public static readonly grantAppColumn: string = "App";
   public static readonly grantChatColumn: string = "Chat";
   public static readonly grantGrantedColumn: string = "Allowed";
@@ -1711,8 +1714,7 @@ export class Resources {
   public static readonly kindTitleColumns: number = 3;
   public static readonly kindActionColumns: number = 3;
   public static readonly hiddenDisplay: string = "none";
-  public static readonly teammateColumnShares: { readonly name: number; readonly connection: number; readonly model: number; readonly effort: number; readonly actions: number } =
-    { name: 3, connection: 4, model: 3, effort: 3, actions: 3 };
+  public static readonly teammateColumnShares: TeammateColumnShares = new TeammateColumnShares(3, 4, 3, 3, 3);
   public static readonly fallbackActionSlots: readonly number[] = [0, 1, 2];
   public static readonly sustainGroupLabel: string = "When usage runs out";
   public static readonly sustainSwitchLabel: string = "Continue elsewhere when a limit is hit";
@@ -1927,16 +1929,16 @@ export class Resources {
     return `${section}: ${answer}`;
   }
 
-  private static readonly browserWent: Readonly<Record<string, readonly [string, string, string]>> = {
-    back: ["Went back", "Going back", "Didn't go back"],
-    forward: ["Went forward", "Going forward", "Didn't go forward"],
-    reload: ["Reloaded the page", "Reloading the page", "Didn't reload the page"]
+  private static readonly browserWent: Readonly<Record<string, BrowserStepWords>> = {
+    back: new BrowserStepWords("Went back", "Going back", "Didn't go back"),
+    forward: new BrowserStepWords("Went forward", "Going forward", "Didn't go forward"),
+    reload: new BrowserStepWords("Reloaded the page", "Reloading the page", "Didn't reload the page")
   };
-  private static readonly browserReads: Readonly<Record<string, readonly [string, string, string]>> = {
-    browser_snapshot: ["Read", "Reading", "read"],
-    browser_screenshot: ["Took a screenshot of", "Taking a screenshot of", "take a screenshot of"],
-    browser_console: ["Read the console of", "Reading the console of", "read the console of"],
-    browser_wait_for: ["Waited on", "Waiting on", "wait on"]
+  private static readonly browserReads: Readonly<Record<string, BrowserStepWords>> = {
+    browser_snapshot: new BrowserStepWords("Read", "Reading", "read"),
+    browser_screenshot: new BrowserStepWords("Took a screenshot of", "Taking a screenshot of", "take a screenshot of"),
+    browser_console: new BrowserStepWords("Read the console of", "Reading the console of", "read the console of"),
+    browser_wait_for: new BrowserStepWords("Waited on", "Waiting on", "wait on")
   };
   private static readonly browserStale: Readonly<Record<string, string>> = {
     browser_click: "the page changed before the click, so nothing was clicked",
@@ -2404,7 +2406,7 @@ export class Resources {
   }
 
   public static formatProvenance(kind: string | null, model: string | null, effort: string | null): string {
-    return [kind, model, effort].filter(t => t !== null).join(Resources.titleSeparator);
+    return [kind, model, effort].filter(t => !Object.isNull(t)).join(Resources.titleSeparator);
   }
 
   public static formatContextGauge(percent: number): string {
@@ -2456,7 +2458,7 @@ export class Resources {
   }
 
   public static formatPlanWindow(label: string, figure: string, reset: string | null): string {
-    return reset === null ? `${label}: ${figure}` : `${label}: ${figure}, ${reset}`;
+    return Object.isNull(reset) ? `${label}: ${figure}` : `${label}: ${figure}, ${reset}`;
   }
 
   public static formatPlanShort(label: string, figure: string): string {
@@ -2468,7 +2470,7 @@ export class Resources {
   }
 
   public static formatCountUsed(used: string, allowance: string, percent: number | null): string {
-    return percent === null ? `${used} of ${allowance} used` : `${used} of ${allowance} used (${percent}%)`;
+    return Object.isNull(percent) ? `${used} of ${allowance} used` : `${used} of ${allowance} used (${percent}%)`;
   }
 
   public static formatPercentLeft(percent: number): string {
@@ -2480,7 +2482,7 @@ export class Resources {
   }
 
   public static formatShortCount(used: string, allowance: string, percent: number | null): string {
-    return percent === null ? `${used}/${allowance}` : `${used}/${allowance} (${percent}%)`;
+    return Object.isNull(percent) ? `${used}/${allowance}` : `${used}/${allowance} (${percent}%)`;
   }
 
   public static formatShortLeft(percent: number): string {
@@ -3149,23 +3151,23 @@ export class Resources {
   }
 
   public static formatBrowserClicked(element: string, phase: BrowserStepPhase, why: string | null): string {
-    return Resources.browserStep([`Clicked ${element}`, `Clicking ${element}`, `Didn't click ${element}`], phase, [why]);
+    return Resources.browserStep(new BrowserStepWords(`Clicked ${element}`, `Clicking ${element}`, `Didn't click ${element}`), phase, [why]);
   }
 
   public static formatBrowserTyped(element: string, isSecret: boolean, phase: BrowserStepPhase, why: string | null): string {
-    return Resources.browserStep([`Typed into ${element}`, `Typing into ${element}`, `Didn't type into ${element}`], phase, [isSecret ? Resources.browserHiddenNote : null, why]);
+    return Resources.browserStep(new BrowserStepWords(`Typed into ${element}`, `Typing into ${element}`, `Didn't type into ${element}`), phase, [isSecret ? Resources.browserHiddenNote : null, why]);
   }
 
   public static formatBrowserPressed(key: string, phase: BrowserStepPhase, why: string | null): string {
-    return Resources.browserStep([`Pressed ${key}`, `Pressing ${key}`, `Didn't press ${key}`], phase, [why]);
+    return Resources.browserStep(new BrowserStepWords(`Pressed ${key}`, `Pressing ${key}`, `Didn't press ${key}`), phase, [why]);
   }
 
   public static formatBrowserWent(action: string, phase: BrowserStepPhase, why: string | null): string {
-    return Resources.browserStep(Resources.browserWent[action] ?? [`Went ${action}`, `Going ${action}`, `Didn't go ${action}`], phase, [why]);
+    return Resources.browserStep(Resources.browserWent[action] ?? new BrowserStepWords(`Went ${action}`, `Going ${action}`, `Didn't go ${action}`), phase, [why]);
   }
 
   public static formatBrowserOpened(url: string, phase: BrowserStepPhase, why: string | null): string {
-    return Resources.browserStep([`Opened ${url}`, `Opening ${url}`, `Didn't open ${url}`], phase, [why]);
+    return Resources.browserStep(new BrowserStepWords(`Opened ${url}`, `Opening ${url}`, `Didn't open ${url}`), phase, [why]);
   }
 
   public static formatBrowserRefusedSite(url: string): string {
@@ -3173,19 +3175,18 @@ export class Resources {
   }
 
   public static formatBrowserRead(tool: string, url: string | null, phase: BrowserStepPhase, why: string | null): string {
-    const [done, doing, undone] = Resources.browserReads[tool] ?? ["Used", "Using", "use"];
+    const words = Resources.browserReads[tool] ?? new BrowserStepWords("Used", "Using", "use");
     const target = url ?? Resources.browserThePage;
-    return Resources.browserStep([`${done} ${target}`, `${doing} ${target}`, `Couldn't ${undone} ${target}`], phase, [why]);
+    return Resources.browserStep(new BrowserStepWords(`${words.done} ${target}`, `${words.doing} ${target}`, `Couldn't ${words.undone} ${target}`), phase, [why]);
   }
 
   public static isBrowserReading(tool: string): boolean {
     return Object.hasOwn(Resources.browserReads, tool);
   }
 
-  public static formatLowRiskRead(words: readonly [string, string], url: string | null, text: string | null): string {
-    const [changed, same] = words;
-    const done = Object.isNull(text) ? same : `waited for "${text}"`;
-    return Object.isNull(url) ? done : Object.isNull(text) ? `${changed} ${url}` : `${done} on ${url}`;
+  public static formatLowRiskRead(words: LowRiskReadWords, url: string | null, text: string | null): string {
+    const done = Object.isNull(text) ? words.same : `waited for "${text}"`;
+    return Object.isNull(url) ? done : Object.isNull(text) ? `${words.changed} ${url}` : `${done} on ${url}`;
   }
 
   public static formatLowRiskLine(requester: string, steps: readonly string[]): string {
@@ -3240,9 +3241,8 @@ export class Resources {
     return Object.values(TeammateStatus).flatMap(t => (counts.get(t) ?? 0) > 0 ? [`${counts.get(t)} ${Resources.teammateStatusLabels[t].toLowerCase()}`] : []);
   }
 
-  private static browserStep(words: readonly [string, string, string], phase: BrowserStepPhase, notes: readonly (string | null)[]): string {
-    const [done, doing, undone] = words;
-    const shown = phase === BrowserStepPhase.Running ? doing : phase === BrowserStepPhase.Done ? done : undone;
+  private static browserStep(words: BrowserStepWords, phase: BrowserStepPhase, notes: readonly (string | null)[]): string {
+    const shown = phase === BrowserStepPhase.Running ? words.doing : phase === BrowserStepPhase.Done ? words.done : words.undone;
     return [shown, ...notes.filter(t => !Object.isNull(t))].join(Resources.browserStepSeparator);
   }
 }
