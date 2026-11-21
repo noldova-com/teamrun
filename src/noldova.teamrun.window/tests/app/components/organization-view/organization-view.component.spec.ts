@@ -87,7 +87,7 @@ describe("OrganizationViewComponent", () => {
   };
   const shows = (name: string): string[] => [...texts(".status", card(name)), ...texts(".usage", card(name)), ...texts(".model", card(name))];
   const checks = (): (string | null)[][] => menuItems().map(t => [t.querySelector(".nol-menu-item-label")?.textContent?.trim() ?? null, t.getAttribute("aria-checked")]);
-  const tree = (): unknown[] => all(".chart > .tree > .kids > nol-teamrun-organization-department").map(shape);
+  const tree = (): unknown[] => all(".chart .tree > .kids > nol-teamrun-organization-department").map(shape);
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -125,8 +125,9 @@ describe("OrganizationViewComponent", () => {
   it("shows you at the root, then each department in order with its count, leader, members in name order and the departments nested in it", async () => {
     await create();
 
-    expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart").getAttribute("aria-label")])
-      .toEqual([["Organization"], ["4 teammates"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure"]);
+    expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart > nol-canvas").getAttribute("aria-label"),
+      all(".chart [nolCanvasItem]").map(t => t.matches(".owner, .kid"))])
+      .toEqual([["Organization"], ["4 teammates"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure", [true, true, true]]);
     expect(tree()).toEqual([
       ["Design", "2", "Led by Alice · 1 member", ["Alice"], ["Bob"], [["UI", "1", "Led by Code Reviewer · 0 members", ["Code Reviewer"], [], [], []]], []],
       ["Build", "1", "1 member", [], ["Offline"], [], []]
@@ -265,7 +266,7 @@ describe("OrganizationViewComponent", () => {
 
     expect([one(".top .views [role=radiogroup]").getAttribute("aria-label"), pills()])
       .toEqual(["View", [["Tree", "false"], ["Board", "true"], ["Focus", "false"]]]);
-    expect(element().querySelectorAll(".chart > .tree")).toHaveLength(1);
+    expect(element().querySelectorAll(".chart .tree")).toHaveLength(1);
 
     one(".top .views [role=radio]:last-of-type").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
@@ -305,7 +306,7 @@ describe("OrganizationViewComponent", () => {
     it("sizes the cards, hangs each leader under its department, the members off one line, and joins the departments to you through one bar", async () => {
       await create();
       element().style.width = "60rem";
-      element().style.height = "40rem";
+      element().style.height = "60rem";
       await settle();
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
@@ -319,7 +320,7 @@ describe("OrganizationViewComponent", () => {
       const reports = one(":scope > .reports", design);
       const member = one(":scope > nol-teamrun-organization-card", reports);
       const owner = one(".owner");
-      const kids = one(".chart > .tree > .kids");
+      const kids = one(".chart .tree > .kids");
 
       for (const view of [owner, card, leader, one(":scope > .department", build)])
         AppearanceFixture.expectPixels(box(view).width, 15 * rem);
@@ -344,7 +345,22 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("puts the view pills on the right of the header, then Cards show and Edit structure, all centred on one line", async () => {
+    it("fills the space under the header with one canvas, and fits the chart at 100% to its top, under the canvas's tools", async () => {
+      await create();
+      element().style.width = "60rem";
+      element().style.height = "60rem";
+      await settle();
+      const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      const [host, top, canvas] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas")];
+      const [tools, tree] = [box(".chart .nol-canvas-tools"), box(".chart .tree")];
+
+      for (const [actual, expected] of [[canvas.top, top.bottom], [canvas.left, host.left], [canvas.right, host.right], [canvas.bottom, host.bottom],
+        [tree.width, one(".chart .tree").offsetWidth]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
+      expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
+    });
+
+  it("puts the view pills on the right of the header, then Cards show and Edit structure, all centred on one line", async () => {
       await create();
       element().style.width = "72rem";
       await settle();
