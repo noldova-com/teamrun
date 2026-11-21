@@ -6,6 +6,13 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
+@if (organization.actionError(); as error) {
+  <div class="action-error">
+    <p class="error" role="alert">{{ error }}</p>
+    <button type="button" nol-icon-button class="dismiss-error" [icon]="resources.organizationBoardDismissIcon" [label]="resources.organizationBoardDismissError"
+      (click)="organization.clearActionError()"></button>
+  </div>
+}
 <section class="section needs-section" aria-labelledby="organization-board-needs">
   <div class="section-head">
     <span class="material-symbols-rounded icon" aria-hidden="true">{{ resources.organizationBoardNeedsIcon }}</span>
@@ -54,11 +61,16 @@ LICENSE file in the root directory of this source tree.
     @for (node of departments(); track node.department.id) {
       <div class="lane">
         <div class="lane-head">
-          <span class="title lane-name">{{ node.department.name }}</span>
-          <nol-chip class="lane-count">{{ node.headcount }}</nol-chip>
-          <span class="spacer"></span>
-          <button type="button" nol-icon-button class="message-department" [icon]="resources.organizationBoardMessageIcon"
-            [label]="resources.formatOrganizationBoardMessage(node.department.name)" (click)="messageDepartment.emit(node.department.id)"></button>
+          @if (editing()) {
+            <input nol-text-field class="lane-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="node.department.name"
+              (change)="rename(node, $event)" />
+          } @else {
+            <span class="title lane-name">{{ node.department.name }}</span>
+            <nol-chip class="lane-count">{{ node.headcount }}</nol-chip>
+            <span class="spacer"></span>
+            <button type="button" nol-icon-button class="message-department" [icon]="resources.organizationBoardMessageIcon"
+              [label]="resources.formatOrganizationBoardMessage(node.department.name)" (click)="messageDepartment.emit(node.department.id)"></button>
+          }
         </div>
         @if (summaryOf(node); as summary) {
           <span class="note lane-summary">{{ summary }}</span>
@@ -69,10 +81,29 @@ LICENSE file in the root directory of this source tree.
         }
         @for (member of membersOf(node); track member.id) {
           <nol-teamrun-organization-card [teammate]="member" [shape]="row" />
+          @if (editing()) {
+            <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(member.name)" [options]="departmentOptions()" [value]="node.department.id"
+              (valueChange)="move(member, $event)" />
+          }
         } @empty {
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>
+        }
+        @if (editing()) {
+          <button type="button" nol-button class="add-member" [variant]="outlined" [disabled]="addable(node).length === 0" [nolMenuTriggerFor]="addMenu"><span nolButtonIcon
+            class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationBoardAddMemberIcon }}</span>{{ resources.organizationBoardAddMember }}</button>
+          <ng-template #addMenu>
+            <nol-menu>
+              @for (teammate of addable(node); track teammate.id) {
+                <button nol-menu-item [label]="teammate.name" (triggered)="addMember(node, teammate)"></button>
+              }
+            </nol-menu>
+          </ng-template>
         }
       </div>
     }
   </div>
+  @if (editing()) {
+    <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon class="material-symbols-rounded"
+      aria-hidden="true">{{ resources.organizationBoardAddDepartmentIcon }}</span>{{ resources.organizationBoardAddDepartment }}</button>
+  }
 </section>

@@ -6,18 +6,20 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization,
   Teammate } from "@noldova/teamrun.protocol";
-import { DialogService, ThemeMode } from "@noldova/ui.components.angular";
+import { DialogService, type SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
 import { OrganizationNode } from "../../../../src/app/models/organization-node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
@@ -64,9 +66,12 @@ describe("OrganizationBoardComponent", () => {
   };
   const create = async (): Promise<void> => {
     context = SampleData.createContext().answer(MethodName.MessageListOpen, () => [reply(MessageStatus.AwaitingApproval).toJson()]);
+    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet])
+      context.answer(method, () => null);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider] });
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider,
+      OrganizationStoreService.provider] });
     fixture = TestBed.createComponent(OrganizationBoardComponent);
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer, carol]));
     fixture.autoDetectChanges();
@@ -76,6 +81,7 @@ describe("OrganizationBoardComponent", () => {
 
   afterEach(() => {
     TeammateStatusStoreService.release(context);
+    OrganizationStoreService.release(context);
     OrganizationLayoutService.release(context);
     ChatStoreService.release(context);
   });
@@ -146,6 +152,59 @@ describe("OrganizationBoardComponent", () => {
     expect([shown, dialogs.isOpen]).toEqual([["c9"], true]);
     one("nol-teamrun-teammate-dialog .nol-teamrun-cancel", document).click();
     await Wait.until(() => expect(dialogs.isOpen).toBe(false));
+  });
+
+  it("edits the structure in edit mode: renames a department, moves a member, adds one from outside it and adds a department", async () => {
+    const at = <T>(items: readonly T[], index: number): T => {
+      const found = items[index];
+      if (found === undefined)
+        throw new Error(`Nothing at ${index}.`);
+      return found;
+    };
+    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
+    const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
+    await create();
+    expect([all(".lane-rename").length, all(".member-move").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
+
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+    const fields = (): HTMLInputElement[] => [...element().querySelectorAll<HTMLInputElement>(".lane-rename")];
+    expect([fields().map(t => t.value), all(".lane-rename").map(t => t.getAttribute("aria-label")), all(".lane-name").length,
+      all(".message-department").length]).toEqual([["Design", "UI", "Build"], ["Department name", "Department name", "Department name"], 0, 0]);
+    for (const value of ["  Craft  ", "   ", "UI"]) {
+      const field = at(fields(), value === "UI" ? 1 : 0);
+      field.value = value;
+      field.dispatchEvent(new Event("change"));
+    }
+    const moves = fixture.debugElement.queryAll(By.css("nol-select.member-move")).map(t => t.componentInstance as SelectComponent);
+    expect(moves.map(t => [t.label(), t.value()])).toEqual([["Bob's department", "design"], ["Offline's department", "build"], ["Carol's department", "build"]]);
+    at(moves, 0).valueChange.emit("build");
+    one(".lane:nth-child(1) .add-member").click();
+    await settle();
+    await Wait.until(() => expect(menuItems().map(t => t.textContent?.trim())).toEqual(["Carol", "Code Reviewer", "Offline"]));
+    at(menuItems(), 0).click();
+    one(".add-department").click();
+
+    await Wait.until(() => expect(edits()).toEqual([
+      ["teamrun.departmentUpdate", { departmentId: "design", name: "Craft" }],
+      ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: "build" }],
+      ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
+      ["teamrun.departmentCreate", { name: "New department", parentId: null }]
+    ]));
+  });
+
+  it("says why an edit failed until it's dismissed", async () => {
+    await create();
+    context.fail(MethodName.DepartmentCreate, "No room for another department.");
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+
+    one(".add-department").click();
+    await Wait.until(() => expect(texts(".action-error [role=alert]")).toEqual(["No room for another department."]));
+    expect(one(".dismiss-error").getAttribute("aria-label")).toBe("Dismiss");
+    one(".dismiss-error").click();
+    await settle();
+    expect(all(".action-error")).toEqual([]);
   });
 
   it("asks to message all leaders, or one department by its id", async () => {

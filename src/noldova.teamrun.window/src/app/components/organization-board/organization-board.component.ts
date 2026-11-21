@@ -9,8 +9,9 @@
 import { Component, computed, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, type WritableSignal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import type { Teammate } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, SelectOption } from "@noldova/ui.components.angular";
+import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
+import { ButtonComponent, ButtonVariant, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
+  SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationBoardSort } from "../../enums/organization-board-sort";
@@ -19,6 +20,7 @@ import { TeammateStatus } from "../../enums/teammate-status";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
 import type { OrganizationNode } from "../../models/organization-node";
 import { ChatStoreService } from "../../services/chat-store.service";
+import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
@@ -26,7 +28,8 @@ import { TeammateDialogComponent } from "../teammate-dialog/teammate-dialog.comp
 
 @Component({
   selector: "nol-teamrun-organization-board",
-  imports: [ButtonComponent, ChipComponent, ChoicePillsComponent, IconButtonComponent, OrganizationCardComponent, TeammateAvatarComponent],
+  imports: [ButtonComponent, ChipComponent, ChoicePillsComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
+    SelectComponent, TeammateAvatarComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   templateUrl: "./organization-board.component.html",
   styleUrl: "./organization-board.component.css"
@@ -38,6 +41,7 @@ export class OrganizationBoardComponent {
   private readonly sorts: WritableSignal<ReadonlyMap<string, OrganizationBoardSort>> = signal(new Map());
 
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
+  public readonly editing: InputSignal<boolean> = input<boolean>(false);
   public readonly messageLeaders: OutputEmitterRef<void> = output<void>();
   public readonly messageDepartment: OutputEmitterRef<string> = output<string>();
 
@@ -45,9 +49,12 @@ export class OrganizationBoardComponent {
   protected readonly row: OrganizationCardShape = OrganizationCardShape.Row;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
+  protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
+  protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly sortOptions: readonly SelectOption[] = Object.values(OrganizationBoardSort).map(t => new SelectOption(t, Resources.organizationBoardSortLabels[t]));
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
+  protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() => this.departments().map(t => new SelectOption(t.department.id, t.department.name)));
   protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus(this.departments()
     .flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.department.name, this.status(t))))
     .filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
@@ -74,6 +81,29 @@ export class OrganizationBoardComponent {
     for (const teammate of [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members])
       counts.set(this.status(teammate), (counts.get(this.status(teammate)) ?? 0) + 1);
     return Resources.formatOrganizationBoardSummary(node.leader?.name ?? null, counts);
+  }
+
+  protected addable(node: OrganizationNode): readonly Teammate[] {
+    const inside = new Set([...Object.isNull(node.leader) ? [] : [node.leader.id], ...node.members.map(t => t.id)]);
+    return NameOrder.sort(this.chats.teammates().filter(t => !inside.has(t.id)), t => t.name);
+  }
+
+  protected rename(node: OrganizationNode, event: Event): void {
+    const name = event.target instanceof HTMLInputElement ? event.target.value.trim() : String.empty;
+    if (name.length > 0 && name !== node.department.name)
+      void this.organization.renameDepartment(node.department.id, name);
+  }
+
+  protected move(teammate: Teammate, departmentId: string): void {
+    void this.organization.setMember(teammate.id, departmentId);
+  }
+
+  protected addMember(node: OrganizationNode, teammate: Teammate): void {
+    void this.organization.setMember(teammate.id, node.department.id);
+  }
+
+  protected addDepartment(): void {
+    void this.organization.createDepartment(Resources.organizationBoardNewDepartment, null);
   }
 
   protected answer(ask: OrganizationBoardAsk): void {

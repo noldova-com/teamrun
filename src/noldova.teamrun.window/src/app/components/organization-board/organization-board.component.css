@@ -155,6 +155,34 @@
   margin-bottom: var(--nol-space-1);
 }
 
+.lane-rename {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.member-move {
+  margin-bottom: var(--nol-space-1);
+}
+
+.add-member,
+.add-department {
+  align-self: flex-start;
+}
+
+.action-error {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+}
+
+.error {
+  flex: auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--nol-error);
+  overflow-wrap: anywhere;
+}
+
 .lane-empty {
   padding: var(--nol-space-2);
 }
