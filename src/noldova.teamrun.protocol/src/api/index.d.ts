@@ -593,6 +593,19 @@ export declare enum MethodName {
    */
   OrganizationLayoutSave = "OrganizationLayoutSave",
   /**
+   * Sends a message to one teammate, a department's leader and members, every department's leader, or every teammate, starting
+   * each at once in its own chat, and publishes `OrganizationMessageUpdated` as each starts. Parameters:
+   * `OrganizationMessageSendParams`. Result: `OrganizationMessage`.
+   */
+  OrganizationMessageSend = "OrganizationMessageSend",
+  /**
+   * Stops an organization message: each recipient not yet started is Stopped, and a reply still pending is cancelled.
+   * Parameters: `MessageIdParams`, the organization message's id. Result: `OrganizationMessage`.
+   */
+  OrganizationMessageStop = "OrganizationMessageStop",
+  /** Lists the organization messages, oldest first. Result: `OrganizationMessage[]`. */
+  OrganizationMessageList = "OrganizationMessageList",
+  /**
    * Adds a teammate to a chat. Parameters: `ChatMemberParams`. Result: `ChatMember`.
    */
   ConversationAddMember = "ConversationAddMember",
@@ -1322,7 +1335,9 @@ export declare enum EventName {
   /**
    * The Organization view's layout was saved. Payload: the layout's JSON object.
    */
-  OrganizationLayoutUpdated = "OrganizationLayoutUpdated"
+  OrganizationLayoutUpdated = "OrganizationLayoutUpdated",
+  /** An organization message or one of its recipients changed. Payload: `OrganizationMessage`, the whole message. */
+  OrganizationMessageUpdated = "OrganizationMessageUpdated"
 }
 
 /**
@@ -11854,8 +11869,145 @@ export declare class Organization {
    * @returns The department's id, or null when the teammate is in none.
    */
   public departmentOf(teammateId: string): string | null;
+  /**
+   * Returns the teammates a message to a target goes to, each once.
+   * @param target The target.
+   * @param teammateIds Every teammate's id, in the order to list everyone.
+   * @returns The ids: the teammate when it's one of them; a department's leader, then its other direct members; each
+   * department's leader, in the departments' order; or every teammate.
+   */
+  public recipientsOf(target: OrganizationTarget, teammateIds: readonly string[]): readonly string[];
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): Organization;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Whom an organization message goes to. */
+export declare enum OrganizationTargetKind {
+  /** One teammate. */
+  Teammate = "Teammate",
+  /** A department's leader and its direct members. */
+  Department = "Department",
+  /** Every department's leader. */
+  Leaders = "Leaders",
+  /** Every teammate, in a department or not. */
+  Everyone = "Everyone"
+}
+
+/** Where an organization message stands for one recipient. */
+export declare enum OrganizationRecipientState {
+  /** Not started yet. */
+  Queued = "Queued",
+  /** Its chat has the message and its reply started. */
+  Started = "Started",
+  /** The person stopped the message before it started. */
+  Stopped = "Stopped",
+  /** The teammate was deleted before it started. */
+  Removed = "Removed",
+  /** It couldn't start; the reason says why. */
+  Failed = "Failed"
+}
+
+/** Whom an organization message goes to. */
+export declare class OrganizationTarget {
+  /** Every department's leader. */
+  public static readonly leaders: OrganizationTarget;
+  /** Every teammate. */
+  public static readonly everyone: OrganizationTarget;
+  /** The kind. */
+  public readonly kind: OrganizationTargetKind;
+  /** The teammate's or department's id, or null for leaders and everyone. */
+  public readonly id: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when a teammate or department target has no id, or leaders or everyone has one.
+   */
+  public constructor(kind: OrganizationTargetKind, id: string | null);
+  /** The target of one teammate. */
+  public static teammate(teammateId: string): OrganizationTarget;
+  /** The target of a department. */
+  public static department(departmentId: string): OrganizationTarget;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationTarget;
+  /** Whether both name the same kind and id. */
+  public equals(other: OrganizationTarget): boolean;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** One teammate an organization message goes to, and where it stands. */
+export declare class OrganizationRecipient {
+  /** The teammate's id. */
+  public readonly teammateId: string;
+  /** The teammate's name when the message was sent. */
+  public readonly teammateName: string;
+  /** Where it stands. */
+  public readonly state: OrganizationRecipientState;
+  /** The chat it went to, once started. */
+  public readonly chatId: string | null;
+  /** The message in that chat, once started; its reply answers it. */
+  public readonly messageId: string | null;
+  /** Why it failed, or null. */
+  public readonly reason: string | null;
+  /** Creates a validated immutable value. */
+  public constructor(
+    teammateId: string,
+    teammateName: string,
+    state: OrganizationRecipientState,
+    chatId?: string | null,
+    messageId?: string | null,
+    reason?: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationRecipient;
+  /** Returns a copy in another state, keeping the fields not given. */
+  public with(state: OrganizationRecipientState, chatId?: string | null, messageId?: string | null, reason?: string | null): OrganizationRecipient;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A message sent from the organization view, and each of its recipients. */
+export declare class OrganizationMessage {
+  /** The id. */
+  public readonly id: string;
+  /** Whom it went to. */
+  public readonly target: OrganizationTarget;
+  /** The text. */
+  public readonly text: string;
+  /** When it was sent. */
+  public readonly createdAt: string;
+  /** The teammates it went to, in the order the target lists them. */
+  public readonly recipients: readonly OrganizationRecipient[];
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the text is blank or a teammate is a recipient twice.
+   */
+  public constructor(
+    id: string,
+    target: OrganizationTarget,
+    text: string,
+    createdAt: string,
+    recipients: readonly OrganizationRecipient[]);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationMessage;
+  /** Returns a copy with one recipient replaced, by its teammate. */
+  public withRecipient(recipient: OrganizationRecipient): OrganizationMessage;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for sending an organization message. */
+export declare class OrganizationMessageSendParams {
+  /** Whom it goes to. */
+  public readonly target: OrganizationTarget;
+  /** The text. */
+  public readonly text: string;
+  /** Creates a validated immutable value. */
+  public constructor(
+    target: OrganizationTarget,
+    text: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationMessageSendParams;
   /** Returns the wire representation. */
   public toJson(): JsonObject;
 }
