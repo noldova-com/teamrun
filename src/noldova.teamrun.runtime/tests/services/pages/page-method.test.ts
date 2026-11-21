@@ -48,7 +48,7 @@ export class PageMethodTests {
   }
 
   @TestMethod
-  public async listsThePagesAndCanvasesWhoseLatestVersionATeammateWroteLeavingOutArtboardsAndRefusesABlankTeammate(): Promise<void> {
+  public async listsThePagesAndCanvasesATeammateMadeOrLastEditedLatestChangeFirstLeavingOutArtboardsAndRefusesABlankTeammate(): Promise<void> {
     using harness = new PagesHarness();
     harness.file("a.html", "<p>one</p>");
     const first = await harness.showAsync();
@@ -63,10 +63,13 @@ export class PageMethodTests {
     try {
       const idsOf = async (teammateId: string): Promise<string> => JsonReader.fromValue({ items: await serving.callAsync("teamrun.pageEditedList", { teammateId }) })
         .readObjectArray("items").map(t => t.readString("id")).join(",");
+      const edited = [await idsOf("t-opus"), await idsOf("t-sol")];
+      await serving.callAsync("teamrun.pageRestore", { pageId: taken, version: 1 });
       const listed = [await idsOf("t-opus"), await idsOf("t-sol"), await idsOf("t-nobody")];
       const refused = await serving.callAsync("teamrun.pageEditedList", { teammateId: " " }).then(() => null, (error: unknown) => error);
 
-      Assert.areEqual(JSON.stringify([`${first},${canvas}`, `${taken},${other}`, ""]), JSON.stringify(listed));
+      Assert.areEqual(JSON.stringify([`${first},${taken},${canvas}`, `${taken},${other}`]), JSON.stringify(edited));
+      Assert.areEqual(JSON.stringify([`${taken},${first},${canvas}`, other, ""]), JSON.stringify(listed));
       Assert.isTrue(refused instanceof MethodFailureException);
     }
     finally {

@@ -68,15 +68,15 @@ export class PagesStore {
     return records.filter(t => t.kind === PageKind.Page && !artboards.has(t.id));
   }
 
-  public async listEditedByAsync(teammateId: string, transaction?: SqlTransaction): Promise<readonly Page[]> {
+  public async listOfTeammateAsync(teammateId: string, transaction?: SqlTransaction): Promise<readonly Page[]> {
     if (Object.isUndefined(transaction))
-      return this.connection.runInTransactionAsync(t => this.listEditedByAsync(teammateId, t));
-    const edited = (await transaction.queryAsync(new SqlQuery(PagesResources.selectPagesEditedBy, [teammateId]))).map(t => Page.fromJson(PagesStore.jsonOf(t)));
+      return this.connection.runInTransactionAsync(t => this.listOfTeammateAsync(teammateId, t));
+    const pages = (await transaction.queryAsync(new SqlQuery(PagesResources.selectTeammatePages, [teammateId, teammateId]))).map(t => Page.fromJson(PagesStore.jsonOf(t)));
     const artboards = new Set<string>();
-    for (const chatId of new Set(edited.map(t => t.chatId)))
+    for (const chatId of new Set(pages.map(t => t.chatId)))
       for (const id of await this.artboardsOfAsync(await this.recordsAsync(chatId, transaction), transaction))
         artboards.add(id);
-    return edited.filter(t => !artboards.has(t.id)).slice(0, PagesResources.editedPageLimit);
+    return pages.filter(t => !artboards.has(t.id)).slice(0, PagesResources.teammatePageLimit);
   }
 
   public async canvasesAsync(chatId: string): Promise<readonly Page[]> {

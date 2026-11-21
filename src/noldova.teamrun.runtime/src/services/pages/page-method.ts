@@ -39,7 +39,7 @@ export class PageMethod implements IMethodHandler {
     if (this.name === PageMethodName.PageList)
       return (await this.store.listAsync(PageMethod.parse(() => PageListRequest.fromJson(context.payload)).chatId)).map(t => t.toJson());
     if (this.name === PageMethodName.PageEditedList)
-      return (await this.store.listEditedByAsync(PageMethod.parse(() => PageEditedListRequest.fromJson(context.payload)).teammateId)).map(t => t.toJson());
+      return (await this.store.listOfTeammateAsync(PageMethod.parse(() => PageEditedListRequest.fromJson(context.payload)).teammateId)).map(t => t.toJson());
     const request = PageMethod.parse(() => PageRequest.fromJson(context.payload));
     try {
       switch (this.name) {
