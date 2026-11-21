@@ -1255,16 +1255,19 @@ export class ChatStoreService {
     await Promise.all(this.responderWrites.values());
   }
 
-  public async setResponder(conversationId: string, responder: ConversationResponder, chosen: boolean = false): Promise<void> {
+  public async setResponder(conversationId: string, responder: ConversationResponder, chosen: boolean = false, start: boolean = false): Promise<void> {
     const previous = this.findConversation(conversationId);
     if (Object.isNull(previous))
       return;
     this.storeConversation(previous.withResponder(responder));
     const write = (this.responderWrites.get(conversationId) ?? Promise.resolve(previous.responder)).then(async held => {
+      let stored: ConversationResponder | null = responder;
       const kept = await this.attempt(async () => {
-        await this.request(MethodName.ConversationResponderSet, new ConversationResponderParams(conversationId, responder, chosen).toJson());
+        const chat = await this.request(MethodName.ConversationResponderSet, new ConversationResponderParams(conversationId, responder, chosen, start).toJson());
+        if (!chosen)
+          stored = Conversation.fromJson(chat).responder;
       }, this.actionFailed(ChatAction.SetResponder, conversationId, conversationId));
-      return kept ? responder : held;
+      return kept ? stored : held;
     });
     this.responderWrites.set(conversationId, write);
     const held = await write;

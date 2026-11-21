@@ -51,6 +51,9 @@
       "place": "desktop.view",
       "items": [
         {
+          "command": "teamrun.showOrganization"
+        },
+        {
           "command": "teamrun.showTeammates"
         },
         {

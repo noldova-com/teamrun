@@ -21,6 +21,7 @@ import {
   AttachmentInput,
   AuthStatus,
   ChatIdParams,
+  ChatResponderParams,
   ComposerDefaultSaveParams,
   Conversation,
   ConversationIdParams,
@@ -36,6 +37,7 @@ import {
   MessageStatus,
   MethodName,
   ObservedSettings,
+  OrganizationLayoutSaveParams,
   Project,
   ProjectListing,
   ProjectsLayoutSaveParams,
@@ -156,11 +158,13 @@ export class SampleData {
       .answer(MethodName.BackgroundTaskList, () => SampleData.tasks([]))
       .answer(MethodName.ConversationListMembers, () => [])
       .answer(MethodName.WaitingMessageList, t => new WaitingMessagesPayload(ChatIdParams.fromJson(t).chatId, []).toJson())
-      .answer(MethodName.ConversationResponderSet, () => null)
+      .answer(MethodName.ConversationResponderSet, t => SampleData.conversation.withResponder(ChatResponderParams.fromJson(t).responder).toJson())
       .answer(MethodName.ConversationListEmpty, () => [])
       .answer(MethodName.ProjectList, () => [SampleData.listed(SampleData.project)])
       .answer(MethodName.ProjectsLayoutRead, () => null)
       .answer(MethodName.ProjectsLayoutSave, t => ProjectsLayoutSaveParams.fromJson(t).layout)
+      .answer(MethodName.OrganizationLayoutRead, () => null)
+      .answer(MethodName.OrganizationLayoutSave, t => OrganizationLayoutSaveParams.fromJson(t).layout)
       .answer(MethodName.ComposerDefaultRead, () => null)
       .answer(MethodName.ComposerDefaultSave, t => ComposerDefaultSaveParams.fromJson(t).choice)
       .answer(MethodName.ConversationList, t => ConversationListParams.fromJson(t).projectId === SampleData.project.id ? [SampleData.conversation.toJson()] : [])

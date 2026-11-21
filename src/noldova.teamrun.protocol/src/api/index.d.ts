@@ -583,6 +583,16 @@ export declare enum MethodName {
    */
   DepartmentMemberSet = "DepartmentMemberSet",
   /**
+   * Reads the Organization view's layout: its collapsed departments and what its cards show.
+   * Parameters: none. Result: the layout's JSON object, or `null` when none is kept.
+   */
+  OrganizationLayoutRead = "OrganizationLayoutRead",
+  /**
+   * Keeps the Organization view's layout, replacing the one kept, and publishes `OrganizationLayoutUpdated`. Parameters:
+   * `OrganizationLayoutSaveParams`. Result: the layout's JSON object.
+   */
+  OrganizationLayoutSave = "OrganizationLayoutSave",
+  /**
    * Sends a message to one teammate, a department's leader and members, every department's leader, or every teammate, starting
    * each at once in its own chat, and publishes `OrganizationMessageUpdated` as each starts. Parameters:
    * `OrganizationMessageSendParams`. Result: `OrganizationMessage`.
@@ -895,8 +905,9 @@ export declare enum MethodName {
   ConversationTouch = "ConversationTouch",
   /**
    * Sets or clears the responder chosen in a chat's composer, a teammate or the default teammate's settings and provider, to
-   * answer a teammate's message that mentions no one, keeping the chat's update time. Parameters: `ChatResponderParams`.
-   * Result: `Chat`.
+   * answer a teammate's message that mentions no one, keeping the chat's update time. With `start`, it sets the responder
+   * only when the chat holds none and otherwise changes nothing. Parameters: `ChatResponderParams`. Result: `Chat`, as stored
+   * after the request.
    */
   ConversationResponderSet = "ConversationResponderSet",
   /**
@@ -1332,6 +1343,10 @@ export declare enum EventName {
    * changed department, or a deleted teammate left its department. Payload: `Organization`, the whole organization after the change.
    */
   OrganizationChanged = "OrganizationChanged",
+  /**
+   * The Organization view's layout was saved. Payload: the layout's JSON object.
+   */
+  OrganizationLayoutUpdated = "OrganizationLayoutUpdated",
   /** An organization message or one of its recipients changed. Payload: `OrganizationMessage`, the whole message. */
   OrganizationMessageUpdated = "OrganizationMessageUpdated"
 }
@@ -1407,7 +1422,7 @@ export declare class Resources {
   public static readonly defaultTeammateField: string;
 
   /**
-   * The layout field of `ProjectsLayoutSaveParams`.
+   * The layout field of `ProjectsLayoutSaveParams` and `OrganizationLayoutSaveParams`.
    */
   public static readonly layoutField: string;
   /**
@@ -2667,6 +2682,10 @@ export declare class Resources {
    * Name of the field that says the person chose a chat's responder settings: `chosen`.
    */
   public static readonly chosenField: string;
+  /**
+   * Name of the field that asks to set a chat's responder only when the chat holds none: `start`.
+   */
+  public static readonly startField: string;
   /**
    * Name of a chat's forked session field: `forkedSession`.
    */
@@ -8313,15 +8332,22 @@ export declare class ChatResponderParams {
    * `false`.
    */
   public readonly chosen: boolean;
+  /**
+   * Whether to set the responder only when the chat holds none, as the composer's starting choice does, so it never
+   * replaces a responder a mention or another window set; a chat that holds one is returned unchanged. Requests without it
+   * read as `false`.
+   */
+  public readonly start: boolean;
 
   /**
    * Initializes the parameters.
    * @param chatId The chat id.
    * @param responder The chosen responder, or `null` to clear the choice.
    * @param chosen Whether the person chose it; `false` by default.
+   * @param start Whether to set it only when the chat holds no responder; `false` by default.
    * @throws ArgumentException when the chat id is blank.
    */
-  public constructor(chatId: string, responder: ChatResponder | null, chosen?: boolean);
+  public constructor(chatId: string, responder: ChatResponder | null, chosen?: boolean, start?: boolean);
 
   /**
    * The chat's id, by its earlier name.
@@ -8331,7 +8357,7 @@ export declare class ChatResponderParams {
 
   /**
    * Reads the parameters from untrusted JSON.
-   * @param value The untrusted value, expected to carry `conversationId`, `responder` and the optional `chosen`.
+   * @param value The untrusted value, expected to carry `conversationId`, `responder` and the optional `chosen` and `start`.
    * @param path Path to report for the value; the root path `$` by default.
    * @returns The parameters.
    * @throws JsonException when a field is missing or invalid.
@@ -8340,7 +8366,7 @@ export declare class ChatResponderParams {
 
   /**
    * Renders the JSON object `fromJson` accepts.
-   * @returns The object with `conversationId`, `responder` and `chosen`.
+   * @returns The object with `conversationId`, `responder`, `chosen` and `start`.
    */
   public toJson(): JsonObject;
 }
@@ -12101,6 +12127,33 @@ export declare class DepartmentMemberSetParams {
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentMemberSetParams;
   /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The parameters of `OrganizationLayoutSave`: the Organization view's layout, a JSON object the window defines and
+ * TeamRun keeps as it is.
+ */
+export declare class OrganizationLayoutSaveParams {
+  /**
+   * The layout.
+   */
+  public readonly layout: JsonObject;
+
+  /**
+   * Initializes the parameters.
+   */
+  public constructor(layout: JsonObject);
+
+  /**
+   * Reads the parameters from untrusted JSON.
+   * @throws JsonException when `layout` is missing or not an object.
+   */
+  public static fromJson(value: unknown, path?: string): OrganizationLayoutSaveParams;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   */
   public toJson(): JsonObject;
 }
 

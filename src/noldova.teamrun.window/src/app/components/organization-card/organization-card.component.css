@@ -1,0 +1,143 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  box-sizing: border-box;
+  width: 15rem;
+  padding: var(--nol-space-3);
+  border: 1px solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background: light-dark(var(--nol-panel), var(--nol-raised));
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.who {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name,
+.role {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.name-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.role {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}
+
+.tune {
+  flex: none;
+}
+
+.remove {
+  flex: none;
+}
+
+.move {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  font-size: var(--nol-text-small);
+}
+
+.move-label {
+  color: var(--nol-text-muted);
+}
+
+.move-choice {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.status {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.now {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--nol-space-1) + var(--nol-space-half));
+  min-width: 0;
+}
+
+.now-icon {
+  flex: none;
+  width: var(--nol-icon);
+  margin-top: 0.0625rem;
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-icon);
+}
+
+.now-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.now-for {
+  flex: none;
+  color: var(--nol-text-muted);
+  font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-code);
+  white-space: nowrap;
+}
+
+.usage {
+  --nol-meter-height: var(--nol-space-1);
+  --nol-meter-gap: var(--nol-space-2);
+  --nol-meter: calc(100% - var(--nol-meter-gap) - 2rem);
+}
+
+.usage:not(.nol-meter-warning) {
+  --nol-meter-color: var(--nol-text-muted);
+}
+
+.last {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.model {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}

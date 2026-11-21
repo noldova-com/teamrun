@@ -156,6 +156,12 @@ export class ConversationsService implements IConversationsService {
     if (Object.isUndefined(transaction))
       return this.context.database.connection.runInTransactionAsync(t => this.setResponderAsync(params, t));
     const conversation = await this.requireAsync(params.conversationId, transaction);
+    if (params.start && !Object.isNull(conversation.responder))
+      return conversation;
+    const held = conversation.responder?.teammateId ?? null;
+    if (!params.chosen && Object.isNull(params.responder?.teammateId ?? null) && !Object.isNull(held) &&
+      (await transaction.queryAsync(new SqlQuery(Resources.selectMember, [conversation.id, held]))).length > 0)
+      return conversation;
     const teammateId = params.responder?.teammateId ?? null;
     const providerId = params.responder?.providerId ?? null;
     if (!Object.isNull(teammateId)) {

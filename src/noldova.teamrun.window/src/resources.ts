@@ -15,7 +15,10 @@ import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
 import { BrowserStepPhase } from "./app/enums/browser-step-phase";
 import { ChatAction } from "./app/enums/chat-action";
 import { ImageOpenMode } from "./app/enums/image-open-mode";
+import { OrganizationCardField } from "./app/enums/organization-card-field";
+import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
+import { TeammateStatus } from "./app/enums/teammate-status";
 import type { ProviderAction } from "./app/types/provider-action";
 
 export class Resources {
@@ -343,6 +346,11 @@ export class Resources {
   public static readonly projectOrderField: string = "projectOrder";
   public static readonly chatOrderField: string = "chatOrder";
   public static readonly collapsedGroupsField: string = "collapsedGroups";
+  public static readonly collapsedDepartmentsField: string = "collapsedDepartments";
+  public static readonly organizationCardsShowField: string = "cardsShow";
+  public static readonly organizationCardsField: string = "cards";
+  public static readonly organizationViewField: string = "view";
+  public static readonly organizationFocusField: string = "focus";
   public static readonly legacyPinnedChatsField: string = "pinnedConversations";
   public static readonly legacyChatOrderField: string = "conversationOrder";
   public static readonly conversationListIdPrefix: string = "teamrun-conversations-";
@@ -520,6 +528,7 @@ export class Resources {
   public static readonly planWarningPercent: number = 75;
   public static readonly planCriticalPercent: number = 90;
   public static readonly wholePercent: number = 100;
+  public static readonly organizationUsageWarning: number = 0.8;
   public static readonly planUsageLabel: string = "Plan usage";
   public static readonly nearPlanLimitLabel: string = "Near the plan limit";
   public static readonly usedUpLabel: string = "Used up";
@@ -830,6 +839,9 @@ export class Resources {
   public static readonly teammatesDocumentName: string = "teamrun.teammates";
   public static readonly teammatesDocumentInstance: string = "teammates";
   public static readonly teammatesViewIcon: string = "group";
+  public static readonly organizationDocumentName: string = "teamrun.organization";
+  public static readonly organizationDocumentInstance: string = "organization";
+  public static readonly organizationViewIcon: string = "lan";
   public static readonly providersDocumentName: string = "teamrun.providers";
   public static readonly providersDocumentInstance: string = "providers";
   public static readonly providersViewIcon: string = "key";
@@ -940,6 +952,8 @@ export class Resources {
   public static readonly changedDetailsLimit: number = 1_000;
   public static readonly showTeammatesCommand: string = "teamrun.showTeammates";
   public static readonly showTeammatesTitle: string = "Manage teammates";
+  public static readonly showOrganizationCommand: string = "teamrun.showOrganization";
+  public static readonly showOrganizationTitle: string = "Show organization";
   public static readonly chooseDefaultTeammateCommand: string = "teamrun.chooseDefaultTeammate";
   public static readonly chooseDefaultTeammateTitle: string = "Choose default teammate";
   public static readonly showProvidersCommand: string = "teamrun.showProviders";
@@ -1143,6 +1157,71 @@ export class Resources {
   public static readonly teamRunTagPrefix: string = "nol-teamrun-";
   public static readonly escapeOwnersSelector: string = "input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='menu'], [role='listbox'], [role='dialog'], dialog";
   public static readonly teammatesTitle: string = "Teammates";
+  public static readonly organizationTitle: string = "Organization";
+  public static readonly organizationStructureLabel: string = "Organization structure";
+  public static readonly organizationOwnerName: string = "You";
+  public static readonly organizationEmpty: string = "No departments yet.";
+  public static readonly organizationCardsShowLabel: string = "Cards show";
+  public static readonly organizationCardsShowIcon: string = "tune";
+  public static readonly organizationEveryCardShows: string = "Every card shows";
+  public static readonly organizationClearEveryCard: string = "Clear every card's own choice";
+  public static readonly organizationUseEveryCard: string = "Use what every card shows";
+  public static readonly organizationResetIcon: string = "restart_alt";
+  public static readonly organizationEditStructure: string = "Edit structure";
+  public static readonly organizationDoneEditing: string = "Done editing";
+  public static readonly organizationEditIcon: string = "account_tree";
+  public static readonly organizationStatusKeyLabel: string = "Status key";
+  public static readonly organizationStatusKey: readonly TeammateStatus[] = [TeammateStatus.Working, TeammateStatus.WaitingForYou, TeammateStatus.Idle,
+    TeammateStatus.Stopped];
+  public static readonly organizationDepartmentNameLabel: string = "Department name";
+  public static readonly organizationLeaderLabel: string = "Leader";
+  public static readonly organizationNoLeader: string = "No leader";
+  public static readonly organizationMemberIn: string = "In";
+  public static readonly organizationAddMember: string = "Add member";
+  public static readonly organizationAddMemberIcon: string = "person_add";
+  public static readonly organizationAddDepartment: string = "Add department";
+  public static readonly organizationAddDepartmentIcon: string = "add";
+  public static readonly organizationNewDepartment: string = "New department";
+  public static readonly organizationDeleteIcon: string = "delete";
+  public static readonly organizationRemoveIcon: string = "person_remove";
+  public static readonly organizationNowRunningIcon: string = "progress_activity";
+  public static readonly organizationNowIdleIcon: string = "pause_circle";
+  public static readonly organizationNothingRunning: string = "Nothing running";
+  public static readonly organizationNowReplying: string = "Replying";
+  public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
+  public static readonly organizationDeleteLabel: string = "Delete";
+  public static readonly organizationRemoveMemberTitle: string = "Remove member";
+  public static readonly organizationRemoveLabel: string = "Remove";
+  public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
+    [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Last,
+      OrganizationCardField.Model];
+  public static readonly organizationFieldLabels: Readonly<Record<OrganizationCardField, string>> = {
+    [OrganizationCardField.Status]: "Status",
+    [OrganizationCardField.Now]: "Current activity",
+    [OrganizationCardField.Usage]: "Usage today",
+    [OrganizationCardField.Last]: "Last message",
+    [OrganizationCardField.Model]: "Model and effort"
+  };
+  public static readonly organizationViewLabel: string = "View";
+  public static readonly organizationViewLabels: Readonly<Record<OrganizationViewMode, string>> = {
+    [OrganizationViewMode.Tree]: "Tree",
+    [OrganizationViewMode.Board]: "Board",
+    [OrganizationViewMode.Focus]: "Focus"
+  };
+  public static readonly teammateStatusLabels: Readonly<Record<TeammateStatus, string>> = {
+    [TeammateStatus.Working]: "Working",
+    [TeammateStatus.WaitingForYou]: "Waiting for you",
+    [TeammateStatus.Idle]: "Idle",
+    [TeammateStatus.UsageLimit]: "Usage limit",
+    [TeammateStatus.Stopped]: "Stopped"
+  };
+  public static readonly teammateStatusTones: Readonly<Record<TeammateStatus, string>> = {
+    [TeammateStatus.Working]: "working",
+    [TeammateStatus.WaitingForYou]: "waiting",
+    [TeammateStatus.Idle]: "idle",
+    [TeammateStatus.UsageLimit]: "waiting",
+    [TeammateStatus.Stopped]: "stopped"
+  };
   public static readonly teammatesHint: string = "Create and configure teammates here. Add them to a chat using its member strip or an @mention.";
   public static readonly defaultTeammateHint: string = "The provider, model and effort a new chat starts with. Chats you already have keep their own.";
   public static readonly lastMessageSentLabel: string = "Last message sent";
@@ -1156,6 +1235,7 @@ export class Resources {
   public static readonly noTeammates: string = "No teammates yet";
   public static readonly teammateNameLabel: string = "Name";
   public static readonly teammateNameHint: string = "1–100 characters, a separate accent or vowel sign counting as one: letters, digits, dashes or underscores, with single spaces between words";
+  public static readonly organizationTeammateNameRule: string = `A teammate's name takes ${Resources.teammateNameHint}.`;
   public static readonly teammateRoleLabel: string = "Role (optional, Markdown)";
   public static readonly teammateRoleRows: number = 4;
   public static readonly connectionColumn: string = "Provider";
@@ -1621,6 +1701,78 @@ export class Resources {
 
   public static formatMoveDown(entry: string): string {
     return `Move ${entry} down`;
+  }
+
+  public static formatOrganizationHeadcount(teammates: number, departments: number): string {
+    return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} in ${departments === 1 ? "1 department" : `${departments} departments`}`;
+  }
+
+  public static formatOrganizationOwnerRole(leaders: number): string {
+    return leaders === 1 ? "Owner · 1 leader reports to you" : `Owner · ${leaders} leaders report to you`;
+  }
+
+  public static formatOrganizationDepartmentSummary(statuses: readonly TeammateStatus[]): string {
+    const counts = Object.values(TeammateStatus).flatMap(t => {
+      const count = statuses.filter(u => u === t).length;
+      return count === 0 ? [] : [`${count} ${Resources.teammateStatusLabels[t].toLowerCase()}`];
+    });
+    return counts.join(" · ");
+  }
+
+  public static formatOrganizationCollapseLabel(name: string, open: boolean): string {
+    return open ? `Hide ${name}'s members` : `Show ${name}'s members`;
+  }
+
+  public static formatOrganizationDeleteDepartment(name: string, parent: string | null): string {
+    return Object.isNull(parent) ? `Delete ${name}? Its departments move up to report to you, and its members leave every department.`
+      : `Delete ${name}? Its departments and members move to ${parent}.`;
+  }
+
+  public static formatOrganizationDeleteNamed(name: string): string {
+    return `Delete ${name}`;
+  }
+
+  public static formatOrganizationRemoveNamed(name: string): string {
+    return `Remove ${name}`;
+  }
+
+  public static formatOrganizationMoveLabel(name: string): string {
+    return `Department of ${name}`;
+  }
+
+  public static formatOrganizationRemoveMember(teammate: string, department: string): string {
+    return `Remove ${teammate} from ${department}? ${teammate} stays on the team, in no department.`;
+  }
+
+  public static formatOrganizationHidden(count: number): string {
+    return count === 1 ? "1 member hidden" : `${count} members hidden`;
+  }
+
+  public static formatOrganizationCardShows(name: string): string {
+    return `${name}'s card shows`;
+  }
+
+  public static formatOrganizationChooseFields(name: string): string {
+    return `Choose what ${name}'s card shows`;
+  }
+
+  public static formatOrganizationNowFor(milliseconds: number, more: number): string {
+    const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+    const lasted = seconds < 60 ? `${seconds} s` : seconds < 3600 ? `${Math.floor(seconds / 60)} min`
+      : `${Math.floor(seconds / 3600)} h ${Math.floor(seconds % 3600 / 60)} min`;
+    return more > 0 ? `${lasted} +${more}` : lasted;
+  }
+
+  public static formatOrganizationUsage(used: number): string {
+    return `${Math.round(used * Resources.wholePercent)}%`;
+  }
+
+  public static formatOrganizationRenameLabel(name: string): string {
+    return `Rename ${name}`;
+  }
+
+  public static formatOrganizationModel(model: string, effort: string | null): string {
+    return [model, effort].filter(t => !Object.isNull(t)).join(Resources.titleSeparator);
   }
 
   public static formatRemove(entry: string): string {
