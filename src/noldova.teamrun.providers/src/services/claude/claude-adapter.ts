@@ -439,8 +439,8 @@ export class ClaudeAdapter implements IProviderAdapter {
   }
 
   private ownFolderOf(profileDir: string | null): string | null {
-    const usual = this.descriptor.profile?.usualFolder ?? null;
-    return Object.isNull(profileDir) || (!Object.isNull(usual) && ProfileFolderPath.isSame(profileDir, usual)) ? null : profileDir;
+    const usual = UsualFolder.of(this.baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, this.homeDirectory);
+    return Object.isNull(profileDir) || ProfileFolderPath.isSame(profileDir, usual) ? null : profileDir;
   }
 
   private async runQuery(command: ProcessCommand, request: TurnRequest, resume: string | null, text: string, effort: EffortLevel | null,
