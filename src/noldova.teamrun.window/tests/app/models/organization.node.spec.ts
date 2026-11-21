@@ -7,7 +7,6 @@
  */
 import { Department, DepartmentMember, Harness, Organization, Teammate } from "@noldova/teamrun.protocol";
 
-import { OrganizationNodeKind } from "../../../src/app/enums/organization-node-kind";
 import { OrganizationNode } from "../../../src/app/models/organization.node";
 import { Resources } from "../../../src/resources";
 
@@ -59,9 +58,9 @@ describe("OrganizationNode", () => {
       [new DepartmentMember("ada", "design"), new DepartmentMember("bea", "ui")]);
     const tree = OrganizationNode.treeOf(organization, [fay, ada, dee, bea, cy]);
 
-    expect([shape(tree), tree.map(t => [t.name, t.isUnplaced, t.department?.id ?? null, t.kind])]).toEqual([
+    expect([shape(tree), tree.map(t => [t.name, t.isUnplaced, t.department?.id ?? null])]).toEqual([
       [["no-department", null, ["cy", "dee", "fay"], 3, 3, 3, []], ["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]],
-      [[Resources.organizationNoDepartment, true, null, OrganizationNodeKind.NoDepartment], ["Design", false, "design", OrganizationNodeKind.Department]]
+      [[Resources.organizationNoDepartment, true, null], ["Design", false, "design"]]
     ]);
     expect(shape(OrganizationNode.treeOf(organization, [ada, bea]))).toEqual([["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]]);
     expect(shape(OrganizationNode.treeOf(Organization.empty, [bea, ada]))).toEqual([["no-department", null, ["ada", "bea"], 2, 2, 2, []]]);
