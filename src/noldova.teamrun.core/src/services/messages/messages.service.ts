@@ -125,7 +125,8 @@ export class MessagesService implements IMessagesService {
   }
 
   public async listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]> {
-    return (await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectTeammateLastReplies, []))).map(t => new TeammateLastReply(
+    const rows = await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectTeammateLastReplies, [Resources.textBlanks]));
+    return rows.map(t => new TeammateLastReply(
       t.readString(Resources.teammateIdColumn), t.readString(Resources.conversationIdColumn), t.readString(Resources.idColumn), t.readString(Resources.textColumn),
       t.readString(Resources.endedAtColumn)));
   }

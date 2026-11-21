@@ -3007,6 +3007,10 @@ export declare class Resources {
   public static readonly organizationMessagesMigrationId: string;
   /** The organization messages table. */
   public static readonly organizationMessagesTable: string;
+  /** The teammate last replies migration's fixed id: `20261122090000_TeammateLastReplies`. */
+  public static readonly teammateLastRepliesMigrationId: string;
+  /** Indexes the Completed provider replies by their teammate and end time. */
+  public static readonly createTeammateLastReplyIndex: string;
   /** Lists every organization message, the oldest first. */
   public static readonly selectOrganizationMessages: string;
   /** Reads one organization message by id. */
@@ -3733,7 +3737,12 @@ export declare class Resources {
    * Selects every reply still pending, running, or awaiting an approval, oldest first.
    */
   public static readonly selectOpenReplies: string;
-  /** Each teammate's latest completed reply with text, its text from `messageText`. */
+  /** The characters JavaScript's trim removes, which the last-reply query trims, so a reply of only line breaks has no text. */
+  public static readonly textBlanks: string;
+  /**
+   * Each teammate's latest completed reply with text, its text from `messageText`: for each teammate it walks the last-reply index down from the last
+   * ended, so it reads no other message; its one parameter is `textBlanks`.
+   */
   public static readonly selectTeammateLastReplies: string;
   /**
    * Selects every message with a sub-agent still running, oldest first; the text search only narrows the rows the details are read from.
@@ -5347,6 +5356,13 @@ export declare class Resources {
    * @returns The pattern.
    */
   public static formatLikePattern(query: string): string;
+
+  /**
+   * Renders the SQL condition for a Completed provider reply, the condition the last-reply index covers.
+   * @param row The message row's name in the statement, or null for the table's own columns.
+   * @returns The condition.
+   */
+  public static formatFinishedReply(row: string | null): string;
 
   /**
    * Renders the SQL expression for a message row's text details joined by spaces, or null when its JSON isn't valid.
@@ -11136,6 +11152,15 @@ export declare class HandoverSummaryKindsMigration extends SqlMigration {
   /**
    * Adds the column with `Resources.addHandoverSummaryKind`.
    */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/** Indexes the Completed provider replies by their teammate and end time, which the last-reply query walks. */
+export declare class TeammateLastRepliesMigration extends SqlMigration {
+  /** Uses the fixed teammate last replies migration id. */
+  public constructor();
+
+  /** Creates the partial index. */
   public override apply(builder: MigrationBuilder): void;
 }
 

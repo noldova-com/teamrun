@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, inject, input } from "@angular/core";
+import { Component, computed, effect, inject, input } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
@@ -32,15 +32,22 @@ import { Wait } from "../../fixtures/wait.fixture";
 
 @Component({
   selector: "nol-teamrun-status-probe",
-  template: "{{ rendered() }}{{ status() }} {{ activities().length }} {{ lastSaid() }}"
+  template: "{{ rendered() }}{{ status() }} {{ activities().length }} {{ store.lastReplyOf(teammateId())()?.text ?? '' }}"
 })
 class StatusProbeComponent {
   public readonly teammateId = input.required<string>();
   public renders: number = 0;
-  private readonly store: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
+  public lastReplyChanges: number = 0;
+  protected readonly store: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
   protected readonly status = computed(() => this.store.statusOf(this.teammateId())());
   protected readonly activities = computed(() => this.store.activitiesOf(this.teammateId())());
-  protected readonly lastSaid = computed(() => this.store.lastReplyOf(this.teammateId())()?.text ?? "");
+
+  public constructor() {
+    effect(() => {
+      this.store.lastReplyOf(this.teammateId())();
+      this.lastReplyChanges++;
+    });
+  }
 
   protected rendered(): string {
     this.renders++;
@@ -262,7 +269,7 @@ describe("TeammateStatusStoreService", () => {
     const fixture = TestBed.createComponent(StatusHostComponent);
     await fixture.whenStable();
     const [alice, bob] = fixture.debugElement.queryAll(By.directive(StatusProbeComponent)).map(t => t.componentInstance as StatusProbeComponent);
-    const before = [alice?.renders, bob?.renders];
+    const before = [alice?.renders, bob?.renders, alice?.lastReplyChanges, bob?.lastReplyChanges];
 
     context.emit(EventName.MessageUpdated, finished("r1", "c1", "alice", "Shipped.").toJson());
     await fixture.whenStable();
@@ -270,7 +277,8 @@ describe("TeammateStatusStoreService", () => {
     await fixture.whenStable();
 
     expect(fixture.nativeElement.textContent).toBe("Idle 0 Shipped.Idle 0 ");
-    expect([alice?.renders, bob?.renders]).toEqual([(before[0] ?? 0) + 1, before[1]]);
+    expect([alice?.renders, bob?.renders, alice?.lastReplyChanges, bob?.lastReplyChanges])
+      .toEqual([(before[0] ?? 0) + 1, before[1], (before[2] ?? 0) + 1, before[3]]);
   });
 
   it("starts from each teammate's last reply the runtime lists and keeps it live as a newer reply with text finishes in any chat", async () => {
@@ -339,6 +347,24 @@ describe("TeammateStatusStoreService", () => {
     await Promise.all(replaced);
 
     expect([lastSaid("alice"), lastSaid("bob"), store.lastRepliesError()]).toEqual([null, null, null]);
+  });
+
+  it("reads again when a chat holding a reply of the answer was rewound or deleted while the list was read", async () => {
+    const readings: ((value: JsonValue) => void)[] = [];
+    listed = () => new Promise<JsonValue>(resolve => readings.push(resolve));
+    await create();
+    await Wait.until(() => expect(readings).toHaveLength(1));
+
+    context.emit(EventName.ConversationDeleted, new ChatIdParams("c1").toJson());
+    context.emit(EventName.ConversationRewound, new ChatRewoundPayload("c2", 1).toJson());
+    readings[0]?.([new TeammateLastReply("alice", "c1", "r1", "Gone.", later).toJson(), new TeammateLastReply("bob", "c3", "r2", "Kept.", later).toJson()]);
+    await Wait.until(() => expect(readings).toHaveLength(2));
+    expect([lastSaid("alice"), lastSaid("bob")]).toEqual([null, null]);
+    context.emit(EventName.ConversationDeleted, new ChatIdParams("c9").toJson());
+    readings[1]?.([new TeammateLastReply("alice", "c4", "r0", "Earlier.", earlier).toJson(), new TeammateLastReply("bob", "c3", "r2", "Kept.", later).toJson()]);
+
+    await Wait.until(() => expect([lastSaid("alice"), lastSaid("bob")]).toEqual(["Earlier.", "Kept."]));
+    expect(readings).toHaveLength(2);
   });
 
   it("says why the list couldn't be read, keeps what it held, and clears the reason once a reading succeeds", async () => {

@@ -32,7 +32,7 @@ export class TeammateStatusStoreService {
   private readonly lastRepliesSignal: WritableSignal<ReadonlyMap<string, TeammateLastReply>> = signal(new Map());
   private readonly lastRepliesErrorSignal: WritableSignal<string | null> = signal(null);
   private readonly subscriptions: readonly (() => void)[];
-  private updatedWhileReading: Message[] | null = null;
+  private reading: { readonly updated: Message[]; readonly removedChats: Set<string> } | null = null;
   private generation: number = 0;
 
   public readonly lastRepliesError: Signal<string | null> = this.lastRepliesErrorSignal.asReadonly();
@@ -110,18 +110,23 @@ export class TeammateStatusStoreService {
 
   public async reloadLastReplies(): Promise<void> {
     const generation = ++this.generation;
-    const updated: Message[] = [];
-    this.updatedWhileReading = updated;
+    const reading = { updated: new Array<Message>(), removedChats: new Set<string>() };
+    this.reading = reading;
     try {
       const json = await this.context.requestAsync(Resources.formatQualifiedName(MethodName.TeammateLastReplyList), null);
       if (generation !== this.generation)
         return;
       if (!Array.isArray(json))
         throw new ListNotArrayException(Resources.formatValueKind(json));
-      this.lastRepliesSignal.set(new Map(json.map(t => TeammateLastReply.fromJson(t)).map(t => [t.teammateId, t])));
+      const answered = json.map(t => TeammateLastReply.fromJson(t));
+      this.reading = null;
+      if (answered.some(t => reading.removedChats.has(t.chatId))) {
+        void this.reloadLastReplies();
+        return;
+      }
+      this.lastRepliesSignal.set(new Map(answered.map(t => [t.teammateId, t])));
       this.lastRepliesErrorSignal.set(null);
-      this.updatedWhileReading = null;
-      for (const message of updated)
+      for (const message of reading.updated)
         this.applyUpdated(message);
     }
     catch (error) {
@@ -129,13 +134,13 @@ export class TeammateStatusStoreService {
         this.lastRepliesErrorSignal.set(error instanceof Error ? error.message : String(error));
     }
     finally {
-      if (this.updatedWhileReading === updated)
-        this.updatedWhileReading = null;
+      if (this.reading === reading)
+        this.reading = null;
     }
   }
 
   private applyUpdated(message: Message): void {
-    this.updatedWhileReading?.push(message);
+    this.reading?.updated.push(message);
     const replies = this.lastRepliesSignal();
     const last = TeammateLastReply.of(message);
     const teammateId = last?.teammateId ?? message.teammateId;
@@ -150,6 +155,7 @@ export class TeammateStatusStoreService {
   }
 
   private reloadIfIn(chatId: string): void {
+    this.reading?.removedChats.add(chatId);
     if ([...this.lastRepliesSignal().values()].some(t => t.chatId === chatId))
       void this.reloadLastReplies();
   }
