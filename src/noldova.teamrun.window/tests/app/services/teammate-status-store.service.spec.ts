@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, effect, inject, input } from "@angular/core";
+import { Component, effect, inject, input } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
@@ -32,15 +32,13 @@ import { Wait } from "../../fixtures/wait.fixture";
 
 @Component({
   selector: "nol-teamrun-status-probe",
-  template: "{{ rendered() }}{{ status() }} {{ activities().length }} {{ store.lastReplyOf(teammateId())()?.text ?? '' }}"
+  template: "{{ rendered() }}{{ store.statusOf(teammateId())() }} {{ store.activitiesOf(teammateId())().length }} {{ store.lastReplyOf(teammateId())()?.text ?? '' }}"
 })
 class StatusProbeComponent {
   public readonly teammateId = input.required<string>();
   public renders: number = 0;
   public lastReplyChanges: number = 0;
   protected readonly store: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
-  protected readonly status = computed(() => this.store.statusOf(this.teammateId())());
-  protected readonly activities = computed(() => this.store.activitiesOf(this.teammateId())());
 
   public constructor() {
     effect(() => {
