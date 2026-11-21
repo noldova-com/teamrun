@@ -10,7 +10,7 @@ import { computed, type Signal } from "@angular/core";
 
 import "@noldova/context.core";
 import type { IWindowPartContext } from "@noldova/desktop.window";
-import { type Message, MessageStatus } from "@noldova/teamrun.protocol";
+import type { Message, Teammate } from "@noldova/teamrun.protocol";
 
 import { TeammateStatus } from "../enums/teammate-status";
 import type { TeammateStopReason } from "../enums/teammate-stop-reason";
@@ -25,7 +25,6 @@ export class TeammateStatusStoreService {
   private readonly stopReasons: Map<string, Signal<TeammateStopReason | null>> = new Map();
   private readonly activities: Map<string, Signal<readonly TeammateActivity[]>> = new Map();
   private readonly repliesByTeammate: Signal<ReadonlyMap<string, readonly Message[]>>;
-  private readonly askingReplies: Signal<ReadonlySet<string>>;
 
   public constructor(chats: ChatStoreService) {
     this.chats = chats;
@@ -36,7 +35,6 @@ export class TeammateStatusStoreService {
           replies.set(reply.teammateId, [...replies.get(reply.teammateId) ?? [], reply]);
       return replies;
     });
-    this.askingReplies = computed(() => new Set(chats.pendingApprovals().map(t => t.messageId)));
   }
 
   public static of(context: IWindowPartContext): TeammateStatusStoreService {
@@ -83,16 +81,24 @@ export class TeammateStatusStoreService {
 
   private readStatus(teammateId: string): TeammateStatus {
     const replies = this.repliesOf(teammateId);
-    const asking = this.askingReplies();
-    if (replies.some(t => t.status === MessageStatus.AwaitingApproval || asking.has(t.id)))
+    if (this.chats.waitingTeammates().has(teammateId))
       return TeammateStatus.WaitingForYou;
     if (replies.length > 0)
       return TeammateStatus.Working;
     if (this.chats.isTeammateUnavailable(teammateId))
       return TeammateStatus.Stopped;
-    if (this.chats.teammates().some(t => t.id === teammateId && this.chats.planUsageOfProvider(t.providerId)?.usedUp === true))
+    if (this.chats.teammates().some(t => t.id === teammateId && this.isUsedUp(t.providerId) && !this.sustainHasRoom(t)))
       return TeammateStatus.UsageLimit;
     return TeammateStatus.Idle;
+  }
+
+  private sustainHasRoom(teammate: Teammate): boolean {
+    const providers = new Set(this.chats.providers().map(t => t.id));
+    return teammate.sustain && teammate.fallbacks.some(t => providers.has(t.providerId) && !this.isUsedUp(t.providerId));
+  }
+
+  private isUsedUp(providerId: string): boolean {
+    return this.chats.planUsageOfProvider(providerId)?.usedUp === true;
   }
 
   private repliesOf(teammateId: string): readonly Message[] {

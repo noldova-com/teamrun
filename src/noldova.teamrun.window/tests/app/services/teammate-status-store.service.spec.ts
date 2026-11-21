@@ -12,7 +12,10 @@ import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { ApprovalStatus, AuthStatus, Approval, EventName, Message, MessageAuthor, MessageStatus, MethodName, PlanUsage, Provider } from "@noldova/teamrun.protocol";
+import {
+  ApprovalStatus, AuthStatus, Approval, ConversationIdParams, EventName, Message, MessageAuthor, MessageIdParams, MessageStatus, MethodName, PlanUsage, Provider,
+  ReplySummary, Teammate, TeammateFallback
+} from "@noldova/teamrun.protocol";
 
 import { TeammateStatus } from "../../../src/app/enums/teammate-status";
 import { TeammateStopReason } from "../../../src/app/enums/teammate-stop-reason";
@@ -53,6 +56,8 @@ describe("TeammateStatusStoreService", () => {
   const later = "2026-09-10T09:00:00.000Z";
   let context: FakeWindowPartContext;
   let open: readonly Message[];
+  let pending: readonly Approval[];
+  let summaries: ReadonlyMap<string, Message>;
   let store: TeammateStatusStoreService;
 
   const reply = (id: string, chatId: string, teammateId: string | null, status: MessageStatus, startedAt: string | null = earlier): Message =>
@@ -60,14 +65,21 @@ describe("TeammateStatusStoreService", () => {
       [MessageStatus.Pending, MessageStatus.Running, MessageStatus.AwaitingApproval].includes(status) ? null : later, [], teammateId, teammateId);
   const approval = (messageId: string, status: ApprovalStatus): Approval => new Approval("ap1", messageId, SampleData.approval.kind, "exec", "run tests", null,
     SampleData.approval.options, status, status === ApprovalStatus.Pending ? null : "yes", earlier, status === ApprovalStatus.Pending ? null : later);
-  const plan = (usedUp: boolean): PlanUsage => new PlanUsage("codex", "a1", [], later, null, usedUp);
+  const plan = (usedUp: boolean, providerId: string = "a1"): PlanUsage => new PlanUsage("codex", providerId, [], later, null, usedUp);
+  const sustaining = (teammate: Teammate, sustain: boolean, providerIds: readonly string[]): Teammate => new Teammate(teammate.id, teammate.name, teammate.role,
+    teammate.providerId, teammate.harness, teammate.model, teammate.effort, "t", "t", null, null, null, [], sustain, providerIds.map(t => new TeammateFallback(t)));
   const provider = (authStatus: AuthStatus, kind: string = "codex", enabled: boolean = true): Provider =>
     new Provider("a1", kind, "Work", "D:\\profiles\\codex", authStatus, null, "1.0", earlier, null, later, enabled);
   const statuses = (): readonly TeammateStatus[] => ["alice", "bob"].map(t => store.statusOf(t)());
 
-  const create = async (): Promise<void> => {
-    context = SampleData.createContext().answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()));
-    new TeammateFixture(context);
+  const create = async (prepare: (fixture: TeammateFixture) => void = () => undefined): Promise<void> => {
+    context = SampleData.createContext().answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()))
+      .answer(MethodName.ApprovalListPending, () => pending.map(t => t.toJson()))
+      .answer(MethodName.MessageSummary, t => {
+        const found = summaries.get(MessageIdParams.fromJson(t).messageId);
+        return Object.isUndefined(found) ? null : ReplySummary.fromMessage(found).toJson();
+      });
+    prepare(new TeammateFixture(context));
     const chats = ChatStoreService.of(context);
     store = TeammateStatusStoreService.of(context);
     await Wait.until(() => expect(chats.teammates()).toHaveLength(3));
@@ -76,6 +88,8 @@ describe("TeammateStatusStoreService", () => {
 
   beforeEach(() => {
     open = [];
+    pending = [];
+    summaries = new Map();
   });
 
   afterEach(() => {
@@ -136,6 +150,38 @@ describe("TeammateStatusStoreService", () => {
     context.emit(EventName.MessageUpdated, reply("r1", "c1", "alice", MessageStatus.Running).toJson());
     context.emit(EventName.ApprovalUpdated, approval("r2", ApprovalStatus.Approved).toJson());
     expect(statuses()).toEqual([TeammateStatus.Working, TeammateStatus.Working]);
+  });
+
+  it("keeps waiting for you while a question outlives its reply or was left pending before a reload, until its chat is deleted", async () => {
+    pending = [approval("m9", ApprovalStatus.Pending)];
+    summaries = new Map([["m9", reply("m9", "c2", "bob", MessageStatus.Completed)]]);
+    await create();
+    await Wait.until(() => expect(store.statusOf("bob")()).toBe(TeammateStatus.WaitingForYou));
+
+    context.emit(EventName.MessageCreated, reply("r1", "c1", "alice", MessageStatus.Running).toJson());
+    context.emit(EventName.ApprovalCreated, new Approval("ap2", "r1", SampleData.approval.kind, "ask", "which branch?", null, SampleData.approval.options,
+      ApprovalStatus.Pending, null, earlier, null).toJson());
+    context.emit(EventName.MessageUpdated, reply("r1", "c1", "alice", MessageStatus.Completed).toJson());
+    const outlived = statuses();
+    context.emit(EventName.ConversationDeleted, new ConversationIdParams("c1").toJson());
+
+    expect(outlived).toEqual([TeammateStatus.WaitingForYou, TeammateStatus.WaitingForYou]);
+    await Wait.until(() => expect(statuses()).toEqual([TeammateStatus.Idle, TeammateStatus.WaitingForYou]));
+    expect(ChatStoreService.of(context).pendingApprovals().map(t => t.messageId)).toEqual(["m9"]);
+  });
+
+  it("is at its usage limit only while no Sustain account it may use has room", async () => {
+    await create(t => {
+      t.teammates = [sustaining(t.alice, true, ["gone", "a2"]), sustaining(t.bob, false, ["a2"]), t.unavailable];
+    });
+    context.emit(EventName.ProviderUpdated, new Provider("a2", "codex", "Spare", "D:\\profiles\\spare", AuthStatus.LoggedIn, null, "1.0", earlier, null, later).toJson());
+    context.emit(EventName.PlanUsageUpdated, plan(true).toJson());
+    const spare = statuses();
+
+    context.emit(EventName.PlanUsageUpdated, plan(true, "a2").toJson());
+
+    expect(spare).toEqual([TeammateStatus.Idle, TeammateStatus.UsageLimit]);
+    expect(statuses()).toEqual([TeammateStatus.UsageLimit, TeammateStatus.UsageLimit]);
   });
 
   it("is at its usage limit while its provider's plan is used up, until the plan has room again, though a running reply shows as working", async () => {
