@@ -35,6 +35,7 @@ import {
   DepartmentCreateParams,
   DepartmentIdParams,
   DepartmentMemberSetParams,
+  OrganizationLayoutSaveParams,
   DepartmentMoveParams,
   DepartmentUpdateParams,
   WaitingMessageAddParams,
@@ -251,6 +252,8 @@ export class RequestDispatcher {
       case MethodName.DepartmentMove:
       case MethodName.DepartmentDelete:
       case MethodName.DepartmentMemberSet:
+      case MethodName.OrganizationLayoutRead:
+      case MethodName.OrganizationLayoutSave:
         return await this.organizeAsync(RequestDispatcher.require(this.organization, method), method, payload);
       case MethodName.SharedMcpServerList:
         return (await RequestDispatcher.require(this.sharedServers, method).listAsync()).map(t => t.toJson());
@@ -612,6 +615,13 @@ export class RequestDispatcher {
     switch (method) {
       case MethodName.OrganizationList:
         return (await organization.listAsync()).toJson();
+      case MethodName.OrganizationLayoutRead:
+        return await organization.readLayoutAsync();
+      case MethodName.OrganizationLayoutSave: {
+        const layout = await organization.saveLayoutAsync(OrganizationLayoutSaveParams.fromJson(payload));
+        this.publish(new Event(EventName.OrganizationLayoutUpdated, layout));
+        return layout;
+      }
       case MethodName.DepartmentCreate:
         result = (await organization.createAsync(DepartmentCreateParams.fromJson(payload))).toJson();
         break;

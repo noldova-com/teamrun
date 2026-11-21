@@ -44,6 +44,7 @@ import { ComposerDefaultService } from "../../src/app/services/composer-default.
 import { GitHubReferenceSource } from "../../src/app/services/github-reference-source";
 import { PlanUsageStatus } from "../../src/app/services/plan-usage-status";
 import { ChatPages } from "../../src/app/services/pages/chat-pages";
+import { OrganizationLayoutService } from "../../src/app/services/organization-layout.service";
 import { ProjectsLayoutService } from "../../src/app/services/projects-layout.service";
 import { SubAgentsBadge } from "../../src/app/services/sub-agents-badge";
 import { TimeFormatService } from "../../src/app/services/time-format.service";
@@ -537,6 +538,7 @@ describe("TeamRun's window part", () => {
     const store = ChatStoreService.of(context);
     const tasks = BackgroundTaskStoreService.of(context);
     const layout = ProjectsLayoutService.of(context);
+    const organizationLayout = OrganizationLayoutService.of(context);
     const choice = ComposerDefaultService.of(context);
     const pages = ChatPages.of(context);
 
@@ -548,11 +550,13 @@ describe("TeamRun's window part", () => {
     expect(ChatStoreService.of(context)).not.toBe(store);
     expect(BackgroundTaskStoreService.of(context)).not.toBe(tasks);
     expect(ProjectsLayoutService.of(context)).not.toBe(layout);
+    expect(OrganizationLayoutService.of(context)).not.toBe(organizationLayout);
     expect(ComposerDefaultService.of(context)).not.toBe(choice);
     expect(ChatPages.of(context)).not.toBe(pages);
     ChatStoreService.release(context);
     BackgroundTaskStoreService.release(context);
     ProjectsLayoutService.release(context);
+    OrganizationLayoutService.release(context);
     ComposerDefaultService.release(context);
     ChatPages.release(context);
   });

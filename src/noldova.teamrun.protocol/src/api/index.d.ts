@@ -583,6 +583,16 @@ export declare enum MethodName {
    */
   DepartmentMemberSet = "DepartmentMemberSet",
   /**
+   * Reads the Organization view's layout: its collapsed departments and what its cards show.
+   * Parameters: none. Result: the layout's JSON object, or `null` when none is kept.
+   */
+  OrganizationLayoutRead = "OrganizationLayoutRead",
+  /**
+   * Keeps the Organization view's layout, replacing the one kept, and publishes `OrganizationLayoutUpdated`. Parameters:
+   * `OrganizationLayoutSaveParams`. Result: the layout's JSON object.
+   */
+  OrganizationLayoutSave = "OrganizationLayoutSave",
+  /**
    * Adds a teammate to a chat. Parameters: `ChatMemberParams`. Result: `ChatMember`.
    */
   ConversationAddMember = "ConversationAddMember",
@@ -1308,7 +1318,11 @@ export declare enum EventName {
    * The organization changed: a department was created, renamed, moved or deleted, a leader was set or cleared, a teammate
    * changed department, or a deleted teammate left its department. Payload: `Organization`, the whole organization after the change.
    */
-  OrganizationChanged = "OrganizationChanged"
+  OrganizationChanged = "OrganizationChanged",
+  /**
+   * The Organization view's layout was saved. Payload: the layout's JSON object.
+   */
+  OrganizationLayoutUpdated = "OrganizationLayoutUpdated"
 }
 
 /**
@@ -1382,7 +1396,7 @@ export declare class Resources {
   public static readonly defaultTeammateField: string;
 
   /**
-   * The layout field of `ProjectsLayoutSaveParams`.
+   * The layout field of `ProjectsLayoutSaveParams` and `OrganizationLayoutSaveParams`.
    */
   public static readonly layoutField: string;
   /**
@@ -11939,6 +11953,33 @@ export declare class DepartmentMemberSetParams {
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentMemberSetParams;
   /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The parameters of `OrganizationLayoutSave`: the Organization view's layout, a JSON object the window defines and
+ * TeamRun keeps as it is.
+ */
+export declare class OrganizationLayoutSaveParams {
+  /**
+   * The layout.
+   */
+  public readonly layout: JsonObject;
+
+  /**
+   * Initializes the parameters.
+   */
+  public constructor(layout: JsonObject);
+
+  /**
+   * Reads the parameters from untrusted JSON.
+   * @throws JsonException when `layout` is missing or not an object.
+   */
+  public static fromJson(value: unknown, path?: string): OrganizationLayoutSaveParams;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   */
   public toJson(): JsonObject;
 }
 

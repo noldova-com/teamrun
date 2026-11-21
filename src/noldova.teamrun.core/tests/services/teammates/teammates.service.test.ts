@@ -246,6 +246,8 @@ export class TeammatesServiceTests {
       moveAsync: t => organization.moveAsync(t),
       deleteAsync: t => organization.deleteAsync(t),
       setMemberAsync: t => organization.setMemberAsync(t),
+      readLayoutAsync: t => organization.readLayoutAsync(t),
+      saveLayoutAsync: t => organization.saveLayoutAsync(t),
       removeTeammateAsync: async (teammateId, transaction) => {
         await organization.removeTeammateAsync(teammateId, transaction);
         throw new Error("The delete failed after the teammate left its department.");

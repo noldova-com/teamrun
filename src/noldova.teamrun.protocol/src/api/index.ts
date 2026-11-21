@@ -194,6 +194,7 @@ export { DepartmentUpdateParams } from "../models/methods/department-update-para
 export { DepartmentMoveParams } from "../models/methods/department-move-params.js";
 export { DepartmentIdParams } from "../models/methods/department-id-params.js";
 export { DepartmentMemberSetParams } from "../models/methods/department-member-set-params.js";
+export { OrganizationLayoutSaveParams } from "../models/methods/organization-layout-save-params.js";
 export { ChatMemberParams, ChatMemberParams as ConversationMemberParams } from "../models/methods/chat-member-params.js";
 export { ChatMemberModeParams } from "../models/methods/chat-member-mode-params.js";
 export { ChatMemberSettingsParams } from "../models/methods/chat-member-settings-params.js";

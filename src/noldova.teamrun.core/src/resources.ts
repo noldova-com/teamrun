@@ -149,6 +149,7 @@ export class Resources {
   public static readonly preferencesTable: string = "preferences";
   public static readonly defaultTeammatePreference: string = "defaultTeammate";
   public static readonly projectsLayoutPreference: string = "projectsLayout";
+  public static readonly organizationLayoutPreference: string = "organizationLayout";
   public static readonly composerDefaultPreference: string = "composerDefault";
   public static readonly firstLaunchPreference: string = "firstLaunch";
   public static readonly outsideChatsPreference: string = "outsideChats";

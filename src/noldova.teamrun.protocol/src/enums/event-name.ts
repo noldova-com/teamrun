@@ -35,5 +35,6 @@ export enum EventName {
   PanelRequested = "PanelRequested",
   WindowReloadRequested = "WindowReloadRequested",
   WaitingMessagesChanged = "WaitingMessagesChanged",
-  OrganizationChanged = "OrganizationChanged"
+  OrganizationChanged = "OrganizationChanged",
+  OrganizationLayoutUpdated = "OrganizationLayoutUpdated"
 }

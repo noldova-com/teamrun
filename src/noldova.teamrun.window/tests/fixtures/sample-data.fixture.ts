@@ -36,6 +36,7 @@ import {
   MessageStatus,
   MethodName,
   ObservedSettings,
+  OrganizationLayoutSaveParams,
   Project,
   ProjectListing,
   ProjectsLayoutSaveParams,
@@ -161,6 +162,8 @@ export class SampleData {
       .answer(MethodName.ProjectList, () => [SampleData.listed(SampleData.project)])
       .answer(MethodName.ProjectsLayoutRead, () => null)
       .answer(MethodName.ProjectsLayoutSave, t => ProjectsLayoutSaveParams.fromJson(t).layout)
+      .answer(MethodName.OrganizationLayoutRead, () => null)
+      .answer(MethodName.OrganizationLayoutSave, t => OrganizationLayoutSaveParams.fromJson(t).layout)
       .answer(MethodName.ComposerDefaultRead, () => null)
       .answer(MethodName.ComposerDefaultSave, t => ComposerDefaultSaveParams.fromJson(t).choice)
       .answer(MethodName.ConversationList, t => ConversationListParams.fromJson(t).projectId === SampleData.project.id ? [SampleData.conversation.toJson()] : [])
