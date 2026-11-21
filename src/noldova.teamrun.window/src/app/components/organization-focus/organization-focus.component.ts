@@ -67,7 +67,7 @@ export class OrganizationFocusComponent {
   });
   protected readonly key: Signal<string> = computed(() => OrganizationConversation.keyOf(this.focus().target));
   protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() =>
-    new Map(this.rows().flatMap(row => row.people.map((person): [string, string] => [person.id, row.node.department.name]))));
+    new Map(this.rows().flatMap(row => row.people.map((person): [string, string] => [person.id, row.node.name]))));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.rows().flatMap(t => Object.isNull(t.node.leader) ? [] : [t.node.leader]));
   protected readonly cards: Signal<readonly Teammate[]> = computed(() => {
     const focus = this.focus();
@@ -79,11 +79,11 @@ export class OrganizationFocusComponent {
   protected readonly crumbs: Signal<readonly OrganizationCrumb[]> = computed(() => {
     const focus = this.focus();
     const here = this.key();
-    const trail = [new OrganizationCrumb(Resources.organizationTitle, OrganizationTarget.leaders, false), ...focus.path.map(t => new OrganizationCrumb(t.department.name, OrganizationTarget.department(t.department.id), false)),
+    const trail = [new OrganizationCrumb(Resources.organizationTitle, OrganizationTarget.leaders, false), ...focus.path.flatMap(t => Object.isNull(t.department) ? [] : [new OrganizationCrumb(t.department.name, OrganizationTarget.department(t.department.id), false)]),
       ...Object.isNull(focus.teammate) ? [] : [new OrganizationCrumb(focus.teammate.name, OrganizationTarget.teammate(focus.teammate.id), false)]];
     return trail.map(t => new OrganizationCrumb(t.label, t.target, OrganizationConversation.keyOf(t.target) === here));
   });
-  protected readonly unitName: Signal<string> = computed(() => this.focus().teammate?.name ?? this.focus().department?.department.name ?? Resources.organizationTitle);
+  protected readonly unitName: Signal<string> = computed(() => this.focus().teammate?.name ?? this.focus().department?.name ?? Resources.organizationTitle);
   protected readonly unitSummary: Signal<string> = computed(() => {
     const focus = this.focus();
     const department = focus.department;
@@ -98,15 +98,15 @@ export class OrganizationFocusComponent {
   }
 
   protected addMember(row: OrganizationOutlineRow, teammate: Teammate): void {
-    void this.organization.setMember(teammate.id, row.node.department.id);
+    void this.organization.setMember(teammate.id, row.node.id);
   }
 
   protected addDepartment(): void {
     void this.organization.createDepartment(Resources.organizationNewDepartment, null);
   }
 
-  protected rename(node: OrganizationNode, event: Event): void {
-    void OrganizationEdits.renameAsync(event, node.department.name, name => this.organization.renameDepartment(node.department.id, name));
+  protected rename(department: Department, event: Event): void {
+    void OrganizationEdits.renameAsync(event, department.name, name => this.organization.renameDepartment(department.id, name));
   }
 
   protected renameTeammate(teammate: Teammate, event: Event): void {
@@ -124,10 +124,10 @@ export class OrganizationFocusComponent {
     });
   }
 
-  protected removeTeammate(teammate: Teammate, node: OrganizationNode): void {
-    this.confirm(new ConfirmRequest(Resources.organizationRemoveMemberTitle, Resources.formatOrganizationRemoveMember(teammate.name, node.department.name),
+  protected removeTeammate(teammate: Teammate, department: Department): void {
+    this.confirm(new ConfirmRequest(Resources.organizationRemoveMemberTitle, Resources.formatOrganizationRemoveMember(teammate.name, department.name),
       Resources.organizationRemoveLabel, null, true), () => {
-      this.go(OrganizationTarget.department(node.department.id));
+      this.go(OrganizationTarget.department(department.id));
       void this.organization.setMember(teammate.id, null);
     });
   }
@@ -137,8 +137,8 @@ export class OrganizationFocusComponent {
     return !Object.isNull(node) && node.members.some(t => t.id === teammate.id) ? node.department : null;
   }
 
-  protected deleteDepartment(node: OrganizationNode): void {
-    this.confirm(OrganizationEdits.deleteRequest(node, this.rows().map(t => t.node)), () => void this.organization.deleteDepartment(node.department.id));
+  protected deleteDepartment(department: Department): void {
+    this.confirm(OrganizationEdits.deleteRequest(department, this.rows().map(t => t.node)), () => void this.organization.deleteDepartment(department.id));
   }
 
   private confirm(request: ConfirmRequest, action: () => void): void {
@@ -168,7 +168,14 @@ export class OrganizationFocusComponent {
   }
 
   protected department(row: OrganizationOutlineRow): OrganizationTarget {
-    return OrganizationTarget.department(row.node.department.id);
+    return OrganizationTarget.department(row.node.id);
+  }
+
+  protected open(row: OrganizationOutlineRow): void {
+    if (row.node.isUnplaced)
+      this.layout.toggleDepartment(row.node.id);
+    else
+      this.go(this.department(row));
   }
 
   protected teammate(teammate: Teammate): OrganizationTarget {

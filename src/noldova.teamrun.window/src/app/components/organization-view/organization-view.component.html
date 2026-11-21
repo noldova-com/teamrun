@@ -70,7 +70,7 @@ LICENSE file in the root directory of this source tree.
             </div>
             @if (tree().length > 0 || editing()) {
               <div class="kids">
-                @for (node of tree(); track node.department.id) {
+                @for (node of tree(); track node.id) {
                   <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
                 }
                 @if (editing()) {

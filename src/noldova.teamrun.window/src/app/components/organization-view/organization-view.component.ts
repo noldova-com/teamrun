@@ -63,10 +63,10 @@ export class OrganizationViewComponent {
   protected readonly headcount: Signal<string> = computed(() =>
     Resources.formatOrganizationHeadcount(this.store.teammates().length, OrganizationNode.departmentsOf(this.organization.organization()).length));
   protected readonly target: Signal<OrganizationTarget | null> = computed(() => {
-    const first = this.tree()[0];
+    const first = this.tree().flatMap(t => t.department ?? [])[0];
     const key = this.focusKey();
     return this.chosen() ?? (Object.isNull(key) ? null : OrganizationFocus.resolve(this.tree(), key).target)
-      ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.department.id));
+      ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.id));
   });
   protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.tree()));
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.choices().map(t => new SelectOption(t.key, t.label)));

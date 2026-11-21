@@ -1958,6 +1958,8 @@ describe("HistoryComponent", () => {
       const lostText = "TeamRun restarted before the work sent there ended.";
       const deletedText = "The chat was deleted before the work sent there ended.";
       expect(opened.map(t => textOf(t, ".wake-reply-heading, .wake-reply-text"))).toEqual([[lostText], [deletedText], [lostText], [deletedText], ["Bob replied:", "Done."]]);
+      const noReply = "Why no reply came back";
+      expect(opened.map(t => t?.querySelector(".wake-replies")?.getAttribute("aria-label") ?? null)).toEqual([noReply, noReply, noReply, noReply, "The message received"]);
       expect([4, 5].flatMap(t => [lines()[t]?.querySelector(".wake-toggle"), lines()[t]?.querySelector(".wake-chevron")])).toEqual([null, null, null, null]);
       expect(element().querySelectorAll("nol-teamrun-history-message").length).toBe(1);
       expect(element().textContent).not.toMatch(/has ended|restarted before the work you sent|that you sent work to|teamrun_list_messages|\(c2\)|n9|gone-chat|w\d-wake|agent-1/);
