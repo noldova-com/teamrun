@@ -28,7 +28,7 @@
       "teamrun.messageDetailsAfter", "teamrun.computerUseGrantList", "teamrun.computerUseGrantRevoke", "teamrun.outsideConnectionRead", "teamrun.outsideTokenReset", "teamrun.teammateWorkRead",
       "teamrun.waitingMessageAdd", "teamrun.waitingMessageList", "teamrun.waitingMessageEdit", "teamrun.waitingMessageRemove",
       "teamrun.waitingMessageSendNow",
-      "teamrun.pageOpen", "teamrun.pageRead", "teamrun.pageRestore", "teamrun.pageList"
+      "teamrun.pageOpen", "teamrun.pageRead", "teamrun.pageRestore", "teamrun.pageList", "teamrun.pageEditedList"
     ],
     "events": [
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.messageCreated", "teamrun.messageUpdated",

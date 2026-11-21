@@ -101,6 +101,7 @@ export { PageVersion } from "../models/pages/page-version.js";
 export { PageView } from "../models/pages/page-view.js";
 export { PageRequest } from "../models/pages/page-request.js";
 export { PageListRequest } from "../models/pages/page-list-request.js";
+export { PageEditedListRequest } from "../models/pages/page-edited-list-request.js";
 export { PageMethodName } from "../enums/pages/page-method-name.js";
 export { PageEventName } from "../enums/pages/page-event-name.js";
 export { PageKind } from "../enums/pages/page-kind.js";

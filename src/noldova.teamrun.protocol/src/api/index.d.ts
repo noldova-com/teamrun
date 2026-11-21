@@ -7478,6 +7478,39 @@ export declare class PageRequest {
 }
 
 /**
+ * The parameters of the edited page list method: the teammate whose pages and canvases to list.
+ * @remarks
+ * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
+ * path; `toJson` renders the canonical wire and storage shape.
+ */
+export declare class PageEditedListRequest {
+  /**
+   * The teammate's id.
+   */
+  public readonly teammateId: string;
+  /**
+   * Initializes the request.
+   * @throws ArgumentException when the id is blank.
+   */
+  public constructor(teammateId: string);
+
+  /**
+   * Decodes the request.
+   * @param value Object with teammateId.
+   * @param path Diagnostic field path; defaults to the JSON root.
+   * @returns The request.
+   * @throws JsonException for a missing or incorrectly typed field.
+   * @throws ArgumentException for a blank id.
+   */
+  public static fromJson(value: unknown, path?: string): PageEditedListRequest;
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object with teammateId.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
  * The parameters of the page list method: the chat whose pages to list.
  * @remarks
  * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
@@ -7511,7 +7544,8 @@ export declare class PageListRequest {
 }
 
 /**
- * The methods Pages' runtime serves its window, each taking a `PageRequest` but `PageList`, which takes a `PageListRequest`; values
+ * The methods Pages' runtime serves its window, each taking a `PageRequest` but `PageList`, which takes a `PageListRequest`, and
+ * `PageEditedList`, which takes a `PageEditedListRequest`; values
  * match the member names, and the qualified name starts lowercase, as `teamrun.pageOpen`.
  */
 export declare enum PageMethodName {
@@ -7530,7 +7564,12 @@ export declare enum PageMethodName {
   /**
    * Answers the chat's pages, the most recently changed first, as an array of `Page`.
    */
-  PageList = "PageList"
+  PageList = "PageList",
+  /**
+   * Answers, across chats, the pages and canvases whose latest version the teammate wrote, the most recently changed first, at most 20, as an
+   * array of `Page`; a canvas's artboards are left out, as its own.
+   */
+  PageEditedList = "PageEditedList"
 }
 
 /**
