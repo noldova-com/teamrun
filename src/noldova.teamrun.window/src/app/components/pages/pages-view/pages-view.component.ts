@@ -52,6 +52,10 @@ export class PagesViewComponent {
     return ChatPages.provide(context, chatId, follow, editors);
   }
 
+  public static resync(context: IWindowPartContext): void {
+    ChatPages.of(context).resync();
+  }
+
   protected metaOf(page: Page): string {
     return ChatPagesResources.formatMeta(page.version, page.madeBy.name, page.editedBy.name, PagesClock.formatSince(page.updatedAt, this.now()), false);
   }

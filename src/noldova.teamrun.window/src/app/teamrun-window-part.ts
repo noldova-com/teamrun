@@ -142,6 +142,7 @@ export class TeamRunWindowPart implements IWindowPart {
     SubAgentsBadge.reload(this.activeContext);
     ComputerUseBorder.reload(this.activeContext);
     EngineResync.request(this.activeContext);
+    PagesViewComponent.resync(this.activeContext);
     return ChatStoreService.resync(this.activeContext);
   }
 
