@@ -9,7 +9,7 @@
 import { Component, ElementRef, computed, inject, type InputSignal, input, type Signal, viewChild } from "@angular/core";
 
 import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
+import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
   MenuTriggerDirective, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
@@ -18,14 +18,15 @@ import type { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
+import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 
 @Component({
   selector: "nol-teamrun-organization-department",
-  imports: [ButtonComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
+  imports: [ButtonComponent, CanvasItemDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
     OrganizationCardComponent, SelectComponent, TextFieldComponent],
-  providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider],
+  providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { class: "nol-teamrun-organization-department" },
   templateUrl: "./organization-department.component.html",
   styleUrls: ["../organization-tree.css", "./organization-department.component.css"]
@@ -35,6 +36,7 @@ export class OrganizationDepartmentComponent {
   private readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   private readonly store: ChatStoreService = inject(ChatStoreService);
   private readonly dialogs: DialogService = inject(DialogService);
+  private readonly statuses: TeammateStatusStoreService = inject(TeammateStatusStoreService);
   private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("name", { read: ElementRef });
 
   public readonly node: InputSignal<OrganizationNode> = input.required<OrganizationNode>();
@@ -43,8 +45,11 @@ export class OrganizationDepartmentComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly isOpen: Signal<boolean> = computed(() => !this.layout.layout().isCollapsed(this.node().department.id));
-  protected readonly summary: Signal<string> = computed(() =>
-    Resources.formatOrganizationDepartmentSummary(this.node().leader?.name ?? null, this.node().members.length));
+  protected readonly summary: Signal<string> = computed(() => {
+    const node = this.node();
+    const people = Object.isNull(node.leader) ? node.members : [node.leader, ...node.members];
+    return Resources.formatOrganizationDepartmentSummary(people.map(t => this.statuses.statusOf(t.id)()));
+  });
   protected readonly leaderOptions: Signal<readonly SelectOption[]> = computed(() => {
     const node = this.node();
     const people = Object.isNull(node.leader) ? node.members : [node.leader, ...node.members];

@@ -21,14 +21,14 @@ LICENSE file in the root directory of this source tree.
       <button type="button" nol-icon-button class="department-toggle" [icon]="isOpen() ? resources.expandedIcon : resources.collapsedIcon"
         [label]="resources.formatOrganizationCollapseLabel(node().department.name, isOpen())" [attr.aria-expanded]="isOpen()" (click)="toggle()"></button>
       <span class="department-name">{{ node().department.name }}</span>
-      <nol-chip class="department-count">{{ node().headcount }}</nol-chip>
+      <span class="department-count">{{ node().headcount }}</span>
     </div>
   }
   <span class="department-summary">{{ summary() }}</span>
 </div>
 @if (node().leader; as leader) {
   <div class="stem"></div>
-  <nol-teamrun-organization-card class="leader" nolCanvasItem [teammate]="leader" [editing]="editing()" [department]="node().department" />
+  <nol-teamrun-organization-card class="leader" nolCanvasItem [teammate]="leader" [editing]="editing()" />
 }
 @if (isOpen()) {
   @if (node().members.length > 0 || editing()) {
@@ -49,8 +49,8 @@ LICENSE file in the root directory of this source tree.
       }
     </div>
   }
-} @else if (node().headcount > 0) {
-  <span class="hidden">{{ resources.formatOrganizationHidden(node().headcount) }}</span>
+} @else if (node().hidden > 0) {
+  <span class="hidden">{{ resources.formatOrganizationHidden(node().hidden) }}</span>
 }
 <ng-template #candidatesMenu>
   <nol-menu>

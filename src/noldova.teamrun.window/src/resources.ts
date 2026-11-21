@@ -1149,11 +1149,14 @@ export class Resources {
   public static readonly organizationResetIcon: string = "restart_alt";
   public static readonly organizationEditStructure: string = "Edit structure";
   public static readonly organizationDoneEditing: string = "Done editing";
-  public static readonly organizationEditIcon: string = "edit";
-  public static readonly organizationDoneIcon: string = "check";
+  public static readonly organizationEditIcon: string = "account_tree";
+  public static readonly organizationStatusKeyLabel: string = "Status key";
+  public static readonly organizationStatusKey: readonly TeammateStatus[] = [TeammateStatus.Working, TeammateStatus.WaitingForYou, TeammateStatus.Idle,
+    TeammateStatus.Stopped];
   public static readonly organizationDepartmentNameLabel: string = "Department name";
   public static readonly organizationLeaderLabel: string = "Leader";
   public static readonly organizationNoLeader: string = "No leader";
+  public static readonly organizationNoMembers: string = "No members";
   public static readonly organizationMemberIn: string = "In";
   public static readonly organizationAddMember: string = "Add member";
   public static readonly organizationAddMemberIcon: string = "person_add";
@@ -1213,6 +1216,7 @@ export class Resources {
   public static readonly noTeammates: string = "No teammates yet";
   public static readonly teammateNameLabel: string = "Name";
   public static readonly teammateNameHint: string = "1–100 characters, a separate accent or vowel sign counting as one: letters, digits, dashes or underscores, with single spaces between words";
+  public static readonly organizationTeammateNameRule: string = `A teammate's name takes ${Resources.teammateNameHint}.`;
   public static readonly teammateRoleLabel: string = "Role (optional, Markdown)";
   public static readonly teammateRoleRows: number = 4;
   public static readonly connectionColumn: string = "Provider";
@@ -1680,21 +1684,24 @@ export class Resources {
     return `Move ${entry} down`;
   }
 
-  public static formatOrganizationHeadcount(count: number): string {
-    return count === 1 ? "1 teammate" : `${count} teammates`;
+  public static formatOrganizationHeadcount(teammates: number, departments: number): string {
+    return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} in ${departments === 1 ? "1 department" : `${departments} departments`}`;
   }
 
   public static formatOrganizationOwnerRole(leaders: number): string {
     return leaders === 1 ? "Owner · 1 leader reports to you" : `Owner · ${leaders} leaders report to you`;
   }
 
-  public static formatOrganizationDepartmentSummary(leader: string | null, members: number): string {
-    const people = members === 1 ? "1 member" : `${members} members`;
-    return Object.isNull(leader) ? people : `Led by ${leader} · ${people}`;
+  public static formatOrganizationDepartmentSummary(statuses: readonly TeammateStatus[]): string {
+    const counts = Object.values(TeammateStatus).flatMap(t => {
+      const count = statuses.filter(u => u === t).length;
+      return count === 0 ? [] : [`${count} ${Resources.teammateStatusLabels[t].toLowerCase()}`];
+    });
+    return counts.length === 0 ? Resources.organizationNoMembers : counts.join(" · ");
   }
 
   public static formatOrganizationCollapseLabel(name: string, open: boolean): string {
-    return open ? `Collapse ${name}` : `Expand ${name}`;
+    return open ? `Hide ${name}'s members` : `Show ${name}'s members`;
   }
 
   public static formatOrganizationDeleteDepartment(name: string, parent: string | null): string {
@@ -1719,7 +1726,7 @@ export class Resources {
   }
 
   public static formatOrganizationHidden(count: number): string {
-    return count === 1 ? "1 teammate hidden" : `${count} teammates hidden`;
+    return count === 1 ? "1 member hidden" : `${count} members hidden`;
   }
 
   public static formatOrganizationCardShows(name: string): string {
@@ -1731,7 +1738,18 @@ export class Resources {
   }
 
   public static formatOrganizationNowFor(milliseconds: number, more: number): string {
-    return more > 0 ? `${Resources.formatDuration(milliseconds)} +${more}` : Resources.formatDuration(milliseconds);
+    const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+    const lasted = seconds < 60 ? `${seconds} s` : seconds < 3600 ? `${Math.floor(seconds / 60)} min`
+      : `${Math.floor(seconds / 3600)} h ${Math.floor(seconds % 3600 / 60)} min`;
+    return more > 0 ? `${lasted} +${more}` : lasted;
+  }
+
+  public static formatOrganizationUsage(used: number): string {
+    return `${Math.round(used * Resources.wholePercent)}%`;
+  }
+
+  public static formatOrganizationRenameLabel(name: string): string {
+    return `Rename ${name}`;
   }
 
   public static formatOrganizationModel(model: string, effort: string | null): string {

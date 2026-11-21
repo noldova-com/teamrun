@@ -13,9 +13,9 @@ describe("OrganizationNode", () => {
   const teammate = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
   const [ada, bea, cy, dee] = [teammate("ada", "Ada"), teammate("bea", "Bea"), teammate("cy", "Cy"), teammate("dee", "Dee")];
   const shape = (nodes: readonly OrganizationNode[]): unknown[] =>
-    nodes.map(t => [t.department.id, t.leader?.id ?? null, t.members.map(u => u.id), t.headcount, shape(t.children)]);
+    nodes.map(t => [t.department.id, t.leader?.id ?? null, t.members.map(u => u.id), t.headcount, t.hidden, shape(t.children)]);
 
-  it("nests departments in their order, each with its leader apart from its members in name order", () => {
+  it("nests departments in their order, each with its leader apart from its members in name order, and counts what collapsing it hides, its nested departments' people too", () => {
     const organization = new Organization([
       new Department("design", "Design", null, "dee", 1, "c", "u"),
       new Department("build", "Build", null, null, 0, "c", "u"),
@@ -23,13 +23,13 @@ describe("OrganizationNode", () => {
     ], [new DepartmentMember("dee", "design"), new DepartmentMember("cy", "design"), new DepartmentMember("ada", "design"), new DepartmentMember("bea", "ui")]);
 
     expect(shape(OrganizationNode.treeOf(organization, [ada, bea, cy, dee])))
-      .toEqual([["build", null, [], 0, []], ["design", "dee", ["ada", "cy"], 3, [["ui", "bea", [], 1, []]]]]);
+      .toEqual([["build", null, [], 0, 0, []], ["design", "dee", ["ada", "cy"], 3, 3, [["ui", "bea", [], 1, 0, []]]]]);
   });
 
   it("leaves out a leader or member whose teammate it doesn't know", () => {
     const organization = new Organization([new Department("design", "Design", null, "gone", 0, "c", "u")],
       [new DepartmentMember("gone", "design"), new DepartmentMember("lost", "design"), new DepartmentMember("ada", "design")]);
 
-    expect(shape(OrganizationNode.treeOf(organization, [ada]))).toEqual([["design", null, ["ada"], 1, []]]);
+    expect(shape(OrganizationNode.treeOf(organization, [ada]))).toEqual([["design", null, ["ada"], 1, 1, []]]);
   });
 });

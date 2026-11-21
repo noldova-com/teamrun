@@ -15,6 +15,7 @@ export class OrganizationNode {
   public readonly members: readonly Teammate[];
   public readonly children: readonly OrganizationNode[];
   public readonly headcount: number;
+  public readonly hidden: number;
 
   public constructor(department: Department, leader: Teammate | null, members: readonly Teammate[], children: readonly OrganizationNode[]) {
     this.department = department;
@@ -22,6 +23,7 @@ export class OrganizationNode {
     this.members = members;
     this.children = children;
     this.headcount = (Object.isNull(leader) ? 0 : 1) + members.length;
+    this.hidden = children.reduce((sum, t) => sum + t.headcount + t.hidden, members.length);
   }
 
   public static treeOf(organization: Organization, teammates: readonly Teammate[]): readonly OrganizationNode[] {

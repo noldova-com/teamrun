@@ -23,6 +23,7 @@
 }
 
 .kid {
+  position: relative;
   padding: var(--nol-space-3) var(--nol-space-2) 0;
 }
 

@@ -29,7 +29,6 @@ export class OrganizationLayoutService {
   private readonly subscriptions: readonly (() => void)[];
   private readonly held: ((layout: OrganizationLayout) => OrganizationLayout)[] = [];
   private isOpen: boolean = false;
-  private latest: OrganizationLayout | null = null;
   private edits: number = 0;
   private received: number = 0;
   private saving: number = 0;
@@ -42,9 +41,11 @@ export class OrganizationLayoutService {
     this.subscriptions = [
       context.onEvent(Resources.formatQualifiedName(EventName.OrganizationLayoutUpdated), t => {
         this.received++;
-        this.latest = OrganizationLayout.fromJson(t);
-        if (this.saving === 0)
-          this.current.set(this.held.reduce((layout, change) => change(layout), this.latest));
+        const latest = OrganizationLayout.fromJson(t);
+        if (!this.isOpen)
+          this.openWith(latest);
+        else if (this.saving === 0)
+          this.current.set(latest);
       }),
       context.onEvent(Resources.formatQualifiedName(EventName.StateResyncRequested), () => void this.load())
     ];
@@ -104,8 +105,12 @@ export class OrganizationLayoutService {
   }
 
   private async open(): Promise<void> {
-    const kept = await this.request(MethodName.OrganizationLayoutRead, null).catch(() => null);
-    const base = this.latest ?? OrganizationLayout.fromJson(kept);
+    const kept = await this.read();
+    if (!this.isOpen && !Object.isUndefined(kept))
+      this.openWith(OrganizationLayout.fromJson(kept));
+  }
+
+  private openWith(base: OrganizationLayout): void {
     this.isOpen = true;
     const held = this.held.splice(0);
     this.current.set(held.reduce((layout, change) => change(layout), base));
@@ -115,9 +120,17 @@ export class OrganizationLayoutService {
 
   private async load(): Promise<void> {
     const [edits, received] = [this.edits, this.received];
-    const kept = await this.request(MethodName.OrganizationLayoutRead, null).catch(() => null);
-    if (!Object.isNull(kept) && edits === this.edits && received === this.received && this.saving === 0)
+    const kept = await this.read();
+    if (Object.isUndefined(kept))
+      return;
+    if (!this.isOpen)
+      this.openWith(OrganizationLayout.fromJson(kept));
+    else if (!Object.isNull(kept) && edits === this.edits && received === this.received && this.saving === 0)
       this.current.set(OrganizationLayout.fromJson(kept));
+  }
+
+  private read(): Promise<JsonValue | undefined> {
+    return this.request(MethodName.OrganizationLayoutRead, null).catch(() => undefined);
   }
 
   private save(layout: JsonObject): void {

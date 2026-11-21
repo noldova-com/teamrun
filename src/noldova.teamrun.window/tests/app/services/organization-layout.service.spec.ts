@@ -59,10 +59,17 @@ describe("OrganizationLayoutService", () => {
     await Wait.until(() => expect(kept.layout().collapsedDepartments).toEqual(["d1"]));
   });
 
-  it("starts from the defaults when the layout can't be read", async () => {
-    context = new FakeWindowPartContext().fail(MethodName.OrganizationLayoutRead, "offline");
+  it("shows the defaults when the layout can't be read, saving nothing over the layout kept until a later read succeeds, and then saves its changes over it", async () => {
+    context = contextKeeping(() => null).fail(MethodName.OrganizationLayoutRead, "offline");
+    const layout = await open();
+    layout.toggleDepartment("d2");
+    await settle();
 
-    expect((await open()).layout().toJson()).toEqual(new OrganizationLayout().toJson());
+    expect([layout.layout().collapsedDepartments, saves]).toEqual([["d2"], []]);
+    context.answer(MethodName.OrganizationLayoutRead, () => collapsed("d1"));
+    context.emit(EventName.StateResyncRequested, null);
+    await Wait.until(() => expect(saves).toEqual([collapsed("d1", "d2")]));
+    expect(layout.layout().collapsedDepartments).toEqual(["d1", "d2"]);
   });
 
   it("saves each change in turn, each card's own choice, every card's and their clearing, the view and what Focus shows", async () => {
