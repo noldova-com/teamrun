@@ -9,6 +9,8 @@
 import type { TreeKeyManagerItem } from "@angular/cdk/a11y";
 import { Directive, ElementRef, type InputSignal, type OnInit, type OutputEmitterRef, type Signal, type WritableSignal, computed, inject, input, output, signal } from "@angular/core";
 
+import "@noldova/context.core";
+
 import type { TreeFocus } from "../../models/tree-focus";
 
 @Directive({
@@ -16,7 +18,7 @@ import type { TreeFocus } from "../../models/tree-focus";
   host: {
     "role": "treeitem",
     "[attr.tabindex]": "tabIndex()",
-    "[attr.aria-level]": "treeParent() === null ? 1 : 2",
+    "[attr.aria-level]": "level()",
     "[attr.aria-expanded]": "treeExpanded()",
     "(focus)": "take()",
     "(keydown)": "press($event)"
@@ -30,6 +32,7 @@ export class TreeItemDirective implements TreeKeyManagerItem, OnInit {
   public readonly treeParent: InputSignal<string | null> = input<string | null>(null);
   public readonly treeExpanded: InputSignal<boolean | null> = input<boolean | null>(null);
   public readonly treeMovable: InputSignal<boolean> = input<boolean>(false);
+  public readonly treeLevel: InputSignal<number | null> = input<number | null>(null);
   public readonly activated: OutputEmitterRef<void> = output();
   public readonly toggled: OutputEmitterRef<void> = output();
   public readonly moved: OutputEmitterRef<number> = output();
@@ -40,6 +43,7 @@ export class TreeItemDirective implements TreeKeyManagerItem, OnInit {
   public readonly unfocus: () => void = () => undefined;
 
   protected readonly tabIndex: Signal<number> = computed(() => this.tree().stop() === this ? 0 : -1);
+  protected readonly level: Signal<number> = computed(() => this.treeLevel() ?? (Object.isNull(this.treeParent()) ? 1 : 2));
 
   public ngOnInit(): void {
     this.owner.set(this.tree());

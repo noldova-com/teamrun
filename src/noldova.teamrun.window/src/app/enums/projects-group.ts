@@ -9,5 +9,6 @@
 export enum ProjectsGroup {
   Pinned = "Pinned",
   Projects = "Projects",
-  Chats = "Chats"
+  Chats = "Chats",
+  Organizations = "Organizations"
 }
