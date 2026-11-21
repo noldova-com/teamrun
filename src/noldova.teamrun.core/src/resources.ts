@@ -1736,6 +1736,10 @@ export class Resources {
     return `The turn was stopped: ${reason}`;
   }
 
+  public static formatHandOffStopped(names: readonly string[]): string {
+    return `Stopped before handing off to ${names.join(", ")}.`;
+  }
+
   public static formatChainStopped(limit: number): string {
     if (limit === 0)
       return "Teammates' mentions start no one: the limit in Settings › TeamRun is 0 hand-offs. Mention a teammate to go on.";

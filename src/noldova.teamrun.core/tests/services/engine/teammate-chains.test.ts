@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { mkdirSync } from "node:fs";
+
 import "@noldova/context.core";
 import type { SqlTransaction } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
@@ -45,6 +47,28 @@ import { CoreHost } from "../../fixtures/core-host.fixture.js";
 @TestClass
 export class TeammateChainsTests {
   private static readonly accept: ApprovalOption = new ApprovalOption("accept", "Allow", ApprovalOutcome.Approved, ApprovalScope.Once);
+
+  @TestMethod
+  public async startsNoOneFromAReplyStoppedAfterItsAnswerAndNotesWhoItWouldHaveHandedOffTo(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    mkdirSync(project.rootPath, { recursive: true });
+    const conversation = await host.createConversationAsync(project);
+    const [alice] = await TeammateChainsTests.teamAsync(host, "Alice", "Bob");
+    host.adapter.turnTexts = [["@Bob please review, done."]];
+    host.checkpoints.holds = "compare";
+    const sent = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice start", null, null, [], [alice?.id ?? ""]));
+    await host.until("the held compare", () => host.checkpoints.compares.length === 1, host.runs());
+
+    const stopped = await host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id));
+    await host.engine.waitForIdle();
+    const reply = await host.messages.findAsync(sent.replies[0]?.id ?? "");
+
+    Assert.areEqual(reply?.id, stopped.map(t => t.id).join());
+    Assert.areEqual(MessageStatus.Cancelled, reply?.status);
+    Assert.areEqual(Resources.formatHandOffStopped(["Bob"]), reply?.details.at(-1)?.text);
+    Assert.areEqual(1, host.adapter.requests.length);
+  }
 
   @TestMethod
   public async handsOffToTheTeammateAReplyMentionsWithTheReplyAsItsContext(): Promise<void> {

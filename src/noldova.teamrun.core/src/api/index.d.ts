@@ -4482,6 +4482,11 @@ export declare class Resources {
   public static formatChainStopped(limit: number): string;
 
   /**
+   * The note on a teammate's reply the person stopped, naming each teammate it addressed and so didn't start.
+   */
+  public static formatHandOffStopped(names: readonly string[]): string;
+
+  /**
    * The note at the top of a reply the provider started on its own: the background task whose end started it, or that a task's end did.
    * @param command The task's command, or `null` when the provider named none.
    */

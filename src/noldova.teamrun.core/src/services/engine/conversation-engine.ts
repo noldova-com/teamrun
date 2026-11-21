@@ -1167,7 +1167,10 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   private async handOffAsync(item: ReplyWork, work: ReplyWork[]): Promise<void> {
     const handed = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const finished = await this.messages.findAsync(item.message.id, transaction);
-      if (Object.isNull(finished) || Object.isNull(finished.teammateId) || finished.status !== MessageStatus.Completed || item.run.isCancelled)
+      if (Object.isNull(finished) || Object.isNull(finished.teammateId))
+        return null;
+      const halted = item.run.isCancelled;
+      if (finished.status !== MessageStatus.Completed && !halted)
         return null;
       const text = finished.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join(Resources.lineSeparator);
       const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
@@ -1179,11 +1182,11 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       for (const addressed of MentionResolver.resolveAddressed(text, available).filter(t => !skipped.has(t.teammateId)))
         others.push((await this.teammates.findAsync(addressed.teammateId, transaction))!);
       const limit = this.readHopLimit();
-      const stopped = others.length > 0 && item.hop >= limit;
+      const stopped = others.length > 0 && (halted || item.hop >= limit);
       const now = new Date().toISOString();
+      const note = halted ? Resources.formatHandOffStopped(others.map(t => t.name)) : Resources.formatChainStopped(limit);
       const stored = stopped
-        ? finished.withMentions(mentions).withDetail(new MessageDetail(finished.details.length, DetailKind.Note, Resources.formatChainStopped(limit),
-          { source: Resources.handOffSource }, now))
+        ? finished.withMentions(mentions).withDetail(new MessageDetail(finished.details.length, DetailKind.Note, note, { source: Resources.handOffSource }, now))
         : finished.withMentions(mentions);
       const sequence = await this.messages.nextSequenceAsync(finished.conversationId, transaction);
       const pending: ReplyWork[] = [];
