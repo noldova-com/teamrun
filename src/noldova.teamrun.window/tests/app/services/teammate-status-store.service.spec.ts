@@ -6,37 +6,46 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, inject, input } from "@angular/core";
+import { Component, effect, inject, input } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
+import type { JsonValue } from "@noldova/context.json";
 import {
-  ApprovalStatus, AuthStatus, Approval, ConversationIdParams, EventName, Message, MessageAuthor, MessageIdParams, MessageStatus, MethodName, PlanUsage, Provider,
-  ReplySummary, Teammate, TeammateFallback
+  ApprovalStatus, AuthStatus, Approval, ChatIdParams, ChatRewoundPayload, DetailKind, EventName, Message, MessageAuthor, MessageIdParams,
+  MessageStatus, MethodName, PlanUsage, Provider, ReplySummary, Teammate, TeammateFallback, TeammateLastReply
 } from "@noldova/teamrun.protocol";
 
+import { Resources } from "../../../src/resources";
 import { TeammateStatus } from "../../../src/app/enums/teammate-status";
 import { TeammateStopReason } from "../../../src/app/enums/teammate-stop-reason";
+import { ListNotArrayException } from "../../../src/app/exceptions/list-not-array.exception";
 import { TeammateActivity } from "../../../src/app/models/teammate-activity";
 import { ChatStoreService } from "../../../src/app/services/chat-store.service";
 import { TeammateStatusStoreService } from "../../../src/app/services/teammate-status-store.service";
-import type { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../fixtures/teammate.fixture";
 import { Wait } from "../../fixtures/wait.fixture";
 
 @Component({
   selector: "nol-teamrun-status-probe",
-  template: "{{ rendered() }}{{ status() }} {{ activities().length }}"
+  template: "{{ rendered() }}{{ store.statusOf(teammateId())() }} {{ store.activitiesOf(teammateId())().length }} {{ store.lastReplyOf(teammateId())()?.text ?? '' }}"
 })
 class StatusProbeComponent {
   public readonly teammateId = input.required<string>();
   public renders: number = 0;
-  private readonly store: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
-  protected readonly status = computed(() => this.store.statusOf(this.teammateId())());
-  protected readonly activities = computed(() => this.store.activitiesOf(this.teammateId())());
+  public lastReplyChanges: number = 0;
+  protected readonly store: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
+
+  public constructor() {
+    effect(() => {
+      this.store.lastReplyOf(this.teammateId())();
+      this.lastReplyChanges++;
+    });
+  }
 
   protected rendered(): string {
     this.renders++;
@@ -58,6 +67,7 @@ describe("TeammateStatusStoreService", () => {
   let open: readonly Message[];
   let pending: readonly Approval[];
   let summaries: ReadonlyMap<string, Message>;
+  let listed: () => JsonValue | Promise<JsonValue>;
   let store: TeammateStatusStoreService;
 
   const reply = (id: string, chatId: string, teammateId: string | null, status: MessageStatus, startedAt: string | null = earlier): Message =>
@@ -71,10 +81,16 @@ describe("TeammateStatusStoreService", () => {
   const provider = (authStatus: AuthStatus, kind: string = "codex", enabled: boolean = true): Provider =>
     new Provider("a1", kind, "Work", "D:\\profiles\\codex", authStatus, null, "1.0", earlier, null, later, enabled);
   const statuses = (): readonly TeammateStatus[] => ["alice", "bob"].map(t => store.statusOf(t)());
+  const finished = (id: string, chatId: string, teammateId: string | null, text: string, endedAt: string = later): Message =>
+    new Message(id, chatId, 1, MessageAuthor.Provider, null, MessageStatus.Completed, text === "" ? [] : [SampleData.detail(0, DetailKind.Text, text)],
+      SampleData.provenance, earlier, earlier, endedAt, [], teammateId, teammateId);
+  const lastSaid = (teammateId: string): string | null => store.lastReplyOf(teammateId)()?.text ?? null;
+  const reads = (): number => context.methods.filter(t => t === FakeWindowPartContext.qualify(MethodName.TeammateLastReplyList)).length;
 
   const create = async (prepare: (fixture: TeammateFixture) => void = () => undefined): Promise<void> => {
     context = SampleData.createContext().answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()))
       .answer(MethodName.ApprovalListPending, () => pending.map(t => t.toJson()))
+      .answer(MethodName.TeammateLastReplyList, () => listed())
       .answer(MethodName.MessageSummary, t => {
         const found = summaries.get(MessageIdParams.fromJson(t).messageId);
         return Object.isUndefined(found) ? null : ReplySummary.fromMessage(found).toJson();
@@ -91,6 +107,7 @@ describe("TeammateStatusStoreService", () => {
     open = [];
     pending = [];
     summaries = new Map();
+    listed = () => [];
   });
 
   afterEach(() => {
@@ -164,7 +181,7 @@ describe("TeammateStatusStoreService", () => {
       ApprovalStatus.Pending, null, earlier, null).toJson());
     context.emit(EventName.MessageUpdated, reply("r1", "c1", "alice", MessageStatus.Completed).toJson());
     const outlived = statuses();
-    context.emit(EventName.ConversationDeleted, new ConversationIdParams("c1").toJson());
+    context.emit(EventName.ConversationDeleted, new ChatIdParams("c1").toJson());
 
     expect(outlived).toEqual([TeammateStatus.WaitingForYou, TeammateStatus.WaitingForYou]);
     await Wait.until(() => expect(statuses()).toEqual([TeammateStatus.Idle, TeammateStatus.WaitingForYou]));
@@ -240,7 +257,143 @@ describe("TeammateStatusStoreService", () => {
     context.emit(EventName.MessageCreated, reply("r2", "c2", "alice", MessageStatus.Running).toJson());
     await fixture.whenStable();
 
-    expect(fixture.nativeElement.textContent).toBe("Working 2Idle 0");
+    expect(fixture.nativeElement.textContent).toBe("Working 2 Idle 0 ");
     expect([alice?.renders, bob?.renders]).toEqual([(before[0] ?? 0) + 2, before[1]]);
+  });
+
+  it("renders only the card of the teammate whose last reply changed, and not again for the same reply", async () => {
+    await create();
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
+    const fixture = TestBed.createComponent(StatusHostComponent);
+    await fixture.whenStable();
+    const [alice, bob] = fixture.debugElement.queryAll(By.directive(StatusProbeComponent)).map(t => t.componentInstance as StatusProbeComponent);
+    const before = [alice?.renders, bob?.renders, alice?.lastReplyChanges, bob?.lastReplyChanges];
+
+    context.emit(EventName.MessageUpdated, finished("r1", "c1", "alice", "Shipped.").toJson());
+    await fixture.whenStable();
+    context.emit(EventName.MessageUpdated, finished("r1", "c1", "alice", "Shipped.").toJson());
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toBe("Idle 0 Shipped.Idle 0 ");
+    expect([alice?.renders, bob?.renders, alice?.lastReplyChanges, bob?.lastReplyChanges])
+      .toEqual([(before[0] ?? 0) + 1, before[1], (before[2] ?? 0) + 1, before[3]]);
+  });
+
+  it("starts from each teammate's last reply the runtime lists and keeps it live as a newer reply with text finishes in any chat", async () => {
+    listed = () => [new TeammateLastReply("alice", "c1", "r0", "Done.", earlier).toJson()];
+    await create();
+    await Wait.until(() => expect(lastSaid("alice")).toBe("Done."));
+
+    context.emit(EventName.MessageUpdated, finished("r1", "c2", "alice", "").toJson());
+    context.emit(EventName.MessageUpdated, finished("r2", "c2", "alice", "Old news.", "2026-09-10T07:00:00.000Z").toJson());
+    context.emit(EventName.MessageUpdated, reply("r3", "c2", "alice", MessageStatus.Running).toJson());
+    context.emit(EventName.MessageUpdated, finished("r4", "c2", null, "No one's.").toJson());
+    expect([lastSaid("alice"), lastSaid("bob")]).toEqual(["Done.", null]);
+
+    context.emit(EventName.MessageUpdated, finished("r5", "c2", "alice", "Shipped.").toJson());
+    context.emit(EventName.MessageUpdated, finished("r6", "c1", "bob", "On it.").toJson());
+
+    expect([lastSaid("alice"), lastSaid("bob")]).toEqual(["Shipped.", "On it."]);
+    expect(store.lastReplyOf("alice")()).toEqual(new TeammateLastReply("alice", "c2", "r5", "Shipped.", later));
+    expect(store.lastReplyOf("alice")).toBe(store.lastReplyOf("alice"));
+    expect(reads()).toBe(1);
+  });
+
+  it("reads them again when a chat holding one is rewound or deleted, when a last reply loses its text, or on a resync, and not for other chats", async () => {
+    let answer = [new TeammateLastReply("alice", "c1", "r1", "Done.", later)];
+    listed = () => answer.map(t => t.toJson());
+    await create();
+    await Wait.until(() => expect(lastSaid("alice")).toBe("Done."));
+
+    context.emit(EventName.ConversationRewound, new ChatRewoundPayload("c2", 1).toJson());
+    context.emit(EventName.ConversationDeleted, new ChatIdParams("c2").toJson());
+    expect(reads()).toBe(1);
+    answer = [new TeammateLastReply("alice", "c3", "r0", "Earlier.", earlier)];
+    context.emit(EventName.ConversationRewound, new ChatRewoundPayload("c1", 1).toJson());
+    await Wait.until(() => expect(lastSaid("alice")).toBe("Earlier."));
+    answer = [];
+    context.emit(EventName.ConversationDeleted, new ChatIdParams("c3").toJson());
+    await Wait.until(() => expect(lastSaid("alice")).toBeNull());
+    answer = [new TeammateLastReply("bob", "c1", "r2", "Hi.", later)];
+    context.emit(EventName.StateResyncRequested, null);
+    await Wait.until(() => expect(lastSaid("bob")).toBe("Hi."));
+    answer = [];
+    context.emit(EventName.MessageUpdated, finished("r2", "c1", "bob", "").toJson());
+    await Wait.until(() => expect(lastSaid("bob")).toBeNull());
+
+    expect(reads()).toBe(5);
+  });
+
+  it("keeps a reply that finishes while the list is read and drops a reading a newer one replaced", async () => {
+    const readings: ((value: JsonValue) => void)[] = [];
+    const failings: ((error: Error) => void)[] = [];
+    listed = () => new Promise<JsonValue>((resolve, reject) => {
+      readings.push(resolve);
+      failings.push(reject);
+    });
+    await create();
+    await Wait.until(() => expect(readings).toHaveLength(1));
+
+    context.emit(EventName.MessageUpdated, finished("r2", "c2", "bob", "On it.").toJson());
+    readings[0]?.([new TeammateLastReply("alice", "c1", "r1", "Done.", earlier).toJson()]);
+    await Wait.until(() => expect([lastSaid("alice"), lastSaid("bob")]).toEqual(["Done.", "On it."]));
+    const replaced = [store.reloadLastReplies(), store.reloadLastReplies(), store.reloadLastReplies()];
+    await Wait.until(() => expect(readings).toHaveLength(4));
+    readings[3]?.([]);
+    readings[1]?.([new TeammateLastReply("alice", "c1", "r1", "Done.", earlier).toJson()]);
+    failings[2]?.(new Error("late"));
+    await Promise.all(replaced);
+
+    expect([lastSaid("alice"), lastSaid("bob"), store.lastRepliesError()]).toEqual([null, null, null]);
+  });
+
+  it("reads again when a chat holding a reply of the answer was rewound or deleted while the list was read", async () => {
+    const readings: ((value: JsonValue) => void)[] = [];
+    listed = () => new Promise<JsonValue>(resolve => readings.push(resolve));
+    await create();
+    await Wait.until(() => expect(readings).toHaveLength(1));
+
+    context.emit(EventName.ConversationDeleted, new ChatIdParams("c1").toJson());
+    context.emit(EventName.ConversationRewound, new ChatRewoundPayload("c2", 1).toJson());
+    readings[0]?.([new TeammateLastReply("alice", "c1", "r1", "Gone.", later).toJson(), new TeammateLastReply("bob", "c3", "r2", "Kept.", later).toJson()]);
+    await Wait.until(() => expect(readings).toHaveLength(2));
+    expect([lastSaid("alice"), lastSaid("bob")]).toEqual([null, null]);
+    context.emit(EventName.ConversationDeleted, new ChatIdParams("c9").toJson());
+    readings[1]?.([new TeammateLastReply("alice", "c4", "r0", "Earlier.", earlier).toJson(), new TeammateLastReply("bob", "c3", "r2", "Kept.", later).toJson()]);
+
+    await Wait.until(() => expect([lastSaid("alice"), lastSaid("bob")]).toEqual(["Earlier.", "Kept."]));
+    expect(readings).toHaveLength(2);
+  });
+
+  it("says why the list couldn't be read, keeps what it held, and clears the reason once a reading succeeds", async () => {
+    listed = () => [new TeammateLastReply("alice", "c1", "r1", "Done.", earlier).toJson()];
+    await create();
+    await Wait.until(() => expect(lastSaid("alice")).toBe("Done."));
+
+    listed = () => { throw new Error("The runtime is offline."); };
+    context.emit(EventName.StateResyncRequested, null);
+    await Wait.until(() => expect(store.lastRepliesError()).toBe("The runtime is offline."));
+    listed = () => Promise.reject("The runtime refused.");
+    context.emit(EventName.StateResyncRequested, null);
+    await Wait.until(() => expect(store.lastRepliesError()).toBe("The runtime refused."));
+    listed = () => ({});
+    context.emit(EventName.StateResyncRequested, null);
+    await Wait.until(() => expect(store.lastRepliesError()).toBe(new ListNotArrayException(Resources.formatValueKind({})).message));
+    expect(lastSaid("alice")).toBe("Done.");
+    listed = () => [];
+    context.emit(EventName.StateResyncRequested, null);
+
+    await Wait.until(() => expect([lastSaid("alice"), store.lastRepliesError()]).toEqual([null, null]));
+  });
+
+  it("stops listening once released", async () => {
+    await create();
+    await Wait.until(() => expect(reads()).toBe(1));
+    TeammateStatusStoreService.release(context);
+
+    context.emit(EventName.StateResyncRequested, null);
+    context.emit(EventName.MessageUpdated, finished("r1", "c1", "alice", "Done.").toJson());
+
+    expect([reads(), lastSaid("alice")]).toEqual([1, null]);
   });
 });

@@ -44,6 +44,19 @@
   white-space: nowrap;
 }
 
+.department-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.leader-choice {
+  width: 100%;
+}
+
+.add-member {
+  align-self: flex-start;
+}
+
 .department-summary,
 .hidden {
   color: var(--nol-text-muted);

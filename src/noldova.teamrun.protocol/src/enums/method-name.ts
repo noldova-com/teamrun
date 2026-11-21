@@ -115,6 +115,7 @@ export enum MethodName {
   PlanUsageList = "PlanUsageList",
   PlanUsageRead = "PlanUsageRead",
   TeammateUsageList = "TeammateUsageList",
+  TeammateLastReplyList = "TeammateLastReplyList",
   BackgroundTaskList = "BackgroundTaskList",
   BackgroundTaskRead = "BackgroundTaskRead",
   BackgroundTaskStop = "BackgroundTaskStop",

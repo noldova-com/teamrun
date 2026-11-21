@@ -42,14 +42,12 @@ const topOf = async (locator: Locator): Promise<number> => (await locator.boundi
 interface IShellCommands {
   readonly run: (shellFile: string, programFile: string, beatFile: string) => string;
   readonly writePid: (file: string) => string;
-  readonly clearKey: string;
 }
 
 const SH: IShellCommands = {
   run: (shellFile, programFile, beatFile) =>
     `echo e2e-ran; echo $$ > ${shellFile}; sh -c 'echo $$ > ${programFile}; i=0; while :; do i=$((i+1)); echo $i > ${beatFile}.tmp && mv ${beatFile}.tmp ${beatFile}; sleep 0.2; done'`,
-  writePid: file => `echo $$ > ${file}`,
-  clearKey: "Control+U"
+  writePid: file => `echo $$ > ${file}`
 };
 
 const powerShellProgramOf = (programFile: string, beatFile: string): string => Buffer.from(`Set-Content -LiteralPath '${programFile}' -Value $PID; $i = 0; ` +
@@ -59,8 +57,7 @@ const powerShellProgramOf = (programFile: string, beatFile: string): string => B
 const POWERSHELL: IShellCommands = {
   run: (shellFile, programFile, beatFile) =>
     `echo e2e-ran; Set-Content -LiteralPath '${shellFile}' -Value $PID; powershell -NoProfile -EncodedCommand ${powerShellProgramOf(programFile, beatFile)}`,
-  writePid: file => `Set-Content -LiteralPath '${file}' -Value $PID`,
-  clearKey: "Escape"
+  writePid: file => `Set-Content -LiteralPath '${file}' -Value $PID`
 };
 
 const SHELL: IShellCommands = process.platform === "win32" ? POWERSHELL : SH;
@@ -125,7 +122,7 @@ const expectBeatingAsync = async (file: string): Promise<void> => {
 
 const expectShellAnswersAsync = async (app: TeamRunApp, page: Page, shell: number): Promise<void> => {
   const file = app.pidFile("alive");
-  await TerminalScreen.enterAsync(page, page.locator("nol-terminal-pane .xterm-rows"), SHELL.writePid(file), SHELL.clearKey);
+  await TerminalScreen.enterAsync(page, page.locator("nol-terminal-pane .xterm-rows"), SHELL.writePid(file));
   try {
     await expect.poll(() => TeamRunApp.readPid(file), TeamRunApp.pollOf(30_000)).toBe(shell);
   }

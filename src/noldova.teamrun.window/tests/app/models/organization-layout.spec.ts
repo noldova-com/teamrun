@@ -64,7 +64,7 @@ describe("OrganizationLayout", () => {
     const changed = [layout.toggleDepartment("d1"), layout.withCardsShow(OrganizationCardField.Usage, true), layout.withCardField("t1", OrganizationCardField.Usage, true),
       layout.withoutCardFields("t1"), layout.withoutAnyCardFields()];
 
-    expect(changed.map(t => [t.view, t.focus])).toEqual(Array(5).fill([OrganizationViewMode.Focus, "d1"]));
+    expect(changed.map(t => [t.view, t.focus])).toEqual(new Array<unknown[]>(5).fill([OrganizationViewMode.Focus, "d1"]));
     expect([layout.withView(OrganizationViewMode.Board).focus, layout.withFocus(" ").focus, layout.withFocus(null).view]).toEqual(["d1", null, OrganizationViewMode.Focus]);
   });
 });

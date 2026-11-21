@@ -14,9 +14,33 @@ LICENSE file in the root directory of this source tree.
       <span class="role">{{ role }}</span>
     }
   </div>
+  @if (editsIn(); as department) {
+    <button type="button" nol-icon-button class="remove" [icon]="resources.organizationRemoveIcon" [label]="resources.formatOrganizationRemoveNamed(teammate().name)"
+      (click)="confirmRemove(department)"></button>
+  }
   <button type="button" nol-icon-button class="tune" [icon]="resources.organizationCardsShowIcon"
     [label]="resources.formatOrganizationChooseFields(teammate().name)" [nolMenuTriggerFor]="fieldsMenu"></button>
 </div>
+@if (editsIn(); as department) {
+  <div class="move">
+    <span class="move-label" aria-hidden="true">{{ resources.organizationMemberIn }}</span>
+    <nol-select class="move-choice" [label]="resources.formatOrganizationMoveLabel(teammate().name)" [options]="departmentOptions()" [value]="department.id"
+      (valueChange)="move($event)" />
+  </div>
+}
+@if (fields().has(fieldNames.Status)) {
+  <nol-teamrun-teammate-status class="status" [teammateId]="teammate().id" />
+}
+@if (fields().has(fieldNames.Now)) {
+  @let shown = now();
+  <div class="now">
+    <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ shown.icon }}</span>
+    <span class="now-text">{{ shown.text }}</span>
+    @if (shown.lasted; as lasted) {
+      <span class="now-for">{{ lasted }}</span>
+    }
+  </div>
+}
 @if (fields().has(fieldNames.Usage)) {
   @if (usage(); as shown) {
     <nol-meter class="usage" [label]="shown.meter.label" [value]="shown.used" [warning]="isWarning(shown.meter)">{{ shown.meter.text }}</nol-meter>

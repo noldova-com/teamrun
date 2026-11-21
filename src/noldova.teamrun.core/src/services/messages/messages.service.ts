@@ -13,7 +13,7 @@ import { ChangeOperation, type DataRecord } from "@noldova/context.data";
 import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
 import { JsonReader } from "@noldova/context.json";
 import { FileChangeReader, Message, MessageAttachment, type MessageListParams, MessagePage, type MessagePageParams, MessageStatus, ReplyPanel, ReplyPage, ReplySummary,
-  ReplyUsage, TeammateDocument, TeammateUsage, TeammateWork } from "@noldova/teamrun.protocol";
+  ReplyUsage, TeammateDocument, TeammateLastReply, TeammateUsage, TeammateWork } from "@noldova/teamrun.protocol";
 
 import { ChangeEntity } from "../../enums/change-entity.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
@@ -125,6 +125,13 @@ export class MessagesService implements IMessagesService {
       t.readString(Resources.teammateIdColumn), t.readString(Resources.conversationIdColumn), t.readString(Resources.idColumn),
       t.readNullableString(Resources.startedAtColumn), t.readNullableString(Resources.endedAtColumn),
       ReplyUsage.fromJson(JsonReader.parse(t.readString(Resources.usageColumn)).toJson())));
+  }
+
+  public async listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]> {
+    const rows = await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectTeammateLastReplies, [Resources.textBlanks]));
+    return rows.map(t => new TeammateLastReply(
+      t.readString(Resources.teammateIdColumn), t.readString(Resources.conversationIdColumn), t.readString(Resources.idColumn), t.readString(Resources.textColumn),
+      t.readString(Resources.endedAtColumn)));
   }
 
   public async readTeammateWorkAsync(teammateId: string): Promise<TeammateWork> {

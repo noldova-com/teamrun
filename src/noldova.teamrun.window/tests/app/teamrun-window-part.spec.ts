@@ -117,7 +117,7 @@ describe("TeamRun's window part", () => {
     const shows = context.commands.slice(0, 6);
 
     expect(shows.map(t => [t.name, t.title, t.icon, t.defaultKey])).toEqual([
-      ["teamrun.showOrganization", "Show organization", "account_tree", null],
+      ["teamrun.showOrganization", "Show organization", "lan", null],
       ["teamrun.showTeammates", "Manage teammates", "group", null],
       ["teamrun.showProviders", "Manage providers", "key", null],
       ["teamrun.showMcpServers", "Manage MCP servers", "hub", null],

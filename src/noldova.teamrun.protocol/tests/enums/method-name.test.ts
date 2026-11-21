@@ -77,6 +77,7 @@ export class MethodNameTests {
     Assert.areEqual("PlanUsageList", MethodName.PlanUsageList);
     Assert.areEqual("PlanUsageRead", MethodName.PlanUsageRead);
     Assert.areEqual("TeammateUsageList", MethodName.TeammateUsageList);
+    Assert.areEqual("TeammateLastReplyList", MethodName.TeammateLastReplyList);
     Assert.areEqual("WindowFocused", MethodName.WindowFocused);
     Assert.areEqual("WindowClosed", MethodName.WindowClosed);
     Assert.areEqual("WindowReload", MethodName.WindowReload);

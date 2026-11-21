@@ -19,6 +19,7 @@ import { ImageOpenMode } from "./app/enums/image-open-mode";
 import { OrganizationCardField } from "./app/enums/organization-card-field";
 import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
+import { TeammateStatus } from "./app/enums/teammate-status";
 import type { ProviderAction } from "./app/types/provider-action";
 
 export class Resources {
@@ -851,7 +852,7 @@ export class Resources {
   public static readonly teammatesViewIcon: string = "group";
   public static readonly organizationDocumentName: string = "teamrun.organization";
   public static readonly organizationDocumentInstance: string = "organization";
-  public static readonly organizationViewIcon: string = "account_tree";
+  public static readonly organizationViewIcon: string = "lan";
   public static readonly providersDocumentName: string = "teamrun.providers";
   public static readonly providersDocumentInstance: string = "providers";
   public static readonly providersViewIcon: string = "key";
@@ -1177,6 +1178,29 @@ export class Resources {
   public static readonly organizationClearEveryCard: string = "Clear every card's own choice";
   public static readonly organizationUseEveryCard: string = "Use what every card shows";
   public static readonly organizationResetIcon: string = "restart_alt";
+  public static readonly organizationEditStructure: string = "Edit structure";
+  public static readonly organizationDoneEditing: string = "Done editing";
+  public static readonly organizationEditIcon: string = "edit";
+  public static readonly organizationDoneIcon: string = "check";
+  public static readonly organizationDepartmentNameLabel: string = "Department name";
+  public static readonly organizationLeaderLabel: string = "Leader";
+  public static readonly organizationNoLeader: string = "No leader";
+  public static readonly organizationMemberIn: string = "In";
+  public static readonly organizationAddMember: string = "Add member";
+  public static readonly organizationAddMemberIcon: string = "person_add";
+  public static readonly organizationAddDepartment: string = "Add department";
+  public static readonly organizationAddDepartmentIcon: string = "add";
+  public static readonly organizationNewDepartment: string = "New department";
+  public static readonly organizationDeleteIcon: string = "delete";
+  public static readonly organizationRemoveIcon: string = "person_remove";
+  public static readonly organizationNowRunningIcon: string = "progress_activity";
+  public static readonly organizationNowIdleIcon: string = "pause_circle";
+  public static readonly organizationNothingRunning: string = "Nothing running";
+  public static readonly organizationNowReplying: string = "Replying";
+  public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
+  public static readonly organizationDeleteLabel: string = "Delete";
+  public static readonly organizationRemoveMemberTitle: string = "Remove member";
+  public static readonly organizationRemoveLabel: string = "Remove";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
     [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Model, OrganizationCardField.Git,
       OrganizationCardField.PullRequests, OrganizationCardField.Documents, OrganizationCardField.Artifacts];
@@ -1198,6 +1222,20 @@ export class Resources {
     [OrganizationViewMode.Tree]: "Tree",
     [OrganizationViewMode.Board]: "Board",
     [OrganizationViewMode.Focus]: "Focus"
+  };
+  public static readonly teammateStatusLabels: Readonly<Record<TeammateStatus, string>> = {
+    [TeammateStatus.Working]: "Working",
+    [TeammateStatus.WaitingForYou]: "Waiting for you",
+    [TeammateStatus.Idle]: "Idle",
+    [TeammateStatus.UsageLimit]: "Usage limit",
+    [TeammateStatus.Stopped]: "Stopped"
+  };
+  public static readonly teammateStatusTones: Readonly<Record<TeammateStatus, string>> = {
+    [TeammateStatus.Working]: "working",
+    [TeammateStatus.WaitingForYou]: "waiting",
+    [TeammateStatus.Idle]: "idle",
+    [TeammateStatus.UsageLimit]: "waiting",
+    [TeammateStatus.Stopped]: "stopped"
   };
   public static readonly teammatesHint: string = "Create and configure teammates here. Add them to a chat using its member strip or an @mention.";
   public static readonly defaultTeammateHint: string = "The provider, model and effort a new chat starts with. Chats you already have keep their own.";
@@ -1734,6 +1772,27 @@ export class Resources {
     return open ? `Collapse ${name}` : `Expand ${name}`;
   }
 
+  public static formatOrganizationDeleteDepartment(name: string, parent: string | null): string {
+    return Object.isNull(parent) ? `Delete ${name}? Its departments move up to report to you, and its members leave every department.`
+      : `Delete ${name}? Its departments and members move to ${parent}.`;
+  }
+
+  public static formatOrganizationDeleteNamed(name: string): string {
+    return `Delete ${name}`;
+  }
+
+  public static formatOrganizationRemoveNamed(name: string): string {
+    return `Remove ${name}`;
+  }
+
+  public static formatOrganizationMoveLabel(name: string): string {
+    return `Department of ${name}`;
+  }
+
+  public static formatOrganizationRemoveMember(teammate: string, department: string): string {
+    return `Remove ${teammate} from ${department}? ${teammate} stays on the team, in no department.`;
+  }
+
   public static formatOrganizationHidden(count: number): string {
     return count === 1 ? "1 teammate hidden" : `${count} teammates hidden`;
   }
@@ -1744,6 +1803,10 @@ export class Resources {
 
   public static formatOrganizationChooseFields(name: string): string {
     return `Choose what ${name}'s card shows`;
+  }
+
+  public static formatOrganizationNowFor(milliseconds: number, more: number): string {
+    return more > 0 ? `${Resources.formatDuration(milliseconds)} +${more}` : Resources.formatDuration(milliseconds);
   }
 
   public static formatOrganizationModel(model: string, effort: string | null): string {

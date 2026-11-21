@@ -10,16 +10,21 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, MethodName, Organization, OrganizationLayoutSaveParams, PlanUsage, PlanWindow, PlanWindowName,
-  TeammateIdParams, TeammateWork } from "@noldova/teamrun.protocol";
+import { Department, DepartmentMember, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams, PlanUsage, PlanWindow,
+  PlanWindowName, TeammateIdParams, TeammateWork } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import { userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
+import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
+import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
+import { Resources } from "../../../../src/resources";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
+import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -47,7 +52,8 @@ describe("OrganizationViewComponent", () => {
   };
   const texts = (selector: string, root: ParentNode = element()): string[] => all(selector, root).map(t => t.textContent?.trim() ?? "");
   const department = (name: string): HTMLElement => {
-    const found = all("nol-teamrun-organization-department").find(t => t.querySelector(".department-name")?.textContent?.trim() === name);
+    const found = all("nol-teamrun-organization-department").find(t => t.querySelector(".department-name")?.textContent?.trim() === name
+      || t.querySelector<HTMLInputElement>(".department-field")?.value === name);
     if (Object.isUndefined(found))
       throw new Error(`No department is named ${name}.`);
     return found;
@@ -84,9 +90,9 @@ describe("OrganizationViewComponent", () => {
       throw new Error(`No card is named ${name}.`);
     return found;
   };
-  const shows = (name: string): string[] => [...texts(".usage", card(name)), ...texts(".model", card(name))];
+  const shows = (name: string): string[] => [...texts(".status", card(name)), ...texts(".usage", card(name)), ...texts(".model", card(name))];
   const checks = (): (string | null)[][] => menuItems().map(t => [t.querySelector(".nol-menu-item-label")?.textContent?.trim() ?? null, t.getAttribute("aria-checked")]);
-  const tree = (): unknown[] => all(".chart > .tree > .kids > nol-teamrun-organization-department").map(shape);
+  const tree = (): unknown[] => all(".chart .tree > .kids > nol-teamrun-organization-department").map(shape);
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -115,6 +121,7 @@ describe("OrganizationViewComponent", () => {
   };
 
   afterEach(() => {
+    TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
     ChatStoreService.release(context);
@@ -123,8 +130,9 @@ describe("OrganizationViewComponent", () => {
   it("shows you at the root, then each department in order with its count, leader, members in name order and the departments nested in it", async () => {
     await create();
 
-    expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart").getAttribute("aria-label")])
-      .toEqual([["Organization"], ["4 teammates"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure"]);
+    expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart > nol-canvas").getAttribute("aria-label"),
+      all(".chart [nolCanvasItem]").filter(t => t.matches(".owner, .department, nol-teamrun-organization-card")).length])
+      .toEqual([["Organization"], ["4 teammates"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure", 8]);
     expect(tree()).toEqual([
       ["Design", "2", "Led by Alice · 1 member", ["Alice"], ["Bob"], [["UI", "1", "Led by Code Reviewer · 0 members", ["Code Reviewer"], [], [], []]], []],
       ["Build", "1", "1 member", [], ["Offline"], [], []]
@@ -202,7 +210,7 @@ describe("OrganizationViewComponent", () => {
     await create(context => context.answer(MethodName.PlanUsageList, () =>
       [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, 40, null)], "2026-10-22T09:00:00.000Z").toJson()]));
 
-    expect([shows("Alice"), shows("Bob")]).toEqual([[], []]);
+    expect([shows("Alice"), shows("Bob")]).toEqual([["Idle"], ["Idle"]]);
 
     await openMenu(one(".top .cards-show"));
     expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Model and effort", "false"],
@@ -217,7 +225,7 @@ describe("OrganizationViewComponent", () => {
     await Wait.until(() => expect(saves).toHaveLength(2));
     await settle();
 
-    expect([shows("Alice"), shows("Bob")]).toEqual([["60% left", "gpt-5 · high"], ["60% left"]]);
+    expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "60% left", "gpt-5 · high"], ["Idle", "60% left"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
     expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true, Git: false, PullRequests: false, Documents: false,
       Artifacts: false } }));
@@ -238,6 +246,43 @@ describe("OrganizationViewComponent", () => {
     const cards = all("nol-teamrun-organization-card").length;
     expect([cards, all("nol-teamrun-teammate-work").length, context.count(MethodName.TeammateWorkRead), saves[0]])
       .toEqual([4, cards, cards, expect.objectContaining({ cardsShow: expect.objectContaining({ Git: true }) })]);
+  });
+
+  it("says on each card what its teammate runs now, the earliest first with for how long and how many more, ticking each second", async () => {
+    const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
+    TestBed.overrideProvider(ClockService, { useValue: clock });
+    const reply = (id: string, chatId: string, started: string, status: MessageStatus): Message =>
+      new Message(id, chatId, 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, started, started,
+        status === MessageStatus.Running ? null : started, [], "alice", "alice");
+    const now = (name: string): string[] => [...texts(".now-icon", card(name)), ...texts(".now-text", card(name)), ...texts(".now-for", card(name))];
+    await create();
+    const idle = [now("Alice"), now("Offline"), clock.running];
+    context.emit(EventName.MessageCreated, reply("r1", "c9", "2026-09-10T08:00:00.000Z", MessageStatus.Running).toJson());
+    await settle();
+    const single = now("Alice");
+    context.emit(EventName.MessageCreated, reply("r2", "c1", "2026-09-10T07:59:00.000Z", MessageStatus.Running).toJson());
+    await settle();
+    const two = now("Alice");
+    clock.advance(Resources.clockIntervalMilliseconds);
+    await settle();
+    const ticked = [now("Alice"), clock.intervals];
+    context.emit(EventName.MessageUpdated, reply("r1", "c9", "2026-09-10T08:00:00.000Z", MessageStatus.Completed).toJson());
+    context.emit(EventName.MessageUpdated, reply("r2", "c1", "2026-09-10T07:59:00.000Z", MessageStatus.Completed).toJson());
+    await settle();
+
+    expect(idle).toEqual([["pause_circle", "Nothing running"], ["pause_circle", "Stopped"], 0]);
+    expect([single, two, ticked]).toEqual([["progress_activity", "Replying", "5m 0s"], ["progress_activity", "First", "6m 0s +1"],
+      [["progress_activity", "First", "6m 1s +1"], [Resources.clockIntervalMilliseconds]]]);
+    expect([now("Alice"), clock.running]).toEqual([["pause_circle", "Nothing running"], 0]);
+    expect(card("Alice").querySelector(".now-icon")?.getAttribute("aria-hidden")).toBe("true");
+
+    context.emit(EventName.MessageCreated, reply("r3", "c1", "2026-09-10T08:04:00.000Z", MessageStatus.Running).toJson());
+    await openMenu(one(".tune", card("Alice")));
+    menuItem("Current activity").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    expect([all(".now", card("Alice")), now("Bob"), clock.running]).toEqual([[], ["pause_circle", "Nothing running"], 0]);
   });
 
   it("lets a card choose its own fields over every card's, until it or every card's choice is cleared", async () => {
@@ -281,13 +326,200 @@ describe("OrganizationViewComponent", () => {
 
     expect([one(".top .views [role=radiogroup]").getAttribute("aria-label"), pills()])
       .toEqual(["View", [["Tree", "false"], ["Board", "true"], ["Focus", "false"]]]);
-    expect(element().querySelectorAll(".chart > .tree")).toHaveLength(1);
+    expect(element().querySelectorAll(".chart .tree")).toHaveLength(1);
 
     one(".top .views [role=radio]:last-of-type").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
     await settle();
 
     expect([pills()[2], saves[0]]).toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null })]);
+  });
+
+  it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
+    await create();
+    const edit = (): HTMLElement => one(".top .edit");
+    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-secondary")];
+    const before = looks();
+
+    edit().click();
+    await settle();
+    const editing = looks();
+    edit().click();
+    await settle();
+
+    expect([before, editing, looks(), saves]).toEqual([["editEdit structure", true], ["checkDone editing", false], ["editEdit structure", true], []]);
+  });
+
+  describe("while its structure is edited", () => {
+    const changes = [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet];
+    let asked: [string, JsonValue][];
+
+    const editAsync = async (answer: () => JsonValue | Promise<JsonValue> = () => null): Promise<void> => {
+      asked = [];
+      await create(context => {
+        for (const method of changes)
+          context.answer(method, t => {
+            asked.push([method, t]);
+            return answer();
+          });
+      });
+      element().style.width = "72rem";
+      element().style.height = "60rem";
+      one(".top .edit").click();
+      await settle();
+      one(".chart .nol-canvas-map-toggle").click();
+      await settle();
+      one(".chart .nol-canvas-fit").click();
+      await settle();
+    };
+    const inDialog = (selector: string): HTMLElement => {
+      const found = document.querySelector<HTMLElement>(`nol-dialog ${selector}`);
+      if (Object.isNull(found))
+        throw new Error(`No dialog shows ${selector}.`);
+      return found;
+    };
+    const dialogAsync = async (): Promise<string[]> => {
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-confirm")?.textContent?.trim()).toBeTruthy());
+      return [inDialog(".nol-dialog-title").textContent?.trim() ?? "", inDialog("[nolDialogDescription]").textContent?.trim() ?? "",
+        inDialog(".nol-teamrun-confirm").textContent?.trim() ?? ""];
+    };
+    const answerAsync = async (selector: string): Promise<void> => {
+      inDialog(selector).click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog")).toBeNull());
+      await settle();
+    };
+    const optionsAsync = async (select: HTMLElement): Promise<string[]> => {
+      await userEvent.click(one(".nol-select-button", select));
+      await Wait.until(() => expect(document.querySelector(".nol-select-option")).not.toBeNull());
+      return [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
+    };
+    const closeOptionsAsync = async (): Promise<void> => {
+      await userEvent.keyboard("{Escape}");
+      await Wait.until(() => expect(document.querySelector(".nol-select-option")).toBeNull());
+    };
+    const chooseAsync = async (select: HTMLElement, label: string): Promise<void> => {
+      await optionsAsync(select);
+      const option = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].find(t => t.textContent?.trim() === label);
+      if (Object.isUndefined(option))
+        throw new Error(`No option reads ${label}.`);
+      await userEvent.click(option);
+      await settle();
+    };
+    const field = (name: string): HTMLInputElement => {
+      const found = department(name).querySelector<HTMLInputElement>(":scope > .department .department-field");
+      if (Object.isNull(found))
+        throw new Error(`${name} has no name field.`);
+      return found;
+    };
+    const rename = async (name: string, value: string): Promise<void> => {
+      const named = field(name);
+      named.value = value;
+      named.dispatchEvent(new Event("change"));
+      await settle();
+    };
+
+    it("names a department in a field in place of its toggle, renames it once the field changes, and puts back a blank or unchanged name", async () => {
+      await editAsync();
+      const shown = [own(department("Design"), ".department .department-toggle").length, field("Design").value, field("Design").getAttribute("aria-label")];
+
+      await rename("Design", "  ");
+      const blank = field("Design").value;
+      await rename("Design", "Design");
+      await rename("Design", " Craft ");
+
+      expect([shown, blank, asked]).toEqual([[0, "Design", "Department name"], "Design", [[MethodName.DepartmentUpdate, { departmentId: "design", name: "Craft" }]]]);
+    });
+
+    it("chooses a department's leader among its members in name order, or none", async () => {
+      await editAsync();
+      const leader = (): HTMLElement => one(":scope > .department .leader-choice", department("Design"));
+
+      const options = await optionsAsync(leader());
+      await closeOptionsAsync();
+      await chooseAsync(leader(), "Bob");
+      await chooseAsync(leader(), "No leader");
+
+      expect([options, asked]).toEqual([["No leader", "Alice", "Bob"], [
+        [MethodName.DepartmentUpdate, { departmentId: "design", leaderId: "bob" }],
+        [MethodName.DepartmentUpdate, { departmentId: "design", leaderId: null }]
+      ]]);
+    });
+
+    it("deletes a department only once you confirm, saying where what it held goes", async () => {
+      await editAsync();
+      const remove = (name: string): HTMLElement => one(":scope > .department .delete", department(name));
+
+      remove("UI").click();
+      const nested = await dialogAsync();
+      await answerAsync(".nol-teamrun-cancel");
+      const cancelled = asked.length;
+      remove("Build").click();
+      const top = await dialogAsync();
+      await answerAsync(".nol-teamrun-confirm");
+
+      expect([remove("Build").getAttribute("aria-label"), nested, cancelled, top, asked]).toEqual(["Delete Build",
+        ["Delete department", "Delete UI? Its departments and members move to Design.", "Delete"], 0,
+        ["Delete department", "Delete Build? Its departments move up to report to you, and its members leave every department.", "Delete"],
+        [[MethodName.DepartmentDelete, { departmentId: "build" }]]]);
+    });
+
+    it("removes a member from its card once you confirm, moves it to another department, and shows neither once editing is done", async () => {
+      await editAsync();
+
+      one(".remove", card("Bob")).click();
+      await dialogAsync();
+      await answerAsync(".nol-teamrun-cancel");
+      const cancelled = asked.length;
+      one(".remove", card("Bob")).click();
+      const asking = await dialogAsync();
+      await answerAsync(".nol-teamrun-confirm");
+      const departments = await optionsAsync(one(".move-choice", card("Bob")));
+      await closeOptionsAsync();
+      await chooseAsync(one(".move-choice", card("Bob")), "Build");
+      const label = one(".remove", card("Bob")).getAttribute("aria-label");
+      one(".top .edit").click();
+      await settle();
+
+      expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
+        ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob", ["Design", "UI", "Build"], 0]);
+      expect(asked).toEqual([[MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: null }],
+        [MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: "build" }]]);
+    });
+
+    it("adds a member from the teammates not yet in the department, in name order", async () => {
+      await editAsync();
+
+      await openMenu(one(":scope > .reports > .add-member", department("Build")));
+      const offered = menuItems().map(t => t.querySelector(".nol-menu-item-label")?.textContent?.trim());
+      menuItem("Alice").click();
+      await Wait.until(() => expect(asked).toHaveLength(1));
+
+      expect([offered, asked]).toEqual([["Alice", "Bob", "Code Reviewer"], [[MethodName.DepartmentMemberSet, { teammateId: "alice", departmentId: "build" }]]]);
+    });
+
+    it("adds a department under you, even when there is none yet", async () => {
+      await editAsync();
+      context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
+      await settle();
+
+      const empty = texts(".empty");
+      one(".chart .add-department").click();
+      await Wait.until(() => expect(asked).toHaveLength(1));
+
+      expect([empty, asked]).toEqual([[], [[MethodName.DepartmentCreate, { name: "New department", parentId: null }]]]);
+    });
+
+    it("says why a change failed until it is dismissed", async () => {
+      await editAsync(() => Promise.reject(new Error("The runtime is busy.")));
+
+      one(".chart .add-department").click();
+      await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
+      const role = one(".action-error").getAttribute("role");
+      one(".dismiss").click();
+      await settle();
+
+      expect([role, texts(".action-error")]).toEqual(["alert", []]);
+    });
   });
 
   describe.each([
@@ -303,10 +535,30 @@ describe("OrganizationViewComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
+    it("lines a card's current activity up inside its padding: the icon, its text a small space after, and the time at the end", async () => {
+      await create();
+      context.emit(EventName.MessageCreated, new Message("r1", "c9", 1, MessageAuthor.Provider, null, MessageStatus.Running, [], SampleData.provenance,
+        SampleData.timestamp, SampleData.timestamp, null, [], "alice", "alice").toJson());
+      await settle();
+      const alice = card("Alice");
+      const [icon, text, lasted] = [one(".now-icon", alice), one(".now-text", alice), one(".now-for", alice)];
+      const style = getComputedStyle(alice);
+      const inner = alice.getBoundingClientRect();
+      const left = inner.left + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth);
+      const right = inner.right - Number.parseFloat(style.paddingRight) - Number.parseFloat(style.borderRightWidth);
+
+      AppearanceFixture.expectPixels(icon.getBoundingClientRect().left, left);
+      AppearanceFixture.expectPixels(icon.getBoundingClientRect().width, AppearanceFixture.measureLook("icon"));
+      AppearanceFixture.expectPixels(text.getBoundingClientRect().left - icon.getBoundingClientRect().right, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(lasted.getBoundingClientRect().right, right);
+      AppearanceFixture.expectPixels(icon.getBoundingClientRect().top, text.getBoundingClientRect().top);
+      expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
+    });
+
     it("sizes the cards, hangs each leader under its department, the members off one line, and joins the departments to you through one bar", async () => {
       await create();
       element().style.width = "60rem";
-      element().style.height = "40rem";
+      element().style.height = "60rem";
       await settle();
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
@@ -320,7 +572,7 @@ describe("OrganizationViewComponent", () => {
       const reports = one(":scope > .reports", design);
       const member = one(":scope > nol-teamrun-organization-card", reports);
       const owner = one(".owner");
-      const kids = one(".chart > .tree > .kids");
+      const kids = one(".chart .tree > .kids");
 
       for (const view of [owner, card, leader, one(":scope > .department", build)])
         AppearanceFixture.expectPixels(box(view).width, 15 * rem);
@@ -345,16 +597,60 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("puts the view pills on the right of the header, before Cards show and centred with it", async () => {
+    it("fills the space under the header with one canvas, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
       element().style.width = "60rem";
+      element().style.height = "60rem";
       await settle();
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
-      const [top, views, cards] = [box(".top"), box(".top .views"), box(".top .cards-show")];
+      const [host, top, canvas] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas")];
+      const [tools, tree] = [box(".chart .nol-canvas-tools"), box(".chart .tree")];
+
+      for (const [actual, expected] of [[canvas.top, top.bottom], [canvas.left, host.left], [canvas.right, host.right], [canvas.bottom, host.bottom]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
+      expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
+    });
+
+    it("keeps the cards at their widths while editing, with their fields, choices and buttons inside the cards' padding", async () => {
+      await create();
+      element().style.width = "72rem";
+      element().style.height = "60rem";
+      one(".top .edit").click();
+      await settle();
+      one(".chart .nol-canvas-actual").click();
+      await settle();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const inset = AppearanceFixture.measureLook("space-3") + 1;
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const design = department("Design");
+      const unit = box(one(":scope > .department", design));
+      const name = box(one(":scope > .department .department-field", design));
+      const remove = box(one(":scope > .department .delete", design));
+      const leader = box(one(":scope > .department .leader-choice", design));
+      const bob = box(card("Bob"));
+      const move = box(one(".move", card("Bob")));
+      const drop = box(one(".remove", card("Bob")));
+      const tune = box(one(".tune", card("Bob")));
+
+      for (const [actual, expected] of [[unit.width, 15 * rem], [bob.width, 13.25 * rem], [name.left, unit.left + inset], [remove.right, unit.right - inset],
+        [leader.left, unit.left + inset], [leader.right, unit.right - inset], [move.left, bob.left + inset], [move.right, bob.right - inset],
+        [tune.right, bob.right - inset]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
+      expect([name.right <= remove.left, drop.right <= tune.left, texts(".chart .nol-canvas-zoom")]).toEqual([true, true, ["100%"]]);
+    });
+
+    it("puts the view pills on the right of the header, then Cards show and Edit structure, all centred on one line", async () => {
+      await create();
+      element().style.width = "72rem";
+      await settle();
+      const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      const [top, views, cards, edit] = [box(".top"), box(".top .views"), box(".top .cards-show"), box(".top .edit")];
 
       AppearanceFixture.expectPixels(cards.left - views.right, AppearanceFixture.measureLook("space-4"));
-      AppearanceFixture.expectPixels(top.right - cards.right, AppearanceFixture.measureLook("space-6"));
+      AppearanceFixture.expectPixels(edit.left - cards.right, AppearanceFixture.measureLook("space-4"));
+      AppearanceFixture.expectPixels(top.right - edit.right, AppearanceFixture.measureLook("space-6"));
       AppearanceFixture.expectPixels(views.top + views.height / 2, cards.top + cards.height / 2);
+      AppearanceFixture.expectPixels(edit.top + edit.height / 2, cards.top + cards.height / 2);
       expect(views.left).toBeGreaterThan(box(".top .headcount").right);
     });
   });
