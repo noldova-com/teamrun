@@ -19,6 +19,7 @@ import { OrganizationViewComponent } from "../../../../src/app/components/organi
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
+import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
@@ -84,7 +85,7 @@ describe("OrganizationViewComponent", () => {
       throw new Error(`No card is named ${name}.`);
     return found;
   };
-  const shows = (name: string): string[] => [...texts(".usage", card(name)), ...texts(".model", card(name))];
+  const shows = (name: string): string[] => [...texts(".status", card(name)), ...texts(".usage", card(name)), ...texts(".model", card(name))];
   const checks = (): (string | null)[][] => menuItems().map(t => [t.querySelector(".nol-menu-item-label")?.textContent?.trim() ?? null, t.getAttribute("aria-checked")]);
   const tree = (): unknown[] => all(".chart > .tree > .kids > nol-teamrun-organization-department").map(shape);
   const settle = async (): Promise<void> => {
@@ -115,6 +116,7 @@ describe("OrganizationViewComponent", () => {
   };
 
   afterEach(() => {
+    TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
     ChatStoreService.release(context);
@@ -202,7 +204,7 @@ describe("OrganizationViewComponent", () => {
     await create(context => context.answer(MethodName.PlanUsageList, () =>
       [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, 40, null)], "2026-10-22T09:00:00.000Z").toJson()]));
 
-    expect([shows("Alice"), shows("Bob")]).toEqual([[], []]);
+    expect([shows("Alice"), shows("Bob")]).toEqual([["Idle"], ["Idle"]]);
 
     await openMenu(one(".top .cards-show"));
     expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Model and effort", "false"],
@@ -217,7 +219,7 @@ describe("OrganizationViewComponent", () => {
     await Wait.until(() => expect(saves).toHaveLength(2));
     await settle();
 
-    expect([shows("Alice"), shows("Bob")]).toEqual([["60% left", "gpt-5 · high"], ["60% left"]]);
+    expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "60% left", "gpt-5 · high"], ["Idle", "60% left"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
     expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
   });
