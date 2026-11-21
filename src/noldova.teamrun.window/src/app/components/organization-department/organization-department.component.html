@@ -30,7 +30,7 @@ LICENSE file in the root directory of this source tree.
 </div>
 @if (node().leader; as leader) {
   <div class="stem"></div>
-  <nol-teamrun-organization-card class="leader" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="leader.name" [teammate]="leader"
+  <nol-teamrun-organization-card class="leader" nolCanvasItem data-nol-canvas-no-pan tabindex="0" role="group" [attr.aria-label]="leader.name" [teammate]="leader"
     [editing]="editing()" [nolPopoverTrigger]="leaderDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
     [nolPopoverAlignment]="detailsAlignment" (click)="choose(leader.id, $event)" (keydown.enter)="choose(leader.id, $event)" />
   <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" /></ng-template>
@@ -39,7 +39,7 @@ LICENSE file in the root directory of this source tree.
   @if (node().members.length > 0 || editing()) {
     <div class="reports">
       @for (member of node().members; track member.id) {
-        <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="member.name" [teammate]="member" [editing]="editing()"
+        <nol-teamrun-organization-card nolCanvasItem data-nol-canvas-no-pan tabindex="0" role="group" [attr.aria-label]="member.name" [teammate]="member" [editing]="editing()"
           [department]="node().department" [nolPopoverTrigger]="memberDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
           [nolPopoverAlignment]="detailsAlignment" (click)="choose(member.id, $event)" (keydown.enter)="choose(member.id, $event)" />
         <ng-template #memberDetails><nol-teamrun-organization-details [teammate]="member" /></ng-template>

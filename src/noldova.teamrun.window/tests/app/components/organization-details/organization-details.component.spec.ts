@@ -123,33 +123,6 @@ describe("OrganizationDetailsComponent", () => {
     ChatStoreService.release(context);
   });
 
-  it("PROBE", async () => {
-    await create();
-    const r = (e: Element | null): string => { if (e === null) return "none"; const b = e.getBoundingClientRect(); return `${b.left.toFixed(0)},${b.top.toFixed(0)} ${b.width.toFixed(0)}x${b.height.toFixed(0)}`; };
-    const tag = (e: Element | null): string => e === null ? "null" : `${e.tagName.toLowerCase()}.${[...e.classList].slice(0, 3).join(".")}`;
-    const at = (e: Element): string => { const b = e.getBoundingClientRect(); return tag(document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)); };
-    const hovered = (): string => tag([...document.querySelectorAll(":hover")].at(-1) ?? null);
-    const wait = (ms: number): Promise<void> => new Promise<void>(resolve => setTimeout(resolve, ms));
-    console.log(`PROBE D vp ${window.innerWidth}x${window.innerHeight} host ${r(element())} canvas ${r(one(".chart"))} map ${r(element().querySelector("nol-canvas-map"))} zoom ${texts(".chart .nol-canvas-tools button").join("|")}`);
-    for (const name of ["Alice", "Code Reviewer", "Bob", "Offline"])
-      console.log(`PROBE D card ${name} ${r(card(name))}`);
-    await userEvent.hover(card("Bob"));
-    await wait(900); await settle();
-    console.log(`PROBE D hover pops=${popovers().length} pop ${popovers().map(t => r(t)).join("|")} hovered=${hovered()}`);
-    await userEvent.unhover(card("Bob"));
-    await wait(900); await settle();
-    console.log(`PROBE D unhover pops=${popovers().length} hovered=${hovered()}`);
-    await userEvent.hover(one(".top"));
-    await wait(900); await settle();
-    one(".top .edit").click();
-    await settle(); await wait(300);
-    console.log(`PROBE D edit card Bob ${r(card("Bob"))} select ${r(one(".move-choice .nol-select-button", card("Bob")))} pops=${popovers().length} hovered=${hovered()}`);
-    TestBed.inject(FocusMonitor).focusVia(card("Bob"), "keyboard");
-    await settle(); await wait(300);
-    const select = one(".move-choice .nol-select-button", card("Bob"));
-    console.log(`PROBE D edit-focus card Bob ${r(card("Bob"))} select ${r(select)} at-select ${at(select)} pops ${popovers().map(t => r(t)).join("|")}`);
-  });
-
   it("opens a card's details when the card takes the keyboard focus: its status, whom it reports to, its model, usage and last words, and what runs now", async () => {
     await create(context => context
       .answer(MethodName.PlanUsageList, () => [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, 40, null)], SampleData.timestamp).toJson()])
@@ -221,7 +194,7 @@ describe("OrganizationDetailsComponent", () => {
     await userEvent.hover(card("Bob"));
     await Wait.until(() => expect(popovers()).toHaveLength(1));
     const opened = [texts(".head .name", popover()), document.activeElement === card("Bob")];
-    await userEvent.unhover(card("Bob"));
+    await userEvent.hover(one(".top"));
     await Wait.until(() => expect(popovers()).toEqual([]));
 
     expect(opened).toEqual([["Bob"], false]);
@@ -254,9 +227,9 @@ describe("OrganizationDetailsComponent", () => {
     await create();
     one(".top .edit").click();
     await settle();
-    await focus("Bob");
+    await focus("Offline");
 
-    await userEvent.click(one(".move-choice .nol-select-button", card("Bob")));
+    await userEvent.click(one(".move-choice .nol-select-button", card("Offline")));
     await Wait.until(() => expect(document.querySelector(".nol-select-option")).not.toBeNull());
     const closed = popovers();
     await userEvent.keyboard("{Escape}");

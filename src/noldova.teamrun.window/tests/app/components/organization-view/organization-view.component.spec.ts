@@ -379,24 +379,6 @@ describe("OrganizationViewComponent", () => {
 
     afterEach(() => AppearanceFixture.reset());
 
-    it("PROBE", async () => {
-      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
-      await create();
-      const r = (e: Element | null): string => { if (e === null) return "none"; const b = e.getBoundingClientRect(); return `${b.left.toFixed(0)},${b.top.toFixed(0)} ${b.width.toFixed(0)}x${b.height.toFixed(0)}`; };
-      const tag = (e: EventTarget | null): string => e instanceof Element ? `${e.tagName.toLowerCase()}.${[...e.classList].slice(0, 3).join(".")}` : String(e);
-      const at = (e: Element): string => { const b = e.getBoundingClientRect(); return tag(document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)); };
-      const log: string[] = [];
-      for (const type of ["pointerdown", "pointerup", "click", "focusin"])
-        document.addEventListener(type, e => log.push(`${type} ${tag(e.target)}`), { capture: true });
-      console.log(`PROBE V vp ${window.innerWidth}x${window.innerHeight} host ${r(element())} chart ${r(one(".chart"))} messages ${r(one("aside.messages"))} map ${r(element().querySelector("nol-canvas-map"))}`);
-      for (const name of ["Alice", "Bob", "Code Reviewer"])
-        console.log(`PROBE V card ${name} ${r(card(name))} name ${r(one(".name", card(name)))} at-name ${at(one(".name", card(name)))}`);
-      await userEvent.click(one(".name", card("Bob")));
-      await settle();
-      console.log(`PROBE V events ${log.join(" > ")}`);
-      console.log(`PROBE V after heading=${heading().join("|")} bob ${r(card("Bob"))}`);
-    });
-
     it("talks to the first department until a card is chosen, by a click on the card or Enter on it, but not by its own buttons or while editing", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
       await create();
