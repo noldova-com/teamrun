@@ -13,7 +13,7 @@ import { FileState, GitFolderParams, GitRemote, GitStatus, RemoteTransport, Stat
 import { EventName, Message, MessageAuthor, MessageStatus, Page, TeammateDocument, TeammateWork } from "@noldova/teamrun.protocol";
 
 import { TeammateSourceState } from "../../../src/app/enums/teammate-source-state";
-import { TeammateWorkReader } from "../../../src/app/services/teammate-work-reader";
+import { TeammateWorkReader } from "../../../src/app/services/teammate-work.reader";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../fixtures/sample-data.fixture";

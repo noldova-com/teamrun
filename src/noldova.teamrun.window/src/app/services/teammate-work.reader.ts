@@ -13,7 +13,7 @@ import type { IWindowPartContext } from "@noldova/desktop.window";
 import { GitHubNames } from "@noldova/git.github.protocol";
 import { BranchPullRequest, BranchQuery, HostSignIn, ReferenceState, SignInState } from "@noldova/git.hosting.protocol";
 import { GitChanged, GitFolderParams, GitNames, GitStatus } from "@noldova/git.protocol";
-import { EventName, Message, MethodName, Page, PageEditedListRequest, PageMethodName, TeammateIdParams, TeammateWork } from "@noldova/teamrun.protocol";
+import { EventName, Message, MethodName, Page, PageEditedListRequest, PageEventName, PageMethodName, TeammateIdParams, TeammateWork } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { TeammateSourceState } from "../enums/teammate-source-state";
@@ -21,7 +21,6 @@ import { TeammateGit } from "../models/teammate-git";
 import { TeammatePullRequest } from "../models/teammate-pull-request";
 import { TeammatePullRequests } from "../models/teammate-pull-requests";
 import { GitHubReferenceLinks } from "./github-reference-links";
-import { ChatPagesResources } from "./pages/chat-pages-resources";
 
 export class TeammateWorkReader {
   private static readonly openStates: readonly ReferenceState[] = [ReferenceState.Open, ReferenceState.Draft];
@@ -55,8 +54,8 @@ export class TeammateWorkReader {
     this.releases = [
       context.onEvent(Resources.formatQualifiedName(EventName.MessageUpdated), t => this.onMessage(Message.fromJson(t))),
       context.onEvent(Resources.formatQualifiedName(EventName.StateResyncRequested), () => this.readAll()),
-      context.onEvent(ChatPagesResources.shownName, () => void this.readArtifactsAsync()),
-      context.onEvent(ChatPagesResources.updatedName, () => void this.readArtifactsAsync()),
+      context.onEvent(Resources.formatQualifiedName(PageEventName.PageShown), () => void this.readArtifactsAsync()),
+      context.onEvent(Resources.formatQualifiedName(PageEventName.PageUpdated), () => void this.readArtifactsAsync()),
       context.onEvent(GitNames.changedEvent, t => this.onGitChanged(GitChanged.fromJson(t).folder)),
       context.onEvent(GitHubNames.signInChangedEvent, t => this.onSignIn(HostSignIn.fromJson(t).state)),
       context.onDependencyChanged(moduleId => this.onDependency(moduleId))
@@ -129,7 +128,7 @@ export class TeammateWorkReader {
   private async readArtifactsAsync(): Promise<void> {
     const read = ++this.artifactsRead;
     try {
-      const value = await this.context.requestAsync(ChatPagesResources.formatQualifiedName(PageMethodName.PageEditedList),
+      const value = await this.context.requestAsync(Resources.formatQualifiedName(PageMethodName.PageEditedList),
         new PageEditedListRequest(this.teammateId).toJson());
       const artifacts = Array.isArray(value) ? value.map(t => Page.fromJson(t)) : [];
       if (read !== this.artifactsRead)

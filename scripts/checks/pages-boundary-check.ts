@@ -34,8 +34,8 @@ export class PagesBoundaryCheck implements ICheck {
   private static readonly WINDOW_FILE: string = "src/noldova.teamrun.window/";
   private static readonly WINDOW_PACKAGES: readonly string[] = ["@angular/", "@noldova/ui.components.angular", "@noldova/desktop.window"];
   private static readonly PROTOCOL_NAMES: ReadonlySet<string> = new Set(["Page", "PageAuthor", "PageVersion", "PageView", "PageRequest", "PageListRequest",
-    "PageMethodName", "PageEventName", "PageKind", "CanvasManifest", "CanvasPage", "CanvasArtboard", "CanvasNote", "CanvasMark", "CanvasGuide", "CanvasNoteKind",
-    "CanvasMarkKind", "CanvasAxis"]);
+    "PageEditedListRequest", "PageMethodName", "PageEventName", "PageKind", "CanvasManifest", "CanvasPage", "CanvasArtboard", "CanvasNote", "CanvasMark", "CanvasGuide",
+    "CanvasNoteKind", "CanvasMarkKind", "CanvasAxis"]);
   private static readonly PROTOCOL_LIST: string = [...PagesBoundaryCheck.PROTOCOL_NAMES].join(", ");
   private static readonly ENTRIES: ReadonlyMap<string, string> = new Map([
     ["services/pages/pages", "Pages"],
@@ -47,6 +47,7 @@ export class PagesBoundaryCheck implements ICheck {
     ["models/pages/page-view", "PageView"],
     ["models/pages/page-request", "PageRequest"],
     ["models/pages/page-list-request", "PageListRequest"],
+    ["models/pages/page-edited-list-request", "PageEditedListRequest"],
     ["enums/pages/page-method-name", "PageMethodName"],
     ["enums/pages/page-event-name", "PageEventName"],
     ["enums/pages/page-kind", "PageKind"],

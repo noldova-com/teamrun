@@ -17,7 +17,7 @@ import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
 import { TeammateSourceState } from "../../enums/teammate-source-state";
 import type { TeammatePullRequest } from "../../models/teammate-pull-request";
-import { TeammateWorkReader } from "../../services/teammate-work-reader";
+import { TeammateWorkReader } from "../../services/teammate-work.reader";
 
 @Component({
   selector: "nol-teamrun-teammate-work",

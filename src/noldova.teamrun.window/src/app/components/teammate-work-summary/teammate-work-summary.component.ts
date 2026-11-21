@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 
 import { Resources } from "../../../resources";
-import { TeammateWorkReader } from "../../services/teammate-work-reader";
+import { TeammateWorkReader } from "../../services/teammate-work.reader";
 
 @Component({
   selector: "nol-teamrun-teammate-work-summary",
