@@ -35,7 +35,7 @@ export default defineConfig({
     alias: Object.fromEntries(Object.entries(compilerOptions.paths).map(([name, targets]) => [name, fileURLToPath(new URL(String(targets[0]), import.meta.url))]))
   },
   test: {
-    api: { port: 24315 },
+    api: { port: 24315, host: "127.0.0.1" },
     browser: { commands: { __vitest_screenshot: new ShortScreenshotNames().screenshot } },
     coverage: {
       reportsDirectory: fileURLToPath(new URL("../_build/angular-coverage", import.meta.url))
