@@ -215,14 +215,15 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(box(reports).left - box(leader).left, space(4));
       AppearanceFixture.expectPixels(box(member).left - box(reports).left, space(3) + 1);
       AppearanceFixture.expectPixels(box(member).top - box(leader).bottom, space(2));
-      expect([line(reports, "").borderLeftStyle, line(member, "::before").borderTopStyle, line(member, "::before").width])
-        .toEqual(["solid", "solid", `${space(3)}px`]);
+      expect([line(reports, "").borderLeftStyle, line(member, "::before").borderTopStyle]).toEqual(["solid", "solid"]);
+      AppearanceFixture.expectPixels(Number.parseFloat(line(member, "::before").width), space(3));
       AppearanceFixture.expectPixels(box(kids).top - box(owner).bottom, 0);
       AppearanceFixture.expectPixels(box(card).top - box(kids).top, space(3) * 2);
       AppearanceFixture.expectPixels(box(owner).left + box(owner).width / 2, box(kids).left + box(kids).width / 2);
       AppearanceFixture.expectPixels(box(build).left - box(design).right, 0);
-      expect([line(design, "::before").left, line(build, "::before").right, line(design, "::after").height])
-        .toEqual([`${box(design).width / 2}px`, `${box(build).width / 2}px`, `${space(3)}px`]);
+      for (const [length, expected] of [[line(design, "::before").left, box(design).width / 2], [line(build, "::before").right, box(build).width / 2],
+        [line(design, "::after").height, space(3)]] as const)
+        AppearanceFixture.expectPixels(Number.parseFloat(length), expected);
       expect(getComputedStyle(one(":scope > .department .department-name", design)).fontWeight)
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });

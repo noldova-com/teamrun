@@ -172,7 +172,7 @@ describe("TeamRun's window part", () => {
       ["teamrun.reload", "Load TeamRun's data again", "refresh", undefined],
       ["teamrun.newChatTerminal", "New chat terminal", "terminal", "Mod+Alt+Backquote"]
     ]);
-    expect([...context.commands.slice(12, 16), ...context.commands.slice(21)].map(t => [t.defaultKey?.label("darwin"), t.defaultKey?.label("win32"),
+    expect([...context.commands.slice(13, 17), ...context.commands.slice(22)].map(t => [t.defaultKey?.label("darwin"), t.defaultKey?.label("win32"),
       t.defaultKey?.label("linux")])).toEqual([["⌥↑", "Alt+Up", "Alt+Up"], ["⌥↓", "Alt+Down", "Alt+Down"], ["⇧⌘↑", "Ctrl+Shift+Up", "Ctrl+Shift+Up"],
       ["⇧⌘↓", "Ctrl+Shift+Down", "Ctrl+Shift+Down"], ["⌥⌘`", "Ctrl+Alt+`", "Ctrl+Alt+`"]]);
   });
