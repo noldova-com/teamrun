@@ -627,7 +627,8 @@ Product names and trademarks, such as the providers' names above, belong to thei
   Add a provider in the empty chat's placeholder and the composer, and Settings' Manage providers, open the Providers tab instead.
   The first launch is the `firstLaunch` row of the `preferences` table, which `FirstLaunchFinish` writes once, keeping the first time, and records in the change feed.
   While the placeholder shows with no provider and the first launch isn't finished, it opens the Providers tab with a welcome line above the form, while `ChatStoreService.welcoming` holds, and the search already running, with no dialog.
-  Skip for now and Continue at the form's end both finish the first launch, and Continue is on once a provider is signed in; Skip leaves the form open as a tab, and the tab opened later has no welcome line.
+  Skip for now and Continue sit in a footer along the tab's bottom edge, which stays in view while the form scrolls above it.
+  Both finish the first launch, and Continue is on once a provider is signed in; Skip leaves the form open as a tab, and the tab opened later has no welcome line.
   Continue shows "Your first teammate", `FirstTeammateComponent`, in the form's place: Name, filled in after the earliest signed-in provider's kind, such as Codex, and followed by its @mention, and Answered by, that provider; model, effort and permissions keep the provider's defaults, and Choose now opens the teammate dialog, "Let's add your first teammate", with the step's name and provider.
   The @mention takes at most the name field's end half, cut with an ellipsis, and the field keeps that half as its end padding, so a long name scrolls in the field rather than running under its mention.
   Start chatting, or the dialog's Save, makes the teammate and starts its first chat with it without a project; Not now makes nothing, and both go back to the form.
