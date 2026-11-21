@@ -15,7 +15,7 @@ export default defineConfig({
   test: {
     include: ["long-title.fixture.ts"],
     attachmentsDir: process.env["NOLDOVA_FAILURE_SCREENSHOT_ATTACHMENTS"],
-    api: { port: 24315 },
+    api: { port: 24315, host: "127.0.0.1" },
     browser: {
       enabled: true,
       headless: true,
