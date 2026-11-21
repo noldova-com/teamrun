@@ -32,7 +32,6 @@ import { ReplyExpansion } from "../models/reply-expansion";
 import { ReplyHistorySource } from "../models/reply-history-source";
 import { ChatStoreService } from "./chat-store.service";
 import { ClockService } from "./clock.service";
-import { EngineResync } from "./engine-resync";
 
 @Injectable()
 export class ReplyHistoryService {
@@ -62,7 +61,7 @@ export class ReplyHistoryService {
 
   public constructor() {
     const names = [EventName.MessageCreated, EventName.MessageUpdated, EventName.DetailAppended, EventName.DetailUpdated, EventName.ConversationRewound];
-    this.subscriptions = [...names.map(t => this.context.onEvent(Resources.formatQualifiedName(t), u => this.apply(t, u))), EngineResync.on(this.context, () => this.retry())];
+    this.subscriptions = names.map(t => this.context.onEvent(Resources.formatQualifiedName(t), u => this.apply(t, u)));
     inject(DestroyRef).onDestroy(() => {
       this.reset();
       for (const unsubscribe of this.subscriptions)
