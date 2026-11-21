@@ -45,7 +45,8 @@ describe("OrganizationMessagesComponent", () => {
     recipient("offline", "Offline", OrganizationRecipientState.Failed, null, "Signed out")]);
   const reply = (id: string, inReplyTo: string, teammateId: string, name: string, status: MessageStatus, text: string, createdAt: string): Message =>
     new Message(id, `chat-${teammateId}`, 1, MessageAuthor.Provider, inReplyTo, status, [new MessageDetail(0, DetailKind.Text, text, null, createdAt)],
-      SampleData.provenance, createdAt, createdAt, null, [], teammateId, name);
+      SampleData.provenance, createdAt, status === MessageStatus.Pending ? null : createdAt,
+      [MessageStatus.Pending, MessageStatus.Running, MessageStatus.AwaitingApproval].includes(status) ? null : createdAt, [], teammateId, name);
   const aliceReply = reply("r1", "s1", "alice", "Alice", MessageStatus.Completed, "Hi from Alice", "2026-11-20T09:05:00.000Z");
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<OrganizationMessagesComponent>;
@@ -180,7 +181,7 @@ describe("OrganizationMessagesComponent", () => {
   it("offers everyone, the leaders, each department and each teammate in the To picker, and a choice changes the target", async () => {
     await create(null);
 
-    expect(picker().options().map(t => [t.label, "options" in t ? t.options.map(u => u.title) : []])).toEqual([
+    expect(picker().options().map(t => "options" in t ? [t.label, t.options.map(u => u.title)] : [t.title])).toEqual([
       [Resources.organizationTargetsGroup, [Resources.organizationEveryoneTitle, Resources.organizationLeadersTitle]],
       [Resources.organizationDepartmentsGroup, ["Design"]],
       [Resources.organizationTeammatesGroup, ["Alice", "Bob", "Offline"]]
@@ -336,16 +337,16 @@ describe("OrganizationMessagesComponent", () => {
       const send = box(sendButton());
 
       AppearanceFixture.expectPixels(host.height, rem(40));
-      AppearanceFixture.expectPixels(title.left - head.left, rem(0.75));
+      AppearanceFixture.expectPixels(title.left - head.left, AppearanceFixture.measureLook("space-3"));
       expect(list.height).toBeLessThanOrEqual(host.height * 0.4 + 1);
-      AppearanceFixture.expectPixels(box(first).left - list.left, rem(0.25));
-      AppearanceFixture.expectPixels(avatar.left - box(first).left, rem(0.5));
+      AppearanceFixture.expectPixels(box(first).left - list.left, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(avatar.left - box(first).left, AppearanceFixture.measureLook("space-2"));
       AppearanceFixture.expectPixels(avatar.width, rem(1.75));
       AppearanceFixture.expectPixels(wrap.bottom, host.bottom);
-      AppearanceFixture.expectPixels(wrap.bottom - send.bottom, rem(0.75));
-      AppearanceFixture.expectPixels(field.left - wrap.left, rem(0.75));
-      AppearanceFixture.expectPixels(wrap.right - send.right, rem(0.75));
-      AppearanceFixture.expectPixels(send.left - field.right, rem(0.5));
+      AppearanceFixture.expectPixels(wrap.bottom - field.bottom, AppearanceFixture.measureLook("space-3"));
+      AppearanceFixture.expectPixels(field.left - wrap.left, AppearanceFixture.measureLook("space-3"));
+      AppearanceFixture.expectPixels(wrap.right - send.right, AppearanceFixture.measureLook("space-3"));
+      AppearanceFixture.expectPixels(send.left - field.right, AppearanceFixture.measureLook("space-2"));
       AppearanceFixture.expectPixels(field.top + field.height / 2, send.top + send.height / 2);
       expect(getComputedStyle(first).backgroundColor).not.toBe(getComputedStyle(row(1)).backgroundColor);
     });

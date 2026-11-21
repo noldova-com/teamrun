@@ -164,6 +164,10 @@ export class OrganizationMessagesComponent {
       this.target.set(chosen);
   }
 
+  protected edit(event: Event): void {
+    this.draft.set((event.target as HTMLInputElement).value);
+  }
+
   protected async send(): Promise<void> {
     const target = this.target();
     if (!this.canSend() || Object.isNull(target))

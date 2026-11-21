@@ -14,6 +14,7 @@ import { ListNotArrayException } from "../../../src/app/exceptions/list-not-arra
 import { OrganizationMessagesStoreService } from "../../../src/app/services/organization-messages-store.service";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { SampleData } from "../../fixtures/sample-data.fixture";
 import { Wait } from "../../fixtures/wait.fixture";
 
 describe("OrganizationMessagesStoreService", () => {
@@ -22,8 +23,9 @@ describe("OrganizationMessagesStoreService", () => {
   const sent = (id: string, target: OrganizationTarget, createdAt: string, ...recipients: readonly OrganizationRecipient[]): OrganizationMessage =>
     new OrganizationMessage(id, target, `text ${id}`, createdAt, recipients);
   const reply = (id: string, inReplyTo: string, status: MessageStatus, createdAt: string = "2026-11-20T10:00:00.000Z"): Message =>
-    new Message(id, "chat-ada", 1, MessageAuthor.Provider, inReplyTo, status, [new MessageDetail(0, DetailKind.Text, id, null, createdAt)], null, createdAt,
-      createdAt, null, [], "ada", "Ada");
+    new Message(id, "chat-ada", 1, MessageAuthor.Provider, inReplyTo, status, [new MessageDetail(0, DetailKind.Text, id, null, createdAt)], SampleData.provenance,
+      createdAt, status === MessageStatus.Pending ? null : createdAt, open.includes(status) ? null : createdAt, [], "ada", "Ada");
+  const open: readonly MessageStatus[] = [MessageStatus.Pending, MessageStatus.Running, MessageStatus.AwaitingApproval];
   const toAda = sent("o1", OrganizationTarget.teammate("ada"), "2026-11-20T09:00:00.000Z", started("ada", "s1"));
   const toEveryone = sent("o2", OrganizationTarget.everyone, "2026-11-20T09:30:00.000Z", started("ada", "s2"), started("bob", "s3"));
   const idsOf = (replies: readonly Message[]): string => replies.map(t => `${t.id}:${t.status}`).join(",");
