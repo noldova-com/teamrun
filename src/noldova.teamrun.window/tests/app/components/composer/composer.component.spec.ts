@@ -3354,6 +3354,7 @@ describe("ComposerComponent", () => {
       await type("first, changed");
 
       await ChatStoreService.of(context).rewind(SampleData.userMessage, false);
+      ChatStoreService.of(context).offerRewoundDraft(SampleData.userMessage);
       await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
       document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
       await fixture.whenStable();
