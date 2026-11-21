@@ -8,21 +8,25 @@
 
 import { Component, computed, inject, signal, type Signal, type WritableSignal } from "@angular/core";
 
+import { OrganizationTarget } from "@noldova/teamrun.protocol";
+
 import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, MenuComponent, MenuGroupComponent,
   MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { OrganizationMessagesShape } from "../../enums/organization-messages-shape";
 import { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { OrganizationDepartmentComponent } from "../organization-department/organization-department.component";
+import { OrganizationMessagesComponent } from "../organization-messages/organization-messages.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
   selector: "nol-teamrun-organization-view",
   imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent,
-    MenuTriggerDirective, OrganizationDepartmentComponent, TeammateStatusComponent],
+    MenuTriggerDirective, OrganizationDepartmentComponent, OrganizationMessagesComponent, TeammateStatusComponent],
   providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",
@@ -40,9 +44,15 @@ export class OrganizationViewComponent {
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly editing: WritableSignal<boolean> = signal(false);
+  protected readonly thread: OrganizationMessagesShape = OrganizationMessagesShape.Thread;
+  protected readonly chosen: WritableSignal<OrganizationTarget | null> = signal(null);
   protected readonly tree: Signal<readonly OrganizationNode[]> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
   protected readonly headcount: Signal<string> = computed(() =>
     Resources.formatOrganizationHeadcount(this.store.teammates().length, OrganizationNode.departmentsOf(this.organization.organization()).length));
+  protected readonly target: Signal<OrganizationTarget | null> = computed(() => {
+    const first = this.tree()[0];
+    return this.chosen() ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.department.id));
+  });
   protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length));
 
   protected toggleEditing(): void {

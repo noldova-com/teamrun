@@ -20,6 +20,7 @@ import { OrganizationViewComponent } from "../../../../src/app/components/organi
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -104,6 +105,7 @@ describe("OrganizationViewComponent", () => {
     saves = [];
     context = SampleData.createContext()
       .answer(MethodName.OrganizationList, () => organization.toJson())
+      .answer(MethodName.OrganizationMessageList, () => [])
       .answer(MethodName.OrganizationLayoutSave, t => {
         saves.push(OrganizationLayoutSaveParams.fromJson(t).layout);
         return null;
@@ -122,6 +124,7 @@ describe("OrganizationViewComponent", () => {
   };
 
   afterEach(() => {
+    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
@@ -365,6 +368,79 @@ describe("OrganizationViewComponent", () => {
       ["account_treeEdit structure", true, "false"], []]);
   });
 
+  describe("with its messages beside the tree", () => {
+    const heading = (): string[] => texts("aside.messages .nol-teamrun-organization-thread-title");
+
+    it("talks to the first department until a card is chosen, by a click on the card or Enter on it, but not by its own buttons or while editing", async () => {
+      await create();
+      const first = [one("aside.messages").getAttribute("aria-label"), heading()];
+
+      await userEvent.click(one(".name", card("Bob")));
+      await settle();
+      const clicked = heading();
+      card("Alice").focus();
+      await userEvent.keyboard("{Enter}");
+      await settle();
+      const entered = heading();
+      await userEvent.keyboard("{Escape}");
+      one(".tune", card("Bob")).click();
+      await settle();
+      await closeMenu();
+      const tuned = heading();
+      one(".top .edit").click();
+      await settle();
+      card("Code Reviewer").click();
+      await settle();
+
+      expect([first, clicked, entered, tuned, heading()]).toEqual([["Messages", ["Chat with Design"]], ["Chat with Bob"], ["Chat with Alice"],
+        ["Chat with Alice"], ["Chat with Alice"]]);
+    });
+
+    it("chooses a teammate in a nested department too", async () => {
+      await create();
+
+      card("Code Reviewer").click();
+      await settle();
+
+      expect(heading()).toEqual(["Chat with Code Reviewer"]);
+    });
+
+    it("asks whom to message while there is no department to talk to", async () => {
+      await create(context => context.answer(MethodName.OrganizationList, () => Organization.empty.toJson()), false);
+
+      expect([heading(), texts("aside.messages .nol-teamrun-organization-empty")]).toEqual([[], ["Choose whom to message."]]);
+    });
+
+    it("sets the messages beside the canvas, a gap apart, as wide as their basis while the canvas takes the rest, and under it in a narrow view", async () => {
+      await create();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      element().style.width = "80rem";
+      element().style.height = "50rem";
+      await settle();
+      const [chart, messages, body] = [one(".chart"), one("aside.messages"), one(".body")];
+      const inner = box(body).width - space(6) * 2;
+      const free = inner - space(4) - 57 * rem;
+      const wide = [box(chart), box(messages), box(body)];
+      element().style.width = "40rem";
+      await settle();
+      const narrow = [box(chart), box(messages), box(body)];
+
+      AppearanceFixture.expectPixels(wide[1].left - wide[0].right, space(4));
+      AppearanceFixture.expectPixels(wide[1].width, 22 * rem + free / 1000);
+      AppearanceFixture.expectPixels(wide[1].right, wide[2].right - space(6));
+      AppearanceFixture.expectPixels(wide[1].top, wide[0].top);
+      AppearanceFixture.expectPixels(wide[1].bottom, wide[2].bottom - space(6));
+      AppearanceFixture.expectPixels(narrow[0].height, 32 * rem);
+      AppearanceFixture.expectPixels(narrow[1].height, 30 * rem);
+      AppearanceFixture.expectPixels(narrow[1].top - narrow[0].bottom, space(4));
+      AppearanceFixture.expectPixels(narrow[1].left, narrow[0].left);
+      AppearanceFixture.expectPixels(narrow[1].width, narrow[0].width);
+      expect(getComputedStyle(body).overflowY).toBe("auto");
+    });
+  });
+
   describe("while its structure is edited", () => {
     const changes = [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet];
     let asked: [string, JsonValue][];
@@ -486,16 +562,9 @@ describe("OrganizationViewComponent", () => {
       await answerAsync(".nol-teamrun-cancel");
       const cancelled = asked.length;
       one(".remove", card("Bob")).click();
-      console.log("PROBE", "clicked", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
       const asking = await dialogAsync();
-      console.log("PROBE", "dialog", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
       await answerAsync(".nol-teamrun-confirm");
-      console.log("PROBE", "answered", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
       const departments = await optionsAsync(one(".move-choice", card("Bob")));
-      console.log("PROBE", "options", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
-      await userEvent.keyboard("{Escape}");
-      await settle();
-      console.log("PROBE", "escaped", document.querySelectorAll("nol-teamrun-organization-details").length, document.activeElement?.tagName, document.activeElement?.className, document.activeElement?.getAttribute("aria-label"), document.querySelectorAll(".cdk-overlay-pane").length);
       await closeOptionsAsync();
       await chooseAsync(one(".move-choice", card("Bob")), "Build");
       const label = one(".remove", card("Bob")).getAttribute("aria-label");
@@ -764,6 +833,24 @@ describe("OrganizationViewComponent", () => {
     beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, mode));
 
     afterEach(() => AppearanceFixture.reset());
+
+    it("draws the messages on the panel's colour in a rounded card's border, in light and dark", async () => {
+      await create();
+      const messages = one("aside.messages");
+      const probe = document.createElement("span");
+      element().append(probe);
+      const colour = (name: string): string => {
+        probe.style.color = `var(--nol-${name})`;
+        return getComputedStyle(probe).color;
+      };
+      const expected = [colour("panel"), colour("card-border")];
+      probe.remove();
+      const style = getComputedStyle(messages);
+
+      expect([style.backgroundColor, style.borderTopColor, style.borderTopStyle]).toEqual([...expected, "solid"]);
+      AppearanceFixture.expectPixels(Number.parseFloat(style.borderTopWidth), AppearanceFixture.measureLook("border-width"));
+      AppearanceFixture.expectPixels(Number.parseFloat(style.borderTopLeftRadius), AppearanceFixture.measureLook("radius-large"));
+    });
 
     it("draws the cards, departments and you on the panel's colour in light and the raised colour in dark, off the canvas's, a department's count on a filled badge, and a status's word in its colour", async () => {
       await create();

@@ -6,9 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, ElementRef, computed, inject, type InputSignal, input, type Signal, viewChild } from "@angular/core";
+import { Component, ElementRef, computed, inject, type InputSignal, input, type OutputEmitterRef, output, type Signal, viewChild } from "@angular/core";
 
-import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
+import { NameOrder, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
   MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent }
   from "@noldova/ui.components.angular";
@@ -43,6 +43,8 @@ export class OrganizationDepartmentComponent {
 
   public readonly node: InputSignal<OrganizationNode> = input.required<OrganizationNode>();
   public readonly editing: InputSignal<boolean> = input(false);
+
+  public readonly chosen: OutputEmitterRef<OrganizationTarget> = output<OrganizationTarget>();
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
@@ -100,5 +102,12 @@ export class OrganizationDepartmentComponent {
       if (confirmed)
         void this.organization.deleteDepartment(department.id);
     });
+  }
+
+  protected choose(teammateId: string, event: Event): void {
+    const inner = event.target instanceof Element && event.target !== event.currentTarget ? event.target : null;
+    if (this.editing() || !Object.isNull(inner?.closest(Resources.organizationCardControls) ?? null))
+      return;
+    this.chosen.emit(OrganizationTarget.teammate(teammateId));
   }
 }

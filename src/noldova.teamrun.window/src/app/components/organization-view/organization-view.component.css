@@ -10,6 +10,7 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  container-type: inline-size;
   height: 100%;
   min-height: 0;
   background: var(--nol-window);
@@ -82,12 +83,49 @@
   overflow-wrap: anywhere;
 }
 
-.chart {
+.body {
   display: flex;
   flex: 1 1 auto;
-  flex-direction: column;
+  gap: var(--nol-space-4);
   min-height: 0;
   padding: var(--nol-space-4) var(--nol-space-6) var(--nol-space-6);
+}
+
+.chart {
+  display: flex;
+  flex: 999 1 35rem;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.messages {
+  display: flex;
+  flex: 1 1 22rem;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--nol-border-width) solid var(--nol-card-border);
+  border-radius: var(--nol-radius-large);
+  background: var(--nol-panel);
+}
+
+@container (width < 48rem) {
+  .body {
+    flex-wrap: wrap;
+    overflow-y: auto;
+  }
+
+  .chart {
+    flex: 1 1 100%;
+    height: 32rem;
+  }
+
+  .messages {
+    flex: 1 1 100%;
+    height: 30rem;
+  }
 }
 
 .canvas {

@@ -50,31 +50,36 @@ LICENSE file in the root directory of this source tree.
     <button type="button" nol-button class="dismiss" [variant]="text" (click)="organization.clearActionError()">{{ resources.dismissLabel }}</button>
   </div>
 }
-<main class="chart">
-  <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
-    <div class="tree">
-      <div class="owner" nolCanvasItem>
-        <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
-        <div class="who">
-          <span class="name">{{ resources.organizationOwnerName }}</span>
-          <span class="role">{{ ownerRole() }}</span>
+<div class="body">
+  <main class="chart">
+    <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
+      <div class="tree">
+        <div class="owner" nolCanvasItem>
+          <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
+          <div class="who">
+            <span class="name">{{ resources.organizationOwnerName }}</span>
+            <span class="role">{{ ownerRole() }}</span>
+          </div>
         </div>
+        @if (tree().length > 0 || editing()) {
+          <div class="kids">
+            @for (node of tree(); track node.department.id) {
+              <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
+            }
+            @if (editing()) {
+              <div class="kid">
+                <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
+                  class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="empty">{{ resources.organizationEmpty }}</p>
+        }
       </div>
-      @if (tree().length > 0 || editing()) {
-        <div class="kids">
-          @for (node of tree(); track node.department.id) {
-            <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" />
-          }
-          @if (editing()) {
-            <div class="kid">
-              <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
-                class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
-            </div>
-          }
-        </div>
-      } @else {
-        <p class="empty">{{ resources.organizationEmpty }}</p>
-      }
-    </div>
-  </nol-canvas>
-</main>
+    </nol-canvas>
+  </main>
+  <aside class="messages" [attr.aria-label]="resources.organizationMessagesLabel">
+    <nol-teamrun-organization-messages [shape]="thread" [target]="target()" (targetChange)="chosen.set($event)" />
+  </aside>
+</div>

@@ -20,6 +20,7 @@ import { OrganizationViewComponent } from "../../../../src/app/components/organi
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -88,6 +89,7 @@ describe("OrganizationDetailsComponent", () => {
     TestBed.overrideProvider(ClockService, { useValue: clock });
     context = SampleData.createContext()
       .answer(MethodName.OrganizationList, () => organization.toJson())
+      .answer(MethodName.OrganizationMessageList, () => [])
       .answer(MethodName.OrganizationLayoutSave, () => null);
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer);
@@ -101,6 +103,7 @@ describe("OrganizationDetailsComponent", () => {
   };
 
   afterEach(() => {
+    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
@@ -203,11 +206,26 @@ describe("OrganizationDetailsComponent", () => {
     await create();
     await focus("Alice");
 
-    one(".tune", card("Alice")).click();
+    await userEvent.click(one(".tune", card("Alice")));
     await settle();
 
     await Wait.until(() => expect(document.querySelectorAll("button[nol-menu-item]").length).toBeGreaterThan(0));
     expect(popovers()).toEqual([]);
+  });
+
+  it("closes a card's details while its structure is edited once a field in it takes the focus, so Escape closes that field's list", async () => {
+    await create();
+    one(".top .edit").click();
+    await settle();
+    await focus("Bob");
+
+    await userEvent.click(one(".move-choice .nol-select-button", card("Bob")));
+    await Wait.until(() => expect(document.querySelector(".nol-select-option")).not.toBeNull());
+    const closed = popovers();
+    await userEvent.keyboard("{Escape}");
+
+    await Wait.until(() => expect(document.querySelector(".nol-select-option")).toBeNull());
+    expect(closed).toEqual([]);
   });
 
   describe.each([

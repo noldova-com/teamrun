@@ -24,7 +24,7 @@ LICENSE file in the root directory of this source tree.
       (click)="confirmRemove(department)"></button>
   }
   <button type="button" nol-icon-button class="tune" [icon]="resources.organizationCardsShowIcon"
-    [label]="resources.formatOrganizationChooseFields(teammate().name)" [nolMenuTriggerFor]="fieldsMenu" (click)="closeDetails()"></button>
+    [label]="resources.formatOrganizationChooseFields(teammate().name)" [nolMenuTriggerFor]="fieldsMenu"></button>
 </div>
 @if (editsIn(); as department) {
   <div class="move">

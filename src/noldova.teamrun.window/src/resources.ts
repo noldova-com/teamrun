@@ -1196,6 +1196,8 @@ export class Resources {
   public static readonly organizationDetailsNow: string = "Now";
   public static readonly organizationDetailsNoUsage: string = "Not reported";
   public static readonly organizationDetailsNothingSaid: string = "Nothing yet";
+  public static readonly organizationMessagesLabel: string = "Messages";
+  public static readonly organizationCardControls: string = "button, input, select, nol-select";
   public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Remove member";

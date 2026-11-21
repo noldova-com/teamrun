@@ -32,7 +32,7 @@ LICENSE file in the root directory of this source tree.
   <div class="stem"></div>
   <nol-teamrun-organization-card class="leader" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="leader.name" [teammate]="leader"
     [editing]="editing()" [nolPopoverTrigger]="leaderDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
-    [nolPopoverAlignment]="detailsAlignment" />
+    [nolPopoverAlignment]="detailsAlignment" (click)="choose(leader.id, $event)" (keydown.enter)="choose(leader.id, $event)" />
   <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" /></ng-template>
 }
 @if (isOpen()) {
@@ -41,7 +41,7 @@ LICENSE file in the root directory of this source tree.
       @for (member of node().members; track member.id) {
         <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="member.name" [teammate]="member" [editing]="editing()"
           [department]="node().department" [nolPopoverTrigger]="memberDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
-          [nolPopoverAlignment]="detailsAlignment" />
+          [nolPopoverAlignment]="detailsAlignment" (click)="choose(member.id, $event)" (keydown.enter)="choose(member.id, $event)" />
         <ng-template #memberDetails><nol-teamrun-organization-details [teammate]="member" /></ng-template>
       }
       @if (editing()) {
@@ -53,7 +53,7 @@ LICENSE file in the root directory of this source tree.
   @if (node().children.length > 0) {
     <div class="kids">
       @for (child of node().children; track child.department.id) {
-        <nol-teamrun-organization-department class="kid" [node]="child" [editing]="editing()" />
+        <nol-teamrun-organization-department class="kid" [node]="child" [editing]="editing()" (chosen)="chosen.emit($event)" />
       }
     </div>
   }

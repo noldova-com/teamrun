@@ -33,7 +33,7 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
     SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
-  host: { class: "nol-teamrun-organization-card" },
+  host: { "class": "nol-teamrun-organization-card", "(focusin)": "closeDetails($event)" },
   templateUrl: "./organization-card.component.html",
   styleUrl: "./organization-card.component.css"
 })
@@ -110,8 +110,9 @@ export class OrganizationCardComponent {
       field.value = this.teammate().name;
   }
 
-  protected closeDetails(): void {
-    this.details?.close();
+  protected closeDetails(event: FocusEvent): void {
+    if (event.target !== event.currentTarget)
+      this.details?.close();
   }
 
   protected move(departmentId: string): void {
