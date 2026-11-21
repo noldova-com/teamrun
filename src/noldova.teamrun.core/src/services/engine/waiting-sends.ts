@@ -8,10 +8,11 @@
 
 import "@noldova/context.core";
 import type { SqlTransaction } from "@noldova/context.data.sql";
+import { ArgumentException } from "@noldova/context.exceptions";
 import { ServiceException } from "@noldova/teamrun.services";
 import { AttachmentInput, type ChatIdParams, DetailKind, ErrorCode, Event, EventName, Message, type MessageAttachment, MessageAuthor, MessageDelivery,
-  MessageDetail, MessageSendParams, MessageStatus, TeammateMention, WaitingMessage, type WaitingMessageAddParams, type WaitingMessageEditParams,
-  type WaitingMessageIdParams, WaitingMessagesPayload } from "@noldova/teamrun.protocol";
+  MessageDetail, MessageSendParams, MessageStatus, Resources as ProtocolResources, TeammateMention, WaitingMessage, type WaitingMessageAddParams,
+  type WaitingMessageEditParams, type WaitingMessageIdParams, WaitingMessagesPayload } from "@noldova/teamrun.protocol";
 
 import type { IEngineCallbacks } from "../../interfaces/i-engine-callbacks.js";
 import type { IEventSink } from "../../interfaces/i-event-sink.js";
@@ -74,7 +75,7 @@ export class WaitingSends {
 
   public async addWaitingAsync(params: WaitingMessageAddParams, fromOutside: boolean): Promise<WaitingMessage> {
     const conversation = await this.requireConversationAsync(params.message.chatId);
-    await this.refuseMentionsMismatchAsync(params.message);
+    await this.refuseUnfitWaitingAsync(params.message);
     this.lastWaitingTime = Math.max(Date.now(), this.lastWaitingTime + 1);
     const checked = new WaitingMessage(Guid.createVersion7().toString(), params.delivery, params.message, new Date(this.lastWaitingTime).toISOString(), null,
       fromOutside);
@@ -97,7 +98,7 @@ export class WaitingSends {
       if (params.message.chatId !== found.chatId)
         throw new ServiceException(ErrorCode.InvalidParams, Resources.formatWaitingMessageOtherChat(found.id, params.message.chatId),
           [found.id, params.message.chatId]);
-      await this.refuseMentionsMismatchAsync(params.message, transaction);
+      await this.refuseUnfitWaitingAsync(params.message, transaction);
       const [message, files] = this.keepWaitingFiles(found.id, params.message);
       const changed = found.withMessage(message, found.fromOutside || fromOutside);
       await this.waiting.updateAsync(changed, transaction);
@@ -205,7 +206,9 @@ export class WaitingSends {
       message.mentionedTeammateIds, message.responderTeammateId, message.senderToken, message.wakeWhenDone), kept];
   }
 
-  private async refuseMentionsMismatchAsync(message: MessageSendParams, transaction?: SqlTransaction): Promise<void> {
+  private async refuseUnfitWaitingAsync(message: MessageSendParams, transaction?: SqlTransaction): Promise<void> {
+    if (!Object.isNull(message.senderToken))
+      throw new ArgumentException(ProtocolResources.waitingFromPersonOnly, ProtocolResources.messageField);
     const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
     if (!MentionCheck.matches(message.text, message.mentionedTeammateIds, available, false))
       throw new ServiceException(ErrorCode.Conflict, Resources.waitingMentionsMismatch, []);

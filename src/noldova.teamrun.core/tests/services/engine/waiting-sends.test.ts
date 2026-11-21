@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AttachmentStore, QuestionAsk, Resources, type TurnSteer } from "@noldova/teamrun.core";
+import { AttachmentStore, QuestionAsk, RequestDispatcher, Resources, type TurnSteer } from "@noldova/teamrun.core";
 import {
   ApprovalDecideParams,
   ApprovalQuestion,
@@ -945,6 +945,27 @@ export class WaitingSendsTests {
     Assert.areEqual(`${ErrorCode.Conflict}:${Resources.waitingMentionsMismatch}`, `${refused.info.name}:${refused.message}`);
     Assert.areEqual(0, listed);
     Assert.areEqual("First", await WaitingSendsTests.sentAsync(host, chat.id));
+  }
+
+  @TestMethod
+  public async refusesAWaitingMessageWithASenderTokenAsInvalidBeforeItsMentions(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+
+    let refused: unknown = null;
+    await host.engine.addWaitingAsync(new WaitingMessageAddParams(new MessageSendParams(chat.id, "Check X", null, null, [], [bob.id], null, "sender-token"),
+      MessageDelivery.Queue)).catch((error: unknown) => refused = error);
+    const listed = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length;
+    release();
+    await host.engine.waitForIdle();
+    const described = RequestDispatcher.describe(refused);
+
+    Assert.areEqual(`${ErrorCode.InvalidParams}:${ProtocolResources.waitingFromPersonOnly}:0`, `${described.name}:${described.message}:${listed}`);
   }
 
   @TestMethod
