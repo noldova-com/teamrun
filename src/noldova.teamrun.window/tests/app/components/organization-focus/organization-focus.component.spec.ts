@@ -5,12 +5,13 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
+import { signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
-  Teammate } from "@noldova/teamrun.protocol";
+import { Conversation, Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat,
+  OrganizationLayoutSaveParams, Teammate, TeammateIdParams } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
@@ -20,7 +21,6 @@ import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
-import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -78,7 +78,11 @@ describe("OrganizationFocusComponent", () => {
       .answer(MethodName.MessageListOpen, () => [waiting.toJson()])
       .answer(MethodName.OrganizationLayoutRead, () => ({ focus }))
       .answer(MethodName.OrganizationList, () => sample.toJson())
-      .answer(MethodName.OrganizationMessageList, () => [])
+      .answer(MethodName.OrganizationChatOpen, t => {
+        const teammateId = TeammateIdParams.fromJson(t).teammateId;
+        return new Conversation(`org-${teammateId}`, null, teammateId, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false, false,
+          null, new OrganizationChat("my-organization", teammateId)).toJson();
+      })
       .answer(MethodName.OrganizationLayoutSave, t => {
         saves.push(OrganizationLayout.fromJson(OrganizationLayoutSaveParams.fromJson(t).layout));
         return null;
@@ -87,7 +91,8 @@ describe("OrganizationFocusComponent", () => {
       context.answer(method, () => null);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, OrganizationLayoutService.provider,
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context },
+      { provide: WindowPartTokens.shown, useValue: signal(true).asReadonly() }, OrganizationLayoutService.provider,
       ChatStoreService.provider, OrganizationStoreService.provider] });
     fixture = TestBed.createComponent(OrganizationFocusComponent);
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer, carol]));
@@ -102,7 +107,6 @@ describe("OrganizationFocusComponent", () => {
   };
 
   afterEach(() => {
-    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationStoreService.release(context);
     OrganizationLayoutService.release(context);
@@ -269,15 +273,16 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { departmentId: "design" }]]));
   });
 
-  it("talks in a thread under the canvas with whoever is focused", async () => {
-    const thread = (): string[] => texts(".focus > nol-teamrun-organization-messages .nol-teamrun-organization-thread-title");
+  it("talks under the canvas with whoever is focused: a teammate in their Organization chat, a group through a send to each", async () => {
+    const panel = (): unknown[] => [texts(".focus > nol-teamrun-organization-chat .nol-teamrun-organization-chat-title"),
+      all(".focus > nol-teamrun-organization-chat nol-teamrun-history").length, all(".focus > nol-teamrun-organization-chat .nol-teamrun-organization-recipient").length > 0];
     await create("Department:design");
 
-    expect([one(".focus > nol-teamrun-organization-messages").classList.contains("nol-teamrun-organization-messages-inbox"), thread()]).toEqual([false, ["Chat with Design"]]);
+    expect(panel()).toEqual([["Chat with Design"], 0, true]);
     await click(one(".obtn", row("Bob")));
-    expect(thread()).toEqual(["Chat with Bob"]);
+    await Wait.until(() => expect(panel()).toEqual([["Chat with Bob"], 1, false]));
     await click(one(".crumb"));
-    expect(thread()).toEqual(["Chat with all leaders"]);
+    expect(panel()).toEqual([["Chat with all leaders"], 0, true]);
   });
 
   it("names a focused teammate in its field rather than a unit, names nothing for the leaders, and lets a focused member's card move it", async () => {
@@ -401,7 +406,7 @@ describe("OrganizationFocusComponent", () => {
       const outline = box(one(".outline"));
       const focus = box(one(".focus"));
       const canvas = box(one(".focus > nol-canvas"));
-      const conversation = box(one(".focus > nol-teamrun-organization-messages"));
+      const conversation = box(one(".focus > nol-teamrun-organization-chat"));
       const plane = box(one(".focus-plane"));
       const cards = all(".grid nol-teamrun-organization-card").map(box);
       const columns = Math.floor((plane.width + space(3)) / (18 * rem() + space(3)));

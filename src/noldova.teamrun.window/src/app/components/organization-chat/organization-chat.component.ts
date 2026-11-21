@@ -51,6 +51,20 @@ export class OrganizationChatComponent {
     const teammateId = this.teammateId();
     return Object.isNull(teammateId) ? null : this.chatOf(teammateId);
   });
+  protected readonly title: Signal<string> = computed(() => {
+    const target = this.target();
+    switch (target.kind) {
+      case OrganizationTargetKind.Teammate:
+        return Resources.formatOrganizationChat(this.store.teammate(target.id)?.name ?? Resources.organizationRemovedTeammate);
+      case OrganizationTargetKind.Department:
+        return Resources.formatOrganizationChat(this.organizations.organization().departments.find(t => t.id === target.id)?.name
+          ?? Resources.organizationDeletedDepartment);
+      case OrganizationTargetKind.Leaders:
+        return Resources.organizationLeadersChat;
+      case OrganizationTargetKind.Everyone:
+        return Resources.formatOrganizationChat(Resources.organizationEveryoneTitle);
+    }
+  });
   protected readonly historyInputs: Signal<Record<string, unknown>> = computed(() => ({ chatId: this.chatId() }));
   protected readonly error: Signal<string | null> = this.organizations.actionError;
   protected readonly recipients: Signal<readonly string[]> = computed(() =>

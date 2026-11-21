@@ -20,7 +20,6 @@ import { OrganizationViewComponent } from "../../../../src/app/components/organi
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
-import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -91,7 +90,6 @@ describe("OrganizationDetailsComponent", () => {
     TestBed.overrideProvider(ClockService, { useValue: clock });
     context = SampleData.createContext()
       .answer(MethodName.OrganizationList, () => organization.toJson())
-      .answer(MethodName.OrganizationMessageList, () => [])
       .answer(MethodName.OrganizationLayoutSave, () => null);
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer);
@@ -117,7 +115,6 @@ describe("OrganizationDetailsComponent", () => {
   afterEach(async () => {
     await page.viewport(viewport.width, viewport.height);
     AppearanceFixture.reset();
-    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);

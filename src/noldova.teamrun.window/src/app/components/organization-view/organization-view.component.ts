@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { NgTemplateOutlet } from "@angular/common";
 import { Component, computed, inject, linkedSignal, signal, type Signal, type WritableSignal } from "@angular/core";
 
 import { OrganizationTarget, OrganizationTargetKind } from "@noldova/teamrun.protocol";
@@ -33,8 +34,8 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 @Component({
   selector: "nol-teamrun-organization-view",
   imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent,
-    MenuSeparatorComponent, MenuTriggerDirective, OrganizationBoardComponent, OrganizationChatComponent, OrganizationChatsComponent, OrganizationDepartmentComponent,
-    OrganizationFocusComponent, SelectComponent, TeammateStatusComponent],
+    MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, OrganizationBoardComponent, OrganizationChatComponent, OrganizationChatsComponent,
+    OrganizationDepartmentComponent, OrganizationFocusComponent, SelectComponent, TeammateStatusComponent],
   providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",

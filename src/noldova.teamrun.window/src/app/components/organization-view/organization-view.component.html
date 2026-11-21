@@ -93,17 +93,26 @@ LICENSE file in the root directory of this source tree.
       @if (mode() === modes.Board) {
         <nol-teamrun-organization-chats class="chats" [selectedTeammateId]="selectedTeammateId()" (chosen)="chooseTeammate($event)" />
       }
-      @if (mode() === modes.Tree) {
-        <div class="to">
-          <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
-          <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
-        </div>
-      }
       @if (target(); as current) {
-        <nol-teamrun-organization-chat class="thread" [target]="current" (targetChange)="chosen.set($event)" />
+        <nol-teamrun-organization-chat class="thread" [target]="current" (targetChange)="chosen.set($event)">
+          @if (mode() === modes.Tree) {
+            <div class="to" nolTeamrunOrganizationTo>
+              <ng-container *ngTemplateOutlet="to" />
+            </div>
+          }
+        </nol-teamrun-organization-chat>
       } @else {
+        @if (mode() === modes.Tree) {
+          <div class="to">
+            <ng-container *ngTemplateOutlet="to" />
+          </div>
+        }
         <p class="empty">{{ resources.organizationChooseTarget }}</p>
       }
+      <ng-template #to>
+        <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
+        <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
+      </ng-template>
     </aside>
   }
 </div>

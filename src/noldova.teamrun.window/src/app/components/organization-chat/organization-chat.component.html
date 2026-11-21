@@ -6,6 +6,13 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
+<div class="nol-teamrun-organization-chat-head">
+  @if (teammateId() === null) {
+    <span class="nol-teamrun-organization-chat-icon material-symbols-rounded" aria-hidden="true">{{ resources.organizationGroupIcon }}</span>
+  }
+  <h3 class="nol-teamrun-organization-chat-title">{{ title() }}</h3>
+</div>
+<ng-content select="[nolTeamrunOrganizationTo]" />
 @if (teammateId(); as teammate) {
   @if (chatId(); as chat) {
     <div class="history">

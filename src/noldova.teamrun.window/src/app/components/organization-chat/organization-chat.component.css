@@ -13,6 +13,37 @@
   min-height: 0;
 }
 
+.nol-teamrun-organization-chat-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  padding: var(--nol-space-3);
+}
+
+.nol-teamrun-organization-chat-icon {
+  flex: none;
+  width: var(--nol-icon);
+  height: var(--nol-icon);
+  overflow: hidden;
+  font-size: var(--nol-icon);
+  line-height: 1;
+}
+
+.nol-teamrun-organization-chat-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-title);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .history {
   flex: 1;
   min-height: 0;

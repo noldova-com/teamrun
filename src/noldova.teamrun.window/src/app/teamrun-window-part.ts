@@ -28,7 +28,6 @@ import { PagesViewComponent } from "./components/pages/pages-view/pages-view.com
 import { AbilitySettingsRows } from "./services/ability-settings-rows";
 import { BackgroundTaskStoreService } from "./services/background-task-store.service";
 import { OrganizationLayoutService } from "./services/organization-layout.service";
-import { OrganizationMessagesStoreService } from "./services/organization-messages-store.service";
 import { OrganizationStoreService } from "./services/organization-store.service";
 import { BrowserAvailability } from "./services/browser-availability";
 import { ChatPageAction } from "./services/chat-page-action";
@@ -175,7 +174,6 @@ export class TeamRunWindowPart implements IWindowPart {
       ChatPageAction.release(this.activeContext);
       PageDocuments.release(this.activeContext);
       BackgroundTaskStoreService.release(this.activeContext);
-      OrganizationMessagesStoreService.release(this.activeContext);
       OrganizationStoreService.release(this.activeContext);
       OrganizationLayoutService.release(this.activeContext);
       TeammateStatusStoreService.release(this.activeContext);
