@@ -17,6 +17,7 @@ export class ModelCatalogCache {
   private readonly fetchModels: (kind: string, providerId: string | null, refresh: boolean, workingDirectory: string | null) => Promise<ProviderModelList>;
   private readonly cached: Map<string, ModelCatalog> = new Map();
   private readonly pending: Map<string, Promise<ModelCatalog>> = new Map();
+  private readonly expired: WeakSet<ModelCatalog> = new WeakSet();
   private readonly loads: WritableSignal<number> = signal(0);
   private readonly now: () => number;
 
@@ -28,7 +29,7 @@ export class ModelCatalogCache {
   public load(kind: string, providerId: string | null, refresh: boolean = false, workingDirectory: string | null = null): Promise<ModelCatalog> {
     const key = JSON.stringify([kind, providerId, workingDirectory]);
     const cached = this.cached.get(key);
-    if (!refresh && !Object.isUndefined(cached) && !cached.awaitsTurn && this.now() - cached.fetchedAt < Resources.modelCatalogLifetime)
+    if (!refresh && !Object.isUndefined(cached) && !cached.awaitsTurn && !this.expired.has(cached) && this.now() - cached.fetchedAt < Resources.modelCatalogLifetime)
       return Promise.resolve(cached);
     const pending = this.pending.get(key);
     if (!Object.isUndefined(pending))
@@ -46,6 +47,11 @@ export class ModelCatalogCache {
     });
     this.pending.set(key, request);
     return request;
+  }
+
+  public expire(): void {
+    for (const catalog of this.cached.values())
+      this.expired.add(catalog);
   }
 
   public loadedOf(kind: string, providerId: string | null): ModelCatalog | undefined {

@@ -131,6 +131,7 @@ describe("OrganizationViewComponent", () => {
 
   afterEach(async () => {
     await page.viewport(viewport.width, viewport.height);
+    AppearanceFixture.reset();
     OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
@@ -372,10 +373,54 @@ describe("OrganizationViewComponent", () => {
     expect([shows("Alice"), saves[3]]).toEqual([["gpt-5 · high"], expect.objectContaining({ cards: {} })]);
   });
 
-  it("offers no Board or Focus before they are built, and draws the tree whatever view is kept", async () => {
+  it("shows the kept view checked among Tree, Board and Focus, and keeps the one chosen on the server", async () => {
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
+    const pills = (): string[][] => all(".top .views [role=radio]").map(t => [t.textContent?.trim() ?? "", t.getAttribute("aria-checked") ?? ""]);
 
-    expect([all(".top [role=radio]"), all(".chart .tree")]).toEqual([[], [one(".chart .tree")]]);
+    expect([one(".top .views [role=radiogroup]").getAttribute("aria-label"), pills()])
+      .toEqual(["View", [["Tree", "false"], ["Board", "true"], ["Focus", "false"]]]);
+    expect([all(".chart .tree").length, texts(".chart nol-canvas nol-teamrun-organization-board .lane-name")]).toEqual([0, ["Design", "UI", "Build"]]);
+
+    one(".top .views [role=radio]:last-of-type").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    expect([pills()[2], saves[0], texts(".chart > nol-teamrun-organization-focus .unit-name"), all("aside.messages").length])
+      .toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null }), ["Organization"], 0]);
+  });
+
+  it("talks in a thread beside the Tree and in an inbox beside the Board, whose leaders and department buttons open their conversations", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
+    const panel = (): unknown[] => [one("aside.messages > nol-teamrun-organization-messages").classList.contains("nol-teamrun-organization-messages-inbox"),
+      texts("aside.messages .nol-teamrun-organization-thread-title"), all("aside.messages .to").length];
+
+    expect(panel()).toEqual([true, ["Design"], 0]);
+    await userEvent.click(one(".message-leaders"));
+    await settle();
+    expect(panel()).toEqual([true, ["All leaders"], 0]);
+    await userEvent.click(one(".lane:nth-child(1) .message-department"));
+    await settle();
+    expect(panel()).toEqual([true, ["Design"], 0]);
+
+    one(".top .views [role=radio]:first-of-type").click();
+    await settle();
+    expect(panel()).toEqual([false, ["Chat with Design"], 1]);
+  });
+
+  it("talks with the kept focus until another conversation is chosen, and keeps that one when the organization changes", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ focus: "Department:build" })));
+    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-thread-title")).toEqual(["Chat with Build"]));
+    const kept = texts("aside.messages .nol-teamrun-organization-thread-title");
+    await userEvent.click(one(":scope > .department .message", department("Design")));
+    await settle();
+    const chosen = texts("aside.messages .nol-teamrun-organization-thread-title");
+
+    context.emit(EventName.OrganizationChanged, organization.toJson());
+    await settle();
+
+    expect([kept, chosen, texts("aside.messages .nol-teamrun-organization-thread-title")]).toEqual([["Chat with Build"], ["Chat with Design"], ["Chat with Design"]]);
   });
 
   it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
@@ -824,6 +869,12 @@ describe("OrganizationViewComponent", () => {
       element().style.width = "100rem";
       element().style.height = "76rem";
       await settle();
+      await Wait.until(async () => {
+        one(".chart .nol-canvas-actual").click();
+        await settle();
+        await settle();
+        expect(texts(".chart .nol-canvas-zoom")).toEqual(["100%"]);
+      });
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
@@ -861,20 +912,53 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("fills the space under the header with one canvas inside the view's padding, and fits the chart at 100% to its top, under the canvas's tools", async () => {
+    it("fills the space under the header, inside the view's padding, with the canvas and the messages beside it, 22rem wide for the Tree's thread and 24rem for the Board's inbox as the chart takes the rest, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
       element().style.width = "100rem";
       element().style.height = "76rem";
       await settle();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
       const [host, top, canvas, messages] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas"), box("aside.messages")];
       const [tools, tree] = [box(".chart .nol-canvas-tools"), box(".chart .tree")];
-
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
-      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.right, messages.left - space(4)], [messages.right, host.right - space(6)],
-        [canvas.bottom, host.bottom - space(6)]] as const)
+      const panelWidth = (basis: number): number => basis * rem + (host.width - 2 * space(6) - space(4) - (35 + basis) * rem) / 1000;
+
+      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.right, messages.left - space(4)],
+        [messages.right, host.right - space(6)], [canvas.bottom, host.bottom - space(6)], [messages.top, canvas.top], [messages.bottom, canvas.bottom],
+        [messages.width, panelWidth(22)]] as const)
         AppearanceFixture.expectPixels(actual, expected);
+      one(".top .views [role=radio]:nth-of-type(2)").click();
+      await settle();
+      AppearanceFixture.expectPixels(box("aside.messages").width, panelWidth(24));
+      one(".top .views [role=radio]:first-of-type").click();
+      await settle();
       expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
+    });
+
+    it("stacks each view below 48rem: the Board's 32rem canvas over its 34rem inbox, and Focus's outline, at most 20rem, over its 32rem canvas and conversation", async () => {
+      await create();
+      element().style.width = "40rem";
+      element().style.height = "50rem";
+      await settle();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      one(".top .views [role=radio]:nth-of-type(2)").click();
+      await settle();
+      const [board, inbox] = [box(".chart"), box("aside.messages")];
+      for (const [actual, expected] of [[board.height, 32 * rem], [inbox.height, 34 * rem], [inbox.top - board.bottom, space(4)], [inbox.left, board.left],
+        [inbox.width, board.width]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
+
+      one(".top .views [role=radio]:nth-of-type(3)").click();
+      await settle();
+      const [chart, outline, focus, canvas, conversation] = [box(".chart"), box(".chart .outline"), box(".chart section.focus"), box(".chart section.focus > nol-canvas"),
+        box(".chart section.focus > nol-teamrun-organization-messages")];
+      for (const [actual, expected] of [[outline.left, chart.left], [outline.width, chart.width], [focus.top - outline.bottom, space(4)], [focus.left, chart.left],
+        [focus.width, chart.width], [canvas.height, 32 * rem], [conversation.top - canvas.bottom, space(4)], [conversation.height, 17 * rem]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
+      expect([all("aside.messages").length, getComputedStyle(one(".chart .outline")).maxHeight, outline.height <= 20 * rem + 1]).toEqual([0, `${20 * rem}px`, true]);
     });
 
     it("keeps the cards at their widths while editing, with their fields, choices and buttons inside the cards' padding", async () => {
