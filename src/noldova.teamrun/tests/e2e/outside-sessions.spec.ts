@@ -95,7 +95,8 @@ test("an outside agent sends a teammate a message with the kept token after a re
       await portField.blur();
       await expect(portField).toHaveValue(String(port));
       await settingsSearchAsync(page, "teamrun.outsideSessions");
-      await page.getByRole("checkbox", { name: SETTING_TEXT }).check();
+      await page.getByRole("checkbox", { name: SETTING_TEXT }).click();
+      await expect(page.getByRole("checkbox", { name: SETTING_TEXT })).toBeChecked();
       const before = await connectionOfAsync(page);
       await expect(before.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 60_000 });
       await expect(before.locator(".nol-teamrun-outside-token code")).toHaveText(/^[A-Za-z0-9_-]{43}$/);
