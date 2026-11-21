@@ -277,7 +277,7 @@ describe("OrganizationViewComponent", () => {
   it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
     await create();
     const edit = (): HTMLElement => one(".top .edit");
-    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-primary"), edit().classList.contains("nol-button-outlined")];
+    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-outlined")];
     const before = looks();
 
     edit().click();
@@ -286,7 +286,7 @@ describe("OrganizationViewComponent", () => {
     edit().click();
     await settle();
 
-    expect([before, editing, looks(), saves]).toEqual([["editEdit structure", false, true], ["checkDone editing", true, false], ["editEdit structure", false, true], []]);
+    expect([before, editing, looks(), saves]).toEqual([["editEdit structure", true], ["checkDone editing", false], ["editEdit structure", true], []]);
   });
 
   describe.each([

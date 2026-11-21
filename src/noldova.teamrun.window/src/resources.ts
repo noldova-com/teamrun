@@ -821,7 +821,7 @@ export class Resources {
   public static readonly teammatesViewIcon: string = "group";
   public static readonly organizationDocumentName: string = "teamrun.organization";
   public static readonly organizationDocumentInstance: string = "organization";
-  public static readonly organizationViewIcon: string = "account_tree";
+  public static readonly organizationViewIcon: string = "lan";
   public static readonly providersDocumentName: string = "teamrun.providers";
   public static readonly providersDocumentInstance: string = "providers";
   public static readonly providersViewIcon: string = "key";
