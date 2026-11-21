@@ -1,0 +1,58 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.kids {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: var(--nol-space-3);
+}
+
+.kids::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: var(--nol-space-3);
+  border-left: 1px solid var(--nol-menu-border);
+  content: "";
+}
+
+.kid {
+  position: relative;
+  padding: var(--nol-space-3) var(--nol-space-2) 0;
+}
+
+.kid::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--nol-menu-border);
+  content: "";
+}
+
+.kid:first-child::before {
+  left: 50%;
+}
+
+.kid:last-child::before {
+  right: 50%;
+}
+
+.kid:only-child::before {
+  display: none;
+}
+
+.kid::after {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: var(--nol-space-3);
+  border-left: 1px solid var(--nol-menu-border);
+  content: "";
+}

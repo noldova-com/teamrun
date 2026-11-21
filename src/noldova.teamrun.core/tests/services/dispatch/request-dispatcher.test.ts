@@ -29,7 +29,7 @@ import { ChatMemberModeParams, ChatMemberSettings, ChatMemberSettingsParams, Cha
   ComposerDefaultSaveParams } from "@noldova/teamrun.protocol";
 import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization }
   from "@noldova/teamrun.protocol";
-import { OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget } from "@noldova/teamrun.protocol";
+import { OrganizationLayoutSaveParams, OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget } from "@noldova/teamrun.protocol";
 import { SenderEnvironment, SubAgent, SubAgentStartParams, SubAgentStatus, SubAgentStopParams, SubAgentWaitParams, SubAgentWaitResult } from "@noldova/teamrun.protocol";
 import {
   AttachmentContent,
@@ -414,6 +414,22 @@ export class RequestDispatcherTests {
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DefaultTeammateRead, null));
     Assert.areEqual(2, host.listener.count(EventName.StateInvalidated));
     Assert.isTrue((await host.dispatcher.dispatch(new Request("bad", MethodName.DefaultTeammateSet, { defaultTeammate: { providerId: null } }))).hasErrors);
+  }
+
+  @TestMethod
+  public async readsAndSavesTheOrganizationLayoutAndTellsEveryWindowWithoutAnOrganizationChange(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const layout = { collapsed: ["d1"], cardsShow: { usage: true } };
+
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.OrganizationLayoutRead, null));
+    Assert.areEqual(JSON.stringify(layout), JSON.stringify(await RequestDispatcherTests.succeed(host, MethodName.OrganizationLayoutSave,
+      new OrganizationLayoutSaveParams(layout).toJson())));
+    Assert.areEqual(JSON.stringify(layout), JSON.stringify(await RequestDispatcherTests.succeed(host, MethodName.OrganizationLayoutRead, null)));
+    Assert.areEqual(JSON.stringify([layout]), JSON.stringify(host.listener.events.filter(t => t.name === EventName.OrganizationLayoutUpdated).map(t => t.payload)));
+    Assert.areEqual(0, host.listener.count(EventName.OrganizationChanged));
+
+    Assert.isTrue((await host.dispatcher.dispatch(new Request("bad", MethodName.OrganizationLayoutSave, { layout: ["d1"] }))).hasErrors);
+    Assert.areEqual(1, host.listener.count(EventName.OrganizationLayoutUpdated));
   }
 
   @TestMethod

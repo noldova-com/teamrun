@@ -156,6 +156,7 @@ import type {
   DepartmentMoveParams,
   DepartmentUpdateParams,
   Organization,
+  OrganizationLayoutSaveParams,
   OrganizationMessage,
   OrganizationMessageSendParams
 } from "@noldova/teamrun.protocol";
@@ -2854,6 +2855,10 @@ export declare class Resources {
    * The name of the Projects view's layout preference.
    */
   public static readonly projectsLayoutPreference: string;
+  /**
+   * The name of the Organization view's layout preference.
+   */
+  public static readonly organizationLayoutPreference: string;
   /**
    * The name of the composer's default choice preference.
    */
@@ -9979,6 +9984,18 @@ export interface IOrganizationService {
   setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
 
   /**
+   * Reads the Organization view's layout, or `null` when none is kept.
+   * @param transaction The transaction to read in, or none.
+   */
+  readLayoutAsync(transaction?: SqlTransaction): Promise<JsonObject | null>;
+
+  /**
+   * Keeps the Organization view's layout in the preferences, replacing the one kept, and records it in the change feed.
+   * @returns The layout kept.
+   */
+  saveLayoutAsync(params: OrganizationLayoutSaveParams): Promise<JsonObject>;
+
+  /**
    * Takes a teammate being deleted out of its department and clears its leadership, in the deleting transaction.
    * @param teammateId The teammate's id.
    * @param transaction The deleting transaction.
@@ -10096,6 +10113,18 @@ export declare class OrganizationService implements IOrganizationService {
    * @throws ServiceException `NotFound` for an unknown teammate or department.
    */
   public setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+
+  /**
+   * Reads the Organization view's layout, or `null` when none is kept.
+   * @param transaction The transaction to read in, or none.
+   */
+  public readLayoutAsync(transaction?: SqlTransaction): Promise<JsonObject | null>;
+
+  /**
+   * Keeps the Organization view's layout in the preferences, replacing the one kept, and records it in the change feed.
+   * @returns The layout kept.
+   */
+  public saveLayoutAsync(params: OrganizationLayoutSaveParams): Promise<JsonObject>;
 
   /**
    * Takes a teammate being deleted out of its department and clears its leadership, in the deleting transaction.

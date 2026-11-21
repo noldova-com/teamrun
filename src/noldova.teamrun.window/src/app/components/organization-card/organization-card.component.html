@@ -1,0 +1,76 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="head">
+  <nol-teamrun-teammate-avatar [teammate]="teammate()" [decorative]="true" />
+  <div class="who">
+    @if (editing()) {
+      <input #nameField nol-text-field class="name-field" [attr.aria-label]="resources.formatOrganizationRenameLabel(teammate().name)" [value]="teammate().name"
+        (change)="rename()">
+    } @else {
+      <span class="name">{{ teammate().name }}</span>
+    }
+    @if (teammate().role; as role) {
+      <span class="role">{{ role }}</span>
+    }
+  </div>
+  @if (editsIn(); as department) {
+    <button type="button" nol-icon-button class="remove" [icon]="resources.organizationRemoveIcon" [label]="resources.formatOrganizationRemoveNamed(teammate().name)"
+      (click)="confirmRemove(department)"></button>
+  }
+  <button type="button" nol-icon-button class="tune" [icon]="resources.organizationCardsShowIcon"
+    [label]="resources.formatOrganizationChooseFields(teammate().name)" [nolMenuTriggerFor]="fieldsMenu"></button>
+</div>
+@if (editsIn(); as department) {
+  <div class="move">
+    <span class="move-label" aria-hidden="true">{{ resources.organizationMemberIn }}</span>
+    <nol-select class="move-choice" [label]="resources.formatOrganizationMoveLabel(teammate().name)" [options]="departmentOptions()" [value]="department.id"
+      (valueChange)="move($event)" />
+  </div>
+}
+@if (fields().has(fieldNames.Status)) {
+  <nol-teamrun-teammate-status class="status" [teammateId]="teammate().id" />
+}
+@if (fields().has(fieldNames.Now)) {
+  @let shown = now();
+  <div class="now">
+    <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ shown.icon }}</span>
+    <span class="now-text">{{ shown.text }}</span>
+    @if (shown.lasted; as lasted) {
+      <span class="now-for">{{ lasted }}</span>
+    }
+  </div>
+}
+@if (fields().has(fieldNames.Usage)) {
+  @if (usage(); as shown) {
+    <nol-meter class="usage" [label]="shown.meter.label" [value]="shown.used" [warning]="shown.used >= resources.organizationUsageWarning">{{ resources.formatOrganizationUsage(shown.used) }}</nol-meter>
+  }
+}
+@if (fields().has(fieldNames.Last)) {
+  @if (last(); as reply) {
+    <p class="last">{{ reply.text }}</p>
+  }
+}
+@if (fields().has(fieldNames.Model)) {
+  @if (model(); as text) {
+    <span class="model">{{ text }}</span>
+  }
+}
+<ng-template #fieldsMenu>
+  <nol-menu>
+    <nol-menu-group [label]="resources.formatOrganizationCardShows(teammate().name)">
+      @for (field of resources.organizationOfferedFields; track field) {
+        <button nol-menu-item [label]="resources.organizationFieldLabels[field]" [checkbox]="true" [checked]="fields().has(field)"
+          (triggered)="layout.showOnCard(teammate().id, field, !fields().has(field))"></button>
+      }
+    </nol-menu-group>
+    <nol-menu-separator />
+    <button nol-menu-item class="use-every-card" [label]="resources.organizationUseEveryCard" [icon]="resources.organizationResetIcon"
+      [disabled]="!layout.layout().hasOwnFields(teammate().id)" (triggered)="layout.clearCard(teammate().id)"></button>
+  </nol-menu>
+</ng-template>
