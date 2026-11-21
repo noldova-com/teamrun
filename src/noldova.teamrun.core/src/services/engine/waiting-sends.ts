@@ -90,15 +90,15 @@ export class WaitingSends {
   }
 
   public async editWaitingAsync(params: WaitingMessageEditParams, fromOutside: boolean): Promise<WaitingMessage> {
-    const available = (await this.teammates.listAsync()).map(t => new TeammateMention(t.id, t.name));
-    if (!MentionCheck.matches(params.message.text, params.message.mentionedTeammateIds, available, !Object.isNull(params.message.senderToken)))
-      throw new ServiceException(ErrorCode.Conflict, Resources.editMentionsMismatch, []);
     const [current, edited, kept] = await this.context.database.connection.runInTransactionAsync(async (transaction)
       : Promise<readonly [WaitingMessage, WaitingMessage, readonly MessageAttachment[]]> => {
       const found = await this.requireWaitingAsync(params.id, transaction);
       if (params.message.chatId !== found.chatId)
         throw new ServiceException(ErrorCode.InvalidParams, Resources.formatWaitingMessageOtherChat(found.id, params.message.chatId),
           [found.id, params.message.chatId]);
+      const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
+      if (!MentionCheck.matches(params.message.text, params.message.mentionedTeammateIds, available, !Object.isNull(params.message.senderToken)))
+        throw new ServiceException(ErrorCode.Conflict, Resources.editMentionsMismatch, []);
       const [message, files] = this.keepWaitingFiles(found.id, params.message);
       const changed = found.withMessage(message, found.fromOutside || fromOutside);
       await this.waiting.updateAsync(changed, transaction);
