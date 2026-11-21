@@ -1,0 +1,99 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  font-size: var(--nol-text-small);
+  line-height: 1rem;
+}
+
+.work {
+  display: flex;
+  gap: 0.375rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.work-icon {
+  flex: none;
+  width: var(--nol-icon);
+  height: var(--nol-icon);
+  margin-top: 0.0625rem;
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-icon);
+  line-height: 1;
+}
+
+.work-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.work-branch {
+  overflow: hidden;
+  font-family: var(--nol-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-muted {
+  color: var(--nol-text-muted);
+}
+
+.work-pull-request {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.work-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-strong {
+  color: var(--nol-text-strong);
+  font-weight: 500;
+}
+
+.work-pull-request-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--nol-space-2);
+}
+
+.work-ci {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.work-dot {
+  flex: none;
+  width: var(--nol-space-2);
+  height: var(--nol-space-2);
+  border-radius: 50%;
+  background: var(--nol-badge);
+}
+
+.ci-passed .work-dot {
+  background: var(--nol-status-ok);
+}
+
+.ci-failed .work-dot {
+  background: var(--nol-status-failed);
+}

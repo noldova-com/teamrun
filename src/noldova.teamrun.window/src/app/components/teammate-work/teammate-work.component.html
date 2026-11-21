@@ -1,0 +1,66 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (showsGit()) {
+  <div class="work" data-field="Git">
+    <span class="work-icon material-symbols-rounded" aria-hidden="true">{{ resources.teammateGitIcon }}</span>
+    <div class="work-body">
+      @if (gitBranch(); as branch) {
+        <span class="work-branch">{{ branch }}</span>
+      }
+      <span class="work-muted">{{ gitMeta() }}</span>
+    </div>
+  </div>
+}
+@if (showsPullRequests()) {
+  <div class="work" data-field="PullRequests">
+    <span class="work-icon material-symbols-rounded" aria-hidden="true">{{ resources.teammatePullRequestsIcon }}</span>
+    <div class="work-body">
+      @for (item of pullRequests(); track item.pullRequest.url) {
+        <div class="work-pull-request">
+          <span class="work-title"><span class="work-strong">{{ numberOf(item) }}</span> {{ item.pullRequest.title }}</span>
+          <span class="work-pull-request-meta">
+            @if (ciOf(item); as ci) {
+              <span class="work-ci" [class]="ci[1]"><span class="work-dot"></span>{{ ci[0] }}</span>
+            }
+            @if (reviewOf(item); as review) {
+              <span class="work-muted">{{ review }}</span>
+            }
+          </span>
+        </div>
+      }
+      @if (pullRequestsNote(); as note) {
+        <span class="work-muted">{{ note }}</span>
+      }
+    </div>
+  </div>
+}
+@if (showsDocuments()) {
+  <div class="work" data-field="Documents">
+    <span class="work-icon material-symbols-rounded" aria-hidden="true">{{ resources.teammateDocumentsIcon }}</span>
+    <div class="work-body">
+      <span>{{ documentsText() }}</span>
+    </div>
+  </div>
+}
+@if (showsArtifacts()) {
+  <div class="work-body" data-field="Artifacts">
+    @for (artifact of artifacts(); track $index) {
+      <span class="work">
+        <span class="work-icon material-symbols-rounded" aria-hidden="true">{{ artifact[0] }}</span>
+        <span>{{ artifact[1] }}</span>
+      </span>
+    }
+    @if (artifactsNote(); as note) {
+      <span class="work work-muted">
+        <span class="work-icon material-symbols-rounded" aria-hidden="true">{{ resources.teammateCanvasIcon }}</span>
+        <span>{{ note }}</span>
+      </span>
+    }
+  </div>
+}

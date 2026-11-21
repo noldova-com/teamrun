@@ -7,8 +7,8 @@
  */
 
 import type { JsonValue } from "@noldova/context.json";
-import { BranchPullRequest, BranchQuery, CheckState, DeviceCode, HostAccount, HostCheck, HostItem, HostPerson, HostReference, HostSignIn, ReferenceKind,
-  ReferenceState } from "@noldova/git.hosting.protocol";
+import { BranchPullRequest, BranchQuery, CheckState, DeviceCode, HostAccount, HostChanges, HostCheck, HostItem, HostPerson, HostReference, HostSignIn,
+  ReferenceKind, ReferenceState } from "@noldova/git.hosting.protocol";
 import { FileState, GitFolderParams, GitRemote, GitStatus, RemoteTransport, StatusEntry } from "@noldova/git.protocol";
 import { EventName, Message, MessageAuthor, MessageStatus, Page, TeammateDocument, TeammateWork } from "@noldova/teamrun.protocol";
 
@@ -42,7 +42,8 @@ describe("TeammateWorkReader", () => {
     new GitStatus(branch, commit, null, entries, false, `f-${branch}-${commit}`, null, remote).toJson();
   const pullRequestOf = (number: number, state: ReferenceState = ReferenceState.Open): HostItem =>
     new HostItem(new HostReference("git-github", "noldova-com", "app", number), ReferenceKind.PullRequest, state, `Change ${number}`,
-      `https://github.com/noldova-com/app/pull/${number}`, new HostPerson("dev", null, null), Date.parse("2026-11-20T09:00:00.000Z"), null, 0, null);
+      `https://github.com/noldova-com/app/pull/${number}`, new HostPerson("dev", null, null), Date.parse("2026-11-20T09:00:00.000Z"),
+      state === ReferenceState.Merged ? Date.parse("2026-11-20T10:00:00.000Z") : null, 0, new HostChanges(1, 0, 1, "feature", "main", head));
   const answerOf = (item: HostItem | null, checks: readonly HostCheck[] = []): JsonValue => new BranchPullRequest(item, checks).toJson();
   const workOf = (folder: string | null, folders: readonly string[] = Object.isNull(folder) ? [] : [folder],
     documents: readonly TeammateDocument[] = []): JsonValue => new TeammateWork("t1", folder, folders, documents).toJson();
@@ -175,7 +176,7 @@ describe("TeammateWorkReader", () => {
     const work = start();
 
     await Wait.until(() => expect([work.git().state, work.pullRequests().state]).toEqual([TeammateSourceState.NoFolder, TeammateSourceState.Shown]));
-    expect(work.pullRequests().items).toEqual([]);
+    expect([work.pullRequests().items, work.git().changes]).toEqual([[], 0]);
     expect([count(statusMethod), count(watchMethod)]).toEqual([0, 0]);
   });
 
@@ -291,9 +292,12 @@ describe("TeammateWorkReader", () => {
     const work = start();
     await Wait.until(() => expect(work.pullRequests().state).toBe(TeammateSourceState.Shown));
     const parsed = [vi.spyOn(TeammateWork, "fromJson"), vi.spyOn(Page, "fromJson"), vi.spyOn(GitStatus, "fromJson"), vi.spyOn(BranchPullRequest, "fromJson")];
-    const held = [new DeferredResponse(), new DeferredResponse(), new DeferredResponse(), new DeferredResponse()];
-    context.answerModule(workMethod, () => held[0].promise).answerModule(editedMethod, () => held[1].promise)
-      .answerModule(statusMethod, () => held[2].promise).answerModule(pullRequestMethod, () => held[3].promise);
+    const heldWork = new DeferredResponse();
+    const heldPages = new DeferredResponse();
+    const heldStatus = new DeferredResponse();
+    const heldPullRequest = new DeferredResponse();
+    context.answerModule(workMethod, () => heldWork.promise).answerModule(editedMethod, () => heldPages.promise)
+      .answerModule(statusMethod, () => heldStatus.promise).answerModule(pullRequestMethod, () => heldPullRequest.promise);
     context.emit(EventName.StateResyncRequested, null);
     context.emitModule("git.changed", { folder: app });
     context.emitModule(signInEvent, signedIn);
@@ -301,10 +305,10 @@ describe("TeammateWorkReader", () => {
 
     work.stop();
     reader = null;
-    held[0].resolve(workOf(site));
-    held[1].resolve([SamplePages.page("p3", "Notes").toJson()]);
-    held[2].resolve(statusOf("other", gitHub("noldova-com/app"), otherHead));
-    held[3].resolve(answerOf(pullRequestOf(9)));
+    heldWork.resolve(workOf(site));
+    heldPages.resolve([SamplePages.page("p3", "Notes").toJson()]);
+    heldStatus.resolve(statusOf("other", gitHub("noldova-com/app"), otherHead));
+    heldPullRequest.resolve(answerOf(pullRequestOf(9)));
 
     await Wait.until(() => expect(parsed.map(t => t.mock.calls.length)).toEqual([1, 1, 2, 1]));
     expect(foldersOf(unwatchMethod)).toEqual([app]);
@@ -323,15 +327,16 @@ describe("TeammateWorkReader", () => {
         return "late";
       }
     });
-    const held = [new DeferredResponse(), new DeferredResponse()];
-    context.answerModule(workMethod, () => held[0].promise).answerModule(editedMethod, () => held[1].promise);
+    const heldWork = new DeferredResponse();
+    const heldPages = new DeferredResponse();
+    context.answerModule(workMethod, () => heldWork.promise).answerModule(editedMethod, () => heldPages.promise);
     const work = start();
     await Wait.until(() => expect(count(editedMethod)).toBe(1));
 
     work.stop();
     reader = null;
-    held[0].reject(late);
-    held[1].reject(late);
+    heldWork.reject(late);
+    heldPages.reject(late);
 
     await Wait.until(() => expect(reads).toBe(2));
     expect([work.workFailure(), work.artifactsFailure(), work.work(), work.git().state, count(unwatchMethod)])

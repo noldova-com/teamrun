@@ -7,6 +7,7 @@
  */
 
 import type { FocusOrigin } from "@angular/cdk/a11y";
+import { CheckState } from "@noldova/git.hosting.protocol";
 import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
   type ProviderKindInstallation, ReplyPanel, Resources as ProtocolResources, SharedMcpSetting, SharedMcpTransport, SharedMcpVariableSource, SubAgentStatus } from "@noldova/teamrun.protocol";
 import { TerminalShellKind } from "@noldova/terminal.window";
@@ -344,6 +345,31 @@ export class Resources {
   public static readonly collapsedDepartmentsField: string = "collapsedDepartments";
   public static readonly organizationCardsShowField: string = "cardsShow";
   public static readonly organizationCardsField: string = "cards";
+  public static readonly teammateGitIcon: string = "call_split";
+  public static readonly teammatePullRequestsIcon: string = "merge";
+  public static readonly teammateDocumentsIcon: string = "description";
+  public static readonly teammatePageIcon: string = "web";
+  public static readonly teammateCanvasIcon: string = "dashboard";
+  public static readonly teammateWorkReading: string = "Reading…";
+  public static readonly teammateNoBranch: string = "No branch checked out";
+  public static readonly teammateNoFolder: string = "No working folder yet";
+  public static readonly teammateNoChanges: string = "No changes";
+  public static readonly teammateNoUpstream: string = "No upstream branch";
+  public static readonly teammateGitMissing: string = "The Git module isn't installed";
+  public static readonly teammateGitHubMissing: string = "The GitHub module isn't installed";
+  public static readonly teammateGitHubSignedOut: string = "Sign in to GitHub to see pull requests";
+  public static readonly teammateNoPullRequests: string = "No open pull requests";
+  public static readonly teammateNoDocuments: string = "None";
+  public static readonly teammateNoArtifacts: string = "No artifacts yet";
+  public static readonly teammateDraftPullRequest: string = "Draft";
+  public static readonly teammateDocumentSeparator: string = ", ";
+  public static readonly teammateCiLabels: Readonly<Record<CheckState, readonly [text: string, look: string]>> = {
+    [CheckState.Failed]: ["CI failed", "ci-failed"],
+    [CheckState.Running]: ["CI running", "ci-running"],
+    [CheckState.Queued]: ["CI running", "ci-running"],
+    [CheckState.Succeeded]: ["CI passed", "ci-passed"],
+    [CheckState.Neutral]: ["CI passed", "ci-passed"]
+  };
   public static readonly legacyPinnedChatsField: string = "pinnedConversations";
   public static readonly legacyChatOrderField: string = "conversationOrder";
   public static readonly conversationListIdPrefix: string = "teamrun-conversations-";
@@ -1586,6 +1612,26 @@ export class Resources {
   public static readonly fallbackUpSelector: string = ".nol-teamrun-fallback-up";
   public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
+
+  public static formatTeammateChanges(count: number): string {
+    return count === 1 ? "1 changed file" : `${count} changed files`;
+  }
+
+  public static formatTeammateUpstream(ahead: number, behind: number, upstream: string): string {
+    return `${ahead} ahead, ${behind} behind ${upstream}`;
+  }
+
+  public static formatTeammateGitMeta(changes: string, upstream: string): string {
+    return `${changes} · ${upstream}`;
+  }
+
+  public static formatTeammatePullRequestNumber(number: number): string {
+    return `#${number}`;
+  }
+
+  public static formatTeammateArtifact(kind: string, title: string): string {
+    return `${kind}: ${title}`;
+  }
 
   public static formatTeammateFolderUnread(folder: string, error: string): string {
     return `The teammate's pull requests leave out ${folder}, whose Git state couldn't be read: ${error}`;

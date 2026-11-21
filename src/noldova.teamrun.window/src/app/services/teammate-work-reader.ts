@@ -153,18 +153,18 @@ export class TeammateWorkReader {
     };
     if (!this.context.isDependencyActive(GitNames.moduleId)) {
       this.watched = null;
-      show(new TeammateGit(TeammateSourceState.ModuleMissing, folder, null, null));
+      show(new TeammateGit(TeammateSourceState.ModuleMissing, folder, null));
       return;
     }
     await this.followAsync(folder);
     if (Object.isNull(folder)) {
-      show(new TeammateGit(TeammateSourceState.NoFolder, null, null, null));
+      show(new TeammateGit(TeammateSourceState.NoFolder, null, null));
       return;
     }
     try {
       const status = await this.readStatusAsync(folder);
       const previous = this.gitSignal().status;
-      show(new TeammateGit(TeammateSourceState.Shown, folder, status, null));
+      show(new TeammateGit(TeammateSourceState.Shown, folder, status));
       if (read === this.gitRead && !Object.isNull(previous) && (previous.branch !== status.branch || previous.head !== status.head))
         void this.readPullRequestsAsync();
     }
@@ -192,13 +192,13 @@ export class TeammateWorkReader {
         this.pullRequestsSignal.set(pullRequests);
     };
     if (!this.context.isDependencyActive(GitNames.moduleId) || !this.context.isDependencyActive(GitHubNames.moduleId)) {
-      show(new TeammatePullRequests(TeammateSourceState.ModuleMissing, [], null));
+      show(new TeammatePullRequests(TeammateSourceState.ModuleMissing, []));
       return;
     }
     try {
       this.signIn ??= HostSignIn.fromJson(await this.context.requestAsync(GitHubNames.readSignInMethod, null)).state;
       if (this.signIn !== SignInState.SignedIn) {
-        show(new TeammatePullRequests(TeammateSourceState.SignedOut, [], null));
+        show(new TeammatePullRequests(TeammateSourceState.SignedOut, []));
         return;
       }
       const found = await Promise.all((this.workSignal()?.folders ?? []).map(t => this.readFolderPullRequestAsync(t)));
@@ -207,7 +207,7 @@ export class TeammateWorkReader {
         if (!Object.isNull(item) && !items.has(item.pullRequest.url))
           items.set(item.pullRequest.url, item);
       }
-      show(new TeammatePullRequests(TeammateSourceState.Shown, [...items.values()], null));
+      show(new TeammatePullRequests(TeammateSourceState.Shown, [...items.values()]));
     }
     catch (error) {
       show(new TeammatePullRequests(TeammateSourceState.Failed, [], TeammateWorkReader.messageOf(error)));

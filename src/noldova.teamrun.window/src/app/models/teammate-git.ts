@@ -11,14 +11,14 @@ import type { GitStatus } from "@noldova/git.protocol";
 import { TeammateSourceState } from "../enums/teammate-source-state";
 
 export class TeammateGit {
-  public static readonly reading: TeammateGit = new TeammateGit(TeammateSourceState.Reading, null, null, null);
+  public static readonly reading: TeammateGit = new TeammateGit(TeammateSourceState.Reading, null, null);
 
   public readonly state: TeammateSourceState;
   public readonly folder: string | null;
   public readonly status: GitStatus | null;
-  public readonly failure: string | null;
+  public readonly failure: string;
 
-  public constructor(state: TeammateSourceState, folder: string | null, status: GitStatus | null, failure: string | null) {
+  public constructor(state: TeammateSourceState, folder: string | null, status: GitStatus | null, failure: string = "") {
     this.state = state;
     this.folder = folder;
     this.status = status;

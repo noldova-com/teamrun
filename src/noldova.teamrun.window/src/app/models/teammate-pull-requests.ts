@@ -10,13 +10,13 @@ import { TeammateSourceState } from "../enums/teammate-source-state";
 import type { TeammatePullRequest } from "./teammate-pull-request";
 
 export class TeammatePullRequests {
-  public static readonly reading: TeammatePullRequests = new TeammatePullRequests(TeammateSourceState.Reading, [], null);
+  public static readonly reading: TeammatePullRequests = new TeammatePullRequests(TeammateSourceState.Reading, []);
 
   public readonly state: TeammateSourceState;
   public readonly items: readonly TeammatePullRequest[];
-  public readonly failure: string | null;
+  public readonly failure: string;
 
-  public constructor(state: TeammateSourceState, items: readonly TeammatePullRequest[], failure: string | null) {
+  public constructor(state: TeammateSourceState, items: readonly TeammatePullRequest[], failure: string = "") {
     this.state = state;
     this.items = [...items];
     this.failure = failure;
