@@ -241,6 +241,7 @@ describe("PageDocumentComponent", () => {
     await Wait.until(() => expect(context.updates.at(-1)?.update.title).toBe("Onboarding options"));
     read(PagesWindow.view(4, null, PagesWindow.you).toJson());
     await fixture.whenStable();
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
 
     expect([bars(), opens()]).toEqual([[], [null, 1, null, null]]);
   });
