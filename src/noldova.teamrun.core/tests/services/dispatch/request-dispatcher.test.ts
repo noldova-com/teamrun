@@ -1460,7 +1460,8 @@ export class RequestDispatcherTests {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
     const conversation = await host.createConversationAsync(project);
-    await host.messages.insertAsync(new Message("reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Completed, [], null, "t", "t",
+    const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
+    await host.messages.insertAsync(new Message("reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Completed, [], provenance, "t", "t",
       "2026-11-20T09:00:00.000Z", [], "tm-ada", "Ada"));
 
     const work = TeammateWork.fromJson(await RequestDispatcherTests.succeed(host, MethodName.TeammateWorkRead, new TeammateIdParams("tm-ada").toJson()));

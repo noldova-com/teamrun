@@ -420,7 +420,7 @@ export class MessagesServiceTests {
     const readme = join(project.rootPath, "README.md");
     const reply = (chatId: string, sequence: number, teammateId: string, endedAt: string | null, ...details: MessageDetail[]): Message =>
       new Message(`reply-${sequence}`, chatId, sequence, MessageAuthor.Provider, "msg-0", Object.isNull(endedAt) ? MessageStatus.Running : MessageStatus.Completed,
-        details, null, "t", "t", endedAt, [], teammateId, teammateId);
+        details, MessagesServiceTests.provenance(), "t", "t", endedAt, [], teammateId, teammateId);
     const written = (file: string): MessageDetail => new MessageDetail(0, DetailKind.Command, "Write", { tool: "Write", input: { file_path: file, content: "x" } }, "t");
     const changed = (...changes: [string, string][]): MessageDetail => new MessageDetail(1, DetailKind.FileChange, "Changed files",
       { changes: changes.map(([path, kind]) => ({ path, kind, diff: null })), source: "workingTree" }, "t");
@@ -455,12 +455,16 @@ export class MessagesServiceTests {
     const chat = await host.createConversationAsync(project);
     const changes = Array.from({ length: 25 }, (_, index) => ({ path: `doc-${String(index).padStart(2, "0")}.md`, kind: "add", diff: null }));
     await host.messages.insertAsync(new Message("reply-1", chat.id, 1, MessageAuthor.Provider, "msg-0", MessageStatus.Completed,
-      [new MessageDetail(0, DetailKind.FileChange, "Changed files", { changes }, "t")], null, "t", "t", "2026-11-20T09:00:00.000Z", [], "tm-ada", "Ada"));
+      [new MessageDetail(0, DetailKind.FileChange, "Changed files", { changes }, "t")], MessagesServiceTests.provenance(), "t", "t", "2026-11-20T09:00:00.000Z", [], "tm-ada", "Ada"));
 
     const work = await host.messages.readTeammateWorkAsync("tm-ada");
 
     Assert.areEqual(20, work.documents.length);
     Assert.areEqual(join(project.rootPath, "doc-19.md"), work.documents.at(-1)?.path);
+  }
+
+  private static provenance(): Provenance {
+    return new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
   }
 
   private static teammateReply(conversationId: string, sequence: number, teammateId: string, usage: ReplyUsage | null,
