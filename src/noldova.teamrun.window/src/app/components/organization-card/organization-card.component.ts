@@ -27,11 +27,12 @@ import { UsageFormatterService } from "../../services/usage-formatter.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
+import { TeammateWorkComponent } from "../teammate-work/teammate-work.component";
 
 @Component({
   selector: "nol-teamrun-organization-card",
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
-    SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
+    SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TeammateWorkComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { class: "nol-teamrun-organization-card" },
   templateUrl: "./organization-card.component.html",
@@ -55,6 +56,7 @@ export class OrganizationCardComponent {
   protected readonly fieldNames: typeof OrganizationCardField = OrganizationCardField;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly fields: Signal<ReadonlySet<OrganizationCardField>> = computed(() => this.layout.layout().fieldsOf(this.teammate().id));
+  protected readonly showsWork: Signal<boolean> = computed(() => Resources.organizationWorkFields.some(t => this.fields().has(t)));
   protected readonly usage: Signal<{ readonly meter: UsageMeter; readonly used: number } | null> = computed(() => {
     const plan = this.store.planUsageOfProvider(this.teammate().providerId);
     for (const meter of Object.isNull(plan) ? [] : this.formatter.limitsOf(plan))

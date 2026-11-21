@@ -11,5 +11,9 @@ export enum OrganizationCardField {
   Now = "Now",
   Usage = "Usage",
   Last = "Last",
-  Model = "Model"
+  Model = "Model",
+  Git = "Git",
+  PullRequests = "PullRequests",
+  Documents = "Documents",
+  Artifacts = "Artifacts"
 }

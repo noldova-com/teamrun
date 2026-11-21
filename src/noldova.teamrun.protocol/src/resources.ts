@@ -67,6 +67,7 @@ export class Resources {
   public static readonly invalidOutsideLabel: string = "An outside sender's label must be 1 to 40 characters on one line, with no line break, other control or format character, or @, and not only spaces.";
   public static readonly outsideSenderWithTeammate: string = "An outside sender has no teammate id.";
   public static readonly invalidTeammateName: string = "A teammate name must be 1 to 100 characters, where a separate accent or vowel sign counts as one: letters, digits, dash or underscore, with single spaces between words.";
+  public static readonly teammateWorkFolderUnlisted: string = "The folder a teammate last worked in must be one of its folders.";
   public static readonly invalidHarness: string = "The teammate harness is not supported.";
   public static readonly emptyTeammateUpdate: string = "A teammate update must change at least one field.";
   public static readonly teammateUpdateProviderUnread: string = "A teammate update that sets its model, effort, speed or mode must name the provider it read, or a new one.";
@@ -334,6 +335,9 @@ export class Resources {
   public static readonly accountNotReported: string = "Account not reported";
   public static readonly rootPathField: string = "rootPath";
   public static readonly folderField: string = "folder";
+  public static readonly foldersField: string = "folders";
+  public static readonly documentsField: string = "documents";
+  public static readonly changedAtField: string = "changedAt";
   public static readonly projectIdField: string = "projectId";
   public static readonly projectField: string = "project";
   public static readonly folderMissingField: string = "folderMissing";

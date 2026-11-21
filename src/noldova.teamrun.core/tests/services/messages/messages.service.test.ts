@@ -6,13 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { JsonValue } from "@noldova/context.json";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+
+import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { ChangeOperation } from "@noldova/context.data";
 import { SqlQuery } from "@noldova/context.data.sql";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChangeEntity, Resources } from "@noldova/teamrun.core";
+import { ChangeEntity, FolderState, Resources } from "@noldova/teamrun.core";
 import {
+  ChatFolderAttachParams,
   ContextUsage,
+  ConversationCreateParams,
   ConversationMemberParams,
   DetailKind,
   Harness,
@@ -450,6 +455,104 @@ export class MessagesServiceTests {
     Assert.isTrue(plan.includes("SEARCH r USING INDEX IX_messages_teammateId_endedAt (<expr>=?)"), plan.join("; "));
     Assert.isTrue(plan.some(t => t.startsWith("SEARCH m USING INTEGER PRIMARY KEY")), plan.join("; "));
     Assert.isFalse(plan.some(t => /^SCAN (messages|m|r)\b/u.test(t) || t.includes("TEMP B-TREE")), plan.join("; "));
+  }
+
+  @TestMethod
+  public async readsTheFoldersAndTheDocumentsOfATeammatesCompletedRepliesNewestFirst(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync("beta");
+    const inProject = await host.createConversationAsync(project);
+    const ownFolder = await host.conversations.createAsync(new ConversationCreateParams(null, null));
+    const attached = await host.conversations.createAsync(new ConversationCreateParams(null, null));
+    const site = join(host.directory.path, "site");
+    mkdirSync(site, { recursive: true });
+    await host.conversations.attachFolderAsync(new ChatFolderAttachParams(attached.id, site), async () => FolderState.Present);
+    const [ada, bob] = ["tm-ada", "tm-bob"];
+    const own = host.context.chatFolders.pathOf(ownFolder.id);
+    const readme = join(project.rootPath, "README.md");
+    const reply = (chatId: string, sequence: number, teammateId: string, endedAt: string | null, ...details: MessageDetail[]): Message =>
+      new Message(`reply-${sequence}`, chatId, sequence, MessageAuthor.Provider, "msg-0", Object.isNull(endedAt) ? MessageStatus.Running : MessageStatus.Completed,
+        details, MessagesServiceTests.provenance(), "t", "t", endedAt, [], teammateId, teammateId);
+    const written = (file: string): MessageDetail => new MessageDetail(0, DetailKind.Command, "Write", { tool: "Write", input: { file_path: file, content: "x" } }, "t");
+    const changed = (...changes: [string, string][]): MessageDetail => new MessageDetail(1, DetailKind.FileChange, "Changed files",
+      { changes: changes.map(([path, kind]) => ({ path, kind, diff: null })), source: "workingTree" }, "t");
+    await host.messages.insertAsync(reply(inProject.id, 1, ada, "2026-11-20T09:00:00.000Z", written(readme)));
+    await host.messages.insertAsync(reply(ownFolder.id, 2, ada, "2026-11-20T10:00:00.000Z",
+      changed(["notes/plan.md", "add"], ["src/app.ts", "update"], ["old.txt", "delete"], ["NOTES.TXT", "update"])));
+    await host.messages.insertAsync(reply(inProject.id, 3, ada, "2026-11-20T11:00:00.000Z", written(readme), changed(["docs/guide.markdown", "update"])));
+    await host.messages.insertAsync(reply(attached.id, 4, ada, "2026-11-20T08:00:00.000Z"));
+    await host.messages.insertAsync(reply(attached.id, 5, ada, null, written(join(site, "draft.md"))));
+    await host.messages.insertAsync(reply(attached.id, 6, bob, "2026-11-20T12:00:00.000Z", written(join(site, "bob.md"))));
+    await host.messages.insertAsync(MessagesServiceTests.userMessage(attached.id, 7, "see index.md\""));
+    await host.messages.insertAsync(new Message("reply-8", attached.id, 8, MessageAuthor.Provider, "msg-0", MessageStatus.Interrupted,
+      [written(join(site, "stopped.md"))], MessagesServiceTests.provenance(), "t", "t", "2026-11-20T13:00:00.000Z", [], ada, ada));
+
+    const work = await host.messages.readTeammateWorkAsync(ada);
+    const none = await host.messages.readTeammateWorkAsync("tm-cyd");
+
+    Assert.areEqual(JSON.stringify({
+      teammateId: ada, folder: project.rootPath, folders: [project.rootPath, own, site],
+      documents: [
+        { path: readme, chatId: inProject.id, changedAt: "2026-11-20T11:00:00.000Z" },
+        { path: join(project.rootPath, "docs", "guide.markdown"), chatId: inProject.id, changedAt: "2026-11-20T11:00:00.000Z" },
+        { path: join(own, "notes", "plan.md"), chatId: ownFolder.id, changedAt: "2026-11-20T10:00:00.000Z" },
+        { path: join(own, "NOTES.TXT"), chatId: ownFolder.id, changedAt: "2026-11-20T10:00:00.000Z" }
+      ]
+    }), JSON.stringify(work.toJson()));
+    Assert.areEqual(JSON.stringify({ teammateId: "tm-cyd", folder: null, folders: [], documents: [] }), JSON.stringify(none.toJson()));
+  }
+
+  @TestMethod
+  public async leavesOutADocumentANewerReplyDeletedOrMovedAndListsAMovedDocumentAtItsNewPath(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const chat = await host.createConversationAsync(project);
+    const reply = (sequence: number, endedAt: string, changes: JsonObject[]): Message => new Message(`reply-${sequence}`, chat.id, sequence, MessageAuthor.Provider,
+      "msg-0", MessageStatus.Completed, [new MessageDetail(0, DetailKind.FileChange, "Changed files", { changes }, "t")], MessagesServiceTests.provenance(), "t", "t",
+      endedAt, [], "tm-ada", "Ada");
+    await host.messages.insertAsync(reply(1, "2026-11-20T09:00:00.000Z",
+      [{ path: "PLAN.md", kind: "add", diff: null }, { path: "DRAFT.md", kind: "add", diff: null }, { path: "KEPT.md", kind: "add", diff: null }]));
+    await host.messages.insertAsync(reply(2, "2026-11-20T10:00:00.000Z", [{ path: "PLAN.md", kind: "delete", diff: null },
+      { path: "DRAFT.md", kind: { type: "update", move_path: "docs/DRAFT.md" }, diff: null }]));
+
+    const work = await host.messages.readTeammateWorkAsync("tm-ada");
+
+    Assert.areEqual(`${join(project.rootPath, "docs", "DRAFT.md")} 2026-11-20T10:00:00.000Z|${join(project.rootPath, "KEPT.md")} 2026-11-20T09:00:00.000Z`,
+      work.documents.map(t => `${t.path} ${t.changedAt}`).join("|"));
+  }
+
+  @TestMethod
+  public async keepsATeammatesNewestTwentyDocumentsLeavingOutAnOlderReplysOnes(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const chat = await host.createConversationAsync(project);
+    const changes = Array.from({ length: 25 }, (_, index) => ({ path: `doc-${String(index).padStart(2, "0")}.md`, kind: "add", diff: null }));
+    await host.messages.insertAsync(new Message("reply-1", chat.id, 1, MessageAuthor.Provider, "msg-0", MessageStatus.Completed,
+      [new MessageDetail(0, DetailKind.FileChange, "Changed files", { changes }, "t")], MessagesServiceTests.provenance(), "t", "t", "2026-11-20T09:00:00.000Z", [], "tm-ada", "Ada"));
+    await host.messages.insertAsync(new Message("reply-0", chat.id, 0, MessageAuthor.Provider, "msg-0", MessageStatus.Completed,
+      [new MessageDetail(0, DetailKind.FileChange, "Changed files", { changes: [{ path: "older.md", kind: "add", diff: null }] }, "t")],
+      MessagesServiceTests.provenance(), "t", "t", "2026-11-20T08:00:00.000Z", [], "tm-ada", "Ada"));
+
+    const work = await host.messages.readTeammateWorkAsync("tm-ada");
+
+    Assert.areEqual(20, work.documents.length);
+    Assert.areEqual(join(project.rootPath, "doc-19.md"), work.documents.at(-1)?.path);
+  }
+
+  @TestMethod
+  public async readsATeammatesWorkThroughTheFinishedReplyIndexWithoutScanningMessagesOrSorting(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+
+    const plans = await Promise.all([Resources.selectTeammateChatFolders, Resources.selectTeammateDocumentReplies].map(async query =>
+      (await host.context.database.connection.queryAsync(new SqlQuery(`EXPLAIN QUERY PLAN ${query}`, ["tm-ada"]))).map(t => t.readString("detail"))));
+
+    Assert.areEqual(2, plans.filter(plan => plan.some(t => t.startsWith("SEARCH m USING INDEX IX_messages_teammateId_endedAt (<expr>=?"))).length,
+      plans.map(t => t.join("; ")).join(" | "));
+    Assert.isFalse(plans.flat().some(t => /^SCAN (messages|m)\b/u.test(t) || t.includes("TEMP B-TREE")), plans.map(t => t.join("; ")).join(" | "));
+  }
+
+  private static provenance(): Provenance {
+    return new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
   }
 
   private static said(conversationId: string, sequence: number, teammateId: string | null, status: MessageStatus, endedAt: string | null,

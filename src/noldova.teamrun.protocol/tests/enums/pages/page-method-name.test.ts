@@ -14,6 +14,6 @@ import { PageMethodName } from "@noldova/teamrun.protocol";
 export class PageMethodNameTests {
   @TestMethod
   public namesEachMemberByItsNameInOrder(): void {
-    Assert.areEqual("PageOpen,PageRead,PageRestore,PageList", Object.values(PageMethodName).join(","));
+    Assert.areEqual("PageOpen,PageRead,PageRestore,PageList,PageEditedList", Object.values(PageMethodName).join(","));
   }
 }
