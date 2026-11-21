@@ -74,7 +74,7 @@ describe("ConversationComponent", () => {
       .answer(MethodName.ConversationList, () => [SampleData.conversation.toJson(), second.toJson()])
       .answer(MethodName.MessagePage, t => SampleData.page(MessagePageParams.fromJson(t).conversationId === "c2" ? [elsewhere] : [SampleData.userMessage, answer], false, false)
         .toJson())
-      .answer(MethodName.ConversationRename, () => new Conversation("c1", "p1", "Renamed", SampleData.timestamp, SampleData.timestamp).toJson());
+      .answer(MethodName.ConversationRename, () => (store().conversation("c1") ?? SampleData.conversation).withTitle("Renamed", SampleData.timestamp).toJson());
     TestBed.configureTestingModule({
       imports: [ConversationComponent],
       providers: [{ provide: WindowPartTokens.context, useValue: context }, { provide: WindowPartTokens.shown, useValue: shown.asReadonly() }]
