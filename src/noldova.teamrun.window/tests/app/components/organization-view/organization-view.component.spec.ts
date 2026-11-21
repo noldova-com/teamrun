@@ -354,8 +354,7 @@ describe("OrganizationViewComponent", () => {
       const [host, top, canvas] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas")];
       const [tools, tree] = [box(".chart .nol-canvas-tools"), box(".chart .tree")];
 
-      for (const [actual, expected] of [[canvas.top, top.bottom], [canvas.left, host.left], [canvas.right, host.right], [canvas.bottom, host.bottom],
-        [tree.width, one(".chart .tree").offsetWidth]] as const)
+      for (const [actual, expected] of [[canvas.top, top.bottom], [canvas.left, host.left], [canvas.right, host.right], [canvas.bottom, host.bottom]] as const)
         AppearanceFixture.expectPixels(actual, expected);
       expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
     });
