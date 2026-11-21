@@ -438,6 +438,42 @@ export class ReplyRunTests {
   }
 
   @TestMethod
+  public async keepsAReplyCompletedWhenItsApprovalIsDecidedRightAfterTheCompletionWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const conversation = await host.createConversationAsync(project);
+    const reply = new Message("raced-reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Pending, [], ReplyRunTests.provenance, "t", null,
+      null, [], "alice", "Alice");
+    await host.messages.insertAsync(reply);
+    const active = new ActiveRun(reply.id);
+    let asked: Promise<string> = Promise.resolve("not asked");
+    host.adapter.holdTurn = async (): Promise<void> => {
+      const created = host.listener.next(EventName.ApprovalCreated);
+      asked = host.adapter.lastListener?.onApprovalRequested(ReplyRunTests.ask("late")) ?? asked;
+      await created;
+    };
+    const statuses: MessageStatus[] = [];
+    const messages = new Proxy(host.messages, { get: (target, name, receiver): unknown => name === "updateAsync"
+      ? async (message: Message): Promise<void> => {
+        statuses.push(message.status);
+        await target.updateAsync(message);
+        if (message.status === MessageStatus.Completed) {
+          Assert.isTrue(active.decide(new ApprovalDecideParams((await host.approvals.listPendingAsync(reply.id))[0]?.id ?? "", "yes")));
+          Assert.areEqual("yes", await asked);
+        }
+      }
+      : Reflect.get(target, name, receiver) });
+    const run = new ReplyRun(reply, ReplyRunTests.provenance, active, messages, host.approvals, host.events, host.directory.path);
+
+    await run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null));
+
+    const stored = await host.messages.findAsync(reply.id);
+    Assert.areEqual(MessageStatus.Completed, stored?.status);
+    Assert.isFalse(Object.isNullOrUndefined(stored?.endedAt));
+    Assert.areEqual(MessageStatus.Completed, statuses.at(-1));
+  }
+
+  @TestMethod
   public async asksNothingWhenTheRequestWasWithdrawnBeforeItArrived(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const { reply, active, listener, executed } = await ReplyRunTests.hold(host);
