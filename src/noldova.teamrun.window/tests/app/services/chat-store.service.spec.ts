@@ -783,6 +783,19 @@ describe("ChatStoreService", () => {
     });
   });
 
+  it("keeps the responder the runtime holds when a starting choice finds the chat already answered", async () => {
+    await store.initialize();
+    const alice = new ConversationResponder("alice");
+    context.answer(MethodName.ConversationResponderSet, () => SampleData.conversation.withResponder(alice).toJson());
+    const responder = new ConversationResponder(null, new RequestedSettings("claude", "sonnet", null), "a1");
+
+    await store.setResponder("c1", responder, false, true);
+
+    expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
+    expect(JSON.stringify(context.parametersOf(MethodName.ConversationResponderSet))).toBe(JSON.stringify(new ConversationResponderParams("c1", responder, false, true).toJson()));
+    expect(context.noticeText()).toBeNull();
+  });
+
   it("shows a chat's new chosen responder at once, while the runtime keeps it, and leaves an unknown chat alone", async () => {
     await store.initialize();
     const kept = new DeferredResponse();

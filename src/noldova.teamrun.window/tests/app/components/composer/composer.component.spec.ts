@@ -304,8 +304,8 @@ describe("ComposerComponent", () => {
   };
   const keptChoices = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationResponderSet))
     .map(t => JSON.stringify(ConversationResponderParams.fromJson(t.parameters).toJson()));
-  const choiceParams = (responder: ConversationResponder, conversationId: string = "c1", chosen: boolean = false): string =>
-    JSON.stringify(new ConversationResponderParams(conversationId, responder, chosen).toJson());
+  const choiceParams = (responder: ConversationResponder, conversationId: string = "c1", chosen: boolean = false, start: boolean = false): string =>
+    JSON.stringify(new ConversationResponderParams(conversationId, responder, chosen, start).toJson());
 
   beforeEach(() => {
     localStorage.removeItem(Resources.composerChoicesStorageKey);
@@ -2347,23 +2347,23 @@ describe("ComposerComponent", () => {
     const store = await prepare();
     remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
     await render();
-    const fallback = (model: string, chosen: boolean = false): string =>
-      choiceParams(new ConversationResponder(null, new RequestedSettings("codex", model, model === "gpt-5" ? "high" : null), "a1"), "c1", chosen);
+    const fallback = (model: string, chosen: boolean = false, start: boolean = false): string =>
+      choiceParams(new ConversationResponder(null, new RequestedSettings("codex", model, model === "gpt-5" ? "high" : null), "a1"), "c1", chosen, start);
     const alice = (chosen: boolean): string => choiceParams(new ConversationResponder("alice"), "c1", chosen);
 
-    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5")]));
+    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5", false, true)]));
     await choose("gpt-5-mini");
-    expect(keptChoices()).toEqual([fallback("gpt-5"), fallback("gpt-5-mini", true)]);
+    expect(keptChoices()).toEqual([fallback("gpt-5", false, true), fallback("gpt-5-mini", true)]);
     await type("Any news?");
     await send();
     await Wait.until(() => expect(sent()).toHaveLength(1));
     expect(keptChoices()).toHaveLength(2);
     await type("@Alice, have a look");
     await send();
-    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5"), fallback("gpt-5-mini", true), alice(false)]));
+    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5", false, true), fallback("gpt-5-mini", true), alice(false)]));
     expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
     await choose(Resources.answerWithoutTeammateLabel);
-    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5"), fallback("gpt-5-mini", true), alice(false), fallback("gpt-5-mini", true)]));
+    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5", false, true), fallback("gpt-5-mini", true), alice(false), fallback("gpt-5-mini", true)]));
     expect(store.conversation("c1")?.responder?.teammateId ?? null).toBeNull();
   });
 
@@ -2373,9 +2373,9 @@ describe("ComposerComponent", () => {
     const store = await prepare();
     remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
     await render();
-    const fallback = (model: string, chosen: boolean = false): string =>
-      choiceParams(new ConversationResponder(null, new RequestedSettings("codex", model, model === "gpt-5" ? "high" : null), "a1"), "c1", chosen);
-    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5")]));
+    const fallback = (model: string, chosen: boolean = false, start: boolean = false): string =>
+      choiceParams(new ConversationResponder(null, new RequestedSettings("codex", model, model === "gpt-5" ? "high" : null), "a1"), "c1", chosen, start);
+    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5", false, true)]));
 
     await type("Any news?");
     await send();
@@ -2386,7 +2386,7 @@ describe("ComposerComponent", () => {
     await Wait.until(() => expect(box().value).toBe(""));
     await fixture.whenStable();
 
-    expect(keptChoices()).toEqual([fallback("gpt-5"), fallback("gpt-5-mini", true)]);
+    expect(keptChoices()).toEqual([fallback("gpt-5", false, true), fallback("gpt-5-mini", true)]);
     expect(summary()).toContain("gpt-5-mini");
     expect([choice()?.model, store.conversation("c1")?.responder?.requested?.model]).toEqual(["gpt-5-mini", "gpt-5-mini"]);
   });
@@ -2460,6 +2460,35 @@ describe("ComposerComponent", () => {
     expect(summary()).toContain("Alice");
     expect(choice("c2")?.equals(new ComposerSettings("codex", "gpt-5", "high", "a1", "alice"))).toBe(true);
     expect(context.count(MethodName.ConversationResponderSet)).toBe(0);
+  });
+
+  it("writes its starting choice only if the chat holds no responder in the runtime, and shows the teammate the runtime holds when one does", async () => {
+    new TeammateFixture(context);
+    context.answer(MethodName.ConversationResponderSet, () => SampleData.conversation.withResponder(new ConversationResponder("alice")).toJson());
+    const store = await prepare();
+    remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+    await render();
+
+    await Wait.until(() => expect(store.conversation("c1")?.responder?.teammateId).toBe("alice"));
+    await ready();
+    expect(summary()).toContain("Alice");
+    expect(keptChoices()).toEqual([choiceParams(new ConversationResponder(null, new RequestedSettings("codex", "gpt-5", "high"), "a1"), "c1", false, true)]);
+  });
+
+  it("never writes a choice the person didn't make over a teammate of the chat, and sets that teammate's mode when the person picks one", async () => {
+    new TeammateFixture(context);
+    withModes();
+    context.answer(MethodName.ConversationList, () => [SampleData.conversation.withResponder(new ConversationResponder("alice")).toJson()]);
+    const store = await prepare();
+    remember(new ComposerSettings("gone", null, null, null));
+    await render();
+    await ready();
+
+    expect(summary()).toContain("Alice");
+    await chooseMode("Read Only");
+    await Wait.until(() => expect(memberModes()).toEqual([["c1", "alice", "read-only"]]));
+    expect(context.count(MethodName.ConversationResponderSet)).toBe(0);
+    expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
   });
 
   it("keeps the first provider's choice in place of a kept choice whose provider is gone", async () => {
@@ -4007,7 +4036,7 @@ describe("ComposerComponent", () => {
     await render();
     await ready();
     expect(summary()).toContain("Codex · Work · This computer · gpt-5 · High");
-    await Wait.until(() => expect(keptChoices()).toEqual([choiceParams(new ConversationResponder(null, work.requested, "a1"))]));
+    await Wait.until(() => expect(keptChoices()).toEqual([choiceParams(new ConversationResponder(null, work.requested, "a1"), "c1", false, true)]));
 
     expect(await store.setDefaultTeammate(new DefaultTeammate(new RequestedSettings("claude", null, null)))).toBe(true);
     await fixture.whenStable();

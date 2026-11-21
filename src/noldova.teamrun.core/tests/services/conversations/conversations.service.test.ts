@@ -492,6 +492,25 @@ export class ConversationsServiceTests {
   }
 
   @TestMethod
+  public async startsAResponderOnlyInAChatThatHoldsNoneAndReturnsTheResponderItHolds(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const provider = await host.createProviderAsync();
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", "Reviews", provider.id, Harness.Provider, null, null));
+    const chat = await host.conversations.createAsync(new ConversationCreateParams(project.id, null));
+    const fallback = new ConversationResponder(null, new RequestedSettings("fake", "m1", null), provider.id);
+
+    const started = await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, new ConversationResponder(bob.id), false, true));
+    const feed = (await host.context.database.changeFeed.readAfterAsync(0)).length;
+    const kept = await host.conversations.setResponderAsync(new ConversationResponderParams(chat.id, fallback, false, true));
+
+    Assert.areEqual([bob.id, bob.id, bob.id].join(","),
+      [started.responder?.teammateId, kept.responder?.teammateId, (await host.conversations.findAsync(chat.id))?.responder?.teammateId].join(","));
+    Assert.areEqual(feed, (await host.context.database.changeFeed.readAfterAsync(0)).length);
+    Assert.isFalse(kept.edited);
+  }
+
+  @TestMethod
   public async dropsAReadingPositionAtOrAfterTheRewoundSequenceAndKeepsAnEarlierOne(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const [rewound, kept] = [await host.createConversationAsync(), await host.createConversationAsync()];

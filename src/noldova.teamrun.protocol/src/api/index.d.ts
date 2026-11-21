@@ -890,8 +890,9 @@ export declare enum MethodName {
   ConversationTouch = "ConversationTouch",
   /**
    * Sets or clears the responder chosen in a chat's composer, a teammate or the default teammate's settings and provider, to
-   * answer a teammate's message that mentions no one, keeping the chat's update time. Parameters: `ChatResponderParams`.
-   * Result: `Chat`.
+   * answer a teammate's message that mentions no one, keeping the chat's update time. With `start`, it sets the responder
+   * only when the chat holds none and otherwise changes nothing. Parameters: `ChatResponderParams`. Result: `Chat`, as stored
+   * after the request.
    */
   ConversationResponderSet = "ConversationResponderSet",
   /**
@@ -2662,6 +2663,10 @@ export declare class Resources {
    * Name of the field that says the person chose a chat's responder settings: `chosen`.
    */
   public static readonly chosenField: string;
+  /**
+   * Name of the field that asks to set a chat's responder only when the chat holds none: `start`.
+   */
+  public static readonly startField: string;
   /**
    * Name of a chat's forked session field: `forkedSession`.
    */
@@ -8308,15 +8313,22 @@ export declare class ChatResponderParams {
    * `false`.
    */
   public readonly chosen: boolean;
+  /**
+   * Whether to set the responder only when the chat holds none, as the composer's starting choice does, so it never
+   * replaces a responder a mention or another window set; a chat that holds one is returned unchanged. Requests without it
+   * read as `false`.
+   */
+  public readonly start: boolean;
 
   /**
    * Initializes the parameters.
    * @param chatId The chat id.
    * @param responder The chosen responder, or `null` to clear the choice.
    * @param chosen Whether the person chose it; `false` by default.
+   * @param start Whether to set it only when the chat holds no responder; `false` by default.
    * @throws ArgumentException when the chat id is blank.
    */
-  public constructor(chatId: string, responder: ChatResponder | null, chosen?: boolean);
+  public constructor(chatId: string, responder: ChatResponder | null, chosen?: boolean, start?: boolean);
 
   /**
    * The chat's id, by its earlier name.
@@ -8326,7 +8338,7 @@ export declare class ChatResponderParams {
 
   /**
    * Reads the parameters from untrusted JSON.
-   * @param value The untrusted value, expected to carry `conversationId`, `responder` and the optional `chosen`.
+   * @param value The untrusted value, expected to carry `conversationId`, `responder` and the optional `chosen` and `start`.
    * @param path Path to report for the value; the root path `$` by default.
    * @returns The parameters.
    * @throws JsonException when a field is missing or invalid.
@@ -8335,7 +8347,7 @@ export declare class ChatResponderParams {
 
   /**
    * Renders the JSON object `fromJson` accepts.
-   * @returns The object with `conversationId`, `responder` and `chosen`.
+   * @returns The object with `conversationId`, `responder`, `chosen` and `start`.
    */
   public toJson(): JsonObject;
 }

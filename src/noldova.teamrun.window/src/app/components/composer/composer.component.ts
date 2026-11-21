@@ -1191,8 +1191,13 @@ export class ComposerComponent {
     if (Object.isNull(settings) || Object.isNull(conversation))
       return;
     const responder = settings.toResponder();
+    const held = conversation.responder?.teammateId ?? null;
+    if (!chosen && Object.isNull(responder.teammateId) && !Object.isNull(held) && this.store.membersOf(conversationId).some(t => t.teammateId === held)) {
+      this.responderId.set(held);
+      return;
+    }
     if (!ComposerComponent.sameResponder(responder, conversation.responder))
-      void this.store.setResponder(conversationId, responder, chosen);
+      void this.store.setResponder(conversationId, responder, chosen, !chosen && Object.isNull(conversation.responder));
   }
 
   private static sameResponder(a: ConversationResponder | null | undefined, b: ConversationResponder | null | undefined): boolean {
