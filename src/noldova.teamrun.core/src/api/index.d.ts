@@ -5658,6 +5658,11 @@ export declare class ActiveRun {
   public get isCancelled(): boolean;
 
   /**
+   * True once {@link cancel} was called after {@link afterTurn}, so the stop came after the provider's turn returned.
+   */
+  public get isStoppedAfterTurn(): boolean;
+
+  /**
    * True while `awaitDecision` is pending.
    */
   public get isAwaitingDecision(): boolean;

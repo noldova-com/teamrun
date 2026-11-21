@@ -210,6 +210,7 @@ export class ReplyRun implements ITurnListener {
       await this.startAsync();
       this.writes = this.startWrites();
       const result = await wake.follow(this, this.run.signal);
+      this.afterTurn = this.run.afterTurn();
       await this.toolCalls;
       await this.reportCommandWritesAsync();
       await this.reportCommandNotesAsync(false);

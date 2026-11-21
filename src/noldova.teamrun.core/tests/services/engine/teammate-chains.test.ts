@@ -71,6 +71,52 @@ export class TeammateChainsTests {
   }
 
   @TestMethod
+  public async cancelsAReplyStoppedAfterItsCompletedWriteAndBeforeItsHandOffAndStartsNoOne(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const [alice] = await TeammateChainsTests.teamAsync(host, "Alice", "Bob");
+    host.adapter.turnTexts = [["@Bob please review, done."]];
+    const stops: Promise<readonly Message[]>[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        if (event.name === EventName.MessageUpdated && stops.length === 0 && Message.fromJson(event.payload).status === MessageStatus.Completed)
+          stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id)));
+      }
+    });
+
+    const sent = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice start", null, null, [], [alice?.id ?? ""]));
+    await host.engine.waitForIdle();
+    const stopped = (await Promise.all(stops)).flat();
+    const reply = await host.messages.findAsync(sent.replies[0]?.id ?? "");
+
+    Assert.areEqual(reply?.id, stopped.map(t => t.id).join());
+    Assert.areEqual(MessageStatus.Cancelled, reply?.status);
+    Assert.areEqual(Resources.formatHandOffStopped(["Bob"]), reply?.details.at(-1)?.text);
+    Assert.areEqual(1, host.adapter.requests.length);
+  }
+
+  @TestMethod
+  public async keepsAReplyStoppedDuringItsTurnThatTheProviderStillCompletedCompletedAndStartsNoOne(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const [alice] = await TeammateChainsTests.teamAsync(host, "Alice", "Bob");
+    host.adapter.turnTexts = [["@Bob please review, done."]];
+    host.adapter.holdUntilAbort = true;
+    host.adapter.outcomeOnAbort = TurnOutcome.Completed;
+    const sent = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice start", null, null, [], [alice?.id ?? ""]));
+    await host.adapter.requested(1);
+
+    const stopped = await host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id));
+    await host.engine.waitForIdle();
+    const reply = await host.messages.findAsync(sent.replies[0]?.id ?? "");
+
+    Assert.areEqual(0, stopped.length);
+    Assert.areEqual(MessageStatus.Completed, reply?.status);
+    Assert.areEqual(Resources.formatHandOffStopped(["Bob"]), reply?.details.at(-1)?.text);
+    Assert.areEqual(1, host.adapter.requests.length);
+  }
+
+  @TestMethod
   public async handsOffToTheTeammateAReplyMentionsWithTheReplyAsItsContext(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
