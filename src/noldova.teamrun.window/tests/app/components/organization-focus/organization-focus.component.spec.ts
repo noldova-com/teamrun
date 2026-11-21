@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
   Teammate } from "@noldova/teamrun.protocol";
-import { type SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
+import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationFocusComponent } from "../../../../src/app/components/organization-focus/organization-focus.component";
@@ -175,7 +175,7 @@ describe("OrganizationFocusComponent", () => {
   it("edits the structure in edit mode: renames the focused department, moves its members, adds one from outside it and adds a department", async () => {
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
     const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
-    const moves = (): SelectComponent[] => fixture.debugElement.queryAll(By.css("nol-select.member-move")).map((t): SelectComponent => t.componentInstance);
+    const moves = (): SelectComponent[] => fixture.debugElement.queryAll(By.css("nol-select.member-move")).map(t => t.injector.get(SelectComponent));
     await create("Department:design");
     expect([all(".unit-rename").length, all(".member-move").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
 

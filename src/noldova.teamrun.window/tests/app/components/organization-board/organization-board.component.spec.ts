@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization,
   Teammate } from "@noldova/teamrun.protocol";
-import { DialogService, type SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
+import { DialogService, SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
@@ -176,7 +176,7 @@ describe("OrganizationBoardComponent", () => {
       field.value = value;
       field.dispatchEvent(new Event("change"));
     }
-    const moves = fixture.debugElement.queryAll(By.css("nol-select.member-move")).map((t): SelectComponent => t.componentInstance);
+    const moves = fixture.debugElement.queryAll(By.css("nol-select.member-move")).map(t => t.injector.get(SelectComponent));
     expect(moves.map(t => [t.label(), t.value()])).toEqual([["Bob's department", "design"], ["Offline's department", "build"], ["Carol's department", "build"]]);
     at(moves, 0).valueChange.emit("build");
     one(".lane:nth-child(1) .add-member").click();
