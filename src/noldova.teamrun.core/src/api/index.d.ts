@@ -531,6 +531,13 @@ export interface IProviderAdapter {
   checkFoundSignIn?(provider: Provider): Promise<SignInCheck>;
 
   /**
+   * Rebuilds the descriptor from the environment the provider's tooling is given, such as the login shell's, when what it says depends on
+   * that environment; absent for a kind whose descriptor never changes. `IProviderKindsService.listAsync` awaits it before listing.
+   * @returns A promise that resolves once the descriptor is current.
+   */
+  refreshDescriptorAsync?(): Promise<void>;
+
+  /**
    * Readies a provider's empty profile folder before anything can sign in to it, such as claiming the folder as TeamRun's and making the
    * folders its sign-in terminal gets: one TeamRun just made for a new provider, or an empty one the person chose for a new or moved
    * provider; absent for a kind whose folder needs nothing first.
@@ -2004,6 +2011,12 @@ export interface IProviderKindsService {
    * @returns Their descriptors.
    */
   list(): readonly ProviderKind[];
+
+  /**
+   * Lists the registered kinds as `list` does, once each adapter's `refreshDescriptorAsync` has run; the kind list the window reads.
+   * @returns Their descriptors.
+   */
+  listAsync(): Promise<readonly ProviderKind[]>;
 
   /**
    * Lists the models a provider reports, optionally through a provider of that provider.
@@ -7739,6 +7752,11 @@ export declare class ProviderKindsService implements IProviderKindsService {
    * @returns Their descriptors.
    */
   public list(): readonly ProviderKind[];
+
+  /**
+   * @inheritdoc
+   */
+  public listAsync(): Promise<readonly ProviderKind[]>;
 
   /**
    * @inheritdoc

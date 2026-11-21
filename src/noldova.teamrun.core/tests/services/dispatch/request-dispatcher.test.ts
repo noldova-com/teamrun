@@ -507,6 +507,25 @@ export class RequestDispatcherTests {
   }
 
   @TestMethod
+  public async listsEachKindAsItsRefreshedDescriptorSaysAndItsLastOneWhenTheRefreshFails(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const refreshed = new FakeProviderAdapter("refreshed");
+    refreshed.refreshDescriptorAsync = () => {
+      refreshed.descriptor = new ProviderKind("refreshed", "Refreshed provider", true, false, null);
+      return Promise.resolve();
+    };
+    const failing = new FakeProviderAdapter("failing");
+    failing.refreshDescriptorAsync = () => Promise.reject(new Error("The environment couldn't be read."));
+    host.registry.register(refreshed);
+    host.registry.register(failing);
+
+    const kinds = await RequestDispatcherTests.succeed(host, MethodName.ProviderKindList, null);
+
+    Assert.areEqual("fake:Fake provider,refreshed:Refreshed provider,failing:Fake provider",
+      RequestDispatcherTests.objects(kinds).map(t => ProviderKind.fromJson(t.toJson())).map(t => `${t.id}:${t.displayName}`).join(","));
+  }
+
+  @TestMethod
   public async answersEveryMethodOfTheCatalog(): Promise<void> {
     await using host = await CoreHost.createAsync();
     host.adapter.approvalAsk = new ApprovalAsk("req-1", ApprovalKind.Command, "commandExecution", "Run", null, [new ApprovalOption("accept", "Allow", ApprovalOutcome.Approved, ApprovalScope.Once)]);

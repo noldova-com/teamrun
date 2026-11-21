@@ -60,6 +60,11 @@ export class ProviderKindsService implements IProviderKindsService {
     return this.registry.all().map(t => t.descriptor.withNamesChats(!Object.isUndefined(t.askIsolated)));
   }
 
+  public async listAsync(): Promise<readonly ProviderKind[]> {
+    await Promise.all(this.registry.all().map(t => t.refreshDescriptorAsync?.().catch(() => undefined)));
+    return this.list();
+  }
+
   public async listModelsAsync(params: ProviderListModelsParams): Promise<readonly string[]> {
     return (await this.modelCatalogAsync(params)).models.map(t => t.id);
   }

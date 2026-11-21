@@ -68,7 +68,6 @@ export class ClaudeAdapter implements IProviderAdapter {
     new ProviderMode(Resources.acceptEditsPermissionMode, Resources.claudeAcceptEditsModeName, Resources.claudeAcceptEditsModeDescription),
     new ProviderMode(Resources.planPermissionMode, Resources.claudePlanModeName, Resources.claudePlanModeDescription, false, true),
     new ProviderMode(Resources.bypassPermissionMode, Resources.claudeBypassModeName, Resources.claudeBypassModeDescription, true)];
-  public readonly descriptor: ProviderKind;
   public readonly takesTeamRunTools: boolean = true;
   public readonly profileSearch: ProfileSearch;
   public readonly modes: readonly ProviderMode[] = ClaudeAdapter.modes;
@@ -77,6 +76,7 @@ export class ClaudeAdapter implements IProviderAdapter {
   public readonly planMode: string = Resources.planPermissionMode;
   private readonly commands: CommandSource;
   private readonly baseEnvironment: NodeJS.ProcessEnv;
+  private kind: ProviderKind;
   private readonly homeDirectory: string;
   private readonly appVersion: string;
   private readonly queryFactory: IClaudeQueryFactory;
@@ -116,11 +116,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     idleTimer: ITimer = new NodeTimer()) {
     this.log = log;
     this.idleTimer = idleTimer;
-    const usual = UsualFolder.of(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory);
-    this.descriptor = new ProviderKind(Resources.claudeKindId, Resources.claudeDisplayName, true, false, null,
-      new ProviderProfile(Resources.claudeConfigDirVariable, Resources.claudeSignInCommand, usual, null, {}, {}, [usual]),
-      true, null, false, null, false, Resources.claudeOwnMcpServersNote, ProviderAbilityTable.claude, false, false, undefined,
-      Resources.claudeOwnMcpServersShortNote, false, true);
+    this.kind = ClaudeAdapter.kindOf(UsualFolder.of(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory));
     this.profileSearch = new ProfileSearch(UsualFolder.places(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory),
       Resources.claudeProfileEntries);
     this.commands = new CommandSource(command, locate);
@@ -136,8 +132,17 @@ export class ClaudeAdapter implements IProviderAdapter {
     this.timer = timer;
   }
 
+  public get descriptor(): ProviderKind {
+    return this.kind;
+  }
+
   public get activeRunCount(): number {
     return this.runs.size + this.chats.size;
+  }
+
+  public async refreshDescriptorAsync(): Promise<void> {
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    this.kind = ClaudeAdapter.kindOf(UsualFolder.of(passed, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, this.homeDirectory));
   }
 
   public async readSignInCommand(_provider: Provider): Promise<ProviderSignInCommand | null> {
@@ -439,6 +444,13 @@ export class ClaudeAdapter implements IProviderAdapter {
 
   private originOf(provider: Provider | null): ProcessOrigin {
     return new ProcessOrigin(this.descriptor.id, provider?.id ?? null);
+  }
+
+  private static kindOf(usual: string): ProviderKind {
+    return new ProviderKind(Resources.claudeKindId, Resources.claudeDisplayName, true, false, null,
+      new ProviderProfile(Resources.claudeConfigDirVariable, Resources.claudeSignInCommand, usual, null, {}, {}, [usual]),
+      true, null, false, null, false, Resources.claudeOwnMcpServersNote, ProviderAbilityTable.claude, false, false, undefined,
+      Resources.claudeOwnMcpServersShortNote, false, true);
   }
 
   private ownFolderOf(passed: NodeJS.ProcessEnv, profileDir: string | null): string | null {

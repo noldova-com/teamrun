@@ -2080,6 +2080,23 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async makesTheFolderThePassedOnEnvironmentNamesItsProfilesUsualAndPersonFolderOnceItsDescriptorIsRefreshed(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter({ ...host.environment, CLAUDE_CONFIG_DIR: undefined }, host.command, host.timings, host.directory.resolve("home"));
+    host.starter.current = { CLAUDE_CONFIG_DIR: host.directory.resolve("claude-work") };
+    const folders = [host.directory.resolve(join("home", ".claude")), host.directory.resolve("claude-work")];
+    const terminalVariables = (): readonly (string | null)[] => folders.map(t => adapter.descriptor.profile?.personFolders.includes(t) === true ? null : t);
+
+    const before = [adapter.descriptor.profile?.usualFolder, terminalVariables()];
+    await adapter.refreshDescriptorAsync();
+    const after = [adapter.descriptor.profile?.usualFolder, terminalVariables()];
+
+    Assert.areEqual(JSON.stringify([folders[0], [null, folders[1]]]), JSON.stringify(before));
+    Assert.areEqual(JSON.stringify([folders[1], [folders[0], null]]), JSON.stringify(after));
+    Assert.areEqual(JSON.stringify([folders[1]]), JSON.stringify(adapter.descriptor.profile?.personFolders));
+  }
+
+  @TestMethod
   public async takesClaudeCodesUsualFolderFromTheEnvironmentItPassesOnNotTeamRunsOwn(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CLAUDE_OUTPUT: "env", CLAUDE_CONFIG_DIR: undefined }, host.command, host.timings,
