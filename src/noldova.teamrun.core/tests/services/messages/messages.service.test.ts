@@ -522,13 +522,16 @@ export class MessagesServiceTests {
   }
 
   @TestMethod
-  public async keepsATeammatesNewestTwentyDocuments(): Promise<void> {
+  public async keepsATeammatesNewestTwentyDocumentsLeavingOutAnOlderReplysOnes(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
     const chat = await host.createConversationAsync(project);
     const changes = Array.from({ length: 25 }, (_, index) => ({ path: `doc-${String(index).padStart(2, "0")}.md`, kind: "add", diff: null }));
     await host.messages.insertAsync(new Message("reply-1", chat.id, 1, MessageAuthor.Provider, "msg-0", MessageStatus.Completed,
       [new MessageDetail(0, DetailKind.FileChange, "Changed files", { changes }, "t")], MessagesServiceTests.provenance(), "t", "t", "2026-11-20T09:00:00.000Z", [], "tm-ada", "Ada"));
+    await host.messages.insertAsync(new Message("reply-0", chat.id, 0, MessageAuthor.Provider, "msg-0", MessageStatus.Completed,
+      [new MessageDetail(0, DetailKind.FileChange, "Changed files", { changes: [{ path: "older.md", kind: "add", diff: null }] }, "t")],
+      MessagesServiceTests.provenance(), "t", "t", "2026-11-20T08:00:00.000Z", [], "tm-ada", "Ada"));
 
     const work = await host.messages.readTeammateWorkAsync("tm-ada");
 

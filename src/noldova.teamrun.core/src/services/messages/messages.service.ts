@@ -145,6 +145,8 @@ export class MessagesService implements IMessagesService {
     const documents = new Map<string, TeammateDocument>();
     const seen = new Set<string>();
     for (const reply of await connection.queryAsync(new SqlQuery(Resources.selectTeammateDocumentReplies, [teammateId]))) {
+      if (documents.size >= Resources.teammateDocumentLimit)
+        break;
       const message = MessagesService.read(reply);
       for (const [file, present] of MessagesService.filesLeftBy(MessagesService.fileChanges.editsOf(message), this.folderOf(reply, message.chatId))) {
         if (seen.has(file))

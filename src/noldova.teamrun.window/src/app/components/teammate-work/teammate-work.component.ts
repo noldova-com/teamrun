@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, effect, inject, input, type InputSignal, type Signal } from "@angular/core";
+import { Component, computed, effect, inject, input, type InputSignal, type Signal, untracked } from "@angular/core";
 
 import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
@@ -26,7 +26,7 @@ import { TeammateWorkReader } from "../../services/teammate-work.reader";
 })
 export class TeammateWorkComponent {
   private readonly context: IWindowPartContext = inject(WindowPartTokens.context);
-  private readonly reader: Signal<TeammateWorkReader> = computed(() => new TeammateWorkReader(this.context, this.teammateId()));
+  private readonly reader: Signal<TeammateWorkReader> = computed(() => new TeammateWorkReader(this.context, this.teammateId(), this.fields()));
 
   public readonly teammateId: InputSignal<string> = input.required<string>();
   public readonly fields: InputSignal<ReadonlySet<OrganizationCardField>> = input.required<ReadonlySet<OrganizationCardField>>();
@@ -73,6 +73,7 @@ export class TeammateWorkComponent {
   public constructor() {
     effect(onCleanup => {
       const reader = this.reader();
+      untracked(() => reader.start());
       onCleanup(() => reader.stop());
     });
   }

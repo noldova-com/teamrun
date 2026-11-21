@@ -12,6 +12,7 @@ import { BranchPullRequest, BranchQuery, CheckState, DeviceCode, HostAccount, Ho
 import { FileState, GitFolderParams, GitRemote, GitStatus, RemoteTransport, StatusEntry } from "@noldova/git.protocol";
 import { EventName, Message, MessageAuthor, MessageStatus, Page, TeammateDocument, TeammateWork } from "@noldova/teamrun.protocol";
 
+import { OrganizationCardField } from "../../../src/app/enums/organization-card-field";
 import { TeammateSourceState } from "../../../src/app/enums/teammate-source-state";
 import { TeammateWorkReader } from "../../../src/app/services/teammate-work.reader";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
@@ -61,8 +62,9 @@ describe("TeammateWorkReader", () => {
   let statuses: Map<string, JsonValue>;
   let answers: Map<string, JsonValue>;
 
-  const start = (): TeammateWorkReader => {
-    reader = new TeammateWorkReader(context, "t1");
+  const start = (fields: ReadonlySet<OrganizationCardField> = new Set(Object.values(OrganizationCardField))): TeammateWorkReader => {
+    reader = new TeammateWorkReader(context, "t1", fields);
+    reader.start();
     return reader;
   };
   const shownPullRequests = (work: TeammateWorkReader): readonly (string | null)[][] =>
@@ -251,6 +253,67 @@ describe("TeammateWorkReader", () => {
     context.emitModule("git.changed", { folder: app });
     await Wait.until(() => expect(work.pullRequests().items).toEqual([]));
     expect(reads()).toEqual([7, 3]);
+  });
+
+  it.each([EventName.ConversationRewound, EventName.ConversationDeleted, EventName.ProjectFolderChanged])(
+    "reads its work and its artifacts again on %s, as its folders or documents may have changed", async name => {
+      const work = start();
+      await Wait.until(() => expect(work.pullRequests().state).toBe(TeammateSourceState.Shown));
+      context.answerModule(workMethod, () => workOf(site, [site], [new TeammateDocument("/work/site/README.md", "c1", SampleData.timestamp)]));
+      context.answerModule(editedMethod, () => [SamplePages.page("p3", "Notes").toJson()]);
+      statuses.set(site, statusOf("main", null));
+
+      context.emit(name, null);
+
+      await Wait.until(() => expect([work.git().folder, work.git().status?.branch, titles(work.artifacts())]).toEqual([site, "main", ["Notes"]]));
+      expect(work.work()?.documents.map(t => t.path)).toEqual(["/work/site/README.md"]);
+      await Wait.until(() => expect(work.pullRequests().items).toEqual([]));
+    });
+
+  it("reads only the sources whose fields are on", async () => {
+    const documents = start(new Set([OrganizationCardField.Documents, OrganizationCardField.Status]));
+    await Wait.until(() => expect(documents.work()?.folder).toBe(app));
+    const artifacts = new TeammateWorkReader(context, "t1", new Set([OrganizationCardField.Artifacts]));
+    artifacts.start();
+    await Wait.until(() => expect(titles(artifacts.artifacts())).toEqual(["Plan", "Board"]));
+    artifacts.stop();
+
+    expect([workMethod, editedMethod, statusMethod, watchMethod, signInMethod, pullRequestMethod].map(count)).toEqual([1, 1, 0, 0, 0, 0]);
+    expect([documents.git().state, documents.pullRequests().state, documents.artifacts()]).toEqual([TeammateSourceState.Reading, TeammateSourceState.Reading, []]);
+  });
+
+  it("asks GitHub about the newest five of its folders", async () => {
+    const folders = [app, "/work/f2", "/work/f3", "/work/f4", "/work/f5", "/work/f6", "/work/f7"];
+    context.answerModule(workMethod, () => workOf(app, folders));
+    for (const folder of folders.slice(1))
+      statuses.set(folder, statusOf(null, null));
+
+    const work = start();
+
+    await Wait.until(() => expect(work.pullRequests().state).toBe(TeammateSourceState.Shown));
+    expect([...new Set(foldersOf(statusMethod))].sort()).toEqual(folders.slice(0, 5).sort());
+  });
+
+  it("moves its watch from one folder to the next in turn, so a quick second move leaves no folder watched", async () => {
+    const work = start();
+    await Wait.until(() => expect(work.pullRequests().state).toBe(TeammateSourceState.Shown));
+    const held = new DeferredResponse();
+    context.answerModule(unwatchMethod, () => held.promise);
+    statuses.set(site, statusOf("main", null));
+    statuses.set(copy, statusOf("main", null));
+    context.answerModule(workMethod, () => workOf(site));
+    context.emit(EventName.MessageUpdated, replyOf("t1", true));
+    await Wait.until(() => expect(foldersOf(unwatchMethod)).toEqual([app]));
+    context.answerModule(workMethod, () => workOf(copy));
+    context.emit(EventName.MessageUpdated, replyOf("t1", true));
+    await Wait.until(() => expect(count(workMethod)).toBe(3));
+
+    context.answerModule(unwatchMethod, () => null);
+    held.resolve(null);
+
+    await Wait.until(() => expect(work.git().folder).toBe(copy));
+    expect(context.requests.filter(t => t.method === watchMethod || t.method === unwatchMethod).map(t => `${t.method} ${GitFolderParams.fromJson(t.parameters).folder}`))
+      .toEqual([`${watchMethod} ${app}`, `${unwatchMethod} ${app}`, `${watchMethod} ${site}`, `${unwatchMethod} ${site}`, `${watchMethod} ${copy}`]);
   });
 
   it("reads its artifacts again when a page is shown or changes", async () => {
