@@ -250,6 +250,28 @@ describe("ProjectsLayoutService", () => {
     });
   });
 
+  it("shows the layout another window kept during its own save once that save settles, and saves its next change on top of it", async () => {
+    const layout = await open();
+    const save = new DeferredResponse();
+    context.answer(MethodName.ProjectsLayoutSave, () => save.promise);
+    layout.togglePin("c1");
+    await Wait.until(() => expect(context.count(MethodName.ProjectsLayoutSave)).toBe(1));
+    context.emit(EventName.ProjectsLayoutUpdated, kept(["c1"]));
+    context.emit(EventName.ProjectsLayoutUpdated, kept(["c8"]));
+    expect(layout.pinnedConversations()).toEqual(["c1"]);
+
+    save.resolve(kept(["c1"]));
+    await Wait.until(() => expect(layout.pinnedConversations()).toEqual(["c8"]));
+    context.answer(MethodName.ProjectsLayoutSave, t => {
+      const saved = ProjectsLayoutSaveParams.fromJson(t).layout;
+      saves.push(saved);
+      return saved;
+    });
+    layout.togglePin("c2");
+
+    await Wait.until(() => expect(saves.map(t => ProjectsLayout.fromJson(t).pinnedConversations)).toEqual([["c8", "c2"]]));
+  });
+
   it("applies a change made while a stored layout's move is saved to the move's answer", async () => {
     localStorage.setItem(key, JSON.stringify(kept(["c9"])));
     const move = new DeferredResponse();
@@ -263,6 +285,26 @@ describe("ProjectsLayoutService", () => {
     await settle();
 
     expect(layout.pinnedConversations()).toEqual(["c8", "c1"]);
+  });
+
+  it("shows the layout another window kept during a stored layout's move, with a change made meanwhile on top, and saves that", async () => {
+    localStorage.setItem(key, JSON.stringify(kept(["c9"])));
+    const move = new DeferredResponse();
+    context.answer(MethodName.ProjectsLayoutSave, () => move.promise);
+    const layout = ProjectsLayoutService.of(context);
+    await Wait.until(() => expect(context.count(MethodName.ProjectsLayoutSave)).toBe(1));
+
+    layout.togglePin("c1");
+    context.emit(EventName.ProjectsLayoutUpdated, kept(["c7"]));
+    context.answer(MethodName.ProjectsLayoutSave, t => {
+      const saved = ProjectsLayoutSaveParams.fromJson(t).layout;
+      saves.push(saved);
+      return saved;
+    });
+    move.resolve(kept(["c9"]));
+
+    await Wait.until(() => expect(saves.map(t => ProjectsLayout.fromJson(t).pinnedConversations)).toEqual([["c7", "c1"]]));
+    expect(layout.pinnedConversations()).toEqual(["c7", "c1"]);
   });
 
   it("shows a layout another window keeps while its own read waits, over the read's older answer", async () => {
