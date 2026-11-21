@@ -10,6 +10,7 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  container-type: inline-size;
   height: 100%;
   min-height: 0;
   background: var(--nol-window);
@@ -82,7 +83,7 @@
   overflow-wrap: anywhere;
 }
 
-.chart {
+.body {
   display: flex;
   flex: 1 1 auto;
   align-items: stretch;
@@ -91,18 +92,49 @@
   padding: var(--nol-space-4) var(--nol-space-6) var(--nol-space-6);
 }
 
-.messages {
-  box-sizing: border-box;
-  flex: 1 1 22rem;
+.chart {
+  display: flex;
+  flex: 999 1 35rem;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  border: 1px solid var(--nol-card-border);
+}
+
+.messages {
+  display: flex;
+  flex: 1 1 22rem;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--nol-border-width) solid var(--nol-card-border);
   border-radius: var(--nol-radius-large);
   background: var(--nol-panel);
 }
 
 .messages.inbox {
   flex-basis: 24rem;
+}
+
+@container (width < 48rem) {
+  .body {
+    flex-wrap: wrap;
+    overflow-y: auto;
+  }
+
+  .chart {
+    flex: 1 1 100%;
+    height: 32rem;
+  }
+
+  .messages {
+    flex: 1 1 100%;
+    height: 30rem;
+  }
+
+  .messages.inbox {
+    height: 34rem;
+  }
 }
 
 .canvas {
@@ -114,6 +146,30 @@
 .focus {
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.to {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-3);
+  padding: var(--nol-space-3) var(--nol-space-3) 0;
+}
+
+.to-label {
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-small);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-label);
+}
+
+.to-choice {
+  width: 100%;
+  min-width: 0;
+}
+
+.messages .thread {
+  flex: 1 1 0;
+  height: auto;
 }
 
 .tree {

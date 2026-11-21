@@ -6,11 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, ElementRef, computed, effect, inject, type InputSignal, input, type Signal, signal, untracked, viewChild, type WritableSignal } from "@angular/core";
+import { Component, ElementRef, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, viewChild,
+  type WritableSignal } from "@angular/core";
 
 import { type Department, type Teammate, type TeammateLastReply, TeammateUpdateParams } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
-  MeterComponent, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+  MeterComponent, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
@@ -34,7 +35,7 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
     SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
-  host: { class: "nol-teamrun-organization-card", "[class.fluid]": "shape() === shapes.Fluid", "[class.row]": "shape() === shapes.Row" },
+  host: { "class": "nol-teamrun-organization-card", "[class.fluid]": "shape() === shapes.Fluid", "[class.row]": "shape() === shapes.Row", "(focusin)": "closeDetails($event)" },
   templateUrl: "./organization-card.component.html",
   styleUrl: "./organization-card.component.css"
 })
@@ -46,12 +47,14 @@ export class OrganizationCardComponent {
   private readonly statuses: TeammateStatusStoreService = inject(TeammateStatusStoreService);
   private readonly clock: ClockService = inject(ClockService);
   private readonly time: WritableSignal<number> = signal(this.clock.now());
+  private readonly details: PopoverTriggerDirective | null = inject(PopoverTriggerDirective, { self: true, optional: true });
   private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("nameField", { read: ElementRef });
 
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
   public readonly shape: InputSignal<OrganizationCardShape> = input<OrganizationCardShape>(OrganizationCardShape.Card);
   public readonly editing: InputSignal<boolean> = input(false);
   public readonly department: InputSignal<Department | null> = input<Department | null>(null);
+  public readonly message: OutputEmitterRef<void> = output<void>();
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly fieldNames: typeof OrganizationCardField = OrganizationCardField;
@@ -110,6 +113,11 @@ export class OrganizationCardComponent {
     }
     if (!await this.store.updateTeammate(teammate.id, params, message => this.organization.fail(message)))
       field.value = this.teammate().name;
+  }
+
+  protected closeDetails(event: FocusEvent): void {
+    if (event.target !== event.currentTarget)
+      this.details?.close();
   }
 
   protected move(departmentId: string): void {

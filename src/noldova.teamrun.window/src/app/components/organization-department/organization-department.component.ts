@@ -6,15 +6,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, ElementRef, computed, inject, type InputSignal, input, type Signal, viewChild } from "@angular/core";
+import { Component, ElementRef, computed, inject, type InputSignal, input, type OutputEmitterRef, output, type Signal, viewChild } from "@angular/core";
 
 import { NameOrder, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
-  MenuTriggerDirective, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+  MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent }
+  from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { ConfirmRequest } from "../../models/confirm-request";
-import { OrganizationFocus } from "../../models/organization-focus";
 import type { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
@@ -22,11 +22,12 @@ import { OrganizationStoreService } from "../../services/organization-store.serv
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
+import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 
 @Component({
   selector: "nol-teamrun-organization-department",
   imports: [ButtonComponent, CanvasItemDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
-    OrganizationCardComponent, SelectComponent, TextFieldComponent],
+    OrganizationCardComponent, OrganizationDetailsComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { class: "nol-teamrun-organization-department" },
   templateUrl: "./organization-department.component.html",
@@ -43,8 +44,15 @@ export class OrganizationDepartmentComponent {
   public readonly node: InputSignal<OrganizationNode> = input.required<OrganizationNode>();
   public readonly editing: InputSignal<boolean> = input(false);
 
+  public readonly chosen: OutputEmitterRef<OrganizationTarget> = output<OrganizationTarget>();
+
   protected readonly resources: typeof Resources = Resources;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
+  protected readonly textVariant: ButtonVariant = ButtonVariant.Text;
+  protected readonly target: typeof OrganizationTarget = OrganizationTarget;
+  protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
+  protected readonly detailsSide: OverlaySide = OverlaySide.below;
+  protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
   protected readonly isOpen: Signal<boolean> = computed(() => !this.layout.layout().isCollapsed(this.node().department.id));
   protected readonly summary: Signal<string> = computed(() => {
     const node = this.node();
@@ -61,16 +69,6 @@ export class OrganizationDepartmentComponent {
     const members = this.organization.organization().members;
     return NameOrder.sort(this.store.teammates().filter(t => !members.some(u => u.teammateId === t.id && u.departmentId === id)), t => t.name);
   });
-
-  protected department(): OrganizationTarget {
-    return OrganizationTarget.department(this.node().department.id);
-  }
-
-  protected choose(target: OrganizationTarget, event: MouseEvent): void {
-    if (this.editing() || (event.target instanceof Element && !Object.isNull(event.target.closest("button, input, nol-select, a"))))
-      return;
-    this.layout.focusOn(OrganizationFocus.keyOf(target));
-  }
 
   protected toggle(): void {
     this.layout.toggleDepartment(this.node().department.id);

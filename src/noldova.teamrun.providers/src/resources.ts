@@ -1382,6 +1382,7 @@ export class Resources {
   public static readonly modelListTimeout: number = 15_000;
   public static readonly silenceLimit: number = 14_400_000;
   public static readonly idleLimit: number = 1_800_000;
+  public static readonly stopReportWait: number = 60_000;
   public static readonly idleCompactionDelay: number = 3_240_000;
   public static readonly idleCompactionTokens: number = 150_000;
 
@@ -2488,6 +2489,7 @@ export class Resources {
   public static readonly modelListTimeoutParameterName: string = "modelListTimeout";
   public static readonly silenceLimitParameterName: string = "silenceLimit";
   public static readonly idleLimitParameterName: string = "idleLimit";
+  public static readonly stopReportWaitParameterName: string = "stopReportWait";
 
   public static readonly codexNotFound: string = "The Codex CLI was not found. Install it with `npm install -g @openai/codex` and sign in once with `codex login`.";
   public static readonly claudeNotFound: string = "The Claude Code executable was not found. Install Claude Code and sign in once with `claude auth login`.";
@@ -2939,6 +2941,24 @@ export class Resources {
 
   public static formatBlockedServersUnnoted(kind: string, reason: string): string {
     return `${kind}: TeamRun couldn't note the shared MCP servers the agent blocked: ${reason}`;
+  }
+
+  public static readonly turnStepStart: string = "the turn's start";
+  public static readonly turnStepPrompt: string = "the prompt's answer";
+  public static readonly turnStepAnswer: string = "the answer's reading";
+  public static readonly turnStepHandled: string = "the agent's messages already received";
+  public static readonly turnStepBlockedServers: string = "the note of blocked servers";
+  public static readonly turnStepFinish: string = "the turn's finish";
+  public static readonly turnStepCompaction: string = "the compaction note";
+  public static readonly turnStepSteers: string = "the turn's steers";
+  public static readonly turnStepRelease: string = "the agent's release";
+
+  public static formatTurnStopStuck(kind: string, step: string, subAgents: string): string {
+    return `${kind}: a stopped turn still waits on ${step}; its sub-agents at the stop: ${subAgents.length === 0 ? "none" : subAgents}`;
+  }
+
+  public static formatSubAgentState(toolCallId: string, status: SubAgentStatus, background: boolean, kept: boolean): string {
+    return `${toolCallId} ${status}${background ? " in the background" : ""}${kept ? ", kept" : ""}`;
   }
 
   public static formatClaudeServerSettleFailed(reason: string): string {

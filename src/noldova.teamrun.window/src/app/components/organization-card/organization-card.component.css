@@ -41,8 +41,20 @@
 }
 
 .name {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--nol-text-strong);
+  font: inherit;
   font-weight: var(--nol-weight-emphasis);
+  text-align: start;
+  cursor: pointer;
+}
+
+.name:hover {
+  text-decoration: underline;
 }
 
 .name-field {

@@ -1189,6 +1189,18 @@ export class Resources {
   public static readonly organizationNowIdleIcon: string = "pause_circle";
   public static readonly organizationNothingRunning: string = "Nothing running";
   public static readonly organizationNowReplying: string = "Replying";
+  public static readonly organizationDetailsStatus: string = "Status";
+  public static readonly organizationDetailsReportsTo: string = "Reports to";
+  public static readonly organizationDetailsModel: string = "Model";
+  public static readonly organizationDetailsUsage: string = "Usage";
+  public static readonly organizationDetailsLastSaid: string = "Last said";
+  public static readonly organizationDetailsNow: string = "Now";
+  public static readonly organizationDetailsNoUsage: string = "Not reported";
+  public static readonly organizationDetailsNothingSaid: string = "Nothing yet";
+  public static readonly organizationMessagesLabel: string = "Messages";
+  public static readonly organizationMessageButton: string = "Message";
+  public static readonly organizationMessageIcon: string = "chat";
+  public static readonly organizationToLabel: string = "To";
   public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
@@ -1803,6 +1815,14 @@ export class Resources {
     return [model, effort].filter(t => !Object.isNull(t)).join(Resources.titleSeparator);
   }
 
+  public static formatOrganizationDetailsLabel(name: string): string {
+    return `${name}'s details`;
+  }
+
+  public static formatOrganizationDetailsUsage(used: number, limit: string): string {
+    return `${Resources.formatOrganizationUsage(used)} used${Resources.titleSeparator}${limit}`;
+  }
+
   public static formatRemove(entry: string): string {
     return `Remove ${entry}`;
   }
@@ -1962,6 +1982,18 @@ export class Resources {
 
   public static formatOrganizationEveryoneNote(count: number): string {
     return `Every teammate (${count})`;
+  }
+
+  public static formatOrganizationMessageNamed(name: string): string {
+    return `Message ${name}`;
+  }
+
+  public static formatOrganizationDepartmentOption(name: string): string {
+    return `${name} (department)`;
+  }
+
+  public static formatOrganizationLeaderOption(name: string, department: string): string {
+    return `${name} (leads ${department})`;
   }
 
   public static formatOrganizationPlaceholder(title: string): string {
