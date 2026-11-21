@@ -183,6 +183,8 @@ export { WrittenImageReader } from "../services/written-image.reader.js";
 export { Teammate } from "../models/teammate.js";
 export { TeammateFallback } from "../models/teammate-fallback.js";
 export { TeammateUsage } from "../models/teammate-usage.js";
+export { TeammateDocument } from "../models/teammate-document.js";
+export { TeammateWork } from "../models/teammate-work.js";
 export { TeammateCreateParams } from "../models/methods/teammate-create-params.js";
 export { TeammateUpdateParams } from "../models/methods/teammate-update-params.js";
 export { TeammateIdParams } from "../models/methods/teammate-id-params.js";

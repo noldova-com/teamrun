@@ -1181,7 +1181,12 @@ export declare enum MethodName {
    * Replaces the outside token, so that every outside session's next request is refused, ends their waits and forgets the message ids
    * they were given. Parameters: none. Result: `OutsideConnection`.
    */
-  OutsideTokenReset = "OutsideTokenReset"
+  OutsideTokenReset = "OutsideTokenReset",
+  /**
+   * Reads what a teammate worked on: the folder of the chat it last answered in, every folder of a chat it answered in, and the Markdown and
+   * text files its replies created or changed. Parameters: `TeammateIdParams`. Result: `TeammateWork`.
+   */
+  TeammateWorkRead = "TeammateWorkRead"
 }
 
 /**
@@ -13243,6 +13248,95 @@ export declare class TeammateUsage {
    * @throws JsonException when a field is missing or invalid.
    */
   public static fromJson(value: unknown, path?: string): TeammateUsage;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * What a teammate worked on, as `TeammateWorkRead` returns it, for its Organization card.
+ */
+export declare class TeammateWork {
+  /**
+   * The `Teammate` id.
+   */
+  public readonly teammateId: string;
+  /**
+   * The working folder of the chat the teammate last answered in, or `null` when it hasn't answered.
+   */
+  public readonly folder: string | null;
+  /**
+   * The working folder of each chat the teammate answered in, each once, the latest answered first.
+   */
+  public readonly folders: readonly string[];
+  /**
+   * The Markdown and text files the teammate's replies created or changed, each once, the latest changed first.
+   */
+  public readonly documents: readonly TeammateDocument[];
+
+  /**
+   * Initializes the teammate's work.
+   * @param teammateId The teammate's id.
+   * @param folder The latest chat's folder, or `null`.
+   * @param folders The chats' folders.
+   * @param documents The documents.
+   * @throws ArgumentException when the id is blank, or `folder` isn't one of `folders`.
+   */
+  public constructor(teammateId: string, folder: string | null, folders: readonly string[], documents: readonly TeammateDocument[]);
+
+  /**
+   * Reads the teammate's work from untrusted JSON.
+   * @param value The untrusted value, with `teammateId`, the nullable `folder`, `folders` and `documents`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The teammate's work.
+   * @throws JsonException when a field is missing or invalid.
+   */
+  public static fromJson(value: unknown, path?: string): TeammateWork;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A Markdown or text file a teammate's reply created or changed.
+ */
+export declare class TeammateDocument {
+  /**
+   * The file's absolute path.
+   */
+  public readonly path: string;
+  /**
+   * The id of the chat whose reply last changed it.
+   */
+  public readonly chatId: string;
+  /**
+   * ISO 8601 timestamp of the end of the reply that last changed it.
+   */
+  public readonly changedAt: string;
+
+  /**
+   * Initializes the document.
+   * @param path The file's absolute path.
+   * @param chatId The chat's id.
+   * @param changedAt The reply's end.
+   * @throws ArgumentException when a value is blank.
+   */
+  public constructor(path: string, chatId: string, changedAt: string);
+
+  /**
+   * Reads the document from untrusted JSON.
+   * @param value The untrusted value, with `path`, `chatId` and `changedAt`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The document.
+   * @throws JsonException when a field is missing or invalid.
+   */
+  public static fromJson(value: unknown, path?: string): TeammateDocument;
 
   /**
    * Renders the JSON object `fromJson` accepts.

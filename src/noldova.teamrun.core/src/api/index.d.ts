@@ -137,6 +137,7 @@ import type {
   TeammateIdParams,
   TeammateUpdateParams,
   TeammateUsage,
+  TeammateWork,
   SubAgent,
   SubAgentStartParams,
   SubAgentStopParams,
@@ -1554,6 +1555,11 @@ export interface IMessagesService {
    * Lists, for each teammate in each conversation, its latest reply that reports usage, while that reply is in the teammate's current session there.
    */
   listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
+
+  /**
+   * Reads what a teammate worked on: the working folders of the chats it answered in and the Markdown and text files its replies changed.
+   */
+  readTeammateWorkAsync(teammateId: string): Promise<TeammateWork>;
 
   /**
    * Lists every reply still pending, running, or awaiting an approval, across conversations.
@@ -7443,6 +7449,15 @@ export declare class MessagesService implements IMessagesService {
    * @remarks Queries the database directly without loading transcripts.
    */
   public listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
+
+  /**
+   * Reads what a teammate worked on, from the replies it finished.
+   * @param teammateId The teammate's id.
+   * @returns The working folder of each chat it answered in, the latest first, and at most 20 Markdown and text files its replies created or changed,
+   * each once, the latest changed first; a relative path is resolved against the chat's working folder, and a deleted file is left out.
+   * @remarks Queries the database directly, reading only the replies whose text names such a file.
+   */
+  public readTeammateWorkAsync(teammateId: string): Promise<TeammateWork>;
 
   /**
    * Lists every reply still pending, running, or awaiting an approval, across conversations, oldest first.

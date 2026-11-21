@@ -522,6 +522,8 @@ export class RequestDispatcher {
         return (await this.kinds.readPlanUsageAsync(PlanUsageParams.fromJson(payload)))?.toJson() ?? null;
       case MethodName.TeammateUsageList:
         return (await this.messages.listTeammateUsageAsync()).map(t => t.toJson());
+      case MethodName.TeammateWorkRead:
+        return (await this.messages.readTeammateWorkAsync(TeammateIdParams.fromJson(payload).teammateId)).toJson();
       case MethodName.BackgroundTaskList:
         return (await RequestDispatcher.require(this.tasks, method).pageAsync(BackgroundTaskListParams.fromJson(payload))).toJson();
       case MethodName.BackgroundTaskRead:

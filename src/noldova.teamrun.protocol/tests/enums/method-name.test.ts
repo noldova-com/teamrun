@@ -126,6 +126,7 @@ export class MethodNameTests {
     Assert.areEqual("DepartmentMemberSet", MethodName.DepartmentMemberSet);
     Assert.areEqual("OrganizationLayoutRead", MethodName.OrganizationLayoutRead);
     Assert.areEqual("OrganizationLayoutSave", MethodName.OrganizationLayoutSave);
+    Assert.areEqual("TeammateWorkRead", MethodName.TeammateWorkRead);
   }
 
   @TestMethod
