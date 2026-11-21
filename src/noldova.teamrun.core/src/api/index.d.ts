@@ -2541,9 +2541,9 @@ export declare class Resources {
    */
   public static readonly mentionsChanged: string;
   /**
-   * Refusal of a waiting message's edit whose mentioned teammates are not exactly the teammates its new text names.
+   * Refusal of a waiting message, added or edited, whose mentioned teammates are not exactly the teammates its text names.
    */
-  public static readonly editMentionsMismatch: string;
+  public static readonly waitingMentionsMismatch: string;
   /**
    * Participant execution literal.
    */
