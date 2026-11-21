@@ -28,7 +28,7 @@ LICENSE file in the root directory of this source tree.
             <span class="name">{{ ask.teammate.name }}</span>
             <span class="note department">{{ ask.department }}</span>
           </div>
-          <span class="note status">{{ resources.teammateStatusLabels[ask.status] }}</span>
+          <nol-teamrun-teammate-status class="status" [teammateId]="ask.teammate.id" />
         </div>
         <button type="button" nol-button class="answer" [variant]="primary" [attr.aria-label]="resources.formatOrganizationBoardAnswer(ask.isAnswer, ask.teammate.name)"
           (click)="answer(ask)">{{ ask.isAnswer ? resources.organizationBoardAnswer : resources.organizationBoardOpen }}</button>
@@ -59,11 +59,13 @@ LICENSE file in the root directory of this source tree.
   </div>
   <div class="lanes">
     @for (node of departments(); track node.department.id) {
-      <div class="lane" nolCanvasItem>
+      <div class="lane">
         <div class="lane-head">
           @if (editing()) {
             <input nol-text-field class="lane-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="node.department.name"
               (change)="rename(node, $event)" />
+            <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationBoardDeleteIcon"
+              [label]="resources.formatOrganizationBoardDelete(node.department.name)" (click)="deleteDepartment(node)"></button>
           } @else {
             <span class="title lane-name">{{ node.department.name }}</span>
             <nol-chip class="lane-count">{{ node.headcount }}</nol-chip>
@@ -82,8 +84,12 @@ LICENSE file in the root directory of this source tree.
         @for (member of membersOf(node); track member.id) {
           <nol-teamrun-organization-card nolCanvasItem [teammate]="member" [shape]="row" />
           @if (editing()) {
-            <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(member.name)" [options]="departmentOptions()" [value]="node.department.id"
-              (valueChange)="move(member, $event)" />
+            <div class="member-edit">
+              <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(member.name)" [options]="departmentOptions()" [value]="node.department.id"
+                (valueChange)="move(member, $event)" />
+              <button type="button" nol-icon-button class="remove-member" [icon]="resources.organizationBoardRemoveIcon"
+                [label]="resources.formatOrganizationBoardRemove(member.name, node.department.name)" (click)="removeMember(member, node)"></button>
+            </div>
           }
         } @empty {
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>

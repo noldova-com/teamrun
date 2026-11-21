@@ -1661,6 +1661,12 @@ export class Resources {
   public static readonly organizationBoardNewDepartment: string = "New department";
   public static readonly organizationBoardDismissError: string = "Dismiss";
   public static readonly organizationBoardDismissIcon: string = "close";
+  public static readonly organizationBoardDeleteTitle: string = "Delete department";
+  public static readonly organizationBoardDeleteLabel: string = "Delete";
+  public static readonly organizationBoardDeleteIcon: string = "delete";
+  public static readonly organizationBoardRemoveTitle: string = "Remove from department";
+  public static readonly organizationBoardRemoveLabel: string = "Remove";
+  public static readonly organizationBoardRemoveIcon: string = "person_remove";
   public static readonly organizationBoardSortLabels: Readonly<Record<OrganizationBoardSort, string>> = {
     [OrganizationBoardSort.Status]: "Status",
     [OrganizationBoardSort.Name]: "Name"
@@ -2929,6 +2935,14 @@ export class Resources {
 
   public static formatOrganizationBoardAnswer(isAnswer: boolean, name: string): string {
     return `${isAnswer ? Resources.organizationBoardAnswer : Resources.organizationBoardOpen} ${name}`;
+  }
+
+  public static formatOrganizationBoardDelete(name: string): string {
+    return `Delete ${name}`;
+  }
+
+  public static formatOrganizationBoardRemove(teammate: string, department: string): string {
+    return `Remove ${teammate} from ${department}`;
   }
 
   public static formatOrganizationBoardMove(name: string): string {

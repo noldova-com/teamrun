@@ -78,7 +78,7 @@ describe("OrganizationFocusComponent", () => {
         saves.push(OrganizationLayout.fromJson(OrganizationLayoutSaveParams.fromJson(t).layout));
         return null;
       });
-    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet])
+    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
@@ -110,9 +110,9 @@ describe("OrganizationFocusComponent", () => {
     expect([texts(".outline-head"), texts(".orow.root .label"), texts(".orow.root nol-chip"), all(".orow.department").map(t => [text(one(".label", t)), texts(".asks", t), texts("nol-chip", t)])]).toEqual([
       ["Structure"], ["Organization"], ["5"], [["Design", ["1 need you"], ["2"]], ["UI", [], ["1"]], ["Build", ["1 need you"], ["2"]]]
     ]);
-    expect(all(".orow.person").map(t => [text(one(".label", t)), texts(".tag", t), texts(".short", t), one(".dot", t).getAttribute("data-status")])).toEqual([
-      ["Alice", ["leads"], ["Idle"], "Idle"], ["Bob", [], ["Waiting for you"], "WaitingForYou"], ["Code Reviewer", ["leads"], ["Idle"], "Idle"],
-      ["Carol", [], ["Idle"], "Idle"], ["Offline", [], ["Stopped"], "Stopped"]
+    expect(all(".orow.person").map(t => [text(one(".label", t)), texts(".tag", t), texts(".short", t), one(".dot", t).className])).toEqual([
+      ["Alice", ["leads"], ["Idle"], "dot idle"], ["Bob", [], ["Waiting for you"], "dot waiting"], ["Code Reviewer", ["leads"], ["Idle"], "dot idle"],
+      ["Carol", [], ["Idle"], "dot idle"], ["Offline", [], ["Stopped"], "dot stopped"]
     ]);
     expect([indent("Design"), indent("UI"), indent("Build"), indent("Alice"), indent("Code Reviewer")]).toEqual([0.25, 1.75, 0.25, 2.25, 3.75]);
   });
@@ -157,7 +157,8 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(saves.map(t => t.focus)).toEqual(["Department:ui", "Department:build", "Teammate:bob", "Department:design",
       "Leaders"]));
     expect(all(".crumb[aria-current=true]").map(text)).toEqual(["Organization"]);
-    expect(all("[nolCanvasItem]").map(t => t.querySelector(".name")?.textContent?.trim())).toEqual(["Alice", "Code Reviewer"]);
+    expect(all("[nolCanvasItem]").map(t => [t.tagName.toLowerCase(), texts(".name", t).join()])).toEqual([["nol-teamrun-organization-card", "Alice"],
+      ["nol-teamrun-organization-card", "Code Reviewer"]]);
   });
 
   it("hides and shows a department's people from its arrow, and keeps that on the server", async () => {
@@ -210,6 +211,39 @@ describe("OrganizationFocusComponent", () => {
       ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: "build" }],
       ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
       ["teamrun.departmentCreate", { name: "New department", parentId: null }]
+    ]));
+  });
+
+  it("asks before deleting the focused department or taking a member out of it", async () => {
+    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
+    const dialog = (): string[] => [...document.querySelectorAll("nol-teamrun-confirm-dialog .nol-dialog-title, nol-teamrun-confirm-dialog p, nol-teamrun-confirm-dialog .nol-dialog-actions button")]
+      .map(t => t.textContent?.trim() ?? "");
+    const answer = async (button: string): Promise<void> => {
+      const found = document.querySelector<HTMLButtonElement>(`nol-teamrun-confirm-dialog ${button}`);
+      if (Object.isNull(found))
+        throw new Error(`No ${button} in the dialog.`);
+      found.click();
+      await settle();
+    };
+    await create("Department:ui");
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+
+    expect([one(".delete-department").getAttribute("aria-label"), all(".remove-member").length]).toEqual(["Delete UI", 0]);
+    await click(one(".delete-department"));
+    expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
+    await answer(".nol-teamrun-cancel");
+    await click(one(".obtn", row("Design")));
+    expect(all(".remove-member").map(t => t.getAttribute("aria-label"))).toEqual(["Remove Bob from Design"]);
+    await click(one(".remove-member"));
+    expect(dialog()).toEqual(["Remove from department", "Remove Bob from Design? Bob stays on the team, in no department.", "Close", "Remove"]);
+    await answer(".nol-teamrun-confirm");
+    await click(one(".delete-department"));
+    await answer(".nol-teamrun-confirm");
+
+    await Wait.until(() => expect(edits()).toEqual([
+      ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: null }],
+      ["teamrun.departmentDelete", { departmentId: "design" }]
     ]));
   });
 

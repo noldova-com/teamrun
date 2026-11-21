@@ -47,7 +47,7 @@ LICENSE file in the root directory of this source tree.
     @if (!layout.layout().isCollapsed(row.node.department.id)) {
       @for (person of row.people; track person.id) {
         <div class="orow person" [class.selected]="isHere(teammate(person))" [style.padding-inline-start.rem]="2.25 + row.depth * 1.5">
-          <button type="button" class="obtn" [attr.aria-current]="isHere(teammate(person))" (click)="go(teammate(person))"><span class="dot" [attr.data-status]="status(person)"
+          <button type="button" class="obtn" [attr.aria-current]="isHere(teammate(person))" (click)="go(teammate(person))"><span class="dot" [class]="resources.teammateStatusTones[status(person)]"
             aria-hidden="true"></span><span class="label">{{ person.name }}</span>
             @if (person.id === row.node.leader?.id) {
               <span class="note tag">{{ resources.organizationFocusLeads }}</span>
@@ -68,8 +68,10 @@ LICENSE file in the root directory of this source tree.
     }
   </div>
   <div class="unit-head">
-    @if (editing() && focus().department !== null && focus().teammate === null) {
-      <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="unitName()" (change)="renameUnit($event)" />
+    @if (editing() && unit(); as unit) {
+      <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="unit.department.name" (change)="rename(unit, $event)" />
+      <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationBoardDeleteIcon"
+        [label]="resources.formatOrganizationBoardDelete(unit.department.name)" (click)="deleteDepartment(unit)"></button>
     } @else {
       <h2 class="unit-name">{{ unitName() }}</h2>
     }
@@ -77,11 +79,15 @@ LICENSE file in the root directory of this source tree.
   </div>
   <div class="grid" [class.one]="cards().length === 1">
     @for (card of cards(); track card.id) {
-      <div class="unit-card" nolCanvasItem>
-        <nol-teamrun-organization-card [teammate]="card" [shape]="fluid" />
-        @if (editing() && isMember(card)) {
-          <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(card.name)" [options]="departmentOptions()" [value]="focus().department?.department?.id ?? ''"
-            (valueChange)="move(card, $event)" />
+      <div class="unit-card">
+        <nol-teamrun-organization-card nolCanvasItem [teammate]="card" [shape]="fluid" />
+        @if (editing() && memberOf(card); as node) {
+          <div class="member-edit">
+            <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(card.name)" [options]="departmentOptions()" [value]="node.department.id"
+              (valueChange)="move(card, $event)" />
+            <button type="button" nol-icon-button class="remove-member" [icon]="resources.organizationBoardRemoveIcon"
+              [label]="resources.formatOrganizationBoardRemove(card.name, node.department.name)" (click)="removeMember(card, node)"></button>
+          </div>
         }
       </div>
     } @empty {

@@ -10,7 +10,7 @@ import { Component, computed, inject, type InputSignal, input, type Signal } fro
 
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
-import { CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, SelectComponent, type SelectOption,
+import { CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, SelectComponent, type SelectOption,
   TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
@@ -18,6 +18,7 @@ import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
 import { OrganizationCrumb } from "../../models/organization-crumb";
+import type { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationEdits } from "../../models/organization-edits";
 import { OrganizationFocus } from "../../models/organization-focus";
 import type { OrganizationNode } from "../../models/organization-node";
@@ -26,6 +27,7 @@ import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
+import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 
 @Component({
@@ -39,6 +41,7 @@ export class OrganizationFocusComponent {
   private readonly statuses: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
 
   private readonly chats: ChatStoreService = inject(ChatStoreService);
+  private readonly dialogs: DialogService = inject(DialogService);
 
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
@@ -51,6 +54,7 @@ export class OrganizationFocusComponent {
   protected readonly headcount: Signal<number> = computed(() => this.rows().reduce((total, t) => total + t.node.headcount, 0));
   protected readonly focus: Signal<OrganizationFocus> = computed(() => OrganizationFocus.resolve(this.tree(), this.layout.layout().focus));
   protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() => OrganizationEdits.departmentOptions(this.rows().map(t => t.node)));
+  protected readonly unit: Signal<OrganizationNode | null> = computed(() => Object.isNull(this.focus().teammate) ? this.focus().department : null);
   protected readonly key: Signal<string> = computed(() => OrganizationFocus.keyOf(this.focus().target));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.rows().flatMap(t => Object.isNull(t.node.leader) ? [] : [t.node.leader]));
   protected readonly cards: Signal<readonly Teammate[]> = computed(() => {
@@ -89,20 +93,37 @@ export class OrganizationFocusComponent {
     void this.organization.createDepartment(Resources.organizationBoardNewDepartment, null);
   }
 
-  protected renameUnit(event: Event): void {
-    const department = this.focus().department;
+  protected rename(node: OrganizationNode, event: Event): void {
     const name = OrganizationEdits.nameOf(event);
-    if (!Object.isNull(department) && Object.isNull(this.focus().teammate) && name.length > 0 && name !== department.department.name)
-      void this.organization.renameDepartment(department.department.id, name);
+    if (name.length > 0 && name !== node.department.name)
+      void this.organization.renameDepartment(node.department.id, name);
   }
 
-  protected isMember(teammate: Teammate): boolean {
-    const department = this.focus().department;
-    return !Object.isNull(department) && department.members.some(t => t.id === teammate.id);
+  protected memberOf(teammate: Teammate): OrganizationNode | null {
+    const node = this.focus().department;
+    return !Object.isNull(node) && node.members.some(t => t.id === teammate.id) ? node : null;
   }
 
   protected move(teammate: Teammate, departmentId: string): void {
     void this.organization.setMember(teammate.id, departmentId);
+  }
+
+  protected deleteDepartment(node: OrganizationNode): void {
+    this.confirm(OrganizationEdits.deleteRequest(node, this.rows().map(t => t.node)), () => void this.organization.deleteDepartment(node.department.id));
+  }
+
+  protected removeMember(teammate: Teammate, node: OrganizationNode): void {
+    this.confirm(OrganizationEdits.removeRequest(teammate, node), () => void this.organization.setMember(teammate.id, null));
+  }
+
+  private confirm(request: ConfirmRequest, action: () => void): void {
+    const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
+    dialog.componentRef?.setInput("request", request);
+    dialog.componentInstance?.answered.subscribe(confirmed => {
+      dialog.close();
+      if (confirmed)
+        action();
+    });
   }
 
   protected status(teammate: Teammate): TeammateStatus {

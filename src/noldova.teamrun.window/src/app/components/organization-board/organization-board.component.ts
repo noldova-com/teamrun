@@ -17,20 +17,23 @@ import { Resources } from "../../../resources";
 import { OrganizationBoardSort } from "../../enums/organization-board-sort";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
+import type { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
 import { OrganizationEdits } from "../../models/organization-edits";
 import type { OrganizationNode } from "../../models/organization-node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
+import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
 import { TeammateDialogComponent } from "../teammate-dialog/teammate-dialog.component";
+import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
   selector: "nol-teamrun-organization-board",
   imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    SelectComponent, TeammateAvatarComponent, TextFieldComponent],
+    SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   templateUrl: "./organization-board.component.html",
   styleUrl: "./organization-board.component.css"
@@ -116,6 +119,24 @@ export class OrganizationBoardComponent {
     dialog.componentRef?.setInput("store", this.chats);
     dialog.componentRef?.setInput("teammate", ask.teammate);
     dialog.componentInstance?.closed.subscribe(() => dialog.close());
+  }
+
+  protected deleteDepartment(node: OrganizationNode): void {
+    this.confirm(OrganizationEdits.deleteRequest(node, this.departments()), () => void this.organization.deleteDepartment(node.department.id));
+  }
+
+  protected removeMember(teammate: Teammate, node: OrganizationNode): void {
+    this.confirm(OrganizationEdits.removeRequest(teammate, node), () => void this.organization.setMember(teammate.id, null));
+  }
+
+  private confirm(request: ConfirmRequest, action: () => void): void {
+    const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
+    dialog.componentRef?.setInput("request", request);
+    dialog.componentInstance?.answered.subscribe(confirmed => {
+      dialog.close();
+      if (confirmed)
+        action();
+    });
   }
 
   private static flatten(nodes: readonly OrganizationNode[]): readonly OrganizationNode[] {

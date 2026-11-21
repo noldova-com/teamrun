@@ -113,17 +113,15 @@
   background: var(--nol-badge);
 }
 
-.dot[data-status="Working"] {
+.dot.working {
   background: var(--nol-status-ok);
 }
 
-.dot.waiting,
-.dot[data-status="WaitingForYou"],
-.dot[data-status="UsageLimit"] {
+.dot.waiting {
   background: var(--nol-warning);
 }
 
-.dot[data-status="Stopped"] {
+.dot.stopped {
   background: var(--nol-status-failed);
 }
 
@@ -188,6 +186,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.member-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+}
+
+.member-move {
+  flex: 1 1 auto;
   min-width: 0;
 }
 

@@ -66,7 +66,7 @@ describe("OrganizationBoardComponent", () => {
   };
   const create = async (): Promise<void> => {
     context = SampleData.createContext().answer(MethodName.MessageListOpen, () => [reply(MessageStatus.AwaitingApproval).toJson()]);
-    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet])
+    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
@@ -105,8 +105,9 @@ describe("OrganizationBoardComponent", () => {
       [["Build"], ["2"], ["1 idle · 1 stopped"], 1, ["Offline", "Carol"], [], "Message Build"]
     ]);
     expect(all("nol-teamrun-organization-card").every(t => t.classList.contains("row"))).toBe(true);
-    expect(all("[nolCanvasItem]").map(t => t.classList.contains("lane") ? texts(".lane-name", t).join() : texts(".name", t).join())).toEqual(
-      ["Alice", "Code Reviewer", "Design", "Bob", "UI", "Build", "Offline", "Carol"]);
+    expect(all("[nolCanvasItem]").map(t => [t.tagName.toLowerCase(), texts(".name", t).join()])).toEqual([["nol-teamrun-organization-card", "Alice"],
+      ["nol-teamrun-organization-card", "Code Reviewer"], ["nol-teamrun-organization-card", "Bob"], ["nol-teamrun-organization-card", "Offline"],
+      ["nol-teamrun-organization-card", "Carol"]]);
   });
 
   it("sorts a column by name, and by status again, on its own", async () => {
@@ -192,6 +193,44 @@ describe("OrganizationBoardComponent", () => {
       ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: "build" }],
       ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
       ["teamrun.departmentCreate", { name: "New department", parentId: null }]
+    ]));
+  });
+
+  it("asks before deleting a department or taking a member out of one, and does neither when the question is closed", async () => {
+    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
+    const dialog = (): string[] => [...document.querySelectorAll("nol-teamrun-confirm-dialog .nol-dialog-title, nol-teamrun-confirm-dialog p, nol-teamrun-confirm-dialog .nol-dialog-actions button")]
+      .map(t => t.textContent?.trim() ?? "");
+    const answer = async (button: string): Promise<void> => {
+      const found = document.querySelector<HTMLButtonElement>(`nol-teamrun-confirm-dialog ${button}`);
+      if (Object.isNull(found))
+        throw new Error(`No ${button} in the dialog.`);
+      found.click();
+      await settle();
+    };
+    await create();
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+    const deletes = (): HTMLElement[] => all(".delete-department");
+
+    expect([deletes().map(t => t.getAttribute("aria-label")), all(".remove-member").map(t => t.getAttribute("aria-label"))]).toEqual([
+      ["Delete Design", "Delete UI", "Delete Build"], ["Remove Bob from Design", "Remove Offline from Build", "Remove Carol from Build"]
+    ]);
+    deletes()[1]?.click();
+    await settle();
+    expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
+    await answer(".nol-teamrun-cancel");
+    deletes()[0]?.click();
+    await settle();
+    expect(dialog()).toContain("Delete Design? Its departments move up to report to you, and its members leave every department.");
+    await answer(".nol-teamrun-confirm");
+    one(".remove-member").click();
+    await settle();
+    expect(dialog()).toEqual(["Remove from department", "Remove Bob from Design? Bob stays on the team, in no department.", "Close", "Remove"]);
+    await answer(".nol-teamrun-confirm");
+
+    await Wait.until(() => expect(edits()).toEqual([
+      ["teamrun.departmentDelete", { departmentId: "design" }],
+      ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: null }]
     ]));
   });
 

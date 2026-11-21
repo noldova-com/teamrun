@@ -98,8 +98,8 @@ describe("OrganizationCardComponent's shapes", () => {
 
       AppearanceFixture.expectPixels(box(element()).width, 15 * rem());
       AppearanceFixture.expectPixels(box(avatar()).left - box(element()).left, space(3) + 1);
-      AppearanceFixture.expectPixels(box(one(".model")).top - box(head).bottom, space(2));
-      AppearanceFixture.expectPixels(box(one(".model")).left, box(head).left);
+      AppearanceFixture.expectPixels(box(one(".status")).top - box(head).bottom, space(2));
+      AppearanceFixture.expectPixels(box(one(".status")).left, box(head).left);
     });
 
     it("widens a fluid card to its container, with the card's own insets", async () => {
@@ -116,6 +116,7 @@ describe("OrganizationCardComponent's shapes", () => {
       const face = box(avatar());
       const who = box(one(".who"));
       const tune = box(one(".tune"));
+      const status = box(one(".status"));
       const model = box(one(".model"));
 
       AppearanceFixture.expectPixels(host.width, 30 * rem());
@@ -127,8 +128,9 @@ describe("OrganizationCardComponent's shapes", () => {
       AppearanceFixture.expectPixels(host.right - tune.right, space(2));
       AppearanceFixture.expectPixels(tune.top - host.top, space(2));
       AppearanceFixture.expectPixels(box(one(".role")).left - box(one(".name")).right, space(2));
+      AppearanceFixture.expectPixels(status.left, who.left);
+      AppearanceFixture.expectPixels(status.top - Math.max(face.bottom, who.bottom, tune.bottom), space(1));
       AppearanceFixture.expectPixels(model.left, who.left);
-      AppearanceFixture.expectPixels(model.top - Math.max(face.bottom, who.bottom, tune.bottom), space(1));
       AppearanceFixture.expectPixels(host.bottom - model.bottom, space(2));
     });
   });

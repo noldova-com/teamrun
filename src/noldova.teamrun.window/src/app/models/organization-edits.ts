@@ -9,6 +9,8 @@
 import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
 import { SelectOption } from "@noldova/ui.components.angular";
 
+import { Resources } from "../../resources";
+import { ConfirmRequest } from "./confirm-request";
 import type { OrganizationNode } from "./organization-node";
 
 export class OrganizationEdits {
@@ -19,6 +21,17 @@ export class OrganizationEdits {
 
   public static departmentOptions(nodes: readonly OrganizationNode[]): readonly SelectOption[] {
     return nodes.map(t => new SelectOption(t.department.id, t.department.name));
+  }
+
+  public static deleteRequest(node: OrganizationNode, nodes: readonly OrganizationNode[]): ConfirmRequest {
+    const parent = nodes.find(t => t.department.id === node.department.parentId)?.department.name ?? null;
+    return new ConfirmRequest(Resources.organizationBoardDeleteTitle, Resources.formatOrganizationDeleteDepartment(node.department.name, parent),
+      Resources.organizationBoardDeleteLabel, null, true);
+  }
+
+  public static removeRequest(teammate: Teammate, node: OrganizationNode): ConfirmRequest {
+    return new ConfirmRequest(Resources.organizationBoardRemoveTitle, Resources.formatOrganizationRemoveMember(teammate.name, node.department.name),
+      Resources.organizationBoardRemoveLabel, null, true);
   }
 
   public static nameOf(event: Event): string {
