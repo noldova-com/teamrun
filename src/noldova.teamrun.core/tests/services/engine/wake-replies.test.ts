@@ -18,10 +18,14 @@ import {
   ApprovalOption,
   ApprovalOutcome,
   ApprovalScope,
+  ChatMemberModeParams,
   ChatPlanFirstParams,
+  CommandStartParams,
   ConversationIdParams,
   ConversationMemberParams,
   ConversationMoveParams,
+  ConversationResponder,
+  ConversationResponderParams,
   DetailKind,
   EventName,
   Harness,
@@ -359,6 +363,108 @@ export class WakeRepliesTests {
 
     Assert.isTrue(interrupts > 0);
     Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(shown.id))?.status);
+  }
+
+  @TestMethod
+  public async wakesTheDefaultResponderInTheModeTheChatHoldsWhenTheWakeStarts(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const conversation = await host.createConversationAsync();
+    const provider = (await host.providerOfAsync()).id;
+    const choose = async (mode: string): Promise<void> => {
+      await host.engine.setResponderAsync(new ConversationResponderParams(conversation.id, new ConversationResponder(null,
+        new RequestedSettings("fake", null, null, null, mode), provider), true));
+    };
+    await choose("bypass");
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null, null, "bypass"), provider));
+    await host.engine.waitForIdle();
+    await choose("ask");
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+    const woken = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+
+    Assert.areEqual("ask", wake?.mode);
+    Assert.areEqual("ask", woken?.provenance?.requested.mode);
+  }
+
+  @TestMethod
+  public async wakesTheDefaultResponderAfterItsOwnCommandInTheModeTheChatHoldsWhenTheCommandEnds(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    host.adapter.turnTexts = [["Started."], ["Thanks."]];
+    const conversation = await host.createConversationAsync();
+    const provider = (await host.providerOfAsync()).id;
+    const choose = async (mode: string): Promise<void> => {
+      await host.engine.setResponderAsync(new ConversationResponderParams(conversation.id, new ConversationResponder(null,
+        new RequestedSettings("fake", null, null, null, mode), provider), true));
+    };
+    await choose("bypass");
+    let started = false;
+    host.adapter.holdTurn = async request => {
+      const token = SenderEnvironment.read(request.environment);
+      if (started || Object.isNull(token))
+        return;
+      started = true;
+      await host.engine.startCommandAsync(new CommandStartParams(token, "npm test", "Test"));
+    };
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Test it", new RequestedSettings("fake", null, null, null, "bypass"), provider));
+    await host.engine.waitForIdle();
+    await choose("ask");
+
+    host.commands.started[0]?.end(0);
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+    const [first, woken] = host.adapter.requests;
+    const reply = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+
+    Assert.areEqual("bypass,ask,ask", [first?.requested.mode, woken?.requested.mode, reply?.provenance?.requested.mode].join());
+  }
+
+  @TestMethod
+  public async wakesATeammateInTheModeTheChatHoldsForItWhenTheWakeStarts(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const conversation = await host.createConversationAsync();
+    const alice = await WakeRepliesTests.teammateAsync(host, "Alice");
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice start the server", null, null, [], [alice.id]));
+    await host.engine.waitForIdle();
+    await host.conversations.setMemberModeAsync(new ChatMemberModeParams(conversation.id, alice.id, "bypass"));
+    const unrestricted = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    unrestricted?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+    await host.conversations.setMemberModeAsync(new ChatMemberModeParams(conversation.id, alice.id, "ask"));
+
+    const restricted = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-2", "npm test"));
+    restricted?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+    const woken = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+
+    Assert.areEqual("bypass", unrestricted?.mode);
+    Assert.areEqual("ask", restricted?.mode);
+    Assert.areEqual("ask", woken?.provenance?.requested.mode);
+  }
+
+  @TestMethod
+  public async keepsTheReplysModeForADefaultWakeWhenTheChatsResponderIsAnotherKind(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    const conversation = await host.createConversationAsync();
+    const provider = (await host.providerOfAsync()).id;
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null, null, "bypass"), provider));
+    await host.engine.waitForIdle();
+    await host.conversations.setResponderAsync(new ConversationResponderParams(conversation.id, new ConversationResponder(null,
+      new RequestedSettings("other", null, null, null, "ask"), null), true));
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual("bypass", wake?.mode);
   }
 
   @TestMethod

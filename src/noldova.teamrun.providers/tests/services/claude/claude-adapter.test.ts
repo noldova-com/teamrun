@@ -1044,6 +1044,35 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async switchesAWakeToTheModeTheChatHoldsWhenItStarts(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const query = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-woken", "none", null, []),
+      SdkMessages.taskStarted("s-woken", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-woken", "Started")),
+      SdkMessages.taskNotification("s-woken", "server", "completed", host.directory.resolve("missing.output")),
+      SdkMessages.assistant("33333333-3333-3333-3333-333333333333", [SdkMessages.text("The server stopped")], "claude-opus-5"),
+      SdkMessages.success("s-woken", "Stopped"),
+      new WaitForCloseStep()
+    ]);
+    host.factory.next = query;
+    const listener = new RecordingTurnListener();
+    listener.wakeTurn = new WakeTurn({}, false, undefined, Resources.defaultPermissionMode);
+    const woken = listener.wakeTurn.follow(new RecordingTurnListener(), new AbortController().signal);
+
+    await adapter.runTurn(new TurnRequest(null, host.directory.path, "Start", new RequestedSettings("claude", null, null, null, Resources.acceptEditsPermissionMode),
+      null, [], null, null), listener, new AbortController().signal);
+    const turnModes = query.permissionModes.join(",");
+    const reply = await woken;
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Completed, reply.outcome);
+    Assert.areEqual(`|${Resources.defaultPermissionMode}`, `${turnModes}|${query.permissionModes.join(",")}`);
+  }
+
+  @TestMethod
   @TestData(true)
   @TestData(false)
   public async saysTeamRunsToolsAreUnavailableInAWakeWhoseTokenIsRefusedAndResumesTheNextTurnOnANewChat(expired: boolean): Promise<void> {
@@ -2470,6 +2499,41 @@ export class ClaudeAdapterTests {
     Assert.areEqual(TurnOutcome.Completed, reply.outcome);
     Assert.areEqual("acceptEdits", String(host.factory.lastOptions?.permissionMode));
     Assert.areEqual("plan|plan,acceptEdits", `${asked}|${warm.permissionModes.join(",")}`);
+  }
+
+  @TestMethod
+  public async leavesAPlanFirstWakesPlanForTheModeTheChatHoldsWhenTheWakeStarts(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const warm = new FakeClaudeQuery([new WaitForInputStep(), SdkMessages.init("s-never", "none", null, []),
+      SdkMessages.taskStarted("s-never", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-never", "Started")),
+      SdkMessages.taskNotification("s-never", "server", "completed", host.directory.resolve("missing.output")),
+      SdkMessages.assistant("11111111-1111-1111-1111-111111111111", [SdkMessages.toolUse("tu-1", "ExitPlanMode", { plan: "# Restart" })], "claude-opus-5"),
+      new ToolAskStep("ExitPlanMode", { plan: "# Restart" }, "tu-1"),
+      SdkMessages.user("22222222-2222-2222-2222-222222222222", [SdkMessages.toolResult("tu-1", "User has approved your plan.")]),
+      SdkMessages.success("s-never", "Restarted"), new WaitForCloseStep()]);
+    host.factory.next = warm;
+    const listener = new RecordingTurnListener();
+    listener.wakeTurn = new WakeTurn({}, true, undefined, Resources.defaultPermissionMode);
+    const follower = new RecordingTurnListener();
+    follower.decisions.push("allow");
+    let asked = String.empty;
+    const decide = follower.onApprovalRequested.bind(follower);
+    follower.onApprovalRequested = (ask, signal) => {
+      asked = warm.permissionModes.join(",");
+      return decide(ask, signal);
+    };
+    const woken = listener.wakeTurn.follow(follower, new AbortController().signal);
+
+    await adapter.runTurn(new TurnRequest(null, host.directory.path, "Start", new RequestedSettings("claude", null, null, null, "acceptEdits", false), null, [],
+      null, null), listener, new AbortController().signal);
+    const reply = await woken;
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Completed, reply.outcome);
+    Assert.areEqual("acceptEdits", String(host.factory.lastOptions?.permissionMode));
+    Assert.areEqual(`plan|plan,${Resources.defaultPermissionMode}`, `${asked}|${warm.permissionModes.join(",")}`);
   }
 
   @TestMethod
