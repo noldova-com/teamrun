@@ -115,8 +115,8 @@ describe("OrganizationViewComponent", () => {
     configure(context);
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
-    element().style.width = "84rem";
-    element().style.height = "60rem";
+    element().style.width = "100rem";
+    element().style.height = "70rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
     await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
