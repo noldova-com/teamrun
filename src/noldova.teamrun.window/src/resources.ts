@@ -345,6 +345,8 @@ export class Resources {
   public static readonly collapsedDepartmentsField: string = "collapsedDepartments";
   public static readonly organizationCardsShowField: string = "cardsShow";
   public static readonly organizationCardsField: string = "cards";
+  public static readonly organizationViewField: string = "view";
+  public static readonly organizationFocusField: string = "focus";
   public static readonly legacyPinnedChatsField: string = "pinnedConversations";
   public static readonly legacyChatOrderField: string = "conversationOrder";
   public static readonly conversationListIdPrefix: string = "teamrun-conversations-";

@@ -12,6 +12,7 @@ import { AvatarComponent, ButtonComponent, ButtonVariant, MenuComponent, MenuGro
   from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import type { OrganizationViewMode } from "../../enums/organization-view-mode";
 import { OrganizationNode } from "../../models/organization-node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
@@ -35,6 +36,7 @@ export class OrganizationViewComponent {
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
+  protected readonly mode: Signal<OrganizationViewMode> = computed(() => this.layout.layout().view);
   protected readonly tree: Signal<readonly OrganizationNode[]> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
   protected readonly headcount: Signal<string> = computed(() => Resources.formatOrganizationHeadcount(this.store.teammates().length));
   protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length));
