@@ -9,9 +9,9 @@
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity, OrganizationMessagesService, Resources, SignInCheck } from "@noldova/teamrun.core";
 import {
-  AuthStatus, type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, DetailKind, ErrorCode, EventName, Harness,
-  MessageAuthor, MessageIdParams, MessageListParams, MessageStatus, type OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget,
-  ProviderIdParams, type Teammate, TeammateCreateParams
+  AuthStatus, Chat, ConversationIdParams, type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, DetailKind, ErrorCode,
+  EventName, Harness, MessageAuthor, MessageIdParams, MessageListParams, MessageSendParams, MessageStatus, MethodName, type OrganizationMessage, OrganizationMessageSendParams,
+  OrganizationTarget, ProviderIdParams, Request, type Teammate, TeammateCreateParams, TeammateIdParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -21,7 +21,35 @@ import { FakeOrganizationSender } from "../../fixtures/fake-organization-sender.
 @TestClass
 export class OrganizationMessagesServiceTests {
   @TestMethod
-  public async sendsADepartmentMessageToItsLeaderThenItsDirectMembersThroughTheEngineAndStoresEachStarted(): Promise<void> {
+  public async opensATeammatesOrganizationChatOnceWithoutSendingAndTellsTheTeammateItsPlaceWithEachOfThePersonsMessagesThere(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const grok = await OrganizationMessagesServiceTests.teammateAsync(host, "Grok");
+    const invalidated = host.listener.count(EventName.StateInvalidated);
+    const open = (teammateId: string): ReturnType<CoreHost["dispatcher"]["dispatch"]> =>
+      host.dispatcher.dispatch(new Request("r", MethodName.OrganizationChatOpen, new TeammateIdParams(teammateId).toJson()));
+
+    const opened = Chat.fromJson((await open(grok.id)).payload);
+    const again = Chat.fromJson((await open(grok.id)).payload);
+    const made = host.listener.count(EventName.StateInvalidated);
+    const unknown = await open("gone");
+    const sent = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate(grok.id), "Hi"));
+    await host.engine.waitForIdle();
+    await host.engine.sendAsync(new MessageSendParams(opened.id, "Direct", null, null, [], [], grok.id));
+    await host.engine.waitForIdle();
+    const members = await host.conversations.listMembersAsync(new ConversationIdParams(opened.id));
+    const told = (text: string): boolean => host.adapter.requests.some(t =>
+      t.prompt.includes(Resources.formatOrganizationMessagePrompt(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, text)));
+
+    Assert.areEqual(JSON.stringify([Resources.formatOrganizationChatTitle("Grok"), null, Resources.defaultOrganizationId, grok.id, [grok.id]]),
+      JSON.stringify([opened.title, opened.projectId, opened.organizationChat?.organizationId, opened.organizationChat?.teammateId, members.map(t => t.teammateId)]));
+    Assert.areEqual(`${opened.id} ${opened.id}`, `${again.id} ${sent.recipients[0]?.chatId}`);
+    Assert.areEqual(invalidated + 1, made);
+    Assert.areEqual(ErrorCode.NotFound, unknown.info?.name);
+    Assert.areEqual("true true 2", `${told("Hi")} ${told("Direct")} ${host.adapter.requests.length}`);
+  }
+
+  @TestMethod
+  public async sendsADepartmentMessageAsThePersonToItsLeaderThenItsDirectMembersEachInItsOrganizationChatTellingItsPlace(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
     const bob = await OrganizationMessagesServiceTests.teammateAsync(host, "Bob");
@@ -36,12 +64,21 @@ export class OrganizationMessagesServiceTests {
 
     Assert.areEqual("Bob:Started,Ada:Started", OrganizationMessagesServiceTests.states(sent));
     Assert.isTrue(sent.recipients.every(t => !Object.isNull(t.chatId) && !Object.isNull(t.messageId)));
-    Assert.areEqual(`${MessageAuthor.User} ${Resources.organizationMessageLabel} ${sent.recipients[0]?.chatId}`,
-      `${first?.author} ${first?.sender?.name} ${first?.chatId}`);
+    const chat = await host.conversations.findAsync(String(first?.chatId));
+    const prompts = [Resources.formatOrganizationMessagePrompt(Resources.formatOrganizationLeader("Design"), Resources.organizationReportsToPerson, "Status?"),
+      Resources.formatOrganizationMessagePrompt(Resources.formatOrganizationMember("Design"), "Bob", "Status?")];
+    Assert.areEqual(`${MessageAuthor.User} null Status? ${Resources.formatOrganizationChatTitle("Bob")} ${Resources.defaultOrganizationId} ${bob.id}`,
+      `${first?.author} ${first?.sender} ${first?.details[0]?.text} ${chat?.title} ${chat?.organizationChat?.organizationId} ${chat?.organizationChat?.teammateId}`);
     Assert.areEqual(2, host.adapter.requests.length);
+    Assert.areEqual(JSON.stringify([true, true]), JSON.stringify(prompts.map(t => host.adapter.requests.some(u => u.prompt.includes(t)))));
     Assert.areEqual(JSON.stringify([sent.toJson()]), JSON.stringify((await host.organizationMessages.listAsync()).map(t => t.toJson())));
     Assert.areEqual("Insert,Update,Update", await OrganizationMessagesServiceTests.feedAsync(host));
     Assert.areEqual(updated + 3, host.listener.count(EventName.OrganizationMessageUpdated));
+
+    const again = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate(bob.id), "Again"));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(sent.recipients[0]?.chatId, again.recipients[0]?.chatId);
   }
 
   @TestMethod
@@ -62,7 +99,8 @@ export class OrganizationMessagesServiceTests {
 
     Assert.areEqual("Bob:Started|Ada:Started|Ada:Started,Bob:Started,Carol:Started|",
       [one, leaders, everyone, nobody].map(t => OrganizationMessagesServiceTests.states(t)).join("|"));
-    Assert.areEqual(`${bob.id}:${Resources.organizationMessageLabel}:One`, sender.sends[0]);
+    Assert.areEqual(`${Resources.defaultOrganizationId}:${bob.id}:One ${Resources.defaultOrganizationId}:${carol.id}:All`,
+      `${sender.sends[0]} ${sender.sends.find(t => t.includes(`:${carol.id}:`))}`);
     Assert.areEqual(5, sender.sends.length);
     await OrganizationMessagesServiceTests.failsAsync(() => service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate("gone"), "Hi")));
     await OrganizationMessagesServiceTests.failsAsync(() => service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.department("gone"), "Hi")));

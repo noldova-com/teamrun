@@ -6,9 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { Message, MessageIdParams, MessageSendResult } from "@noldova/teamrun.protocol";
+import type { Message, MessageIdParams, MessageSendResult, OrganizationChat } from "@noldova/teamrun.protocol";
 
 export interface IOrganizationSender {
-  startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult>;
+  startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult>;
   cancelAsync(params: MessageIdParams): Promise<Message>;
 }

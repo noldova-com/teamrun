@@ -611,6 +611,11 @@ export declare enum MethodName {
    */
   OrganizationMessageReplyList = "OrganizationMessageReplyList",
   /**
+   * Finds a teammate's Organization chat, or makes it when there is none yet, without sending anything.
+   * Parameters: `TeammateIdParams`. Result: `Chat`.
+   */
+  OrganizationChatOpen = "OrganizationChatOpen",
+  /**
    * Adds a teammate to a chat. Parameters: `ChatMemberParams`. Result: `ChatMember`.
    */
   ConversationAddMember = "ConversationAddMember",
@@ -1625,6 +1630,10 @@ export declare class Resources {
   public static readonly titleChosenField: string;
   /** Name of a chat's field for the existing folder a person attached to it: `attachedFolder`. */
   public static readonly attachedFolderField: string;
+  /** Name of a chat's field for the organization and teammate whose Organization chat it is: `organizationChat`. */
+  public static readonly organizationChatField: string;
+  /** Name of the field for an organization's id: `organizationId`. */
+  public static readonly organizationIdField: string;
   /** Name of a teammate update's field for the provider its sender read: `expectedProviderId`. */
   public static readonly expectedProviderIdField: string;
   /** Name of a provider mode's field saying it lifts the provider's restrictions: `unrestricted`. */
@@ -4498,6 +4507,10 @@ export declare class Chat {
    * folder; `null` when none is attached, and always in a project. Written only when set.
    */
   public readonly attachedFolder: string | null;
+  /**
+   * The organization and teammate whose Organization chat this is, or `null` for any other chat. Written only when set.
+   */
+  public readonly organizationChat: OrganizationChat | null;
 
   /**
    * Initializes the chat.
@@ -4517,6 +4530,7 @@ export declare class Chat {
    * @param approvedResponderPlan Whether the chat's own provider's plan was approved since Plan first turned on; `false` by default.
    * @param titleChosen Whether a person chose the title; `false` by default.
    * @param attachedFolder The folder a person attached, or `null` (the default).
+   * @param organizationChat The organization and teammate whose Organization chat this is, or `null` (the default).
    * @throws ArgumentException when the id, a given project id, the title, a timestamp, a given folder, a given attached folder or an
    * approved teammate is blank.
    */
@@ -4535,7 +4549,8 @@ export declare class Chat {
     approvedPlanTeammates?: readonly string[],
     approvedResponderPlan?: boolean,
     titleChosen?: boolean,
-    attachedFolder?: string | null);
+    attachedFolder?: string | null,
+    organizationChat?: OrganizationChat | null);
 
   /**
    * Reads a chat from untrusted JSON.
@@ -11945,6 +11960,13 @@ export declare class Organization {
    */
   public departmentOf(teammateId: string): string | null;
   /**
+   * Returns the teammate a teammate reports to: its department's leader, or for a leader, or in a department with
+   * none, the nearest leader of a parent department.
+   * @param teammateId The teammate's id.
+   * @returns The leader's id, or null when the teammate reports to the person.
+   */
+  public managerOf(teammateId: string): string | null;
+  /**
    * Returns the teammates a message to a target goes to, each once.
    * @param target The target.
    * @param teammateIds Every teammate's id, in the order to list everyone.
@@ -12072,6 +12094,43 @@ export declare class OrganizationMessage {
 }
 
 /** Parameters for sending an organization message. */
+/**
+ * The key of a teammate's Organization chat: the organization and the teammate it talks with.
+ */
+export declare class OrganizationChat {
+  /**
+   * The organization's id.
+   */
+  public readonly organizationId: string;
+  /**
+   * The teammate's id.
+   */
+  public readonly teammateId: string;
+
+  /**
+   * Initializes the key.
+   * @param organizationId The organization's id.
+   * @param teammateId The teammate's id.
+   * @throws ArgumentException when an id is blank.
+   */
+  public constructor(organizationId: string, teammateId: string);
+
+  /**
+   * Reads a key from untrusted JSON.
+   * @param value The untrusted value, expected to carry `organizationId` and `teammateId`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The key.
+   * @throws JsonException when a field is missing or blank.
+   */
+  public static fromJson(value: unknown, path?: string): OrganizationChat;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object with `organizationId` and `teammateId`.
+   */
+  public toJson(): JsonObject;
+}
+
 export declare class OrganizationMessageSendParams {
   /** Whom it goes to. */
   public readonly target: OrganizationTarget;

@@ -8,7 +8,8 @@
 
 import type { IOrganizationSender, MessagesService } from "@noldova/teamrun.core";
 import {
-  DetailKind, Message, MessageAuthor, MessageDetail, type MessageIdParams, MessageSendResult, MessageStatus, ObservedSettings, Provenance, RequestedSettings
+  DetailKind, Message, MessageAuthor, MessageDetail, type MessageIdParams, MessageSendResult, MessageStatus, ObservedSettings, type OrganizationChat, Provenance,
+  RequestedSettings
 } from "@noldova/teamrun.protocol";
 
 import { ChangeSignal } from "./change-signal.fixture.js";
@@ -26,8 +27,9 @@ export class FakeOrganizationSender implements IOrganizationSender {
     this.chatIds = chatIds;
   }
 
-  public async startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult> {
-    this.sends.push(`${teammateId}:${label}:${text}`);
+  public async startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult> {
+    const teammateId = chat.teammateId;
+    this.sends.push(`${chat.organizationId}:${teammateId}:${text}`);
     ChangeSignal.notify();
     await (this.holds.get(teammateId) ?? Promise.resolve());
     if (this.failures.has(teammateId))

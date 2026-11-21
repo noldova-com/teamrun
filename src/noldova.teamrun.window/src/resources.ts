@@ -2064,8 +2064,9 @@ export class Resources {
     return `${count} unread`;
   }
 
-  public static formatOrganizationLeadersNote(count: number): string {
-    return `Every department's leader (${count})`;
+  public static formatOrganizationLeadersNote(names: readonly string[]): string {
+    return names.length === 0 ? "No department has a leader yet"
+      : `${names.length} ${names.length === 1 ? "leader" : "leaders"}: ${Resources.formatNameList(names)}`;
   }
 
   public static formatOrganizationChat(name: string): string {
@@ -2076,12 +2077,14 @@ export class Resources {
     return `Only ${name}`;
   }
 
-  public static formatOrganizationDepartmentNote(count: number): string {
-    return `The leader and every member (${count})`;
+  public static formatOrganizationDepartmentNote(leader: string | null, members: readonly string[]): string {
+    const lead = Object.isNull(leader) ? "No leader" : `Leader: ${leader}`;
+    return members.length === 0 ? `${lead}, no members`
+      : `${lead} · ${members.length} ${members.length === 1 ? "member" : "members"}: ${Resources.formatNameList(members)}`;
   }
 
-  public static formatOrganizationEveryoneNote(count: number): string {
-    return `Every teammate (${count})`;
+  public static formatOrganizationEveryoneNote(names: readonly string[]): string {
+    return names.length === 0 ? "No teammates yet" : `${names.length} ${names.length === 1 ? "teammate" : "teammates"}: ${Resources.formatNameList(names)}`;
   }
 
   public static formatOrganizationMessageNamed(name: string): string {
