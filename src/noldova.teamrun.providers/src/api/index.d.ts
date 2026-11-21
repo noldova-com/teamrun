@@ -1085,7 +1085,8 @@ export interface IProcessTree {
    * @param processId The process.
    * @param startedBy The time, in milliseconds since the epoch, by which the process had started: when TeamRun learned its id.
    * @param ancestorId The process the tree must run under.
-   * @returns `true` once it has ended the tree; `false`, ending nothing, when the process isn't that one any more or the processes can't be listed.
+   * @returns `true` once it has ended the tree, which on Windows includes when a process of it still shows after the last round or a round's script
+   * fails; `false`, ending nothing, when the process isn't that one any more or the processes can't be listed.
    */
   endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean>;
 
@@ -1094,7 +1095,8 @@ export interface IProcessTree {
    * process started no later than `startedBy`, since a process TeamRun still holds keeps its id.
    * @param processId The process.
    * @param startedBy The time, in milliseconds since the epoch, by which the process had started.
-   * @returns `true` once it has ended the tree; `false`, ending nothing, when the process isn't listed or the processes can't be listed.
+   * @returns `true` once it has ended the tree, as {@link endTree} returns it; `false`, ending nothing, when the process isn't listed or the processes
+   * can't be listed.
    */
   endOwnTree(processId: number, startedBy: number): Promise<boolean>;
 
@@ -4145,6 +4147,10 @@ export declare class Resources {
    */
   public static readonly processTreeFreezeRounds: number;
   /**
+   * How long `formatProcessEndScript` waits, in all, for the processes it ends to exit, in milliseconds: 2000.
+   */
+  public static readonly processExitWait: number;
+  /**
    * How often `ProcessTree` looks whether a tree it sent `SIGTERM` has ended, so the grace ends early once it has, in milliseconds: 100.
    */
   public static readonly processTreeGracePoll: number;
@@ -6224,12 +6230,26 @@ export declare class Resources {
   public static formatTaskProcessUnknown(providerName: string): string;
   public static formatAcpTerminalUnknown(terminalId: string): string;
   public static formatAcpTerminalOutside(providerName: string, directory: string): string;
+  /**
+   * The line a Windows tree's end writes to its log when a round's script fails, so the tree may still run.
+   * @param round The round, counted from 1.
+   * @param failure The failure's type.
+   */
+  public static formatTreeEndRoundFailed(round: number, failure: string): string;
+
+  /**
+   * The line a Windows tree's end writes to its log when a process of the tree still shows after its last round.
+   * @param processes Each process still listed, as its id and its start in milliseconds since the epoch.
+   */
+  public static formatTreeLeftListed(processes: readonly (readonly [number, number])[]): string;
+
   public static formatTaskProcessGone(providerName: string): string;
 
   /**
    * The PowerShell script that ends a round of a tree on Windows, then lists the processes again: it opens each process by its id and takes its handle
    * before it reads the start, and ends it through that same handle, which keeps its id from being reused, only when the process started when the
-   * listing said, to the millisecond.
+   * listing said, to the millisecond. After each end it waits for the process to exit, all of them within `processExitWait` of the script's start,
+   * so the listing that follows doesn't show a process still exiting.
    * @param processIds The processes, parents first.
    * @param starts Their starts, in milliseconds since the epoch, as the listing gave them.
    */
@@ -10763,8 +10783,11 @@ export declare class ProcessTerminator {
  * Lists processes with their parents and starts, and ends a tree. A process counts as the tree's only through a parent that started no later than
  * it, and not through a parent id the listing shows another process holding now.
  * On Windows it ends the tree in rounds, each one PowerShell script that opens each listed process by id, ends it through that handle only when it
- * started when the listing said, parents first, and lists again, until no new process shows under the tree, at most `processTreeFreezeRounds`
- * rounds; its listings and rounds run in its `IPowershellSession` when it has one, and otherwise each in a new PowerShell, and a script the session
+ * started when the listing said, parents first, waits for it to exit, and lists again, until no process of the tree shows, at most
+ * `processTreeFreezeRounds` rounds, so one whose end failed is ended again in the next round; after the last round, or a round whose script fails,
+ * it stops with the tree reported ended even if a process of it still shows, and writes to its log which processes still showed or which round
+ * failed. Its listings and rounds run in its `IPowershellSession` when it has
+ * one, and otherwise each in a new PowerShell, and a script the session
  * fails or runs out of time on runs once more in a new PowerShell, so a stalled session doesn't leave the tree running.
  * Elsewhere it sends `SIGSTOP` to each process of the tree and lists again until no new process shows under it, at most `processTreeFreezeRounds`
  * listings, so a parent can't start its next process meanwhile; then `SIGTERM` and `SIGCONT` to each it stopped. Once those have ended, or after
@@ -10784,7 +10807,7 @@ export declare class ProcessTree implements IProcessTree, IOrphanSweep {
    * @param read Reads a process's environment file for `endOrphaned`, throwing when it can't; the file system by default.
    */
   public constructor(platform: string, runner: CommandRunner, environment: NodeJS.ProcessEnv, timeout: number, timer: ITimer, grace: number,
-    kill?: (processId: number, signal: NodeJS.Signals | 0) => void, session?: IPowershellSession | null, read?: (path: string) => string);
+    kill?: (processId: number, signal: NodeJS.Signals | 0) => void, session?: IPowershellSession | null, read?: (path: string) => string, log?: ILog | null);
 
   /** @inheritdoc */
   public endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean>;
