@@ -25,6 +25,7 @@ import type { TurnWake } from "./turn-wake.js";
 export class WakeTurn implements ITurnListener {
   public readonly environment: Readonly<Record<string, string>>;
   public readonly planFirst: boolean;
+  public readonly mode: string | null;
   private readonly result: PromiseWithResolvers<TurnResult> = Promise.withResolvers<TurnResult>();
   private readonly queued: { readonly run: (target: ITurnListener) => Promise<void>; readonly fail?: (error: unknown) => void }[] = [];
   private readonly replay: PromiseWithResolvers<void> = Promise.withResolvers<void>();
@@ -36,9 +37,11 @@ export class WakeTurn implements ITurnListener {
   private readonly followHandlers: (() => void)[] = [];
   private readonly senderAdopter: (token: string) => boolean;
 
-  public constructor(environment: Readonly<Record<string, string>>, planFirst: boolean = false, adoptSender: (token: string) => boolean = () => false) {
+  public constructor(environment: Readonly<Record<string, string>>, planFirst: boolean = false, adoptSender: (token: string) => boolean = () => false,
+    mode: string | null = null) {
     this.environment = environment;
     this.planFirst = planFirst;
+    this.mode = mode;
     this.senderAdopter = adoptSender;
   }
 
