@@ -777,8 +777,8 @@ export class WaitingSendsTests {
     Assert.isFalse(existsSync(folder(chat.id, sent.id)));
 
     const kept = prepare();
-    await addAsync(new MessageSendParams(other.id, "To nobody", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id,
-      [new AttachmentInput(kept.name, kept.mediaType, null, kept.path)], ["teammate-gone"]));
+    await addAsync(new MessageSendParams(other.id, "To nobody", new RequestedSettings("fake", null, null), "provider-gone",
+      [new AttachmentInput(kept.name, kept.mediaType, null, kept.path)], []));
     await host.until("the failed message kept", async () => (await host.engine.listWaitingAsync(new ChatIdParams(other.id))).messages.some(t => !Object.isNull(t.failure)));
     const before = existsSync(folder(other.id));
     await host.conversations.deleteAsync(new ChatIdParams(other.id));
@@ -1020,7 +1020,7 @@ export class WaitingSendsTests {
     const release = WaitingSendsTests.holdFirst(host);
     await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
     await host.adapter.requested(1);
-    const unknown = new MessageSendParams(chat.id, "To nobody", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id, [], ["teammate-gone"]);
+    const unknown = new MessageSendParams(chat.id, "To nobody", new RequestedSettings("fake", null, null), "provider-gone", [], []);
     const failing = await host.engine.addWaitingAsync(new WaitingMessageAddParams(unknown, MessageDelivery.Queue));
     await host.engine.addWaitingAsync(new WaitingMessageAddParams(await WaitingSendsTests.paramsAsync(host, chat.id, "Next"), MessageDelivery.Queue));
 
@@ -1033,7 +1033,7 @@ export class WaitingSendsTests {
     await host.engine.waitForIdle();
 
     Assert.areEqual(failing.id, kept[0]?.id);
-    Assert.isTrue(kept.length === 1 && (kept[0]?.failure?.includes("teammate-gone") ?? false), kept[0]?.failure ?? "no failure");
+    Assert.isTrue(kept.length === 1 && (kept[0]?.failure?.includes("provider-gone") ?? false), kept[0]?.failure ?? "no failure");
     Assert.areEqual("First,Next,To the chat", await WaitingSendsTests.sentAsync(host, chat.id));
     Assert.areEqual(1, host.log.lines.filter(t => t.startsWith(`A waiting message in the chat ${chat.id} wasn't sent: `)).length,
       host.log.lines.join("\n"));
