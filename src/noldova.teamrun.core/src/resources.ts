@@ -632,6 +632,8 @@ export class Resources {
   public static readonly selectLastSequenceByConversation: string = "SELECT sequence FROM messages WHERE chatId = ? ORDER BY sequence DESC LIMIT 1";
   public static readonly selectMessageById: string = "SELECT json FROM messages WHERE id = ?";
   public static readonly selectMessagesByConversation: string = "SELECT json FROM messages WHERE chatId = ? AND sequence > ? ORDER BY sequence";
+  public static readonly selectRepliesTo: string =
+    "SELECT json FROM messages WHERE chatId = ? AND sequence > ? AND json_valid(json) AND json_extract(json, '$.inReplyTo') = ? ORDER BY sequence";
   public static readonly selectMessageOutlinesByConversation: string =
     "SELECT json_set(json, '$.details', json('[]')) AS json FROM messages WHERE chatId = ? AND sequence > ? ORDER BY sequence";
   public static readonly selectNewestMessagesByConversation: string = "SELECT json FROM messages WHERE chatId = ? ORDER BY sequence DESC LIMIT ?";

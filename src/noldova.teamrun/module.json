@@ -9,7 +9,7 @@
   "noldovaDesktop": ">=0.0.11 <0.1.0",
   "contributes": {
     "methods": [
-      "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.organizationList", "teamrun.organizationMessageSend", "teamrun.organizationMessageStop", "teamrun.organizationMessageList", "teamrun.departmentCreate", "teamrun.departmentUpdate",
+      "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.organizationList", "teamrun.organizationMessageSend", "teamrun.organizationMessageStop", "teamrun.organizationMessageList", "teamrun.organizationMessageReplyList", "teamrun.departmentCreate", "teamrun.departmentUpdate",
       "teamrun.departmentMove", "teamrun.departmentDelete", "teamrun.departmentMemberSet", "teamrun.defaultTeammateRead",
       "teamrun.defaultTeammateSet", "teamrun.conversationAddMember",
       "teamrun.conversationRemoveMember", "teamrun.conversationSetMemberMode", "teamrun.conversationSetMemberSettings", "teamrun.conversationSetPlanFirst", "teamrun.conversationListMembers", "teamrun.attachmentPrepare", "teamrun.attachmentDiscard", "teamrun.attachmentRead", "teamrun.attachmentShare", "teamrun.attachmentExists", "teamrun.writtenImageRead", "teamrun.writtenImageShare", "teamrun.linkedFolderList", "teamrun.draftSave", "teamrun.draftRead", "teamrun.draftDiscard", "teamrun.readingPositionList", "teamrun.readingPositionSave", "teamrun.runOutputList", "teamrun.runOutputSave", "teamrun.dataFolderRead", "teamrun.firstLaunchRead", "teamrun.firstLaunchFinish", "teamrun.providerKindList",

@@ -20,6 +20,7 @@ export enum MethodName {
   OrganizationMessageSend = "OrganizationMessageSend",
   OrganizationMessageStop = "OrganizationMessageStop",
   OrganizationMessageList = "OrganizationMessageList",
+  OrganizationMessageReplyList = "OrganizationMessageReplyList",
   ConversationAddMember = "ConversationAddMember",
   ConversationRemoveMember = "ConversationRemoveMember",
   ConversationListMembers = "ConversationListMembers",

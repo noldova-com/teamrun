@@ -6,15 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type Signal, signal, type WritableSignal } from "@angular/core";
+import { type FactoryProvider, inject, type Signal, signal, type WritableSignal } from "@angular/core";
 
 import "@noldova/context.core";
-import type { IWindowPartContext } from "@noldova/desktop.window";
+import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 import { EventName, MethodName, Organization } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 
 export class OrganizationStoreService {
+  public static readonly provider: FactoryProvider =
+    { provide: OrganizationStoreService, useFactory: (): OrganizationStoreService => OrganizationStoreService.of(inject(WindowPartTokens.context)) };
+
   private static readonly stores: WeakMap<IWindowPartContext, OrganizationStoreService> = new WeakMap();
 
   private readonly context: IWindowPartContext;

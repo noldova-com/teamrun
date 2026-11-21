@@ -596,6 +596,11 @@ export declare enum MethodName {
   /** Lists the organization messages, oldest first. Result: `OrganizationMessage[]`. */
   OrganizationMessageList = "OrganizationMessageList",
   /**
+   * Lists the replies to one organization message: for each recipient its message reached, the replies in its chat that answer the message it was
+   * sent, in chat order. Parameters: `MessageIdParams`, the organization message's id. Result: `Message[]`.
+   */
+  OrganizationMessageReplyList = "OrganizationMessageReplyList",
+  /**
    * Adds a teammate to a chat. Parameters: `ChatMemberParams`. Result: `ChatMember`.
    */
   ConversationAddMember = "ConversationAddMember",
