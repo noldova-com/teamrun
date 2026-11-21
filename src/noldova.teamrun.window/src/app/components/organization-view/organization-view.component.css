@@ -62,10 +62,15 @@
 }
 
 .chart {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.canvas {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
-  padding: var(--nol-space-4) var(--nol-space-6) var(--nol-space-6);
 }
 
 .tree {
@@ -73,6 +78,7 @@
   flex-direction: column;
   align-items: center;
   min-width: max-content;
+  padding: var(--nol-space-4) var(--nol-space-6) var(--nol-space-6);
 }
 
 .owner {

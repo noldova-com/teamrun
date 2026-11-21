@@ -8,7 +8,7 @@
 
 import { Component, computed, inject, type InputSignal, input, type Signal } from "@angular/core";
 
-import { ChipComponent, IconButtonComponent } from "@noldova/ui.components.angular";
+import { CanvasItemDirective, ChipComponent, IconButtonComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import type { OrganizationNode } from "../../models/organization-node";
@@ -17,7 +17,7 @@ import { OrganizationCardComponent } from "../organization-card/organization-car
 
 @Component({
   selector: "nol-teamrun-organization-department",
-  imports: [ChipComponent, IconButtonComponent, OrganizationCardComponent],
+  imports: [CanvasItemDirective, ChipComponent, IconButtonComponent, OrganizationCardComponent],
   providers: [OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-department" },
   templateUrl: "./organization-department.component.html",

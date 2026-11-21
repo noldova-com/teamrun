@@ -8,8 +8,8 @@
 
 import { Component, computed, inject, signal, type Signal, type WritableSignal } from "@angular/core";
 
-import { AvatarComponent, ButtonComponent, ButtonVariant, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent,
-  MenuTriggerDirective, SelectOption } from "@noldova/ui.components.angular";
+import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChoicePillsComponent, MenuComponent,
+  MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationViewMode } from "../../enums/organization-view-mode";
@@ -24,8 +24,8 @@ import { OrganizationFocusComponent } from "../organization-focus/organization-f
 
 @Component({
   selector: "nol-teamrun-organization-view",
-  imports: [AvatarComponent, ButtonComponent, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
-    OrganizationBoardComponent, OrganizationDepartmentComponent, OrganizationFocusComponent],
+  imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent,
+    MenuSeparatorComponent, MenuTriggerDirective, OrganizationBoardComponent, OrganizationDepartmentComponent, OrganizationFocusComponent],
   providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",
@@ -38,6 +38,7 @@ export class OrganizationViewComponent {
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
+  protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly modes: typeof OrganizationViewMode = OrganizationViewMode;
