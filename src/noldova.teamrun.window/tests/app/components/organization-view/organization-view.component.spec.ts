@@ -395,7 +395,7 @@ describe("OrganizationViewComponent", () => {
     };
     const chosenLabel = (): string => one(".nol-select-value", select()).textContent?.trim() ?? "";
 
-    it("talks to the first department until a teammate's name or a department's Message is chosen, but not by the rest of a card, Enter on it, its own buttons or while editing", async () => {
+    it("talks to the first department until a teammate's name or a department's Message is chosen, also while editing, but not by the rest of a card, Enter on it or its own buttons", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
       await create();
       const first = [one("aside.messages").getAttribute("aria-label"), heading()];
@@ -426,10 +426,13 @@ describe("OrganizationViewComponent", () => {
       await settle();
       card("Code Reviewer").click();
       await settle();
+      const editing = [heading(), all(".message").length, all("button.name").length];
+      await userEvent.click(one(":scope > .department .message", department("UI")));
+      await settle();
 
-      expect([first, names, clicked, rest, entered, build, tuned, heading(), all(".message").length, all("button.name").length]).toEqual([
+      expect([first, names, clicked, rest, entered, build, tuned, editing, heading()]).toEqual([
         ["Messages", ["Chat with Design"]], [["BUTTON", "Message Alice"], ["BUTTON", "Message Bob"]], ["Chat with Bob"], ["Chat with Bob"], ["Chat with Alice"],
-        ["Message Build", ["Chat with Build"]], ["Chat with Build"], ["Chat with Build"], 0, 0]);
+        ["Message Build", ["Chat with Build"]], ["Chat with Build"], [["Chat with Build"], 3, 0], ["Chat with UI"]]);
     });
 
     it("chooses a teammate in a nested department too", async () => {
@@ -760,6 +763,38 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(text).fontSize), AppearanceFixture.measureLook("text-panel"));
       AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(lasted).fontSize), AppearanceFixture.measureLook("text-code"));
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
+    });
+
+    it("sets To over a select as wide as the messages' padding allows, a department's Message under its summary at its start, and a name as plain text", async () => {
+      await create();
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const aside = one("aside.messages");
+      const border = Number.parseFloat(getComputedStyle(aside).borderTopWidth);
+      const [label, choice] = [one(".to-label", aside), one(".to-choice", aside)];
+      const design = one(":scope > .department", department("Design"));
+      const inset = Number.parseFloat(getComputedStyle(design).borderLeftWidth) + space(3);
+      const [summary, message] = [one(".department-summary", design), one(".message", design)];
+      const alice = card("Alice");
+      const [name, role] = [one(".name", alice), one(".role", alice)];
+      const labelStyle = getComputedStyle(label);
+      const nameStyle = getComputedStyle(name);
+
+      AppearanceFixture.expectPixels(box(label).left, box(aside).left + border + space(3));
+      AppearanceFixture.expectPixels(box(label).top, box(aside).top + border + space(3));
+      AppearanceFixture.expectPixels(box(choice).left, box(label).left);
+      AppearanceFixture.expectPixels(box(choice).right, box(aside).right - border - space(3));
+      AppearanceFixture.expectPixels(box(choice).top - box(label).bottom, space(3));
+      AppearanceFixture.expectPixels(Number.parseFloat(labelStyle.fontSize), AppearanceFixture.measureLook("text-small"));
+      AppearanceFixture.expectPixels(Number.parseFloat(labelStyle.lineHeight), AppearanceFixture.measureLook("line-label"));
+      expect(labelStyle.fontWeight).toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
+      AppearanceFixture.expectPixels(box(message).left, box(design).left + inset);
+      AppearanceFixture.expectPixels(box(message).top - box(summary).bottom, space(1) + AppearanceFixture.measureLook("space-half"));
+      expect(box(message).right).toBeLessThanOrEqual(box(design).right - inset);
+      AppearanceFixture.expectPixels(box(name).left, box(role).left);
+      AppearanceFixture.expectPixels(box(role).top, box(name).bottom);
+      expect([nameStyle.paddingLeft, nameStyle.paddingTop, nameStyle.borderTopWidth, nameStyle.fontWeight]).toEqual(["0px", "0px", "0px",
+        getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim()]);
     });
 
     it("sizes the cards, hangs each leader under its department, the members off one line, and joins the departments to you through one bar", async () => {

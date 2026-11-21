@@ -27,11 +27,9 @@ LICENSE file in the root directory of this source tree.
   @if (summary(); as text) {
     <span class="department-summary">{{ text }}</span>
   }
-  @if (!editing()) {
-    <button type="button" nol-button class="message" [variant]="textVariant" [attr.aria-label]="resources.formatOrganizationMessageNamed(node().department.name)"
-      (click)="chosen.emit(target.department(node().department.id))"><span nolButtonIcon class="material-symbols-rounded"
-      aria-hidden="true">{{ resources.organizationMessageIcon }}</span>{{ resources.organizationMessageButton }}</button>
-  }
+  <button type="button" nol-button class="message" [variant]="textVariant" [attr.aria-label]="resources.formatOrganizationMessageNamed(node().department.name)"
+    (click)="chosen.emit(target.department(node().department.id))"><span nolButtonIcon class="material-symbols-rounded"
+    aria-hidden="true">{{ resources.organizationMessageIcon }}</span>{{ resources.organizationMessageButton }}</button>
 </div>
 @if (node().leader; as leader) {
   <div class="stem"></div>
