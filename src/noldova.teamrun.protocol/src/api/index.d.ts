@@ -1172,7 +1172,8 @@ export declare enum MethodName {
    * publishes `WaitingMessagesChanged`. Stop and send stops the chat's running replies. The waiting messages go one at a time, each
    * as `MessageSend` sends it, once the chat has no running reply and no answer to a question waits; one added to an idle chat goes
    * at once. Steer waits like Queue until a provider can take it into its running turn. Parameters: `WaitingMessageAddParams`.
-   * Result: `WaitingMessage`; an unknown chat is `NotFound`.
+   * Result: `WaitingMessage`; an unknown chat is `NotFound`, and a send whose `mentionedTeammateIds` aren't the teammates its text
+   * mentions, as `MessageSend` resolves them for a person's text, is `Conflict`, as for `WaitingMessageEdit`.
    */
   WaitingMessageAdd = "WaitingMessageAdd",
   /**

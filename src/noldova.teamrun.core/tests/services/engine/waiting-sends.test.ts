@@ -927,6 +927,27 @@ export class WaitingSendsTests {
   }
 
   @TestMethod
+  public async refusesAWaitingMessageWhoseMentionsArentThoseOfItsTextAndAddsNothing(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+
+    const refused = await Assert.throwsAsync(() => host.engine.addWaitingAsync(new WaitingMessageAddParams(
+      new MessageSendParams(chat.id, "Check X", null, null, [], [bob.id]), MessageDelivery.Queue)), ServiceException);
+    const listed = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length;
+    release();
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(`${ErrorCode.Conflict}:${Resources.waitingMentionsMismatch}`, `${refused.info.name}:${refused.message}`);
+    Assert.areEqual(0, listed);
+    Assert.areEqual("First", await WaitingSendsTests.sentAsync(host, chat.id));
+  }
+
+  @TestMethod
   public async refusesAnEditWhoseMentionsArentThoseOfItsNewTextAndKeepsTheMessageAsItWas(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.createConversationAsync();
@@ -947,7 +968,7 @@ export class WaitingSendsTests {
     await host.adapter.requested(2);
     await host.engine.waitForIdle();
 
-    Assert.areEqual(`${ErrorCode.Conflict}:${Resources.editMentionsMismatch}`, `${refused.info.name}:${refused.message}`);
+    Assert.areEqual(`${ErrorCode.Conflict}:${Resources.waitingMentionsMismatch}`, `${refused.info.name}:${refused.message}`);
     Assert.areEqual(`@Bob check X:${bob.id}`, kept.join("|"));
     Assert.areEqual("First,@Alice check X", await WaitingSendsTests.sentAsync(host, chat.id));
     Assert.areEqual(0, (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length);

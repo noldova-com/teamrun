@@ -74,6 +74,7 @@ export class WaitingSends {
 
   public async addWaitingAsync(params: WaitingMessageAddParams, fromOutside: boolean): Promise<WaitingMessage> {
     const conversation = await this.requireConversationAsync(params.message.chatId);
+    await this.refuseMentionsMismatchAsync(params.message);
     this.lastWaitingTime = Math.max(Date.now(), this.lastWaitingTime + 1);
     const checked = new WaitingMessage(Guid.createVersion7().toString(), params.delivery, params.message, new Date(this.lastWaitingTime).toISOString(), null,
       fromOutside);
@@ -96,9 +97,7 @@ export class WaitingSends {
       if (params.message.chatId !== found.chatId)
         throw new ServiceException(ErrorCode.InvalidParams, Resources.formatWaitingMessageOtherChat(found.id, params.message.chatId),
           [found.id, params.message.chatId]);
-      const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
-      if (!MentionCheck.matches(params.message.text, params.message.mentionedTeammateIds, available, false))
-        throw new ServiceException(ErrorCode.Conflict, Resources.editMentionsMismatch, []);
+      await this.refuseMentionsMismatchAsync(params.message, transaction);
       const [message, files] = this.keepWaitingFiles(found.id, params.message);
       const changed = found.withMessage(message, found.fromOutside || fromOutside);
       await this.waiting.updateAsync(changed, transaction);
@@ -204,6 +203,12 @@ export class WaitingSends {
     const kept = this.attachments.saveWaiting(message.chatId, id, message.attachments);
     return [new MessageSendParams(message.chatId, message.text, message.requested, message.providerId, kept.map(t => new AttachmentInput(t.name, t.mediaType, null, t.path)),
       message.mentionedTeammateIds, message.responderTeammateId, message.senderToken, message.wakeWhenDone), kept];
+  }
+
+  private async refuseMentionsMismatchAsync(message: MessageSendParams, transaction?: SqlTransaction): Promise<void> {
+    const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
+    if (!MentionCheck.matches(message.text, message.mentionedTeammateIds, available, false))
+      throw new ServiceException(ErrorCode.Conflict, Resources.waitingMentionsMismatch, []);
   }
 
   private async requireWaitingAsync(id: string, transaction: SqlTransaction): Promise<WaitingMessage> {
