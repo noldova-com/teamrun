@@ -322,20 +322,40 @@ describe("ComposerDraftService", () => {
       .toEqual([FakeWindowPartContext.qualify(MethodName.DraftSave), FakeWindowPartContext.qualify(MethodName.DraftRead)]);
   });
 
-  it("rejects with the reason a stored draft could not be read, and saves nothing over it until a later read answers", async () => {
+  it("rejects with the reason a stored draft could not be read, saves nothing over it while a save's own read still fails, and then saves what was typed over the draft that read finds", async () => {
+    answerSaves();
     context.fail(MethodName.DraftRead, "unreadable");
 
     await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
     drafts.schedule(draft("hello"));
-    drafts.schedule(draft("other", "c2"));
-    await drafts.save();
-    expect(context.noticeText()).toBeNull();
-    expect(saved().map(t => t.conversationId)).toEqual(["c2"]);
+    await expect(drafts.save()).rejects.toThrow(DraftNotSavedException);
+    expect([context.noticeText(), saved(), context.count(MethodName.DraftRead)]).toEqual([null, [], 2]);
 
+    drafts.schedule(draft("hello there"));
+    context.answer(MethodName.DraftRead, () => stored(4).toJson());
+    await drafts.save();
+    drafts.schedule(draft("hello again"));
+    await drafts.save();
+
+    expect([saved().map(t => [t.conversationId, t.text, t.revision]), context.count(MethodName.DraftRead)])
+      .toEqual([[["c1", "hello there", 4], ["c1", "hello again", 1]], 3]);
+  });
+
+  it("saves on no revision when a save's read after a failed one finds no draft, and reads nothing more once a restore has answered", async () => {
+    answerSaves();
+    context.fail(MethodName.DraftRead, "unreadable");
+    await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
     context.answer(MethodName.DraftRead, () => null);
-    await drafts.restore("c1");
     drafts.schedule(draft("hello"));
     await drafts.save();
-    expect(saved().map(t => t.conversationId)).toEqual(["c2", "c1"]);
+    context.fail(MethodName.DraftRead, "unreadable");
+    await expect(drafts.restore("c2")).rejects.toThrow("unreadable");
+    context.answer(MethodName.DraftRead, () => stored(2).toJson());
+    await drafts.restore("c2");
+    drafts.schedule(draft("other", "c2"));
+    await drafts.save();
+
+    expect([saved().map(t => [t.conversationId, t.text, t.revision]), context.count(MethodName.DraftRead)])
+      .toEqual([[["c1", "hello", 0], ["c2", "other", 2]], 4]);
   });
 });

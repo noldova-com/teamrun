@@ -28,6 +28,7 @@ export class ComposerDraftService {
   private readonly saveInterval: number = inject(ComposerDraftService.interval);
   private readonly revisions: Map<string, number> = new Map();
   private readonly unread: Set<string> = new Set();
+  private readonly unreadable: Set<string> = new Set();
   private readonly arrivals: Map<string, number> = new Map();
   private readonly staleWatchers: Set<(conversationId: string) => void> = new Set();
   private latest: ComposerDraft | null = null;
@@ -36,9 +37,18 @@ export class ComposerDraftService {
 
   public async restore(conversationId: string): Promise<Draft | null> {
     this.unread.add(conversationId);
-    await this.flush();
-    const draft = await this.store.readDraft(conversationId);
-    this.unread.delete(conversationId);
+    let draft: Draft | null;
+    try {
+      await this.flush();
+      draft = await this.store.readDraft(conversationId).catch((error: unknown) => {
+        this.unreadable.add(conversationId);
+        throw error;
+      });
+    }
+    finally {
+      this.unread.delete(conversationId);
+    }
+    this.unreadable.delete(conversationId);
     this.arrive(conversationId);
     if (Object.isNull(draft))
       this.revisions.delete(conversationId);
@@ -92,6 +102,10 @@ export class ComposerDraftService {
   }
 
   private async write(draft: ComposerDraft): Promise<boolean> {
+    if (this.unreadable.has(draft.conversationId) && !await this.readAgain(draft.conversationId)) {
+      this.latest ??= draft;
+      return false;
+    }
     const prepared: MessageAttachment[] = [];
     const grant = (file: File): Promise<string> => this.store.grantFile(file);
     let saved: Draft | null;
@@ -126,6 +140,22 @@ export class ComposerDraftService {
     }
     this.revisions.set(draft.conversationId, saved.revision);
     draft.attachments.forEach((t, index) => t.markSaved(saved.attachments[index]!));
+    return true;
+  }
+
+  private async readAgain(conversationId: string): Promise<boolean> {
+    let kept: Draft | null;
+    try {
+      kept = await this.store.readDraft(conversationId);
+    }
+    catch {
+      return false;
+    }
+    this.unreadable.delete(conversationId);
+    if (Object.isNull(kept))
+      this.revisions.delete(conversationId);
+    else
+      this.revisions.set(conversationId, kept.revision);
     return true;
   }
 

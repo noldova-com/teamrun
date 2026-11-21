@@ -4852,17 +4852,21 @@ describe("ComposerComponent", () => {
       expect(box().value).toBe("hello");
     });
 
-    it("says when the unsent message could not be read, and keeps nothing written there over it", async () => {
+    it("says when the unsent message could not be read, saves nothing written there over it while it still can't be read, and saves it once it can", async () => {
+      let readable = false;
       context.answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c1"
-        ? Promise.reject(new Error("unreadable")) : Promise.reject("offline"));
+        ? readable ? null : Promise.reject(new Error("unreadable")) : Promise.reject("offline"));
       await prepare();
       await render();
 
       expect(alert()).toBe(Resources.formatDraftUnreadable("unreadable"));
       expect(box().readOnly).toBe(false);
       await type("hello");
-      await saveStep()();
+      await expect(saveStep()()).rejects.toThrow(Resources.draftNotSaved);
       expect(context.count(MethodName.DraftSave)).toBe(0);
+      readable = true;
+      await saveStep()();
+      expect(saves().map(t => t.text)).toEqual(["hello"]);
 
       fixture.componentRef.setInput("conversationId", "c2");
       await fixture.whenStable();
