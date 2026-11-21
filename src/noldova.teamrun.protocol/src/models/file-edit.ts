@@ -13,11 +13,13 @@ export class FileEdit {
   public readonly path: string;
   public readonly kind: string;
   public readonly lines: readonly DiffLine[];
+  public readonly movePath: string | null;
 
-  public constructor(path: string, kind: string, lines: readonly DiffLine[]) {
+  public constructor(path: string, kind: string, lines: readonly DiffLine[], movePath: string | null = null) {
     this.path = path;
     this.kind = kind;
     this.lines = lines;
+    this.movePath = movePath;
   }
 
   public get additions(): number {

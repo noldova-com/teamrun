@@ -25,10 +25,10 @@
       "teamrun.panelAnswered", "teamrun.providerOwnMcpServerList", "teamrun.sharedMcpServerList", "teamrun.sharedMcpServerCreate", "teamrun.sharedMcpServerUpdate",
       "teamrun.sharedMcpServerDelete", "teamrun.sharedMcpProviderSet", "teamrun.sharedMcpTeammateSet", "teamrun.sharedMcpSecretSet",
       "teamrun.sharedMcpSignInStart", "teamrun.sharedMcpSignOut",
-      "teamrun.messageDetailsAfter", "teamrun.computerUseGrantList", "teamrun.computerUseGrantRevoke", "teamrun.outsideConnectionRead", "teamrun.outsideTokenReset",
+      "teamrun.messageDetailsAfter", "teamrun.computerUseGrantList", "teamrun.computerUseGrantRevoke", "teamrun.outsideConnectionRead", "teamrun.outsideTokenReset", "teamrun.teammateWorkRead",
       "teamrun.waitingMessageAdd", "teamrun.waitingMessageList", "teamrun.waitingMessageEdit", "teamrun.waitingMessageRemove",
       "teamrun.waitingMessageSendNow",
-      "teamrun.pageOpen", "teamrun.pageRead", "teamrun.pageRestore", "teamrun.pageList"
+      "teamrun.pageOpen", "teamrun.pageRead", "teamrun.pageRestore", "teamrun.pageList", "teamrun.pageEditedList"
     ],
     "events": [
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.messageCreated", "teamrun.messageUpdated",
