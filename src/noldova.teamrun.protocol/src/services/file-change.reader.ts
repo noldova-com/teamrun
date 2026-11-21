@@ -48,7 +48,8 @@ export class FileChangeReader {
         continue;
       const kind = FileChangeReader.kindOf(change[Resources.kindField]);
       const diff = change[Resources.diffField];
-      const edit = new FileEdit(path, kind, Object.isString(diff) ? FileChangeReader.changeLines(kind, diff, sendsContent) : []);
+      const edit = new FileEdit(path, kind, Object.isString(diff) ? FileChangeReader.changeLines(kind, diff, sendsContent) : [],
+        FileChangeReader.movePathOf(change[Resources.kindField]));
       compared?.set(edit, Object.isString(diff) && FileChangeReader.isWhole(diff));
       edits.push(edit);
     }
@@ -114,7 +115,15 @@ export class FileChangeReader {
     const type = value[Resources.typeField];
     if (!Object.isString(type))
       return Resources.updateKind;
-    return type === Resources.updateKind && Object.isString(value[Resources.movePathField]) ? Resources.moveKind : type;
+    return Object.isNull(FileChangeReader.movePathOf(value)) ? type : Resources.moveKind;
+  }
+
+  private static movePathOf(kind: JsonValue | undefined): string | null {
+    const value = Object.isString(kind) && kind.startsWith(Resources.jsonObjectStart) ? FileChangeReader.parse(kind) : kind;
+    if (!FileChangeReader.isJsonObject(value) || value[Resources.typeField] !== Resources.updateKind)
+      return null;
+    const movePath = value[Resources.movePathField];
+    return Object.isString(movePath) ? movePath : null;
   }
 
   private static sendsContent(payload: JsonObject): boolean {
@@ -154,7 +163,7 @@ export class FileChangeReader {
       if (Object.isUndefined(previous) || (replaces && compared.get(edit) === true))
         merged.set(key, edit);
       else if (!replaces)
-        merged.set(key, new FileEdit(previous.path, previous.kind, [...previous.lines, ...edit.lines]));
+        merged.set(key, new FileEdit(previous.path, previous.kind, [...previous.lines, ...edit.lines], previous.movePath));
       if (merged.get(key) === edit && compared.has(edit))
         fromTree.add(key);
     }

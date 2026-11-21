@@ -11,7 +11,7 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
-  PlanUsage, PlanWindow, PlanWindowName, TeammateLastReply } from "@noldova/teamrun.protocol";
+  PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammateWork } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
@@ -223,7 +223,8 @@ describe("OrganizationViewComponent", () => {
 
     await openMenu(one(".top .cards-show"));
     expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Last message", "false"],
-      ["Model and effort", "false"], ["Clear every card's own choice", null]]);
+      ["Model and effort", "false"], ["Git branch", "false"], ["Pull requests", "false"], ["Documents", "false"], ["Artifacts", "false"],
+      ["Clear every card's own choice", null]]);
     expect(menuItem("Clear every card's own choice").getAttribute("aria-disabled")).toBe("true");
     menuItem("Usage today").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
@@ -236,7 +237,25 @@ describe("OrganizationViewComponent", () => {
 
     expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "40%", "gpt-5 · high"], ["Idle", "40%"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
-    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
+    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true, Git: false, PullRequests: false, Documents: false,
+      Artifacts: false } }));
+  });
+
+  it("shows a teammate's work on its card only while a work field is on, and reads it only then", async () => {
+    await create();
+
+    expect([all("nol-teamrun-teammate-work"), context.count(MethodName.TeammateWorkRead)]).toEqual([[], 0]);
+
+    context.answer(MethodName.TeammateWorkRead, t => new TeammateWork(TeammateIdParams.fromJson(t).teammateId, null, [], []).toJson());
+    await openMenu(one(".top .cards-show"));
+    menuItem("Git branch").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    await Wait.until(() => expect(texts("[data-field=Git] .work-muted", card("Alice"))).toEqual(["The Git module isn't installed"]));
+    const cards = all("nol-teamrun-organization-card").length;
+    expect([cards, all("nol-teamrun-teammate-work").length, context.count(MethodName.TeammateWorkRead), saves[0]])
+      .toEqual([4, cards, cards, expect.objectContaining({ cardsShow: expect.objectContaining({ Git: true }) })]);
   });
 
   it("shows no usage on a card whose provider's plan has no window with a percent, such as an unlimited one", async () => {

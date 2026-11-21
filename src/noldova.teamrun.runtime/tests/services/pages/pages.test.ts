@@ -61,7 +61,7 @@ export class PagesTests {
     await harness.pages.serveAsync(serving, new ManualTimer());
     await harness.pages.closeAsync();
 
-    Assert.areEqual("teamrun.pageOpen,teamrun.pageRead,teamrun.pageRestore,teamrun.pageList", [...serving.methods.keys()].join(","));
+    Assert.areEqual("teamrun.pageOpen,teamrun.pageRead,teamrun.pageRestore,teamrun.pageList,teamrun.pageEditedList", [...serving.methods.keys()].join(","));
     Assert.areEqual("teamrun.pageShown,teamrun.pageUpdated,teamrun.pageStopped", serving.events.join(","));
   }
 

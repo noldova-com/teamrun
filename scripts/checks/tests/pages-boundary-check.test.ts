@@ -132,8 +132,8 @@ describe("PagesBoundaryCheck", () => {
       `${STORE}:7: takes ../../resources.js, outside Pages' folders`,
       `${STORE}:8: takes ../conversations-service.js, outside Pages' folders`,
       `${STORE}:9: takes @noldova/teamrun.core, which Pages may not use`,
-      `${STORE}:10: takes Conversation from @noldova/teamrun.protocol, of which Pages may use only Page, PageAuthor, PageVersion, PageView, PageRequest, PageListRequest, PageMethodName, PageEventName, PageKind, CanvasManifest, CanvasPage, CanvasArtboard, CanvasNote, CanvasMark, CanvasGuide, CanvasNoteKind, CanvasMarkKind, CanvasAxis`,
-      `${STORE}:11: takes all of @noldova/teamrun.protocol, of which Pages may use only Page, PageAuthor, PageVersion, PageView, PageRequest, PageListRequest, PageMethodName, PageEventName, PageKind, CanvasManifest, CanvasPage, CanvasArtboard, CanvasNote, CanvasMark, CanvasGuide, CanvasNoteKind, CanvasMarkKind, CanvasAxis`
+      `${STORE}:10: takes Conversation from @noldova/teamrun.protocol, of which Pages may use only Page, PageAuthor, PageVersion, PageView, PageRequest, PageListRequest, PageEditedListRequest, PageMethodName, PageEventName, PageKind, CanvasManifest, CanvasPage, CanvasArtboard, CanvasNote, CanvasMark, CanvasGuide, CanvasNoteKind, CanvasMarkKind, CanvasAxis`,
+      `${STORE}:11: takes all of @noldova/teamrun.protocol, of which Pages may use only Page, PageAuthor, PageVersion, PageView, PageRequest, PageListRequest, PageEditedListRequest, PageMethodName, PageEventName, PageKind, CanvasManifest, CanvasPage, CanvasArtboard, CanvasNote, CanvasMark, CanvasGuide, CanvasNoteKind, CanvasMarkKind, CanvasAxis`
     ]);
   });
 
