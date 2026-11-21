@@ -101,6 +101,11 @@ describe("Resources", () => {
     expect(Resources.formatReplyProvider("Claude Code")).toBe("·\u00a0Claude Code");
   });
 
+  it("joins a teammate's role and department, leaving out what is missing, and gives nothing when both are", () => {
+    expect([Resources.formatOrganizationRoleIn("Review", "Design"), Resources.formatOrganizationRoleIn("", "Design"), Resources.formatOrganizationRoleIn("Review", null),
+      Resources.formatOrganizationRoleIn(null, null)]).toEqual(["Review · Design", "Design", "Review", null]);
+  });
+
   it("asks before deleting a department or removing a member, saying where what it held goes", () => {
     expect([Resources.formatOrganizationDeleteDepartment("Design", null), Resources.formatOrganizationDeleteDepartment("Web", "Build"),
       Resources.formatOrganizationRemoveMember("Alice", "Design")]).toEqual([

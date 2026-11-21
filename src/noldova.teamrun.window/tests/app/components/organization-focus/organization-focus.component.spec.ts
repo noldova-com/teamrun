@@ -289,7 +289,7 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(saves.map(t => t.focus)).toEqual(["Teammate:alice", "Department:design", "Teammate:bob"]));
   });
 
-  it("renames a focused teammate, puts the name back on an empty or refused one, and removes a member from its department after asking, but no leader", async () => {
+  it("renames a focused teammate, puts the name back with why on an empty, invalid or refused one, and removes a member from its department after asking, but no leader", async () => {
     const field = (): HTMLInputElement => {
       const found = one(".edit-row .unit-rename");
       if (!(found instanceof HTMLInputElement))
@@ -321,6 +321,11 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(context.count(MethodName.TeammateUpdate)).toBe(1));
     expect([leader, typed, OrganizationStoreService.of(context).actionError(), texts(".remove-teammate")]).toEqual([["Alice", "Rename Alice", 0],
       ["Bob", "Bob", Resources.organizationTeammateNameRule, 0], null, ["deleteRemove teammate"]]);
+    context.fail(MethodName.TeammateUpdate, "That name is taken.");
+    field().value = "Alice";
+    field().dispatchEvent(new Event("change"));
+    await Wait.until(() => expect(field().value).toBe("Bob"));
+    expect([context.count(MethodName.TeammateUpdate), OrganizationStoreService.of(context).actionError()?.includes("That name is taken.")]).toEqual([2, true]);
 
     await click(one(".remove-teammate"));
     await answer(".nol-teamrun-cancel");

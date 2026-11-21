@@ -66,6 +66,8 @@ export class OrganizationFocusComponent {
     return Object.isNull(focus.teammate) || focus.department?.leader?.id !== focus.teammate.id;
   });
   protected readonly key: Signal<string> = computed(() => OrganizationConversation.keyOf(this.focus().target));
+  protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() =>
+    new Map(this.rows().flatMap(row => row.people.map((person): [string, string] => [person.id, row.node.department.name]))));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.rows().flatMap(t => Object.isNull(t.node.leader) ? [] : [t.node.leader]));
   protected readonly cards: Signal<readonly Teammate[]> = computed(() => {
     const focus = this.focus();
@@ -128,10 +130,6 @@ export class OrganizationFocusComponent {
       this.go(OrganizationTarget.department(node.department.id));
       void this.organization.setMember(teammate.id, null);
     });
-  }
-
-  protected departmentNameOf(teammate: Teammate): string | null {
-    return this.rows().find(t => t.node.leader?.id === teammate.id || t.node.members.some(member => member.id === teammate.id))?.node.department.name ?? null;
   }
 
   protected departmentOf(teammate: Teammate): Department | null {

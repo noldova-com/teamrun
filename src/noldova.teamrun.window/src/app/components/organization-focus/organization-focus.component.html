@@ -93,7 +93,7 @@ LICENSE file in the root directory of this source tree.
       <div class="grid" [class.one]="cards().length === 1">
         @for (card of cards(); track card.id) {
           <nol-teamrun-organization-card nolCanvasItem [teammate]="card" [shape]="fluid" [editing]="editing()" [department]="departmentOf(card)"
-            [departmentName]="departmentNameOf(card)" (message)="go(teammate(card))" />
+            [departmentName]="departmentNames().get(card.id)" (message)="go(teammate(card))" />
         } @empty {
           <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
         }
