@@ -55,6 +55,7 @@ export class Resources {
   public static readonly draftSaveIntervalToken: string = "teamrun.draftSaveInterval";
   public static readonly maximumModelCatalogs: number = 20;
   public static readonly composerChoicesStorageKey: string = "teamrun.composerChoices";
+  public static readonly keptComposerDraftsStorageKey: string = "teamrun.keptComposerDrafts";
   public static readonly defaultChoiceField: string = "defaultChoice";
   public static readonly chatChoicesField: string = "chats";
   public static readonly legacyChatChoicesField: string = "conversations";
