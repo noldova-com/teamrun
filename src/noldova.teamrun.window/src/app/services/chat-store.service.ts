@@ -971,8 +971,11 @@ export class ChatStoreService {
   }
 
   public teammateStopReason(id: string): TeammateStopReason | null {
-    const teammate = this.teammate(id);
-    const provider = this.providers().find(t => t.id === teammate?.providerId);
+    return this.providerStopReason(this.teammate(id)?.providerId ?? null);
+  }
+
+  public providerStopReason(providerId: string | null): TeammateStopReason | null {
+    const provider = this.providers().find(t => t.id === providerId);
     if (Object.isUndefined(provider))
       return TeammateStopReason.ProviderDeleted;
     if (!provider.enabled)

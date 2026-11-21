@@ -79,10 +79,11 @@ describe("TeammateStatusStoreService", () => {
         const found = summaries.get(MessageIdParams.fromJson(t).messageId);
         return Object.isUndefined(found) ? null : ReplySummary.fromMessage(found).toJson();
       });
-    prepare(new TeammateFixture(context));
+    const fixture = new TeammateFixture(context);
+    prepare(fixture);
     const chats = ChatStoreService.of(context);
     store = TeammateStatusStoreService.of(context);
-    await Wait.until(() => expect(chats.teammates()).toHaveLength(3));
+    await Wait.until(() => expect(chats.teammates()).toHaveLength(fixture.teammates.length));
     await Wait.until(() => expect(chats.providers()).toHaveLength(1));
   };
 
@@ -170,17 +171,22 @@ describe("TeammateStatusStoreService", () => {
     expect(ChatStoreService.of(context).pendingApprovals().map(t => t.messageId)).toEqual(["m9"]);
   });
 
-  it("is at its usage limit only while no Sustain account it may use has room", async () => {
+  it("is at its usage limit only while no Sustain account that can reply has room", async () => {
     await create(t => {
-      t.teammates = [sustaining(t.alice, true, ["gone", "a2"]), sustaining(t.bob, false, ["a2"]), t.unavailable];
+      t.teammates = [sustaining(t.alice, true, ["gone", "a2"]), sustaining(t.bob, true, ["off", "out", "old"]), sustaining(t.reviewer, false, ["a2"]),
+        t.unavailable];
     });
-    context.emit(EventName.ProviderUpdated, new Provider("a2", "codex", "Spare", "D:\\profiles\\spare", AuthStatus.LoggedIn, null, "1.0", earlier, null, later).toJson());
+    const spare = (id: string, authStatus: AuthStatus, kind: string = "codex", enabled: boolean = true): Provider =>
+      new Provider(id, kind, id, "D:\\profiles\\spare", authStatus, null, "1.0", earlier, null, later, enabled);
+    for (const provider of [spare("a2", AuthStatus.LoggedIn), spare("off", AuthStatus.LoggedIn, "codex", false), spare("out", AuthStatus.LoggedOut),
+      spare("old", AuthStatus.LoggedIn, "retired")])
+      context.emit(EventName.ProviderUpdated, provider.toJson());
     context.emit(EventName.PlanUsageUpdated, plan(true).toJson());
-    const spare = statuses();
+    const room = [...statuses(), store.statusOf("reviewer")()];
 
     context.emit(EventName.PlanUsageUpdated, plan(true, "a2").toJson());
 
-    expect(spare).toEqual([TeammateStatus.Idle, TeammateStatus.UsageLimit]);
+    expect(room).toEqual([TeammateStatus.Idle, TeammateStatus.UsageLimit, TeammateStatus.UsageLimit]);
     expect(statuses()).toEqual([TeammateStatus.UsageLimit, TeammateStatus.UsageLimit]);
   });
 

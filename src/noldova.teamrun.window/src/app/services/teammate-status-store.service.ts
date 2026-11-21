@@ -93,8 +93,7 @@ export class TeammateStatusStoreService {
   }
 
   private sustainHasRoom(teammate: Teammate): boolean {
-    const providers = new Set(this.chats.providers().map(t => t.id));
-    return teammate.sustain && teammate.fallbacks.some(t => providers.has(t.providerId) && !this.isUsedUp(t.providerId));
+    return teammate.sustain && teammate.fallbacks.some(t => Object.isNull(this.chats.providerStopReason(t.providerId)) && !this.isUsedUp(t.providerId));
   }
 
   private isUsedUp(providerId: string): boolean {
