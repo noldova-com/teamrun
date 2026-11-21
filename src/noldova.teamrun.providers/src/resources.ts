@@ -1175,6 +1175,7 @@ export class Resources {
   public static readonly killSignal: NodeJS.Signals = "SIGKILL";
   public static readonly processTreeFreezeRounds: number = 10;
   public static readonly processListTimeout: number = 30_000;
+  public static readonly powershellSessionAnswerLimit: number = 5_000;
   public static readonly psExecutable: string = "ps";
   public static readonly psProcessListArguments: readonly string[] = ["-A", "-o", "pid=,ppid=,lstart="];
   public static readonly psProcessGroupArguments: readonly string[] = ["-A", "-o", "pid=,pgid=,lstart="];

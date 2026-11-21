@@ -4155,6 +4155,11 @@ export declare class Resources {
    */
   public static readonly processListTimeout: number;
   /**
+   * How long `ProcessTree` waits for its kept PowerShell to answer one script, in milliseconds: 5 seconds, at most half of the listing time,
+   * before it runs the script in a new PowerShell with the rest of that time and the rest of the stop's scripts there too.
+   */
+  public static readonly powershellSessionAnswerLimit: number;
+  /**
    * The process listings `ProcessTree` runs: `ps -A -o pid=,ppid=,lstart=` with `LC_ALL=C`, or one `Get-CimInstance Win32_Process` on Windows; and
    * the pattern of their lines, a process id, its parent's, and its start: `ps`'s start time, to the second, or the milliseconds since the epoch.
    */
