@@ -16,6 +16,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **A reply that fails in a group:** a reply whose failure escapes, such as a failed write as it starts or as it fails, fails only itself, and the other teammates addressed in the same message still answer, rather than all failing with its error; a reply stopped as it fails stays stopped, and its tools and sub-agents still close (#141).
 - **A chat tab's place:** a chat moved to another project, or from Chats into one, now shows its new project in its tab's breadcrumb, rather than the old one (#152).
 - **Claude Code on macOS:** a Claude Code signed in the usual way is listed as signed in, and its turns run, rather than showing `Sign-in required` (#338).
 - **A chat's wake:** when work a chat sent to another chat ends, the chat shows a closed row, `Received a message from <chat> ›`, at the top of the reply it starts, rather than a message that read as the other teammate answering there, with the chat's IDs and a hint meant for the teammate; the chat's name opens that chat, and opening the row shows the replies; a wake that started no turn shows why below its row, one whose work never came back reads `No reply came back from <chat> ›`, and wakes from earlier versions show as the same row; deleting a chat whose replies already came back no longer drops them: they are delivered as received from a deleted chat and start the asking chat's turn (#296).

@@ -23,6 +23,7 @@ import { Approval, ApprovalDecideParams, ApprovalKind, ApprovalOption, ApprovalO
   SubAgentStatus, SubAgentWaitParams, type Teammate, TeammateCreateParams } from "@noldova/teamrun.protocol";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { FailingMessages } from "../../fixtures/failing-messages.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
@@ -63,6 +64,30 @@ export class ReplyRunTests {
     Assert.areEqual("Alice", saved?.teammateName);
     Assert.isTrue(saved?.details.some(t => t.text === "complete") ?? false);
     Assert.isFalse(saved?.details.some(t => t.text === "part") ?? true);
+  }
+
+  @TestMethod
+  public async endsAStoppedReplyCancelledWhenTheNoteItsFailureWritesFails(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const conversation = await host.createConversationAsync(project);
+    const reply = new Message("stopped-reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Pending, [], ReplyRunTests.provenance, "t", null,
+      null, []);
+    await host.messages.insertAsync(reply);
+    const active = new ActiveRun(reply.id);
+    const full = new RangeError("The disk is full.");
+    const messages = new FailingMessages(host.context, message => message.details.some(t => t.text === Resources.uncomparedWorkingTree), full);
+    const run = new ReplyRun(reply, ReplyRunTests.provenance, active, messages, host.approvals, host.events, host.directory.path);
+    host.adapter.steps = [new TurnDetail(DetailKind.Command, "> ls", null, "c1"), (): void => {
+      active.cancel();
+      throw new TypeError("The turn broke.");
+    }];
+
+    const thrown = await Assert.throwsAsync(() => run.executeAsync(host.adapter, new TurnRequest(null, project.rootPath, "fixture", ReplyRunTests.requested, null)),
+      RangeError);
+
+    Assert.areEqual(full, thrown);
+    Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(reply.id))?.status);
   }
 
   @TestMethod

@@ -369,7 +369,7 @@ export class TeammateChainsTests {
   @TestMethod
   @TestData(true)
   @TestData(false)
-  public async failsTheQueuedRepliesWhenAHandOffFailsAndTakesTheNextSend(thrownAsError: boolean): Promise<void> {
+  public async runsTheQueuedRepliesWhenAHandOffFailsAndTakesTheNextSend(thrownAsError: boolean): Promise<void> {
     const failure = "The limit could not be read.";
     await using host = await CoreHost.createAsync(false, false, undefined, () => { throw thrownAsError ? new Error(failure) : failure; });
     const conversation = await host.createConversationAsync();
@@ -379,16 +379,14 @@ export class TeammateChainsTests {
     const ended = await host.engine.waitForIdle().then(() => null, (error: unknown) => error);
 
     Assert.areEqual(failure, String(ended instanceof Error ? ended.message : ended));
-    Assert.areEqual(1, host.adapter.requests.length);
+    Assert.areEqual(2, host.adapter.requests.length);
     Assert.areEqual(MessageStatus.Completed, (await host.messages.findAsync(sent.replies[0]!.id))!.status);
-    const queued = (await host.messages.findAsync(sent.replies[1]!.id))!;
-    Assert.areEqual(MessageStatus.Failed, queued.status);
-    Assert.areEqual(failure, queued.details.at(-1)?.text);
+    Assert.areEqual(MessageStatus.Completed, (await host.messages.findAsync(sent.replies[1]!.id))?.status);
     Assert.areEqual(3, (await TeammateChainsTests.chatAsync(host, conversation.id)).length);
     Assert.areEqual(0, host.engine.activeRunCount);
     await host.engine.sendAsync(new MessageSendParams(conversation.id, "after", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
     await host.engine.waitForIdle();
-    Assert.areEqual(2, host.adapter.requests.length);
+    Assert.areEqual(3, host.adapter.requests.length);
   }
 
   @TestMethod

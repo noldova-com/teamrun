@@ -23,8 +23,9 @@ import {
   ConversationMemberParams,
   ConversationMoveParams,
   DetailKind,
+  EventName,
   Harness,
-  type Message,
+  Message,
   MessageAuthor,
   MessageIdParams,
   MessageListParams,
@@ -339,6 +340,57 @@ export class WakeRepliesTests {
 
     Assert.isTrue(interrupts > 0);
     Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(shown.id))?.status);
+  }
+
+  @TestMethod
+  public async failsAWakeReplyWhoseStartFailsToWriteWithTheTurnsFailure(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const started: string[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
+        if (message?.status === MessageStatus.Running && started.push(message.id) === 1)
+          throw new RangeError("The window is gone.");
+      }
+    });
+
+    await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await host.engine.waitForIdle();
+    const woken = await host.messages.findAsync(started[0] ?? String.empty);
+    const last = woken?.details.at(-1);
+
+    Assert.areEqual(1, started.length);
+    Assert.areEqual(MessageStatus.Failed, woken?.status);
+    Assert.areEqual(`${DetailKind.Error} ${Resources.formatTurnFailed("The window is gone.")}`, `${last?.kind} ${last?.text}`);
+  }
+
+  @TestMethod
+  public async cancelsAStoppedWakeReplyWhoseStartFailsToWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const stops: Promise<Message>[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
+        if (message?.status === MessageStatus.Running && stops.length === 0) {
+          stops.push(host.engine.cancelAsync(new MessageIdParams(message.id)));
+          throw new RangeError("The window is gone.");
+        }
+      }
+    });
+
+    await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await host.engine.waitForIdle();
+    const stopped = await Promise.all(stops);
+
+    Assert.areEqual(1, stopped.length);
+    Assert.areEqual(MessageStatus.Cancelled, stopped[0]?.status);
+    Assert.isFalse(stopped[0]?.details.some(t => t.kind === DetailKind.Error) ?? true);
   }
 
   @TestMethod
