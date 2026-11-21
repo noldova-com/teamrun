@@ -23,7 +23,6 @@ import { OrganizationLayoutService } from "../../../../src/app/services/organiza
 import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
-import { Resources } from "../../../../src/resources";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
@@ -46,7 +45,12 @@ describe("OrganizationFocusComponent", () => {
     new DepartmentMember("carol", "build"), new DepartmentMember("reviewer", "ui")]);
   const waiting = new Message("r1", "c9", 1, MessageAuthor.Provider, null, MessageStatus.AwaitingApproval, [], SampleData.provenance, started, started, null, [],
     "bob", "bob");
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => {
+    const native: unknown = fixture.nativeElement;
+    if (!(native instanceof HTMLElement))
+      throw new Error("The component has no element.");
+    return native;
+  };
   const all = (selector: string, root: ParentNode = element()): HTMLElement[] => [...root.querySelectorAll<HTMLElement>(selector)];
   const one = (selector: string, root: ParentNode = element()): HTMLElement => {
     const found = root.querySelector<HTMLElement>(selector);
@@ -138,8 +142,8 @@ describe("OrganizationFocusComponent", () => {
       [["Carol"], true, ["Carol"]]]);
     fixture.componentRef.setInput("editing", true);
     await settle();
-    expect([all(".unit-rename").length, all(".remove-teammate").length, all(".add-member", row("No department")).length, all(".orow.department .add-member").length])
-      .toEqual([1, 0, 0, 3]);
+    expect([all(".unit-rename").length, texts(".unit-name"), all(".remove-teammate").length, all(".add-member", row("No department")).length,
+      all(".orow.department .add-member").length]).toEqual([0, ["Carol"], 0, 0, 3]);
 
     await click(one(".obtn", row("No department")));
     expect([texts(".orow.person .label").includes("Carol"), saves.at(-1)?.isCollapsed("no-department"), texts(".crumb")]).toEqual([false, true, ["Organization", "Carol"]]);
@@ -205,20 +209,20 @@ describe("OrganizationFocusComponent", () => {
   it("edits the structure in edit mode: renames the focused department, adds a member from outside a department and a department, and lets its members' cards move or remove them", async () => {
     const at = <T>(items: readonly T[], index: number): T => {
       const found = items[index];
-      if (found === undefined)
+      if (Object.isUndefined(found))
         throw new Error(`Nothing at ${index}.`);
       return found;
     };
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
     const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
-    const cardEdits = (): unknown[] => all(".grid nol-teamrun-organization-card").map(t => [t.querySelector<HTMLInputElement>(".name-field")?.value, all(".move-choice, .remove", t).length]);
+    const cardEdits = (): unknown[] => all(".grid nol-teamrun-organization-card").map(t => [texts(".name", t), all(".head input", t).length, all(".move-choice, .remove", t).length]);
     await create("Department:design");
     expect([all(".unit-rename").length, all(".grid .move-choice").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
 
     fixture.componentRef.setInput("editing", true);
     await settle();
     expect([all(".add-member").map(t => t.getAttribute("aria-label")), texts(".unit-name"), one(".unit-rename").getAttribute("aria-label"), cardEdits()]).toEqual([
-      ["Add a member to Design", "Add a member to UI", "Add a member to Build"], [], "Department name", [["Alice", 0], ["Bob", 2]]
+      ["Add a member to Design", "Add a member to UI", "Add a member to Build"], [], "Department name", [[["Alice"], 0, 0], [["Bob"], 0, 2]]
     ]);
     const field = one(".unit-rename");
     if (!(field instanceof HTMLInputElement))
@@ -280,11 +284,11 @@ describe("OrganizationFocusComponent", () => {
     expect(thread()).toEqual(["Chat with all leaders"]);
   });
 
-  it("names a focused teammate in its field rather than a unit, names nothing for the leaders, and lets a focused member's card move it", async () => {
+  it("names a focused teammate as its heading, in no field, names nothing for the leaders, and lets a focused member's card move it", async () => {
     await create("Teammate:bob");
     fixture.componentRef.setInput("editing", true);
     await settle();
-    expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([1, [], 1]);
+    expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Bob"], 1]);
     await click(one(".crumb"));
     expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Organization"], 0]);
   });
@@ -311,19 +315,7 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(saves.map(t => t.focus)).toEqual(["Teammate:alice", "Department:design", "Teammate:bob"]));
   });
 
-  it("renames a focused teammate, puts the name back with why on an empty, invalid or refused one, and removes a member from its department after asking, but no leader", async () => {
-    const field = (): HTMLInputElement => {
-      const found = one(".edit-row .unit-rename");
-      if (!(found instanceof HTMLInputElement))
-        throw new Error("The name field is no input.");
-      return found;
-    };
-    const renameAsync = async (value: string): Promise<string> => {
-      field().value = value;
-      field().dispatchEvent(new Event("change"));
-      await settle();
-      return field().value;
-    };
+  it("names a focused teammate as its heading, in no field, while editing, and removes a member from its department after asking, but no leader", async () => {
     const answer = async (button: string): Promise<void> => {
       const found = document.querySelector<HTMLButtonElement>(`nol-teamrun-confirm-dialog ${button}`);
       if (Object.isNull(found))
@@ -332,28 +324,20 @@ describe("OrganizationFocusComponent", () => {
       await settle();
     };
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
+    const head = (): unknown[] => [all(".unit-head input").length, texts(".unit-name"), texts(".remove-teammate")];
     await create("Teammate:alice");
     fixture.componentRef.setInput("editing", true);
     await settle();
-    const leader = [field().value, field().getAttribute("aria-label"), all(".remove-teammate").length];
+    const leader = head();
     await click(one(".obtn", row("Bob")));
-
-    const typed = [await renameAsync("   "), await renameAsync("Bob!!"), OrganizationStoreService.of(context).actionError(), context.count(MethodName.TeammateUpdate)];
-    await renameAsync(" Robert ");
-    await Wait.until(() => expect(context.count(MethodName.TeammateUpdate)).toBe(1));
-    expect([leader, typed, OrganizationStoreService.of(context).actionError(), texts(".remove-teammate")]).toEqual([["Alice", "Rename Alice", 0],
-      ["Bob", "Bob", Resources.organizationTeammateNameRule, 0], null, ["deleteRemove teammate"]]);
-    context.fail(MethodName.TeammateUpdate, "That name is taken.");
-    field().value = "Alice";
-    field().dispatchEvent(new Event("change"));
-    await Wait.until(() => expect(field().value).toBe("Bob"));
-    expect([context.count(MethodName.TeammateUpdate), OrganizationStoreService.of(context).actionError()?.includes("That name is taken.")]).toEqual([2, true]);
+    const member = head();
 
     await click(one(".remove-teammate"));
     await answer(".nol-teamrun-cancel");
     await click(one(".remove-teammate"));
     await answer(".nol-teamrun-confirm");
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: null }]]));
+    expect([leader, member, context.count(MethodName.TeammateUpdate)]).toEqual([[0, ["Alice"], []], [0, ["Bob"], ["deleteRemove teammate"]], 0]);
     expect(all(".unit-rename").map(t => t.getAttribute("aria-label"))).toEqual(["Department name"]);
   });
 

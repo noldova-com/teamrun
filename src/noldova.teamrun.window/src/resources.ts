@@ -1296,7 +1296,6 @@ export class Resources {
   public static readonly noTeammates: string = "No teammates yet";
   public static readonly teammateNameLabel: string = "Name";
   public static readonly teammateNameHint: string = "1–100 characters, a separate accent or vowel sign counting as one: letters, digits, dashes or underscores, with single spaces between words";
-  public static readonly organizationTeammateNameRule: string = `A teammate's name takes ${Resources.teammateNameHint}.`;
   public static readonly teammateRoleLabel: string = "Role (optional, Markdown)";
   public static readonly teammateRoleRows: number = 4;
   public static readonly connectionColumn: string = "Provider";
@@ -1899,10 +1898,6 @@ export class Resources {
 
   public static formatOrganizationUsage(used: number): string {
     return `${Math.round(used * Resources.wholePercent)}%`;
-  }
-
-  public static formatOrganizationRenameLabel(name: string): string {
-    return `Rename ${name}`;
   }
 
   public static formatOrganizationModel(model: string, effort: string | null): string {

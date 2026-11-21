@@ -53,8 +53,7 @@ describe("OrganizationDetailsComponent", () => {
   };
   const texts = (selector: string, root: ParentNode = element()): string[] => all(selector, root).map(t => t.textContent?.replace(/\s+/gu, " ").trim() ?? "");
   const card = (name: string): HTMLElement => {
-    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name
-      || t.querySelector<HTMLInputElement>(".name-field")?.value === name);
+    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name);
     if (Object.isUndefined(found))
       throw new Error(`No card is named ${name}.`);
     return found;

@@ -10,8 +10,7 @@ LICENSE file in the root directory of this source tree.
   <nol-teamrun-teammate-avatar [teammate]="teammate()" [decorative]="true" />
   <div class="who">
     @if (editing()) {
-      <input #nameField nol-text-field class="name-field" [attr.aria-label]="resources.formatOrganizationRenameLabel(teammate().name)" [value]="teammate().name"
-        (change)="rename()">
+      <span class="name plain">{{ teammate().name }}</span>
     } @else {
       <button type="button" class="name" [attr.aria-label]="resources.formatOrganizationMessageNamed(teammate().name)" (click)="message.emit()">{{ teammate().name }}</button>
     }
@@ -46,7 +45,7 @@ LICENSE file in the root directory of this source tree.
 }
 @if (fields().has(fieldNames.Now) && shape() === shapes.Fluid && activities().length > 0) {
   <ul class="acts" [attr.aria-label]="resources.formatOrganizationNowOf(teammate().name)">
-    @for (activity of activities(); track activity.id) {
+    @for (activity of activities(); track activity.chatId) {
       <li class="act">
         <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ resources.organizationNowRunningIcon }}</span>
         <span class="now-text">{{ activity.text }}</span>

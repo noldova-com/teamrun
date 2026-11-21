@@ -57,9 +57,12 @@
   text-decoration: underline;
 }
 
-.name-field {
-  width: 100%;
-  min-width: 0;
+.plain {
+  cursor: auto;
+}
+
+.plain:hover {
+  text-decoration: none;
 }
 
 .role {

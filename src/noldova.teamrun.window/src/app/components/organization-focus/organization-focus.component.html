@@ -76,19 +76,16 @@ LICENSE file in the root directory of this source tree.
             <button type="button" nol-button class="delete-department" [variant]="outlined" (click)="deleteDepartment(department)"><span nolButtonIcon
               class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveDepartment }}</button>
           </div>
-        } @else if (editing() && focus().teammate; as teammate) {
-          <div class="edit-row">
-            <input nol-text-field class="unit-rename" [attr.aria-label]="resources.formatOrganizationRenameLabel(teammate.name)" [value]="teammate.name"
-              (change)="renameTeammate(teammate, $event)" />
-            @if (removable() && focus().department?.department; as department) {
-              <button type="button" nol-button class="remove-teammate" [variant]="outlined" (click)="removeTeammate(teammate, department)"><span nolButtonIcon
-                class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveTeammate }}</button>
-            }
-          </div>
         } @else {
           <h2 class="unit-name">{{ unitName() }}</h2>
         }
         <span class="note unit-summary">{{ unitSummary() }}</span>
+        @if (editing() && focus().teammate; as teammate) {
+          @if (removable() && focus().department?.department; as department) {
+            <button type="button" nol-button class="remove-teammate" [variant]="outlined" (click)="removeTeammate(teammate, department)"><span nolButtonIcon
+              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveTeammate }}</button>
+          }
+        }
       </div>
       <div class="grid" [class.one]="cards().length === 1">
         @for (card of cards(); track card.id) {

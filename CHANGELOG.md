@@ -13,7 +13,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
   A card shows its teammate's status, what it runs now and for how long, and, when chosen, its usage, its last message and its model; Cards show chooses the fields for every card, a card's own menu for itself.
   Pointing at a card or reaching it with the keyboard opens its details: status, whom it reports to, model, usage, last words and what it runs now; the messages beside the tree talk to whom you choose under To, a teammate whose name you click or a department's Message; long last words show three lines.
   View switches between the Tree, a Board and Focus: the Board queues who needs you, with how long ago and what they asked, then the leaders and a column for each department, and opens each conversation in the inbox beside it; Focus outlines the departments and their people beside one department or teammate in full, with every activity and its time, over its conversation.
-  Edit structure, in every view, adds, renames and deletes departments, chooses a department's leader, renames teammates, and adds, moves and removes members, asking before a delete or a removal.
+  Edit structure, in every view, adds, renames and deletes departments, chooses a department's leader, and adds, moves and removes members, asking before a delete or a removal.
   The view, the collapsed departments and the cards' fields are kept across a restart.
 
 ### Fixed

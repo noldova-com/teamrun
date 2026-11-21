@@ -87,8 +87,7 @@ describe("OrganizationViewComponent", () => {
     await Wait.until(() => expect(menuItems()).toEqual([]));
   };
   const card = (name: string): HTMLElement => {
-    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name
-      || t.querySelector<HTMLInputElement>(".name-field")?.value === name);
+    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name);
     if (Object.isUndefined(found))
       throw new Error(`No card is named ${name}.`);
     return found;
@@ -762,30 +761,28 @@ describe("OrganizationViewComponent", () => {
         [MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: "build" }]]);
     });
 
-    it("renames a teammate from its card's field, and puts the name back with why when the name can't be taken", async () => {
-      await editAsync();
-      const field = card("Bob").querySelector<HTMLInputElement>(".name-field");
-      if (Object.isNull(field))
-        throw new Error("Bob's card has no name field.");
-      const named = (): HTMLInputElement => field;
-      const renameAsync = async (value: string): Promise<void> => {
-        named().value = value;
-        named().dispatchEvent(new Event("change"));
-        await settle();
+    it("shows each teammate's name on its card as text, in no field, where it shows outside editing, and renames no teammate", async () => {
+      const at = (name: string): DOMRect => {
+        const box = card(name).getBoundingClientRect();
+        const shown = one(".name", card(name)).getBoundingClientRect();
+        return new DOMRect(shown.left - box.left, shown.top - box.top);
       };
-      const label = named().getAttribute("aria-label");
+      await editAsync();
+      const named = all("nol-teamrun-organization-card .name").map(t => t.textContent?.trim());
+      const fields = all("nol-teamrun-organization-card .head input").length;
+      const editingOnly = [all("nol-teamrun-organization-card .name.plain").length, all(".move-choice").length];
+      const alice = at("Alice");
+      const bob = at("Bob");
+      one(".top .edit").click();
+      await settle();
 
-      await renameAsync("Bob!!");
-      const refused = [named().value, texts(".action-error"), context.count(MethodName.TeammateUpdate)];
-      await renameAsync(" Robert ");
-      await Wait.until(() => expect(named().value).toBe("Robert"));
-      const renamed = [texts(".name, .name-field", card("Robert")).length, texts(".action-error"), all(".name-field", card("Alice")).length];
-      context.fail(MethodName.TeammateUpdate, "That name is taken.");
-      await renameAsync("Alice");
-      await Wait.until(() => expect(texts(".action-error")).toHaveLength(1));
-
-      expect([label, refused, renamed, named().value, texts(".action-error")[0]?.includes("That name is taken."), texts(".name", card("Robert"))]).toEqual([
-        "Rename Bob", ["Bob", [Resources.organizationTeammateNameRule], 0], [1, [], 1], "Robert", true, []]);
+      expect([named.includes("Alice"), named.includes("Bob"), fields, editingOnly.every(t => t > 0)]).toEqual([true, true, 0, true]);
+      expect([all("nol-teamrun-organization-card .name.plain").length, all(".move-choice").length]).toEqual([0, 0]);
+      AppearanceFixture.expectPixels(alice.x, at("Alice").x);
+      AppearanceFixture.expectPixels(alice.y, at("Alice").y);
+      AppearanceFixture.expectPixels(bob.x, at("Bob").x);
+      AppearanceFixture.expectPixels(bob.y, at("Bob").y);
+      expect(context.count(MethodName.TeammateUpdate)).toBe(0);
     });
 
     it("adds a member from the teammates not yet in the department, in name order", async () => {

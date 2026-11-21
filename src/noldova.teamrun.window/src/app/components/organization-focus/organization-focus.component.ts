@@ -9,7 +9,7 @@
 import { Component, computed, inject, type InputSignal, input, type Signal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { type Department, OrganizationTarget, type Teammate, TeammateUpdateParams } from "@noldova/teamrun.protocol";
+import { type Department, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
   MenuTriggerDirective, TextFieldComponent } from "@noldova/ui.components.angular";
 
@@ -66,8 +66,13 @@ export class OrganizationFocusComponent {
     return Object.isNull(focus.teammate) || focus.department?.leader?.id !== focus.teammate.id;
   });
   protected readonly key: Signal<string> = computed(() => OrganizationConversation.keyOf(this.focus().target));
-  protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() =>
-    new Map(this.rows().flatMap(row => row.people.map((person): [string, string] => [person.id, row.node.name]))));
+  protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() => {
+    const names = new Map<string, string>();
+    for (const row of this.rows())
+      for (const person of row.people)
+        names.set(person.id, row.node.name);
+    return names;
+  });
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.rows().flatMap(t => Object.isNull(t.node.leader) ? [] : [t.node.leader]));
   protected readonly cards: Signal<readonly Teammate[]> = computed(() => {
     const focus = this.focus();
@@ -107,21 +112,6 @@ export class OrganizationFocusComponent {
 
   protected rename(department: Department, event: Event): void {
     void OrganizationEdits.renameAsync(event, department.name, name => this.organization.renameDepartment(department.id, name));
-  }
-
-  protected renameTeammate(teammate: Teammate, event: Event): void {
-    this.organization.clearActionError();
-    void OrganizationEdits.renameAsync(event, teammate.name, async name => {
-      let params: TeammateUpdateParams | null;
-      try {
-        params = TeammateUpdateParams.changing(teammate, { name });
-      }
-      catch {
-        this.organization.fail(Resources.organizationTeammateNameRule);
-        return false;
-      }
-      return this.chats.updateTeammate(teammate.id, params, message => this.organization.fail(message));
-    });
   }
 
   protected removeTeammate(teammate: Teammate, department: Department): void {

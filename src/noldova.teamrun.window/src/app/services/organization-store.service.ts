@@ -105,10 +105,6 @@ export class OrganizationStoreService {
     }
   }
 
-  public fail(error: unknown): void {
-    this.actionErrorSignal.set(OrganizationStoreService.messageOf(error));
-  }
-
   public clearActionError(): void {
     this.actionErrorSignal.set(null);
   }

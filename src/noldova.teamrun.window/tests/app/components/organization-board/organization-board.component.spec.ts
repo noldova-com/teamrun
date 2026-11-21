@@ -45,7 +45,12 @@ describe("OrganizationBoardComponent", () => {
     new DepartmentMember("carol", "build"), new DepartmentMember("reviewer", "ui")]);
   const reply = (status: MessageStatus): Message => new Message("r1", "c9", 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, started, started,
     null, [], "bob", "bob");
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => {
+    const native: unknown = fixture.nativeElement;
+    if (!(native instanceof HTMLElement))
+      throw new Error("The component has no element.");
+    return native;
+  };
   const all = (selector: string, root: ParentNode = element()): HTMLElement[] => [...root.querySelectorAll<HTMLElement>(selector)];
   const one = (selector: string, root: ParentNode = element()): HTMLElement => {
     const found = root.querySelector<HTMLElement>(selector);
@@ -57,7 +62,7 @@ describe("OrganizationBoardComponent", () => {
   const box = (view: Element): DOMRect => view.getBoundingClientRect();
   const nth = (boxes: readonly DOMRect[], index: number): DOMRect => {
     const found = boxes[index];
-    if (found === undefined)
+    if (Object.isUndefined(found))
       throw new Error(`No box at ${index}.`);
     return found;
   };
@@ -183,19 +188,19 @@ describe("OrganizationBoardComponent", () => {
     expect([chosen, selected()]).toEqual([["Teammate:bob", "Teammate:offline", "Leaders:", "Teammate:alice", "Teammate:reviewer", "Department:design",
       "Department:ui", "Department:build", "Teammate:bob", "Teammate:offline", "Teammate:carol"], []]);
 
-    const marks: [OrganizationTarget, string[]][] = [[OrganizationTarget.teammate("bob"), ["Bob", "Bob"]], [OrganizationTarget.department("build"), ["Build"]],
-      [OrganizationTarget.teammate("alice"), ["Alice"]]];
-    for (const [target, names] of marks) {
+    const marked: string[][] = [];
+    for (const target of [OrganizationTarget.teammate("bob"), OrganizationTarget.department("build"), OrganizationTarget.teammate("alice")]) {
       fixture.componentRef.setInput("target", target);
       await settle();
-      expect(selected()).toEqual(names);
+      marked.push(selected());
     }
+    expect(marked).toEqual([["Bob", "Bob"], ["Build"], ["Alice"]]);
   });
 
   it("edits the structure in edit mode: renames a department, adds a member from outside it and a department, and lets each member's card move or remove it", async () => {
     const at = <T>(items: readonly T[], index: number): T => {
       const found = items[index];
-      if (found === undefined)
+      if (Object.isUndefined(found))
         throw new Error(`Nothing at ${index}.`);
       return found;
     };
@@ -210,10 +215,11 @@ describe("OrganizationBoardComponent", () => {
     const fields = (): HTMLInputElement[] => [...element().querySelectorAll<HTMLInputElement>(".lane-rename")];
     expect([fields().map(t => t.value), all(".lane-rename").map(t => t.getAttribute("aria-label")), all(".lane-name").length,
       all(".message-department").length]).toEqual([["Design", "UI", "Build"], ["Department name", "Department name", "Department name"], 0, 0]);
-    expect([all(".lanes nol-teamrun-organization-card").map(t => [t.querySelector<HTMLInputElement>(".name-field")?.value, all(".move-choice, .remove", t).length]),
-      all(".leaders nol-teamrun-organization-card").map(t => t.querySelector<HTMLInputElement>(".name-field")?.value),
-      all(".leaders nol-teamrun-organization-card .move-choice, .leaders nol-teamrun-organization-card .remove").length])
-      .toEqual([[["Bob", 2], ["Offline", 2], ["Carol", 2]], ["Alice", "Code Reviewer"], 0]);
+    expect([all(".lanes nol-teamrun-organization-card").map(t => [t.querySelector(".name")?.textContent?.trim(), all(".head input", t).length,
+      all(".move-choice, .remove", t).length]),
+    all(".leaders nol-teamrun-organization-card").map(t => [t.querySelector(".name")?.textContent?.trim(), all(".head input", t).length]),
+    all(".leaders nol-teamrun-organization-card .move-choice, .leaders nol-teamrun-organization-card .remove").length])
+      .toEqual([[["Bob", 0, 2], ["Offline", 0, 2], ["Carol", 0, 2]], [["Alice", 0], ["Code Reviewer", 0]], 0]);
     for (const value of ["  Craft  ", "   ", "UI"]) {
       const field = at(fields(), value === "UI" ? 1 : 0);
       field.value = value;
@@ -236,7 +242,7 @@ describe("OrganizationBoardComponent", () => {
   it("asks before deleting a department, and deletes nothing when the question is closed", async () => {
     const at = <T>(items: readonly T[], index: number): T => {
       const found = items[index];
-      if (found === undefined)
+      if (Object.isUndefined(found))
         throw new Error(`Nothing at ${index}.`);
       return found;
     };

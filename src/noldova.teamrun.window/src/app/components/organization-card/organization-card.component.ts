@@ -6,20 +6,21 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, ElementRef, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, viewChild,
-  type WritableSignal } from "@angular/core";
+import { Component, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
-import { type Department, type Teammate, type TeammateLastReply, TeammateUpdateParams } from "@noldova/teamrun.protocol";
+import { type Department, type Teammate, type TeammateLastReply } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
-  MeterComponent, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+  MeterComponent, PopoverTriggerDirective, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { OrganizationCardNow } from "../../models/organization-card-now";
+import { OrganizationCardUsage } from "../../models/organization-card-usage";
+import { OrganizationRunningReply } from "../../models/organization-running-reply";
 import { OrganizationNode } from "../../models/organization.node";
-import type { UsageMeter } from "../../models/usage-meter";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ClockService } from "../../services/clock.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
@@ -34,7 +35,7 @@ import { TeammateWorkComponent } from "../teammate-work/teammate-work.component"
 @Component({
   selector: "nol-teamrun-organization-card",
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
-    SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TeammateWorkComponent, TextFieldComponent],
+    SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TeammateWorkComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { "class": "nol-teamrun-organization-card", "[class.fluid]": "shape() === shapes.Fluid", "[class.row]": "shape() === shapes.Row", "(focusin)": "closeDetails($event)" },
   templateUrl: "./organization-card.component.html",
@@ -49,7 +50,6 @@ export class OrganizationCardComponent {
   private readonly clock: ClockService = inject(ClockService);
   private readonly time: WritableSignal<number> = signal(this.clock.now());
   private readonly details: PopoverTriggerDirective | null = inject(PopoverTriggerDirective, { self: true, optional: true });
-  private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("nameField", { read: ElementRef });
 
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
   public readonly shape: InputSignal<OrganizationCardShape> = input<OrganizationCardShape>(OrganizationCardShape.Card);
@@ -64,11 +64,11 @@ export class OrganizationCardComponent {
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly fields: Signal<ReadonlySet<OrganizationCardField>> = computed(() => this.layout.layout().fieldsOf(this.teammate().id));
   protected readonly showsWork: Signal<boolean> = computed(() => Resources.organizationWorkFields.some(t => this.fields().has(t)));
-  protected readonly usage: Signal<{ readonly meter: UsageMeter; readonly used: number } | null> = computed(() => {
+  protected readonly usage: Signal<OrganizationCardUsage | null> = computed(() => {
     const plan = this.store.planUsageOfProvider(this.teammate().providerId);
     for (const meter of Object.isNull(plan) ? [] : this.formatter.limitsOf(plan))
       if (!Object.isNull(meter.percent))
-        return { meter, used: (Resources.wholePercent - meter.percent) / Resources.wholePercent };
+        return new OrganizationCardUsage(meter, (Resources.wholePercent - meter.percent) / Resources.wholePercent);
     return null;
   });
   protected readonly model: Signal<string | null> = computed(() => {
@@ -76,19 +76,19 @@ export class OrganizationCardComponent {
     return Object.isNull(teammate.model) ? null : Resources.formatOrganizationModel(teammate.model, teammate.effort);
   });
 
-  protected readonly now: Signal<{ readonly icon: string; readonly text: string; readonly lasted: string | null }> = computed(() => {
+  protected readonly now: Signal<OrganizationCardNow> = computed(() => {
     const teammateId = this.teammate().id;
     const [first, ...others] = this.statuses.activitiesOf(teammateId)();
     if (Object.isUndefined(first))
-      return { icon: Resources.organizationNowIdleIcon, lasted: null, text: this.statuses.statusOf(teammateId)() === TeammateStatus.Stopped
-        ? Resources.teammateStatusLabels[TeammateStatus.Stopped] : Resources.organizationNothingRunning };
-    return { icon: Resources.organizationNowRunningIcon, text: this.store.conversation(first.chatId)?.title ?? Resources.organizationNowReplying,
-      lasted: Resources.formatOrganizationNowFor(this.time() - Date.parse(first.startedAt), others.length) };
+      return new OrganizationCardNow(Resources.organizationNowIdleIcon, this.statuses.statusOf(teammateId)() === TeammateStatus.Stopped
+        ? Resources.teammateStatusLabels[TeammateStatus.Stopped] : Resources.organizationNothingRunning, null);
+    return new OrganizationCardNow(Resources.organizationNowRunningIcon, this.store.conversation(first.chatId)?.title ?? Resources.organizationNowReplying,
+      Resources.formatOrganizationNowFor(this.time() - Date.parse(first.startedAt), others.length));
   });
 
-  protected readonly activities: Signal<readonly { readonly id: string; readonly text: string; readonly lasted: string }[]> = computed(() =>
-    this.statuses.activitiesOf(this.teammate().id)().map(t => ({ id: t.chatId, text: this.store.conversation(t.chatId)?.title ?? Resources.organizationNowReplying,
-      lasted: Resources.formatOrganizationNowFor(this.time() - Date.parse(t.startedAt), 0) })));
+  protected readonly activities: Signal<readonly OrganizationRunningReply[]> = computed(() =>
+    this.statuses.activitiesOf(this.teammate().id)().map(t => new OrganizationRunningReply(t.chatId, this.store.conversation(t.chatId)?.title ?? Resources.organizationNowReplying,
+      Resources.formatOrganizationNowFor(this.time() - Date.parse(t.startedAt), 0))));
   protected readonly roleLine: Signal<string | null> = computed(() => Resources.formatOrganizationRoleIn(this.teammate().role, this.departmentName() ?? this.department()?.name ?? null));
 
   protected readonly last: Signal<TeammateLastReply | null> = computed(() => this.statuses.lastReplyOf(this.teammate().id)());
@@ -104,23 +104,6 @@ export class OrganizationCardComponent {
       untracked(() => this.time.set(this.clock.now()));
       onCleanup(this.clock.every(Resources.clockIntervalMilliseconds, () => this.time.set(this.clock.now())));
     });
-  }
-
-  protected async rename(): Promise<void> {
-    const field = this.nameField().nativeElement;
-    const teammate = this.teammate();
-    this.organization.clearActionError();
-    let params: TeammateUpdateParams | null;
-    try {
-      params = TeammateUpdateParams.changing(teammate, { name: field.value.trim() });
-    }
-    catch {
-      field.value = teammate.name;
-      this.organization.fail(Resources.organizationTeammateNameRule);
-      return;
-    }
-    if (!await this.store.updateTeammate(teammate.id, params, message => this.organization.fail(message)))
-      field.value = this.teammate().name;
   }
 
   protected closeDetails(event: FocusEvent): void {
