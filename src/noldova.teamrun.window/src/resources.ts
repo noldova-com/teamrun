@@ -1611,6 +1611,14 @@ export class Resources {
   public static readonly fallbackUpSelector: string = ".nol-teamrun-fallback-up";
   public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
+  public static readonly organizationBoardLeadersTitle: string = "Leaders";
+  public static readonly organizationBoardLeadersNote: string = "They talk across departments; you lead them.";
+  public static readonly organizationBoardMessageLeaders: string = "Message all leaders";
+  public static readonly organizationBoardMessageLeadersIcon: string = "forum";
+  public static readonly organizationBoardDepartmentsTitle: string = "Departments";
+  public static readonly organizationBoardDepartmentsNote: string = "Each column's members, sorted by who needs you first.";
+  public static readonly organizationBoardMessageIcon: string = "chat";
+  public static readonly organizationBoardNoMembers: string = "No members yet.";
 
   public static formatSustainUnavailable(kind: string): string {
     return `TeamRun can't read ${kind}'s usage limits yet, so neither Sustain nor a hand-off can start for this teammate.`;
@@ -2848,6 +2856,10 @@ export class Resources {
 
   public static formatLowRiskLine(requester: string, steps: readonly string[]): string {
     return `${Resources.lowRiskLead}${requester} ${steps.join(Resources.browserStepSeparator)}`;
+  }
+
+  public static formatOrganizationBoardMessage(name: string): string {
+    return `Message ${name}`;
   }
 
   private static browserStep(words: readonly [string, string, string], phase: BrowserStepPhase, notes: readonly (string | null)[]): string {
