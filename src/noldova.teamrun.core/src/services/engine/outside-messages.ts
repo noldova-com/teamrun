@@ -58,12 +58,12 @@ export class OutsideMessages implements IOutsideMessages {
       : !Object.isNull(teammateId) ? await this.requireTeammateAsync(teammateId) : null;
     if (Object.isNull(teammate))
       throw new ServiceException(ErrorCode.InvalidParams, Resources.outsideTeammateOrChatRequired, []);
-    const result = await this.startAsync(teammate, text, label, chatId);
+    const result = await this.startAsync(teammate, text, label, chatId, false);
     return this.outside.rememberAsync(result.sent.id);
   }
 
   public async startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult> {
-    return this.startAsync(await this.requireTeammateAsync(teammateId), text, label, null);
+    return this.startAsync(await this.requireTeammateAsync(teammateId), text, label, null, true);
   }
 
   public async listOutsideChatsAsync(): Promise<readonly JsonObject[]> {
@@ -108,12 +108,12 @@ export class OutsideMessages implements IOutsideMessages {
     return this.outside.forgetAsync();
   }
 
-  private async startAsync(teammate: Teammate, text: string, label: string, chatId: string | null): Promise<MessageSendResult> {
+  private async startAsync(teammate: Teammate, text: string, label: string, chatId: string | null, queues: boolean): Promise<MessageSendResult> {
     const target = chatId ?? await this.outside.prepareAsync(teammate);
     if (await this.capEndsTasksAsync(teammate, target))
       throw new ServiceException(ErrorCode.Conflict, Resources.formatOutsideCapEndsTasks(target), [target]);
     return this.sendMessageAsync(new MessageSendParams(target, text, null, null, [], [], teammate.id), null, null, undefined,
-      new MessageSender(target, null, label, true));
+      new MessageSender(target, null, label, true), queues);
   }
 
   private async outsideTeammateInAsync(chat: Conversation, teammateId: string | null): Promise<Teammate> {

@@ -12,4 +12,5 @@ export interface IOrganizationMessagesService {
   listAsync(): Promise<readonly OrganizationMessage[]>;
   sendAsync(params: OrganizationMessageSendParams): Promise<OrganizationMessage>;
   stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+  reconcileAsync(): Promise<void>;
 }

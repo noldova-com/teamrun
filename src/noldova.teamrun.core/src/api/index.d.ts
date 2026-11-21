@@ -3011,6 +3011,8 @@ export declare class Resources {
   public static readonly updateOrganizationMessage: string;
   /** The label an organization message's text carries in each recipient's outside chat. */
   public static readonly organizationMessageLabel: string;
+  /** Why a recipient still queued when TeamRun stopped failed. */
+  public static readonly organizationSendInterrupted: string;
   public static readonly selectHandoverSummary: string;
   public static readonly upsertHandoverSummary: string;
   public static readonly deleteHandoverSummaries: string;
@@ -4561,6 +4563,9 @@ export declare class Resources {
 
   /** Missing organization message diagnostic. */
   public static formatOrganizationMessageNotFound(id: string): string;
+
+  /** Why a teammate whose account can't reply, or is deleted, gets no outside message. */
+  public static formatAccountCannotReply(teammate: string, account: string | null): string;
 
   /** Why a teammate outside a department can't lead it. */
   public static formatDepartmentLeaderNotMember(teammate: string, department: string): string;
@@ -9920,8 +9925,10 @@ export interface IOrganizationService {
 /** Starts a teammate's reply to a message from outside its chats, and stops a reply. */
 export interface IOrganizationSender {
   /**
-   * Sends the text to the teammate's outside chat and starts its replies without waiting for them.
-   * @throws ServiceException `NotFound` for a teammate that no longer exists.
+   * Sends the text to the teammate's outside chat and starts its replies without waiting for them; while the chat answers an earlier
+   * message, the new replies wait as Pending behind it and start when it ends.
+   * @throws ServiceException `NotFound` for a teammate that no longer exists, `Conflict` with `Resources.formatAccountCannotReply` when its account
+   * can't reply.
    */
   startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult>;
 
@@ -9942,10 +9949,16 @@ export interface IOrganizationMessagesService {
   sendAsync(params: OrganizationMessageSendParams): Promise<OrganizationMessage>;
 
   /**
-   * Stops the recipients not yet started and the replies still waiting to start, marking them `Stopped`.
+   * Stops the recipients not yet started and the replies still waiting to start when Stop arrives, cancelling those replies together,
+   * and marks them `Stopped`.
    * @throws ServiceException `NotFound` for an unknown message.
    */
   stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+
+  /**
+   * After a restart, marks every recipient still `Queued` `Failed` with `Resources.organizationSendInterrupted`; run once the engine has reconciled.
+   */
+  reconcileAsync(): Promise<void>;
 }
 
 /** Keeps organization messages in the `organizationMessages` table, recording each change in the change feed and publishing it. */
@@ -9962,6 +9975,9 @@ export declare class OrganizationMessagesService implements IOrganizationMessage
 
   /** @inheritdoc */
   public stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+
+  /** @inheritdoc */
+  public reconcileAsync(): Promise<void>;
 }
 
 /** Keeps the organization in the `departments` and `departmentMembers` tables, recording each change in the change feed. */

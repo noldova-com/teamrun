@@ -10,7 +10,8 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity, OrganizationMessagesService, Resources } from "@noldova/teamrun.core";
 import {
   type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, ErrorCode, EventName, Harness, MessageAuthor, MessageIdParams,
-  MessageStatus, type OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget, type Teammate, TeammateCreateParams
+  MessageListParams, MessageStatus, type OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget, ProviderEnabledParams, type Teammate,
+  TeammateCreateParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -114,6 +115,72 @@ export class OrganizationMessagesServiceTests {
     Assert.areEqual("Ada:Started,Bob:Stopped", OrganizationMessagesServiceTests.states(stopped));
     Assert.areEqual(`r1-${bob.id}`, sender.cancels.join());
     Assert.areEqual(JSON.stringify(stopped.toJson()), JSON.stringify(again.toJson()));
+  }
+
+  @TestMethod
+  public async failsARecipientWhoseAccountCantReplyNamingTheAccountAndSendsItNothing(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
+    const off = await host.createProviderAsync("fake", "Spare");
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, off.id, Harness.Provider, null, null));
+    await host.providers.setEnabledAsync(new ProviderEnabledParams(off.id, false));
+
+    const sent = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.everyone, "Status?"));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(`Ada:Started:null,Bob:Failed:${Resources.formatAccountCannotReply("Bob", "Spare")}`,
+      sent.recipients.map(t => `${t.teammateName}:${t.state}:${t.reason}`).join());
+    Assert.areEqual(1, host.adapter.requests.length);
+    Assert.areEqual(ada.id, sent.recipients[0]?.teammateId);
+    Assert.isNull(sent.recipients.find(t => t.teammateId === bob.id)?.chatId);
+  }
+
+  @TestMethod
+  public async queuesAMessageToATeammateStillAnsweringBehindItsRunningReplyWhereStopCanHaltIt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
+    let release = (): void => undefined;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    host.adapter.holdTurn = () => held;
+    const send = (text: string): Promise<OrganizationMessage> =>
+      host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate(ada.id), text));
+
+    await send("First");
+    await host.until("the first reply's run", async () => (await host.messages.listOpenAsync()).some(t => t.status === MessageStatus.Running), host.runs());
+    const second = await send("Second");
+    const third = await send("Third");
+    const waiting = (await host.messages.listOpenAsync()).filter(t => t.status === MessageStatus.Pending).length;
+    const stopped = await host.organizationMessages.stopAsync(new MessageIdParams(third.id));
+    release();
+    await host.engine.waitForIdle();
+    const replyTo = async (message: OrganizationMessage): Promise<MessageStatus | undefined> =>
+      (await host.messages.listAsync(new MessageListParams(String(message.recipients[0]?.chatId), null)))
+        .find(t => t.inReplyTo === message.recipients[0]?.messageId)?.status;
+
+    Assert.areEqual("Started,Started,Stopped", [second, third, stopped].map(t => t.recipients[0]?.state).join());
+    Assert.areEqual(2, waiting);
+    Assert.areEqual(`${MessageStatus.Completed},${MessageStatus.Cancelled}`, [await replyTo(second), await replyTo(third)].join());
+    Assert.areEqual(2, host.adapter.requests.length);
+    Assert.isTrue(host.adapter.requests[1]?.prompt.includes("Second") ?? false);
+  }
+
+  @TestMethod
+  public async failsTheRecipientsAQuitLeftQueuedOnceStartedAgain(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
+    const bob = await OrganizationMessagesServiceTests.teammateAsync(host, "Bob");
+    const sender = await OrganizationMessagesServiceTests.senderAsync(host, [ada, bob]);
+    sender.holds.set(bob.id, new Promise(() => undefined));
+    void OrganizationMessagesServiceTests.service(host, sender).sendAsync(new OrganizationMessageSendParams(OrganizationTarget.everyone, "Bye"));
+    await host.until("Ada's start", async () => (await host.organizationMessages.listAsync()).map(t => OrganizationMessagesServiceTests.states(t)).join()
+      === "Ada:Started,Bob:Queued");
+
+    await OrganizationMessagesServiceTests.service(host, sender).reconcileAsync();
+    await OrganizationMessagesServiceTests.service(host, sender).reconcileAsync();
+    const [message] = await host.organizationMessages.listAsync();
+
+    Assert.areEqual(`Ada:Started:null,Bob:Failed:${Resources.organizationSendInterrupted}`,
+      message?.recipients.map(t => `${t.teammateName}:${t.state}:${t.reason}`).join());
   }
 
   @TestMethod

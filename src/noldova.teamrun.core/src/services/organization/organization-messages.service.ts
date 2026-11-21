@@ -76,11 +76,17 @@ export class OrganizationMessagesService implements IOrganizationMessagesService
     const message = await this.changeAsync(id, t => t.state === OrganizationRecipientState.Queued ? t.with(OrganizationRecipientState.Stopped) : t);
     const started = new Set(message.recipients.filter(t => t.state === OrganizationRecipientState.Started).map(t => t.messageId));
     const waiting = (await this.messages.listOpenAsync()).filter(t => t.status === MessageStatus.Pending && started.has(t.inReplyTo));
-    for (const reply of waiting)
-      await this.sender.cancelAsync(new MessageIdParams(reply.id));
+    await Promise.all(waiting.map(t => this.sender.cancelAsync(new MessageIdParams(t.id))));
     const halted = new Set(waiting.map(t => t.inReplyTo));
     return halted.size === 0 ? message : await this.changeAsync(id,
       t => t.state === OrganizationRecipientState.Started && halted.has(t.messageId) ? t.with(OrganizationRecipientState.Stopped) : t);
+  }
+
+  public async reconcileAsync(): Promise<void> {
+    for (const message of await this.listAsync())
+      if (message.recipients.some(t => t.state === OrganizationRecipientState.Queued))
+        await this.changeAsync(message.id, t => t.state === OrganizationRecipientState.Queued
+          ? t.with(OrganizationRecipientState.Failed, undefined, undefined, Resources.organizationSendInterrupted) : t);
   }
 
   private async startAsync(messageId: string, teammateId: string, text: string): Promise<void> {
