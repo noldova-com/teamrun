@@ -937,7 +937,7 @@ export class Resources {
     + "OR (json_type(d.value, '$.payload.text') = 'text' AND length(trim(json_extract(d.value, '$.payload.text'))) > 0)))";
 
   public static formatRewindNotSavedAfterRestore(reason: string): string {
-    return `The files were restored to before that reply, but its messages couldn't be removed, so the chat still shows them: ${reason} Rewind again to remove them.`;
+    return `The files were restored to before that reply, but the chat still shows its messages. Rewind again to remove them. They couldn't be removed: ${reason}`;
   }
 
   public static formatCompactRefused(provider: string, reason: string): string {

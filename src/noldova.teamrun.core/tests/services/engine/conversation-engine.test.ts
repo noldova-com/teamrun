@@ -1794,7 +1794,8 @@ export class ConversationEngineTests {
     host.adapter.writeFiles = { "base.txt": "reply\n" };
     const sent = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Change"));
     await host.engine.waitForIdle();
-    const failure: unknown = thrownAs === "error" ? new Error("The disk is full.") : "The disk is full.";
+    const reason = thrownAs === "error" ? "The disk is full." : "database or disk is full";
+    const failure: unknown = thrownAs === "error" ? new Error(reason) : reason;
     const connection = host.context.database.connection;
     const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
     let failures = 1;
@@ -1811,8 +1812,8 @@ export class ConversationEngineTests {
     const again = await host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, true));
 
     const described = RequestDispatcher.describe(thrown);
-    Assert.areEqual(`${ErrorCode.Internal}:${Resources.formatRewindNotSavedAfterRestore("The disk is full.")}:true`,
-      `${described.name}:${described.message}:${thrown.cause === failure}`);
+    Assert.areEqual(`${ErrorCode.Internal}:${Resources.formatRewindNotSavedAfterRestore(reason)}:true:true`,
+      `${described.name}:${described.message}:${described.message.endsWith(`Rewind again to remove them. They couldn't be removed: ${reason}`)}:${thrown.cause === failure}`);
     Assert.areEqual("2:one\n", `${kept}:${restored}`);
     Assert.areEqual(2, again.removedMessageIds.length);
     Assert.areEqual(0, (await host.messages.listAsync(new MessageListParams(conversation.id, null))).length);
