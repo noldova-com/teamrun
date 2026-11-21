@@ -14,6 +14,7 @@ import { IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemCompone
 
 import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
+import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { UsageLevel } from "../../enums/usage-level";
 import type { UsageMeter } from "../../models/usage-meter";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -26,7 +27,7 @@ import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.comp
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
     TeammateAvatarComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider],
-  host: { class: "nol-teamrun-organization-card" },
+  host: { class: "nol-teamrun-organization-card", "[class.fluid]": "shape() === shapes.Fluid", "[class.row]": "shape() === shapes.Row" },
   templateUrl: "./organization-card.component.html",
   styleUrl: "./organization-card.component.css"
 })
@@ -35,9 +36,11 @@ export class OrganizationCardComponent {
   private readonly formatter: UsageFormatterService = inject(UsageFormatterService);
 
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
+  public readonly shape: InputSignal<OrganizationCardShape> = input<OrganizationCardShape>(OrganizationCardShape.Card);
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly fieldNames: typeof OrganizationCardField = OrganizationCardField;
+  protected readonly shapes: typeof OrganizationCardShape = OrganizationCardShape;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly fields: Signal<ReadonlySet<OrganizationCardField>> = computed(() => this.layout.layout().fieldsOf(this.teammate().id));
   protected readonly usage: Signal<{ readonly meter: UsageMeter; readonly used: number } | null> = computed(() => {

@@ -58,3 +58,36 @@
   color: var(--nol-text-muted);
   font-size: var(--nol-text-small);
 }
+
+:host(.fluid) {
+  width: auto;
+}
+
+:host(.row) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--nol-space-1) var(--nol-space-2);
+  width: auto;
+  padding: var(--nol-space-2);
+  border: none;
+  background: var(--nol-panel);
+}
+
+:host(.row:hover) {
+  background: var(--nol-hover);
+}
+
+:host(.row) .head {
+  display: contents;
+}
+
+:host(.row) .who {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--nol-space-2);
+}
+
+:host(.row) > :not(.head) {
+  grid-column: 2;
+}
