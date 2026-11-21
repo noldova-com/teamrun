@@ -19,8 +19,11 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { ILog } from "../../interfaces/i-log.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
 import type { ActiveRun } from "../../models/active-run.js";
+import { DecidedApproval } from "../../models/decided-approval.js";
 import { PermissionAsk } from "../../models/permission-ask.js";
 import { QueuedAnswer } from "../../models/queued-answer.js";
+import { QuestionReply } from "../../models/question-reply.js";
+import { ReplyMode } from "../../models/reply-mode.js";
 import type { ReplyWork } from "../../models/reply-work.js";
 import type { SendAsk } from "../../models/send-ask.js";
 import { Resources } from "../../resources.js";
@@ -75,7 +78,7 @@ export class PermissionAsks {
   }
 
   public async decideAsync(params: ApprovalDecideParams): Promise<Approval> {
-    const [decided, queued] = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<readonly [Approval, QueuedAnswer | null]> => {
+    const { approval: decided, queued } = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<DecidedApproval> => {
       const approval = await this.approvals.findAsync(params.approvalId, transaction);
       if (Object.isNull(approval))
         throw new ServiceException(ErrorCode.NotFound, Resources.formatApprovalNotFound(params.approvalId), [params.approvalId]);
@@ -92,7 +95,7 @@ export class PermissionAsks {
       const kept = params.answers?.filter(t => approval.questions.some(u => u.id === t.questionId && !u.secret)) ?? null;
       const decision = approval.withDecision(params.optionId, new Date().toISOString(), kept);
       await this.approvals.updateAsync(decision, transaction);
-      return [decision, null];
+      return new DecidedApproval(decision, null);
     });
     this.events.publish(new Event(EventName.ApprovalUpdated, decided.toJson()));
     const run = this.state.runs.get(decided.messageId);
@@ -121,7 +124,7 @@ export class PermissionAsks {
     const run = this.state.replyRuns.get(origin) ?? await this.startedRunOf(origin, ended);
     if (Object.isUndefined(run))
       throw new ServiceException(ErrorCode.Unauthorized, Resources.sendNotAllowed, [ask.chatId]);
-    const open = this.state.sessions.find(t => t.run === run) ?? { reply: origin.message, mode: this.modeIn(await this.startedRequestedAsync(origin.message)) };
+    const open = this.state.sessions.find(t => t.run === run) ?? new ReplyMode(origin.message, this.modeIn(await this.startedRequestedAsync(origin.message)));
     if ((await this.toolModeOfAsync(open))?.unrestricted === true)
       return ask.starts;
     const payload = new PermissionPayload(Resources.sendMessageModule, ask.chatId, PermissionRisk.Medium, [
@@ -141,7 +144,7 @@ export class PermissionAsks {
     if (Object.isNull(answers) || Object.isNull(provenance) || Object.isNull(replyTo))
       return null;
     const replies = approval.questions.flatMap(question => answers.filter(t => t.questionId === question.id)
-      .map(t => ({ question: question.text, answer: [...t.choices, ...Object.isNull(t.text) ? [] : [t.text]].join(Resources.listSeparator) })));
+      .map(t => new QuestionReply(question.text, [...t.choices, ...Object.isNull(t.text) ? [] : [t.text]].join(Resources.listSeparator))));
     const adapter = this.registry.all().find(t => t.descriptor.id === provenance.requested.kind);
     const format = adapter?.formatQuestionReply?.bind(adapter);
     const prompt = Object.isUndefined(format) ? null : replies.map(t => format(replyTo, t.question, t.answer)).join(Resources.lineSeparator);
@@ -216,13 +219,13 @@ export class PermissionAsks {
   }
 
   private async decidePostedAsync(approval: Approval, params: ApprovalDecideParams, replyTo: string,
-    transaction: SqlTransaction): Promise<readonly [Approval, QueuedAnswer | null]> {
+    transaction: SqlTransaction): Promise<DecidedApproval> {
     const reply = await this.requireMessageAsync(approval.messageId, transaction);
     const answered = approval.withDecision(params.optionId, new Date().toISOString(), params.answers);
     const queued = this.answerOf(PermissionAsks.withAnswerUnsent(answered, replyTo, true), reply);
     const decided = Object.isNull(queued) ? answered : queued.approval;
     await this.approvals.updateAsync(decided, transaction);
-    return [decided, queued];
+    return new DecidedApproval(decided, queued);
   }
 
   private static withAnswerUnsent(approval: Approval, replyTo: string, isUnsent: boolean): Approval {

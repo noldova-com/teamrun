@@ -23,7 +23,6 @@ import {
   BackgroundTaskStatus,
   type Conversation,
   ConversationCreateParams,
-  type ConversationResponder,
   type ConversationResponderParams,
   ConversationIdParams,
   type ConversationRewindParams,
@@ -126,6 +125,17 @@ import type { TurnWake } from "../../models/turn-wake.js";
 import { WakeTurn } from "../../models/wake-turn.js";
 import { WorkFolder } from "../../models/work-folder.js";
 import { ConversationTitle } from "../../models/conversation-title.js";
+import { CarriedSession } from "../../models/carried-session.js";
+import { HandOffResult } from "../../models/hand-off-result.js";
+import { LostWake } from "../../models/lost-wake.js";
+import { MovedSettings } from "../../models/moved-settings.js";
+import type { ReplyMode } from "../../models/reply-mode.js";
+import { SendAllowance } from "../../models/send-allowance.js";
+import { StoppedReply } from "../../models/stopped-reply.js";
+import { StoppedSubAgents } from "../../models/stopped-sub-agents.js";
+import { SustainedSettings } from "../../models/sustained-settings.js";
+import { UsableResponder } from "../../models/usable-responder.js";
+import { WrittenImageFolder } from "../../models/written-image-folder.js";
 import { Resources } from "../../resources.js";
 import type { DatabaseContext } from "../database-context.js";
 import type { ProviderKindRegistry } from "../provider-kinds/provider-kind-registry.js";
@@ -359,7 +369,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return ProjectImageReader.share(folder.path, params.path, folder.isStored ? null : this.sharedImages);
   }
 
-  private async writtenImageFolderOfAsync(params: WrittenImageReadParams): Promise<{ readonly path: string; readonly isStored: boolean }> {
+  private async writtenImageFolderOfAsync(params: WrittenImageReadParams): Promise<WrittenImageFolder> {
     const conversation = await this.requireConversationAsync(params.conversationId);
     const folder = await this.requireWorkFolderAsync(conversation, false);
     const message = await this.messages.findAsync(params.messageId);
@@ -368,12 +378,12 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       throw notFound;
     const reader = new WrittenImageReader();
     if (message.details.some(t => reader.storedPathOf(t) === params.path))
-      return { path: join(this.context.dataDirectory, Resources.imagesDirectoryName), isStored: true };
+      return new WrittenImageFolder(join(this.context.dataDirectory, Resources.imagesDirectoryName), true);
     if (!reader.pathsOf(message, folder.path).includes(params.path) && !reader.markdownImagePathsOf(message, folder.path).includes(params.path)
       && !reader.markdownLinkImagePathsOf(message, folder.path).includes(params.path)
       && !message.details.some(t => reader.generatedPathOf(t, folder.path) === params.path))
       throw notFound;
-    return { path: folder.path, isStored: false };
+    return new WrittenImageFolder(folder.path, false);
   }
 
   public async sendAsync(params: MessageSendParams, signal?: AbortSignal): Promise<MessageSendResult> {
@@ -412,7 +422,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   public async sendAllowedAsync(params: MessageSendParams, starts: string | null): Promise<MessageSendResult> {
-    return this.sendMessageAsync(params, null, { starts }, undefined);
+    return this.sendMessageAsync(params, null, new SendAllowance(starts), undefined);
   }
 
   public sendOutsideAsync(teammateId: string | null, text: string, label: string, chatId: string | null = null): Promise<string> {
@@ -473,7 +483,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     };
   }
 
-  private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null,
+  private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: SendAllowance | null,
     signal: AbortSignal | undefined, outside: MessageSender | null = null, queues: boolean = false): Promise<MessageSendResult> {
     if (!Object.isNull(params.senderToken) && !Object.isNull(params.requested) && !Object.isNull(params.requested.mode)) {
       this.requireTurn(params.senderToken);
@@ -617,7 +627,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     const now = new Date().toISOString();
     const interrupted: Message[] = [];
     const ended = await this.context.database.connection.runInTransactionAsync(async transaction => {
-      const stopped: { readonly open: Message; readonly withoutSubAgents: Message; readonly message: Message; readonly cancelled: readonly Approval[] }[] = [];
+      const stopped: StoppedReply[] = [];
       for (const open of await this.messages.listOpenAsync(transaction)) {
         const note = new MessageDetail(open.details.length, DetailKind.Note, Resources.replyInterruptedByStop, null, now);
         const withoutSubAgents = ConversationEngine.stopSubAgents(open);
@@ -627,7 +637,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
         await this.messages.updateAsync(message, transaction);
         for (const approval of cancelled)
           await this.approvals.updateAsync(approval, transaction);
-        stopped.push({ open, withoutSubAgents, message, cancelled });
+        stopped.push(new StoppedReply(open, withoutSubAgents, message, cancelled));
       }
       return stopped;
     });
@@ -639,15 +649,15 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       interrupted.push(message);
     }
     const left = await this.context.database.connection.runInTransactionAsync(async transaction => {
-      const stopped: (readonly [Message, Message])[] = [];
+      const stopped: StoppedSubAgents[] = [];
       for (const running of await this.messages.listWithRunningSubAgentsAsync(transaction)) {
         const message = ConversationEngine.stopSubAgents(running);
         await this.messages.updateAsync(message, transaction);
-        stopped.push([running, message]);
+        stopped.push(new StoppedSubAgents(running, message));
       }
       return stopped;
     });
-    for (const [running, message] of left) {
+    for (const { running, message } of left) {
       this.publishStopped(running, message);
       this.events.publish(new Event(EventName.MessageUpdated, message.toJson()));
     }
@@ -669,8 +679,8 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     }
     for (const wake of await this.wakes.listAsync(ChatWakeState.Waiting))
       await this.settleSafelyAsync(wake.chatId, async () => {
-        const [text, end] = await this.lostOfAsync(wake);
-        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, text, null), end);
+        const lost = await this.lostOfAsync(wake);
+        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, lost.text, null), lost.end);
       });
     for (const conversationId of unsent)
       await this.permissions.sendAnswersAsync(conversationId);
@@ -1037,8 +1047,8 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       throw new ServiceException(ErrorCode.InvalidParams, Resources.formatMemberNotFound(conversation.id, responder.id), [conversation.id, responder.id]);
     const byChoice = called.length === 0 && !Object.isNull(sender) && Object.isNull(responder) && Object.isNull(params.requested);
     const usable = byChoice ? await this.usableResponderOfAsync(conversation, sender) : null;
-    const choice = usable?.[0] ?? null;
-    const participants = called.length > 0 ? called : answersItself ? [] : !byChoice ? [responder] : Object.isNull(usable) ? [] : [usable[1]];
+    const choice = usable?.responder ?? null;
+    const participants = called.length > 0 ? called : answersItself ? [] : !byChoice ? [responder] : Object.isNull(usable) ? [] : [usable.teammate];
     const requested = choice?.requested ?? params.requested;
     const providerId = Object.isNull(choice) ? params.providerId : choice.providerId;
     if (Object.isNull(sender) && Object.isNull(providerId) && !Object.isNull(requested) && participants.includes(null))
@@ -1065,19 +1075,19 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       starts.length === 0 ? Resources.sendStartsNoOne : starts.join(Resources.sendStartsSeparator));
   }
 
-  private async usableResponderOfAsync(conversation: Conversation, sender: MessageSender): Promise<readonly [ConversationResponder, Teammate | null] | null> {
+  private async usableResponderOfAsync(conversation: Conversation, sender: MessageSender): Promise<UsableResponder | null> {
     const chosen = conversation.responder;
     if (Object.isNull(chosen))
       return null;
     if (!Object.isNull(chosen.teammateId)) {
       const teammate = await this.teammates.findAsync(chosen.teammateId);
       return chosen.teammateId === sender.teammateId || Object.isNull(teammate)
-        || Object.isNull(await this.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, chosen.teammateId))) ? null : [chosen, teammate];
+        || Object.isNull(await this.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, chosen.teammateId))) ? null : new UsableResponder(chosen, teammate);
     }
-    const kind = chosen.requested!.kind;
+    const kind = chosen.requested?.kind;
     const provider = Object.isNull(chosen.providerId) ? null : await this.providers.findAsync(chosen.providerId);
-    return (Object.isNull(sender.teammateId) && sender.conversationId === conversation.id) || !this.registry.has(kind)
-      || provider?.kind !== kind || provider?.enabled !== true ? null : [chosen, null];
+    return Object.isUndefined(kind) || (Object.isNull(sender.teammateId) && sender.conversationId === conversation.id) || !this.registry.has(kind)
+      || provider?.kind !== kind || provider?.enabled !== true ? null : new UsableResponder(chosen, null);
   }
 
   private async requireTeammateAsync(id: string, transaction?: SqlTransaction): Promise<Teammate> {
@@ -1149,7 +1159,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   private static isJsonObject(value: JsonValue): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return Object.isObject(value) && !Array.isArray(value);
   }
 
   private async startedRequestedAsync(reply: Message, transaction?: SqlTransaction): Promise<RequestedSettings> {
@@ -1181,7 +1191,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       && !String.isNullOrWhitespace(this.registry.get(kind).planMode ?? null);
   }
 
-  private async toolModeOfAsync(open: { readonly reply: Message; readonly mode: ProviderMode | null }): Promise<ProviderMode | null> {
+  private async toolModeOfAsync(open: ReplyMode): Promise<ProviderMode | null> {
     const requested = await this.startedRequestedAsync(open.reply);
     const chosen = Object.isNull(open.reply.teammateId) ? this.chosenModes.get(open.reply.conversationId)?.get(requested.kind) : undefined;
     const current = chosen ?? this.modeIn(requested);
@@ -1246,7 +1256,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       if (!Object.isNull(handed) || finished === found)
         return handed;
       await this.messages.updateAsync(finished, transaction);
-      return { stored: finished, pending: [], waiting: [], joined: false };
+      return new HandOffResult(finished, [], [], false);
     });
     if (Object.isNull(handed))
       return;
@@ -1267,21 +1277,21 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   private async handOffOfAsync(item: ReplyWork, work: ReplyWork[], finished: Message, transaction: SqlTransaction)
-    : Promise<{ stored: Message; pending: ReplyWork[]; waiting: ReplyWork[]; joined: boolean } | null> {
+    : Promise<HandOffResult | null> {
     if (Object.isNull(finished.teammateId))
       return null;
     const halted = item.run.isCancelled;
     if (finished.status !== MessageStatus.Completed && !halted)
       return null;
     const text = finished.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join(Resources.lineSeparator);
-    const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
+    const teammates = await this.teammates.listAsync(transaction);
+    const available = teammates.map(t => new TeammateMention(t.id, t.name));
     const mentions = MentionResolver.resolveTeammateText(text, available);
     if (mentions.length === 0)
       return null;
     const skipped = new Set([finished.teammateId, item.trigger.sender?.teammateId, ...item.sentTo]);
-    const others: Teammate[] = [];
-    for (const addressed of MentionResolver.resolveAddressed(text, available).filter(t => !skipped.has(t.teammateId)))
-      others.push((await this.teammates.findAsync(addressed.teammateId, transaction))!);
+    const others = MentionResolver.resolveAddressed(text, available).filter(t => !skipped.has(t.teammateId))
+      .flatMap(t => teammates.filter(u => u.id === t.teammateId));
     const limit = this.readHopLimit();
     const stopped = others.length > 0 && (halted || item.hop >= limit);
     const now = new Date().toISOString();
@@ -1313,7 +1323,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     await this.messages.updateAsync(stored, transaction);
     for (const next of pending)
       await this.messages.insertAsync(next.message, transaction);
-    return { stored, pending, waiting, joined };
+    return new HandOffResult(stored, pending, waiting, joined);
   }
 
   private async isIdleAsync(chatId: string, transaction?: SqlTransaction, held: boolean = false): Promise<boolean> {
@@ -1605,7 +1615,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     }
   }
 
-  private async sustainedAsync(item: ReplyWork, carry: SessionCarry | null): Promise<{ readonly requested: RequestedSettings; readonly note: string | null } | null> {
+  private async sustainedAsync(item: ReplyWork, carry: SessionCarry | null): Promise<SustainedSettings | null> {
     const reply = item.message;
     const teammate = Object.isNull(reply.teammateId) ? null : await this.teammates.findAsync(reply.teammateId);
     if (Object.isNull(teammate) || !teammate.sustain)
@@ -1622,8 +1632,8 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       return null;
     if (entry === own) {
       const started = await this.startedRequestedAsync(reply);
-      return { requested: started, note: await this.sustain.isOutAsync(teammate) ? null
-        : Resources.formatSustainReturned(this.kindNameOf(provider), provider.label, started.model) };
+      return new SustainedSettings(started, await this.sustain.isOutAsync(teammate) ? null
+        : Resources.formatSustainReturned(this.kindNameOf(provider), provider.label, started.model));
     }
     const mode = await this.chatModeOfAsync(teammate, provider.kind, reply.conversationId, await this.answersOutsideAsync(reply));
     const requested = new RequestedSettings(provider.kind, entry.model, entry.effort, null, mode, false, null)
@@ -1631,12 +1641,10 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     const left = await this.providers.findAsync(from ?? own.providerId);
     const note = from === entry.providerId || Object.isNull(left) ? null
       : ConversationEngine.movedNoteOf(carry, this.kindNameOf(provider), provider.label, entry.model, left.label);
-    return { requested, note };
+    return new SustainedSettings(requested, note);
   }
 
-  private async movedOfAsync(item: ReplyWork, member: ConversationMember | null, context: ParticipantContext): Promise<{
-    readonly sustained: { readonly requested: RequestedSettings; readonly note: string | null } | null; readonly requested: RequestedSettings;
-    readonly handover: HandoverPrompt | null; readonly posted: Message | null; readonly kept: string | null; }> {
+  private async movedOfAsync(item: ReplyWork, member: ConversationMember | null, context: ParticipantContext): Promise<MovedSettings> {
     let summary: Promise<ChatSummary | null> | null = null;
     let posted: Message | null = null;
     for (;;) {
@@ -1647,19 +1655,19 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       const teammateId = reply.teammateId;
       if (Object.isNull(teammateId) || Object.isNull(provider) || (Object.isNull(first) && Object.isNull(item.continued))
         || (Object.isNull(item.continued) && !Object.isNull(await this.sessionOnAsync(member, provider))))
-        return { sustained: first, requested, handover: null, posted, kept: null };
+        return new MovedSettings(first, requested, null, posted, null);
       const carried = await this.carryOfAsync(member, provider);
       const sustained = Object.isNull(carried) ? first : await this.sustainedAsync(item, carried.carry);
       const note = sustained?.note ?? null;
       if (carried?.carry === SessionCarry.Carried)
-        return { sustained, requested, handover: null, posted, kept: carried.sessionId };
+        return new MovedSettings(sustained, requested, null, posted, carried.sessionId);
       summary ??= await context.compactedAsync(reply, item.continued) ? this.summaryOfAsync(item, teammateId, member, provider, requested, context, async () => {
         posted = await this.postMovedAsync(reply, note);
       }) : Promise.resolve(null);
       const handover = await context.createHandoverAsync(reply, item.trigger, item.continued, item.handOffs,
         await this.messages.findWindowTokensAsync(provider.id, requested.model), item.instructions, await summary);
       if (!Object.isNull(handover) || await this.triedElseRecordNoRoomAsync(item, teammateId, provider.id))
-        return { sustained, requested, handover, posted, kept: null };
+        return new MovedSettings(sustained, requested, handover, posted, null);
     }
   }
 
@@ -1794,7 +1802,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return Resources.formatSustainMoved(kind, label, model, from);
   }
 
-  private async carryOfAsync(member: ConversationMember | null, provider: Provider): Promise<{ readonly carry: SessionCarry; readonly sessionId: string } | null> {
+  private async carryOfAsync(member: ConversationMember | null, provider: Provider): Promise<CarriedSession | null> {
     if (Object.isNull(member) || Object.isNull(member.nativeSessionId))
       return null;
     const session = member.nativeSessionId;
@@ -1804,7 +1812,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     if (Object.isUndefined(from) || from.id === provider.id || from.kind !== provider.kind || !adapter.descriptor.carriesSessions
       || Object.isUndefined(adapter.carrySession))
       return null;
-    return { carry: await adapter.carrySession(from, provider, session), sessionId: session };
+    return new CarriedSession(await adapter.carrySession(from, provider, session), session);
   }
 
   private async accountOfSessionAsync(member: ConversationMember): Promise<string | undefined> {
@@ -2431,16 +2439,16 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       .join(Resources.transcriptSeparator);
   }
 
-  private async lostOfAsync(wake: ChatWake): Promise<readonly [string, string]> {
+  private async lostOfAsync(wake: ChatWake): Promise<LostWake> {
     switch (wake.kind) {
       case ChatWakeKind.SubAgent:
-        return [Resources.formatSubAgentWakeLost(wake.watchedIds[0]!), ProtocolResources.wakeLostEnd];
+        return new LostWake(Resources.formatSubAgentWakeLost(wake.watchedIds.join(Resources.listSeparator)), ProtocolResources.wakeLostEnd);
       case ChatWakeKind.Command:
-        return [Resources.formatCommandWakeLost(wake.watchedIds.join(Resources.listSeparator)), ProtocolResources.wakeLostEnd];
+        return new LostWake(Resources.formatCommandWakeLost(wake.watchedIds.join(Resources.listSeparator)), ProtocolResources.wakeLostEnd);
       case ChatWakeKind.Reply: {
         const watched = await this.conversations.findAsync(wake.watchedChatId);
-        return Object.isNull(watched) ? [Resources.formatWakeChatDeleted(wake.watchedChatId), ProtocolResources.wakeChatDeletedEnd]
-          : [Resources.formatWakeLost(watched.title, wake.watchedChatId), ProtocolResources.wakeLostEnd];
+        return Object.isNull(watched) ? new LostWake(Resources.formatWakeChatDeleted(wake.watchedChatId), ProtocolResources.wakeChatDeletedEnd)
+          : new LostWake(Resources.formatWakeLost(watched.title, wake.watchedChatId), ProtocolResources.wakeLostEnd);
       }
     }
   }
