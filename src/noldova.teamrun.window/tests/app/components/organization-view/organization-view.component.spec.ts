@@ -187,13 +187,13 @@ describe("OrganizationViewComponent", () => {
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
-    expect(shape(department("Top"))).toEqual(["Top", "0", "No members", [], [], [], ["1 member hidden"]]);
+    expect(shape(department("Top"))).toEqual(["Top", "0", undefined, [], [], [], ["1 member hidden"]]);
 
     organization = new Organization([new Department("ui", "UI", null, null, 0, "c", "u")], []);
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
-    expect(shape(department("UI"))).toEqual(["UI", "0", "No members", [], [], [], []]);
+    expect(shape(department("UI"))).toEqual(["UI", "0", undefined, [], [], [], []]);
   });
 
   it("says when the organization can't be read, and reads it again on Retry", async () => {
@@ -777,6 +777,32 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(count.getBoundingClientRect().height, 1.25 * rem);
       expect(all(".top .status-key nol-teamrun-teammate-status").map(t => [t.textContent?.trim(), getComputedStyle(t).color])).toEqual([
         ["Working", colour("text")], ["Waiting for you", colour("warning")], ["Idle", colour("text")], ["Stopped", colour("status-failed")]]);
+    });
+
+    it.each([
+      { used: 79, fill: "text-muted" },
+      { used: 80, fill: "warning" }
+    ])("draws a card's usage at $used% used as a bar across the card a step high, filled in $fill, half a step before its figure", async ({ used, fill }) => {
+      await create(context => context
+        .answer(MethodName.OrganizationLayoutRead, () => ({ cardsShow: { Usage: true } }))
+        .answer(MethodName.PlanUsageList, () => [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, used, null)], "2026-10-22T09:00:00.000Z").toJson()]));
+      const probe = document.createElement("span");
+      probe.style.color = `var(--nol-${fill})`;
+      element().append(probe);
+      const expected = getComputedStyle(probe).color;
+      probe.remove();
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const meter = one(".usage", card("Alice"));
+      const [box, track, text] = [card("Alice").getBoundingClientRect(), one(".nol-meter-track", meter).getBoundingClientRect(),
+        one(".nol-meter-text", meter).getBoundingClientRect()];
+      const inset = Number.parseFloat(getComputedStyle(card("Alice")).borderLeftWidth) + space(3);
+
+      expect([meter.textContent?.trim(), getComputedStyle(one(".nol-meter-fill", meter)).backgroundColor]).toEqual([`${used}%`, expected]);
+      AppearanceFixture.expectPixels(track.left, box.left + inset);
+      AppearanceFixture.expectPixels(track.height, space(1));
+      AppearanceFixture.expectPixels(text.left - track.right, space(2));
+      expect(text.right).toBeLessThanOrEqual(box.right - inset + 0.5);
+      expect(track.width).toBeGreaterThan(box.width - 2 * inset - 2 * space(6));
     });
   });
 });

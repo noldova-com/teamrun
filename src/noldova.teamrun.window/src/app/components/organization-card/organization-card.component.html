@@ -48,7 +48,7 @@ LICENSE file in the root directory of this source tree.
 }
 @if (fields().has(fieldNames.Usage)) {
   @if (usage(); as shown) {
-    <nol-meter class="usage" [label]="shown.meter.label" [value]="shown.used" [warning]="isWarning(shown.meter)">{{ resources.formatOrganizationUsage(shown.used) }}</nol-meter>
+    <nol-meter class="usage" [label]="shown.meter.label" [value]="shown.used" [warning]="shown.used >= resources.organizationUsageWarning">{{ resources.formatOrganizationUsage(shown.used) }}</nol-meter>
   }
 }
 @if (fields().has(fieldNames.Last)) {

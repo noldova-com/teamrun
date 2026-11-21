@@ -528,6 +528,7 @@ export class Resources {
   public static readonly planWarningPercent: number = 75;
   public static readonly planCriticalPercent: number = 90;
   public static readonly wholePercent: number = 100;
+  public static readonly organizationUsageWarning: number = 0.8;
   public static readonly planUsageLabel: string = "Plan usage";
   public static readonly nearPlanLimitLabel: string = "Near the plan limit";
   public static readonly usedUpLabel: string = "Used up";
@@ -1175,7 +1176,6 @@ export class Resources {
   public static readonly organizationDepartmentNameLabel: string = "Department name";
   public static readonly organizationLeaderLabel: string = "Leader";
   public static readonly organizationNoLeader: string = "No leader";
-  public static readonly organizationNoMembers: string = "No members";
   public static readonly organizationMemberIn: string = "In";
   public static readonly organizationAddMember: string = "Add member";
   public static readonly organizationAddMemberIcon: string = "person_add";
@@ -1716,7 +1716,7 @@ export class Resources {
       const count = statuses.filter(u => u === t).length;
       return count === 0 ? [] : [`${count} ${Resources.teammateStatusLabels[t].toLowerCase()}`];
     });
-    return counts.length === 0 ? Resources.organizationNoMembers : counts.join(" · ");
+    return counts.join(" · ");
   }
 
   public static formatOrganizationCollapseLabel(name: string, open: boolean): string {

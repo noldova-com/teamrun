@@ -15,7 +15,6 @@ import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, 
 import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
 import { TeammateStatus } from "../../enums/teammate-status";
-import { UsageLevel } from "../../enums/usage-level";
 import { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationNode } from "../../models/organization.node";
 import type { UsageMeter } from "../../models/usage-meter";
@@ -124,9 +123,5 @@ export class OrganizationCardComponent {
       if (confirmed)
         void this.organization.setMember(teammate.id, null);
     });
-  }
-
-  protected isWarning(meter: UsageMeter): boolean {
-    return meter.level !== UsageLevel.Normal;
   }
 }

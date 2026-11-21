@@ -116,9 +116,9 @@ describe("Resources", () => {
       .toEqual(["0 teammates in 0 departments", "1 teammate in 1 department", "2 teammates in 3 departments"]);
   });
 
-  it("sums up a department by its people's statuses in the status key's order, and says when it has no one", () => {
+  it("sums up a department by its people's statuses in the status key's order, and says nothing when it has no one", () => {
     expect([Resources.formatOrganizationDepartmentSummary([TeammateStatus.Idle, TeammateStatus.Working, TeammateStatus.Idle, TeammateStatus.UsageLimit]),
-      Resources.formatOrganizationDepartmentSummary([])]).toEqual(["1 working · 2 idle · 1 usage limit", "No members"]);
+      Resources.formatOrganizationDepartmentSummary([])]).toEqual(["1 working · 2 idle · 1 usage limit", ""]);
   });
 
   it("says how long a card's work has run in seconds, minutes, or hours and minutes, with how many more run, and what share of usage is used", () => {

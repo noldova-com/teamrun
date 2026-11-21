@@ -63,6 +63,7 @@ describe("OrganizationLayoutService", () => {
     context = contextKeeping(() => null).fail(MethodName.OrganizationLayoutRead, "offline");
     const layout = await open();
     layout.toggleDepartment("d2");
+    await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(2));
     await settle();
 
     expect([layout.layout().collapsedDepartments, saves]).toEqual([["d2"], []]);
@@ -70,6 +71,21 @@ describe("OrganizationLayoutService", () => {
     context.emit(EventName.StateResyncRequested, null);
     await Wait.until(() => expect(saves).toEqual([collapsed("d1", "d2")]));
     expect(layout.layout().collapsedDepartments).toEqual(["d1", "d2"]);
+  });
+
+  it("reads the layout again on the first change after a failed read, once while that read is on its way, and saves its changes over what it reads", async () => {
+    context = contextKeeping(() => null).fail(MethodName.OrganizationLayoutRead, "offline");
+    const layout = await open();
+    const again = new DeferredResponse();
+    context.answer(MethodName.OrganizationLayoutRead, () => again.promise);
+    layout.toggleDepartment("d2");
+    layout.toggleDepartment("d3");
+    await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(2));
+
+    expect(saves).toEqual([]);
+    again.resolve(collapsed("d1"));
+    await Wait.until(() => expect(saves).toEqual([collapsed("d1", "d2", "d3")]));
+    expect([layout.layout().collapsedDepartments, context.count(MethodName.OrganizationLayoutRead)]).toEqual([["d1", "d2", "d3"], 2]);
   });
 
   it("saves each change in turn, each card's own choice, every card's and their clearing, the view and what Focus shows", async () => {

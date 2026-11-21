@@ -29,6 +29,7 @@ export class OrganizationLayoutService {
   private readonly subscriptions: readonly (() => void)[];
   private readonly held: ((layout: OrganizationLayout) => OrganizationLayout)[] = [];
   private isOpen: boolean = false;
+  private isReading: boolean = false;
   private edits: number = 0;
   private received: number = 0;
   private saving: number = 0;
@@ -100,12 +101,17 @@ export class OrganizationLayoutService {
     this.current.set(next);
     if (this.isOpen)
       this.save(next.toJson());
-    else
+    else {
       this.held.push(change);
+      if (!this.isReading)
+        void this.open();
+    }
   }
 
   private async open(): Promise<void> {
+    this.isReading = true;
     const kept = await this.read();
+    this.isReading = false;
     if (!this.isOpen && !Object.isUndefined(kept))
       this.openWith(OrganizationLayout.fromJson(kept));
   }

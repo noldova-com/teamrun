@@ -115,6 +115,16 @@
   white-space: nowrap;
 }
 
+.usage {
+  --nol-meter-height: var(--nol-space-1);
+  --nol-meter-gap: var(--nol-space-2);
+  --nol-meter: calc(100% - var(--nol-meter-gap) - 2rem);
+}
+
+.usage:not(.nol-meter-warning) {
+  --nol-meter-color: var(--nol-text-muted);
+}
+
 .last {
   display: -webkit-box;
   margin: 0;
