@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 export class Resources {
   public static readonly mentionMarker: string = "@";
   public static readonly mentionEscape: string = "\\";
@@ -803,6 +805,6 @@ export class Resources {
   }
 
   public static formatMcpToolFailure(code: string, moduleCode: string | null, message: string): string {
-    return moduleCode === null ? `${code}: ${message}` : `${code} (${moduleCode}): ${message}`;
+    return Object.isNull(moduleCode) ? `${code}: ${message}` : `${code} (${moduleCode}): ${message}`;
   }
 }
