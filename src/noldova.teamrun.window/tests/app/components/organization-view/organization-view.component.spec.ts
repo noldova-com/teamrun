@@ -126,8 +126,8 @@ describe("OrganizationViewComponent", () => {
     await create();
 
     expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart > nol-canvas").getAttribute("aria-label"),
-      all(".chart [nolCanvasItem]").map(t => t.matches(".owner, .kid"))])
-      .toEqual([["Organization"], ["4 teammates"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure", [true, true, true]]);
+      all(".chart [nolCanvasItem]").filter(t => t.matches(".owner, .department, nol-teamrun-organization-card")).length])
+      .toEqual([["Organization"], ["4 teammates"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure", 8]);
     expect(tree()).toEqual([
       ["Design", "2", "Led by Alice · 1 member", ["Alice"], ["Bob"], [["UI", "1", "Led by Code Reviewer · 0 members", ["Code Reviewer"], [], [], []]], []],
       ["Build", "1", "1 member", [], ["Offline"], [], []]
