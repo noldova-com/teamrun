@@ -1,0 +1,17 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="head">
+  <nol-teamrun-teammate-avatar [teammate]="teammate()" [decorative]="true" />
+  <div class="who">
+    <span class="name">{{ teammate().name }}</span>
+    @if (teammate().role; as role) {
+      <span class="role">{{ role }}</span>
+    }
+  </div>
+</div>

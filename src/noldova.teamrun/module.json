@@ -40,7 +40,7 @@
       "teamrun.pageShown", "teamrun.pageUpdated", "teamrun.pageStopped"
     ],
     "commands": [
-      "teamrun.showTeammates", "teamrun.showProviders", "teamrun.showMcpServers", "teamrun.showComputerUseGrants", "teamrun.showOutsideSessions", "teamrun.newConversation", "teamrun.openProject", "teamrun.openBrowser", "teamrun.searchConversations", "teamrun.focusComposer", "teamrun.openChatPage",
+      "teamrun.showOrganization", "teamrun.showTeammates", "teamrun.showProviders", "teamrun.showMcpServers", "teamrun.showComputerUseGrants", "teamrun.showOutsideSessions", "teamrun.newConversation", "teamrun.openProject", "teamrun.openBrowser", "teamrun.searchConversations", "teamrun.focusComposer", "teamrun.openChatPage",
       "teamrun.stopReply", "teamrun.previousConversation", "teamrun.nextConversation", "teamrun.moveRowUp", "teamrun.moveRowDown",
       "teamrun.chooseDefaultTeammate", "teamrun.showDataFolder", "teamrun.openChat", "teamrun.enableProvider", "teamrun.reload", "teamrun.newChatTerminal"
     ],
@@ -49,7 +49,7 @@
     "statusBarItems": ["teamrun.planUsage"],
     "topBarActions": ["teamrun.chatPage"],
     "menus": ["teamrun.chats"],
-    "documents": ["teamrun.conversation", "teamrun.image", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection", "teamrun.page"],
+    "documents": ["teamrun.conversation", "teamrun.image", "teamrun.organization", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection", "teamrun.page"],
     "placeholders": ["teamrun.noChat"],
     "settings": ["teamrun.chainHopLimit", "teamrun.titleModel", "teamrun.sendKey", "teamrun.whileReplying", "teamrun.imageOpenMode", "teamrun.newTerminals", "teamrun.runOpensIn", "teamrun.defaultTeammate", "teamrun.manageTeammates", "teamrun.manageProviders", "teamrun.manageMcpServers", "teamrun.manageComputerUse", "teamrun.idleCompaction", "teamrun.outsideSessions", "teamrun.outsidePort", "teamrun.connectOutsideAgents", "teamrun.dataFolder"],
     "settingsPages": ["teamrun.abilities"],

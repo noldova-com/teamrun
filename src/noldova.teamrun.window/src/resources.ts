@@ -814,6 +814,9 @@ export class Resources {
   public static readonly teammatesDocumentName: string = "teamrun.teammates";
   public static readonly teammatesDocumentInstance: string = "teammates";
   public static readonly teammatesViewIcon: string = "group";
+  public static readonly organizationDocumentName: string = "teamrun.organization";
+  public static readonly organizationDocumentInstance: string = "organization";
+  public static readonly organizationViewIcon: string = "account_tree";
   public static readonly providersDocumentName: string = "teamrun.providers";
   public static readonly providersDocumentInstance: string = "providers";
   public static readonly providersViewIcon: string = "key";
@@ -924,6 +927,8 @@ export class Resources {
   public static readonly changedDetailsLimit: number = 1_000;
   public static readonly showTeammatesCommand: string = "teamrun.showTeammates";
   public static readonly showTeammatesTitle: string = "Manage teammates";
+  public static readonly showOrganizationCommand: string = "teamrun.showOrganization";
+  public static readonly showOrganizationTitle: string = "Show organization";
   public static readonly chooseDefaultTeammateCommand: string = "teamrun.chooseDefaultTeammate";
   public static readonly chooseDefaultTeammateTitle: string = "Choose default teammate";
   public static readonly showProvidersCommand: string = "teamrun.showProviders";
@@ -1127,6 +1132,10 @@ export class Resources {
   public static readonly teamRunTagPrefix: string = "nol-teamrun-";
   public static readonly escapeOwnersSelector: string = "input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='menu'], [role='listbox'], [role='dialog'], dialog";
   public static readonly teammatesTitle: string = "Teammates";
+  public static readonly organizationTitle: string = "Organization";
+  public static readonly organizationStructureLabel: string = "Organization structure";
+  public static readonly organizationOwnerName: string = "You";
+  public static readonly organizationEmpty: string = "No departments yet.";
   public static readonly teammatesHint: string = "Create and configure teammates here. Add them to a chat using its member strip or an @mention.";
   public static readonly defaultTeammateHint: string = "The provider, model and effort a new chat starts with. Chats you already have keep their own.";
   public static readonly lastMessageSentLabel: string = "Last message sent";
@@ -1605,6 +1614,27 @@ export class Resources {
 
   public static formatMoveDown(entry: string): string {
     return `Move ${entry} down`;
+  }
+
+  public static formatOrganizationHeadcount(count: number): string {
+    return count === 1 ? "1 teammate" : `${count} teammates`;
+  }
+
+  public static formatOrganizationOwnerRole(leaders: number): string {
+    return leaders === 1 ? "Owner · 1 leader reports to you" : `Owner · ${leaders} leaders report to you`;
+  }
+
+  public static formatOrganizationDepartmentSummary(leader: string | null, members: number): string {
+    const people = members === 1 ? "1 member" : `${members} members`;
+    return Object.isNull(leader) ? people : `Led by ${leader} · ${people}`;
+  }
+
+  public static formatOrganizationCollapseLabel(name: string, open: boolean): string {
+    return open ? `Collapse ${name}` : `Expand ${name}`;
+  }
+
+  public static formatOrganizationHidden(count: number): string {
+    return count === 1 ? "1 teammate hidden" : `${count} teammates hidden`;
   }
 
   public static formatRemove(entry: string): string {

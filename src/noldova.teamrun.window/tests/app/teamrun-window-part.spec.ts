@@ -37,6 +37,7 @@ import { McpServersViewComponent } from "../../src/app/components/mcp-servers-vi
 import { PlanViewComponent } from "../../src/app/components/plan-view/plan-view.component";
 import { ProjectsViewComponent } from "../../src/app/components/projects-view/projects-view.component";
 import { SubAgentsViewComponent } from "../../src/app/components/sub-agents-view/sub-agents-view.component";
+import { OrganizationViewComponent } from "../../src/app/components/organization-view/organization-view.component";
 import { TeammatesViewComponent } from "../../src/app/components/teammates-view/teammates-view.component";
 import { BackgroundTaskStoreService } from "../../src/app/services/background-task-store.service";
 import { ChatStoreService } from "../../src/app/services/chat-store.service";
@@ -113,18 +114,20 @@ describe("TeamRun's window part", () => {
   it("registers the commands that Settings' buttons and the View menu run, each opening its document as one tab in the middle, and the same tab again while it's open", async () => {
     const context = new RecordingWindowPartContext();
     await createPart().activateAsync(context);
-    const shows = context.commands.slice(0, 5);
+    const shows = context.commands.slice(0, 6);
 
     expect(shows.map(t => [t.name, t.title, t.icon, t.defaultKey])).toEqual([
+      ["teamrun.showOrganization", "Show organization", "account_tree", null],
       ["teamrun.showTeammates", "Manage teammates", "group", null],
       ["teamrun.showProviders", "Manage providers", "key", null],
       ["teamrun.showMcpServers", "Manage MCP servers", "hub", null],
       ["teamrun.showComputerUseGrants", "Manage computer use", "desktop_windows", null],
       ["teamrun.showOutsideSessions", "Connect outside agents", "hub", null]
     ]);
-    expect(await Promise.all(shows.map(t => t.runAsync(null)))).toEqual([null, null, null, null, null]);
-    await shows[0]?.runAsync(null);
+    expect(await Promise.all(shows.map(t => t.runAsync(null)))).toEqual([null, null, null, null, null, null]);
+    await shows[1]?.runAsync(null);
     expect(context.openedDocuments).toEqual([
+      { name: "teamrun.organization", instance: "organization", title: "Organization", options: undefined },
       { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined },
       { name: "teamrun.providers", instance: "providers", title: "Providers", options: undefined },
       { name: "teamrun.mcpServers", instance: "mcpServers", title: "MCP servers", options: undefined },
@@ -135,10 +138,10 @@ describe("TeamRun's window part", () => {
     expect([context.dialogs, context.keptDocuments]).toEqual([[], []]);
   });
 
-  it("leaves Teammates, Providers, MCP servers, Computer use and Outside sessions out of the docks a layout reset fills, and out of a saved layout's views, declaring them as documents only", async () => {
+  it("leaves Organization, Teammates, Providers, MCP servers, Computer use and Outside sessions out of the docks a layout reset fills, and out of a saved layout's views, declaring them as documents only", async () => {
     const context = new RecordingWindowPartContext();
     await createPart().activateAsync(context);
-    const names = ["teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection"];
+    const names = ["teamrun.organization", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection"];
 
     expect([declaration.contributes.views.filter(t => names.includes(t)), context.views.filter(t => names.includes(t.name))]).toEqual([[], []]);
     expect([declaration.contributes.documents.filter(t => names.includes(t)), context.documents.filter(t => names.includes(t.name)).map(t => t.name)]).toEqual([names, names]);
@@ -350,9 +353,9 @@ describe("TeamRun's window part", () => {
     await createPart().activateAsync(context);
 
     expect(context.documents.map(t => [t.name, t.padding])).toEqual([["teamrun.conversation", ContentPadding.None], ["teamrun.image", ContentPadding.None],
-      ["teamrun.teammates", ContentPadding.None], ["teamrun.providers", ContentPadding.None], ["teamrun.mcpServers", ContentPadding.None],
+      ["teamrun.organization", ContentPadding.None], ["teamrun.teammates", ContentPadding.None], ["teamrun.providers", ContentPadding.None], ["teamrun.mcpServers", ContentPadding.None],
       ["teamrun.computerUseGrants", ContentPadding.None], ["teamrun.outsideConnection", ContentPadding.None], ["teamrun.page", ContentPadding.None]]);
-    expect(await Promise.all(context.documents.map(t => t.loadComponent()))).toEqual([ConversationComponent, ImageDocumentComponent, TeammatesViewComponent,
+    expect(await Promise.all(context.documents.map(t => t.loadComponent()))).toEqual([ConversationComponent, ImageDocumentComponent, OrganizationViewComponent, TeammatesViewComponent,
       ProvidersViewComponent, McpServersViewComponent, ComputerUseGrantsViewComponent, OutsideConnectionViewComponent, PageDocumentComponent]);
   });
 

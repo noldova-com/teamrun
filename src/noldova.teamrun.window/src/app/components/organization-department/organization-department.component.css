@@ -1,0 +1,84 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.department {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  box-sizing: border-box;
+  width: 15rem;
+  padding: var(--nol-space-3);
+  border: 1px solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background: var(--nol-raised);
+}
+
+.department-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.department-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-title);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.department-summary,
+.hidden {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}
+
+.hidden {
+  padding: var(--nol-space-2) 0 0 var(--nol-space-4);
+}
+
+.stem {
+  width: 1px;
+  height: var(--nol-space-3);
+  margin-left: 7.5rem;
+  background: var(--nol-menu-border);
+}
+
+.reports {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  margin-left: var(--nol-space-4);
+  padding: var(--nol-space-2) 0 0 var(--nol-space-3);
+  border-left: 1px solid var(--nol-menu-border);
+}
+
+.reports > nol-teamrun-organization-card {
+  width: 13.25rem;
+}
+
+.reports > nol-teamrun-organization-card::before {
+  position: absolute;
+  top: 1.375rem;
+  left: calc(-1 * var(--nol-space-3) - 1px);
+  width: var(--nol-space-3);
+  border-top: 1px solid var(--nol-menu-border);
+  content: "";
+}

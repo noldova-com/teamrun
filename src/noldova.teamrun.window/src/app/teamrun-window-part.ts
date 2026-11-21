@@ -93,6 +93,8 @@ export class TeamRunWindowPart implements IWindowPart {
       () => Promise.resolve(PagesViewComponent), ContentPadding.None));
     context.registerView(new ViewContribution(Resources.activityViewName, Resources.activityTitle, Resources.activityViewIcon, DockSide.Bottom, true,
       () => import("./components/activity-view/activity-view.component").then(t => t.ActivityViewComponent), ContentPadding.None));
+    context.registerCommand(TeamRunWindowPart.opening(context, Resources.showOrganizationCommand, Resources.showOrganizationTitle, Resources.organizationViewIcon,
+      Resources.organizationDocumentName, Resources.organizationDocumentInstance, Resources.organizationTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showTeammatesCommand, Resources.showTeammatesTitle, Resources.teammatesViewIcon,
       Resources.teammatesDocumentName, Resources.teammatesDocumentInstance, Resources.teammatesTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showProvidersCommand, Resources.showProvidersTitle, Resources.providersViewIcon,
@@ -113,6 +115,8 @@ export class TeamRunWindowPart implements IWindowPart {
       context.registerSearchSource(source);
     context.registerDocument(new DocumentContribution(Resources.conversationDocumentName, () => import("./components/conversation/conversation.component").then(t => t.ConversationComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.imageDocumentName, () => import("./components/image-document/image-document.component").then(t => t.ImageDocumentComponent), ContentPadding.None));
+    context.registerDocument(new DocumentContribution(Resources.organizationDocumentName,
+      () => import("./components/organization-view/organization-view.component").then(t => t.OrganizationViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.teammatesDocumentName, () => import("./components/teammates-view/teammates-view.component").then(t => t.TeammatesViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.providersDocumentName, () => import("./components/providers-view/providers-view.component").then(t => t.ProvidersViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.mcpServersDocumentName, () => import("./components/mcp-servers-view/mcp-servers-view.component").then(t => t.McpServersViewComponent), ContentPadding.None));
