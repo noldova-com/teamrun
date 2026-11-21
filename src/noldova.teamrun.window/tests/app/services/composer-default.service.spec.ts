@@ -249,6 +249,21 @@ describe("ComposerDefaultService", () => {
     });
   });
 
+  it("shows the choice another window kept during its own save once that save settles", async () => {
+    const store = await open();
+    const save = new DeferredResponse();
+    context.answer(MethodName.ComposerDefaultSave, () => save.promise);
+    store.remember(claude);
+    await Wait.until(() => expect(context.count(MethodName.ComposerDefaultSave)).toBe(1));
+    context.emit(EventName.ComposerDefaultUpdated, claude.toJson());
+    context.emit(EventName.ComposerDefaultUpdated, gemini.toJson());
+    expect(shown(store)).toEqual(claude.toJson());
+
+    save.resolve(claude.toJson());
+
+    await Wait.until(() => expect(shown(store)).toEqual(gemini.toJson()));
+  });
+
   it("shows a choice another window keeps while its own read waits, over the read's older answer, and removes the stored one", async () => {
     storeEarlier(gemini.toJson());
     const read = new DeferredResponse();

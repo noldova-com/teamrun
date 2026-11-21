@@ -250,6 +250,28 @@ describe("ProjectsLayoutService", () => {
     });
   });
 
+  it("shows the layout another window kept during its own save once that save settles, and saves its next change on top of it", async () => {
+    const layout = await open();
+    const save = new DeferredResponse();
+    context.answer(MethodName.ProjectsLayoutSave, () => save.promise);
+    layout.togglePin("c1");
+    await Wait.until(() => expect(context.count(MethodName.ProjectsLayoutSave)).toBe(1));
+    context.emit(EventName.ProjectsLayoutUpdated, kept(["c1"]));
+    context.emit(EventName.ProjectsLayoutUpdated, kept(["c8"]));
+    expect(layout.pinnedConversations()).toEqual(["c1"]);
+
+    save.resolve(kept(["c1"]));
+    await Wait.until(() => expect(layout.pinnedConversations()).toEqual(["c8"]));
+    context.answer(MethodName.ProjectsLayoutSave, t => {
+      const saved = ProjectsLayoutSaveParams.fromJson(t).layout;
+      saves.push(saved);
+      return saved;
+    });
+    layout.togglePin("c2");
+
+    await Wait.until(() => expect(saves.map(t => ProjectsLayout.fromJson(t).pinnedConversations)).toEqual([["c8", "c2"]]));
+  });
+
   it("applies a change made while a stored layout's move is saved to the move's answer", async () => {
     localStorage.setItem(key, JSON.stringify(kept(["c9"])));
     const move = new DeferredResponse();
