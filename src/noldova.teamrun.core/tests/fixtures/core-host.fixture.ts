@@ -11,6 +11,7 @@ import { join } from "node:path";
 
 import {
   TeammatesService,
+  OrganizationMessagesService,
   OrganizationService,
   ApprovalsService,
   BackgroundTasksService,
@@ -92,6 +93,7 @@ export class CoreHost implements AsyncDisposable {
   public readonly providers: ProvidersService;
   public readonly teammates: TeammatesService;
   public readonly organization: OrganizationService;
+  public readonly organizationMessages: OrganizationMessagesService;
   public readonly kinds: ProviderKindsService;
   public readonly planUsage: PlanUsageService;
   public readonly engine: ConversationEngine;
@@ -148,9 +150,10 @@ export class CoreHost implements AsyncDisposable {
     this.engine = new ConversationEngine(this.context, this.projects, this.conversations, this.messages, this.approvals,
       this.providers, this.teammates, this.registry, this.events, this.attachments, readHopLimit, this.log, readCommand, this.tasks, this.planUsage, tools,
       this.checkpoints, this.sharedServers, null, runsCommands ? this.commands : null, readTitleModel, readIdleCompaction, this.timer);
+    this.organizationMessages = new OrganizationMessagesService(this.context, this.organization, this.teammates, this.messages, this.engine, this.events);
     this.dispatcher = new RequestDispatcher(this.kinds, this.providers, this.projects, this.conversations,
       this.messages, this.approvals, this.engine, this.teammates, this.events, this.drafts, null, this.tasks, this.planUsage,
-      this.readingPositions, this.windows, this.sharedServers, this.computerUseGrants, null, this.organization);
+      this.readingPositions, this.windows, this.sharedServers, this.computerUseGrants, null, this.organization, this.organizationMessages);
   }
 
   public static async createAsync(supportsFork: boolean = false, supportsSignIn: boolean = false, signInTimeout?: number, readHopLimit?: () => number,
