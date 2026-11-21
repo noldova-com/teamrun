@@ -2038,6 +2038,34 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async namesNoConfigFolderToClaudeCodeForAProviderInItsUsualFolderAndItsOwnToAnyOther(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CLAUDE_OUTPUT: "env", CLAUDE_CONFIG_DIR: undefined }, host.command, host.timings,
+      host.directory.resolve("home"));
+    const usual = host.createProvider("acc-1", join("home", ".claude"));
+    const own = host.createProvider("acc-2", "claude-profile");
+    const turnFolder = async (provider: Provider, session: string): Promise<string | undefined> => {
+      host.factory.next = new FakeClaudeQuery([SdkMessages.init(session, "none", null, []), SdkMessages.success(session, "ok")]);
+      await adapter.runTurn(host.createRequest("Hi", provider), new RecordingTurnListener(), new AbortController().signal);
+      return host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    };
+    const signOutFolder = async (provider: Provider): Promise<string | undefined> => {
+      await adapter.signOut(provider);
+      return host.starter.environments.at(-1)?.["CLAUDE_CONFIG_DIR"];
+    };
+
+    const checked = [(await adapter.checkSignIn(usual)).identity?.email, (await adapter.checkSignIn(own)).identity?.email];
+    const turns = [await turnFolder(usual, "s-1"), await turnFolder(own, "s-2")];
+    const signOuts = [await signOutFolder(usual), await signOutFolder(own)];
+
+    Assert.areEqual(JSON.stringify(["unset", host.directory.resolve("claude-profile")]), JSON.stringify(checked));
+    Assert.isUndefined(turns[0]);
+    Assert.areEqual(host.directory.resolve("claude-profile"), turns[1]);
+    Assert.isUndefined(signOuts[0]);
+    Assert.areEqual(host.directory.resolve("claude-profile"), signOuts[1]);
+  }
+
+  @TestMethod
   public async checksAFoundFolderWithNonessentialTrafficOffWhichOpenedNoConnectionWhereWithoutItAuthStatusOpenedOneAndShowsOnlySignedInOrOut(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CLAUDE_OUTPUT: "traffic" });
