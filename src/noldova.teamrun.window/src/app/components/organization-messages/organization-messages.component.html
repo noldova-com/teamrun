@@ -17,7 +17,7 @@ LICENSE file in the root directory of this source tree.
         <button type="button" class="nol-teamrun-organization-conversation" [class.nol-teamrun-organization-conversation-selected]="row.conversation.key === selectedKey()"
           [attr.aria-current]="row.conversation.key === selectedKey() ? 'true' : null" (click)="open(row.conversation)">
           @if (row.teammate) {
-            <nol-teamrun-teammate-avatar [teammate]="row.teammate" [size]="smallAvatar" [decorative]="true" />
+            <nol-teamrun-teammate-avatar [teammate]="row.teammate" [size]="avatar" [decorative]="true" />
           } @else {
             <span class="nol-teamrun-organization-group-icon material-symbols-rounded" aria-hidden="true">{{ row.icon }}</span>
           }
@@ -41,6 +41,9 @@ LICENSE file in the root directory of this source tree.
 <section class="nol-teamrun-organization-thread-wrap" [attr.aria-label]="title() || resources.organizationChooseTarget">
   @if (target(); as current) {
     <div class="nol-teamrun-organization-thread-head">
+      @if (shape() === shapes.Thread) {
+        <span class="nol-teamrun-organization-thread-icon material-symbols-rounded" aria-hidden="true">{{ resources.organizationGroupIcon }}</span>
+      }
       <h3 class="nol-teamrun-organization-thread-title">{{ title() }}</h3>
       <span class="nol-teamrun-organization-thread-note">{{ noteOf(current) }}</span>
     </div>
@@ -48,7 +51,7 @@ LICENSE file in the root directory of this source tree.
   <div class="nol-teamrun-organization-thread">
     @for (entry of entries(); track entry.message.id) {
       <article class="nol-teamrun-organization-entry">
-        <nol-message [author]="you" [time]="time(entry.message.createdAt)" [blocks]="entry.blocks" [layout]="column" />
+        <nol-message [author]="you" [time]="time(entry.message.createdAt)" [blocks]="entry.blocks" />
         <div class="nol-teamrun-organization-delivery">
           @for (line of entry.lines; track line) {
             <span class="nol-teamrun-organization-delivery-line">{{ line }}</span>
@@ -61,34 +64,27 @@ LICENSE file in the root directory of this source tree.
               (click)="stop(entry.message)"></button>
           }
         </div>
+        @if (entry.repliesError; as shown) {
+          <p class="nol-teamrun-organization-error" role="alert">{{ shown }}</p>
+        }
         @for (reply of entry.replies; track reply.reply.id) {
-          <nol-message [author]="reply.author" [time]="time(reply.reply.createdAt)" [blocks]="reply.blocks" [status]="reply.status" [layout]="column" />
+          <nol-message [author]="reply.author" [time]="time(reply.reply.createdAt)" [blocks]="reply.blocks" [status]="reply.status" />
         }
       </article>
     } @empty {
       <p class="nol-teamrun-organization-empty">{{ target() ? resources.organizationThreadEmpty : resources.organizationChooseTarget }}</p>
     }
+    @if (replying()) {
+      <p class="nol-teamrun-organization-replying" aria-live="polite">{{ replying() }}</p>
+    }
   </div>
-  @if (replying()) {
-    <p class="nol-teamrun-organization-replying" aria-live="polite">{{ replying() }}</p>
-  }
   @if (error(); as shown) {
     <p class="nol-teamrun-organization-error" role="alert">{{ shown }}</p>
   }
   <form class="nol-teamrun-organization-composer" (submit)="$event.preventDefault(); send()">
-    @if (shape() === shapes.Inbox) {
-      <div class="nol-teamrun-organization-to">
-        <nol-select [options]="options()" [value]="selectedValue()" [label]="resources.organizationToLabel" (valueChange)="choose($event)" />
-        @if (target()) {
-          <span class="nol-teamrun-organization-count">{{ resources.formatOrganizationGoesTo(recipientCount()) }}</span>
-        }
-      </div>
-    }
-    <div class="nol-teamrun-organization-field">
-      <input nol-text-field class="nol-teamrun-organization-input" name="text" autocomplete="off" [attr.aria-label]="resources.formatOrganizationPlaceholder(title())"
-        [placeholder]="resources.formatOrganizationPlaceholder(title())" [disabled]="!target()" [value]="draft()" (input)="edit($event)" (keydown.enter)="$event.preventDefault(); send()">
-      <button type="submit" nol-icon-button class="nol-teamrun-organization-send" [icon]="resources.sendGlyph" [label]="resources.organizationSendLabel"
-        [disabled]="!canSend()" [busy]="sending()"></button>
-    </div>
+    <input nol-text-field class="nol-teamrun-organization-input" name="text" autocomplete="off" [attr.aria-label]="resources.formatOrganizationPlaceholder(title())"
+      [placeholder]="resources.formatOrganizationPlaceholder(title())" [disabled]="!target()" [value]="draft()" (input)="edit($event)" (keydown.enter)="$event.preventDefault(); send()">
+    <button type="submit" nol-icon-button class="nol-teamrun-organization-send" [icon]="resources.sendGlyph" [label]="resources.organizationSendLabel"
+      [filled]="true" [disabled]="!canSend()" [busy]="sending()"></button>
   </form>
 </section>

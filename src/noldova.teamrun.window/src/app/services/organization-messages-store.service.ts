@@ -28,7 +28,7 @@ export class OrganizationMessagesStoreService {
   private readonly context: IWindowPartContext;
   private readonly messagesSignal: WritableSignal<readonly OrganizationMessage[]> = signal([]);
   private readonly loadErrorSignal: WritableSignal<string | null> = signal(null);
-  private readonly repliesErrorSignal: WritableSignal<string | null> = signal(null);
+  private readonly repliesErrorsSignal: WritableSignal<ReadonlyMap<string, string>> = signal(new Map());
   private readonly unreadSignal: WritableSignal<ReadonlyMap<string, string>> = signal(new Map());
   private readonly replies: Map<string, WritableSignal<readonly Message[]>> = new Map();
   private readonly replyGenerations: Map<string, number> = new Map();
@@ -39,7 +39,6 @@ export class OrganizationMessagesStoreService {
 
   public readonly messages: Signal<readonly OrganizationMessage[]> = this.messagesSignal.asReadonly();
   public readonly loadError: Signal<string | null> = this.loadErrorSignal.asReadonly();
-  public readonly repliesError: Signal<string | null> = this.repliesErrorSignal.asReadonly();
   public readonly conversations: Signal<readonly OrganizationConversation[]> = computed(() => OrganizationConversation.group(this.messagesSignal()));
 
   public constructor(context: IWindowPartContext) {
@@ -68,13 +67,16 @@ export class OrganizationMessagesStoreService {
 
   public async reload(): Promise<void> {
     const generation = ++this.generation;
+    const live = new Map(this.messagesSignal().map(t => [t.id, t]));
     try {
       const answer = await this.context.requestAsync(Resources.formatQualifiedName(MethodName.OrganizationMessageList), null);
       if (!Array.isArray(answer))
         throw new ListNotArrayException(Resources.formatValueKind(answer));
-      const messages = answer.map(t => OrganizationMessage.fromJson(t));
+      const loaded = answer.map(t => OrganizationMessage.fromJson(t));
       if (generation === this.generation) {
-        this.setMessages(messages);
+        const changed = new Map(this.messagesSignal().filter(t => live.get(t.id) !== t).map(t => [t.id, t]));
+        const ids = new Set(loaded.map(t => t.id));
+        this.setMessages([...loaded.map(t => changed.get(t.id) ?? t), ...[...changed.values()].filter(t => !ids.has(t.id))]);
         this.loadErrorSignal.set(null);
       }
     }
@@ -82,6 +84,10 @@ export class OrganizationMessagesStoreService {
       if (generation === this.generation)
         this.loadErrorSignal.set(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  public repliesErrorOf(messageId: string): string | null {
+    return this.repliesErrorsSignal().get(messageId) ?? null;
   }
 
   public repliesOf(messageId: string): Signal<readonly Message[]> {
@@ -139,11 +145,11 @@ export class OrganizationMessagesStoreService {
       replies.set(OrganizationMessagesStoreService.ordered([...loaded.filter(t => !current.has(t.id)), ...current.values()]));
       for (const reply of loaded.filter(t => t.status === MessageStatus.Completed))
         this.counted.add(reply.id);
-      this.repliesErrorSignal.set(null);
+      this.setRepliesError(messageId, null);
     }
     catch (error) {
       if (generation === this.replyGenerations.get(messageId))
-        this.repliesErrorSignal.set(error instanceof Error ? error.message : String(error));
+        this.setRepliesError(messageId, error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -160,16 +166,32 @@ export class OrganizationMessagesStoreService {
     }
   }
 
+  private setRepliesError(messageId: string, error: string | null): void {
+    const errors = this.repliesErrorsSignal();
+    if (errors.get(messageId) === (error ?? undefined))
+      return;
+    const next = new Map(errors);
+    if (Object.isNull(error))
+      next.delete(messageId);
+    else
+      next.set(messageId, error);
+    this.repliesErrorsSignal.set(next);
+  }
+
   private apply(message: OrganizationMessage): void {
-    this.generation++;
     const messages = this.messagesSignal();
     const index = messages.findIndex(t => t.id === message.id);
     this.setMessages(index < 0 ? [...messages, message] : messages.with(index, message));
   }
 
   private setMessages(messages: readonly OrganizationMessage[]): void {
+    const known = this.sentIndex;
     this.messagesSignal.set(messages);
     this.sentIndex = new Map(messages.flatMap(t => t.recipients.flatMap((u): [string, OrganizationMessage][] => Object.isNull(u.messageId) ? [] : [[u.messageId, t]])));
+    const gained = new Set([...this.sentIndex].filter(t => !known.has(t[0])).map(t => t[1].id));
+    for (const [id, replies] of this.replies)
+      if (gained.has(id) && this.replyGenerations.has(id))
+        void this.reloadReplies(id, replies);
   }
 
   private dispose(): void {

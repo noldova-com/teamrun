@@ -7,14 +7,13 @@
  */
 
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
-import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageDetail, MessageIdParams, MessageStatus, MethodName, Organization,
   OrganizationMessage, OrganizationMessageSendParams, OrganizationRecipient, OrganizationRecipientState, OrganizationTarget } from "@noldova/teamrun.protocol";
-import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
+import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
 
@@ -25,6 +24,7 @@ import { OrganizationMessagesStoreService } from "../../../../src/app/services/o
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TimeFormatService } from "../../../../src/app/services/time-format.service";
 import { Resources } from "../../../../src/resources";
+import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -58,8 +58,8 @@ describe("OrganizationMessagesComponent", () => {
 
   const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const all = (selector: string): HTMLElement[] => [...element().querySelectorAll<HTMLElement>(selector)];
-  const one = <T extends HTMLElement = HTMLElement>(selector: string): T => {
-    const found = element().querySelector<T>(selector);
+  const one = <T extends HTMLElement = HTMLElement>(selector: string, parent: HTMLElement = element()): T => {
+    const found = parent.querySelector<T>(selector);
     if (Object.isNull(found))
       throw new Error(`Nothing matches ${selector}.`);
     return found;
@@ -73,7 +73,6 @@ describe("OrganizationMessagesComponent", () => {
   const texts = (selector: string): string[] => all(selector).map(t => t.textContent?.trim() ?? "");
   const input = (): HTMLInputElement => one<HTMLInputElement>(".nol-teamrun-organization-input");
   const sendButton = (): HTMLButtonElement => one<HTMLButtonElement>(".nol-teamrun-organization-send");
-  const picker = (): SelectComponent => fixture.debugElement.query(By.directive(SelectComponent)).injector.get(SelectComponent);
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -134,6 +133,7 @@ describe("OrganizationMessagesComponent", () => {
     expect(one(".nol-teamrun-organization-unread").textContent?.trim()).toBe(Resources.organizationAllRead);
     expect(texts(".nol-teamrun-organization-empty")).toEqual([Resources.organizationChooseTarget]);
     expect(input().disabled).toBe(true);
+    expect(all("nol-select, .nol-teamrun-organization-count")).toHaveLength(0);
 
     await userEvent.click(row(1));
     await settle();
@@ -152,20 +152,20 @@ describe("OrganizationMessagesComponent", () => {
   });
 
   it.each([
-    ["a teammate with a role", toAlice, "Alice", "Review", 1],
-    ["a teammate without one", OrganizationTarget.teammate("bob"), "Bob", Resources.organizationTeammateNote, 1],
-    ["a removed teammate never written to", OrganizationTarget.teammate("ghost"), Resources.organizationRemovedTeammate, Resources.organizationTeammateNote, 0],
-    ["a department", design, "Design", Resources.formatOrganizationDepartmentNote(2), 2],
-    ["a deleted department", OrganizationTarget.department("gone"), Resources.organizationDeletedDepartment, Resources.formatOrganizationDepartmentNote(0), 0],
-    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersTitle, Resources.organizationLeadersNote, 1],
-    ["everyone", OrganizationTarget.everyone, Resources.organizationEveryoneTitle, Resources.formatOrganizationEveryoneNote(3), 3]
-  ])("names %s in the thread's head and says how many teammates a message goes to", async (_, target, title, note, count) => {
+    ["a teammate with a role", toAlice, "Alice", "Review"],
+    ["a teammate without one", OrganizationTarget.teammate("bob"), "Bob", Resources.organizationTeammateNote],
+    ["a removed teammate never written to", OrganizationTarget.teammate("ghost"), Resources.organizationRemovedTeammate, Resources.organizationTeammateNote],
+    ["a department", design, "Design", Resources.formatOrganizationDepartmentNote(2)],
+    ["a deleted department", OrganizationTarget.department("gone"), Resources.organizationDeletedDepartment, Resources.formatOrganizationDepartmentNote(0)],
+    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersTitle, Resources.organizationLeadersNote],
+    ["everyone", OrganizationTarget.everyone, Resources.organizationEveryoneTitle, Resources.formatOrganizationEveryoneNote(3)]
+  ])("names %s in the thread's head, with how many teammates a message goes to in its note", async (_, target, title, note) => {
     await create(target);
     await Wait.until(() => expect(texts(".nol-teamrun-organization-conversation-title")).toHaveLength(3));
 
     expect(one(".nol-teamrun-organization-thread-title").textContent?.trim()).toBe(title);
     expect(one(".nol-teamrun-organization-thread-note").textContent?.trim()).toBe(note);
-    expect(one(".nol-teamrun-organization-count").textContent?.trim()).toBe(Resources.formatOrganizationGoesTo(count));
+    expect(all(".nol-teamrun-organization-thread-icon")).toHaveLength(0);
   });
 
   it("names a removed teammate's conversation by the name its message kept", async () => {
@@ -176,23 +176,6 @@ describe("OrganizationMessagesComponent", () => {
     expect(texts(".nol-teamrun-organization-conversation-title")).toEqual(["Gina"]);
     expect(one(".nol-teamrun-organization-thread-title").textContent?.trim()).toBe("Gina");
     expect(texts(".nol-teamrun-organization-delivery-line")).toEqual([Resources.formatOrganizationRecipients(OrganizationRecipientState.Removed, ["Gina"])]);
-  });
-
-  it("offers everyone, the leaders, each department and each teammate in the To picker, and a choice changes the target", async () => {
-    await create(null);
-
-    expect(picker().options().map(t => "options" in t ? [t.label, t.options.map(u => u.title)] : [t.title])).toEqual([
-      [Resources.organizationTargetsGroup, [Resources.organizationEveryoneTitle, Resources.organizationLeadersTitle]],
-      [Resources.organizationDepartmentsGroup, ["Design"]],
-      [Resources.organizationTeammatesGroup, ["Alice", "Bob", "Offline"]]
-    ]);
-    picker().valueChange.emit("Department|d1");
-    picker().valueChange.emit("Department|unknown");
-    await settle();
-
-    expect(changes.map(t => t?.id)).toEqual(["d1"]);
-    expect(picker().value()).toBe("Department|d1");
-    expect(one(".nol-teamrun-organization-count").textContent?.trim()).toBe(Resources.formatOrganizationGoesTo(2));
   });
 
   it("sends the trimmed text on Enter, clears the field, and keeps Send off while the text is blank or nobody would get it", async () => {
@@ -218,6 +201,52 @@ describe("OrganizationMessagesComponent", () => {
     one(".nol-teamrun-organization-composer").dispatchEvent(new Event("submit"));
     await settle();
     expect(context.count(MethodName.OrganizationMessageSend)).toBe(1);
+  });
+
+  it("keeps text typed while a send was on its way, and clears only the text it sent", async () => {
+    const answer = new DeferredResponse();
+    sendAnswer = () => answer.promise;
+    await create(toAlice);
+
+    await userEvent.type(input(), "Hello{Enter}");
+    await Wait.until(() => expect(context.count(MethodName.OrganizationMessageSend)).toBe(1));
+    await userEvent.type(input(), " again");
+    answer.resolve(aliceMessage.toJson());
+    await Wait.until(() => expect(sendButton().disabled).toBe(false));
+
+    expect(input().value).toBe("Hello again");
+  });
+
+  it("stops a message while its send is still on its way, and shows it stopped once the send answers", async () => {
+    const answer = new DeferredResponse();
+    const queued = new OrganizationMessage("o9", OrganizationTarget.leaders, "Hello", "2026-11-20T10:00:00.000Z", [recipient("alice", "Alice", OrganizationRecipientState.Queued)]);
+    const stopped = queued.withRecipient(recipient("alice", "Alice", OrganizationRecipientState.Stopped));
+    sendAnswer = () => answer.promise;
+    stopAnswer = () => stopped.toJson();
+    await create(OrganizationTarget.leaders);
+
+    await userEvent.type(input(), "Hello{Enter}");
+    context.emit(EventName.OrganizationMessageUpdated, queued.toJson());
+    await settle();
+    await userEvent.click(one(".nol-teamrun-organization-stop"));
+    await Wait.until(() => expect(all(".nol-teamrun-organization-stop")).toHaveLength(0));
+    answer.resolve(stopped.toJson());
+    await Wait.until(() => expect(input().value).toBe(""));
+
+    expect(context.parametersOf(MethodName.OrganizationMessageStop)).toEqual(new MessageIdParams("o9").toJson());
+    expect(texts(".nol-teamrun-organization-delivery-line")).toEqual([Resources.formatOrganizationRecipients(OrganizationRecipientState.Stopped, ["Alice"])]);
+  });
+
+  it("offers Stop while a recipient's reply hasn't started", async () => {
+    messages = [new OrganizationMessage("o2", OrganizationTarget.everyone, "Status?", "2026-11-20T09:30:00.000Z", [recipient("bob", "Bob", OrganizationRecipientState.Started, "s4")])];
+    replies = { o2: [reply("r3", "s4", "bob", "Bob", MessageStatus.Pending, "", "2026-11-20T09:31:00.000Z")] };
+    await create(OrganizationTarget.everyone);
+
+    await Wait.until(() => expect(all(".nol-teamrun-organization-stop")).toHaveLength(1));
+    context.emit(EventName.MessageUpdated, reply("r3", "s4", "bob", "Bob", MessageStatus.Running, "On it", "2026-11-20T09:31:00.000Z").toJson());
+    await settle();
+
+    expect(all(".nol-teamrun-organization-stop")).toHaveLength(0);
   });
 
   it.each([
@@ -272,17 +301,20 @@ describe("OrganizationMessagesComponent", () => {
     replies = { o2: [reply("r2", "s2", "alice", "Alice", MessageStatus.Pending, "", at("r2")), reply("r3", "s4", "bob", "Bob", MessageStatus.AwaitingApproval, "", at("r3"))] };
     messages = [everyoneMessage.withRecipient(recipient("bob", "Bob", OrganizationRecipientState.Started, "s4"))];
     await create(OrganizationTarget.everyone);
-    await Wait.until(() => expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(3));
+    await Wait.until(() => expect(one(".nol-teamrun-organization-replying").textContent?.trim()).toBe(Resources.formatOrganizationReplying(["Alice", "Bob"])));
 
-    expect(one(".nol-teamrun-organization-replying").textContent?.trim()).toBe(Resources.formatOrganizationReplying(["Alice", "Bob"]));
+    expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(1);
     await update("r2", MessageStatus.Running, "Working");
+    expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(1);
     await update("r3", MessageStatus.Cancelled);
     expect(one(".nol-teamrun-organization-replying").textContent?.trim()).toBe(Resources.formatOrganizationReplying(["Alice"]));
+    expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(2);
     await update("r3", MessageStatus.Interrupted);
     await update("r3", MessageStatus.Failed);
     await update("r2", MessageStatus.Completed, "All good");
 
     expect(all(".nol-teamrun-organization-replying")).toHaveLength(0);
+    expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(3);
     expect(texts(".nol-teamrun-organization-entry nol-message")[1]).toContain("All good");
     expect(texts(".nol-teamrun-organization-conversation-line")).toEqual(["Alice: All good"]);
   });
@@ -307,16 +339,17 @@ describe("OrganizationMessagesComponent", () => {
     await create(toAlice, OrganizationMessagesShape.Thread);
 
     await Wait.until(() => expect(texts(".nol-teamrun-organization-entry nol-message")[1]).toContain("Hi from Alice"));
-    expect(all(".nol-teamrun-organization-conversations, .nol-teamrun-organization-inbox-head, nol-select")).toHaveLength(0);
+    expect(all(".nol-teamrun-organization-conversations, .nol-teamrun-organization-inbox-head")).toHaveLength(0);
+    expect(one(".nol-teamrun-organization-thread-icon").textContent?.trim()).toBe(Resources.organizationGroupIcon);
   });
 
   it.each([
-    ["messages", MethodName.OrganizationMessageList],
-    ["replies", MethodName.OrganizationMessageReplyList]
-  ])("says why the %s couldn't be read", async (_, method) => {
+    ["messages", MethodName.OrganizationMessageList, ".nol-teamrun-organization-thread-wrap > .nol-teamrun-organization-error"],
+    ["replies", MethodName.OrganizationMessageReplyList, ".nol-teamrun-organization-entry > .nol-teamrun-organization-error"]
+  ])("says why the %s couldn't be read, where they would show", async (_, method, selector) => {
     await create(OrganizationTarget.everyone, OrganizationMessagesShape.Inbox, t => t.fail(method, "runtime down"));
 
-    await Wait.until(() => expect(one(".nol-teamrun-organization-error").textContent?.trim()).toBe("runtime down"));
+    await Wait.until(() => expect(one(selector).textContent?.trim()).toBe("runtime down"));
   });
 
   describe.each([
@@ -330,31 +363,74 @@ describe("OrganizationMessagesComponent", () => {
 
     afterEach(() => AppearanceFixture.reset());
 
-    it("fills its host, insets the head, rows and thread, and keeps the field and Send on one line at the bottom", async () => {
+    it("fills its host, puts the unread count at the head's end, rounds the group icons and keeps the field and the filled Send on one line at the bottom", async () => {
       await create(OrganizationTarget.everyone);
       const host = box(element());
       const head = box(one(".nol-teamrun-organization-inbox-head"));
       const title = box(one(".nol-teamrun-organization-inbox-title"));
+      const unread = box(one(".nol-teamrun-organization-unread"));
       const list = box(one(".nol-teamrun-organization-conversations"));
       const first = row(0);
-      const avatar = box(one(".nol-teamrun-organization-conversation .nol-teamrun-organization-group-icon"));
+      const icon = one(".nol-teamrun-organization-conversation .nol-teamrun-organization-group-icon");
+      const avatar = box(one(".nol-teamrun-organization-conversation nol-teamrun-teammate-avatar nol-avatar"));
       const wrap = box(one(".nol-teamrun-organization-thread-wrap"));
       const field = box(input());
       const send = box(sendButton());
 
       AppearanceFixture.expectPixels(host.height, rem(40));
       AppearanceFixture.expectPixels(title.left - head.left, AppearanceFixture.measureLook("space-3"));
+      AppearanceFixture.expectPixels(head.right - unread.right, AppearanceFixture.measureLook("space-3"));
+      AppearanceFixture.expectPixels(unread.top + unread.height / 2, title.top + title.height / 2);
       expect(list.height).toBeLessThanOrEqual(host.height * 0.4 + 1);
       AppearanceFixture.expectPixels(box(first).left - list.left, AppearanceFixture.measureLook("space-1"));
-      AppearanceFixture.expectPixels(avatar.left - box(first).left, AppearanceFixture.measureLook("space-2"));
-      AppearanceFixture.expectPixels(avatar.width, rem(1.75));
+      AppearanceFixture.expectPixels(box(icon).left - box(first).left, AppearanceFixture.measureLook("space-2"));
+      AppearanceFixture.expectPixels(box(icon).width, AppearanceFixture.measureLook("avatar"));
+      AppearanceFixture.expectPixels(box(icon).height, AppearanceFixture.measureLook("avatar"));
+      AppearanceFixture.expectPixels(avatar.width, AppearanceFixture.measureLook("avatar"));
+      expect(getComputedStyle(icon).borderRadius).toBe("50%");
+      expect(getComputedStyle(icon).backgroundColor).toBe(getComputedStyle(first).backgroundColor);
       AppearanceFixture.expectPixels(wrap.bottom, host.bottom);
       AppearanceFixture.expectPixels(wrap.bottom - field.bottom, AppearanceFixture.measureLook("space-3"));
       AppearanceFixture.expectPixels(field.left - wrap.left, AppearanceFixture.measureLook("space-3"));
       AppearanceFixture.expectPixels(wrap.right - send.right, AppearanceFixture.measureLook("space-3"));
       AppearanceFixture.expectPixels(send.left - field.right, AppearanceFixture.measureLook("space-2"));
+      AppearanceFixture.expectPixels(send.width, AppearanceFixture.measureLook("button-height"));
+      AppearanceFixture.expectPixels(send.height, AppearanceFixture.measureLook("button-height"));
       AppearanceFixture.expectPixels(field.top + field.height / 2, send.top + send.height / 2);
       expect(getComputedStyle(first).backgroundColor).not.toBe(getComputedStyle(row(1)).backgroundColor);
+    });
+
+    it("puts the thread's title and note on one line, each message's avatar beside its text, and the spacing between a message and its delivery", async () => {
+      await create(toAlice);
+      await Wait.until(() => expect(all(".nol-teamrun-organization-entry nol-message")).toHaveLength(2));
+      const title = box(one(".nol-teamrun-organization-thread-title"));
+      const note = box(one(".nol-teamrun-organization-thread-note"));
+      const sent = one(".nol-teamrun-organization-entry nol-message");
+      const delivery = box(one(".nol-teamrun-organization-delivery"));
+
+      AppearanceFixture.expectPixels(note.left - title.right, AppearanceFixture.measureLook("space-2"));
+      expect(note.top).toBeLessThan(title.bottom);
+      AppearanceFixture.expectPixels(delivery.top - box(sent).bottom, AppearanceFixture.measureLook("space-3"));
+      for (const message of all(".nol-teamrun-organization-entry nol-message")) {
+        const avatar = box(one(".nol-message-avatar", message));
+        const content = box(one(".nol-message-content", message));
+        expect(avatar.right).toBeLessThan(content.left);
+        expect(content.top).toBeLessThan(avatar.bottom);
+      }
+    });
+
+    it("puts the group icon before the title and the note at the head's end in the thread shape", async () => {
+      await create(OrganizationTarget.everyone, OrganizationMessagesShape.Thread);
+      const wrap = box(one(".nol-teamrun-organization-thread-wrap"));
+      const icon = box(one(".nol-teamrun-organization-thread-icon"));
+      const title = box(one(".nol-teamrun-organization-thread-title"));
+      const note = box(one(".nol-teamrun-organization-thread-note"));
+
+      AppearanceFixture.expectPixels(icon.left - wrap.left, AppearanceFixture.measureLook("space-3"));
+      AppearanceFixture.expectPixels(title.left - icon.right, AppearanceFixture.measureLook("space-2"));
+      AppearanceFixture.expectPixels(wrap.right - note.right, AppearanceFixture.measureLook("space-3"));
+      AppearanceFixture.expectPixels(icon.width, AppearanceFixture.measureLook("icon"));
+      AppearanceFixture.expectPixels(note.top + note.height / 2, title.top + title.height / 2);
     });
   });
 });

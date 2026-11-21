@@ -61,7 +61,6 @@ describe("Resources", () => {
       "Waiting to start for Ada, Bob and Cid", "Stopped before it reached Ada, Bob and Cid", "Ada, Bob and Cid were removed before it arrived",
       "Couldn't reach Ada, Bob and Cid"]);
     expect(Resources.formatOrganizationRecipients(OrganizationRecipientState.Removed, ["Ada"])).toBe("Ada was removed before it arrived");
-    expect([0, 1, 2].map(t => Resources.formatOrganizationGoesTo(t))).toEqual(["Goes to no teammate", "Goes to 1 teammate", "Goes to 2 teammates"]);
   });
 
   it("qualifies a TeamRun method or event name with the module's id", () => {

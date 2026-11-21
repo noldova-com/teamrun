@@ -597,7 +597,7 @@ export class Resources {
   public static readonly organizationConversationsLabel: string = "Conversations";
   public static readonly organizationAllRead: string = "All read";
   public static readonly organizationNoMessages: string = "No messages yet";
-  public static readonly organizationThreadEmpty: string = "No messages yet. Write the first.";
+  public static readonly organizationThreadEmpty: string = "No messages yet.";
   public static readonly organizationChooseTarget: string = "Choose whom to message.";
   public static readonly organizationLeadersTitle: string = "All leaders";
   public static readonly organizationLeadersNote: string = "Every department's leader";
@@ -605,13 +605,8 @@ export class Resources {
   public static readonly organizationDeletedDepartment: string = "Deleted department";
   public static readonly organizationRemovedTeammate: string = "Removed teammate";
   public static readonly organizationTeammateNote: string = "Teammate";
-  public static readonly organizationToLabel: string = "To";
-  public static readonly organizationTargetsGroup: string = "Groups";
-  public static readonly organizationDepartmentsGroup: string = "Departments";
-  public static readonly organizationTeammatesGroup: string = "Teammates";
   public static readonly organizationSendLabel: string = "Send";
   public static readonly organizationStopLabel: string = "Stop sending";
-  public static readonly organizationTargetSeparator: string = "|";
   public static readonly organizationDepartmentIcon: string = "groups";
   public static readonly organizationGroupIcon: string = "forum";
   public static readonly senderChatGone: string = "from a deleted chat";
@@ -1772,10 +1767,6 @@ export class Resources {
 
   public static formatOrganizationEveryoneNote(count: number): string {
     return `Every teammate (${count})`;
-  }
-
-  public static formatOrganizationGoesTo(count: number): string {
-    return count === 0 ? "Goes to no teammate" : count === 1 ? "Goes to 1 teammate" : `Goes to ${count} teammates`;
   }
 
   public static formatOrganizationPlaceholder(title: string): string {

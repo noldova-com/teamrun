@@ -10,10 +10,10 @@ import { Component, type InputSignal, type ModelSignal, type Signal, type Writab
   from "@angular/core";
 
 import "@noldova/context.core";
-import { DetailKind, type Message, MessageStatus, type OrganizationMessage, OrganizationRecipientState, OrganizationTarget, OrganizationTargetKind }
+import { DetailKind, type Message, MessageStatus, type OrganizationMessage, OrganizationRecipientState, type OrganizationTarget, OrganizationTargetKind }
   from "@noldova/teamrun.protocol";
-import { AvatarSize, ChipComponent, IconButtonComponent, MessageAuthor as Author, MessageAuthorKind, MessageComponent,
-  MessageLayout, MessageStatus as Status, MessageText, SelectComponent, SelectGroup, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+import { AvatarSize, ChipComponent, IconButtonComponent, MessageAuthor as Author, MessageAuthorKind, MessageComponent, MessageStatus as Status, MessageText,
+  TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationMessagesShape } from "../../enums/organization-messages-shape";
@@ -29,19 +29,19 @@ import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.comp
 
 @Component({
   selector: "nol-teamrun-organization-messages",
-  imports: [ChipComponent, IconButtonComponent, MessageComponent, SelectComponent, TeammateAvatarComponent, TextFieldComponent],
+  imports: [ChipComponent, IconButtonComponent, MessageComponent, TeammateAvatarComponent, TextFieldComponent],
   providers: [OrganizationMessagesStoreService.provider, OrganizationStoreService.provider],
   templateUrl: "./organization-messages.component.html",
   styleUrl: "./organization-messages.component.css",
   host: {
-    "[class.nol-teamrun-organization-messages-inbox]": "shape() === shapes.Inbox"
+    "[class.nol-teamrun-organization-messages-inbox]": "shape() === shapes.Inbox",
+    "[class.nol-teamrun-organization-messages-thread]": "shape() === shapes.Thread"
   }
 })
 export class OrganizationMessagesComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly shapes: typeof OrganizationMessagesShape = OrganizationMessagesShape;
-  protected readonly column: MessageLayout = MessageLayout.Column;
-  protected readonly smallAvatar: AvatarSize = AvatarSize.Small;
+  protected readonly avatar: AvatarSize = AvatarSize.Normal;
   protected readonly you: Author = new Author(Resources.personAuthorId, Resources.youLabel, MessageAuthorKind.Person);
   protected readonly store: OrganizationMessagesStoreService = inject(OrganizationMessagesStoreService);
   private readonly organizations: OrganizationStoreService = inject(OrganizationStoreService);
@@ -55,7 +55,7 @@ export class OrganizationMessagesComponent {
   protected readonly draft: WritableSignal<string> = signal(String.empty);
   protected readonly sending: WritableSignal<boolean> = signal(false);
   protected readonly actionError: WritableSignal<string | null> = signal(null);
-  protected readonly error: Signal<string | null> = computed(() => this.actionError() ?? this.store.loadError() ?? this.store.repliesError());
+  protected readonly error: Signal<string | null> = computed(() => this.actionError() ?? this.store.loadError());
 
   protected readonly rows: Signal<readonly IOrganizationConversationRow[]> = computed(() => this.store.conversations().map(t => {
     const shown = this.store.repliesOf(t.last.id)().flatMap(u => {
@@ -90,20 +90,8 @@ export class OrganizationMessagesComponent {
     this.store.conversations().find(t => t.key === this.selectedKey())?.messages ?? []);
   protected readonly entries: Signal<readonly IOrganizationThreadEntry[]> = computed(() => this.messages().map(t => this.entryOf(t)));
   protected readonly replying: Signal<string> = computed(() => {
-    const names = this.entries().flatMap(t => t.replies.filter(u => u.status === Status.Streaming).map(u => u.author.name));
+    const names = this.entries().flatMap(t => t.waiting);
     return names.length === 0 ? String.empty : Resources.formatOrganizationReplying([...new Set(names)]);
-  });
-  private readonly targets: Signal<readonly OrganizationTarget[]> = computed(() => [OrganizationTarget.everyone, OrganizationTarget.leaders,
-    ...this.organizations.organization().departments.map(t => OrganizationTarget.department(t.id)),
-    ...this.chats.teammates().map(t => OrganizationTarget.teammate(t.id))]);
-  protected readonly options: Signal<readonly SelectGroup[]> = computed(() => [
-    new SelectGroup(Resources.organizationTargetsGroup, [OrganizationTarget.everyone, OrganizationTarget.leaders].map(t => this.optionOf(t))),
-    new SelectGroup(Resources.organizationDepartmentsGroup, this.organizations.organization().departments.map(t => this.optionOf(OrganizationTarget.department(t.id)))),
-    new SelectGroup(Resources.organizationTeammatesGroup, this.chats.teammates().map(t => this.optionOf(OrganizationTarget.teammate(t.id))))
-  ]);
-  protected readonly selectedValue: Signal<string> = computed(() => {
-    const target = this.target();
-    return Object.isNull(target) ? String.empty : OrganizationMessagesComponent.valueOf(target);
   });
   protected readonly canSend: Signal<boolean> = computed(() => !this.sending() && this.recipientCount() > 0 && this.draft().trim().length > 0);
 
@@ -119,12 +107,6 @@ export class OrganizationMessagesComponent {
     this.target.set(conversation.target);
   }
 
-  protected choose(value: string): void {
-    const chosen = this.targets().find(t => OrganizationMessagesComponent.valueOf(t) === value);
-    if (!Object.isUndefined(chosen))
-      this.target.set(chosen);
-  }
-
   protected edit(event: Event): void {
     this.draft.set((event.target as HTMLInputElement).value);
   }
@@ -133,11 +115,13 @@ export class OrganizationMessagesComponent {
     const target = this.target();
     if (!this.canSend() || Object.isNull(target))
       return;
+    const text = this.draft().trim();
     this.sending.set(true);
     this.actionError.set(null);
     try {
-      await this.store.sendAsync(target, this.draft().trim());
-      this.draft.set(String.empty);
+      await this.store.sendAsync(target, text);
+      if (this.draft().trim() === text)
+        this.draft.set(String.empty);
     }
     catch (error) {
       this.actionError.set(Resources.formatOrganizationSendFailed(error instanceof Error ? error.message : String(error)));
@@ -181,24 +165,24 @@ export class OrganizationMessagesComponent {
       const names = message.recipients.filter(u => u.state === t).map(u => u.teammateName);
       return names.length === 0 ? [] : [Resources.formatOrganizationRecipients(t, names)];
     });
+    const loaded = this.store.repliesOf(message.id)();
+    const replies = loaded.map(t => ({
+      reply: t,
+      author: this.replyAuthor(t),
+      blocks: t.details.filter(u => u.kind === DetailKind.Text).map(u => new MessageText(u.text)),
+      status: OrganizationMessagesComponent.statusOf(t.status)
+    }));
     return {
       message,
       blocks: [new MessageText(message.text)],
       lines,
       failures: message.recipients.flatMap(t => t.state !== OrganizationRecipientState.Failed || Object.isNull(t.reason) ? []
         : [Resources.formatOrganizationFailure(t.teammateName, t.reason)]),
-      stoppable: message.recipients.some(t => t.state === OrganizationRecipientState.Queued),
-      replies: this.store.repliesOf(message.id)().map(t => ({
-        reply: t,
-        author: this.replyAuthor(t),
-        blocks: t.details.filter(u => u.kind === DetailKind.Text).map(u => new MessageText(u.text)),
-        status: OrganizationMessagesComponent.statusOf(t.status)
-      }))
+      stoppable: message.recipients.some(t => t.state === OrganizationRecipientState.Queued) || loaded.some(t => t.status === MessageStatus.Pending),
+      repliesError: this.store.repliesErrorOf(message.id),
+      replies: replies.filter(t => t.status !== Status.Streaming),
+      waiting: replies.filter(t => t.status === Status.Streaming).map(t => t.author.name)
     };
-  }
-
-  private optionOf(target: OrganizationTarget): SelectOption {
-    return new SelectOption(OrganizationMessagesComponent.valueOf(target), this.titleOf(target, null));
   }
 
   private replyAuthor(reply: Message): Author {
@@ -221,10 +205,6 @@ export class OrganizationMessagesComponent {
 
   private static textOf(reply: Message): string | undefined {
     return reply.details.filter(t => t.kind === DetailKind.Text).map(t => t.text.trim()).filter(t => t.length > 0).at(-1);
-  }
-
-  private static valueOf(target: OrganizationTarget): string {
-    return [target.kind, target.id ?? String.empty].join(Resources.organizationTargetSeparator);
   }
 
   private static statusOf(status: MessageStatus): Status {

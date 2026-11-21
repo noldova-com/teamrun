@@ -17,5 +17,7 @@ export interface IOrganizationThreadEntry {
   readonly lines: readonly string[];
   readonly failures: readonly string[];
   readonly stoppable: boolean;
+  readonly repliesError: string | null;
   readonly replies: readonly IOrganizationReplyEntry[];
+  readonly waiting: readonly string[];
 }

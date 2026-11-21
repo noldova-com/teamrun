@@ -57,7 +57,8 @@ describe("OrganizationMessagesStoreService", () => {
     expect(store.loadError()).toBeNull();
   });
 
-  it("applies each updated message in place, adds a new one, and drops a list answer read before an update", async () => {
+  it("applies each updated message in place, adds a new one, and keeps the listed history with the updates made while the list was read", async () => {
+    const history = sent("o0", OrganizationTarget.leaders, "2026-11-20T08:00:00.000Z", started("ada", "s0"));
     const store = create([]);
     await Wait.until(() => expect(context.count(MethodName.OrganizationMessageList)).toBe(1));
     const listed = new DeferredResponse();
@@ -68,16 +69,30 @@ describe("OrganizationMessagesStoreService", () => {
     context.emit(EventName.OrganizationMessageUpdated, toAda.toJson());
     context.emit(EventName.OrganizationMessageUpdated, toEveryone.toJson());
     context.emit(EventName.OrganizationMessageUpdated, stopped.toJson());
-    listed.resolve([]);
+    listed.resolve([history.toJson(), toAda.toJson()]);
     await reading;
 
-    expect(store.messages().map(t => `${t.id}:${t.recipients[0]?.state}`)).toEqual(["o1:Stopped", "o2:Started"]);
-    const failed = new DeferredResponse();
-    context.answer(MethodName.OrganizationMessageList, () => failed.promise);
-    const failing = store.reload();
-    context.emit(EventName.OrganizationMessageUpdated, toAda.toJson());
-    failed.reject(new Error("too late"));
-    await failing;
+    expect(store.messages().map(t => `${t.id}:${t.recipients[0]?.state}`)).toEqual(["o0:Started", "o1:Stopped", "o2:Started"]);
+  });
+
+  it("drops a list answer or failure that a newer reading replaced", async () => {
+    const store = create([]);
+    await Wait.until(() => expect(context.count(MethodName.OrganizationMessageList)).toBe(1));
+    const answers: DeferredResponse[] = [];
+    context.answer(MethodName.OrganizationMessageList, () => {
+      const answer = new DeferredResponse();
+      answers.push(answer);
+      return answer.promise;
+    });
+
+    const readings = [store.reload(), store.reload(), store.reload()];
+    await Wait.until(() => expect(answers).toHaveLength(3));
+    answers.at(0)?.resolve([toEveryone.toJson()]);
+    answers.at(1)?.reject(new Error("too late"));
+    answers.at(2)?.resolve([toAda.toJson()]);
+    await Promise.all(readings);
+
+    expect(store.messages().map(t => t.id)).toEqual(["o1"]);
     expect(store.loadError()).toBeNull();
   });
 
@@ -152,17 +167,39 @@ describe("OrganizationMessagesStoreService", () => {
     ["an error", (): never => { throw new Error("chat gone"); }, "chat gone"],
     ["a string", (): Promise<JsonValue> => Promise.reject("chat gone"), "chat gone"],
     ["a value that isn't a list", (): JsonValue => "nope", new ListNotArrayException("string").message]
-  ])("reports replies answered with %s and clears it once replies read", async (_, answer, shown) => {
+  ])("reports replies answered with %s under that message alone, and clears it once its replies read", async (_, answer, shown) => {
     let fail = true;
-    const store = create(undefined, () => fail ? answer() : []);
+    const store = create(undefined, id => fail ? answer() : id === "o2" ? [reply("r9", "s2", MessageStatus.Completed).toJson()] : []);
     await loaded(store);
 
     store.repliesOf("o1");
-    await Wait.until(() => expect(store.repliesError()).toBe(shown));
+    await Wait.until(() => expect(store.repliesErrorOf("o1")).toBe(shown));
     fail = false;
-    store.repliesOf("o2");
+    const other = store.repliesOf("o2");
+    await Wait.until(() => expect(idsOf(other())).toBe("r9:Completed"));
 
-    await Wait.until(() => expect(store.repliesError()).toBeNull());
+    expect(store.repliesErrorOf("o2")).toBeNull();
+    expect(store.repliesErrorOf("o1")).toBe(shown);
+    context.emit(EventName.StateResyncRequested, null);
+    await Wait.until(() => expect(store.repliesErrorOf("o1")).toBeNull());
+  });
+
+  it("reads a message's replies again once a recipient's sent message is known, keeping a reply that came before", async () => {
+    const queued = sent("o4", OrganizationTarget.teammate("ada"), "2026-11-20T09:50:00.000Z", new OrganizationRecipient("ada", "ada", OrganizationRecipientState.Queued));
+    let listed: JsonValue = [];
+    const store = create([queued], () => listed);
+    await loaded(store, 1);
+    const replies = store.repliesOf("o4");
+    await Wait.until(() => expect(context.count(MethodName.OrganizationMessageReplyList)).toBe(1));
+
+    context.emit(EventName.MessageCreated, reply("r4", "s4", MessageStatus.Running).toJson());
+    expect(replies()).toEqual([]);
+    listed = [reply("r4", "s4", MessageStatus.Running).toJson()];
+    context.emit(EventName.OrganizationMessageUpdated, sent("o4", OrganizationTarget.teammate("ada"), "2026-11-20T09:50:00.000Z", started("ada", "s4")).toJson());
+
+    await Wait.until(() => expect(idsOf(replies())).toBe("r4:Running"));
+    context.emit(EventName.OrganizationMessageUpdated, sent("o4", OrganizationTarget.teammate("ada"), "2026-11-20T09:50:00.000Z", started("ada", "s4")).toJson());
+    expect(context.count(MethodName.OrganizationMessageReplyList)).toBe(2);
   });
 
   it("reads the list and every open message's replies again after a resync", async () => {
@@ -219,7 +256,7 @@ describe("OrganizationMessagesStoreService", () => {
     await Wait.until(() => expect(idsOf(after())).toBe("r9:Completed"));
 
     expect(idsOf(replies())).toBe("r1:Completed");
-    expect(store.repliesError()).toBeNull();
+    expect(store.repliesErrorOf("o1")).toBeNull();
   });
 
   it("stops following events and answers once released", async () => {
