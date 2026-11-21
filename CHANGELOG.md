@@ -18,6 +18,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 ### Fixed
 
 - **A reply that fails in a group:** a reply whose failure escapes, such as a failed write as it starts or as it fails, fails only itself, and the other teammates addressed in the same message still answer, rather than all failing with its error; a reply stopped as it fails stays stopped, and its tools and sub-agents still close (#141).
+- **A chat's wake that brought nothing back:** a screen reader names the part it opens to `Why no reply came back`, rather than `The message received`, which it never holds (#311).
 - **The Projects view's layout:** when its first read fails, a pin, collapse or reorder no longer saves the window's unread layout over the one TeamRun keeps; the change waits, the read is tried again at the next change or resync, or at once for one made while the read was out, and the failure, a failed save or a failed read at a resync is logged (#154).
 - **After the engine restarts:** the Tasks panel, the projects' layout, the composer's default, the organization, Pages and each open page, and the title-model setting's models read their state again, rather than showing what they had before the engine went away (#151).
 - **Stop as an answer lands:** Stop pressed just as a teammate's answer arrives stops the change comparison, shows the reply as stopped and lists it among what Stop stopped; a teammate it addressed isn't started, and the reply notes whom it would have handed off to (#142).
