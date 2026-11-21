@@ -406,7 +406,7 @@ export class MessagesServiceTests {
   }
 
   @TestMethod
-  public async readsTheFoldersATeammateAnsweredInAndTheDocumentsItsRepliesChangedNewestFirst(): Promise<void> {
+  public async readsTheFoldersAndTheDocumentsOfATeammatesCompletedRepliesNewestFirst(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync("beta");
     const inProject = await host.createConversationAsync(project);
@@ -432,6 +432,8 @@ export class MessagesServiceTests {
     await host.messages.insertAsync(reply(attached.id, 5, ada, null, written(join(site, "draft.md"))));
     await host.messages.insertAsync(reply(attached.id, 6, bob, "2026-11-20T12:00:00.000Z", written(join(site, "bob.md"))));
     await host.messages.insertAsync(MessagesServiceTests.userMessage(attached.id, 7, "see index.md\""));
+    await host.messages.insertAsync(new Message("reply-8", attached.id, 8, MessageAuthor.Provider, "msg-0", MessageStatus.Interrupted,
+      [written(join(site, "stopped.md"))], MessagesServiceTests.provenance(), "t", "t", "2026-11-20T13:00:00.000Z", [], ada, ada));
 
     const work = await host.messages.readTeammateWorkAsync(ada);
     const none = await host.messages.readTeammateWorkAsync("tm-cyd");
@@ -461,6 +463,18 @@ export class MessagesServiceTests {
 
     Assert.areEqual(20, work.documents.length);
     Assert.areEqual(join(project.rootPath, "doc-19.md"), work.documents.at(-1)?.path);
+  }
+
+  @TestMethod
+  public async readsATeammatesWorkThroughTheFinishedReplyIndexWithoutScanningMessagesOrSorting(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+
+    const plans = await Promise.all([Resources.selectTeammateChatFolders, Resources.selectTeammateDocumentReplies].map(async query =>
+      (await host.context.database.connection.queryAsync(new SqlQuery(`EXPLAIN QUERY PLAN ${query}`, ["tm-ada"]))).map(t => t.readString("detail"))));
+
+    Assert.areEqual(2, plans.filter(plan => plan.some(t => t.startsWith("SEARCH m USING INDEX IX_messages_teammateId_endedAt (<expr>=?"))).length,
+      plans.map(t => t.join("; ")).join(" | "));
+    Assert.isFalse(plans.flat().some(t => /^SCAN (messages|m)\b/u.test(t) || t.includes("TEMP B-TREE")), plans.map(t => t.join("; ")).join(" | "));
   }
 
   private static provenance(): Provenance {
