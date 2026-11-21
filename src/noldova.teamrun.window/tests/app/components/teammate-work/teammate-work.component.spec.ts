@@ -220,6 +220,23 @@ describe("TeammateWorkComponent", () => {
       .toEqual([{ teammateId: "t1" }, { teammateId: "t2" }]);
   });
 
+  it("keeps its reader when the card's fields change but not its work fields, and reads again once a work field changes", async () => {
+    answer(new TeammateWork("t1", app, [app], []).toJson(), statusOf("main", [], null), pullRequestOf(4, ReferenceState.Open, []));
+    const fixture = render();
+    await Wait.until(() => expect(texts(fixture)[1]).toEqual(["PullRequests", "#4 Change 4 Waiting for review"]));
+    const sent = context.requests.length;
+
+    fixture.componentRef.setInput("fields", new Set([OrganizationCardField.Status, ...every]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const kept = context.requests.length;
+    fixture.componentRef.setInput("fields", new Set([OrganizationCardField.Git, OrganizationCardField.Documents]));
+    fixture.detectChanges();
+
+    expect(kept).toBe(sent);
+    await Wait.until(() => expect(context.requests.filter(t => t.method === "teamrun.teammateWorkRead")).toHaveLength(2));
+  });
+
   it("stops reading when it goes away", async () => {
     answer(new TeammateWork("t1", app, [app], []).toJson(), statusOf("main", [], null), pullRequestOf(4, ReferenceState.Open, []));
     const fixture = render();

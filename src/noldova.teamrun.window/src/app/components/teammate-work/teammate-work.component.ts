@@ -25,8 +25,14 @@ import { TeammateWorkReader } from "../../services/teammate-work.reader";
   styleUrls: ["./teammate-work.component.css"]
 })
 export class TeammateWorkComponent {
+  private static readonly workFields: readonly OrganizationCardField[] =
+    [OrganizationCardField.Git, OrganizationCardField.PullRequests, OrganizationCardField.Documents, OrganizationCardField.Artifacts];
+
   private readonly context: IWindowPartContext = inject(WindowPartTokens.context);
-  private readonly reader: Signal<TeammateWorkReader> = computed(() => new TeammateWorkReader(this.context, this.teammateId(), this.fields()));
+  private readonly shownWork: Signal<ReadonlySet<OrganizationCardField>> = computed(
+    () => new Set(TeammateWorkComponent.workFields.filter(t => this.fields().has(t))),
+    { equal: (shown, next) => [...shown].join() === [...next].join() });
+  private readonly reader: Signal<TeammateWorkReader> = computed(() => new TeammateWorkReader(this.context, this.teammateId(), this.shownWork()));
 
   public readonly teammateId: InputSignal<string> = input.required<string>();
   public readonly fields: InputSignal<ReadonlySet<OrganizationCardField>> = input.required<ReadonlySet<OrganizationCardField>>();
