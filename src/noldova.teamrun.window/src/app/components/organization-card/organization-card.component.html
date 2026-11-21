@@ -14,4 +14,29 @@ LICENSE file in the root directory of this source tree.
       <span class="role">{{ role }}</span>
     }
   </div>
+  <button type="button" nol-icon-button class="tune" [icon]="resources.organizationCardsShowIcon"
+    [label]="resources.formatOrganizationChooseFields(teammate().name)" [nolMenuTriggerFor]="fieldsMenu"></button>
 </div>
+@if (fields().has(fieldNames.Usage)) {
+  @if (usage(); as shown) {
+    <nol-meter class="usage" [label]="shown.meter.label" [value]="shown.used" [warning]="isWarning(shown.meter)">{{ shown.meter.text }}</nol-meter>
+  }
+}
+@if (fields().has(fieldNames.Model)) {
+  @if (model(); as text) {
+    <span class="model">{{ text }}</span>
+  }
+}
+<ng-template #fieldsMenu>
+  <nol-menu>
+    <nol-menu-group [label]="resources.formatOrganizationCardShows(teammate().name)">
+      @for (field of resources.organizationOfferedFields; track field) {
+        <button nol-menu-item [label]="resources.organizationFieldLabels[field]" [checkbox]="true" [checked]="fields().has(field)"
+          (triggered)="layout.showOnCard(teammate().id, field, !fields().has(field))"></button>
+      }
+    </nol-menu-group>
+    <nol-menu-separator />
+    <button nol-menu-item class="use-every-card" [label]="resources.organizationUseEveryCard" [icon]="resources.organizationResetIcon"
+      [disabled]="!layout.layout().hasOwnFields(teammate().id)" (triggered)="layout.clearCard(teammate().id)"></button>
+  </nol-menu>
+</ng-template>

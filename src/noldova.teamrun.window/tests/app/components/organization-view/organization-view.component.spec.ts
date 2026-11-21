@@ -10,7 +10,8 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, MethodName, Organization, OrganizationLayoutSaveParams } from "@noldova/teamrun.protocol";
+import { Department, DepartmentMember, EventName, MethodName, Organization, OrganizationLayoutSaveParams, PlanUsage, PlanWindow, PlanWindowName }
+  from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
@@ -61,6 +62,30 @@ describe("OrganizationViewComponent", () => {
     own(view, ".kids").flatMap(t => all(":scope > nol-teamrun-organization-department", t).map(shape)),
     texts(":scope > .hidden", view)
   ];
+  const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
+  const menuItem = (label: string): HTMLButtonElement => {
+    const found = menuItems().find(t => t.querySelector(".nol-menu-item-label")?.textContent?.trim() === label);
+    if (Object.isUndefined(found))
+      throw new Error(`No menu item reads ${label}.`);
+    return found;
+  };
+  const openMenu = async (trigger: HTMLElement): Promise<void> => {
+    trigger.click();
+    await settle();
+    await Wait.until(() => expect(menuItems().length).toBeGreaterThan(0));
+  };
+  const closeMenu = async (): Promise<void> => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await Wait.until(() => expect(menuItems()).toEqual([]));
+  };
+  const card = (name: string): HTMLElement => {
+    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name);
+    if (Object.isUndefined(found))
+      throw new Error(`No card is named ${name}.`);
+    return found;
+  };
+  const shows = (name: string): string[] => [...texts(".usage", card(name)), ...texts(".model", card(name))];
+  const checks = (): (string | null)[][] => menuItems().map(t => [t.querySelector(".nol-menu-item-label")?.textContent?.trim() ?? null, t.getAttribute("aria-checked")]);
   const tree = (): unknown[] => all(".chart > .tree > .kids > nol-teamrun-organization-department").map(shape);
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
@@ -171,6 +196,65 @@ describe("OrganizationViewComponent", () => {
     await settle();
 
     expect(tree()).toHaveLength(2);
+  });
+
+  it("switches what every card shows from Cards show, and keeps it on the server", async () => {
+    await create(context => context.answer(MethodName.PlanUsageList, () =>
+      [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, 40, null)], "2026-10-22T09:00:00.000Z").toJson()]));
+
+    expect([shows("Alice"), shows("Bob")]).toEqual([[], []]);
+
+    await openMenu(one(".top .cards-show"));
+    expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Model and effort", "false"],
+      ["Clear every card's own choice", null]]);
+    expect(menuItem("Clear every card's own choice").disabled).toBe(true);
+    menuItem("Usage today").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+    await closeMenu();
+    await openMenu(one(".top .cards-show"));
+    menuItem("Model and effort").click();
+    await Wait.until(() => expect(saves).toHaveLength(2));
+    await settle();
+
+    expect([shows("Alice"), shows("Bob")]).toEqual([["60% left", "gpt-5 · high"], ["60% left"]]);
+    expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
+    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
+  });
+
+  it("lets a card choose its own fields over every card's, until it or every card's choice is cleared", async () => {
+    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ cardsShow: { Model: true } })));
+    const tune = (name: string): HTMLElement => one(".tune", card(name));
+
+    expect([shows("Alice"), tune("Alice").getAttribute("aria-label")]).toEqual([["gpt-5 · high"], "Choose what Alice's card shows"]);
+
+    await openMenu(tune("Alice"));
+    expect(menuItem("Use what every card shows").disabled).toBe(true);
+    menuItem("Model and effort").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+    await closeMenu();
+
+    expect([shows("Alice"), shows("Code Reviewer")]).toEqual([[], []]);
+
+    await openMenu(tune("Alice"));
+    menuItem("Use what every card shows").click();
+    await Wait.until(() => expect(saves).toHaveLength(2));
+    await settle();
+    await closeMenu();
+
+    expect(shows("Alice")).toEqual(["gpt-5 · high"]);
+
+    await openMenu(tune("Alice"));
+    menuItem("Model and effort").click();
+    await Wait.until(() => expect(saves).toHaveLength(3));
+    await closeMenu();
+    await openMenu(one(".top .cards-show"));
+    menuItem("Clear every card's own choice").click();
+    await Wait.until(() => expect(saves).toHaveLength(4));
+    await settle();
+
+    expect([shows("Alice"), saves[3]]).toEqual([["gpt-5 · high"], expect.objectContaining({ cards: {} })]);
   });
 
   describe.each([

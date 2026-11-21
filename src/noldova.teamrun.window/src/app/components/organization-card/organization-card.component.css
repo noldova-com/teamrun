@@ -49,3 +49,12 @@
   color: var(--nol-text-muted);
   font-size: var(--nol-text-small);
 }
+
+.tune {
+  flex: none;
+}
+
+.model {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}

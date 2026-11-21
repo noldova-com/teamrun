@@ -18,11 +18,15 @@
 .top {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: var(--nol-space-2) var(--nol-space-4);
   padding: var(--nol-space-3) var(--nol-space-6);
   border-bottom: 1px solid var(--nol-border);
   background: var(--nol-panel);
+}
+
+.spacer {
+  flex: 1 1 auto;
 }
 
 .title {

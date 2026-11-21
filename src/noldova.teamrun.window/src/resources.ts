@@ -15,6 +15,7 @@ import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
 import { BrowserStepPhase } from "./app/enums/browser-step-phase";
 import { ChatAction } from "./app/enums/chat-action";
 import { ImageOpenMode } from "./app/enums/image-open-mode";
+import { OrganizationCardField } from "./app/enums/organization-card-field";
 import { StepCategory } from "./app/enums/step-category";
 import type { ProviderAction } from "./app/types/provider-action";
 
@@ -1136,6 +1137,21 @@ export class Resources {
   public static readonly organizationStructureLabel: string = "Organization structure";
   public static readonly organizationOwnerName: string = "You";
   public static readonly organizationEmpty: string = "No departments yet.";
+  public static readonly organizationCardsShowLabel: string = "Cards show";
+  public static readonly organizationCardsShowIcon: string = "tune";
+  public static readonly organizationEveryCardShows: string = "Every card shows";
+  public static readonly organizationClearEveryCard: string = "Clear every card's own choice";
+  public static readonly organizationUseEveryCard: string = "Use what every card shows";
+  public static readonly organizationResetIcon: string = "restart_alt";
+  public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
+    [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Model];
+  public static readonly organizationFieldLabels: Readonly<Record<OrganizationCardField, string>> = {
+    [OrganizationCardField.Status]: "Status",
+    [OrganizationCardField.Now]: "Current activity",
+    [OrganizationCardField.Usage]: "Usage today",
+    [OrganizationCardField.Last]: "Last message",
+    [OrganizationCardField.Model]: "Model and effort"
+  };
   public static readonly teammatesHint: string = "Create and configure teammates here. Add them to a chat using its member strip or an @mention.";
   public static readonly defaultTeammateHint: string = "The provider, model and effort a new chat starts with. Chats you already have keep their own.";
   public static readonly lastMessageSentLabel: string = "Last message sent";
@@ -1635,6 +1651,18 @@ export class Resources {
 
   public static formatOrganizationHidden(count: number): string {
     return count === 1 ? "1 teammate hidden" : `${count} teammates hidden`;
+  }
+
+  public static formatOrganizationCardShows(name: string): string {
+    return `${name}'s card shows`;
+  }
+
+  public static formatOrganizationChooseFields(name: string): string {
+    return `Choose what ${name}'s card shows`;
+  }
+
+  public static formatOrganizationModel(model: string, effort: string | null): string {
+    return [model, effort].filter(t => !Object.isNull(t)).join(Resources.titleSeparator);
   }
 
   public static formatRemove(entry: string): string {
