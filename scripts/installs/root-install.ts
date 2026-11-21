@@ -15,6 +15,8 @@ import { setTimeout as delayAsync } from "node:timers/promises";
 
 export class RootInstall {
   public static readonly ARGUMENTS: readonly string[] = ["ci", "--ignore-scripts", "--no-audit", "--no-fund"];
+  public static readonly WITH_SCRIPTS_ARGUMENTS: readonly string[] = ["ci", "--no-audit", "--no-fund"];
+  public static readonly WITH_SCRIPTS_OPTION: string = "--with-scripts";
   public static readonly RETRY_PAUSE: number = 5000;
 
   private static readonly MODULES_FOLDER: string = "node_modules";
@@ -30,16 +32,20 @@ export class RootInstall {
   private static readonly REQUEST_LINES: number = 5;
   private static readonly INSTALLING: string = "The root has no node_modules, so npm ci installs the root's and src/'s packages first, with install scripts off.\n";
   private static readonly UNAVAILABLE: string = "The root has no node_modules and npm_execpath is not set; run npm run build, which installs the packages through npm.\n";
+  private static readonly UNAVAILABLE_WITH_SCRIPTS: string = "npm_execpath is not set; run npm run install:root, which runs npm ci through npm.\n";
 
   private readonly root: string;
   private readonly environment: NodeJS.ProcessEnv;
   private readonly output: Writable;
+  private readonly isWithScripts: boolean;
   private readonly waitAsync: (milliseconds: number) => Promise<void>;
 
-  public constructor(root: string, environment: NodeJS.ProcessEnv, output: Writable, waitAsync: (milliseconds: number) => Promise<void> = delayAsync) {
+  public constructor(root: string, environment: NodeJS.ProcessEnv, output: Writable, isWithScripts: boolean = false,
+    waitAsync: (milliseconds: number) => Promise<void> = delayAsync) {
     this.root = root;
     this.environment = environment;
     this.output = output;
+    this.isWithScripts = isWithScripts;
     this.waitAsync = waitAsync;
   }
 
@@ -52,14 +58,15 @@ export class RootInstall {
   }
 
   public async runAsync(): Promise<number> {
-    if (existsSync(path.join(this.root, RootInstall.MODULES_FOLDER)))
+    if (!this.isWithScripts && existsSync(path.join(this.root, RootInstall.MODULES_FOLDER)))
       return RootInstall.SUCCESS_EXIT_CODE;
     const npm = this.environment[RootInstall.NPM_VARIABLE];
     if (npm === undefined || npm.length === 0) {
-      this.output.write(RootInstall.UNAVAILABLE);
+      this.output.write(this.isWithScripts ? RootInstall.UNAVAILABLE_WITH_SCRIPTS : RootInstall.UNAVAILABLE);
       return RootInstall.FAILED_EXIT_CODE;
     }
-    this.output.write(RootInstall.INSTALLING);
+    if (!this.isWithScripts)
+      this.output.write(RootInstall.INSTALLING);
     const first = await this.attemptAsync(npm);
     if (first.exitCode === RootInstall.SUCCESS_EXIT_CODE || !RootInstall.isNetworkFailure(first.log))
       return first.exitCode;
@@ -72,7 +79,7 @@ export class RootInstall {
     const logs = mkdtempSync(path.join(tmpdir(), RootInstall.LOGS_PREFIX));
     try {
       const exitCode = await new Promise<number>((resolve, reject) => {
-        const child = spawn(process.execPath, [npm, ...RootInstall.ARGUMENTS], { cwd: this.root, shell: false, stdio: "inherit", env: { ...this.environment, [RootInstall.LOGS_VARIABLE]: logs } });
+        const child = spawn(process.execPath, [npm, ...(this.isWithScripts ? RootInstall.WITH_SCRIPTS_ARGUMENTS : RootInstall.ARGUMENTS)], { cwd: this.root, shell: false, stdio: "inherit", env: { ...this.environment, [RootInstall.LOGS_VARIABLE]: logs } });
         child.once("error", reject);
         child.once("close", code => resolve(code ?? RootInstall.FAILED_EXIT_CODE));
       });
@@ -85,4 +92,4 @@ export class RootInstall {
 }
 
 if (import.meta.main)
-  process.exitCode = await new RootInstall(process.cwd(), process.env, process.stdout).runAsync();
+  process.exitCode = await new RootInstall(process.cwd(), process.env, process.stdout, process.argv.includes(RootInstall.WITH_SCRIPTS_OPTION)).runAsync();

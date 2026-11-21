@@ -20,7 +20,7 @@
     "build:app": "node scripts/app.ts build",
     "format:documents": "node scripts/format-documents.ts",
     "install:app": "node scripts/app.ts install",
-    "install:root": "npm ci --no-audit --no-fund",
+    "install:root": "node scripts/installs/root-install.ts --with-scripts",
     "lock:app": "node scripts/app.ts lock",
     "package:app": "node scripts/app.ts package",
     "package:smoke": "node scripts/app.ts package-smoke",

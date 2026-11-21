@@ -47,11 +47,11 @@ const OTHER: readonly string[] = [...REQUESTS, "8 error code EINTEGRITY", "9 err
 
 const readCalls = (record: string): { values: string[]; directory: string; logs: string }[] => JSON.parse(readFileSync(record, "utf8"));
 
-const runAsync = async (root: string, environment: NodeJS.ProcessEnv): Promise<{ exitCode: number; text: string; waits: number[] }> => {
+const runAsync = async (root: string, environment: NodeJS.ProcessEnv, isWithScripts: boolean = false): Promise<{ exitCode: number; text: string; waits: number[] }> => {
   let text = "";
   const waits: number[] = [];
   const output = new Writable({ write: (chunk, _encoding, done): void => { text += String(chunk); done(); } });
-  const exitCode = await new RootInstall(root, environment, output, async milliseconds => { waits.push(milliseconds); }).runAsync();
+  const exitCode = await new RootInstall(root, environment, output, isWithScripts, async milliseconds => { waits.push(milliseconds); }).runAsync();
   return { exitCode, text, waits };
 };
 
@@ -113,6 +113,37 @@ describe("RootInstall", () => {
     const { exitCode, waits } = await runAsync(root, { ...process.env, npm_execpath: npm, FAKE_NPM_RESULTS: results({ exitCode: 1, log: ABORTED }, { exitCode: 2, log: STALLED }, { exitCode: 0 }) });
 
     assert.deepEqual([exitCode, readCalls(record).length, waits], [2, 2, [RootInstall.RETRY_PAUSE]]);
+  });
+
+  it("runs npm ci with install scripts on for install:root, though the root has node_modules, and says nothing first", async () => {
+    const { root, npm, record } = createRoot();
+    mkdirSync(path.join(root, "node_modules"));
+
+    const { exitCode, text } = await runAsync(root, { ...process.env, npm_execpath: npm, FAKE_NPM_RESULTS: results({ exitCode: 0 }) }, true);
+
+    assert.deepEqual([exitCode, text], [0, ""]);
+    assert.deepEqual(readCalls(record).map(t => t.values), [["ci", "--no-audit", "--no-fund"]]);
+  });
+
+  it("runs install:root's npm ci once more after a pause when a connection was reset, with install scripts on both times", async () => {
+    const { root, npm, record } = createRoot();
+
+    const { exitCode, text, waits } = await runAsync(root, { ...process.env, npm_execpath: npm, FAKE_NPM_RESULTS: results({ exitCode: 1, log: ABORTED }, { exitCode: 0 }) }, true);
+
+    assert.deepEqual([exitCode, waits], [0, [RootInstall.RETRY_PAUSE]]);
+    assert.deepEqual(readCalls(record).map(t => t.values), [RootInstall.WITH_SCRIPTS_ARGUMENTS, RootInstall.WITH_SCRIPTS_ARGUMENTS]);
+    assert.equal(text.startsWith("npm ci stopped on a read that stalled or a connection that was reset"), true);
+  });
+
+  it("fails install:root with a reason when npm_execpath is not set", async () => {
+    const { root, record } = createRoot();
+    const environment = { ...process.env };
+    delete environment["npm_execpath"];
+
+    const { exitCode, text } = await runAsync(root, environment, true);
+
+    assert.deepEqual([exitCode, text], [1, "npm_execpath is not set; run npm run install:root, which runs npm ci through npm.\n"]);
+    assert.equal(existsSync(record), false);
   });
 
   it("runs nothing when the root already has node_modules", async () => {
