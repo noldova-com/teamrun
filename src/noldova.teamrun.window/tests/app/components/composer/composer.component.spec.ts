@@ -4695,7 +4695,7 @@ describe("ComposerComponent", () => {
         expect([...rows()].map(t => t.textContent)).toEqual([expect.stringContaining("notes.txt")]);
       });
 
-      it("takes a rewind confirmed with the keyboard once its dialog has closed, into an empty box with the focus, or asks to replace a draft only then", async () => {
+      it("takes a rewind confirmed with the keyboard once its dialog has closed, into an empty box with the focus, or asks to replace a draft only then, the focus back in the box either way", async () => {
         const store = await prepare();
         await render();
         const dialogs = (): number => document.querySelectorAll("nol-dialog").length;
@@ -4721,12 +4721,19 @@ describe("ComposerComponent", () => {
         await type("mine");
         await rewindByKeyboard();
         await Wait.until(() => expect(title()?.trim()).toBe(Resources.replaceDraftTitle));
+        document.querySelector<HTMLButtonElement>(".nol-teamrun-cancel")?.click();
+        await Wait.until(() => expect(dialogs()).toBe(0));
+        await fixture.whenStable();
+        const kept = [box().value, document.activeElement === box(), store.rewoundDraft()];
+
+        await rewindByKeyboard();
+        await Wait.until(() => expect(title()?.trim()).toBe(Resources.replaceDraftTitle));
         const asking = [dialogs(), box().value];
         document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
         await Wait.until(() => expect(box().value).toBe(rewound));
         await fixture.whenStable();
 
-        expect([asking, document.activeElement === box(), dialogs()]).toEqual([[1, "mine"], true, 0]);
+        expect([kept, asking, document.activeElement === box(), dialogs()]).toEqual([["mine", true, null], [1, "mine"], true, 0]);
       });
 
       it("keeps the rewound message for its own conversation until the composer shows it", async () => {

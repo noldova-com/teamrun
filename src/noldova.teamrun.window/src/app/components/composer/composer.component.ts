@@ -1155,7 +1155,7 @@ export class ComposerComponent {
       return;
     }
 
-    const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
+    const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel", this.box().nativeElement);
     dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.replaceDraftTitle, Resources.replaceDraftText, Resources.replaceDraftLabel, null, true));
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
