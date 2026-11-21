@@ -1,0 +1,104 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  background: var(--nol-window);
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-2) var(--nol-space-4);
+  padding: var(--nol-space-3) var(--nol-space-6);
+  border-bottom: 1px solid var(--nol-border);
+  background: var(--nol-panel);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.title {
+  margin: 0;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-display);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.headcount,
+.role,
+.empty {
+  color: var(--nol-text-muted);
+}
+
+.role {
+  font-size: var(--nol-text-small);
+}
+
+.failure {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  padding: var(--nol-space-2) var(--nol-space-6) 0;
+}
+
+.error {
+  flex: auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--nol-error);
+  overflow-wrap: anywhere;
+}
+
+.chart {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--nol-space-4) var(--nol-space-6) var(--nol-space-6);
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: max-content;
+}
+
+.owner {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  box-sizing: border-box;
+  width: 15rem;
+  padding: var(--nol-space-3);
+  border: 1px solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background: var(--nol-raised);
+}
+
+.who {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.empty {
+  margin: var(--nol-space-4) 0 0;
+}

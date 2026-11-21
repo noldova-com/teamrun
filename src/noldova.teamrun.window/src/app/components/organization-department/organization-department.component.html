@@ -1,0 +1,39 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="department">
+  <div class="department-row">
+    <button type="button" nol-icon-button class="department-toggle" [icon]="isOpen() ? resources.expandedIcon : resources.collapsedIcon"
+      [label]="resources.formatOrganizationCollapseLabel(node().department.name, isOpen())" [attr.aria-expanded]="isOpen()" (click)="toggle()"></button>
+    <span class="department-name">{{ node().department.name }}</span>
+    <nol-chip class="department-count">{{ node().headcount }}</nol-chip>
+  </div>
+  <span class="department-summary">{{ summary() }}</span>
+</div>
+@if (node().leader; as leader) {
+  <div class="stem"></div>
+  <nol-teamrun-organization-card class="leader" [teammate]="leader" />
+}
+@if (isOpen()) {
+  @if (node().members.length > 0) {
+    <div class="reports">
+      @for (member of node().members; track member.id) {
+        <nol-teamrun-organization-card [teammate]="member" />
+      }
+    </div>
+  }
+  @if (node().children.length > 0) {
+    <div class="kids">
+      @for (child of node().children; track child.department.id) {
+        <nol-teamrun-organization-department class="kid" [node]="child" />
+      }
+    </div>
+  }
+} @else if (node().headcount > 0) {
+  <span class="hidden">{{ resources.formatOrganizationHidden(node().headcount) }}</span>
+}
