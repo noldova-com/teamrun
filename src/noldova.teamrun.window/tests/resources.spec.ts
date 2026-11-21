@@ -90,6 +90,15 @@ describe("Resources", () => {
     expect(Resources.formatReplyProvider("Claude Code")).toBe("·\u00a0Claude Code");
   });
 
+  it("asks before deleting a department or removing a member, saying where what it held goes", () => {
+    expect([Resources.formatOrganizationDeleteDepartment("Design", null), Resources.formatOrganizationDeleteDepartment("Web", "Build"),
+      Resources.formatOrganizationRemoveMember("Alice", "Design")]).toEqual([
+      "Delete Design? Its departments move up to report to you, and its members leave every department.",
+      "Delete Web? Its departments and members move to Build.",
+      "Remove Alice from Design? Alice stays on the team, in no department."
+    ]);
+  });
+
   it("writes the composer's accessible names and unavailable choices", () => {
     expect(Resources.formatRemoveAttachment("notes.txt")).toBe("Remove attachment: notes.txt");
     expect(Resources.formatChatPermissions("Accept edits")).toBe("Permissions in this chat: Accept edits");

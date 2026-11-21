@@ -13,6 +13,9 @@ LICENSE file in the root directory of this source tree.
   <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
   <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
     aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
+  <button type="button" nol-button class="edit" [variant]="editing() ? primary : outlined" (click)="toggleEditing()"><span nolButtonIcon
+    class="material-symbols-rounded" aria-hidden="true">{{ editing() ? resources.organizationDoneIcon : resources.organizationEditIcon }}</span>{{ editing()
+    ? resources.organizationDoneEditing : resources.organizationEditStructure }}</button>
 </header>
 <ng-template #cardsShowMenu>
   <nol-menu>

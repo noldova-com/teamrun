@@ -19,6 +19,7 @@ import { OrganizationViewComponent } from "../../../../src/app/components/organi
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
+import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
@@ -84,7 +85,7 @@ describe("OrganizationViewComponent", () => {
       throw new Error(`No card is named ${name}.`);
     return found;
   };
-  const shows = (name: string): string[] => [...texts(".usage", card(name)), ...texts(".model", card(name))];
+  const shows = (name: string): string[] => [...texts(".status", card(name)), ...texts(".usage", card(name)), ...texts(".model", card(name))];
   const checks = (): (string | null)[][] => menuItems().map(t => [t.querySelector(".nol-menu-item-label")?.textContent?.trim() ?? null, t.getAttribute("aria-checked")]);
   const tree = (): unknown[] => all(".chart > .tree > .kids > nol-teamrun-organization-department").map(shape);
   const settle = async (): Promise<void> => {
@@ -115,6 +116,7 @@ describe("OrganizationViewComponent", () => {
   };
 
   afterEach(() => {
+    TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
     ChatStoreService.release(context);
@@ -202,7 +204,7 @@ describe("OrganizationViewComponent", () => {
     await create(context => context.answer(MethodName.PlanUsageList, () =>
       [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, 40, null)], "2026-10-22T09:00:00.000Z").toJson()]));
 
-    expect([shows("Alice"), shows("Bob")]).toEqual([[], []]);
+    expect([shows("Alice"), shows("Bob")]).toEqual([["Idle"], ["Idle"]]);
 
     await openMenu(one(".top .cards-show"));
     expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Model and effort", "false"],
@@ -217,7 +219,7 @@ describe("OrganizationViewComponent", () => {
     await Wait.until(() => expect(saves).toHaveLength(2));
     await settle();
 
-    expect([shows("Alice"), shows("Bob")]).toEqual([["60% left", "gpt-5 · high"], ["60% left"]]);
+    expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "60% left", "gpt-5 · high"], ["Idle", "60% left"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
     expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
   });
@@ -271,6 +273,21 @@ describe("OrganizationViewComponent", () => {
 
     expect([pills()[2], saves[0], texts(".chart > nol-teamrun-organization-focus .unit-name")])
       .toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null }), ["Organization"]]);
+  });
+
+  it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
+    await create();
+    const edit = (): HTMLElement => one(".top .edit");
+    const looks = (): unknown[] => [edit().textContent?.trim(), edit().classList.contains("nol-button-outlined")];
+    const before = looks();
+
+    edit().click();
+    await settle();
+    const editing = looks();
+    edit().click();
+    await settle();
+
+    expect([before, editing, looks(), saves]).toEqual([["editEdit structure", true], ["checkDone editing", false], ["editEdit structure", true], []]);
   });
 
   describe.each([
@@ -328,16 +345,18 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("puts the view pills on the right of the header, before Cards show and centred with it", async () => {
+    it("puts the view pills on the right of the header, then Cards show and Edit structure, all centred on one line", async () => {
       await create();
-      element().style.width = "60rem";
+      element().style.width = "72rem";
       await settle();
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
-      const [top, views, cards] = [box(".top"), box(".top .views"), box(".top .cards-show")];
+      const [top, views, cards, edit] = [box(".top"), box(".top .views"), box(".top .cards-show"), box(".top .edit")];
 
       AppearanceFixture.expectPixels(cards.left - views.right, AppearanceFixture.measureLook("space-4"));
-      AppearanceFixture.expectPixels(top.right - cards.right, AppearanceFixture.measureLook("space-6"));
+      AppearanceFixture.expectPixels(edit.left - cards.right, AppearanceFixture.measureLook("space-4"));
+      AppearanceFixture.expectPixels(top.right - edit.right, AppearanceFixture.measureLook("space-6"));
       AppearanceFixture.expectPixels(views.top + views.height / 2, cards.top + cards.height / 2);
+      AppearanceFixture.expectPixels(edit.top + edit.height / 2, cards.top + cards.height / 2);
       expect(views.left).toBeGreaterThan(box(".top .headcount").right);
     });
   });

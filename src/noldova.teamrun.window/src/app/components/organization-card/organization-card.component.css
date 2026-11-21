@@ -54,6 +54,12 @@
   flex: none;
 }
 
+.status {
+  align-self: flex-start;
+  max-width: 100%;
+  font-size: var(--nol-text-small);
+}
+
 .model {
   color: var(--nol-text-muted);
   font-size: var(--nol-text-small);

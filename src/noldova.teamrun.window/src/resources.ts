@@ -822,7 +822,7 @@ export class Resources {
   public static readonly teammatesViewIcon: string = "group";
   public static readonly organizationDocumentName: string = "teamrun.organization";
   public static readonly organizationDocumentInstance: string = "organization";
-  public static readonly organizationViewIcon: string = "account_tree";
+  public static readonly organizationViewIcon: string = "lan";
   public static readonly providersDocumentName: string = "teamrun.providers";
   public static readonly providersDocumentInstance: string = "providers";
   public static readonly providersViewIcon: string = "key";
@@ -1148,6 +1148,10 @@ export class Resources {
   public static readonly organizationClearEveryCard: string = "Clear every card's own choice";
   public static readonly organizationUseEveryCard: string = "Use what every card shows";
   public static readonly organizationResetIcon: string = "restart_alt";
+  public static readonly organizationEditStructure: string = "Edit structure";
+  public static readonly organizationDoneEditing: string = "Done editing";
+  public static readonly organizationEditIcon: string = "edit";
+  public static readonly organizationDoneIcon: string = "check";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
     [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Model];
   public static readonly organizationFieldLabels: Readonly<Record<OrganizationCardField, string>> = {
@@ -1169,6 +1173,13 @@ export class Resources {
     [TeammateStatus.Idle]: "Idle",
     [TeammateStatus.UsageLimit]: "Usage limit",
     [TeammateStatus.Stopped]: "Stopped"
+  };
+  public static readonly teammateStatusTones: Readonly<Record<TeammateStatus, string>> = {
+    [TeammateStatus.Working]: "working",
+    [TeammateStatus.WaitingForYou]: "waiting",
+    [TeammateStatus.Idle]: "idle",
+    [TeammateStatus.UsageLimit]: "waiting",
+    [TeammateStatus.Stopped]: "stopped"
   };
   public static readonly teammatesHint: string = "Create and configure teammates here. Add them to a chat using its member strip or an @mention.";
   public static readonly defaultTeammateHint: string = "The provider, model and effort a new chat starts with. Chats you already have keep their own.";
@@ -1700,6 +1711,15 @@ export class Resources {
 
   public static formatOrganizationCollapseLabel(name: string, open: boolean): string {
     return open ? `Collapse ${name}` : `Expand ${name}`;
+  }
+
+  public static formatOrganizationDeleteDepartment(name: string, parent: string | null): string {
+    return Object.isNull(parent) ? `Delete ${name}? Its departments move up to report to you, and its members leave every department.`
+      : `Delete ${name}? Its departments and members move to ${parent}.`;
+  }
+
+  public static formatOrganizationRemoveMember(teammate: string, department: string): string {
+    return `Remove ${teammate} from ${department}? ${teammate} stays on the team, in no department.`;
   }
 
   public static formatOrganizationHidden(count: number): string {

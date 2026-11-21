@@ -21,11 +21,12 @@ import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { UsageFormatterService } from "../../services/usage-formatter.service";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
+import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
   selector: "nol-teamrun-organization-card",
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
-    TeammateAvatarComponent],
+    TeammateAvatarComponent, TeammateStatusComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-card", "[class.fluid]": "shape() === shapes.Fluid", "[class.row]": "shape() === shapes.Row" },
   templateUrl: "./organization-card.component.html",
