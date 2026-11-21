@@ -22,6 +22,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **A chat's mentioned teammate:** a chat whose next answer goes to a teammate, after a message that mentions one, keeps that teammate when you open another chat or the new chat, or come back to it; the composer's settings no longer replace it with the default teammate, and a mode picked there is that teammate's mode (#326).
 - **Ending a sub-agent's processes on Windows:** a stop, deleting the chat, quitting, a sign-out or the provider's exit ends what a kept sub-agent started even when TeamRun's PowerShell stalls, within seconds rather than leaving it running (#309).
 - **Editing a waiting message:** an edit whose mentions aren't the teammates its new text names is refused when it's made, and the message stays as it was, rather than being saved and failing later as changed mentions when it's sent (#371).
+- **Ending a shared MCP server on Windows:** when the launcher of a shared MCP server ends, what the server started is ended even when the PowerShell that lists it stalls, within seconds, rather than left running (#383).
 - **Ending a process tree on Windows:** a process whose end failed is ended again while the tree's listing still shows it, in each of the stop's ten rounds, rather than left running after its first end, and each end waits for the process to exit, all of a round's within two seconds (#344).
 
 ### Changed

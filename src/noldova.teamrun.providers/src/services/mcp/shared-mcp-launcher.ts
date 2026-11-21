@@ -31,6 +31,7 @@ export class SharedMcpLauncher {
   public static readonly withheldVariables: readonly string[] = ["TEAMRUN_SENDER_TOKEN"];
   public static readonly forwardedSignals: readonly NodeJS.Signals[] = ["SIGTERM", "SIGINT", "SIGHUP"];
   public static readonly graceMilliseconds: number = 2000;
+  public static readonly powershellAnswerMilliseconds: number = 10_000;
 
   private static readonly WINDOWS: string = "win32";
   private static readonly PATH_VARIABLE: string = "PATH";
@@ -83,11 +84,11 @@ export class SharedMcpLauncher {
   private readonly host: ISharedMcpLauncherHost;
   private readonly start: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
   private readonly isFile: (file: string) => boolean;
-  private readonly delayAsync: (milliseconds: number) => Promise<unknown>;
+  private readonly delayAsync: (milliseconds: number, signal?: AbortSignal) => Promise<unknown>;
 
   public constructor(platform: string, environment: NodeJS.ProcessEnv, program: string, script: string, host: ISharedMcpLauncherHost = process,
     start: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess = spawn, isFile: (file: string) => boolean = SharedMcpLauncher.fileExists,
-    delayAsync: (milliseconds: number) => Promise<unknown> = delay) {
+    delayAsync: (milliseconds: number, signal?: AbortSignal) => Promise<unknown> = (milliseconds, signal) => delay(milliseconds, undefined, { signal })) {
     this.platform = platform;
     this.environment = environment;
     this.program = program;
@@ -249,11 +250,25 @@ export class SharedMcpLauncher {
     return this.runPowerShellAsync(script);
   }
 
-  private runPowerShellAsync(script: string): Promise<void> {
-    return new Promise(resolve => {
-      this.start(SharedMcpLauncher.POWERSHELL, [...SharedMcpLauncher.POWERSHELL_ARGUMENTS, Buffer.from(script, "utf16le").toString("base64")],
-        { env: this.environment, stdio: "ignore", windowsHide: true }).once("exit", () => resolve()).once("error", () => resolve());
+  private async runPowerShellAsync(script: string): Promise<void> {
+    if (!await this.runPowerShellOnceAsync(script, SharedMcpLauncher.powershellAnswerMilliseconds))
+      await this.runPowerShellOnceAsync(script, null);
+  }
+
+  private async runPowerShellOnceAsync(script: string, limit: number | null): Promise<boolean> {
+    const powershell = this.start(SharedMcpLauncher.POWERSHELL, [...SharedMcpLauncher.POWERSHELL_ARGUMENTS, Buffer.from(script, "utf16le").toString("base64")],
+      { env: this.environment, stdio: "ignore", windowsHide: true });
+    const ended = new Promise<boolean>(resolve => {
+      powershell.once("exit", () => resolve(true)).once("error", () => resolve(true));
     });
+    if (limit === null)
+      return ended;
+    const timer = new AbortController();
+    const answered = await Promise.race([ended, this.delayAsync(limit, timer.signal).then(() => false, () => false)]);
+    timer.abort();
+    if (!answered)
+      powershell.kill();
+    return answered;
   }
 
   private refuse(message: string, code: number): number {

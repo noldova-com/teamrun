@@ -531,6 +531,24 @@ export class SharedMcpLauncherTests {
   }
 
   @TestMethod
+  public async endsAPowershellThatDoesntAnswerWithinItsLimitOnWindowsAndListsOnceMoreInANewOne(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.waiting(), SharedMcpLauncherTests.exiting(0));
+    const limits: number[] = [];
+    const delayAsync = async (milliseconds: number): Promise<void> => {
+      limits.push(milliseconds);
+    };
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, delayAsync).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+    const [stalled, second] = recorder.starts;
+
+    Assert.areEqual(JSON.stringify([2, "powershell.exe", true, [SharedMcpLauncher.powershellAnswerMilliseconds], true, [0]]),
+      JSON.stringify([recorder.starts.length, second?.command, second?.args[3] === stalled?.args[3], limits, recorder.children[0]?.killed, host.codes]));
+  }
+
+  @TestMethod
   public async exitsOnWindowsEvenWhenPowerShellCannotStart(): Promise<void> {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.failing());

@@ -10964,11 +10964,11 @@ export declare class SharedMcpLaunch {
  * its fourth descriptor, which the launcher writes only after the watch's line, and then runs the command in its own place, without the
  * `PWD` and `SHLVL` it sets unless the server names them, or answers on it that the command isn't found, which the launcher reports as Node
  * does; a launcher killed before the watch's line closes that descriptor and the command never starts. On Windows, where ending the launcher
- * ends only the server and leaves what the server started, the watch ends, through one PowerShell run comparing times in UTC, the server if
+ * ends only the server and leaves what the server started, the watch ends, through a PowerShell run comparing times in UTC, the server if
  * it still runs and each process under it that started no earlier than its parent; when another process holds the server's id, one that started
  * outside those times, it ends nothing. A watch on Windows whose pipe ends without that line ends, the same way, each process its launcher
  * started after it, other than itself and before any later process took the launcher's id, with what those started, and none while the launcher
- * still runs.
+ * still runs. A PowerShell that hasn't ended within `powershellAnswerMilliseconds` is ended, and the same run starts once more in a new one.
  */
 export declare class SharedMcpLauncher {
   /**
@@ -11025,6 +11025,12 @@ export declare class SharedMcpLauncher {
   public static readonly graceMilliseconds: number;
 
   /**
+   * How long the watch on Windows waits for its PowerShell to end before it ends it and runs the same script once more in a new one, without a
+   * limit, in milliseconds.
+   */
+  public static readonly powershellAnswerMilliseconds: number;
+
+  /**
    * @param platform The platform, as `process.platform`.
    * @param environment The launcher's own environment.
    * @param program The program that runs the watch, as `process.execPath`.
@@ -11032,11 +11038,11 @@ export declare class SharedMcpLauncher {
    * @param host The launcher's own process; `process` by default.
    * @param start Starts a process; `spawn` by default.
    * @param isFile Whether a path is a file; by default, whether it exists and is one.
-   * @param delayAsync Waits a number of milliseconds; `setTimeout` of `node:timers/promises` by default.
+   * @param delayAsync Waits a number of milliseconds, until the signal aborts; `setTimeout` of `node:timers/promises` by default.
    */
   public constructor(platform: string, environment: NodeJS.ProcessEnv, program: string, script: string, host?: ISharedMcpLauncherHost,
     start?: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess, isFile?: (file: string) => boolean,
-    delayAsync?: (milliseconds: number) => Promise<unknown>);
+    delayAsync?: (milliseconds: number, signal?: AbortSignal) => Promise<unknown>);
 
   /**
    * Runs the launcher or, after `watchOption`, the watch, and exits through the host; wrong arguments write their usage to the errors and exit
