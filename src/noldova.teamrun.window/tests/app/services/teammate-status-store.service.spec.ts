@@ -57,8 +57,8 @@ describe("TeammateStatusStore", () => {
   let store: TeammateStatusStore;
 
   const reply = (id: string, chatId: string, teammateId: string | null, status: MessageStatus, startedAt: string | null = earlier): Message =>
-    new Message(id, chatId, 1, MessageAuthor.Provider, null, status, [], null, earlier, status === MessageStatus.Pending ? null : startedAt,
-      [MessageStatus.Pending, MessageStatus.Running, MessageStatus.AwaitingApproval].includes(status) ? null : later, [], teammateId);
+    new Message(id, chatId, 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, earlier, status === MessageStatus.Pending ? null : startedAt,
+      [MessageStatus.Pending, MessageStatus.Running, MessageStatus.AwaitingApproval].includes(status) ? null : later, [], teammateId, teammateId);
   const approval = (messageId: string, status: ApprovalStatus): Approval => new Approval("ap1", messageId, SampleData.approval.kind, "exec", "run tests", null,
     SampleData.approval.options, status, status === ApprovalStatus.Pending ? null : "yes", earlier, status === ApprovalStatus.Pending ? null : later);
   const plan = (usedUp: boolean): PlanUsage => new PlanUsage("codex", "a1", [], later, null, usedUp);
