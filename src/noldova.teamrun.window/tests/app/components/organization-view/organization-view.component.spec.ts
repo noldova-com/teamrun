@@ -156,7 +156,7 @@ describe("OrganizationViewComponent", () => {
 
   it("collapses a department to a count of who it hides, keeps that on the server, and opens it again", async () => {
     await create();
-    const toggle = (): HTMLButtonElement => one(":scope > .department .department-toggle", department("Design")) as HTMLButtonElement;
+    const toggle = (): HTMLElement => one(":scope > .department .department-toggle", department("Design"));
 
     expect([toggle().getAttribute("aria-expanded"), toggle().getAttribute("aria-label")]).toEqual(["true", "Collapse Design"]);
 
