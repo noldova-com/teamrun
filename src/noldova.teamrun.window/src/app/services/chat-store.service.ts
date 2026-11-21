@@ -442,6 +442,7 @@ export class ChatStoreService {
   }
 
   public resync(): Promise<boolean> {
+    this.modelCatalogs.expire();
     if (this.watchSubscriptions.length > 0)
       return this.readWorking();
     this.resyncRequested = true;

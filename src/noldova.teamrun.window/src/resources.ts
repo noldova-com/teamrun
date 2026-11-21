@@ -664,6 +664,7 @@ export class Resources {
   public static readonly wakeOldTaskLabel: string = "A sub-agent or background command of this chat ended";
   public static readonly wakeChatGone: string = "a deleted chat";
   public static readonly wakeRepliesLabel: string = "The message received";
+  public static readonly wakeNoReplyLabel: string = "Why no reply came back";
   public static readonly wakeCommandOutputLabel: string = "The command's last lines";
   public static readonly wakeSubAgentResultLabel: string = "The sub-agent's summary";
   public static readonly wakeTaskLostLabel: string = "Why it didn't end";
@@ -2032,6 +2033,14 @@ export class Resources {
 
   public static formatChatPageNotChanged(conversationId: string, failure: string): string {
     return `TeamRun could not open or close chat ${conversationId}'s Browser page: ${failure}.`;
+  }
+
+  public static formatProjectsLayoutNotRead(failure: string): string {
+    return `TeamRun could not read the projects' layout, so it keeps the changes made since and reads it again at the next change or resync: ${failure}.`;
+  }
+
+  public static formatProjectsLayoutNotSaved(failure: string): string {
+    return `TeamRun could not save the projects' layout, so the change stays in this window only: ${failure}.`;
   }
 
   public static formatNoticeNotPosted(kind: string, failure: string): string {

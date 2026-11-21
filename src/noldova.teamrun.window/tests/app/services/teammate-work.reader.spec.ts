@@ -14,6 +14,7 @@ import { EventName, Message, MessageAuthor, MessageStatus, Page, TeammateDocumen
 
 import { OrganizationCardField } from "../../../src/app/enums/organization-card-field";
 import { TeammateSourceState } from "../../../src/app/enums/teammate-source-state";
+import { EngineResync } from "../../../src/app/services/engine-resync";
 import { TeammateWorkReader } from "../../../src/app/services/teammate-work.reader";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
@@ -214,6 +215,16 @@ describe("TeammateWorkReader", () => {
 
     await Wait.until(() => expect([work.workFailure(), work.artifactsFailure()]).toEqual([null, null]));
     expect([work.work()?.folder, work.artifacts()]).toEqual([app, []]);
+  });
+
+  it("reads its work again when the window reconnects to a restarted runtime", async () => {
+    const work = start();
+    await Wait.until(() => expect(work.work()?.folder).toBe(app));
+    context.answerModule(workMethod, () => workOf(site));
+
+    EngineResync.request(context);
+
+    await Wait.until(() => expect(work.work()?.folder).toBe(site));
   });
 
   it("reads its work again when one of its replies ends, and not for another teammate's or one still running", async () => {

@@ -652,6 +652,28 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return this.keptSessions.releaseFolderAsync(conversationId);
   }
 
+  public async requireNothingRunningAsync(conversationId: string, change: string): Promise<void> {
+    const running = await this.runningWorkAsync(conversationId);
+    if (running.length > 0)
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatChatWorkRunning(change, running), [conversationId]);
+  }
+
+  private async runningWorkAsync(conversationId: string): Promise<readonly string[]> {
+    const tasks = await this.runningTasksAsync(conversationId);
+    let kept = false;
+    for (const [messageId, run] of this.state.runs) {
+      const message = run.isOpen && !tasks.some(t => t.messageId === messageId) ? await this.messages.findAsync(messageId) : null;
+      kept ||= message?.conversationId === conversationId && !Object.isNull(message.endedAt);
+    }
+    return [...tasks.map(t => Object.isNull(t.subAgentId) ? Resources.formatRunningCommand(t.command) : Resources.formatRunningHelper(t.command)),
+      ...(kept ? [Resources.runningReplyWork] : [])];
+  }
+
+  private async runningTasksAsync(chatId: string): Promise<readonly BackgroundTask[]> {
+    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(chatId));
+    return listed.filter(t => t.status === BackgroundTaskStatus.Running);
+  }
+
   public sweepFoldersAsync(signal: AbortSignal): Promise<void> {
     return this.keptSessions.sweepFoldersAsync(signal);
   }
@@ -1066,8 +1088,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   private async capEndsTasksAsync(teammate: Teammate, chatId: string): Promise<boolean> {
-    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(chatId));
-    if (!listed.some(t => t.status === BackgroundTaskStatus.Running))
+    if ((await this.runningTasksAsync(chatId)).length === 0)
       return false;
     for (const provider of await this.providers.listAsync())
       if (provider.id === teammate.providerId && this.registry.has(provider.kind)
@@ -1883,8 +1904,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   private async compactsWhenIdleAsync(conversation: Conversation): Promise<boolean> {
     if (!this.readIdleCompaction() || conversation.sessionReset || !await this.isIdleAsync(conversation.id))
       return false;
-    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(conversation.id));
-    return !listed.some(t => t.status === BackgroundTaskStatus.Running);
+    return (await this.runningTasksAsync(conversation.id)).length === 0;
   }
 
   private runGroup(key: string, work: ReplyWork[], folder: WorkFolder, lease: string): void {
