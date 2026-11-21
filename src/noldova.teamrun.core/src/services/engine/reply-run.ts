@@ -112,6 +112,7 @@ export class ReplyRun implements ITurnListener {
   private steerTo: ((steer: TurnSteer) => Promise<boolean>) | null = null;
   private failedTurn: TurnResult | null = null;
   private stopNote: string | null = null;
+  private afterTurn: AbortSignal = new AbortController().signal;
   private readonly steerable: (() => Promise<void>) | null;
   private readonly account: string | null;
   private allOut: string | null = null;
@@ -183,8 +184,9 @@ export class ReplyRun implements ITurnListener {
         await this.appendDetailAsync(DetailKind.Note, note, { source: Resources.sharedMcpServersSource });
       const checkpoint = await this.captureAsync();
       const result = await adapter.runTurn(request, this, this.run.signal);
+      this.afterTurn = this.run.afterTurn();
       await this.toolCalls;
-      const compared = await this.reportChangesAsync(checkpoint);
+      const compared = await this.reportChangesAsync(checkpoint, this.afterTurn);
       await this.reportCommandWritesAsync();
       await this.reportCommandNotesAsync(compared);
       await this.completeAsync(result);
@@ -208,6 +210,7 @@ export class ReplyRun implements ITurnListener {
       await this.startAsync();
       this.writes = this.startWrites();
       const result = await wake.follow(this, this.run.signal);
+      this.afterTurn = this.run.afterTurn();
       await this.toolCalls;
       await this.reportCommandWritesAsync();
       await this.reportCommandNotesAsync(false);
@@ -484,11 +487,10 @@ export class ReplyRun implements ITurnListener {
     }
   }
 
-  private async reportChangesAsync(checkpoint: string | null): Promise<boolean> {
+  private async reportChangesAsync(checkpoint: string | null, signal: AbortSignal): Promise<boolean> {
     if (Object.isNull(checkpoint) || Object.isNull(this.checkpoints) || Object.isNull(this.folder))
       return false;
     const reported = new Set(ReplyRun.reportedFiles(this.message.details).map(t => CommandWrites.pathKey(t)));
-    const signal = this.run.afterTurn();
     let evidence: ReplyEvidence;
     try {
       evidence = await this.checkpoints.changesSinceAsync(this.folder, checkpoint, t => reported.has(CommandWrites.pathKey(t)), signal);
@@ -636,7 +638,7 @@ export class ReplyRun implements ITurnListener {
       return;
     }
     const interrupted = this.run.isCancelled ? MessageStatus.Cancelled : MessageStatus.Interrupted;
-    const status = result.outcome === TurnOutcome.Completed ? MessageStatus.Completed : interrupted;
+    const status = result.outcome === TurnOutcome.Completed && !this.afterTurn.aborted ? MessageStatus.Completed : interrupted;
     if (status === MessageStatus.Completed)
       await this.notePlanFromAnswerAsync();
     if (status === MessageStatus.Cancelled && !Object.isNull(this.stopNote))
@@ -749,7 +751,7 @@ export class ReplyRun implements ITurnListener {
       await this.approvals.updateAsync(approval.withCancellation(ReplyRun.now()));
       return await decision;
     }
-    if (!this.finished)
+    if (this.isTurnOpen)
       await this.updateAsync(this.message.withStatus(MessageStatus.AwaitingApproval, null));
     this.events.publish(new Event(EventName.ApprovalCreated, approval.toJson()));
     const withdrawals: Promise<void>[] = [];
@@ -768,7 +770,7 @@ export class ReplyRun implements ITurnListener {
       signal?.removeEventListener(Resources.abortEvent, withdraw);
       await Promise.all(withdrawals);
     }
-    if (!this.finished && !this.run.isAwaitingDecision)
+    if (this.isTurnOpen && !this.run.isAwaitingDecision)
       await this.updateAsync(this.message.withStatus(MessageStatus.Running, null));
     return decided;
   }
@@ -779,8 +781,12 @@ export class ReplyRun implements ITurnListener {
     const cancelled = approval.withCancellation(ReplyRun.now());
     await this.approvals.updateAsync(cancelled);
     this.events.publish(new Event(EventName.ApprovalUpdated, cancelled.toJson()));
-    if (!this.finished && !this.run.isAwaitingDecision)
+    if (this.isTurnOpen && !this.run.isAwaitingDecision)
       await this.updateAsync(this.message.withStatus(MessageStatus.Running, null));
+  }
+
+  private get isTurnOpen(): boolean {
+    return !this.finished && Object.isNull(this.message.endedAt);
   }
 
   private async endAsync(): Promise<void> {

@@ -13,6 +13,7 @@ LICENSE file in the root directory of this source tree.
   </div>
   <span class="spacer"></span>
   <div class="tools">
+    <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
     <div class="status-key" role="group" [attr.aria-label]="resources.organizationStatusKeyLabel">
       @for (status of resources.organizationStatusKey; track status) {
         <nol-teamrun-teammate-status [status]="status" />
@@ -50,31 +51,53 @@ LICENSE file in the root directory of this source tree.
     <button type="button" nol-button class="dismiss" [variant]="text" (click)="organization.clearActionError()">{{ resources.dismissLabel }}</button>
   </div>
 }
-<main class="chart">
-  <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
-    <div class="tree">
-      <div class="owner" nolCanvasItem>
-        <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
-        <div class="who">
-          <span class="name">{{ resources.organizationOwnerName }}</span>
-          <span class="role">{{ ownerRole() }}</span>
-        </div>
-      </div>
-      @if (tree().length > 0 || editing()) {
-        <div class="kids">
-          @for (node of tree(); track node.department.id) {
-            <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" />
-          }
-          @if (editing()) {
-            <div class="kid">
-              <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
-                class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
+<div class="body">
+  <main class="chart" [class.focused]="mode() === modes.Focus">
+    @if (mode() === modes.Focus) {
+      <nol-teamrun-organization-focus class="focus" [tree]="tree()" [editing]="editing()" />
+    } @else {
+      <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
+        @if (mode() === modes.Board) {
+          <nol-teamrun-organization-board [tree]="tree()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
+        } @else {
+          <div class="tree">
+            <div class="owner" nolCanvasItem>
+              <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
+              <div class="who">
+                <span class="name">{{ resources.organizationOwnerName }}</span>
+                <span class="role">{{ ownerRole() }}</span>
+              </div>
             </div>
-          }
-        </div>
-      } @else {
-        <p class="empty">{{ resources.organizationEmpty }}</p>
-      }
-    </div>
-  </nol-canvas>
-</main>
+            @if (tree().length > 0 || editing()) {
+              <div class="kids">
+                @for (node of tree(); track node.department.id) {
+                  <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
+                }
+                @if (editing()) {
+                  <div class="kid">
+                    <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
+                      class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty">{{ resources.organizationEmpty }}</p>
+            }
+          </div>
+        }
+      </nol-canvas>
+    }
+  </main>
+  @if (mode() !== modes.Focus) {
+    <aside class="messages" [class.inbox]="mode() === modes.Board" [attr.aria-label]="resources.organizationMessagesLabel">
+      <nol-teamrun-organization-messages class="thread" [shape]="mode() === modes.Board ? shapes.Inbox : thread" [target]="target()" (targetChange)="chosen.set($event)">
+        @if (mode() === modes.Tree) {
+          <div class="to" nolTeamrunOrganizationTo>
+            <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
+            <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
+          </div>
+        }
+      </nol-teamrun-organization-messages>
+    </aside>
+  }
+</div>

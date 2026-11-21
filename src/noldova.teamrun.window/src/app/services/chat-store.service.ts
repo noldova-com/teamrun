@@ -1591,6 +1591,10 @@ export class ChatStoreService {
     }, report);
   }
 
+  public acpAgentFailed(action: ChatAction.AddAcpAgent | ChatAction.RemoveAcpAgent, target: string, name: string): (message: string) => void {
+    return this.actionFailed(action, target, null, NotificationSeverity.Error, () => Resources.formatAcpAgentActionTitle(action, name));
+  }
+
   public async removeAcpAgent(id: string, report: (message: string) => void): Promise<boolean> {
     return this.perform(async () => {
       await this.request(MethodName.AcpAgentRemove, new AcpAgentIdParams(id).toJson());

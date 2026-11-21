@@ -23,8 +23,9 @@ import {
   ConversationMemberParams,
   ConversationMoveParams,
   DetailKind,
+  EventName,
   Harness,
-  type Message,
+  Message,
   MessageAuthor,
   MessageIdParams,
   MessageListParams,
@@ -339,6 +340,30 @@ export class WakeRepliesTests {
 
     Assert.isTrue(interrupts > 0);
     Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(shown.id))?.status);
+  }
+
+  @TestMethod
+  public async cancelsAWakeReplyStoppedAfterItsCompletedWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const stops: Promise<Message>[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
+        if (message?.status === MessageStatus.Completed && stops.length === 0)
+          stops.push(host.engine.cancelAsync(new MessageIdParams(message.id)));
+      }
+    });
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+    const stopped = await Promise.all(stops);
+
+    Assert.areEqual(1, stopped.length);
+    Assert.areEqual(MessageStatus.Cancelled, stopped[0]?.status);
   }
 
   @TestMethod

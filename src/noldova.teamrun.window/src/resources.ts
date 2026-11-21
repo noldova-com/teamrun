@@ -16,6 +16,7 @@ import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
 import { BrowserStepPhase } from "./app/enums/browser-step-phase";
 import { ChatAction } from "./app/enums/chat-action";
 import { ImageOpenMode } from "./app/enums/image-open-mode";
+import { OrganizationBoardSort } from "./app/enums/organization-board-sort";
 import { OrganizationCardField } from "./app/enums/organization-card-field";
 import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
@@ -1149,6 +1150,8 @@ export class Resources {
     [ChatAction.CancelInstall]: "Couldn't cancel the install",
     [ChatAction.RemoveProvider]: "Couldn't remove the provider",
     [ChatAction.InstallTool]: "Couldn't install the provider's tool",
+    [ChatAction.AddAcpAgent]: "Couldn't add the ACP agent",
+    [ChatAction.RemoveAcpAgent]: "Couldn't remove the ACP agent",
     [ChatAction.OpenPage]: "Couldn't open the page",
     [ChatAction.OpenBrowser]: "Couldn't open the Browser",
     [ChatAction.SaveTeammate]: "Couldn't save the teammate",
@@ -1220,10 +1223,24 @@ export class Resources {
   public static readonly organizationNowIdleIcon: string = "pause_circle";
   public static readonly organizationNothingRunning: string = "Nothing running";
   public static readonly organizationNowReplying: string = "Replying";
+  public static readonly organizationDetailsStatus: string = "Status";
+  public static readonly organizationDetailsReportsTo: string = "Reports to";
+  public static readonly organizationDetailsModel: string = "Model";
+  public static readonly organizationDetailsUsage: string = "Usage";
+  public static readonly organizationDetailsLastSaid: string = "Last said";
+  public static readonly organizationDetailsNow: string = "Now";
+  public static readonly organizationDetailsNoUsage: string = "Not reported";
+  public static readonly organizationDetailsNothingSaid: string = "Nothing yet";
+  public static readonly organizationMessagesLabel: string = "Messages";
+  public static readonly organizationMessageButton: string = "Message";
+  public static readonly organizationMessageIcon: string = "chat";
+  public static readonly organizationToLabel: string = "To";
   public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
   public static readonly organizationRemoveLabel: string = "Remove";
+  public static readonly organizationRemoveDepartment: string = "Remove department";
+  public static readonly organizationRemoveTeammate: string = "Remove teammate";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
     [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Last,
       OrganizationCardField.Model, OrganizationCardField.Git, OrganizationCardField.PullRequests, OrganizationCardField.Documents, OrganizationCardField.Artifacts];
@@ -1720,6 +1737,34 @@ export class Resources {
   public static readonly fallbackUpSelector: string = ".nol-teamrun-fallback-up";
   public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
+  public static readonly organizationBoardLeadersTitle: string = "Leaders";
+  public static readonly organizationBoardLeadersNote: string = "They talk across departments; you lead them.";
+  public static readonly organizationBoardMessageLeaders: string = "Message all leaders";
+  public static readonly organizationBoardMessageLeadersIcon: string = "forum";
+  public static readonly organizationBoardDepartmentsTitle: string = "Departments";
+  public static readonly organizationBoardDepartmentsNote: string = "Each column's members, sorted by who needs you first.";
+  public static readonly organizationBoardMessageIcon: string = "chat";
+  public static readonly organizationBoardNoMembers: string = "No members yet.";
+  public static readonly organizationBoardNeedsTitle: string = "Needs you";
+  public static readonly organizationBoardNeedsIcon: string = "pan_tool";
+  public static readonly organizationBoardNobodyWaiting: string = "Nobody is waiting for you.";
+  public static readonly organizationBoardAnswer: string = "Answer";
+  public static readonly organizationBoardOpen: string = "Open";
+  public static readonly organizationBoardMessage: string = "Message";
+  public static readonly organizationBoardSortLabels: Readonly<Record<OrganizationBoardSort, string>> = {
+    [OrganizationBoardSort.Status]: "Status",
+    [OrganizationBoardSort.Name]: "Name"
+  };
+  public static readonly organizationFocusOutlineLabel: string = "Organization outline";
+  public static readonly organizationFocusStructure: string = "Structure";
+  public static readonly organizationFocusRootIcon: string = "domain";
+  public static readonly organizationFocusDepartmentIcon: string = "groups";
+  public static readonly organizationFocusShowIcon: string = "chevron_right";
+  public static readonly organizationFocusHideIcon: string = "expand_more";
+  public static readonly organizationFocusCrumbIcon: string = "chevron_right";
+  public static readonly organizationFocusLeads: string = "leads";
+  public static readonly organizationFocusUnitLabel: string = "Focused unit";
+  public static readonly organizationFocusNobody: string = "Nobody here yet.";
 
   public static formatTeammateWorkSummary(pullRequests: number, documents: number, artifacts: number, branch: string | null): string {
     const counts = [Resources.formatCount(pullRequests, "pull request", "pull requests"), Resources.formatCount(documents, "document", "documents"),
@@ -1832,6 +1877,15 @@ export class Resources {
     return `Choose what ${name}'s card shows`;
   }
 
+  public static formatOrganizationRoleIn(role: string | null, department: string | null): string | null {
+    const parts = [role, department].filter(t => !Object.isNull(t) && t.length > 0);
+    return parts.length === 0 ? null : parts.join(" · ");
+  }
+
+  public static formatOrganizationNowOf(name: string): string {
+    return `What ${name} is doing now`;
+  }
+
   public static formatOrganizationNowFor(milliseconds: number, more: number): string {
     const seconds = Math.max(0, Math.floor(milliseconds / 1000));
     const lasted = seconds < 60 ? `${seconds} s` : seconds < 3600 ? `${Math.floor(seconds / 60)} min`
@@ -1849,6 +1903,14 @@ export class Resources {
 
   public static formatOrganizationModel(model: string, effort: string | null): string {
     return [model, effort].filter(t => !Object.isNull(t)).join(Resources.titleSeparator);
+  }
+
+  public static formatOrganizationDetailsLabel(name: string): string {
+    return `${name}'s details`;
+  }
+
+  public static formatOrganizationDetailsUsage(used: number, limit: string): string {
+    return `${Resources.formatOrganizationUsage(used)} used${Resources.titleSeparator}${limit}`;
   }
 
   public static formatRemove(entry: string): string {
@@ -2012,6 +2074,18 @@ export class Resources {
     return `Every teammate (${count})`;
   }
 
+  public static formatOrganizationMessageNamed(name: string): string {
+    return `Message ${name}`;
+  }
+
+  public static formatOrganizationDepartmentOption(name: string): string {
+    return `${name} (department)`;
+  }
+
+  public static formatOrganizationLeaderOption(name: string, department: string): string {
+    return `${name} (leads ${department})`;
+  }
+
   public static formatOrganizationPlaceholder(title: string): string {
     return `Message ${title}`;
   }
@@ -2110,6 +2184,10 @@ export class Resources {
 
   public static formatTeammateError(name: string, error: string): string {
     return `@${name}: ${error}`;
+  }
+
+  public static formatAcpAgentActionTitle(action: ChatAction.AddAcpAgent | ChatAction.RemoveAcpAgent, name: string): string {
+    return action === ChatAction.AddAcpAgent ? `Couldn't add ${name}` : `Couldn't remove ${name}`;
   }
 
   public static formatProviderActionTitle(action: ProviderAction, name: string | null): string {
@@ -3102,6 +3180,54 @@ export class Resources {
 
   public static formatLowRiskLine(requester: string, steps: readonly string[]): string {
     return `${Resources.lowRiskLead}${requester} ${steps.join(Resources.browserStepSeparator)}`;
+  }
+
+  public static formatOrganizationBoardMessage(name: string): string {
+    return `Message ${name}`;
+  }
+
+  public static formatOrganizationBoardAnswer(action: string, name: string): string {
+    return `${action} ${name}`;
+  }
+
+  public static formatOrganizationBoardAskAgo(endedAt: number, now: number): string {
+    return `· ${Resources.formatAgo(Math.floor((now - endedAt) / Resources.minuteMilliseconds))}`;
+  }
+
+  public static formatOrganizationBoardSort(name: string): string {
+    return `Sort ${name} by`;
+  }
+
+  public static formatOrganizationBoardSummary(leader: string | null, counts: ReadonlyMap<TeammateStatus, number>): string {
+    return [...Object.isNull(leader) ? [] : [`Led by ${leader}`], ...Resources.statusCountParts(counts)].join(" · ");
+  }
+
+  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
+    return [`Your ${count} ${count === 1 ? "leader" : "leaders"}`, ...Resources.statusCountParts(counts)].join(" · ");
+  }
+
+  public static formatOrganizationFocusDepartment(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
+    return [`${count} ${count === 1 ? "teammate" : "teammates"}`, ...Resources.statusCountParts(counts)].join(" · ");
+  }
+
+  public static formatOrganizationFocusTeammate(role: string | null, department: string, model: string | null): string {
+    return [Object.isNull(role) ? department : `${role} in ${department}`, ...Object.isNull(model) ? [] : [model]].join(" · ");
+  }
+
+  public static formatOrganizationFocusAddMember(name: string): string {
+    return `Add a member to ${name}`;
+  }
+
+  public static formatOrganizationFocusAsks(count: number): string {
+    return `${count} need you`;
+  }
+
+  public static formatOrganizationFocusToggle(isOpen: boolean, name: string): string {
+    return `${isOpen ? "Hide" : "Show"} ${name}'s teammates`;
+  }
+
+  private static statusCountParts(counts: ReadonlyMap<TeammateStatus, number>): readonly string[] {
+    return Object.values(TeammateStatus).flatMap(t => (counts.get(t) ?? 0) > 0 ? [`${counts.get(t)} ${Resources.teammateStatusLabels[t].toLowerCase()}`] : []);
   }
 
   private static browserStep(words: readonly [string, string, string], phase: BrowserStepPhase, notes: readonly (string | null)[]): string {
