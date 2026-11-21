@@ -16,6 +16,7 @@ import { DialogService, DialogTokens, ThemeMode } from "@noldova/ui.components.a
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { RewindDialogComponent } from "../../../../src/app/components/rewind-dialog/rewind-dialog.component";
+import type { RewoundDraft } from "../../../../src/app/models/rewound-draft";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
@@ -32,6 +33,7 @@ describe("RewindDialogComponent", () => {
   let store: ChatStoreService;
   let fixture: ComponentFixture<RewindDialogComponent>;
   let closes: number;
+  let draftsAtClose: (RewoundDraft | null)[];
 
   const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const settle = async (): Promise<void> => {
@@ -81,7 +83,11 @@ describe("RewindDialogComponent", () => {
     fixture.componentRef.setInput("store", store);
     fixture.componentRef.setInput("message", message);
     closes = 0;
-    fixture.componentInstance.closed.subscribe(() => closes++);
+    draftsAtClose = [];
+    fixture.componentInstance.closed.subscribe(() => {
+      closes++;
+      draftsAtClose.push(store.rewoundDraft());
+    });
     fixture.autoDetectChanges();
     await settle();
   };
@@ -90,7 +96,7 @@ describe("RewindDialogComponent", () => {
     ChatStoreService.release(context);
   });
 
-  it("says what a rewind removes, restores the files by default, then rewinds from the message and closes", async () => {
+  it("says what a rewind removes, restores the files by default, then rewinds from the message, closes, and only then offers the message back", async () => {
     await create(t => t.answer(MethodName.ConversationRewind, () => rewound().toJson()));
 
     expect(element().querySelector(".nol-dialog-title")?.textContent).toBe(Resources.rewindTitle);
@@ -104,7 +110,7 @@ describe("RewindDialogComponent", () => {
 
     expect(context.parametersOf(MethodName.ConversationRewind)).toEqual(new ConversationRewindParams("c1", "m1", true).toJson());
     expect(ids()).toEqual([]);
-    expect(closes).toBe(1);
+    expect([closes, draftsAtClose, store.rewoundDraft()?.conversationId]).toEqual([1, [null], "c1"]);
   });
 
   it("is described by what a rewind removes and keeps, under the title, when Rewind takes the first focus", async () => {
@@ -170,7 +176,7 @@ describe("RewindDialogComponent", () => {
     expect(field("nol-field-message").textContent?.trim()).toBe("A reply in this conversation is in progress.");
     expect(context.noticeText()).toBeNull();
     expect(ids()).toEqual(["m1", "m2"]);
-    expect(closes).toBe(0);
+    expect([closes, store.rewoundDraft()]).toEqual([0, null]);
     expect(field<HTMLButtonElement>(".nol-teamrun-confirm").disabled).toBe(false);
   });
 

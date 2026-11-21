@@ -139,6 +139,7 @@ import { SustainAttempts } from "../sustain/sustain-attempts.js";
 import { HandoverSummaries } from "../sustain/handover-summaries.js";
 import { ProjectActivity } from "../projects/project-activity.js";
 import { OrganizationService } from "../organization/organization.service.js";
+import { OrganizationChatOpening } from "../../models/organization-chat-opening.js";
 import { EngineServices } from "./engine-services.js";
 import { KeptSessions } from "./kept-sessions.js";
 import { McpToolCalls } from "./mcp-tool-calls.js";
@@ -420,14 +421,14 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   public async openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation> {
     const teammate = await this.requireTeammateAsync(chat.teammateId);
-    const [opened, made] = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<readonly [Conversation, boolean]> => {
+    const opening = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const known = await this.conversations.findOrganizationChatAsync(chat, transaction);
-      return Object.isNull(known) ? [await this.conversations.createAsync(new ConversationCreateParams(null, Resources.formatOrganizationChatTitle(teammate.name),
-        teammate.id), transaction, chat), true] : [known, false];
+      return Object.isNull(known) ? new OrganizationChatOpening(await this.conversations.createAsync(new ConversationCreateParams(null,
+        Resources.formatOrganizationChatTitle(teammate.name), teammate.id), transaction, chat), true) : new OrganizationChatOpening(known, false);
     });
-    if (made)
+    if (opening.made)
       this.events.publish(new Event(EventName.StateInvalidated, null));
-    return opened;
+    return opening.conversation;
   }
 
   public listOutsideChatsAsync(): Promise<readonly JsonObject[]> {
@@ -1150,6 +1151,18 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return (mode === requested.mode ? requested : new RequestedSettings(requested.kind, requested.model, requested.effort, requested.speed, mode, false,
       requested.contextWindow))
       .withPlanFirst(planFirst);
+  }
+
+  private async wakeRequestedAsync(source: Message, requested: RequestedSettings, transaction?: SqlTransaction): Promise<RequestedSettings> {
+    const mode = Object.isNull(source.teammateId) ? await this.responderModeAsync(source.conversationId, requested, transaction)
+      : (await this.startedRequestedAsync(source, transaction)).mode;
+    return mode === requested.mode ? requested
+      : new RequestedSettings(requested.kind, requested.model, requested.effort, requested.speed, mode, requested.planFirst, requested.contextWindow);
+  }
+
+  private async responderModeAsync(conversationId: string, requested: RequestedSettings, transaction?: SqlTransaction): Promise<string | null> {
+    const chosen = (await this.conversations.findAsync(conversationId, transaction))?.responder?.requested ?? null;
+    return Object.isNull(chosen) || chosen.kind !== requested.kind ? requested.mode : chosen.mode;
   }
 
   private async plansFirstAsync(conversationId: string, kind: string, teammateId: string | null, transaction?: SqlTransaction): Promise<boolean> {
@@ -1901,8 +1914,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     };
     const note = new MessageDetail(0, DetailKind.Note, wake.compaction ? Resources.idleCompactionNote : Resources.formatWakeNote(wake.command), payload, now);
     const token = randomBytes(Resources.senderTokenBytes).toString("base64url");
-    const turn = new WakeTurn(SenderEnvironment.of(token), await this.plansFirstAsync(source.conversationId, provenance.requested.kind, source.teammateId),
-      t => this.adoptSender(t, token));
+    const requested = await this.wakeRequestedAsync(source, provenance.requested);
+    const turn = new WakeTurn(SenderEnvironment.of(token), await this.plansFirstAsync(source.conversationId, requested.kind, source.teammateId),
+      t => this.adoptSender(t, token), requested.mode);
     const hop = this.replyHops.get(source.conversationId)?.get(source.id);
     if (Object.isUndefined(hop) || this.state.closing)
       return null;
@@ -1918,7 +1932,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         return null;
       const created = new Message(Guid.createVersion7().toString(), source.conversationId, await this.messages.nextSequenceAsync(source.conversationId, transaction),
         MessageAuthor.Provider, source.id, MessageStatus.Pending, [note],
-        new Provenance(provider?.id ?? null, provenance.requested, new ObservedSettings(null, null, null, null), null, false),
+        new Provenance(provider?.id ?? null, requested, new ObservedSettings(null, null, null, null), null, false),
         now, null, null, [], teammate?.id ?? null, teammate?.name ?? null);
       await this.messages.insertAsync(created, transaction);
       return created;
@@ -2351,7 +2365,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const teammate = Object.isNull(source.teammateId) ? null : await this.teammates.findAsync(source.teammateId, transaction);
     let work: ReplyWork | null;
     try {
-      work = await this.prepareReplyAsync(teammate, provenance.requested, provenance.providerId, trigger, sequence, createdAt, hop, null, null, transaction);
+      work = await this.prepareReplyAsync(teammate, await this.wakeRequestedAsync(source, provenance.requested, transaction), provenance.providerId, trigger,
+        sequence, createdAt, hop, null, null, transaction);
     }
     catch (error) {
       if (!(error instanceof ServiceException))

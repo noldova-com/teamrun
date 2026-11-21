@@ -6581,6 +6581,27 @@ export declare class ForkRequest {
 }
 
 /**
+ * A teammate's Organization chat as the engine found or made it.
+ */
+export declare class OrganizationChatOpening {
+  /**
+   * The chat.
+   */
+  public readonly conversation: Conversation;
+  /**
+   * Whether the engine made the chat rather than finding it.
+   */
+  public readonly made: boolean;
+
+  /**
+   * Initializes the opening.
+   * @param conversation The chat.
+   * @param made Whether the engine made it.
+   */
+  public constructor(conversation: Conversation, made: boolean);
+}
+
+/**
  * The reply to an outside message, as the outside session reads it.
  */
 export declare class OutsideReply {
@@ -6739,11 +6760,18 @@ export declare class WakeTurn implements ITurnListener {
   public readonly planFirst: boolean;
 
   /**
+   * The id of the mode the chat holds for the reply's member when the turn begins, which the provider runs the turn in; `null` keeps the
+   * session's last mode.
+   */
+  public readonly mode: string | null;
+
+  /**
    * @param environment The variables with the turn's sender token.
    * @param planFirst Whether the reply's member plans first when the turn begins.
    * @param adoptSender Routes another sender token to the turn's reply until it ends; refuses every token by default.
+   * @param mode The id of the mode the chat holds for the reply's member when the turn begins, or `null` (the default).
    */
-  public constructor(environment: Readonly<Record<string, string>>, planFirst?: boolean, adoptSender?: (token: string) => boolean);
+  public constructor(environment: Readonly<Record<string, string>>, planFirst?: boolean, adoptSender?: (token: string) => boolean, mode?: string | null);
 
   /**
    * Routes the sender token of the turn whose process runs this one, which that process's environment still holds, to this turn's reply until the reply

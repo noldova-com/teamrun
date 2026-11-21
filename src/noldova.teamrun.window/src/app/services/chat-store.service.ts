@@ -1396,11 +1396,14 @@ export class ChatStoreService {
       this.applyRewound(new ConversationRewoundPayload(conversationId, fromSequence));
       const removed = new Set(result.removedMessageIds);
       this.approvalsSignal.update(t => t.filter(u => !removed.has(u.messageId)));
-      if (target.author === MessageAuthor.User)
-        this.rewoundDraftSignal.set(RewoundDraft.of(target));
     }, report);
 
     return result;
+  }
+
+  public offerRewoundDraft(target: Message): void {
+    if (target.author === MessageAuthor.User)
+      this.rewoundDraftSignal.set(RewoundDraft.of(target));
   }
 
   public clearRewoundDraft(): void {

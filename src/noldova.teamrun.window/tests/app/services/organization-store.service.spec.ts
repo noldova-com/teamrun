@@ -127,11 +127,11 @@ describe("OrganizationStoreService", () => {
   });
 
   it("asks the runtime for each change to the departments in its own words, and says nothing went wrong", async () => {
-    const asked: [string, JsonValue][] = [];
+    const asked: string[] = [];
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => Organization.empty.toJson());
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMove, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet])
       context.answer(method, t => {
-        asked.push([method, t]);
+        asked.push(`${method} ${JSON.stringify(t)}`);
         return null;
       });
     const store = OrganizationStoreService.of(context);
@@ -142,14 +142,14 @@ describe("OrganizationStoreService", () => {
 
     expect([done, store.actionError()]).toEqual([new Array<boolean>(8).fill(true), null]);
     expect(asked).toEqual([
-      [MethodName.DepartmentCreate, { name: "Design", parentId: null }],
-      [MethodName.DepartmentUpdate, { departmentId: "d1", name: "Craft" }],
-      [MethodName.DepartmentUpdate, { departmentId: "d1", leaderId: "t1" }],
-      [MethodName.DepartmentUpdate, { departmentId: "d1", leaderId: null }],
-      [MethodName.DepartmentMove, { departmentId: "d1", parentId: "d2", order: 1 }],
-      [MethodName.DepartmentDelete, { departmentId: "d1" }],
-      [MethodName.DepartmentMemberSet, { teammateId: "t1", departmentId: "d2" }],
-      [MethodName.DepartmentMemberSet, { teammateId: "t1", departmentId: null }]
+      `${MethodName.DepartmentCreate} {"name":"Design","parentId":null}`,
+      `${MethodName.DepartmentUpdate} {"departmentId":"d1","name":"Craft"}`,
+      `${MethodName.DepartmentUpdate} {"departmentId":"d1","leaderId":"t1"}`,
+      `${MethodName.DepartmentUpdate} {"departmentId":"d1","leaderId":null}`,
+      `${MethodName.DepartmentMove} {"departmentId":"d1","parentId":"d2","order":1}`,
+      `${MethodName.DepartmentDelete} {"departmentId":"d1"}`,
+      `${MethodName.DepartmentMemberSet} {"teammateId":"t1","departmentId":"d2"}`,
+      `${MethodName.DepartmentMemberSet} {"teammateId":"t1","departmentId":null}`
     ]);
   });
 

@@ -73,7 +73,7 @@ import {
   WaitingMessageEditParams,
   WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
-import { ClipboardWriter, DefaultTheme, MentionValue, ThemeMode, TooltipDirective } from "@noldova/ui.components.angular";
+import { ClipboardWriter, DefaultTheme, DialogService, MentionValue, ThemeMode, TooltipDirective } from "@noldova/ui.components.angular";
 import { AppearanceFixture, ClipboardWriterFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { page, userEvent } from "vitest/browser";
 
@@ -95,6 +95,7 @@ import { PlanUsageStatus } from "../../../../src/app/services/plan-usage-status"
 import { TimeFormatService } from "../../../../src/app/services/time-format.service";
 import { UsageFormatterService } from "../../../../src/app/services/usage-formatter.service";
 import { Resources } from "../../../../src/resources";
+import { RewindDialogComponent } from "../../../../src/app/components/rewind-dialog/rewind-dialog.component";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
@@ -3376,6 +3377,7 @@ describe("ComposerComponent", () => {
       await type("first, changed");
 
       await ChatStoreService.of(context).rewind(SampleData.userMessage, false);
+      ChatStoreService.of(context).offerRewoundDraft(SampleData.userMessage);
       await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
       document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
       await fixture.whenStable();
@@ -4602,6 +4604,7 @@ describe("ComposerComponent", () => {
         await render();
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(box().value).toBe(rewound);
@@ -4623,6 +4626,7 @@ describe("ComposerComponent", () => {
         await render();
 
         await store.rewind(mentioned, false);
+        store.offerRewoundDraft(mentioned);
         await fixture.whenStable();
 
         expect([box().value, document.querySelectorAll(".nol-mention-chip").length]).toEqual(["Ask @Alice", 0]);
@@ -4639,6 +4643,7 @@ describe("ComposerComponent", () => {
         await type("mine");
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(title()).toBe(Resources.replaceDraftTitle);
@@ -4661,6 +4666,7 @@ describe("ComposerComponent", () => {
         const dispose = vi.spyOn(ComposerAttachment.prototype, "dispose");
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(title()).toBe(Resources.replaceDraftTitle);
@@ -4684,6 +4690,7 @@ describe("ComposerComponent", () => {
         await render();
 
         await store.rewind(pictured, false);
+        store.offerRewoundDraft(pictured);
 
         await Wait.until(() => expect(previews()[0]?.getAttribute("src")).toBe(`data:image/png;base64,${pixels()}`));
         expect(reads()).toEqual([new AttachmentReadParams("c1", "D:/data/attachments/drafts/c1/shot.png")]);
@@ -4700,6 +4707,7 @@ describe("ComposerComponent", () => {
         await Wait.until(() => expect(context.count(MethodName.AttachmentPrepare)).toBe(1));
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(title()).toBeUndefined();
@@ -4710,11 +4718,53 @@ describe("ComposerComponent", () => {
         expect([...rows()].map(t => t.textContent)).toEqual([expect.stringContaining("notes.txt")]);
       });
 
+      it("takes a rewind confirmed with the keyboard once its dialog has closed, into an empty box with the focus, or asks to replace a draft only then, the focus back in the box either way", async () => {
+        const store = await prepare();
+        await render();
+        const dialogs = (): number => document.querySelectorAll("nol-dialog").length;
+        const rewindByKeyboard = async (): Promise<void> => {
+          const opener = document.body.appendChild(document.createElement("button"));
+          opener.focus();
+          const dialog = TestBed.inject(DialogService).open(RewindDialogComponent, ".nol-teamrun-confirm");
+          dialog.componentRef?.setInput("store", store);
+          dialog.componentRef?.setInput("message", asked);
+          dialog.componentInstance?.closed.subscribe(() => {
+            opener.remove();
+            dialog.close();
+          });
+          await Wait.until(() => expect(document.activeElement?.classList.contains("nol-teamrun-confirm")).toBe(true));
+          await userEvent.keyboard("{Enter}");
+        };
+
+        await rewindByKeyboard();
+        await Wait.until(() => expect(box().value).toBe(rewound));
+        await fixture.whenStable();
+        expect([document.activeElement === box(), dialogs(), store.rewoundDraft()]).toEqual([true, 0, null]);
+
+        await type("mine");
+        await rewindByKeyboard();
+        await Wait.until(() => expect(title()?.trim()).toBe(Resources.replaceDraftTitle));
+        document.querySelector<HTMLButtonElement>(".nol-teamrun-cancel")?.click();
+        await Wait.until(() => expect(dialogs()).toBe(0));
+        await fixture.whenStable();
+        const kept = [box().value, document.activeElement === box(), store.rewoundDraft()];
+
+        await rewindByKeyboard();
+        await Wait.until(() => expect(title()?.trim()).toBe(Resources.replaceDraftTitle));
+        const asking = [dialogs(), box().value];
+        document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
+        await Wait.until(() => expect(box().value).toBe(rewound));
+        await fixture.whenStable();
+
+        expect([kept, asking, document.activeElement === box(), dialogs()]).toEqual([["mine", true, null], [1, "mine"], true, 0]);
+      });
+
       it("keeps the rewound message for its own conversation until the composer shows it", async () => {
         const store = await prepare();
         await render("c2");
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(box().value).toBe("");
@@ -4730,6 +4780,7 @@ describe("ComposerComponent", () => {
         await render();
         await type("mine");
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         fixture.componentRef.setInput("conversationId", "c2");
