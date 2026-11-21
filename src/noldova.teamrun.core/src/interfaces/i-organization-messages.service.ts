@@ -6,11 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { MessageIdParams, OrganizationMessage, OrganizationMessageSendParams } from "@noldova/teamrun.protocol";
+import type { Message, MessageIdParams, OrganizationMessage, OrganizationMessageSendParams } from "@noldova/teamrun.protocol";
 
 export interface IOrganizationMessagesService {
   listAsync(): Promise<readonly OrganizationMessage[]>;
   sendAsync(params: OrganizationMessageSendParams): Promise<OrganizationMessage>;
   stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+  listRepliesAsync(params: MessageIdParams): Promise<readonly Message[]>;
   reconcileAsync(): Promise<void>;
 }

@@ -12,7 +12,7 @@ import { SqlQuery } from "@noldova/context.data.sql";
 import { JsonReader } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import {
-  ErrorCode, Event, EventName, MessageIdParams, MessageStatus, type Organization, OrganizationMessage, type OrganizationMessageSendParams,
+  ErrorCode, Event, EventName, type Message, MessageIdParams, MessageStatus, type Organization, OrganizationMessage, type OrganizationMessageSendParams,
   OrganizationRecipient, OrganizationRecipientState, type OrganizationTarget, OrganizationTargetKind, type Teammate
 } from "@noldova/teamrun.protocol";
 
@@ -80,6 +80,12 @@ export class OrganizationMessagesService implements IOrganizationMessagesService
     const halted = new Set(waiting.map(t => t.inReplyTo));
     return halted.size === 0 ? message : await this.changeAsync(id,
       t => t.state === OrganizationRecipientState.Started && halted.has(t.messageId) ? t.with(OrganizationRecipientState.Stopped) : t);
+  }
+
+  public async listRepliesAsync(params: MessageIdParams): Promise<readonly Message[]> {
+    const message = await this.requireAsync(params.messageId);
+    const sent = await Promise.all(message.recipients.map(t => Object.isNull(t.messageId) ? null : this.messages.findAsync(t.messageId)));
+    return (await Promise.all(sent.filter(t => !Object.isNull(t)).map(t => this.messages.listRepliesToAsync(t)))).flat();
   }
 
   public async reconcileAsync(): Promise<void> {

@@ -22,6 +22,7 @@ export interface IMessagesService {
   findAttachmentAsync(conversationId: string, path: string, transaction?: SqlTransaction): Promise<MessageAttachment | null>;
   findCheckpointAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
   findCheckpointFolderAsync(messageId: string, transaction?: SqlTransaction): Promise<string | null>;
+  listRepliesToAsync(sent: Message): Promise<readonly Message[]>;
   listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
   listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
   listOpenAsync(transaction?: SqlTransaction): Promise<readonly Message[]>;

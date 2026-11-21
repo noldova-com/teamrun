@@ -1567,6 +1567,12 @@ export interface IMessagesService {
   listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
 
   /**
+   * Lists the replies in the sent message's chat that answer it, in chat order, walking the chat's messages after it.
+   * @param sent The message the replies answer.
+   */
+  listRepliesToAsync(sent: Message): Promise<readonly Message[]>;
+
+  /**
    * Lists each teammate's latest completed reply that has text, in any chat.
    */
   listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
@@ -3724,6 +3730,8 @@ export declare class Resources {
    * Selects a conversation's messages' JSON after a sequence, in sequence order: `conversationId`, `sequence`.
    */
   public static readonly selectMessagesByConversation: string;
+  /** Reads the messages after a sent one in its chat that answer it: its chat, its sequence and its id. */
+  public static readonly selectRepliesTo: string;
   /**
    * Selects one row when a conversation has an ended reply that ran a command: `conversationId`.
    */
@@ -7506,6 +7514,9 @@ export declare class MessagesService implements IMessagesService {
    */
   public listTeammateUsageAsync(): Promise<readonly TeammateUsage[]>;
 
+  /** @inheritdoc */
+  public listRepliesToAsync(sent: Message): Promise<readonly Message[]>;
+
   /**
    * Lists each teammate's latest completed reply that has text, in any chat, by the end of the reply and then the latest saved.
    * @returns One entry per teammate that has such a reply, by teammate id.
@@ -10010,6 +10021,12 @@ export interface IOrganizationMessagesService {
   stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
 
   /**
+   * Lists the replies to the message: for each recipient its message reached, the replies in its chat that answer the message it was sent, in chat order.
+   * @throws ServiceException `NotFound` for an unknown message.
+   */
+  listRepliesAsync(params: MessageIdParams): Promise<readonly Message[]>;
+
+  /**
    * After a restart, marks every recipient still `Queued` `Failed` with `Resources.organizationSendInterrupted`; run once the engine has reconciled.
    */
   reconcileAsync(): Promise<void>;
@@ -10029,6 +10046,9 @@ export declare class OrganizationMessagesService implements IOrganizationMessage
 
   /** @inheritdoc */
   public stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+
+  /** @inheritdoc */
+  public listRepliesAsync(params: MessageIdParams): Promise<readonly Message[]>;
 
   /** @inheritdoc */
   public reconcileAsync(): Promise<void>;
