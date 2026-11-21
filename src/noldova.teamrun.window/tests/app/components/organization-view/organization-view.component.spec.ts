@@ -309,6 +309,8 @@ describe("OrganizationViewComponent", () => {
       element().style.height = "60rem";
       one(".top .edit").click();
       await settle();
+      one(".chart .nol-canvas-map-toggle").click();
+      await settle();
       one(".chart .nol-canvas-fit").click();
       await settle();
     };
@@ -319,7 +321,7 @@ describe("OrganizationViewComponent", () => {
       return found;
     };
     const dialogAsync = async (): Promise<string[]> => {
-      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-confirm")).not.toBeNull());
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-confirm")?.textContent?.trim()).toBeTruthy());
       return [inDialog(".nol-dialog-title").textContent?.trim() ?? "", inDialog("[nolDialogDescription]").textContent?.trim() ?? "",
         inDialog(".nol-teamrun-confirm").textContent?.trim() ?? ""];
     };
@@ -352,8 +354,9 @@ describe("OrganizationViewComponent", () => {
       return found;
     };
     const rename = async (name: string, value: string): Promise<void> => {
-      field(name).value = value;
-      field(name).dispatchEvent(new Event("change"));
+      const named = field(name);
+      named.value = value;
+      named.dispatchEvent(new Event("change"));
       await settle();
     };
 
