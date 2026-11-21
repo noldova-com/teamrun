@@ -3757,6 +3757,16 @@ export declare class Resources {
    */
   public static readonly selectTeammateLastReplies: string;
   /**
+   * The working folder of each chat a teammate answered in, one row for each of its completed replies, the latest ended first: it walks the
+   * last-reply index for the teammate, so it reads no other message and sorts nothing. Its one parameter is the teammate's id.
+   */
+  public static readonly selectTeammateChatFolders: string;
+  /**
+   * A teammate's completed replies whose JSON names a Markdown or text file, with each one's end and working folder, the latest ended first: it walks
+   * the last-reply index for the teammate, so it reads no other message and sorts nothing. Its one parameter is the teammate's id.
+   */
+  public static readonly selectTeammateDocumentReplies: string;
+  /**
    * Selects every message with a sub-agent still running, oldest first; the text search only narrows the rows the details are read from.
    */
   public static readonly selectRepliesWithRunningSubAgents: string;
