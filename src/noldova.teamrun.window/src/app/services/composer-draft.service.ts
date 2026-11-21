@@ -28,17 +28,27 @@ export class ComposerDraftService {
   private readonly saveInterval: number = inject(ComposerDraftService.interval);
   private readonly revisions: Map<string, number> = new Map();
   private readonly unread: Set<string> = new Set();
+  private readonly unreadable: Set<string> = new Set();
   private readonly arrivals: Map<string, number> = new Map();
   private readonly staleWatchers: Set<(conversationId: string) => void> = new Set();
-  private latest: ComposerDraft | null = null;
+  private readonly pending: Map<string, ComposerDraft> = new Map();
   private cancelSave: (() => void) | null = null;
   private writing: Promise<boolean> = Promise.resolve(true);
 
   public async restore(conversationId: string): Promise<Draft | null> {
     this.unread.add(conversationId);
-    await this.flush();
-    const draft = await this.store.readDraft(conversationId);
-    this.unread.delete(conversationId);
+    let draft: Draft | null;
+    try {
+      await this.flush();
+      draft = await this.store.readDraft(conversationId).catch((error: unknown) => {
+        this.unreadable.add(conversationId);
+        throw error;
+      });
+    }
+    finally {
+      this.unread.delete(conversationId);
+    }
+    this.unreadable.delete(conversationId);
     this.arrive(conversationId);
     if (Object.isNull(draft))
       this.revisions.delete(conversationId);
@@ -55,16 +65,16 @@ export class ComposerDraftService {
   public schedule(draft: ComposerDraft): void {
     if (this.unread.has(draft.conversationId))
       return;
-    this.latest = draft;
+    this.pending.set(draft.conversationId, draft);
     this.cancelSave ??= this.clock.after(this.saveInterval, () => void this.flush());
   }
 
   public flush(): Promise<boolean> {
     this.cancelSave?.();
     this.cancelSave = null;
-    const draft = this.latest;
-    this.latest = null;
-    this.writing = this.writing.then(() => Object.isNull(draft) ? true : this.write(draft));
+    const drafts = [...this.pending.values()];
+    this.pending.clear();
+    this.writing = this.writing.then(() => this.writeAll(drafts));
     return this.writing;
   }
 
@@ -74,8 +84,7 @@ export class ComposerDraftService {
   }
 
   public drop(conversationId: string): void {
-    if (this.latest?.conversationId === conversationId)
-      this.latest = null;
+    this.pending.delete(conversationId);
   }
 
   public arrivalsOf(conversationId: string): number {
@@ -83,15 +92,41 @@ export class ComposerDraftService {
   }
 
   public async discard(conversationId: string, arrivals: number = this.arrivalsOf(conversationId)): Promise<void> {
-    if (this.latest?.conversationId === conversationId)
-      this.latest = null;
+    this.pending.delete(conversationId);
     await this.writing;
     const revision = this.revisions.get(conversationId);
     if (!Object.isUndefined(revision) && arrivals === this.arrivalsOf(conversationId) && await this.store.discardDraft(conversationId, revision))
       this.revisions.delete(conversationId);
   }
 
+  private async writeAll(drafts: readonly ComposerDraft[]): Promise<boolean> {
+    let isSaved = true;
+    for (const draft of drafts)
+      isSaved = await this.write(draft) && isSaved;
+    return isSaved;
+  }
+
   private async write(draft: ComposerDraft): Promise<boolean> {
+    if (this.unreadable.has(draft.conversationId)) {
+      let kept: Draft | null;
+      try {
+        kept = await this.store.readDraft(draft.conversationId);
+      }
+      catch {
+        if (this.store.isDeleted(draft.conversationId)) {
+          this.unreadable.delete(draft.conversationId);
+          return true;
+        }
+        this.keep(draft);
+        return false;
+      }
+      this.unreadable.delete(draft.conversationId);
+      if (!Object.isNull(kept)) {
+        this.yieldTo(draft.conversationId);
+        return true;
+      }
+      this.revisions.delete(draft.conversationId);
+    }
     const prepared: MessageAttachment[] = [];
     const grant = (file: File): Promise<string> => this.store.grantFile(file);
     let saved: Draft | null;
@@ -107,11 +142,7 @@ export class ComposerDraftService {
     catch (error) {
       if (!(error instanceof DraftStaleException))
         throw error;
-      this.revisions.delete(draft.conversationId);
-      this.arrive(draft.conversationId);
-      this.drop(draft.conversationId);
-      for (const watcher of this.staleWatchers)
-        watcher(draft.conversationId);
+      this.yieldTo(draft.conversationId);
       return true;
     }
     finally {
@@ -121,12 +152,25 @@ export class ComposerDraftService {
     if (Object.isNull(saved) && this.store.isDeleted(draft.conversationId))
       return true;
     if (Object.isNull(saved)) {
-      this.latest ??= draft;
+      this.keep(draft);
       return false;
     }
     this.revisions.set(draft.conversationId, saved.revision);
     draft.attachments.forEach((t, index) => t.markSaved(saved.attachments[index]!));
     return true;
+  }
+
+  private keep(draft: ComposerDraft): void {
+    if (!this.pending.has(draft.conversationId))
+      this.pending.set(draft.conversationId, draft);
+  }
+
+  private yieldTo(conversationId: string): void {
+    this.revisions.delete(conversationId);
+    this.arrive(conversationId);
+    this.drop(conversationId);
+    for (const watcher of this.staleWatchers)
+      watcher(conversationId);
   }
 
   private arrive(conversationId: string): void {

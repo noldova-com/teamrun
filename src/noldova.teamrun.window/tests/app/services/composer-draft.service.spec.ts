@@ -9,7 +9,7 @@
 import { TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
-import { AttachmentInput, Draft, DraftSaveParams, ErrorCode, MessageAttachment, MethodName } from "@noldova/teamrun.protocol";
+import { AttachmentInput, ConversationIdParams, Draft, DraftSaveParams, ErrorCode, EventName, MessageAttachment, MethodName } from "@noldova/teamrun.protocol";
 
 import { DraftNotSavedException } from "../../../src/app/exceptions/draft-not-saved.exception";
 import { ComposerAttachment } from "../../../src/app/models/composer-attachment";
@@ -322,20 +322,96 @@ describe("ComposerDraftService", () => {
       .toEqual([FakeWindowPartContext.qualify(MethodName.DraftSave), FakeWindowPartContext.qualify(MethodName.DraftRead)]);
   });
 
-  it("rejects with the reason a stored draft could not be read, and saves nothing over it until a later read answers", async () => {
+  it("keeps nothing typed in a conversation while its draft is read, and saves what is typed once the read answers", async () => {
+    answerSaves();
+    const response = new DeferredResponse();
+    context.answer(MethodName.DraftRead, () => response.promise);
+    const restoring = drafts.restore("c1");
+    await Wait.until(() => expect(context.count(MethodName.DraftRead)).toBe(1));
+
+    drafts.schedule(draft("early"));
+    response.resolve(stored(2).toJson());
+    await restoring;
+    await drafts.save();
+    drafts.schedule(draft("later"));
+    await drafts.save();
+
+    expect(saved().map(t => [t.text, t.revision])).toEqual([["later", 2]]);
+  });
+
+  it("rejects with the reason a stored draft could not be read, saves nothing over it while a save's own read still fails, and when that read finds the draft, saves nothing over it either and tells its watchers, as for a stale save", async () => {
+    answerSaves();
+    const refusedOver: string[] = [];
+    drafts.onStale(t => refusedOver.push(t));
     context.fail(MethodName.DraftRead, "unreadable");
 
     await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
     drafts.schedule(draft("hello"));
+    await expect(drafts.save()).rejects.toThrow(DraftNotSavedException);
+    expect([context.noticeText(), saved(), context.count(MethodName.DraftRead), refusedOver]).toEqual([null, [], 2, []]);
+
+    drafts.schedule(draft("ok"));
+    context.answer(MethodName.DraftRead, () => stored(4).toJson());
+    await drafts.save();
+    expect([saved(), context.count(MethodName.DraftRead), refusedOver]).toEqual([[], 3, ["c1"]]);
+
+    await drafts.restore("c1");
+    drafts.schedule(draft("ok again"));
+    await drafts.save();
+    expect([saved().map(t => [t.conversationId, t.text, t.revision]), context.count(MethodName.DraftRead)]).toEqual([[["c1", "ok again", 4]], 4]);
+  });
+
+  it("keeps nothing for a chat deleted while a save's read after a failed one is under way, so later saves go on", async () => {
+    answerSaves();
+    await store.initialize();
+    context.fail(MethodName.DraftRead, "unreadable");
+    await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
+    const response = new DeferredResponse();
+    context.answer(MethodName.DraftRead, () => response.promise);
+    drafts.schedule(draft("gone"));
+    const saving = drafts.save();
+    await Wait.until(() => expect(context.count(MethodName.DraftRead)).toBe(2));
+
+    context.emit(EventName.ConversationDeleted, new ConversationIdParams("c1").toJson());
+    response.reject(new Error("The chat was not found."));
+    await saving;
     drafts.schedule(draft("other", "c2"));
     await drafts.save();
-    expect(context.noticeText()).toBeNull();
-    expect(saved().map(t => t.conversationId)).toEqual(["c2"]);
 
+    expect([saved().map(t => [t.conversationId, t.text]), context.count(MethodName.DraftRead)]).toEqual([[["c2", "other"]], 2]);
+  });
+
+  it("keeps a chat's draft pending while its read keeps failing and another chat's draft is typed and saved, and saves it once its read answers", async () => {
+    answerSaves();
+    context.fail(MethodName.DraftRead, "unreadable");
+    await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
+    drafts.schedule(draft("first"));
+    await expect(drafts.save()).rejects.toThrow(DraftNotSavedException);
+
+    drafts.schedule(draft("other", "c2"));
+    await expect(drafts.save()).rejects.toThrow(DraftNotSavedException);
+    expect(saved().map(t => [t.conversationId, t.text])).toEqual([["c2", "other"]]);
     context.answer(MethodName.DraftRead, () => null);
-    await drafts.restore("c1");
+    await drafts.save();
+
+    expect(saved().map(t => [t.conversationId, t.text, t.revision])).toEqual([["c2", "other", 0], ["c1", "first", 0]]);
+  });
+
+  it("saves on no revision when a save's read after a failed one finds no draft, and reads nothing more once a restore has answered", async () => {
+    answerSaves();
+    context.fail(MethodName.DraftRead, "unreadable");
+    await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
+    context.answer(MethodName.DraftRead, () => null);
     drafts.schedule(draft("hello"));
     await drafts.save();
-    expect(saved().map(t => t.conversationId)).toEqual(["c2", "c1"]);
+    context.fail(MethodName.DraftRead, "unreadable");
+    await expect(drafts.restore("c2")).rejects.toThrow("unreadable");
+    context.answer(MethodName.DraftRead, () => stored(2).toJson());
+    await drafts.restore("c2");
+    drafts.schedule(draft("other", "c2"));
+    await drafts.save();
+
+    expect([saved().map(t => [t.conversationId, t.text, t.revision]), context.count(MethodName.DraftRead)])
+      .toEqual([[["c1", "hello", 0], ["c2", "other", 2]], 4]);
   });
 });
