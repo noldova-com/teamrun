@@ -21,6 +21,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **A chat's mentioned teammate:** a chat whose next answer goes to a teammate, after a message that mentions one, keeps that teammate when you open another chat or the new chat, or come back to it; the composer's settings no longer replace it with the default teammate, and a mode picked there is that teammate's mode (#326).
 - **Ending a sub-agent's processes on Windows:** a stop, deleting the chat, quitting, a sign-out or the provider's exit ends what a kept sub-agent started even when TeamRun's PowerShell stalls, within seconds rather than leaving it running (#309).
 - **Ending a process tree on Windows:** a process whose end failed is ended again while the tree's listing still shows it, in each of the stop's ten rounds, rather than left running after its first end, and each end waits for the process to exit, all of a round's within two seconds (#344).
+- **A provider's tool install and the ACP agents' Add and Remove:** a tool install that fails after Install closed the provider dialog, and an Add or Remove that fails after the ACP agents dialog closed, show their failure in a notice rather than nowhere (#153).
 
 ### Changed
 

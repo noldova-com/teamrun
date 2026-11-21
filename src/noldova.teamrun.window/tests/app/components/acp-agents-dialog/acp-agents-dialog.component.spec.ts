@@ -25,6 +25,7 @@ import { AppearanceFixture } from "@noldova/ui.components.angular/testing";
 import { page } from "vitest/browser";
 
 import { AcpAgentsDialogComponent } from "../../../../src/app/components/acp-agents-dialog/acp-agents-dialog.component";
+import { ChatAction } from "../../../../src/app/enums/chat-action";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
@@ -361,6 +362,27 @@ describe("AcpAgentsDialogComponent", () => {
     outside.remove();
 
     expect([failures, focused]).toEqual([[], true]);
+  });
+
+  it("shows an add or a remove that fails after the dialog has closed in a notice", async () => {
+    const adding = new DeferredResponse();
+    const removing = new DeferredResponse();
+    await create(t => t.answer(MethodName.AcpAgentAdd, () => adding.promise).answer(MethodName.AcpAgentRemove, () => removing.promise));
+
+    await click(".nol-teamrun-acp-add", row("droid"));
+    await click(".nol-teamrun-acp-remove", row("devin"));
+    await Wait.until(() => expect([context.count(MethodName.AcpAgentAdd), context.count(MethodName.AcpAgentRemove)]).toEqual([1, 1]));
+    const dialog = fixture.componentInstance;
+    element().remove();
+    fixture.destroy();
+    adding.reject(new Error("Droid can't be added."));
+    removing.reject(new Error("A provider still uses Devin."));
+    await dialog.settled();
+
+    await Wait.until(() => expect(context.shownNotices(Resources.chatActionFailedNotice).map(t => [t.title, t.text])).toEqual([
+      [Resources.chatActionTitles[ChatAction.AddAcpAgent], "Droid can't be added."],
+      [Resources.chatActionTitles[ChatAction.RemoveAcpAgent], "A provider still uses Devin."]
+    ]));
   });
 
   it("removes an agent and a local command, and clears an old error when it tries again", async () => {

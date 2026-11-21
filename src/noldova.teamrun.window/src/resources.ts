@@ -1149,6 +1149,8 @@ export class Resources {
     [ChatAction.CancelInstall]: "Couldn't cancel the install",
     [ChatAction.RemoveProvider]: "Couldn't remove the provider",
     [ChatAction.InstallTool]: "Couldn't install the provider's tool",
+    [ChatAction.AddAcpAgent]: "Couldn't add the ACP agent",
+    [ChatAction.RemoveAcpAgent]: "Couldn't remove the ACP agent",
     [ChatAction.OpenPage]: "Couldn't open the page",
     [ChatAction.OpenBrowser]: "Couldn't open the Browser",
     [ChatAction.SaveTeammate]: "Couldn't save the teammate",

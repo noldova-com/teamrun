@@ -8,6 +8,7 @@
 
 import {
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   type InputSignal,
@@ -38,6 +39,7 @@ import {
   TextFieldComponent
 } from "@noldova/ui.components.angular";
 
+import { ChatAction } from "../../enums/chat-action";
 import { AcpLocalVariable } from "../../models/acp-local-variable";
 import type { ChatStoreService } from "../../services/chat-store.service";
 import { Resources } from "../../../resources";
@@ -75,6 +77,7 @@ export class AcpAgentsDialogComponent implements OnInit {
   private readonly pending: Set<Promise<void>> = new Set();
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
+  private readonly destroyRef: DestroyRef = inject(DestroyRef);
   private readonly added: WritableSignal<string | null> = signal(null);
 
   public constructor() {
@@ -120,7 +123,7 @@ export class AcpAgentsDialogComponent implements OnInit {
   }
 
   protected async add(agent: AcpAgentEntry): Promise<void> {
-    await this.work(agent.id, () => this.store().addAcpAgent(agent.id, this.report));
+    await this.work(agent.id, () => this.store().addAcpAgent(agent.id, this.reportOf(ChatAction.AddAcpAgent, agent.id)));
     this.added.set(agent.id);
   }
 
@@ -135,7 +138,7 @@ export class AcpAgentsDialogComponent implements OnInit {
   }
 
   protected async remove(agent: AcpAgentEntry): Promise<void> {
-    await this.work(agent.id, () => this.store().removeAcpAgent(agent.id, this.report));
+    await this.work(agent.id, () => this.store().removeAcpAgent(agent.id, this.reportOf(ChatAction.RemoveAcpAgent, agent.id)));
     this.keepFocus(agent.id);
   }
 
@@ -166,7 +169,7 @@ export class AcpAgentsDialogComponent implements OnInit {
     }
     const args = this.argumentLines().split(Resources.acpArgumentLineSeparator).map(t => t.trim()).filter(t => t.length > 0);
     await this.work(Resources.acpLocalFormKey, async () => {
-      if (await this.store().addLocalAcpCommand(this.name().trim(), this.command().trim(), args, this.variables(), this.report))
+      if (await this.store().addLocalAcpCommand(this.name().trim(), this.command().trim(), args, this.variables(), this.reportOf(ChatAction.AddAcpAgent, this.name().trim())))
         this.closeForm();
     });
   }
@@ -181,6 +184,11 @@ export class AcpAgentsDialogComponent implements OnInit {
 
   protected done(): void {
     this.closed.emit();
+  }
+
+  private reportOf(action: ChatAction.AddAcpAgent | ChatAction.RemoveAcpAgent, target: string): (message: string) => void {
+    const later = this.store().acpAgentFailed(action, target);
+    return message => this.destroyRef.destroyed ? later(message) : this.error.set(message);
   }
 
   private refusal(): string | null {
