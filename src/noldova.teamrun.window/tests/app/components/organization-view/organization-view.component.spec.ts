@@ -115,8 +115,8 @@ describe("OrganizationViewComponent", () => {
     configure(context);
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
-    element().style.width = "84rem";
-    element().style.height = "60rem";
+    element().style.width = "100rem";
+    element().style.height = "70rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
     await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
@@ -686,8 +686,8 @@ describe("OrganizationViewComponent", () => {
 
     it("sizes the cards, hangs each leader under its department, the members off one line, and joins the departments to you through one bar", async () => {
       await create();
-      element().style.width = "84rem";
-      element().style.height = "60rem";
+      element().style.width = "100rem";
+      element().style.height = "70rem";
       await settle();
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
@@ -728,8 +728,8 @@ describe("OrganizationViewComponent", () => {
 
     it("fills the space under the header with one canvas inside the view's padding, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
-      element().style.width = "84rem";
-      element().style.height = "60rem";
+      element().style.width = "100rem";
+      element().style.height = "70rem";
       await settle();
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
       const [host, top, canvas, messages] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas"), box("aside.messages")];
