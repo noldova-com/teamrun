@@ -52,6 +52,7 @@ export class ConversationComponent {
   private readonly folder: Signal<string | null> = computed(() => this.store.folderOf(this.instance()));
   private shownTitle: string | null = null;
   private shownPlace: string | null = null;
+  private placeMissed: boolean = false;
   private interactedInTeamRun: boolean = false;
 
   public readonly instance: InputSignal<string> = input.required<string>();
@@ -138,12 +139,14 @@ export class ConversationComponent {
   }
 
   private followPlace(id: string, conversation: Conversation | null, breadcrumb: readonly string[]): void {
-    if (Object.isNull(conversation) || breadcrumb.length === 0)
+    if (Object.isNull(conversation) || breadcrumb.length === 0) {
+      this.placeMissed = true;
       return;
+    }
     const shown = this.shownPlace;
     const place = JSON.stringify(breadcrumb);
     this.shownPlace = place;
-    if (Object.isNull(shown) ? !Object.isNull(conversation.attachedFolder) : shown !== place)
+    if (Object.isNull(shown) ? this.placeMissed || !Object.isNull(conversation.attachedFolder) : shown !== place)
       this.context.updateDocument(Resources.conversationDocumentName, id, { breadcrumb });
   }
 

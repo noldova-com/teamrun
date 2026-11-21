@@ -466,6 +466,28 @@ describe("ConversationComponent", () => {
       { breadcrumb: [Resources.chatsTitle, "site"] }, { breadcrumb: [SampleData.otherProject.name] }, { title: "Renamed" }]);
   });
 
+  it("writes the breadcrumb of a tab opened before the store lists its chat's project, once the project comes", async () => {
+    const moved = new Conversation("c2", SampleData.otherProject.id, second.title, SampleData.timestamp, SampleData.timestamp);
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    context.answer(MethodName.ConversationMove, () => moved.toJson())
+      .answer(MethodName.ProjectOpen, () => SampleData.otherProject.toJson())
+      .answer(MethodName.ConversationList, t => ConversationListParams.fromJson(t).projectId === SampleData.otherProject.id ? [moved.toJson()] : []);
+    await store().moveConversation("c2", SampleData.otherProject.id);
+    await settle();
+    const other = TestBed.createComponent(ConversationComponent);
+    other.componentRef.setInput("instance", "c2");
+    other.componentRef.setInput("title", "Second");
+    other.detectChanges();
+    await other.whenStable();
+
+    expect(context.updates).toEqual([]);
+    await store().openProject(SampleData.otherProject.rootPath);
+    await other.whenStable();
+
+    expect(context.updates.map(t => [t.instance, t.update])).toEqual([["c2", { breadcrumb: [SampleData.otherProject.name] }]]);
+    other.destroy();
+  });
+
   it("selects whichever of two tabs side by side the person moves into, while each keeps its own messages in view", async () => {
     const other = TestBed.createComponent(ConversationComponent);
     other.componentRef.setInput("instance", "c2");
