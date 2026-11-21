@@ -207,7 +207,7 @@ describe("OrganizationViewComponent", () => {
     await openMenu(one(".top .cards-show"));
     expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Model and effort", "false"],
       ["Clear every card's own choice", null]]);
-    expect(menuItem("Clear every card's own choice").disabled).toBe(true);
+    expect(menuItem("Clear every card's own choice").getAttribute("aria-disabled")).toBe("true");
     menuItem("Usage today").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
     await settle();
@@ -229,7 +229,7 @@ describe("OrganizationViewComponent", () => {
     expect([shows("Alice"), tune("Alice").getAttribute("aria-label")]).toEqual([["gpt-5 · high"], "Choose what Alice's card shows"]);
 
     await openMenu(tune("Alice"));
-    expect(menuItem("Use what every card shows").disabled).toBe(true);
+    expect(menuItem("Use what every card shows").getAttribute("aria-disabled")).toBe("true");
     menuItem("Model and effort").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
     await settle();
