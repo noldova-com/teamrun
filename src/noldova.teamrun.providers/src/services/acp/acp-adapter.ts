@@ -93,7 +93,7 @@ export class AcpAdapter implements IProviderAdapter {
   public constructor(agent: IAcpAgent, clientInfo: AppServerClientInfo, starter: IProcessStarter, timings: ProviderTimings,
     timer: ITimer = new NodeTimer(), savedImages: ISavedImageReader | null = null, log: ILog | null = null,
     processTree: IProcessTree = new ProcessTree(process.platform, new CommandRunner(starter), process.env, Resources.processListTimeout, timer, timings.stopGrace,
-      undefined, PowershellSession.shared), idleTimer: ITimer = new NodeTimer()) {
+      undefined, PowershellSession.shared, undefined, log), idleTimer: ITimer = new NodeTimer()) {
     this.agent = agent;
     const isolatedMode = agent.isolatedMode;
     if (!Object.isUndefined(isolatedMode))

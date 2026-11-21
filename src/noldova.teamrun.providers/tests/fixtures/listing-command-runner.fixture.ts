@@ -12,16 +12,18 @@ import { CommandResult, CommandRunner, NodeProcessStarter, ProcessTerminator, ty
 export class ListingCommandRunner extends CommandRunner {
   private readonly listings: readonly (string | null)[];
   private readonly then: CommandRunner | null;
+  private readonly refusal: unknown;
 
   public readonly commands: ProcessCommand[] = [];
   public readonly timeouts: number[] = [];
   public readonly outputs: string[] = [];
   public calls: number = 0;
 
-  public constructor(listings: readonly (string | null)[], then: CommandRunner | null = null) {
+  public constructor(listings: readonly (string | null)[], then: CommandRunner | null = null, refusal: unknown = new Error("The listing failed.")) {
     super(new NodeProcessStarter(new ProcessTerminator(process.platform)));
     this.listings = listings;
     this.then = then;
+    this.refusal = refusal;
   }
 
   public override run(command: ProcessCommand, environment: NodeJS.ProcessEnv, timeoutMilliseconds: number): Promise<CommandResult> {
@@ -35,6 +37,6 @@ export class ListingCommandRunner extends CommandRunner {
       });
     }
     const listing = this.listings[Math.min(this.calls++, this.listings.length - 1)]!;
-    return Object.isNull(listing) ? Promise.reject(new Error("The listing failed.")) : Promise.resolve(new CommandResult(0, null, listing, "", false));
+    return Object.isNull(listing) ? Promise.reject(this.refusal) : Promise.resolve(new CommandResult(0, null, listing, "", false));
   }
 }

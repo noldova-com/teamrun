@@ -3507,6 +3507,15 @@ export class Resources {
     return `TeamRun runs ${providerName}'s commands only inside the chat's folder, not in ${directory}.`;
   }
 
+  public static formatTreeEndRoundFailed(round: number, failure: string): string {
+    return `Ending a process tree on Windows stopped at round ${String(round)}, whose script failed (${failure}); the tree may still run.`;
+  }
+
+  public static formatTreeLeftListed(processes: readonly (readonly [number, number])[]): string {
+    return `Ending a process tree on Windows ran its ${String(Resources.processTreeFreezeRounds)} rounds and still listed ` +
+      `${processes.map(([id, start]) => `${String(id)} (started ${new Date(start).toISOString()})`).join(", ")}.`;
+  }
+
   public static formatTaskProcessGone(providerName: string): string {
     return `TeamRun couldn't confirm that this task's process still runs under ${providerName}, so it stopped nothing.`;
   }

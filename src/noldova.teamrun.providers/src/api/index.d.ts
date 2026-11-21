@@ -6230,6 +6230,19 @@ export declare class Resources {
   public static formatTaskProcessUnknown(providerName: string): string;
   public static formatAcpTerminalUnknown(terminalId: string): string;
   public static formatAcpTerminalOutside(providerName: string, directory: string): string;
+  /**
+   * The line a Windows tree's end writes to its log when a round's script fails, so the tree may still run.
+   * @param round The round, counted from 1.
+   * @param failure The failure's type.
+   */
+  public static formatTreeEndRoundFailed(round: number, failure: string): string;
+
+  /**
+   * The line a Windows tree's end writes to its log when a process of the tree still shows after its last round.
+   * @param processes Each process still listed, as its id and its start in milliseconds since the epoch.
+   */
+  public static formatTreeLeftListed(processes: readonly (readonly [number, number])[]): string;
+
   public static formatTaskProcessGone(providerName: string): string;
 
   /**
@@ -10765,7 +10778,8 @@ export declare class ProcessTerminator {
  * On Windows it ends the tree in rounds, each one PowerShell script that opens each listed process by id, ends it through that handle only when it
  * started when the listing said, parents first, waits for it to exit, and lists again, until no process of the tree shows, at most
  * `processTreeFreezeRounds` rounds, so one whose end failed is ended again in the next round; after the last round, or a round whose script fails,
- * it stops with the tree reported ended even if a process of it still shows. Its listings and rounds run in its `IPowershellSession` when it has
+ * it stops with the tree reported ended even if a process of it still shows, and writes to its log which processes still showed or which round
+ * failed. Its listings and rounds run in its `IPowershellSession` when it has
  * one, and otherwise each in a new PowerShell, and a script the session
  * fails or runs out of time on runs once more in a new PowerShell, so a stalled session doesn't leave the tree running.
  * Elsewhere it sends `SIGSTOP` to each process of the tree and lists again until no new process shows under it, at most `processTreeFreezeRounds`
@@ -10786,7 +10800,7 @@ export declare class ProcessTree implements IProcessTree, IOrphanSweep {
    * @param read Reads a process's environment file for `endOrphaned`, throwing when it can't; the file system by default.
    */
   public constructor(platform: string, runner: CommandRunner, environment: NodeJS.ProcessEnv, timeout: number, timer: ITimer, grace: number,
-    kill?: (processId: number, signal: NodeJS.Signals | 0) => void, session?: IPowershellSession | null, read?: (path: string) => string);
+    kill?: (processId: number, signal: NodeJS.Signals | 0) => void, session?: IPowershellSession | null, read?: (path: string) => string, log?: ILog | null);
 
   /** @inheritdoc */
   public endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean>;

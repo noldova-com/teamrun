@@ -14,6 +14,7 @@ import { FakeTaskTree, type FakeTaskTreeMode } from "../../fixtures/fake-task-tr
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
 import { ListingCommandRunner } from "../../fixtures/listing-command-runner.fixture.js";
 import { ListingPowershellSession } from "../../fixtures/listing-powershell-session.fixture.js";
+import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 
@@ -448,13 +449,36 @@ export class ProcessTreeTests {
     const task = ProcessTreeTests.GONE - 1;
     const session = new ListingPowershellSession([
       ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]])]);
+    const log = new RecordingLog();
 
-    const ended = await new ProcessTree("win32", new ListingCommandRunner([null]), process.env, 10_000, new NodeTimer(), 100, undefined, session)
+    const ended = await new ProcessTree("win32", new ListingCommandRunner([null]), process.env, 10_000, new NodeTimer(), 100, undefined, session, undefined, log)
       .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, ...Array.from({ length: Resources.processTreeFreezeRounds },
       () => Resources.formatProcessEndScript([task], [start + 10_000]))]), JSON.stringify(session.calls.map(t => t[0])));
+    Assert.areEqual(JSON.stringify([Resources.formatTreeLeftListed([[task, start + 10_000]])]), JSON.stringify(log.lines));
+  }
+
+  @TestMethod
+  @TestData(true, "Error")
+  @TestData(false, "string")
+  public async writesTheRoundWhoseScriptFailsOnWindowsToItsLogAndEndsNoFurtherRound(throwsError: boolean, failure: string): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const task = ProcessTreeTests.GONE - 1;
+    const session = new ListingPowershellSession([
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]]), null]);
+    const runner = new ListingCommandRunner([null], null, throwsError ? new Error("The end failed.") : "The end failed.");
+    const log = new RecordingLog();
+
+    const ended = await new ProcessTree("win32", runner, process.env, 10_000, new NodeTimer(), 100, undefined, session, undefined, log)
+      .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, Resources.formatProcessEndScript([task], [start + 10_000])]),
+      JSON.stringify(session.calls.map(t => t[0])));
+    Assert.areEqual(1, runner.calls);
+    Assert.areEqual(JSON.stringify([Resources.formatTreeEndRoundFailed(1, failure)]), JSON.stringify(log.lines));
   }
 
   @TestMethod
