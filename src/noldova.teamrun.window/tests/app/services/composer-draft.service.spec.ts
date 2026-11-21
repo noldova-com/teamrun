@@ -322,6 +322,23 @@ describe("ComposerDraftService", () => {
       .toEqual([FakeWindowPartContext.qualify(MethodName.DraftSave), FakeWindowPartContext.qualify(MethodName.DraftRead)]);
   });
 
+  it("keeps nothing typed in a conversation while its draft is read, and saves what is typed once the read answers", async () => {
+    answerSaves();
+    const response = new DeferredResponse();
+    context.answer(MethodName.DraftRead, () => response.promise);
+    const restoring = drafts.restore("c1");
+    await Wait.until(() => expect(context.count(MethodName.DraftRead)).toBe(1));
+
+    drafts.schedule(draft("early"));
+    response.resolve(stored(2).toJson());
+    await restoring;
+    await drafts.save();
+    drafts.schedule(draft("later"));
+    await drafts.save();
+
+    expect(saved().map(t => [t.text, t.revision])).toEqual([["later", 2]]);
+  });
+
   it("rejects with the reason a stored draft could not be read, saves nothing over it while a save's own read still fails, and then saves what was typed over the draft that read finds", async () => {
     answerSaves();
     context.fail(MethodName.DraftRead, "unreadable");
