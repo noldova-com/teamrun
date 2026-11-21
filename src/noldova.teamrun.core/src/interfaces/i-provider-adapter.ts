@@ -34,6 +34,7 @@ export interface IProviderAdapter {
 
   checkSignIn(provider: Provider): Promise<SignInCheck>;
   checkFoundSignIn?(provider: Provider): Promise<SignInCheck>;
+  refreshDescriptorAsync?(): Promise<void>;
   prepareProfile?(provider: Provider): void;
   signIn(provider: Provider, signal: AbortSignal, listener: ISignInListener): Promise<void>;
   readSignInCommand?(provider: Provider): Promise<ProviderSignInCommand | null>;

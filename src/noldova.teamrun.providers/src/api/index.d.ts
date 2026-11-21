@@ -7794,9 +7794,10 @@ export declare class ClaudeAdapter implements IProviderAdapter {
    */
   public readonly takesTeamRunTools: boolean;
   /**
-   * The `claude` provider.
+   * The `claude` provider, its profile's usual folder, which is also its one person folder, decided from TeamRun's own environment
+   * until `refreshDescriptorAsync` decides it from the environment Claude Code is given.
    */
-  public readonly descriptor: ProviderKind;
+  public get descriptor(): ProviderKind;
   /**
    * The usual folder, and `CLAUDE_CONFIG_DIR` when it names another; a profile folder holds `.claude.json`, `settings.json`,
    * `projects`, `history.jsonl`, `statsig` or `todos`.
@@ -7842,6 +7843,12 @@ export declare class ClaudeAdapter implements IProviderAdapter {
    * How many turns are running.
    */
   public get activeRunCount(): number;
+
+  /**
+   * Rebuilds the descriptor with the usual folder that `CLAUDE_CONFIG_DIR` names in the environment Claude Code is given, or `~/.claude`,
+   * as its profile's usual folder and its one person folder.
+   */
+  public refreshDescriptorAsync(): Promise<void>;
 
   /**
    * Claude Code's sign-in command through the copy its turns run, with nothing started (`TerminalSignIn.of`).

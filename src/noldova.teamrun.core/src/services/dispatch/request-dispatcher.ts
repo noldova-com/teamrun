@@ -375,7 +375,7 @@ export class RequestDispatcher {
       case MethodName.FirstLaunchFinish:
         return (await this.providers.finishFirstLaunchAsync()).toJson();
       case MethodName.ProviderKindList:
-        return this.kinds.list().map(t => t.toJson());
+        return (await this.kinds.listAsync()).map(t => t.toJson());
       case MethodName.ProviderListModels:
         return [...await this.kinds.listModelsAsync(ProviderListModelsParams.fromJson(payload))];
       case MethodName.ProviderModelCatalog:
