@@ -1432,6 +1432,22 @@ describe("ProvidersViewComponent", () => {
     await Wait.until(() => expect(document.activeElement).toBe(button(".nol-teamrun-add")));
   });
 
+  it("leaves a focus the person moved while a provider's removal runs", async () => {
+    const removing = new DeferredResponse();
+    await create(t => t.answer(MethodName.ProviderDelete, () => removing.promise));
+    await choose(".nol-teamrun-remove", row("Home"));
+    button(".nol-teamrun-confirm-remove", row("Home")).click();
+    await Wait.until(() => expect(context.count(MethodName.ProviderDelete)).toBe(1));
+    const add = button(".nol-teamrun-add");
+
+    add.focus();
+    removing.resolve(null);
+    await Wait.until(() => expect(texts(".nol-teamrun-item-name")).toEqual(["Work"]));
+    await settle();
+
+    expect(document.activeElement).toBe(add);
+  });
+
   it("keeps the provider when the person presses Escape on the row's question, with the focus back on its menu", async () => {
     await create();
     await choose(".nol-teamrun-remove", row("Home"));
