@@ -17,7 +17,9 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 ### Fixed
 
 - **The Projects view's layout:** when its first read fails, a pin, collapse or reorder no longer saves the window's unread layout over the one TeamRun keeps; the change waits, the read is tried again at the next change or resync, or at once for one made while the read was out, and the failure, a failed save or a failed read at a resync is logged (#154).
+- **Stop as an answer lands:** Stop pressed just as a teammate's answer arrives stops the change comparison, shows the reply as stopped and lists it among what Stop stopped; a teammate it addressed isn't started, and the reply notes whom it would have handed off to (#142).
 - **The focus after a delete:** deleting a teammate, a chat or a shared MCP server moves the keyboard focus to the next row, or the one before for the last, and to Add, or New chat for a chat whose group is gone, once none is left or the next row went meanwhile, rather than dropping it to the window; a focus the person moved while the delete ran stays where it is (#155).
+- **The focus after removing a provider:** a focus the person moved while the removal ran, such as to Add provider, stays where it is, rather than jumping back to a provider row (#388).
 - **A reply's approvals:** an approval decided, withdrawn or asked just as a teammate's reply ends no longer puts the ended reply back to Running for good (#143).
 - **A chat tab's place:** a chat moved to another project, or from Chats into one, now shows its new project in its tab's breadcrumb, rather than the old one (#152).
 - **Claude Code on macOS:** a Claude Code signed in the usual way is listed as signed in, and its turns run, rather than showing `Sign-in required` (#338).
