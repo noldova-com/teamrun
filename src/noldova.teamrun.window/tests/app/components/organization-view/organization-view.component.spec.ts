@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
-  PlanUsage, PlanWindow, PlanWindowName, TeammateLastReply } from "@noldova/teamrun.protocol";
+  PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammateWork } from "@noldova/teamrun.protocol";
 import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { page, userEvent } from "vitest/browser";
@@ -234,7 +234,8 @@ describe("OrganizationViewComponent", () => {
 
     await openMenu(one(".top .cards-show"));
     expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Last message", "false"],
-      ["Model and effort", "false"], ["Clear every card's own choice", null]]);
+      ["Model and effort", "false"], ["Git branch", "false"], ["Pull requests", "false"], ["Documents", "false"], ["Artifacts", "false"],
+      ["Clear every card's own choice", null]]);
     expect(menuItem("Clear every card's own choice").getAttribute("aria-disabled")).toBe("true");
     menuItem("Usage today").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
@@ -247,7 +248,25 @@ describe("OrganizationViewComponent", () => {
 
     expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "40%", "gpt-5 · high"], ["Idle", "40%"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
-    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
+    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true, Git: false, PullRequests: false, Documents: false,
+      Artifacts: false } }));
+  });
+
+  it("shows a teammate's work on its card only while a work field is on, and reads it only then", async () => {
+    await create();
+
+    expect([all("nol-teamrun-teammate-work"), context.count(MethodName.TeammateWorkRead)]).toEqual([[], 0]);
+
+    context.answer(MethodName.TeammateWorkRead, t => new TeammateWork(TeammateIdParams.fromJson(t).teammateId, null, [], []).toJson());
+    await openMenu(one(".top .cards-show"));
+    menuItem("Git branch").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    await Wait.until(() => expect(texts("[data-field=Git] .work-muted", card("Alice"))).toEqual(["The Git module isn't installed"]));
+    const cards = all("nol-teamrun-organization-card").length;
+    expect([cards, all("nol-teamrun-teammate-work").length, context.count(MethodName.TeammateWorkRead), saves[0]])
+      .toEqual([4, cards, cards, expect.objectContaining({ cardsShow: expect.objectContaining({ Git: true }) })]);
   });
 
   it("shows no usage on a card whose provider's plan has no window with a percent, such as an unlimited one", async () => {
@@ -807,13 +826,14 @@ describe("OrganizationViewComponent", () => {
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
     });
 
-    it("sets To over a select as wide as the messages' padding allows, a department's Message under its summary at its start, and a name as plain text", async () => {
+    it("sets To under the messages' head over a select as wide as their padding allows, above the thread, a department's Message under its summary at its start, and a name as plain text", async () => {
       await create();
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const aside = one("aside.messages");
       const border = Number.parseFloat(getComputedStyle(aside).borderTopWidth);
-      const [label, choice] = [one(".to-label", aside), one(".to-choice", aside)];
+      const [head, label, choice, thread] = [one(".nol-teamrun-organization-thread-head", aside), one(".to-label", aside), one(".to-choice", aside),
+        one(".nol-teamrun-organization-thread", aside)];
       const design = one(":scope > .department", department("Design"));
       const inset = Number.parseFloat(getComputedStyle(design).borderLeftWidth) + space(3);
       const [summary, message] = [one(".department-summary", design), one(".message", design)];
@@ -823,7 +843,9 @@ describe("OrganizationViewComponent", () => {
       const nameStyle = getComputedStyle(name);
 
       AppearanceFixture.expectPixels(box(label).left, box(aside).left + border + space(3));
-      AppearanceFixture.expectPixels(box(label).top, box(aside).top + border + space(3));
+      AppearanceFixture.expectPixels(box(head).top, box(aside).top + border + space(3));
+      AppearanceFixture.expectPixels(box(label).top - box(head).bottom, space(3));
+      AppearanceFixture.expectPixels(box(thread).top - box(choice).bottom, space(3));
       AppearanceFixture.expectPixels(box(choice).left, box(label).left);
       AppearanceFixture.expectPixels(box(choice).right, box(aside).right - border - space(3));
       AppearanceFixture.expectPixels(box(choice).top - box(label).bottom, space(3));

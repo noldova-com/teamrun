@@ -18,7 +18,7 @@ import { AppLook, ApprovalAsk, type IAcpAgentsService, type ITurnListener, PlanR
 import { AcpAgentIdParams, AcpAgentListing, AcpLocalCommandAddParams, ComputerUseGrant, ComputerUseGrantIdParams, ProviderContextWindows, ProviderSignInCommand,
   type ITeammateChanges, TeammateFallback } from "@noldova/teamrun.protocol";
 import { ConversationPosition, ObservedSettings, PanelAnsweredParams, PanelName, PanelOutcome, PanelRequestedPayload, PlanUsage, PlanUsageParams, PlanWindow,
-  PlanWindowName, Provenance, ReadingPositionSaveParams, ReplyUsage, RunOutput, TeammateLastReply, TeammateUsage, WindowFocusedParams, WindowIdParams } from "@noldova/teamrun.protocol";
+  PlanWindowName, Provenance, ReadingPositionSaveParams, ReplyUsage, RunOutput, TeammateLastReply, TeammateUsage, TeammateWork, WindowFocusedParams, WindowIdParams } from "@noldova/teamrun.protocol";
 import { SharedMcpProviderSetParams, SharedMcpSecretSetParams, SharedMcpServer, SharedMcpServerDefinition, SharedMcpServerIdParams, SharedMcpServerListing,
   SharedMcpServerUpdateParams, SharedMcpSetting, SharedMcpSignInStarted, SharedMcpTeammateSetParams, SharedMcpTransport } from "@noldova/teamrun.protocol";
 import { SqlQuery } from "@noldova/context.data.sql";
@@ -1519,6 +1519,22 @@ export class RequestDispatcherTests {
     Assert.areEqual("[]", JSON.stringify(empty));
     Assert.areEqual(JSON.stringify([new TeammateUsage(ada.id, conversation.id, "reply", "t", "t2", usage).toJson()]),
       JSON.stringify(listed.map(t => t.toJson())));
+  }
+
+  @TestMethod
+  public async readsATeammatesWorkAndRefusesParamsWithoutATeammate(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const conversation = await host.createConversationAsync(project);
+    const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
+    await host.messages.insertAsync(new Message("reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Completed, [], provenance, "t", "t",
+      "2026-11-20T09:00:00.000Z", [], "tm-ada", "Ada"));
+
+    const work = TeammateWork.fromJson(await RequestDispatcherTests.succeed(host, MethodName.TeammateWorkRead, new TeammateIdParams("tm-ada").toJson()));
+    const refused = await host.dispatcher.dispatch(new Request("r", MethodName.TeammateWorkRead, {}));
+
+    Assert.areEqual(JSON.stringify(new TeammateWork("tm-ada", project.rootPath, [project.rootPath], []).toJson()), JSON.stringify(work.toJson()));
+    Assert.areEqual(ErrorCode.InvalidParams, refused.info?.name);
   }
 
   @TestMethod

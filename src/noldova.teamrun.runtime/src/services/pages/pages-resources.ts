@@ -22,6 +22,9 @@ export class PagesResources {
   public static readonly selectPageVersions: string = "SELECT version, json, createdAt FROM pageVersions WHERE pageId = ? ORDER BY version DESC";
   public static readonly selectPages: string =
     "SELECT json FROM pages WHERE chatId = ? ORDER BY (SELECT MAX(rowid) FROM pageVersions WHERE pageId = pages.id) DESC";
+  public static readonly selectTeammatePages: string = "SELECT json FROM pages "
+    + "WHERE json_extract(json, '$.madeBy.teammateId') = ? OR json_extract(json, '$.editedBy.teammateId') = ? ORDER BY (SELECT MAX(rowid) FROM pageVersions WHERE pageId = pages.id) DESC";
+  public static readonly teammatePageLimit: number = 20;
   public static readonly selectChats: string = "SELECT DISTINCT chatId FROM pages";
   public static readonly selectPageSizes: string = "SELECT id, json_extract(json, '$.bytes') AS bytes FROM pages WHERE chatId = ?";
   public static readonly insertPageVersion: string =

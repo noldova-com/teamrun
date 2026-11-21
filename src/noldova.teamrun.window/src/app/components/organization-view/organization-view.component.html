@@ -90,13 +90,14 @@ LICENSE file in the root directory of this source tree.
   </main>
   @if (mode() !== modes.Focus) {
     <aside class="messages" [class.inbox]="mode() === modes.Board" [attr.aria-label]="resources.organizationMessagesLabel">
-      @if (mode() === modes.Tree) {
-        <div class="to">
-          <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
-          <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
-        </div>
-      }
-      <nol-teamrun-organization-messages class="thread" [shape]="mode() === modes.Board ? shapes.Inbox : thread" [target]="target()" (targetChange)="chosen.set($event)" />
+      <nol-teamrun-organization-messages class="thread" [shape]="mode() === modes.Board ? shapes.Inbox : thread" [target]="target()" (targetChange)="chosen.set($event)">
+        @if (mode() === modes.Tree) {
+          <div class="to" nolTeamrunOrganizationTo>
+            <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
+            <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
+          </div>
+        }
+      </nol-teamrun-organization-messages>
     </aside>
   }
 </div>

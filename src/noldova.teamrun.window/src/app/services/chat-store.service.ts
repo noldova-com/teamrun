@@ -1326,10 +1326,10 @@ export class ChatStoreService {
     return succeeded;
   }
 
-  public editWaiting(waiting: WaitingMessage, text: string, attachments: readonly AttachmentInput[]): Promise<boolean> {
+  public editWaiting(waiting: WaitingMessage, text: string, attachments: readonly AttachmentInput[], mentioned: readonly string[]): Promise<boolean> {
     const message = waiting.message;
     const params = new MessageSendParams(message.chatId, text, message.requested, message.providerId, attachments,
-      message.mentionedTeammateIds, message.responderTeammateId);
+      mentioned, message.responderTeammateId);
     return this.perform(async () => {
       await this.request(MethodName.WaitingMessageEdit, new WaitingMessageEditParams(waiting.id, params).toJson());
     }, this.actionFailed(ChatAction.EditWaiting, waiting.id, waiting.chatId));
