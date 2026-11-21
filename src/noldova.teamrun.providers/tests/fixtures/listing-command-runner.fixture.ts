@@ -14,6 +14,7 @@ export class ListingCommandRunner extends CommandRunner {
   private readonly then: CommandRunner | null;
 
   public readonly commands: ProcessCommand[] = [];
+  public readonly timeouts: number[] = [];
   public calls: number = 0;
 
   public constructor(listings: readonly (string | null)[], then: CommandRunner | null = null) {
@@ -24,6 +25,7 @@ export class ListingCommandRunner extends CommandRunner {
 
   public override run(command: ProcessCommand, environment: NodeJS.ProcessEnv, timeoutMilliseconds: number): Promise<CommandResult> {
     this.commands.push(command);
+    this.timeouts.push(timeoutMilliseconds);
     if (this.calls >= this.listings.length && !Object.isNull(this.then)) {
       this.calls++;
       return this.then.run(command, environment, timeoutMilliseconds);
