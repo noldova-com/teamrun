@@ -242,6 +242,7 @@ describe("PageDocumentComponent", () => {
     read(PagesWindow.view(4, null, PagesWindow.you).toJson());
     await fixture.whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    fixture.detectChanges();
 
     expect([bars(), opens()]).toEqual([[], [null, 1, null, null]]);
   });
