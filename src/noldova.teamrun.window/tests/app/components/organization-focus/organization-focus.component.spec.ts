@@ -209,7 +209,7 @@ describe("OrganizationFocusComponent", () => {
   it("edits the structure in edit mode: renames the focused department, adds a member from outside a department and a department, and lets its members' cards move or remove them", async () => {
     const at = <T>(items: readonly T[], index: number): T => {
       const found = items[index];
-      if (found === undefined)
+      if (Object.isUndefined(found))
         throw new Error(`Nothing at ${index}.`);
       return found;
     };

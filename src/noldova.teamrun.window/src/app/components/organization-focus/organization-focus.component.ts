@@ -64,8 +64,13 @@ export class OrganizationFocusComponent {
     return Object.isNull(focus.teammate) || focus.department?.leader?.id !== focus.teammate.id;
   });
   protected readonly key: Signal<string> = computed(() => OrganizationTargetKey.of(this.focus().target));
-  protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() =>
-    new Map(this.rows().flatMap(row => row.people.map((person): [string, string] => [person.id, row.node.name]))));
+  protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() => {
+    const names = new Map<string, string>();
+    for (const row of this.rows())
+      for (const person of row.people)
+        names.set(person.id, row.node.name);
+    return names;
+  });
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.rows().flatMap(t => Object.isNull(t.node.leader) ? [] : [t.node.leader]));
   protected readonly cards: Signal<readonly Teammate[]> = computed(() => {
     const focus = this.focus();

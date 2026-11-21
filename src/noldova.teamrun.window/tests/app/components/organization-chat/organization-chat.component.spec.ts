@@ -14,11 +14,14 @@ import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Conversation, ConversationListParams, Department, DepartmentMember, MessageSendParams, MessageSendResult, MethodName, Organization, OrganizationChat,
   OrganizationTarget, TeammateIdParams } from "@noldova/teamrun.protocol";
+import { ThemeMode } from "@noldova/ui.components.angular";
+import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationChatComponent } from "../../../../src/app/components/organization-chat/organization-chat.component";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { Resources } from "../../../../src/resources";
+import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -54,7 +57,6 @@ describe("OrganizationChatComponent", () => {
       ChatStoreService.provider] });
     fixture = TestBed.createComponent(OrganizationChatComponent);
     fixture.componentRef.setInput("target", target);
-    element().style.display = "block";
     element().style.height = "40rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
@@ -151,5 +153,86 @@ describe("OrganizationChatComponent", () => {
     element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.click();
     await Wait.until(() => expect(sent()).toHaveLength(2));
     await Wait.until(() => expect(globalThis.localStorage.getItem(Resources.keptComposerDraftsStorageKey)).toBe("{}"));
+  });
+
+  describe.each([
+    { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
+    { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
+    { look: "forced colors", mode: ThemeMode.Light, forcedColors: "active" }
+  ])("in $look", ({ mode, forcedColors }) => {
+    const box = (selector: string): DOMRect => {
+      const found = element().querySelector(selector);
+      if (Object.isNull(found))
+        throw new Error(`Nothing matches ${selector}.`);
+      return found.getBoundingClientRect();
+    };
+    const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+    const rem = (): number => Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const widen = async (width: number): Promise<DOMRect> => {
+      element().style.width = `${width}rem`;
+      await fixture.whenStable();
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      return element().getBoundingClientRect();
+    };
+
+    beforeAll(() => EmulatedMediaFixture.emulateAsync("forced-colors", forcedColors));
+
+    beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, mode));
+
+    afterEach(() => AppearanceFixture.reset());
+
+    afterAll(() => EmulatedMediaFixture.resetAsync());
+
+    it.each([20, 64])("heads a teammate's chat with its name, its history filling the %drem panel down to the composer at its foot", async width => {
+      kept = [chatOf("alice")];
+      await create(OrganizationTarget.teammate("alice"));
+      await Wait.until(() => expect(element().querySelector(".history")).not.toBeNull());
+      const host = await widen(width);
+      const [head, title, history, composer] = [box(".nol-teamrun-organization-chat-head"), box(".nol-teamrun-organization-chat-title"), box(".history"),
+        box("nol-teamrun-composer")];
+
+      expect([element().querySelector(".nol-teamrun-organization-chat-icon"), texts(".nol-teamrun-organization-chat-title")]).toEqual([null, ["Chat with Alice"]]);
+      AppearanceFixture.expectPixels(host.width, width * rem());
+      AppearanceFixture.expectPixels(title.left, host.left + space(3));
+      AppearanceFixture.expectPixels(title.right, host.right - space(3));
+      AppearanceFixture.expectPixels(title.top, host.top + space(3));
+      AppearanceFixture.expectPixels(head.bottom, title.bottom + space(3));
+      for (const part of [history, composer]) {
+        AppearanceFixture.expectPixels(part.left, host.left);
+        AppearanceFixture.expectPixels(part.right, host.right);
+      }
+      AppearanceFixture.expectPixels(history.top, head.bottom);
+      AppearanceFixture.expectPixels(history.bottom, composer.top);
+      AppearanceFixture.expectPixels(composer.bottom, host.bottom);
+    });
+
+    it.each([20, 64])("heads a group with its icon and name over the composer, then each recipient's row with its status at the end, in the %drem panel", async width => {
+      await create(OrganizationTarget.department("d1"));
+      const host = await widen(width);
+      const [head, icon, title, composer, list] = [box(".nol-teamrun-organization-chat-head"), box(".nol-teamrun-organization-chat-icon"),
+        box(".nol-teamrun-organization-chat-title"), box("nol-teamrun-composer"), box(".nol-teamrun-organization-recipients")];
+      const rows = [...element().querySelectorAll(".nol-teamrun-organization-recipient")].map(t => t.getBoundingClientRect());
+      const names = [...element().querySelectorAll(".nol-teamrun-organization-recipient-name")].map(t => t.getBoundingClientRect());
+      const states = [...element().querySelectorAll(".nol-teamrun-organization-recipient-status")].map(t => t.getBoundingClientRect());
+
+      expect([texts(".nol-teamrun-organization-chat-title"), rows.length]).toEqual([["Chat with Design"], 2]);
+      AppearanceFixture.expectPixels(icon.left, host.left + space(3));
+      AppearanceFixture.expectPixels(icon.width, AppearanceFixture.measureLook("icon"));
+      AppearanceFixture.expectPixels(title.left, icon.right + space(2));
+      AppearanceFixture.expectPixels(title.right, host.right - space(3));
+      AppearanceFixture.expectPixels(icon.top + icon.height / 2, title.top + title.height / 2);
+      AppearanceFixture.expectPixels(composer.top, head.bottom);
+      AppearanceFixture.expectPixels(composer.left, host.left);
+      AppearanceFixture.expectPixels(composer.right, host.right);
+      AppearanceFixture.expectPixels(list.top, composer.bottom);
+      AppearanceFixture.expectPixels(list.bottom, host.bottom);
+      for (const [index, row] of rows.entries()) {
+        AppearanceFixture.expectPixels(row.left, list.left + space(1));
+        AppearanceFixture.expectPixels(row.right, list.right - space(1));
+        AppearanceFixture.expectPixels(names[index]?.left ?? Number.NaN, row.left + space(2));
+        AppearanceFixture.expectPixels(states[index]?.right ?? Number.NaN, row.right - space(2));
+        expect((names[index]?.right ?? Number.POSITIVE_INFINITY) <= (states[index]?.left ?? 0) - space(2) + 1).toBe(true);
+      }
+    });
   });
 });

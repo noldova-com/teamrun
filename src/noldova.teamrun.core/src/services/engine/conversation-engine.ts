@@ -105,6 +105,7 @@ import type { OutsideReply } from "../../models/outside-reply.js";
 import { PermissionAsk } from "../../models/permission-ask.js";
 import { ReplyWork } from "../../models/reply-work.js";
 import { ReportedSharedMcpFailures } from "../../models/reported-shared-mcp-failures.js";
+import { SendAllowance } from "../../models/send-allowance.js";
 import { SendAsk } from "../../models/send-ask.js";
 import { SharedMcpSelection } from "../../models/shared-mcp-selection.js";
 import { TaskEnd } from "../../models/task-end.js";
@@ -410,7 +411,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   }
 
   public async sendAllowedAsync(params: MessageSendParams, starts: string | null): Promise<MessageSendResult> {
-    return this.sendMessageAsync(params, null, { starts }, undefined);
+    return this.sendMessageAsync(params, null, new SendAllowance(starts), undefined);
   }
 
   public sendOutsideAsync(teammateId: string | null, text: string, label: string, chatId: string | null = null): Promise<string> {
@@ -460,7 +461,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return Resources.formatOrganizationMessagePrompt(place, manager, text);
   }
 
-  private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null,
+  private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: SendAllowance | null,
     signal: AbortSignal | undefined, outside: MessageSender | null = null): Promise<MessageSendResult> {
     if (!Object.isNull(params.senderToken) && !Object.isNull(params.requested) && !Object.isNull(params.requested.mode)) {
       this.requireTurn(params.senderToken);

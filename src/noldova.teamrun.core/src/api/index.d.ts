@@ -6617,6 +6617,22 @@ export declare class OutsideReply {
 }
 
 /**
+ * The person's allowance of a send asked about before it was made, so the send doesn't ask again.
+ */
+export declare class SendAllowance {
+  /**
+   * Whose reply the send started when it was allowed, as `SendAsk.starts` read; the send goes ahead only while it still reads the same.
+   */
+  public readonly starts: string | null;
+
+  /**
+   * Creates the allowance.
+   * @param starts Whose reply the allowed send starts.
+   */
+  public constructor(starts: string | null);
+}
+
+/**
  * What a send with a sender token asks the person before it sends.
  */
 export declare class SendAsk {

@@ -112,6 +112,7 @@ export { ReplyEvidence } from "../models/reply-evidence.js";
 export { QuestionAsk } from "../models/question-ask.js";
 export { QueuedAnswer } from "../models/queued-answer.js";
 export { SendAsk } from "../models/send-ask.js";
+export { SendAllowance } from "../models/send-allowance.js";
 export { OutsideReply } from "../models/outside-reply.js";
 export { OutsideReplyState } from "../enums/outside-reply-state.js";
 export { EventSubscription } from "../models/event-subscription.js";

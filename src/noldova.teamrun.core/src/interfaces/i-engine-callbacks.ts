@@ -11,13 +11,14 @@ import type { Conversation, Message, MessageIdParams, MessageSender, MessageSend
   Teammate } from "@noldova/teamrun.protocol";
 
 import type { ReplyWork } from "../models/reply-work.js";
+import type { SendAllowance } from "../models/send-allowance.js";
 import type { WorkFolder } from "../models/work-folder.js";
 
 export interface IEngineCallbacks {
   requireConversationAsync(id: string, transaction?: SqlTransaction): Promise<Conversation>;
   requireTeammateAsync(id: string, transaction?: SqlTransaction): Promise<Teammate>;
   capEndsTasksAsync(teammate: Teammate, chatId: string): Promise<boolean>;
-  sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null, signal: AbortSignal | undefined,
+  sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: SendAllowance | null, signal: AbortSignal | undefined,
     outside?: MessageSender | null): Promise<MessageSendResult>;
   refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
   toolModeOfAsync(open: { readonly reply: Message; readonly mode: ProviderMode | null }): Promise<ProviderMode | null>;
