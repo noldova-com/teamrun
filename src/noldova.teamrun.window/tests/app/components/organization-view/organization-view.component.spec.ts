@@ -953,8 +953,8 @@ describe("OrganizationViewComponent", () => {
 
       one(".top .views [role=radio]:nth-of-type(3)").click();
       await settle();
-      const [chart, outline, focus, canvas, conversation] = [box(".chart"), box(".chart .outline"), box(".chart main.focus"), box(".chart main.focus > nol-canvas"),
-        box(".chart main.focus > nol-teamrun-organization-messages")];
+      const [chart, outline, focus, canvas, conversation] = [box(".chart"), box(".chart .outline"), box(".chart section.focus"), box(".chart section.focus > nol-canvas"),
+        box(".chart section.focus > nol-teamrun-organization-messages")];
       for (const [actual, expected] of [[outline.left, chart.left], [outline.width, chart.width], [focus.top - outline.bottom, space(4)], [focus.left, chart.left],
         [focus.width, chart.width], [canvas.height, 32 * rem], [conversation.top - canvas.bottom, space(4)], [conversation.height, 17 * rem]] as const)
         AppearanceFixture.expectPixels(actual, expected);
