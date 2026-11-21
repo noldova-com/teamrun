@@ -86,7 +86,7 @@ LICENSE file in the root directory of this source tree.
     }
     <div class="nol-teamrun-organization-field">
       <input nol-text-field class="nol-teamrun-organization-input" name="text" autocomplete="off" [attr.aria-label]="resources.formatOrganizationPlaceholder(title())"
-        [placeholder]="resources.formatOrganizationPlaceholder(title())" [disabled]="!target()" [value]="draft()" (input)="edit($event)">
+        [placeholder]="resources.formatOrganizationPlaceholder(title())" [disabled]="!target()" [value]="draft()" (input)="edit($event)" (keydown.enter)="$event.preventDefault(); send()">
       <button type="submit" nol-icon-button class="nol-teamrun-organization-send" [icon]="resources.sendGlyph" [label]="resources.organizationSendLabel"
         [disabled]="!canSend()" [busy]="sending()"></button>
     </div>
