@@ -245,6 +245,31 @@ export class CopilotAdapterTests {
     Assert.areEqual(TurnOutcome.Interrupted, stopped.outcome);
   }
 
+  @TestMethod
+  public async logsNothingForAStoppedTurnThatSettlesBeforeTheStopReportWait(): Promise<void> {
+    await using host = new CopilotTestHost();
+    const listener = new RecordingTurnListener();
+    const controller = new AbortController();
+    const timer = new ManualTimer();
+    const log = new RecordingLog();
+    const timings = new ProviderTimings(2000, 2000, 10_000, 2000, 100, 20_000, 100, 5000, 100, 1, 10, Resources.wakeGrace, Resources.taskOutputFollowInterval,
+      Resources.accountTimeout, Resources.modelListTimeout, Resources.silenceLimit, Resources.idleLimit, 10_000);
+    const rows = (): SubAgent[] => listener.details.filter(t => t.kind === DetailKind.SubAgent).map(t => SubAgent.fromJson(t.payload));
+    const last = (id: string): SubAgent | undefined => rows().filter(t => t.toolUseId === id).at(-1);
+
+    const run = host.createAdapter({}, host.command, log, timings, host.terminator, timer)
+      .runTurn(host.request("background-sub-agents-held"), listener, controller.signal);
+    await Wait.until(() => last("toolu-todo")?.isBackground === true && last("toolu-notes")?.isBackground === true, "The sub-agents were not in the background.");
+    controller.abort();
+    const stopped = await run;
+    const pending = timer.pendingWithin(timings.stopReportWait);
+    timer.advance(timings.stopReportWait);
+
+    Assert.areEqual(TurnOutcome.Interrupted, stopped.outcome);
+    Assert.areEqual(0, pending);
+    Assert.areEqual("", log.lines.filter(t => t.startsWith(CopilotAdapterTests.stuckPrefix)).join("\n"));
+  }
+
   private static readonly stuckPrefix: string = Resources.formatTurnStopStuck("copilot", "", "").split(";")[0] ?? "";
 
   @TestMethod
