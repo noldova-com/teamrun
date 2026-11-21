@@ -516,14 +516,18 @@ export class RequestDispatcherTests {
     };
     const failing = new FakeProviderAdapter("failing");
     failing.refreshDescriptorAsync = () => Promise.reject(new Error("The environment couldn't be read."));
+    const refusing = new FakeProviderAdapter("refusing");
+    refusing.refreshDescriptorAsync = () => Promise.reject("refused");
     host.registry.register(refreshed);
     host.registry.register(failing);
+    host.registry.register(refusing);
 
     const kinds = await RequestDispatcherTests.succeed(host, MethodName.ProviderKindList, null);
 
-    Assert.areEqual("fake:Fake provider,refreshed:Refreshed provider,failing:Fake provider",
+    Assert.areEqual("fake:Fake provider,refreshed:Refreshed provider,failing:Fake provider,refusing:Fake provider",
       RequestDispatcherTests.objects(kinds).map(t => ProviderKind.fromJson(t.toJson())).map(t => `${t.id}:${t.displayName}`).join(","));
-    Assert.areEqual(JSON.stringify([Resources.formatDescriptorNotRefreshed("failing", "Error")]), JSON.stringify(host.log.lines));
+    Assert.areEqual(JSON.stringify([Resources.formatDescriptorNotRefreshed("failing", "Error"), Resources.formatDescriptorNotRefreshed("refusing", "string")]),
+      JSON.stringify(host.log.lines));
   }
 
   @TestMethod
