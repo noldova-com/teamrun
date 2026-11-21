@@ -49,7 +49,8 @@ describe("OrganizationViewComponent", () => {
   };
   const texts = (selector: string, root: ParentNode = element()): string[] => all(selector, root).map(t => t.textContent?.trim() ?? "");
   const department = (name: string): HTMLElement => {
-    const found = all("nol-teamrun-organization-department").find(t => t.querySelector(".department-name")?.textContent?.trim() === name);
+    const found = all("nol-teamrun-organization-department").find(t => t.querySelector(".department-name")?.textContent?.trim() === name
+      || t.querySelector<HTMLInputElement>(".department-field")?.value === name);
     if (Object.isUndefined(found))
       throw new Error(`No department is named ${name}.`);
     return found;
@@ -304,7 +305,11 @@ describe("OrganizationViewComponent", () => {
             return answer();
           });
       });
+      element().style.width = "72rem";
+      element().style.height = "60rem";
       one(".top .edit").click();
+      await settle();
+      one(".chart .nol-canvas-fit").click();
       await settle();
     };
     const inDialog = (selector: string): HTMLElement => {
