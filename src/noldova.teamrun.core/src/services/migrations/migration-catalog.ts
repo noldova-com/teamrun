@@ -36,6 +36,7 @@ import { HandoverSummariesMigration } from "../../models/migrations/handover-sum
 import { HandoverSummaryKindsMigration } from "../../models/migrations/handover-summary-kinds-migration.js";
 import { CheckpointFoldersMigration } from "../../models/migrations/checkpoint-folders-migration.js";
 import { DepartmentsMigration } from "../../models/migrations/departments-migration.js";
+import { OrganizationMessagesMigration } from "../../models/migrations/organization-messages-migration.js";
 
 export class MigrationCatalog {
   public static readonly all: readonly SqlMigration[] = [new InitialMigration(), new TeammatesMigration(), new DraftsMigration(), new ApprovalScopesMigration(),
@@ -46,5 +47,6 @@ export class MigrationCatalog {
     new WaitingMessagesMigration(), new RunOutputsMigration(),
     new MessageTextMigration(), new AccountLimitsMigration(), new SustainAttemptsMigration(),
     new SustainAttemptReasonsMigration(), new HandoverSummariesMigration(), new HandoverSummaryKindsMigration(),
-    new CheckpointFoldersMigration(), new DepartmentsMigration()];
+    new CheckpointFoldersMigration(), new DepartmentsMigration(),
+    new OrganizationMessagesMigration()];
 }

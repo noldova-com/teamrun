@@ -9,7 +9,7 @@
 import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonException } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Department, DepartmentMember, Organization } from "@noldova/teamrun.protocol";
+import { Department, DepartmentMember, Organization, OrganizationTarget } from "@noldova/teamrun.protocol";
 
 @TestClass
 export class OrganizationTests {
@@ -43,6 +43,26 @@ export class OrganizationTests {
 
     Assert.areEqual("d1", organization.departmentOf("t1"));
     Assert.isNull(organization.departmentOf("t2"));
+  }
+
+  @TestMethod
+  public listsTheTeammatesEachTargetGoesToOnceAndSkipsTeammatesNoLongerKnown(): void {
+    const design = new Department("design", "Design", null, "lead", 1, "c", "u");
+    const web = new Department("web", "Web", "design", null, 0, "c", "u");
+    const ops = new Department("ops", "Ops", null, "boss", 0, "c", "u");
+    const organization = new Organization([design, web, ops],
+      [new DepartmentMember("ann", "design"), new DepartmentMember("lead", "design"), new DepartmentMember("gone", "design"),
+        new DepartmentMember("kid", "web"), new DepartmentMember("boss", "ops")]);
+    const teammates = ["ann", "boss", "kid", "lead", "solo"];
+
+    Assert.areEqual("lead,ann", organization.recipientsOf(OrganizationTarget.department("design"), teammates).join(","));
+    Assert.areEqual("kid", organization.recipientsOf(OrganizationTarget.department("web"), teammates).join(","));
+    Assert.areEqual("", organization.recipientsOf(OrganizationTarget.department("missing"), teammates).join(","));
+    Assert.areEqual("boss,lead", organization.recipientsOf(OrganizationTarget.leaders, teammates).join(","));
+    Assert.areEqual("boss", organization.recipientsOf(OrganizationTarget.leaders, ["boss"]).join(","));
+    Assert.areEqual("ann,boss,kid,lead,solo", organization.recipientsOf(OrganizationTarget.everyone, teammates).join(","));
+    Assert.areEqual("solo", organization.recipientsOf(OrganizationTarget.teammate("solo"), teammates).join(","));
+    Assert.areEqual("", organization.recipientsOf(OrganizationTarget.teammate("gone"), teammates).join(","));
   }
 
   @TestMethod

@@ -88,6 +88,7 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { ILog } from "../../interfaces/i-log.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
 import type { IEngineCallbacks } from "../../interfaces/i-engine-callbacks.js";
+import type { IOrganizationSender } from "../../interfaces/i-organization-sender.js";
 import type { IOutsideMessages } from "../../interfaces/i-outside-messages.js";
 import type { IPermissionAsker } from "../../interfaces/i-permission-asker.js";
 import type { ISenderSends } from "../../interfaces/i-sender-sends.js";
@@ -149,7 +150,7 @@ import { CommandRun } from "./command-run.js";
 import { StoppedCommands } from "./stopped-commands.js";
 import { SubAgentRun } from "./sub-agent-run.js";
 
-export class ConversationEngine implements IConversationEngine, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
+export class ConversationEngine implements IConversationEngine, IOrganizationSender, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
   private readonly adoptedSenders: Map<ReplyWork, string> = new Map();
   private readonly teammates: ITeammatesService;
   private readonly sharedFailures: ReportedSharedMcpFailures = new ReportedSharedMcpFailures();
@@ -409,6 +410,10 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   public sendOutsideAsync(teammateId: string | null, text: string, label: string, chatId: string | null = null): Promise<string> {
     return this.outside.sendOutsideAsync(teammateId, text, label, chatId);
+  }
+
+  public startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult> {
+    return this.outside.startOutsideAsync(teammateId, text, label);
   }
 
   public listOutsideChatsAsync(): Promise<readonly JsonObject[]> {

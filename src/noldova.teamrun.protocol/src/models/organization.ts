@@ -10,9 +10,11 @@ import "@noldova/context.core";
 import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonReader, type JsonObject } from "@noldova/context.json";
 
+import { OrganizationTargetKind } from "../enums/organization-target-kind.js";
 import { Resources } from "../resources.js";
 import { Department } from "./department.js";
 import { DepartmentMember } from "./department-member.js";
+import type { OrganizationTarget } from "./organization-target.js";
 
 export class Organization {
   public static readonly empty: Organization = new Organization([], []);
@@ -43,6 +45,23 @@ export class Organization {
 
   public departmentOf(teammateId: string): string | null {
     return this.members.find(t => t.teammateId === teammateId)?.departmentId ?? null;
+  }
+
+  public recipientsOf(target: OrganizationTarget, teammateIds: readonly string[]): readonly string[] {
+    const known = new Set(teammateIds);
+    switch (target.kind) {
+      case OrganizationTargetKind.Teammate:
+        return teammateIds.filter(t => t === target.id);
+      case OrganizationTargetKind.Department: {
+        const leaderId = this.departments.find(t => t.id === target.id)?.leaderId ?? null;
+        const members = this.members.filter(t => t.departmentId === target.id && known.has(t.teammateId)).map(t => t.teammateId);
+        return [...members.filter(t => t === leaderId), ...members.filter(t => t !== leaderId)];
+      }
+      case OrganizationTargetKind.Leaders:
+        return this.departments.map(t => t.leaderId).filter((t): t is string => !Object.isNull(t) && known.has(t));
+      default:
+        return [...teammateIds];
+    }
   }
 
   public static fromJson(value: unknown, path?: string): Organization {
