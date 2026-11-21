@@ -1587,6 +1587,14 @@ export class Resources {
   public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
 
+  public static formatTeammateFolderUnread(folder: string, error: string): string {
+    return `The teammate's pull requests leave out ${folder}, whose Git state couldn't be read: ${error}`;
+  }
+
+  public static formatTeammateFolderUnwatched(folder: string, error: string): string {
+    return `The teammate's Git state doesn't follow changes in ${folder}: ${error}`;
+  }
+
   public static formatSustainUnavailable(kind: string): string {
     return `TeamRun can't read ${kind}'s usage limits yet, so neither Sustain nor a hand-off can start for this teammate.`;
   }

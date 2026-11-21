@@ -20,16 +20,18 @@ describe("OrganizationLayout", () => {
 
   it("round-trips through JSON, and reads what is missing or malformed as the defaults or nothing", () => {
     const layout = new OrganizationLayout(["d1", "d1", " ", "d2"], new Set([OrganizationCardField.Usage]),
-      new Map<string, ReadonlySet<OrganizationCardField>>([["t1", new Set([OrganizationCardField.Model])], [" ", new Set([OrganizationCardField.Last])]]));
+      new Map<string, ReadonlySet<OrganizationCardField>>([["t1", new Set([OrganizationCardField.Model, OrganizationCardField.Artifacts])],
+        [" ", new Set([OrganizationCardField.Last])]]));
     const read = OrganizationLayout.fromJson(layout.toJson());
     const odd = OrganizationLayout.fromJson({ collapsedDepartments: ["d1", 3], cardsShow: { Usage: true, Status: false, Ghost: true, Last: "yes" }, cards: { t2: [1], t3: { Now: true } } });
 
     expect(layout.toJson()).toEqual({
       collapsedDepartments: ["d1", "d2"],
-      cardsShow: { Status: false, Now: false, Usage: true, Last: false, Model: false },
-      cards: { t1: { Status: false, Now: false, Usage: false, Last: false, Model: true } }
+      cardsShow: { Status: false, Now: false, Usage: true, Last: false, Model: false, Git: false, PullRequests: false, Documents: false, Artifacts: false },
+      cards: { t1: { Status: false, Now: false, Usage: false, Last: false, Model: true, Git: false, PullRequests: false, Documents: false, Artifacts: true } }
     });
-    expect([read.collapsedDepartments, fields(read.cardsShow), fields(read.fieldsOf("t1"))]).toEqual([["d1", "d2"], [OrganizationCardField.Usage], [OrganizationCardField.Model]]);
+    expect([read.collapsedDepartments, fields(read.cardsShow), fields(read.fieldsOf("t1"))])
+      .toEqual([["d1", "d2"], [OrganizationCardField.Usage], [OrganizationCardField.Artifacts, OrganizationCardField.Model]]);
     expect([odd.collapsedDepartments, fields(odd.cardsShow), fields(odd.fieldsOf("t2")), fields(odd.fieldsOf("t3"))])
       .toEqual([["d1"], [OrganizationCardField.Usage], [], [OrganizationCardField.Now]]);
     for (const value of [null, [], "x", { cards: "x" }])
