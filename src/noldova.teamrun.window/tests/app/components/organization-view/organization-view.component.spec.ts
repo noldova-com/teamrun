@@ -373,6 +373,10 @@ describe("OrganizationViewComponent", () => {
   describe("with its messages beside the tree", () => {
     const heading = (): string[] => texts("aside.messages .nol-teamrun-organization-thread-title");
 
+    beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light));
+
+    afterEach(() => AppearanceFixture.reset());
+
     it("talks to the first department until a card is chosen, by a click on the card or Enter on it, but not by its own buttons or while editing", async () => {
       await create();
       const first = [one("aside.messages").getAttribute("aria-label"), heading()];
