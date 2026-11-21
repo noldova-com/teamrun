@@ -124,6 +124,8 @@ export class Resources {
   public static readonly approvedResponderPlanField: string = "approvedResponderPlan";
   public static readonly titleChosenField: string = "titleChosen";
   public static readonly attachedFolderField: string = "attachedFolder";
+  public static readonly organizationChatField: string = "organizationChat";
+  public static readonly organizationIdField: string = "organizationId";
   public static readonly expectedProviderIdField: string = "expectedProviderId";
   public static readonly unrestrictedField: string = "unrestricted";
   public static readonly attachmentsField: string = "attachments";

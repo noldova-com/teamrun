@@ -47,6 +47,18 @@ export class Organization {
     return this.members.find(t => t.teammateId === teammateId)?.departmentId ?? null;
   }
 
+  public managerOf(teammateId: string): string | null {
+    const departmentId = this.departmentOf(teammateId);
+    let department = this.departments.find(t => t.id === departmentId);
+    while (!Object.isUndefined(department)) {
+      if (!Object.isNull(department.leaderId) && department.leaderId !== teammateId)
+        return department.leaderId;
+      const parentId = department.parentId;
+      department = this.departments.find(t => t.id === parentId);
+    }
+    return null;
+  }
+
   public recipientsOf(target: OrganizationTarget, teammateIds: readonly string[]): readonly string[] {
     const known = new Set(teammateIds);
     switch (target.kind) {

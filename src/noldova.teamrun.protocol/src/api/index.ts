@@ -205,6 +205,7 @@ export { OrganizationTarget } from "../models/organization-target.js";
 export { OrganizationRecipient } from "../models/organization-recipient.js";
 export { OrganizationMessage } from "../models/organization-message.js";
 export { OrganizationMessageSendParams } from "../models/methods/organization-message-send-params.js";
+export { OrganizationChat } from "../models/organization-chat.js";
 export { ChatMemberParams, ChatMemberParams as ConversationMemberParams } from "../models/methods/chat-member-params.js";
 export { ChatMemberModeParams } from "../models/methods/chat-member-mode-params.js";
 export { ChatMemberSettingsParams } from "../models/methods/chat-member-settings-params.js";

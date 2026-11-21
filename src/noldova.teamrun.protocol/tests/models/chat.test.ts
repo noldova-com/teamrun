@@ -10,7 +10,7 @@ import "@noldova/context.core";
 import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonException } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Chat, ChatResponder, ForkedSession, RequestedSettings } from "@noldova/teamrun.protocol";
+import { Chat, ChatResponder, ForkedSession, OrganizationChat, RequestedSettings } from "@noldova/teamrun.protocol";
 
 @TestClass
 export class ChatTests {
@@ -44,6 +44,27 @@ export class ChatTests {
       chosen.withSessionReset(true, "t4"), chosen.withForkedSession(null, "t4"), chosen.withResponder(new ChatResponder("bob")), chosen.asEdited(), planning,
       planning.withPlanApproved("bob"), planning.withPlanApproved(null).withPlanReopened(null)];
     Assert.areEqual(JSON.stringify(copies.map(() => true)), JSON.stringify(copies.map(t => t.titleChosen)));
+  }
+
+  @TestMethod
+  public keepsItsOrganizationChatKeyThroughEveryCopyAndJson(): void {
+    const own = Chat.fromJson({ ...ChatTests.json, projectId: null, folder: "D:/data/chats/conv-1" });
+    const keyed = new Chat("conv-2", null, "Organization · Grok", "t1", "t1", false, null, null, false, null, false, [], false, false, null,
+      new OrganizationChat("org-1", "grok")).withPlanFirst(true);
+    const copies = [keyed.withTitle("Renamed", "t4"), keyed.withFolder("E:/site"), keyed.withAttachedFolder("E:/site", "t4"), keyed.withSessionReset(true, "t4"),
+      keyed.withForkedSession(null, "t4"), keyed.withResponder(new ChatResponder("bob")), keyed.asEdited(), keyed.withChosenTitle("Chosen", "t4"),
+      keyed.withPlanApproved("bob"), keyed.withPlanApproved(null).withPlanReopened(null), keyed.withPlanFirst(false), keyed.withProjectId("prj-2", "t4")];
+
+    Assert.isNull(own.organizationChat);
+    Assert.isFalse(Object.hasOwn(own.toJson(), "organizationChat"));
+    Assert.areEqual(JSON.stringify({ organizationId: "org-1", teammateId: "grok" }), JSON.stringify(keyed.toJson()["organizationChat"]));
+    Assert.areEqual(JSON.stringify(copies.map(() => "org-1 grok")),
+      JSON.stringify(copies.map(t => Chat.fromJson(t.toJson()).organizationChat).map(t => `${t?.organizationId} ${t?.teammateId}`)));
+    Assert.isNull(Chat.fromJson({ ...ChatTests.json, organizationChat: null }).organizationChat);
+    Assert.throws(() => new OrganizationChat(" ", "grok"), ArgumentException);
+    Assert.throws(() => new OrganizationChat("org-1", " "), ArgumentException);
+    Assert.areEqual("$.organizationChat.teammateId",
+      Assert.throws(() => Chat.fromJson({ ...ChatTests.json, organizationChat: { organizationId: "org-1", teammateId: " " } }), JsonException).path);
   }
 
   @TestMethod

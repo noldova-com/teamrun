@@ -46,6 +46,18 @@ export class OrganizationTests {
   }
 
   @TestMethod
+  public findsWhoATeammateReportsToThroughTheNearestLeaderAbove(): void {
+    const design = new Department("design", "Design", null, "lead", 0, "c", "u");
+    const web = new Department("web", "Web", "design", "web-lead", 0, "c", "u");
+    const docs = new Department("docs", "Docs", "web", null, 1, "c", "u");
+    const organization = new Organization([design, web, docs], [new DepartmentMember("lead", "design"), new DepartmentMember("web-lead", "web"),
+      new DepartmentMember("dev", "web"), new DepartmentMember("writer", "docs")]);
+
+    Assert.areEqual(JSON.stringify([null, "lead", "web-lead", "web-lead", null]),
+      JSON.stringify(["lead", "web-lead", "dev", "writer", "outside"].map(t => organization.managerOf(t))));
+  }
+
+  @TestMethod
   public listsTheTeammatesEachTargetGoesToOnceAndSkipsTeammatesNoLongerKnown(): void {
     const design = new Department("design", "Design", null, "lead", 1, "c", "u");
     const web = new Department("web", "Web", "design", null, 0, "c", "u");
