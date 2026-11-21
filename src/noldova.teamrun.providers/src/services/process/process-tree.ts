@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 
 import "@noldova/context.core";
-import type { ITimer } from "@noldova/teamrun.core";
+import type { ILog, ITimer } from "@noldova/teamrun.core";
 
 import type { IOrphanSweep } from "../../interfaces/i-orphan-sweep.js";
 import type { IPowershellSession } from "../../interfaces/i-powershell-session.js";
@@ -29,10 +29,11 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
   private readonly kill: (processId: number, signal: NodeJS.Signals | 0) => void;
   private readonly session: IPowershellSession | null;
   private readonly read: (path: string) => string;
+  private readonly log: ILog | null;
 
   public constructor(platform: string, runner: CommandRunner, environment: NodeJS.ProcessEnv, timeout: number, timer: ITimer, grace: number,
     kill: (processId: number, signal: NodeJS.Signals | 0) => void = (processId, signal) => { process.kill(processId, signal); },
-    session: IPowershellSession | null = null, read: (path: string) => string = path => readFileSync(path, Resources.utf8Encoding)) {
+    session: IPowershellSession | null = null, read: (path: string) => string = path => readFileSync(path, Resources.utf8Encoding), log: ILog | null = null) {
     this.platform = platform;
     this.runner = runner;
     this.environment = environment;
@@ -42,6 +43,7 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     this.kill = kill;
     this.session = session;
     this.read = read;
+    this.log = log;
   }
 
   public async endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean> {
@@ -187,19 +189,24 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
 
   private async endOnWindows(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, known: ReadonlyMap<number, number>,
     stop: StopSession): Promise<void> {
-    const ended = new Map<number, number>();
     let tree = new Map(known);
-    let current: ReadonlyMap<number, { readonly parent: number; readonly start: number }> | null = listing;
-    for (let round = 0; !Object.isNull(current) && round < Resources.processTreeFreezeRounds; round++) {
+    let current: ReadonlyMap<number, { readonly parent: number; readonly start: number }> = listing;
+    for (let round = 1; round <= Resources.processTreeFreezeRounds; round++) {
       tree = ProcessTree.treeOf(current, tree);
-      const found: [number, number][] = ProcessTree.listed(current, tree).filter(([id, started]) => ended.get(id) !== started);
+      const found: [number, number][] = ProcessTree.listed(current, tree);
       if (found.length === 0)
         return;
-      for (const [id, started] of found)
-        ended.set(id, started);
-      current = await this.run(Resources.formatProcessEndScript(found.map(t => t[0]), found.map(t => t[1])), Resources.psProcessListArguments, stop)
-        .catch(() => null);
+      const listed = await this.run(Resources.formatProcessEndScript(found.map(t => t[0]), found.map(t => t[1])), Resources.psProcessListArguments, stop)
+        .catch((error: unknown) => error instanceof Error ? error.name : typeof error);
+      if (typeof listed === "string") {
+        this.log?.write(Resources.formatTreeEndRoundFailed(round, listed));
+        return;
+      }
+      current = listed;
     }
+    const left = ProcessTree.listed(current, ProcessTree.treeOf(current, tree));
+    if (left.length > 0)
+      this.log?.write(Resources.formatTreeLeftListed(left));
   }
 
   private async run(endScript: string | null = null, listArguments: readonly string[] = Resources.psProcessListArguments,

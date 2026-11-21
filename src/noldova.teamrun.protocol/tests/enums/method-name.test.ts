@@ -130,6 +130,7 @@ export class MethodNameTests {
     Assert.areEqual("OrganizationMessageSend", MethodName.OrganizationMessageSend);
     Assert.areEqual("OrganizationMessageStop", MethodName.OrganizationMessageStop);
     Assert.areEqual("OrganizationMessageList", MethodName.OrganizationMessageList);
+    Assert.areEqual("OrganizationMessageReplyList", MethodName.OrganizationMessageReplyList);
   }
 
   @TestMethod

@@ -48,6 +48,7 @@ export class FakeProviderAdapter implements IProviderAdapter {
   public takesTeamRunTools: boolean = true;
   public readonly requests: TurnRequest[] = [];
   public askIsolated?: (request: TurnRequest, listener: ITurnListener, signal: AbortSignal) => Promise<TurnResult | null>;
+  public refreshDescriptorAsync?: () => Promise<void>;
   public readCompaction?: (provider: Provider | null, nativeSessionId: string) => Promise<string | null>;
   public carrySession?: (from: Provider | null, to: Provider, nativeSessionId: string) => Promise<SessionCarry>;
   public lastListener: ITurnListener | null = null;

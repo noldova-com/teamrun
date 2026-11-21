@@ -7,13 +7,14 @@
  */
 
 import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
-import { NodeTimer, TimeoutException } from "@noldova/teamrun.core";
+import { type ITimer, NodeTimer, TimeoutException } from "@noldova/teamrun.core";
 import { CommandRunner, type IPowershellSession, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
 
 import { FakeTaskTree, type FakeTaskTreeMode } from "../../fixtures/fake-task-tree.fixture.js";
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
 import { ListingCommandRunner } from "../../fixtures/listing-command-runner.fixture.js";
 import { ListingPowershellSession } from "../../fixtures/listing-powershell-session.fixture.js";
+import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 
@@ -86,15 +87,17 @@ export class ProcessTreeTests {
     const [root, child, stale, late, impostorChild] = [1001, 1002, 1003, 1004, 1005];
     const first = [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 10_000], [child, root, start + 20_000], [stale, child, start + 15_000]];
     const next = [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 50_000], [impostorChild, root, start + 55_000], [late, child, start + 30_000]];
-    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", first), ProcessTreeTests.listing("win32", next)]);
+    const gone = [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 50_000], [impostorChild, root, start + 55_000]];
+    const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", first), ProcessTreeTests.listing("win32", next), ProcessTreeTests.listing("win32", gone)]);
 
     const ended = await ProcessTreeTests.tree("win32", runner).endTree(root, Date.now(), ProcessTreeTests.ANCESTOR);
 
     Assert.isTrue(ended);
     Assert.areEqual(3, runner.calls);
     Assert.isTrue(runner.commands.every(t => t.executable === "powershell.exe"));
-    Assert.areEqual(JSON.stringify([`$ids = @(${String(root)}, ${String(child)}); $starts = @(${String(start + 10_000)}, ${String(start + 20_000)}); `,
-      `$ids = @(${String(late)}); $starts = @(${String(start + 30_000)}); `]),
+    const deadline = `$deadline = [DateTime]::UtcNow.AddMilliseconds(${String(Resources.processExitWait)}); `;
+    Assert.areEqual(JSON.stringify([`$ids = @(${String(root)}, ${String(child)}); $starts = @(${String(start + 10_000)}, ${String(start + 20_000)}); ${deadline}`,
+      `$ids = @(${String(late)}); $starts = @(${String(start + 30_000)}); ${deadline}`]),
       JSON.stringify(runner.commands.slice(1).map(t => t.arguments.at(-1)!.slice(0, t.arguments.at(-1)!.indexOf("for (")))));
   }
 
@@ -182,15 +185,30 @@ export class ProcessTreeTests {
     FakeTaskTree.start(path, 2);
     await Wait.until(() => FakeTaskTree.read(path).length === 2, "The task tree did not get both processes.");
     const [root, child] = FakeTaskTree.read(path) as [number, number];
-    const tree = new ProcessTree(process.platform, new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform))), process.env,
-      Resources.processListTimeout, new NodeTimer(), 60_000);
+    const runner = new ListingCommandRunner([], new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform))));
+    const delays: number[] = [];
+    const real = new NodeTimer();
+    const timer: ITimer = {
+      now: () => real.now(),
+      delayAsync: (milliseconds, signal) => {
+        delays.push(milliseconds);
+        return real.delayAsync(milliseconds, signal);
+      }
+    };
+    const grace = 60_000;
+    const tree = new ProcessTree(process.platform, runner, process.env, Resources.processListTimeout, timer, grace);
 
-    const began = Date.now();
     const ended = await tree.endTree(root, Date.now(), process.pid);
+    const last = runner.outputs.at(-1) ?? "";
+    const left = [root, child].filter(t => ProcessTreeTests.runs(t))
+      .map(t => `${String(t)} ${last.split("\n").some(line => line.trim().split(" ")[0] === String(t)) ? "listed" : "not listed"}`);
 
+    const rounds = runner.commands.map(t => t.arguments.at(-1) ?? "").filter(t => t.startsWith("$ids = "));
     Assert.isTrue(ended);
-    Assert.isTrue(Date.now() - began < 30_000);
-    Assert.isFalse(ProcessTreeTests.runs(root) || ProcessTreeTests.runs(child));
+    Assert.areEqual("[]", JSON.stringify(left));
+    Assert.isTrue(rounds.length < Resources.processTreeFreezeRounds, JSON.stringify(rounds));
+    Assert.isTrue(delays.reduce((total, delay) => total + delay, 0) < grace, JSON.stringify(delays.length));
+    Assert.isTrue(runner.timeouts.length > 0 && runner.timeouts.every(t => t === Resources.processListTimeout), JSON.stringify(runner.timeouts));
   }
 
   @TestMethod
@@ -345,8 +363,8 @@ export class ProcessTreeTests {
     const script = runner.commands[1]?.arguments.at(-1);
     Assert.isDefined(script);
     Assert.areEqual(2, runner.calls);
-    Assert.areEqual(`$ids = @(${String(left)}, ${String(grandchild)}); $starts = @(${String(launched + 10_000)}, ${String(launched + 40_000)}); `,
-      script.slice(0, script.indexOf("for (")));
+    Assert.areEqual(`$ids = @(${String(left)}, ${String(grandchild)}); $starts = @(${String(launched + 10_000)}, ${String(launched + 40_000)}); ` +
+      `$deadline = [DateTime]::UtcNow.AddMilliseconds(${String(Resources.processExitWait)}); `, script.slice(0, script.indexOf("for (")));
   }
 
   @TestMethod
@@ -406,6 +424,72 @@ export class ProcessTreeTests {
     Assert.areEqual(0, runner.calls);
     Assert.areEqual(JSON.stringify([[Resources.powershellProcessListScript, 5_000],
       [Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000]), 5_000]]), JSON.stringify(session.calls));
+  }
+
+  @TestMethod
+  public async endsAProcessOnWindowsAgainInTheNextRoundWhenTheListingStillShowsItAfterItsEnd(): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const [task, child] = [ProcessTreeTests.GONE - 2, ProcessTreeTests.GONE - 1];
+    const session = new ListingPowershellSession([
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000], [child, task, start + 20_000]]),
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]]),
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
+
+    const ended = await new ProcessTree("win32", new ListingCommandRunner([null]), process.env, 10_000, new NodeTimer(), 100, undefined, session)
+      .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000]),
+      Resources.formatProcessEndScript([task], [start + 10_000])]), JSON.stringify(session.calls.map(t => t[0])));
+  }
+
+  @TestMethod
+  public async endsAWindowsTreeInItsLastRoundAndReportsItEndedWhenEveryListingStillShowsAProcess(): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const task = ProcessTreeTests.GONE - 1;
+    const session = new ListingPowershellSession([
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]])]);
+    const log = new RecordingLog();
+
+    const ended = await new ProcessTree("win32", new ListingCommandRunner([null]), process.env, 10_000, new NodeTimer(), 100, undefined, session, undefined, log)
+      .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, ...Array.from({ length: Resources.processTreeFreezeRounds },
+      () => Resources.formatProcessEndScript([task], [start + 10_000]))]), JSON.stringify(session.calls.map(t => t[0])));
+    Assert.areEqual(JSON.stringify([Resources.formatTreeLeftListed([[task, start + 10_000]])]), JSON.stringify(log.lines));
+  }
+
+  @TestMethod
+  @TestData(true, "Error")
+  @TestData(false, "string")
+  public async writesTheRoundWhoseScriptFailsOnWindowsToItsLogAndEndsNoFurtherRound(throwsError: boolean, failure: string): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const task = ProcessTreeTests.GONE - 1;
+    const session = new ListingPowershellSession([
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]]), null]);
+    const runner = new ListingCommandRunner([null], null, throwsError ? new Error("The end failed.") : "The end failed.");
+    const log = new RecordingLog();
+
+    const ended = await new ProcessTree("win32", runner, process.env, 10_000, new NodeTimer(), 100, undefined, session, undefined, log)
+      .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, Resources.formatProcessEndScript([task], [start + 10_000])]),
+      JSON.stringify(session.calls.map(t => t[0])));
+    Assert.areEqual(1, runner.calls);
+    Assert.areEqual(JSON.stringify([Resources.formatTreeEndRoundFailed(1, failure)]), JSON.stringify(log.lines));
+  }
+
+  @TestMethod
+  public waitsForEachProcessTheEndScriptEndsToExitWithinTheScriptsDeadline(): void {
+    const script = Resources.formatProcessEndScript([1001], [5_000]);
+
+    Assert.areEqual(`$ids = @(1001); $starts = @(5000); $deadline = [DateTime]::UtcNow.AddMilliseconds(${String(Resources.processExitWait)}); ` +
+      "for ($i = 0; $i -lt $ids.Count; $i++) { try { $p = [System.Diagnostics.Process]::GetProcessById($ids[$i]); $null = $p.Handle; " +
+      "if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - $starts[$i]) -le 1) { $p.Kill(); " +
+      "$null = $p.WaitForExit([int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)) } } catch { } }; ",
+      script.slice(0, script.indexOf("}; ") + 3));
   }
 
   @TestMethod

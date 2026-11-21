@@ -62,7 +62,7 @@ export class ProviderMenuComponent {
 
   protected async signOut(): Promise<void> {
     const provider = this.provider();
-    if (await ProviderSignOut.confirmAsync(this.dialogs, this.store(), provider))
+    if (await ProviderSignOut.confirmAsync(this.dialogs, this.store(), provider, this.report()))
       await ProviderSignOut.signOutAsync(this.store(), provider, this.report());
   }
 

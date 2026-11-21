@@ -7,7 +7,7 @@
  */
 
 import type { FocusOrigin } from "@angular/cdk/a11y";
-import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
+import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, OrganizationRecipientState, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
   type ProviderKindInstallation, ReplyPanel, Resources as ProtocolResources, SharedMcpSetting, SharedMcpTransport, SharedMcpVariableSource, SubAgentStatus } from "@noldova/teamrun.protocol";
 import { TerminalShellKind } from "@noldova/terminal.window";
 import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
@@ -40,6 +40,8 @@ export class Resources {
   public static readonly retryLabel: string = "Retry";
   public static readonly kindsUnavailableForProviders: string = "The provider types couldn't be loaded, so providers can't be edited or checked.";
   public static readonly kindsUnavailableForMcpServers: string = "The provider types couldn't be loaded, so their MCP servers can't be shown.";
+  public static readonly signInKindsNotRead: string = "The provider types couldn't be read again, so the sign-in didn't start.";
+  public static readonly signOutKindsNotRead: string = "The provider types couldn't be read again, so the sign-out didn't start.";
   public static readonly nullKind: string = "null";
   public static readonly modelCatalogUnavailable: string = "Models could not be refreshed. Previously loaded choices are kept.";
   public static readonly errorCodeField: string = "code";
@@ -601,6 +603,23 @@ export class Resources {
   public static readonly historyWarmUpQuestion: string = "Warm up";
   public static readonly historyWarmUpReply: string = "Warm up with `code`, **bold** and a list:\n\n- one\n- two";
   public static readonly youLabel: string = "You";
+  public static readonly organizationInboxTitle: string = "Inbox";
+  public static readonly organizationChatsLabel: string = "Chats";
+  public static readonly organizationAllRead: string = "All read";
+  public static readonly organizationNoMessages: string = "No messages yet";
+  public static readonly organizationInboxEmpty: string = "No messages yet. Write the first.";
+  public static readonly organizationThreadEmpty: string = "No messages yet.";
+  public static readonly organizationChooseTarget: string = "Choose whom to message.";
+  public static readonly organizationLeadersTitle: string = "All leaders";
+  public static readonly organizationLeadersChat: string = "Chat with all leaders";
+  public static readonly organizationEveryoneTitle: string = "Everyone";
+  public static readonly organizationDeletedDepartment: string = "Deleted department";
+  public static readonly organizationRemovedTeammate: string = "Removed teammate";
+  public static readonly organizationTeammateNote: string = "Teammate";
+  public static readonly organizationSendLabel: string = "Send";
+  public static readonly organizationStopLabel: string = "Stop sending";
+  public static readonly organizationDepartmentIcon: string = "groups";
+  public static readonly organizationGroupIcon: string = "forum";
   public static readonly senderChatGone: string = "from a deleted chat";
   public static readonly wakeReceivedLabel: string = "Received a message from";
   public static readonly wakeEndedLabel: string = "No reply came back from";
@@ -1891,6 +1910,74 @@ export class Resources {
 
   public static formatDraftUnreadable(error: string): string {
     return `${Resources.draftUnreadable} ${error}`;
+  }
+
+  public static formatOrganizationUnread(count: number): string {
+    return `${count} unread`;
+  }
+
+  public static formatOrganizationLeadersNote(count: number): string {
+    return `Every department's leader (${count})`;
+  }
+
+  public static formatOrganizationChat(name: string): string {
+    return `Chat with ${name}`;
+  }
+
+  public static formatOrganizationOnlyNote(name: string): string {
+    return `Only ${name}`;
+  }
+
+  public static formatOrganizationDepartmentNote(count: number): string {
+    return `The leader and every member (${count})`;
+  }
+
+  public static formatOrganizationEveryoneNote(count: number): string {
+    return `Every teammate (${count})`;
+  }
+
+  public static formatOrganizationPlaceholder(title: string): string {
+    return `Message ${title}`;
+  }
+
+  public static formatOrganizationLastLine(author: string, text: string): string {
+    return `${author}: ${text}`;
+  }
+
+  public static formatOrganizationReplying(names: readonly string[]): string {
+    return names.length === 1 ? `${Resources.formatNameList(names)} is replying…` : `${Resources.formatNameList(names)} are replying…`;
+  }
+
+  public static formatOrganizationRecipients(state: OrganizationRecipientState, names: readonly string[]): string {
+    const list = Resources.formatNameList(names);
+    switch (state) {
+      case OrganizationRecipientState.Queued:
+        return `Waiting to start for ${list}`;
+      case OrganizationRecipientState.Started:
+        return `Sent to ${list}`;
+      case OrganizationRecipientState.Stopped:
+        return `Stopped before it reached ${list}`;
+      case OrganizationRecipientState.Removed:
+        return `${list} ${names.length === 1 ? "was" : "were"} removed before it arrived`;
+      case OrganizationRecipientState.Failed:
+        return `Couldn't reach ${list}`;
+    }
+  }
+
+  public static formatOrganizationFailure(name: string, reason: string): string {
+    return `${name}: ${reason}`;
+  }
+
+  public static formatOrganizationSendFailed(error: string): string {
+    return `The message wasn't sent: ${error}`;
+  }
+
+  public static formatOrganizationStopFailed(error: string): string {
+    return `Sending couldn't be stopped: ${error}`;
+  }
+
+  public static formatNameList(names: readonly string[]): string {
+    return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.slice(-1).join("")}`;
   }
 
   public static formatValueKind(value: unknown): string {

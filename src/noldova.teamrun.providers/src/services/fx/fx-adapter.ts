@@ -21,8 +21,6 @@ import type { ProviderTimings } from "../../models/provider-timings.js";
 import { Resources } from "../../resources.js";
 import { AcpAdapter } from "../acp/acp-adapter.js";
 import { CommandRunner } from "../process/command-runner.js";
-import { PowershellSession } from "../process/powershell-session.js";
-import { ProcessTree } from "../process/process-tree.js";
 import { FxAgent } from "./fx-agent.js";
 
 export class FxAdapter extends AcpAdapter {
@@ -32,8 +30,7 @@ export class FxAdapter extends AcpAdapter {
 
   public constructor(command: ProcessCommand | null, environment: NodeJS.ProcessEnv, clientInfo: AppServerClientInfo,
     starter: IProcessStarter, timings: ProviderTimings, timer: ITimer = new NodeTimer(),
-    processTree: IProcessTree = new ProcessTree(process.platform, new CommandRunner(starter), process.env, Resources.processListTimeout, timer, timings.stopGrace,
-      undefined, PowershellSession.shared),
+    processTree?: IProcessTree,
     locate: () => ProcessCommand | null = CommandSource.none, log: ILog | null = null, platform: string = process.platform) {
     const agent = new FxAgent(command, environment, locate, platform);
     super(agent, clientInfo, starter, timings, timer, null, log, processTree);
