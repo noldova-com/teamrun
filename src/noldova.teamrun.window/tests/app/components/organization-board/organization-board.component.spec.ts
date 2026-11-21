@@ -16,7 +16,7 @@ import { ChoicePillsComponent, ThemeMode } from "@noldova/ui.components.angular"
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
-import { OrganizationConversation } from "../../../../src/app/models/organization-conversation";
+import { OrganizationTargetKey } from "../../../../src/app/models/organization-target-key";
 import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
@@ -174,7 +174,7 @@ describe("OrganizationBoardComponent", () => {
   it("opens each conversation in the inbox from its row, and marks the open one", async () => {
     await create();
     const chosen: string[] = [];
-    fixture.componentInstance.chosen.subscribe(t => chosen.push(OrganizationConversation.keyOf(t)));
+    fixture.componentInstance.chosen.subscribe(t => chosen.push(OrganizationTargetKey.of(t)));
     const selected = (): string[] => all(".ask.selected .name, .leaders > .selected .name, .lane.selected .lane-name, .lane > .selected .name")
       .map(t => t.textContent?.trim() ?? "");
 

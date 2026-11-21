@@ -90,14 +90,20 @@ LICENSE file in the root directory of this source tree.
   </main>
   @if (mode() !== modes.Focus) {
     <aside class="messages" [class.inbox]="mode() === modes.Board" [attr.aria-label]="resources.organizationMessagesLabel">
-      <nol-teamrun-organization-messages class="thread" [shape]="mode() === modes.Board ? shapes.Inbox : thread" [target]="target()" (targetChange)="chosen.set($event)">
-        @if (mode() === modes.Tree) {
-          <div class="to" nolTeamrunOrganizationTo>
-            <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
-            <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
-          </div>
-        }
-      </nol-teamrun-organization-messages>
+      @if (mode() === modes.Board) {
+        <nol-teamrun-organization-chats class="chats" [selectedTeammateId]="selectedTeammateId()" (chosen)="chooseTeammate($event)" />
+      }
+      @if (mode() === modes.Tree) {
+        <div class="to">
+          <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
+          <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
+        </div>
+      }
+      @if (target(); as current) {
+        <nol-teamrun-organization-chat class="thread" [target]="current" (targetChange)="chosen.set($event)" />
+      } @else {
+        <p class="empty">{{ resources.organizationChooseTarget }}</p>
+      }
     </aside>
   }
 </div>

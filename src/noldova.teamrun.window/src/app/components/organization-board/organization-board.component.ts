@@ -19,7 +19,7 @@ import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import type { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
-import { OrganizationConversation } from "../../models/organization-conversation";
+import { OrganizationTargetKey } from "../../models/organization-target-key";
 import { OrganizationEdits } from "../../models/organization-edits";
 import type { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -66,7 +66,7 @@ export class OrganizationBoardComponent {
     .filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
   protected readonly targetKey: Signal<string | null> = computed(() => {
     const target = this.target();
-    return Object.isNull(target) ? null : OrganizationConversation.keyOf(target);
+    return Object.isNull(target) ? null : OrganizationTargetKey.of(target);
   });
   protected readonly leadersTarget: OrganizationTarget = OrganizationTarget.leaders;
 
@@ -78,7 +78,7 @@ export class OrganizationBoardComponent {
   }
 
   protected isOpen(target: OrganizationTarget): boolean {
-    return this.targetKey() === OrganizationConversation.keyOf(target);
+    return this.targetKey() === OrganizationTargetKey.of(target);
   }
 
   protected teammateTarget(teammate: Teammate): OrganizationTarget {
