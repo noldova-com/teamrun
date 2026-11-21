@@ -209,14 +209,46 @@ describe("ProjectsLayoutService", () => {
     await Wait.until(() => expect(saves).toEqual([kept(["c1", "c2"])]));
   });
 
-  it("saves a change made before a failed read on the stored layout", async () => {
+  it("keeps a change made before a failed first read, logs the failure, and saves it with a reorder on the layout the next read returns, never on the stored one", async () => {
     localStorage.setItem(key, JSON.stringify(kept(["c9"])));
     context = contextKeeping(null).fail(MethodName.ProjectsLayoutRead, "The runtime is gone.");
     const layout = ProjectsLayoutService.of(context);
 
     layout.togglePin("c1");
-    await Wait.until(() => expect(saves).toEqual([kept(["c9", "c1"])]));
-    expect(layout.pinnedConversations()).toEqual(["c9", "c1"]);
+    await Wait.until(() => expect(context.lines).toEqual([Resources.formatProjectsLayoutNotRead("Error")]));
+    await settle();
+    expect([layout.pinnedConversations(), saves]).toEqual([["c9", "c1"], []]);
+    context.answer(MethodName.ProjectsLayoutRead, () => kept(["c5"]));
+    layout.orderPins(["c1", "c5"]);
+
+    await Wait.until(() => expect(saves.map(t => ProjectsLayout.fromJson(t).pinnedConversations)).toEqual([["c1", "c5"]]));
+    expect([layout.pinnedConversations(), context.count(MethodName.ProjectsLayoutRead), localStorage.getItem(key)]).toEqual([["c1", "c5"], 2, null]);
+  });
+
+  it("reads the kept layout again at a resync after a failed first read, saving nothing", async () => {
+    context.fail(MethodName.ProjectsLayoutRead, "The runtime is gone.");
+    const layout = await open();
+    context.answer(MethodName.ProjectsLayoutRead, () => kept(["c3"]));
+
+    context.emit(EventName.StateResyncRequested, null);
+
+    await Wait.until(() => expect(layout.pinnedConversations()).toEqual(["c3"]));
+    expect([context.count(MethodName.ProjectsLayoutRead), context.count(MethodName.ProjectsLayoutSave)]).toEqual([2, 0]);
+  });
+
+  it("opens on another window's layout when its own read fails after that layout came, without logging", async () => {
+    const read = new DeferredResponse();
+    context.answer(MethodName.ProjectsLayoutRead, () => read.promise);
+    const layout = ProjectsLayoutService.of(context);
+    await Wait.until(() => expect(context.count(MethodName.ProjectsLayoutRead)).toBe(1));
+    context.emit(EventName.ProjectsLayoutUpdated, kept(["c2"]));
+    read.reject(new Error("The runtime is gone."));
+    await settle();
+
+    layout.togglePin("c1");
+
+    await Wait.until(() => expect(saves).toEqual([kept(["c2", "c1"])]));
+    expect(context.lines).toEqual([]);
   });
 
   it("keeps a change for this window when the runtime refuses it", async () => {
@@ -227,7 +259,7 @@ describe("ProjectsLayoutService", () => {
     await Wait.until(() => expect(context.count(MethodName.ProjectsLayoutSave)).toBe(1));
     await settle();
 
-    expect(layout.pinnedConversations()).toEqual(["c1"]);
+    expect([layout.pinnedConversations(), context.lines]).toEqual([["c1"], [Resources.formatProjectsLayoutNotSaved("Error")]]);
   });
 
   it("follows a layout another window keeps, but not while a save of its own is under way", async () => {
