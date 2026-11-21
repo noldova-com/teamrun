@@ -299,7 +299,7 @@ describe("TeammateStatusStoreService", () => {
     expect(reads()).toBe(1);
   });
 
-  it("reads them again when a chat holding one is rewound or deleted, when a last reply loses its text, or on a resync, and not for other chats", async () => {
+  it("reads them again when a chat holding one is rewound or deleted, when a last reply loses its text, on a resync or when the state is invalidated, and not for other chats", async () => {
     let answer = [new TeammateLastReply("alice", "c1", "r1", "Done.", later)];
     listed = () => answer.map(t => t.toJson());
     await create();
@@ -320,8 +320,11 @@ describe("TeammateStatusStoreService", () => {
     answer = [];
     context.emit(EventName.MessageUpdated, finished("r2", "c1", "bob", "").toJson());
     await Wait.until(() => expect(lastSaid("bob")).toBeNull());
+    answer = [new TeammateLastReply("alice", "c1", "r3", "Back.", later)];
+    context.emit(EventName.StateInvalidated, null);
+    await Wait.until(() => expect(lastSaid("alice")).toBe("Back."));
 
-    expect(reads()).toBe(5);
+    expect(reads()).toBe(6);
   });
 
   it("keeps a reply that finishes while the list is read and drops a reading a newer one replaced", async () => {

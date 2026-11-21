@@ -21,6 +21,7 @@ import { TeammateSourceState } from "../enums/teammate-source-state";
 import { TeammateGit } from "../models/teammate-git";
 import { TeammatePullRequest } from "../models/teammate-pull-request";
 import { TeammatePullRequests } from "../models/teammate-pull-requests";
+import { EngineResync } from "./engine-resync";
 import { GitHubReferenceLinks } from "./github-reference-links";
 
 export class TeammateWorkReader {
@@ -61,10 +62,11 @@ export class TeammateWorkReader {
 
   public start(): void {
     const context = this.context;
-    const rereads = [EventName.StateResyncRequested, EventName.ConversationRewound, EventName.ConversationDeleted, EventName.ProjectFolderChanged];
+    const rereads = [EventName.ConversationRewound, EventName.ConversationDeleted, EventName.ProjectFolderChanged];
     this.releases = [
       context.onEvent(Resources.formatQualifiedName(EventName.MessageUpdated), t => this.onMessage(Message.fromJson(t))),
       ...rereads.map(name => context.onEvent(Resources.formatQualifiedName(name), () => this.readAll())),
+      EngineResync.on(context, () => this.readAll()),
       context.onEvent(Resources.formatQualifiedName(PageEventName.PageShown), () => void this.readArtifactsAsync()),
       context.onEvent(Resources.formatQualifiedName(PageEventName.PageUpdated), () => void this.readArtifactsAsync()),
       context.onEvent(GitNames.changedEvent, t => this.onGitChanged(GitChanged.fromJson(t).folder)),

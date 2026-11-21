@@ -16,6 +16,7 @@ import { EventName, MethodName, ProjectsLayoutSaveParams } from "@noldova/teamru
 import { Resources } from "../../resources";
 import type { ProjectsGroup } from "../enums/projects-group";
 import { ProjectsLayout } from "../models/projects-layout";
+import { EngineResync } from "./engine-resync";
 
 export class ProjectsLayoutService {
   public static readonly provider: FactoryProvider =
@@ -51,7 +52,7 @@ export class ProjectsLayoutService {
         else
           this.missed = this.latest;
       }),
-      context.onEvent(Resources.formatQualifiedName(EventName.StateResyncRequested), () => void this.load())
+      EngineResync.on(context, () => void this.load())
     ];
     void this.open();
   }

@@ -16,6 +16,7 @@ import { EventName, Message, MessageIdParams, MessageStatus, MethodName, Organiz
 import { Resources } from "../../resources";
 import { ListNotArrayException } from "../exceptions/list-not-array.exception";
 import { OrganizationConversation } from "../models/organization-conversation";
+import { EngineResync } from "./engine-resync";
 
 export class OrganizationMessagesStoreService {
   public static readonly provider: FactoryProvider = {
@@ -46,7 +47,7 @@ export class OrganizationMessagesStoreService {
     this.subscriptions = [
       context.onEvent(Resources.formatQualifiedName(EventName.OrganizationMessageUpdated), t => this.apply(OrganizationMessage.fromJson(t))),
       ...[EventName.MessageCreated, EventName.MessageUpdated].map(t => context.onEvent(Resources.formatQualifiedName(t), u => this.watch(Message.fromJson(u)))),
-      context.onEvent(Resources.formatQualifiedName(EventName.StateResyncRequested), () => void this.resync())
+      EngineResync.on(context, () => void this.resync())
     ];
     void this.reload();
   }
