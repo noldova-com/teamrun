@@ -81,6 +81,6 @@ describe("TeammateWorkSummaryComponent", () => {
 
     fixture.destroy();
 
-    expect(context.requests.filter(t => t.method === "git.unwatch")).toHaveLength(1);
+    await Wait.until(() => expect(context.requests.filter(t => t.method === "git.unwatch")).toHaveLength(1));
   });
 });

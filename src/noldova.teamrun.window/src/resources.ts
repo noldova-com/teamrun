@@ -364,7 +364,7 @@ export class Resources {
   public static readonly teammateGitHubMissing: string = "The GitHub module isn't installed";
   public static readonly teammateGitHubSignedOut: string = "Sign in to GitHub to see pull requests";
   public static readonly teammateNoPullRequests: string = "No open pull requests";
-  public static readonly teammatePullRequestFolderLimit: number = 5;
+  public static readonly teammatePullRequestFolderLimit: number = 10;
   public static readonly teammateNoDocuments: string = "None";
   public static readonly teammateNoArtifacts: string = "No artifacts yet";
   public static readonly teammateDraftPullRequest: string = "Draft";

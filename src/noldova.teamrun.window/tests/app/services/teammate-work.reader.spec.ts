@@ -282,8 +282,8 @@ describe("TeammateWorkReader", () => {
     expect([documents.git().state, documents.pullRequests().state, documents.artifacts()]).toEqual([TeammateSourceState.Reading, TeammateSourceState.Reading, []]);
   });
 
-  it("asks GitHub about the newest five of its folders", async () => {
-    const folders = [app, "/work/f2", "/work/f3", "/work/f4", "/work/f5", "/work/f6", "/work/f7"];
+  it("asks GitHub about the newest ten of its folders", async () => {
+    const folders = [app, ...Array.from({ length: 11 }, (_, index) => `/work/f${index + 2}`)];
     context.answerModule(workMethod, () => workOf(app, folders));
     for (const folder of folders.slice(1))
       statuses.set(folder, statusOf(null, null));
@@ -291,7 +291,7 @@ describe("TeammateWorkReader", () => {
     const work = start();
 
     await Wait.until(() => expect(work.pullRequests().state).toBe(TeammateSourceState.Shown));
-    expect([...new Set(foldersOf(statusMethod))].sort()).toEqual(folders.slice(0, 5).sort());
+    expect([...new Set(foldersOf(statusMethod))].sort()).toEqual(folders.slice(0, 10).sort());
   });
 
   it("moves its watch from one folder to the next in turn, so a quick second move leaves no folder watched", async () => {
