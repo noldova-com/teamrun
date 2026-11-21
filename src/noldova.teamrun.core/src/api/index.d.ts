@@ -4078,6 +4078,10 @@ export declare class Resources {
    */
   public static readonly checkpointFolderChangedRefusal: string;
   /**
+   * Refusal of a rewind that restored the files but couldn't remove the messages, saying the files were restored.
+   */
+  public static readonly rewindNotSavedAfterRestore: string;
+  /**
    * Why a rewind restored no files, in plain words, by the checkpoints module's outcome.
    */
   public static readonly restoreRefusals: ReadonlyMap<string, string>;

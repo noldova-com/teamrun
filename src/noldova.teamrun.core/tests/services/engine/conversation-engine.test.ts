@@ -1785,6 +1785,37 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
+  public async saysTheFilesWereRestoredWhenARewindCantRemoveItsMessagesAndRemovesThemOnASecondRewind(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const folder = ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
+    const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
+    host.adapter.writeFiles = { "base.txt": "reply\n" };
+    const sent = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Change"));
+    await host.engine.waitForIdle();
+    const failure = new Error("The disk is full.");
+    const connection = host.context.database.connection;
+    const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
+    let failures = 1;
+    connection.runInTransactionAsync = async work => failures-- > 0
+      ? await runInTransactionAsync(async transaction => {
+        await work(transaction);
+        throw failure;
+      })
+      : await runInTransactionAsync(work);
+
+    const thrown = await Assert.throwsAsync(() => host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, true)), ServiceException);
+    const kept = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).length;
+    const restored = readFileSync(join(folder, "base.txt"), "utf8");
+    const again = await host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, true));
+
+    Assert.areEqual(`${ErrorCode.Internal}:${Resources.rewindNotSavedAfterRestore}:true`, `${thrown.info.name}:${thrown.message}:${thrown.cause === failure}`);
+    Assert.areEqual("2:one\n", `${kept}:${restored}`);
+    Assert.areEqual(2, again.removedMessageIds.length);
+    Assert.areEqual(0, (await host.messages.listAsync(new MessageListParams(conversation.id, null))).length);
+    Assert.areEqual(1, host.listener.count(EventName.ConversationRewound));
+  }
+
+  @TestMethod
   public async failsAProjectChatsReplyWithoutStartingTheProviderWhileTheProjectsFolderIsMissingAndRunsItOnceTheFolderIsBack(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync("repo");

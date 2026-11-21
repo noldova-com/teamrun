@@ -831,6 +831,8 @@ export class Resources {
   public static readonly checkpointPathSeparator: string = "/";
   public static readonly noCheckpointRefusal: string = "No checkpoint was taken before that reply, so no files were restored.";
   public static readonly checkpointFolderChangedRefusal: string = "The chat's folder has changed since that reply, so no files were restored.";
+  public static readonly rewindNotSavedAfterRestore: string =
+    "The files were restored to before that reply, but its messages couldn't be removed, so the chat still shows them. Rewind again to remove them.";
   public static readonly restoreRefusals: ReadonlyMap<string, string> = new Map([
     ["CheckpointMissing", "The checkpoint taken before that reply is gone, so no files were restored."],
     ["FolderMissing", "The project's folder is missing, so no files were restored."],
