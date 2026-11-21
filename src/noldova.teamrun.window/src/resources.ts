@@ -18,6 +18,7 @@ import { ImageOpenMode } from "./app/enums/image-open-mode";
 import { OrganizationCardField } from "./app/enums/organization-card-field";
 import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
+import { TeammateStatus } from "./app/enums/teammate-status";
 import type { ProviderAction } from "./app/types/provider-action";
 
 export class Resources {
@@ -1160,6 +1161,13 @@ export class Resources {
     [OrganizationViewMode.Tree]: "Tree",
     [OrganizationViewMode.Board]: "Board",
     [OrganizationViewMode.Focus]: "Focus"
+  };
+  public static readonly teammateStatusLabels: Readonly<Record<TeammateStatus, string>> = {
+    [TeammateStatus.Working]: "Working",
+    [TeammateStatus.WaitingForYou]: "Waiting for you",
+    [TeammateStatus.Idle]: "Idle",
+    [TeammateStatus.UsageLimit]: "Usage limit",
+    [TeammateStatus.Stopped]: "Stopped"
   };
   public static readonly teammatesHint: string = "Create and configure teammates here. Add them to a chat using its member strip or an @mention.";
   public static readonly defaultTeammateHint: string = "The provider, model and effort a new chat starts with. Chats you already have keep their own.";
