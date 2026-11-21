@@ -38,12 +38,12 @@ export class OrganizationDetailsComponent {
   private readonly time: WritableSignal<number> = signal(this.clock.now());
 
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
-  public readonly department: InputSignal<Department> = input.required<Department>();
+  public readonly department: InputSignal<Department | null> = input.required<Department | null>();
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly label: Signal<string> = computed(() => Resources.formatOrganizationDetailsLabel(this.teammate().name));
   protected readonly place: Signal<string> = computed(() =>
-    [this.teammate().role, this.department().name].filter(t => !Object.isNull(t)).join(Resources.titleSeparator));
+    [this.teammate().role, this.department()?.name ?? Resources.organizationNoDepartment].filter(t => !Object.isNull(t)).join(Resources.titleSeparator));
   protected readonly reportsTo: Signal<string> = computed(() => {
     const leader = OrganizationDetailsComponent.leaderAbove(this.organization.organization(), this.store.teammates(), this.department(), this.teammate().id);
     return Object.isNull(leader) ? Resources.organizationOwnerName : leader.name;
@@ -82,8 +82,8 @@ export class OrganizationDetailsComponent {
     });
   }
 
-  private static leaderAbove(organization: Organization, teammates: readonly Teammate[], department: Department, teammateId: string): Teammate | null {
-    let current: Department | undefined = department;
+  private static leaderAbove(organization: Organization, teammates: readonly Teammate[], department: Department | null, teammateId: string): Teammate | null {
+    let current: Department | undefined = department ?? undefined;
     while (!Object.isUndefined(current)) {
       const leaderId: string | null = current.leaderId;
       const leader = leaderId === teammateId ? undefined : teammates.find(t => t.id === leaderId);

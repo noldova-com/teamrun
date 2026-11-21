@@ -120,6 +120,23 @@ describe("OrganizationBoardComponent", () => {
       ["nol-teamrun-organization-card", "Carol"]]);
   });
 
+  it("gives the teammates in no department a No department column, first, with no message, rename, delete or add, and counts them on its head", async () => {
+    await create();
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+      ChatStoreService.of(context).teammates()));
+    await settle();
+    const none = (): HTMLElement => one(".lane:nth-child(1)");
+
+    expect([all(".lane").length, texts(".lane-name", none()), texts(".lane-count", none()), texts("nol-teamrun-organization-card .name", none()),
+      all(".message-department", none()).length, all(".message-department").length]).toEqual([4, ["No department"], ["1"], ["Carol"], 0, 3]);
+
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+
+    expect([[...element().querySelectorAll<HTMLInputElement>(".lane-rename")].map(t => t.value), all(".delete-department").length, all(".add-member").length,
+      texts(".lane-name", none()), all(".move-choice, .remove", none()).length]).toEqual([["Design", "UI", "Build"], 3, 3, ["No department"], 0]);
+  });
+
   it("sorts a column by name, and by status again, on its own, and by status for a sort it doesn't know", async () => {
     await create();
     const build = (): HTMLElement => one(".lane:nth-child(3)");
@@ -263,6 +280,36 @@ describe("OrganizationBoardComponent", () => {
     afterEach(() => AppearanceFixture.reset());
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
+
+    it("draws No department's column first, as wide as the others, with its head, summary, sort and members at a department column's insets", async () => {
+      await create();
+      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+        ChatStoreService.of(context).teammates()));
+      await settle();
+      const host = box(element());
+      const gap = space(4);
+      const columns = Math.floor((host.width + gap) / (16 * rem() + gap));
+      const width = (host.width - (columns - 1) * gap) / columns;
+      const [none, design] = [one(".lane:nth-child(1)"), one(".lane:nth-child(2)")];
+      const offsets = (lane: HTMLElement): { head: DOMRect; summary: DOMRect; sort: DOMRect; member: DOMRect; column: DOMRect } => ({ column: box(lane),
+        head: box(one(".lane-head", lane)), summary: box(one(".lane-summary", lane)), sort: box(one(".lane-sort", lane)), member: box(one("nol-teamrun-organization-card", lane)) });
+      const [ours, theirs] = [offsets(none), offsets(design)];
+
+      expect(texts(".lane-name", none)).toEqual(["No department"]);
+      for (const [index, column] of all(".lane").map(box).entries()) {
+        AppearanceFixture.expectPixels(column.width, width);
+        AppearanceFixture.expectPixels(column.left - host.left, index * (width + gap));
+        AppearanceFixture.expectPixels(column.top, ours.column.top);
+      }
+      AppearanceFixture.expectPixels(ours.head.left - ours.column.left, space(3) + 1);
+      AppearanceFixture.expectPixels(ours.head.top - ours.column.top, theirs.head.top - theirs.column.top);
+      AppearanceFixture.expectPixels(ours.summary.top - ours.head.bottom, theirs.summary.top - theirs.head.bottom);
+      AppearanceFixture.expectPixels(ours.sort.top - ours.summary.bottom, theirs.sort.top - theirs.summary.bottom);
+      AppearanceFixture.expectPixels(ours.sort.left - ours.column.left, space(3) + 1);
+      AppearanceFixture.expectPixels(ours.member.top - ours.sort.bottom, theirs.member.top - theirs.sort.bottom);
+      AppearanceFixture.expectPixels(ours.member.left - ours.column.left, theirs.member.left - theirs.column.left);
+      AppearanceFixture.expectPixels(ours.member.width, theirs.member.width);
+    });
 
     it("lays the board out at 76rem: the queue in columns of at least 17rem, the leaders at up to 20rem on one line, the departments in columns of at least 16rem", async () => {
       await create();

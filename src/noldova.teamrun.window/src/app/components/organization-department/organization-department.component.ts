@@ -8,7 +8,7 @@
 
 import { Component, ElementRef, computed, inject, type InputSignal, input, type OutputEmitterRef, output, type Signal, viewChild } from "@angular/core";
 
-import { NameOrder, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, NameOrder, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
   MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent }
   from "@noldova/ui.components.angular";
@@ -53,7 +53,7 @@ export class OrganizationDepartmentComponent {
   protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
   protected readonly detailsSide: OverlaySide = OverlaySide.below;
   protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
-  protected readonly isOpen: Signal<boolean> = computed(() => !this.layout.layout().isCollapsed(this.node().department.id));
+  protected readonly isOpen: Signal<boolean> = computed(() => !this.layout.layout().isCollapsed(this.node().id));
   protected readonly summary: Signal<string> = computed(() => {
     const node = this.node();
     const people = Object.isNull(node.leader) ? node.members : [node.leader, ...node.members];
@@ -65,18 +65,17 @@ export class OrganizationDepartmentComponent {
     return [new SelectOption(String.empty, Resources.organizationNoLeader), ...NameOrder.sort(people, t => t.name).map(t => new SelectOption(t.id, t.name))];
   });
   protected readonly candidates: Signal<readonly Teammate[]> = computed(() => {
-    const id = this.node().department.id;
+    const id = this.node().id;
     const members = this.organization.organization().members;
     return NameOrder.sort(this.store.teammates().filter(t => !members.some(u => u.teammateId === t.id && u.departmentId === id)), t => t.name);
   });
 
   protected toggle(): void {
-    this.layout.toggleDepartment(this.node().department.id);
+    this.layout.toggleDepartment(this.node().id);
   }
 
-  protected rename(): void {
+  protected rename(department: Department): void {
     const field = this.nameField().nativeElement;
-    const department = this.node().department;
     const name = field.value.trim();
     if (name.length === 0 || name === department.name) {
       field.value = department.name;
@@ -86,15 +85,14 @@ export class OrganizationDepartmentComponent {
   }
 
   protected setLeader(value: string): void {
-    void this.organization.setLeader(this.node().department.id, value.length === 0 ? null : value);
+    void this.organization.setLeader(this.node().id, value.length === 0 ? null : value);
   }
 
   protected add(teammateId: string): void {
-    void this.organization.setMember(teammateId, this.node().department.id);
+    void this.organization.setMember(teammateId, this.node().id);
   }
 
-  protected confirmDelete(): void {
-    const department = this.node().department;
+  protected confirmDelete(department: Department): void {
     const parent = this.organization.organization().departments.find(t => t.id === department.parentId)?.name ?? null;
     const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
     dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.organizationDeleteDepartmentTitle,

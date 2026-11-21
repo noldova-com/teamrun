@@ -9,7 +9,7 @@
 import { Component, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
   SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
@@ -62,7 +62,7 @@ export class OrganizationBoardComponent {
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
   protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus(this.departments()
-    .flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.department.name, this.status(t))))
+    .flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.name, this.status(t))))
     .filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
   protected readonly targetKey: Signal<string | null> = computed(() => {
     const target = this.target();
@@ -86,7 +86,7 @@ export class OrganizationBoardComponent {
   }
 
   protected departmentTarget(node: OrganizationNode): OrganizationTarget {
-    return OrganizationTarget.department(node.department.id);
+    return OrganizationTarget.department(node.id);
   }
 
   protected askAgo(ask: OrganizationBoardAsk): string | null {
@@ -103,12 +103,12 @@ export class OrganizationBoardComponent {
   }
 
   protected sortOf(node: OrganizationNode): OrganizationBoardSort {
-    return this.sorts().get(node.department.id) ?? OrganizationBoardSort.Status;
+    return this.sorts().get(node.id) ?? OrganizationBoardSort.Status;
   }
 
   protected sort(node: OrganizationNode, value: string): void {
     const sort = Object.values(OrganizationBoardSort).find(t => t === value) ?? OrganizationBoardSort.Status;
-    this.sorts.update(t => new Map([...t, [node.department.id, sort]]));
+    this.sorts.update(t => new Map([...t, [node.id, sort]]));
   }
 
   protected membersOf(node: OrganizationNode): readonly Teammate[] {
@@ -126,20 +126,20 @@ export class OrganizationBoardComponent {
     return OrganizationEdits.addable(node, this.chats.teammates());
   }
 
-  protected rename(node: OrganizationNode, event: Event): void {
-    void OrganizationEdits.renameAsync(event, node.department.name, name => this.organization.renameDepartment(node.department.id, name));
+  protected rename(department: Department, event: Event): void {
+    void OrganizationEdits.renameAsync(event, department.name, name => this.organization.renameDepartment(department.id, name));
   }
 
   protected addMember(node: OrganizationNode, teammate: Teammate): void {
-    void this.organization.setMember(teammate.id, node.department.id);
+    void this.organization.setMember(teammate.id, node.id);
   }
 
   protected addDepartment(): void {
     void this.organization.createDepartment(Resources.organizationNewDepartment, null);
   }
 
-  protected deleteDepartment(node: OrganizationNode): void {
-    this.confirm(OrganizationEdits.deleteRequest(node, this.departments()), () => void this.organization.deleteDepartment(node.department.id));
+  protected deleteDepartment(department: Department): void {
+    this.confirm(OrganizationEdits.deleteRequest(department, this.departments()), () => void this.organization.deleteDepartment(department.id));
   }
 
   private confirm(request: ConfirmRequest, action: () => void): void {
