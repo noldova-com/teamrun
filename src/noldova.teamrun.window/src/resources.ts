@@ -2935,6 +2935,10 @@ export class Resources {
     return [Object.isNull(role) ? department : `${role} in ${department}`, ...Object.isNull(model) ? [] : [model]].join(" · ");
   }
 
+  public static formatOrganizationFocusAddMember(name: string): string {
+    return `Add a member to ${name}`;
+  }
+
   public static formatOrganizationFocusAsks(count: number): string {
     return `${count} need you`;
   }

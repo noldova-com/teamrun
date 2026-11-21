@@ -6,12 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
   Teammate } from "@noldova/teamrun.protocol";
-import { ThemeMode } from "@noldova/ui.components.angular";
+import { type SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationFocusComponent } from "../../../../src/app/components/organization-focus/organization-focus.component";
@@ -19,6 +20,7 @@ import { OrganizationLayout } from "../../../../src/app/models/organization-layo
 import { OrganizationNode } from "../../../../src/app/models/organization-node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
@@ -76,9 +78,12 @@ describe("OrganizationFocusComponent", () => {
         saves.push(OrganizationLayout.fromJson(OrganizationLayoutSaveParams.fromJson(t).layout));
         return null;
       });
+    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet])
+      context.answer(method, () => null);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, OrganizationLayoutService.provider] });
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, OrganizationLayoutService.provider,
+      ChatStoreService.provider, OrganizationStoreService.provider] });
     fixture = TestBed.createComponent(OrganizationFocusComponent);
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer, carol]));
     fixture.autoDetectChanges();
@@ -93,6 +98,7 @@ describe("OrganizationFocusComponent", () => {
 
   afterEach(() => {
     TeammateStatusStoreService.release(context);
+    OrganizationStoreService.release(context);
     OrganizationLayoutService.release(context);
     ChatStoreService.release(context);
   });
@@ -164,6 +170,55 @@ describe("OrganizationFocusComponent", () => {
     await click(twist());
     expect(texts(".orow.person .label")).toEqual(["Alice", "Bob", "Code Reviewer", "Carol", "Offline"]);
     await Wait.until(() => expect(saves).toHaveLength(2));
+  });
+
+  it("edits the structure in edit mode: renames the focused department, moves its members, adds one from outside it and adds a department", async () => {
+    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
+    const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
+    const moves = (): SelectComponent[] => fixture.debugElement.queryAll(By.css("nol-select.member-move")).map(t => t.componentInstance as SelectComponent);
+    await create("Department:design");
+    expect([all(".unit-rename").length, all(".member-move").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
+
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+    expect([all(".add-member").map(t => t.getAttribute("aria-label")), texts(".unit-name"), one(".unit-rename").getAttribute("aria-label")]).toEqual([
+      ["Add a member to Design", "Add a member to UI", "Add a member to Build"], [], "Department name"
+    ]);
+    expect(moves().map(t => [t.label(), t.value()])).toEqual([["Bob's department", "design"]]);
+    const field = one(".unit-rename").querySelector("input") ?? one(".unit-rename");
+    if (!(field instanceof HTMLInputElement))
+      throw new Error("The rename field is no input.");
+    for (const value of ["   ", "Design", "  Craft  "]) {
+      field.value = value;
+      field.dispatchEvent(new Event("change"));
+    }
+    const [move] = moves();
+    if (Object.isUndefined(move))
+      throw new Error("No move select.");
+    move.valueChange.emit("build");
+    await click(one(".add-member", row("Design")));
+    await Wait.until(() => expect(menuItems().map(t => t.textContent?.trim())).toEqual(["Carol", "Code Reviewer", "Offline"]));
+    const [first] = menuItems();
+    if (Object.isUndefined(first))
+      throw new Error("No menu item.");
+    first.click();
+    one(".add-department").click();
+
+    await Wait.until(() => expect(edits()).toEqual([
+      ["teamrun.departmentUpdate", { departmentId: "design", name: "Craft" }],
+      ["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: "build" }],
+      ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
+      ["teamrun.departmentCreate", { name: "New department", parentId: null }]
+    ]));
+  });
+
+  it("renames no unit when a teammate or the leaders are focused, and moves a focused member only", async () => {
+    await create("Teammate:bob");
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+    expect([all(".unit-rename").length, texts(".unit-name"), all(".member-move").length]).toEqual([0, ["Bob"], 1]);
+    await click(one(".crumb"));
+    expect([all(".unit-rename").length, texts(".unit-name"), all(".member-move").length]).toEqual([0, ["Organization"], 0]);
   });
 
   describe.each([

@@ -197,6 +197,18 @@
   gap: var(--nol-space-3);
 }
 
+.unit-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.unit-rename {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
 .grid.one {
   grid-template-columns: minmax(0, 36rem);
 }

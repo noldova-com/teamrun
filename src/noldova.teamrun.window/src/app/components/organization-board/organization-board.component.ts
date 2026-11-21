@@ -9,7 +9,7 @@
 import { Component, computed, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, type WritableSignal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
+import type { Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
   SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
@@ -18,6 +18,7 @@ import { OrganizationBoardSort } from "../../enums/organization-board-sort";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
+import { OrganizationEdits } from "../../models/organization-edits";
 import type { OrganizationNode } from "../../models/organization-node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
@@ -54,7 +55,7 @@ export class OrganizationBoardComponent {
   protected readonly sortOptions: readonly SelectOption[] = Object.values(OrganizationBoardSort).map(t => new SelectOption(t, Resources.organizationBoardSortLabels[t]));
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
-  protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() => this.departments().map(t => new SelectOption(t.department.id, t.department.name)));
+  protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() => OrganizationEdits.departmentOptions(this.departments()));
   protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus(this.departments()
     .flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.department.name, this.status(t))))
     .filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
@@ -84,12 +85,11 @@ export class OrganizationBoardComponent {
   }
 
   protected addable(node: OrganizationNode): readonly Teammate[] {
-    const inside = new Set([...Object.isNull(node.leader) ? [] : [node.leader.id], ...node.members.map(t => t.id)]);
-    return NameOrder.sort(this.chats.teammates().filter(t => !inside.has(t.id)), t => t.name);
+    return OrganizationEdits.addable(node, this.chats.teammates());
   }
 
   protected rename(node: OrganizationNode, event: Event): void {
-    const name = event.target instanceof HTMLInputElement ? event.target.value.trim() : String.empty;
+    const name = OrganizationEdits.nameOf(event);
     if (name.length > 0 && name !== node.department.name)
       void this.organization.renameDepartment(node.department.id, name);
   }

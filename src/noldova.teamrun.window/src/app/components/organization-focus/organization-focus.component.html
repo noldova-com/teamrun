@@ -7,7 +7,14 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <nav class="outline" [attr.aria-label]="resources.organizationFocusOutlineLabel">
-  <div class="outline-head"><span class="title">{{ resources.organizationFocusStructure }}</span></div>
+  <div class="outline-head">
+    <span class="title">{{ resources.organizationFocusStructure }}</span>
+    <span class="spacer"></span>
+    @if (editing()) {
+      <button type="button" nol-icon-button class="add-department" [icon]="resources.organizationBoardAddDepartmentIcon" [label]="resources.organizationBoardAddDepartment"
+        (click)="addDepartment()"></button>
+    }
+  </div>
   <div class="orow root" [class.selected]="isHere(rootTarget())">
     <span class="twist"></span>
     <button type="button" class="obtn" [attr.aria-current]="isHere(rootTarget())" (click)="go(rootTarget())"><span class="material-symbols-rounded icon"
@@ -25,6 +32,17 @@ LICENSE file in the root directory of this source tree.
           <span class="asks note"><span class="dot waiting" aria-hidden="true"></span>{{ resources.formatOrganizationFocusAsks(asksIn(row)) }}</span>
         }
         <nol-chip>{{ row.node.headcount }}</nol-chip></button>
+      @if (editing()) {
+        <button type="button" nol-icon-button class="add-member" [icon]="resources.organizationBoardAddMemberIcon"
+          [label]="resources.formatOrganizationFocusAddMember(row.node.department.name)" [disabled]="addable(row).length === 0" [nolMenuTriggerFor]="addMenu"></button>
+        <ng-template #addMenu>
+          <nol-menu>
+            @for (teammate of addable(row); track teammate.id) {
+              <button nol-menu-item [label]="teammate.name" (triggered)="addMember(row, teammate)"></button>
+            }
+          </nol-menu>
+        </ng-template>
+      }
     </div>
     @if (!layout.layout().isCollapsed(row.node.department.id)) {
       @for (person of row.people; track person.id) {
@@ -51,12 +69,22 @@ LICENSE file in the root directory of this source tree.
       }
     </div>
     <div class="unit-head">
-      <h2 class="unit-name">{{ unitName() }}</h2>
+      @if (editing() && focus().department !== null && focus().teammate === null) {
+        <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="unitName()" (change)="renameUnit($event)" />
+      } @else {
+        <h2 class="unit-name">{{ unitName() }}</h2>
+      }
       <span class="note unit-summary">{{ unitSummary() }}</span>
     </div>
     <div class="grid" [class.one]="cards().length === 1">
       @for (card of cards(); track card.id) {
-        <nol-teamrun-organization-card [teammate]="card" [shape]="fluid" />
+        <div class="unit-card">
+          <nol-teamrun-organization-card [teammate]="card" [shape]="fluid" />
+          @if (editing() && isMember(card)) {
+            <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(card.name)" [options]="departmentOptions()" [value]="focus().department?.department?.id ?? ''"
+              (valueChange)="move(card, $event)" />
+          }
+        </div>
       } @empty {
         <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
       }
