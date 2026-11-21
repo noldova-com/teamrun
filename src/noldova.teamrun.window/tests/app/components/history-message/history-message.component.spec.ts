@@ -720,7 +720,15 @@ describe("HistoryMessageComponent", () => {
       let frame = requestAnimationFrame(sample);
 
       try {
-        await Wait.until(() => expect(frames.filter(t => t[1] === t[2]).length).toBeGreaterThanOrEqual(2), { timeout: 1_000 + 2 * loadedFrame });
+        const waitStart = performance.now();
+        try {
+          await Wait.until(() => expect(frames.filter(t => t[1] === t[2]).length).toBeGreaterThanOrEqual(2), { timeout: 1_000 + 2 * loadedFrame });
+        }
+        catch (error) {
+          throw new Error(`After ${Math.round(performance.now() - waitStart)} ms, ${frames.length} sampled frames, fewer than two showing all ${arrivedOf(40)} arrived characters; `
+            + `text ${JSON.stringify(visibleOf(view))}; highlights ${JSON.stringify([...CSS.highlights].map(([name, ranges]) => [name, [...ranges].map(t => t.toString())]))}; `
+            + `frames as [ms from the wait, shown, arrived] ${JSON.stringify(frames.map(t => [Math.round(t[0] - waitStart), t[1], t[2]]))}`, { cause: error });
+        }
         for (const length of [140, 240, 340]) {
           rendered = undefined;
           await show(reply(length));
