@@ -5,7 +5,7 @@
   "description": "Holds chats with AI agents from several providers as teammates, and lets people follow and approve their work.",
   "parts": ["runtime", "window", "cli"],
   "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.3" },
-  "optionalDependencies": { "browser": "0.0.3", "computer-use": "0.0.2", "git": "0.0.3", "git-github": "0.0.3" },
+  "optionalDependencies": { "browser": "0.0.3", "computer-use": "0.0.2", "git": "0.0.5", "git-github": "0.0.5" },
   "noldovaDesktop": ">=0.0.10 <0.1.0",
   "contributes": {
     "methods": [

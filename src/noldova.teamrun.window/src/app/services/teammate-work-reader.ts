@@ -228,9 +228,9 @@ export class TeammateWorkReader {
       return null;
     const answer = BranchPullRequest.fromJson(await this.context.requestAsync(GitHubNames.readBranchPullRequestMethod,
       new BranchQuery(Resources.gitHubReferenceHost, home, status.branch, status.head).toJson()));
-    const pullRequest = answer.pullRequest;
-    return !Object.isNull(pullRequest) && TeammateWorkReader.openStates.includes(pullRequest.state)
-      ? new TeammatePullRequest(folder, pullRequest, answer.checksState) : null;
+    const { pullRequest, reviewDecision } = answer;
+    return !Object.isNull(pullRequest) && !Object.isNull(reviewDecision) && TeammateWorkReader.openStates.includes(pullRequest.state)
+      ? new TeammatePullRequest(folder, pullRequest, answer.checksState, reviewDecision) : null;
   }
 
   private async readStatusAsync(folder: string): Promise<GitStatus> {

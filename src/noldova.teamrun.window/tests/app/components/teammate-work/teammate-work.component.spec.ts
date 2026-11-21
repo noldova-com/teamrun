@@ -10,7 +10,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { BranchPullRequest, CheckState, HostAccount, HostChanges, HostCheck, HostItem, HostPerson, HostReference, HostSignIn, ReferenceKind,
-  ReferenceState } from "@noldova/git.hosting.protocol";
+  ReferenceState, ReviewDecision } from "@noldova/git.hosting.protocol";
 import { FileState, GitFolderParams, GitRemote, GitStatus, RemoteTransport, StatusEntry, StatusUpstream } from "@noldova/git.protocol";
 import { TeammateDocument, TeammateWork } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
@@ -32,11 +32,12 @@ describe("TeammateWorkComponent", () => {
     new StatusEntry(path, undefined, null, undefined, FileState.Modified, FileState.Unmodified, null, null, null, null);
   const statusOf = (branch: string | null, entries: readonly StatusEntry[], upstream: StatusUpstream | null): JsonValue =>
     new GitStatus(branch, head, upstream, entries, false, "f1", null, new GitRemote("origin", "github.com", "noldova-com/app", RemoteTransport.Https)).toJson();
-  const pullRequestOf = (number: number, state: ReferenceState, checks: readonly HostCheck[]): JsonValue => new BranchPullRequest(
-    new HostItem(new HostReference("git-github", "noldova-com", "app", number), ReferenceKind.PullRequest, state, `Change ${number}`,
-      `https://github.com/noldova-com/app/pull/${number}`, new HostPerson("dev", null, null), Date.parse("2026-11-20T09:00:00.000Z"),
-      state === ReferenceState.Merged ? Date.parse("2026-11-20T10:00:00.000Z") : null, 0, new HostChanges(1, 0, 1, "main", "main", head)),
-    checks).toJson();
+  const pullRequestOf = (number: number, state: ReferenceState, checks: readonly HostCheck[], review: ReviewDecision = ReviewDecision.Waiting): JsonValue =>
+    new BranchPullRequest(
+      new HostItem(new HostReference("git-github", "noldova-com", "app", number), ReferenceKind.PullRequest, state, `Change ${number}`,
+        `https://github.com/noldova-com/app/pull/${number}`, new HostPerson("dev", null, null), Date.parse("2026-11-20T09:00:00.000Z"),
+        state === ReferenceState.Merged ? Date.parse("2026-11-20T10:00:00.000Z") : null, 0, new HostChanges(1, 0, 1, "main", "main", head)),
+      checks, review).toJson();
   const check = (state: CheckState): HostCheck => new HostCheck("build", state, null);
   const documents = [new TeammateDocument("/work/app/docs/PLAN.md", "c1", "2026-11-20T09:00:00.000Z"),
     new TeammateDocument("C:\\work\\app\\README.md", "c1", "2026-11-20T08:00:00.000Z")];
@@ -99,6 +100,20 @@ describe("TeammateWorkComponent", () => {
     expect([...element.querySelectorAll(".work-icon")].map(t => t.getAttribute("aria-hidden"))).toEqual(["true", "true", "true", "true", "true"]);
   });
 
+  for (const [state, review, text] of [
+    [ReferenceState.Open, ReviewDecision.Waiting, "Waiting for review"],
+    [ReferenceState.Open, ReviewDecision.ChangesRequested, "Changes requested"],
+    [ReferenceState.Open, ReviewDecision.Approved, "Approved"],
+    [ReferenceState.Draft, ReviewDecision.Approved, "Draft"]
+  ] as const)
+    it(`shows "${text}" for a ${state} pull request whose review reads ${review}`, async () => {
+      answer(new TeammateWork("t1", app, [app], []).toJson(), statusOf("main", [], null), pullRequestOf(7, state, [], review));
+
+      const fixture = render(new Set([OrganizationCardField.PullRequests]));
+
+      await Wait.until(() => expect(texts(fixture)).toEqual([["PullRequests", `#7 Change 7 ${text}`]]));
+    });
+
   it("shows only the sections its fields switch on, in the design's order, and follows a change without reading again", async () => {
     answer(new TeammateWork("t1", app, [app], []).toJson(), statusOf("main", [], null), pullRequestOf(7, ReferenceState.Open, []));
     const fixture = render(new Set([OrganizationCardField.Status, OrganizationCardField.Model]));
@@ -124,15 +139,15 @@ describe("TeammateWorkComponent", () => {
     expect(one(fixture.nativeElement, "[data-field=Artifacts] .work-muted .work-icon").textContent).toBe("dashboard");
   });
 
-  it("names one changed file and an open pull request with no checks, without a CI or review line", async () => {
+  it("names one changed file and an open pull request with no checks, without a CI line", async () => {
     answer(new TeammateWork("t1", app, [app], []).toJson(), statusOf("main", [entry("a.ts")], new StatusUpstream("origin/main", 0, 2, false)),
       pullRequestOf(4, ReferenceState.Open, []));
 
     const fixture = render(new Set([OrganizationCardField.Git, OrganizationCardField.PullRequests]));
 
     await Wait.until(() => expect(texts(fixture)).toEqual([["Git", "main", "1 changed file · 0 ahead, 2 behind origin/main"],
-      ["PullRequests", "#4 Change 4"]]));
-    expect(one(fixture.nativeElement, ".work-pull-request-meta").children).toHaveLength(0);
+      ["PullRequests", "#4 Change 4 Waiting for review"]]));
+    expect(one(fixture.nativeElement, ".work-pull-request-meta").querySelector(".work-ci")).toBeNull();
   });
 
   it.each([
@@ -145,7 +160,7 @@ describe("TeammateWorkComponent", () => {
 
     const fixture = render(new Set([OrganizationCardField.PullRequests]));
 
-    await Wait.until(() => expect(texts(fixture)).toEqual([["PullRequests", `#4 Change 4 ${label}`]]));
+    await Wait.until(() => expect(texts(fixture)).toEqual([["PullRequests", `#4 Change 4 ${label} Waiting for review`]]));
     expect([...one(fixture.nativeElement, ".work-ci").classList]).toEqual(["work-ci", look]);
   });
 
@@ -237,7 +252,7 @@ describe("TeammateWorkComponent", () => {
       const fixture = render();
       const element: HTMLElement = fixture.nativeElement;
       element.style.width = "13rem";
-      await Wait.until(() => expect(texts(fixture)[1]).toEqual(["PullRequests", "#7 Change 7 CI failed"]));
+      await Wait.until(() => expect(texts(fixture)[1]).toEqual(["PullRequests", "#7 Change 7 CI failed Waiting for review"]));
       const sections = [...element.querySelectorAll<HTMLElement>("[data-field]")];
 
       for (const icon of element.querySelectorAll(".work-icon")) {

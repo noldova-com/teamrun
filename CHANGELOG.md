@@ -33,6 +33,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 - **The command line's add-provider:** it no longer takes a folder: TeamRun makes the new provider's profile folder itself, and the provider signs in from TeamRun's window, so a script that passes a folder must drop it.
 - **Noldova Desktop 0.0.9 and `@noldova/ui.components.angular` 0.0.18:** TeamRun is built on these versions (#253, #255).
+- **Git 0.0.5:** TeamRun takes the Git and GitHub modules at 0.0.5, whose pull request answers carry the review decision a teammate's card shows (#319).
 
 ## 0.0.6
 

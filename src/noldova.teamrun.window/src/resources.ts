@@ -7,7 +7,7 @@
  */
 
 import type { FocusOrigin } from "@angular/cdk/a11y";
-import { CheckState } from "@noldova/git.hosting.protocol";
+import { CheckState, ReviewDecision } from "@noldova/git.hosting.protocol";
 import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
   type ProviderKindInstallation, ReplyPanel, Resources as ProtocolResources, SharedMcpSetting, SharedMcpTransport, SharedMcpVariableSource, SubAgentStatus } from "@noldova/teamrun.protocol";
 import { TerminalShellKind } from "@noldova/terminal.window";
@@ -362,6 +362,11 @@ export class Resources {
   public static readonly teammateNoDocuments: string = "None";
   public static readonly teammateNoArtifacts: string = "No artifacts yet";
   public static readonly teammateDraftPullRequest: string = "Draft";
+  public static readonly teammateReviewLabels: Readonly<Record<ReviewDecision, string>> = {
+    [ReviewDecision.Waiting]: "Waiting for review",
+    [ReviewDecision.ChangesRequested]: "Changes requested",
+    [ReviewDecision.Approved]: "Approved"
+  };
   public static readonly teammateDocumentSeparator: string = ", ";
   public static readonly teammateCiLabels: Readonly<Record<CheckState, readonly [text: string, look: string]>> = {
     [CheckState.Failed]: ["CI failed", "ci-failed"],

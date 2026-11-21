@@ -28,9 +28,7 @@ LICENSE file in the root directory of this source tree.
             @if (ciOf(item); as ci) {
               <span class="work-ci" [class]="ci[1]"><span class="work-dot"></span>{{ ci[0] }}</span>
             }
-            @if (reviewOf(item); as review) {
-              <span class="work-muted">{{ review }}</span>
-            }
+            <span class="work-muted">{{ reviewOf(item) }}</span>
           </span>
         </div>
       }

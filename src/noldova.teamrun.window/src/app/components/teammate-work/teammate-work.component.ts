@@ -85,8 +85,8 @@ export class TeammateWorkComponent {
     return Object.isNull(item.checksState) ? null : Resources.teammateCiLabels[item.checksState];
   }
 
-  protected reviewOf(item: TeammatePullRequest): string | null {
-    return item.pullRequest.state === ReferenceState.Draft ? Resources.teammateDraftPullRequest : null;
+  protected reviewOf(item: TeammatePullRequest): string {
+    return item.pullRequest.state === ReferenceState.Draft ? Resources.teammateDraftPullRequest : Resources.teammateReviewLabels[item.reviewDecision];
   }
 
   private static noteOf(state: TeammateSourceState, failure: string, missing: string): string {
