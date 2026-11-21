@@ -15,6 +15,7 @@ import {
   ChatFolderAttachParams,
   Conversation,
   ConversationListParams,
+  ConversationMoveParams,
   DetailKind,
   ErrorCode,
   EventName,
@@ -73,7 +74,7 @@ describe("ConversationComponent", () => {
       .answer(MethodName.ConversationList, () => [SampleData.conversation.toJson(), second.toJson()])
       .answer(MethodName.MessagePage, t => SampleData.page(MessagePageParams.fromJson(t).conversationId === "c2" ? [elsewhere] : [SampleData.userMessage, answer], false, false)
         .toJson())
-      .answer(MethodName.ConversationRename, () => new Conversation("c1", "p1", "Renamed", SampleData.timestamp, SampleData.timestamp).toJson());
+      .answer(MethodName.ConversationRename, () => (store().conversation("c1") ?? SampleData.conversation).withTitle("Renamed", SampleData.timestamp).toJson());
     TestBed.configureTestingModule({
       imports: [ConversationComponent],
       providers: [{ provide: WindowPartTokens.context, useValue: context }, { provide: WindowPartTokens.shown, useValue: shown.asReadonly() }]
@@ -437,6 +438,54 @@ describe("ConversationComponent", () => {
 
     expect(context.updates.map(t => t.update)).toEqual([{ breadcrumb: [Resources.chatsTitle, "site"] }, { breadcrumb: [Resources.chatsTitle, "/home/ada/notes/"] },
       { breadcrumb: [Resources.chatsTitle] }, { title: "Renamed" }]);
+  });
+
+  it("follows its chat's project in the tab's breadcrumb, once the chat moves into another project, and from Chats into one", async () => {
+    const loose = new Conversation("c1", null, SampleData.conversation.title, SampleData.timestamp, SampleData.timestamp);
+    context.answer(MethodName.ProjectList, () => [SampleData.listed(SampleData.project), SampleData.listed(SampleData.otherProject)])
+      .answer(MethodName.ChatFolderAttach, t => loose.withAttachedFolder(ChatFolderAttachParams.fromJson(t).folder, SampleData.timestamp).toJson())
+      .answer(MethodName.ConversationMove, t => {
+        const params = ConversationMoveParams.fromJson(t);
+        return new Conversation(params.chatId, params.projectId, SampleData.conversation.title, SampleData.timestamp, SampleData.timestamp).toJson();
+      });
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    await settle();
+
+    await store().moveConversation("c1", SampleData.otherProject.id);
+    await settle();
+    await store().moveConversation("c1", SampleData.project.id);
+    await settle();
+    await store().attachFolder("c1", "D:/work/site");
+    await settle();
+    await store().moveConversation("c1", SampleData.otherProject.id);
+    await settle();
+    await store().renameConversation("c1", "Renamed");
+    await settle();
+
+    expect(context.updates.map(t => t.update)).toEqual([{ breadcrumb: [SampleData.otherProject.name] }, { breadcrumb: [SampleData.project.name] },
+      { breadcrumb: [Resources.chatsTitle, "site"] }, { breadcrumb: [SampleData.otherProject.name] }, { title: "Renamed" }]);
+  });
+
+  it("writes the breadcrumb of a tab opened before the store lists its chat's project, once the project comes", async () => {
+    const moved = new Conversation("c2", SampleData.otherProject.id, second.title, SampleData.timestamp, SampleData.timestamp);
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    context.answer(MethodName.ConversationMove, () => moved.toJson())
+      .answer(MethodName.ProjectOpen, () => SampleData.otherProject.toJson())
+      .answer(MethodName.ConversationList, t => ConversationListParams.fromJson(t).projectId === SampleData.otherProject.id ? [moved.toJson()] : []);
+    await store().moveConversation("c2", SampleData.otherProject.id);
+    await settle();
+    const other = TestBed.createComponent(ConversationComponent);
+    other.componentRef.setInput("instance", "c2");
+    other.componentRef.setInput("title", "Second");
+    other.detectChanges();
+    await other.whenStable();
+
+    expect(context.updates).toEqual([]);
+    await store().openProject(SampleData.otherProject.rootPath);
+    await other.whenStable();
+
+    expect(context.updates.map(t => [t.instance, t.update])).toEqual([["c2", { breadcrumb: [SampleData.otherProject.name] }]]);
+    other.destroy();
   });
 
   it("selects whichever of two tabs side by side the person moves into, while each keeps its own messages in view", async () => {
