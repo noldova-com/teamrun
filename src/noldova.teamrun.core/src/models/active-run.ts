@@ -39,6 +39,10 @@ export class ActiveRun {
     return this.cancelled;
   }
 
+  public get isStoppedAfterTurn(): boolean {
+    return this.afterTurnController?.signal.aborted ?? false;
+  }
+
   public get isAwaitingDecision(): boolean {
     return this.decisions.size > 0;
   }

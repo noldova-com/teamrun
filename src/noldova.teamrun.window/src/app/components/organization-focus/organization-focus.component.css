@@ -1,0 +1,256 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  align-items: stretch;
+  gap: var(--nol-space-4);
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.outline {
+  display: flex;
+  flex: 1 1 16rem;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--nol-space-2) var(--nol-space-1);
+  border: 1px solid var(--nol-card-border);
+  border-radius: var(--nol-radius-large);
+  background: var(--nol-panel);
+}
+
+.outline-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  padding: var(--nol-space-1) var(--nol-space-2) var(--nol-space-2);
+}
+
+.title,
+.strong {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.note {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.orow {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  min-height: 1.625rem;
+  padding: 0 var(--nol-space-2) 0 var(--nol-space-1);
+  border-radius: var(--nol-radius-small);
+}
+
+.orow:hover {
+  background: var(--nol-hover);
+}
+
+.orow.selected {
+  background: var(--nol-selected);
+}
+
+.twist {
+  flex: none;
+  width: 1.5rem;
+}
+
+.obtn {
+  all: unset;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  height: 1.625rem;
+  border-radius: var(--nol-radius-small);
+  cursor: pointer;
+}
+
+.obtn:focus-visible,
+.crumb:focus-visible {
+  outline: 1px solid var(--nol-accent);
+}
+
+.label,
+.tag {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asks {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  color: var(--nol-warning);
+  white-space: nowrap;
+}
+
+.dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--nol-badge);
+}
+
+.dot.working {
+  background: var(--nol-status-ok);
+}
+
+.dot.waiting {
+  background: var(--nol-warning);
+}
+
+.dot.stopped {
+  background: var(--nol-status-failed);
+}
+
+.focus {
+  display: flex;
+  flex: 999 1 35rem;
+  flex-direction: column;
+  gap: var(--nol-space-4);
+  min-width: 0;
+  min-height: 0;
+}
+
+.canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.conversation {
+  box-sizing: border-box;
+  flex: none;
+  height: 17rem;
+  border: 1px solid var(--nol-card-border);
+  border-radius: var(--nol-radius-large);
+  background: var(--nol-panel);
+}
+
+.focus-plane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-4);
+  width: 60rem;
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-1);
+  font-size: var(--nol-text-small);
+}
+
+.crumb {
+  all: unset;
+  padding: 0 var(--nol-space-1);
+  border-radius: var(--nol-radius-small);
+  color: var(--nol-text-muted);
+  cursor: pointer;
+}
+
+.crumb:hover {
+  background: var(--nol-hover);
+  color: var(--nol-text);
+}
+
+.crumb.here {
+  background: none;
+  color: var(--nol-text-strong);
+  cursor: default;
+}
+
+.unit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-2) var(--nol-space-4);
+}
+
+.unit-name {
+  margin: 0;
+  color: var(--nol-text-strong);
+  font-size: 1.625rem;
+  font-weight: var(--nol-weight-emphasis);
+  line-height: 2rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  align-items: start;
+  gap: var(--nol-space-3);
+}
+
+.unit-rename {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.grid.one {
+  grid-template-columns: minmax(0, 36rem);
+}
+
+.edit-row {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-2);
+}
+
+@container (width < 48rem) {
+  :host {
+    flex-wrap: wrap;
+  }
+
+  .outline {
+    flex: 1 1 100%;
+    max-height: 20rem;
+  }
+
+  .focus {
+    flex: 1 1 100%;
+  }
+
+  .canvas {
+    flex: none;
+    height: 32rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .dot {
+    background: CanvasText;
+  }
+
+  .orow.selected {
+    outline: 1px solid Highlight;
+  }
+}

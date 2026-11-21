@@ -1188,50 +1188,16 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
 
   private async handOffAsync(item: ReplyWork, work: ReplyWork[]): Promise<void> {
     const handed = await this.context.database.connection.runInTransactionAsync(async transaction => {
-      const finished = await this.messages.findAsync(item.message.id, transaction);
-      if (Object.isNull(finished) || Object.isNull(finished.teammateId) || finished.status !== MessageStatus.Completed || item.run.isCancelled)
+      const found = await this.messages.findAsync(item.message.id, transaction);
+      if (Object.isNull(found))
         return null;
-      const text = finished.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join(Resources.lineSeparator);
-      const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
-      const mentions = MentionResolver.resolveTeammateText(text, available);
-      if (mentions.length === 0)
-        return null;
-      const skipped = new Set([finished.teammateId, item.trigger.sender?.teammateId, ...item.sentTo]);
-      const others: Teammate[] = [];
-      for (const addressed of MentionResolver.resolveAddressed(text, available).filter(t => !skipped.has(t.teammateId)))
-        others.push((await this.teammates.findAsync(addressed.teammateId, transaction))!);
-      const limit = this.readHopLimit();
-      const stopped = others.length > 0 && item.hop >= limit;
-      const now = new Date().toISOString();
-      const stored = stopped
-        ? finished.withMentions(mentions).withDetail(new MessageDetail(finished.details.length, DetailKind.Note, Resources.formatChainStopped(limit),
-          { source: Resources.handOffSource }, now))
-        : finished.withMentions(mentions);
-      const sequence = await this.messages.nextSequenceAsync(finished.conversationId, transaction);
-      const pending: ReplyWork[] = [];
-      const waiting: ReplyWork[] = [];
-      for (const teammate of stopped ? [] : others) {
-        const open = work.find(t => t.message.teammateId === teammate.id && !t.isEnded && Object.isNull(t.wake));
-        if (!Object.isUndefined(open)) {
-          waiting.push(open);
-          continue;
-        }
-        const next = await this.prepareReplyAsync(teammate, null, null, stored, sequence + pending.length, now, item.hop + 1, item.chain, null, transaction);
-        if (!Object.isNull(next))
-          pending.push(next);
-      }
-      let joined = false;
-      for (const teammate of stopped ? [] : others) {
-        const member = new ConversationMemberParams(finished.conversationId, teammate.id);
-        if (Object.isNull(await this.conversations.findMemberAsync(member, transaction))) {
-          await this.conversations.addMemberAsync(member, transaction);
-          joined = true;
-        }
-      }
-      await this.messages.updateAsync(stored, transaction);
-      for (const next of pending)
-        await this.messages.insertAsync(next.message, transaction);
-      return { stored, pending, waiting, joined };
+      const finished = item.run.isStoppedAfterTurn && found.status === MessageStatus.Completed
+        ? found.withStatus(MessageStatus.Cancelled, new Date().toISOString()) : found;
+      const handed = await this.handOffOfAsync(item, work, finished, transaction);
+      if (!Object.isNull(handed) || finished === found)
+        return handed;
+      await this.messages.updateAsync(finished, transaction);
+      return { stored: finished, pending: [], waiting: [], joined: false };
     });
     if (Object.isNull(handed))
       return;
@@ -1249,6 +1215,56 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       this.events.publish(new Event(EventName.MessageCreated, next.message.toJson()));
     if (joined)
       this.events.publish(new Event(EventName.StateInvalidated, null));
+  }
+
+  private async handOffOfAsync(item: ReplyWork, work: ReplyWork[], finished: Message, transaction: SqlTransaction)
+    : Promise<{ stored: Message; pending: ReplyWork[]; waiting: ReplyWork[]; joined: boolean } | null> {
+    if (Object.isNull(finished.teammateId))
+      return null;
+    const halted = item.run.isCancelled;
+    if (finished.status !== MessageStatus.Completed && !halted)
+      return null;
+    const text = finished.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join(Resources.lineSeparator);
+    const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
+    const mentions = MentionResolver.resolveTeammateText(text, available);
+    if (mentions.length === 0)
+      return null;
+    const skipped = new Set([finished.teammateId, item.trigger.sender?.teammateId, ...item.sentTo]);
+    const others: Teammate[] = [];
+    for (const addressed of MentionResolver.resolveAddressed(text, available).filter(t => !skipped.has(t.teammateId)))
+      others.push((await this.teammates.findAsync(addressed.teammateId, transaction))!);
+    const limit = this.readHopLimit();
+    const stopped = others.length > 0 && (halted || item.hop >= limit);
+    const now = new Date().toISOString();
+    const note = halted ? Resources.formatHandOffStopped(others.map(t => t.name)) : Resources.formatChainStopped(limit);
+    const stored = stopped
+      ? finished.withMentions(mentions).withDetail(new MessageDetail(finished.details.length, DetailKind.Note, note, { source: Resources.handOffSource }, now))
+      : finished.withMentions(mentions);
+    const sequence = await this.messages.nextSequenceAsync(finished.conversationId, transaction);
+    const pending: ReplyWork[] = [];
+    const waiting: ReplyWork[] = [];
+    for (const teammate of stopped ? [] : others) {
+      const open = work.find(t => t.message.teammateId === teammate.id && !t.isEnded && Object.isNull(t.wake));
+      if (!Object.isUndefined(open)) {
+        waiting.push(open);
+        continue;
+      }
+      const next = await this.prepareReplyAsync(teammate, null, null, stored, sequence + pending.length, now, item.hop + 1, item.chain, null, transaction);
+      if (!Object.isNull(next))
+        pending.push(next);
+    }
+    let joined = false;
+    for (const teammate of stopped ? [] : others) {
+      const member = new ConversationMemberParams(finished.conversationId, teammate.id);
+      if (Object.isNull(await this.conversations.findMemberAsync(member, transaction))) {
+        await this.conversations.addMemberAsync(member, transaction);
+        joined = true;
+      }
+    }
+    await this.messages.updateAsync(stored, transaction);
+    for (const next of pending)
+      await this.messages.insertAsync(next.message, transaction);
+    return { stored, pending, waiting, joined };
   }
 
   private async isIdleAsync(chatId: string, transaction?: SqlTransaction, held: boolean = false): Promise<boolean> {

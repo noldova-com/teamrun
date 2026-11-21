@@ -11,13 +11,16 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Organization:** Show organization in the View menu opens the team's organization as its own view: you at the root, then each department with its count, its leader's card and its members' cards, nested to any depth, on a canvas you pan, zoom and fit, with an overview map (#317).
   A card shows its teammate's status, what it runs now and for how long, and, when chosen, its usage, its last message and its model; Cards show chooses the fields for every card, a card's own menu for itself.
   Pointing at a card or reaching it with the keyboard opens its details: status, whom it reports to, model, usage, last words and what it runs now; the messages beside the tree talk to whom you choose under To, a teammate whose name you click or a department's Message; long last words show three lines.
-  Edit structure adds, renames and deletes departments, chooses a department's leader, renames teammates, and adds, moves and removes members, asking before a delete or a removal.
+  View switches between the Tree, a Board and Focus: the Board queues who needs you, with how long ago and what they asked, then the leaders and a column for each department, and opens each conversation in the inbox beside it; Focus outlines the departments and their people beside one department or teammate in full, with every activity and its time, over its conversation.
+  Edit structure, in every view, adds, renames and deletes departments, chooses a department's leader, renames teammates, and adds, moves and removes members, asking before a delete or a removal.
   The view, the collapsed departments and the cards' fields are kept across a restart.
 
 ### Fixed
 
+- **Stop as an answer lands:** Stop pressed just as a teammate's answer arrives stops the change comparison, shows the reply as stopped and lists it among what Stop stopped; a teammate it addressed isn't started, and the reply notes whom it would have handed off to (#142).
 - **Moving a chat, or attaching or detaching its folder, while its work runs:** the change is refused with a message naming each background command and helper of the chat still running, or a teammate's background work, rather than moving the folder from under it, which left that work writing in the old folder (#139).
 - **The focus after a delete:** deleting a teammate, a chat or a shared MCP server moves the keyboard focus to the next row, or the one before for the last, and to Add, or New chat for a chat whose group is gone, once none is left or the next row went meanwhile, rather than dropping it to the window; a focus the person moved while the delete ran stays where it is (#155).
+- **The focus after removing a provider:** a focus the person moved while the removal ran, such as to Add provider, stays where it is, rather than jumping back to a provider row (#388).
 - **A reply's approvals:** an approval decided, withdrawn or asked just as a teammate's reply ends no longer puts the ended reply back to Running for good (#143).
 - **A chat tab's place:** a chat moved to another project, or from Chats into one, now shows its new project in its tab's breadcrumb, rather than the old one (#152).
 - **Claude Code on macOS:** a Claude Code signed in the usual way is listed as signed in, and its turns run, rather than showing `Sign-in required` (#338).
