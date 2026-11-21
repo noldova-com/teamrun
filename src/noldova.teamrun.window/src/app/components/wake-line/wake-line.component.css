@@ -1,0 +1,114 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+}
+
+:host(.nol-teamrun-wake-line-alone) {
+  --nol-teamrun-column-side: max(calc(var(--nol-space-4) * 2), calc((100cqw - 55rem) / 2));
+
+  max-width: 55rem;
+  margin-inline: var(--nol-teamrun-column-side) calc(var(--nol-teamrun-column-side) - (100cqw - 100%));
+}
+
+.wake-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-1);
+  min-height: var(--nol-pointer-target);
+  margin: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+}
+
+.wake-label,
+.wake-toggle,
+.wake-chat,
+.wake-chevron {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--nol-pointer-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.wake-label,
+.wake-toggle,
+.wake-chat {
+  min-width: 0;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.wake-label {
+  cursor: default;
+}
+
+.wake-toggle:hover,
+.wake-chevron:hover {
+  color: var(--nol-text);
+}
+
+.wake-chat {
+  color: var(--nol-link);
+}
+
+.wake-chat:hover {
+  text-decoration: underline;
+}
+
+.wake-chevron {
+  flex: none;
+  font-size: var(--nol-icon);
+}
+
+.wake-replies {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  padding-block-end: var(--nol-space-2);
+  color: var(--nol-text);
+  font-size: var(--nol-text-message);
+  line-height: var(--nol-line-message);
+}
+
+.wake-reply-heading {
+  margin: 0;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-label);
+  line-height: var(--nol-line-label);
+}
+
+.wake-reply-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.wake-command-text {
+  font-family: var(--nol-font-mono);
+}
+
+.wake-note {
+  margin: 0;
+  padding-inline-start: var(--nol-space-3);
+  border-inline-start: calc(var(--nol-border-width) * 2) solid var(--nol-border);
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-message);
+  line-height: var(--nol-line-message);
+  overflow-wrap: anywhere;
+  user-select: text;
+}

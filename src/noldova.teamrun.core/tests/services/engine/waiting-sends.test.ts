@@ -34,6 +34,7 @@ import {
   QuestionAnswer,
   QuestionOption,
   RequestedSettings,
+  Resources as ProtocolResources,
   SenderEnvironment,
   TeammateCreateParams,
   WaitingMessage,
@@ -699,7 +700,7 @@ export class WaitingSendsTests {
     const people = (await host.messages.listAsync(new MessageListParams(first.id, null))).filter(t => t.author === MessageAuthor.User).map(t => t.details[0]);
 
     Assert.areEqual("@Alice ask Bob|> Which platform?\n\nWeb|Queued", people.slice(0, 3).map(t => t?.text).join("|"));
-    Assert.isTrue(JSON.stringify(people[3]?.payload ?? null).includes(Resources.chatWakeSource), JSON.stringify(people[3] ?? null));
+    Assert.isTrue(JSON.stringify(people[3]?.payload ?? null).includes(ProtocolResources.chatWakeSource), JSON.stringify(people[3] ?? null));
     Assert.areEqual(4, people.length);
   }
 

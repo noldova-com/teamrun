@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
+import { MessageStatus, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
 
 import { ChatAction } from "../src/app/enums/chat-action";
 import { Resources } from "../src/resources";
@@ -141,6 +141,21 @@ describe("Resources", () => {
   it("names an effort level by its id with a capital, and no level as the model's default", () => {
     expect([Resources.formatEffort("xhigh"), Resources.formatEffort("low"), Resources.formatEffort(null)]).toEqual(["Xhigh", "Low", "Model default"]);
     expect(Resources.noEffortLevels).toBe("Effort levels unavailable. The model's default is used.");
+  });
+
+  it("heads each reply a chat's wake names by how it ended, and one that ended without text", () => {
+    expect([MessageStatus.Cancelled, MessageStatus.Failed, MessageStatus.Interrupted].map(t => Resources.formatWakeReplyHeading("Bob", t, "Done.")))
+      .toEqual(["Bob's reply was cancelled.", "Bob's reply failed.", "Bob's reply was interrupted."]);
+    expect([null, "Done."].map(t => Resources.formatWakeReplyHeading("Bob", MessageStatus.Completed, t))).toEqual(["Bob replied without text.", "Bob replied:"]);
+  });
+
+  it("names a sub-agent's or command's wake by its kind, name and ending, one with no ending by how it was lost, and one with no name by its chat", () => {
+    expect(["subAgent", "command"].map(t => Resources.formatTaskWakeLabel(t, "Search", "ended as completed")))
+      .toEqual(["Sub-agent \"Search\" ended as completed", "Background command \"Search\" ended as completed"]);
+    expect(["subAgent", "command"].map(t => Resources.formatTaskWakeLabel(t, "Search", null)))
+      .toEqual(["Sub-agent \"Search\" didn't come back", "Background command \"Search\" was stopped"]);
+    expect(["subAgent", "command"].map(t => Resources.formatTaskWakeLabel(t, null, null)))
+      .toEqual(["A sub-agent of this chat didn't come back", "A background command of this chat was stopped"]);
   });
 
   it("words a reply's activity for one and for many", () => {

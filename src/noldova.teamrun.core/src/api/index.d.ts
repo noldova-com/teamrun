@@ -3956,11 +3956,6 @@ export declare class Resources {
    * The note at the top of the reply that compacts an idle chat before its prompt cache expires.
    */
   public static readonly idleCompactionNote: string;
-  /**
-   * The `source` of a chat wake's message, with its `wakeId`: the message that tells a turn the work it sent to another chat, or its
-   * sub-agent, has ended.
-   */
-  public static readonly chatWakeSource: string;
   public static readonly addKind: string;
   public static readonly updateKind: string;
   public static readonly deleteKind: string;
@@ -4410,6 +4405,28 @@ export declare class Resources {
    */
   public static formatWakeNote(command: string | null): string;
 
+  /**
+   * The note at the top of a reply that a chat's wake started: the chat the work went to, with no ID.
+   * @param title The chat's title, or `null` when the chat is gone.
+   */
+  public static formatWakeReceived(title: string | null): string;
+
+  /**
+   * How a sub-agent ended, in words for its wake: `ended as <status>`.
+   */
+  public static formatSubAgentEnding(status: string): string;
+  /**
+   * How a background command ended, in words for its wake: its error, signal or exit code.
+   */
+  public static formatCommandEnding(exit: CommandExit): string;
+  /**
+   * A background command's last lines for its wake, cut to their last 2,000 characters, or `null` when it wrote none.
+   */
+  public static formatCommandQuote(lastLines: string): string | null;
+  /**
+   * The note at the top of a reply that a sub-agent's or background command's wake started.
+   */
+  public static readonly taskWakeReceived: string;
   /**
    * The text of the message that wakes a chat whose sub-agent ended after the turn that started it: the sub-agent, how it ended, and its summary cut
    * at 2,000 characters.
