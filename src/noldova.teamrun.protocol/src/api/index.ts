@@ -182,6 +182,7 @@ export { FileChangeReader } from "../services/file-change.reader.js";
 export { WrittenImageReader } from "../services/written-image.reader.js";
 export { Teammate } from "../models/teammate.js";
 export { TeammateFallback } from "../models/teammate-fallback.js";
+export { TeammateLastReply } from "../models/teammate-last-reply.js";
 export { TeammateUsage } from "../models/teammate-usage.js";
 export { TeammateCreateParams } from "../models/methods/teammate-create-params.js";
 export { TeammateUpdateParams } from "../models/methods/teammate-update-params.js";
