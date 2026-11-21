@@ -71,6 +71,8 @@ const commandOf = (shellFile: string, programFile: string, beatFile: string): st
 const dockTabsOf = (page: Page): Locator =>
   page.getByRole("tablist").filter({ has: page.getByRole("tab", { name: "Activity" }) }).getByRole("tab");
 
+const terminalTabsOf = (page: Page): Locator => dockTabsOf(page).filter({ hasNotText: /Activity|Changes/ });
+
 const sendAsync = async (app: TeamRunApp, command: string, variables: Readonly<Record<string, string>> = {}): Promise<Page> => {
   const page = await app.openChatAsync(variables);
   await app.sendAsync(`${CodexDouble.RUN_PREFIX}${command}`);
@@ -89,7 +91,7 @@ const runAsync = async (app: TeamRunApp): Promise<IRunningCommand> => {
   const beat = beatFileOf(app);
   const page = await sendAsync(app, commandOf(shellFile, programFile, beat));
   await expect.poll(() => TeamRunApp.readPid(programFile), TeamRunApp.pollOf(30_000)).not.toBeNull();
-  const tab = dockTabsOf(page).filter({ hasNotText: "Activity" }).first();
+  const tab = terminalTabsOf(page).first();
   await expect(tab).toBeVisible({ timeout: 30_000 });
   const name = await tab.getAttribute("aria-label") ?? "";
   expect(name).not.toBe("");
@@ -164,8 +166,8 @@ test("an agent's command runs in a terminal tied to its chat, shows in the panel
 
   const activity = page.getByRole("tab", { name: "Activity" });
   const dockTabs = dockTabsOf(page);
-  await expect.soft(dockTabs).toHaveCount(2, { timeout: 30_000 });
-  const tab = dockTabs.filter({ hasNotText: "Activity" }).first();
+  await expect.soft(dockTabs).toHaveCount(3, { timeout: 30_000 });
+  const tab = terminalTabsOf(page).first();
   if (await tab.isVisible()) {
     const shellName = shellNameOf(/"shell":"([^"]+)"/.exec(readFileSync(app.codexLog, "utf8"))?.[1]) ?? "";
     expect.soft(shellName).not.toBe("");
@@ -213,7 +215,8 @@ test("the person closes an agent's terminal from the panel, and its tab goes and
   await closeTabAsync(tab, name);
 
   await expect(tab).toBeHidden();
-  await expect(dockTabsOf(page)).toHaveCount(1);
+  await expect(dockTabsOf(page)).toHaveCount(2);
+  await expect(terminalTabsOf(page)).toHaveCount(0);
   await expect.poll(() => [TeamRunApp.isRunning(shell), TeamRunApp.isRunning(program)], TeamRunApp.pollOf(30_000)).toEqual([false, false]);
   await quitAsync(app, []);
 });
