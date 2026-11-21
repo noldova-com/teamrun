@@ -6,11 +6,28 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-@if (chatId(); as chat) {
-  <div class="history">
-    <ng-container *ngComponentOutlet="history; inputs: historyInputs(); environmentInjector: environment" />
-  </div>
-  <nol-teamrun-composer class="composer" [conversationId]="chat" [teammateId]="teammateId()" />
-} @else if (error(); as shown) {
-  <p class="nol-teamrun-organization-chat-error" role="alert">{{ shown }}</p>
+@if (teammateId(); as teammate) {
+  @if (chatId(); as chat) {
+    <div class="history">
+      <ng-container *ngComponentOutlet="history; inputs: historyInputs(); environmentInjector: environment" />
+    </div>
+    <nol-teamrun-composer class="composer" [conversationId]="chat" [teammateId]="teammate" />
+  } @else if (error(); as shown) {
+    <p class="nol-teamrun-organization-chat-error" role="alert">{{ shown }}</p>
+  }
+} @else {
+  <nol-teamrun-composer class="composer" [conversationId]="fanOutKey()" [fanOut]="fanOut" />
+  @if (error(); as shown) {
+    <p class="nol-teamrun-organization-chat-error" role="alert">{{ shown }}</p>
+  }
+  <ul class="nol-teamrun-organization-recipients" [attr.aria-label]="resources.organizationRecipientsLabel">
+    @for (row of rows(); track row.teammateId) {
+      <li>
+        <button type="button" class="nol-teamrun-organization-recipient" (click)="choose(row.teammateId)">
+          <span class="nol-teamrun-organization-recipient-name">{{ row.name }}</span>
+          <span class="nol-teamrun-organization-recipient-status">{{ row.status }}</span>
+        </button>
+      </li>
+    }
+  </ul>
 }

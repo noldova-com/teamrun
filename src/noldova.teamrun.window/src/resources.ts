@@ -640,6 +640,17 @@ export class Resources {
   public static readonly youLabel: string = "You";
   public static readonly organizationInboxTitle: string = "Inbox";
   public static readonly organizationChatsLabel: string = "Chats";
+  public static readonly organizationRecipientsLabel: string = "Recipients";
+  public static readonly organizationRecipientNoReply: string = "No reply yet";
+  public static readonly organizationRecipientStatusLabels: Readonly<Record<MessageStatus, string>> = {
+    [MessageStatus.Pending]: "Queued",
+    [MessageStatus.Running]: "Replying",
+    [MessageStatus.AwaitingApproval]: Resources.awaitingApprovalLabel,
+    [MessageStatus.Completed]: "Replied",
+    [MessageStatus.Failed]: "Failed",
+    [MessageStatus.Cancelled]: "Stopped",
+    [MessageStatus.Interrupted]: "Interrupted"
+  };
   public static readonly organizationAllRead: string = "All read";
   public static readonly organizationNoMessages: string = "No messages yet";
   public static readonly organizationInboxEmpty: string = "No messages yet. Write the first.";
@@ -2106,6 +2117,10 @@ export class Resources {
 
   public static formatOrganizationLastLine(author: string, text: string): string {
     return `${author}: ${text}`;
+  }
+
+  public static formatOrganizationFanOutKey(teammateIds: readonly string[]): string {
+    return `organization:${teammateIds.join(",")}`;
   }
 
   public static formatOrganizationReplying(names: readonly string[]): string {
