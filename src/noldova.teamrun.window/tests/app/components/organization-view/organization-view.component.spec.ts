@@ -117,7 +117,7 @@ describe("OrganizationViewComponent", () => {
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
     element().style.width = "100rem";
-    element().style.height = "70rem";
+    element().style.height = "76rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
     await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
@@ -127,7 +127,7 @@ describe("OrganizationViewComponent", () => {
   };
   const viewport = { width: window.innerWidth, height: window.innerHeight };
 
-  beforeEach(() => page.viewport(1600, 1200));
+  beforeEach(() => page.viewport(1600, 1300));
 
   afterEach(async () => {
     await page.viewport(viewport.width, viewport.height);
@@ -393,7 +393,7 @@ describe("OrganizationViewComponent", () => {
       await settle();
       return shown;
     };
-    const chosenLabel = (): string => one(".nol-select-button", select()).textContent?.trim() ?? "";
+    const chosenLabel = (): string => one(".nol-select-value", select()).textContent?.trim() ?? "";
 
     it("talks to the first department until a teammate's name or a department's Message is chosen, but not by the rest of a card, Enter on it, its own buttons or while editing", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
@@ -470,7 +470,7 @@ describe("OrganizationViewComponent", () => {
       await userEvent.click(one(".name", card("Offline")));
       await settle();
 
-      expect([shown, offered, ui, leaders, [heading(), chosenLabel()]]).toEqual([["To", "To", "Design (department)"],
+      expect([shown, offered, ui, leaders, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (department)", "Design (department)"],
         ["All leaders", "Everyone", "Design (department)", "Alice (leads Design)", "Bob", "UI (department)", "Code Reviewer (leads UI)", "Build (department)", "Offline"],
         [["Chat with UI"], "UI (department)"], [["Chat with all leaders"], "All leaders"], [["Chat with Offline"], "Offline"]]);
     });
@@ -765,7 +765,7 @@ describe("OrganizationViewComponent", () => {
     it("sizes the cards, hangs each leader under its department, the members off one line, and joins the departments to you through one bar", async () => {
       await create();
       element().style.width = "100rem";
-      element().style.height = "70rem";
+      element().style.height = "76rem";
       await settle();
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
@@ -807,7 +807,7 @@ describe("OrganizationViewComponent", () => {
     it("fills the space under the header with one canvas inside the view's padding, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
       element().style.width = "100rem";
-      element().style.height = "70rem";
+      element().style.height = "76rem";
       await settle();
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
       const [host, top, canvas, messages] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas"), box("aside.messages")];

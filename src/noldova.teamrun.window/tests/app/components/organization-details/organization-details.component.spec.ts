@@ -66,7 +66,8 @@ describe("OrganizationDetailsComponent", () => {
       throw new Error(`${popovers().length} details are open.`);
     return found;
   };
-  const facts = (): string[][] => all("dt", popover()).map(t => [t.textContent?.trim() ?? "", t.nextElementSibling?.textContent?.replace(/\s+/gu, " ").trim() ?? ""]);
+  const facts = (): string[][] => all("dt", popover()).map(t => [t.textContent?.trim() ?? "",
+    t.nextElementSibling instanceof HTMLElement ? t.nextElementSibling.innerText.replace(/\s+/gu, " ").trim() : ""]);
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
