@@ -1317,11 +1317,12 @@ export class ComposerComponent {
       this.signOutFailure.set(Resources.logoutUnavailable);
       return;
     }
-    if (!await ProviderSignOut.confirmAsync(this.dialogs, this.store, provider))
+    const report = (message: string): void => this.signOutFailure.set(message);
+    if (!await ProviderSignOut.confirmAsync(this.dialogs, this.store, provider, report))
       return;
     this.value.set(String.empty);
     void this.drafts.discard(conversationId);
-    const isSignedOut = await ProviderSignOut.signOutAsync(this.store, provider, t => this.signOutFailure.set(t));
+    const isSignedOut = await ProviderSignOut.signOutAsync(this.store, provider, report);
     if (Object.isNull(isSignedOut))
       this.signOutNote.set(Resources.formatSignOutUnknown(provider.label));
     else

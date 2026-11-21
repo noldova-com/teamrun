@@ -532,6 +532,13 @@ export interface IProviderAdapter {
   checkFoundSignIn?(provider: Provider): Promise<SignInCheck>;
 
   /**
+   * Rebuilds the descriptor from the environment the provider's tooling is given, such as the login shell's, when what it says depends on
+   * that environment; absent for a kind whose descriptor never changes. `IProviderKindsService.listAsync` awaits it before listing.
+   * @returns A promise that resolves once the descriptor is current.
+   */
+  refreshDescriptorAsync?(): Promise<void>;
+
+  /**
    * Readies a provider's empty profile folder before anything can sign in to it, such as claiming the folder as TeamRun's and making the
    * folders its sign-in terminal gets: one TeamRun just made for a new provider, or an empty one the person chose for a new or moved
    * provider; absent for a kind whose folder needs nothing first.
@@ -2012,6 +2019,13 @@ export interface IProviderKindsService {
   list(): readonly ProviderKind[];
 
   /**
+   * Lists the registered kinds as `list` does, once each adapter's `refreshDescriptorAsync` has run; the kind list the window reads. A kind
+   * whose refresh fails keeps its last descriptor, and the failure is written to the log.
+   * @returns Their descriptors.
+   */
+  listAsync(): Promise<readonly ProviderKind[]>;
+
+  /**
    * Lists the models a provider reports, optionally through a provider of that provider.
    * @param params The kind and the optional provider id.
    * @returns The model names.
@@ -2927,6 +2941,7 @@ export declare class Resources {
    * @returns The note.
    */
   public static formatCompactRefused(provider: string, reason: string): string;
+  public static formatDescriptorNotRefreshed(kind: string, failure: string): string;
   public static formatAcpAgentNotOpened(kind: string, reason: string): string;
   public static formatAcpAgentAlreadyAdded(id: string): string;
   public static formatAcpAgentNotListed(id: string): string;
@@ -7763,15 +7778,21 @@ export declare class ProviderKindsService implements IProviderKindsService {
    * @param events Where `ProviderKindInstallationChanged` is published.
    * @param planUsage Where `readPlanUsageAsync` keeps what it reads; a `PlanUsageService` on `events` by default.
    * @param teammates Whose speeds `modelCatalogAsync` clears when the catalog no longer lists them; none by default.
+   * @param log Where `listAsync` writes a kind whose `refreshDescriptorAsync` failed, with the kind of failure; none by default.
    */
   public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink, planUsage?: IPlanUsageService,
-    teammates?: ITeammatesService | null);
+    teammates?: ITeammatesService | null, log?: ILog | null);
 
   /**
    * Lists the registered kinds, each saying whether it can name a chat: whether its adapter has `askIsolated`.
    * @returns Their descriptors.
    */
   public list(): readonly ProviderKind[];
+
+  /**
+   * @inheritdoc
+   */
+  public listAsync(): Promise<readonly ProviderKind[]>;
 
   /**
    * @inheritdoc
