@@ -155,10 +155,10 @@ describe("TitleModelOptions", () => {
 
     expect(context.refreshedSettings).toHaveLength(refreshed + 1);
     expect(read()).toBeNull();
-    await Wait.until(() => expect(catalogs.size).toBe(2));
+    await Wait.until(() => expect(refreshes).toEqual(["p1:false", "p1:false", "p2:false"]));
+    found(catalogs.get("p1"), "p1 list").resolve(list(model("gpt-5", "GPT 5")));
     found(catalogs.get("p2"), "p2 list").resolve(list(model("opus", "Opus")));
-    await Wait.until(() => expect(pairs(read())).toEqual([["", "Same as the chat"], ["p1/gpt", "Home: GPT"], ["p2/opus", "Work: Opus"]]));
-    expect(refreshes).toEqual(["p1:false", "p2:false"]);
+    await Wait.until(() => expect(pairs(read())).toEqual([["", "Same as the chat"], ["p1/gpt-5", "Home: GPT 5"], ["p2/opus", "Work: Opus"]]));
   });
 
   it("stops supplying options when asked", async () => {

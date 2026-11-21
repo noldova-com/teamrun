@@ -353,7 +353,7 @@ export class PageDocumentComponent {
     }
     await this.loadAsync(null, true);
     const page = this.view()?.page;
-    if (!Object.isUndefined(page) && page.version > before) {
+    if (!Object.isUndefined(page) && page.version > before && page.version !== this.restored) {
       this.replaced = this.updatedBy();
       this.updatedBy.set(page);
     }

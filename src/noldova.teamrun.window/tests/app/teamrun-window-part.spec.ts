@@ -46,6 +46,8 @@ import { GitHubReferenceSource } from "../../src/app/services/github-reference-s
 import { PlanUsageStatus } from "../../src/app/services/plan-usage-status";
 import { ChatPages } from "../../src/app/services/pages/chat-pages";
 import { ChatPagesResources } from "../../src/app/services/pages/chat-pages-resources";
+import { PageDocuments } from "../../src/app/services/pages/page-documents";
+import { TitleModelOptions } from "../../src/app/services/title-model-options";
 import { OrganizationLayoutService } from "../../src/app/services/organization-layout.service";
 import { ProjectsLayoutService } from "../../src/app/services/projects-layout.service";
 import { SubAgentsBadge } from "../../src/app/services/sub-agents-badge";
@@ -540,6 +542,30 @@ describe("TeamRun's window part", () => {
     ProjectsLayoutService.release(context);
     ComposerDefaultService.release(context);
     ChatPages.release(context);
+    ChatStoreService.release(context);
+  });
+
+  it("reads its open page documents again when the runtime starts again, and its title model lists only once its store's state was read again", async () => {
+    const part = createPart();
+    const context = SampleData.createContext();
+    await part.activateAsync(context);
+    const store = ChatStoreService.of(context);
+    await Wait.until(() => expect(store.loaded()).toBe(true));
+    await Wait.until(() => expect(store.isBusy()).toBe(false));
+    let pages = 0;
+    const release = PageDocuments.onResync(context, () => {
+      pages += 1;
+    });
+    const reload = vi.spyOn(TitleModelOptions, "reload");
+
+    await expect(part.reconnectAsync()).resolves.toBe(true);
+    const reloaded = reload.mock.calls.map(t => t[0] === context);
+    context.fail(MethodName.ProjectList, "The runtime part is away.");
+    await expect(part.reconnectAsync()).resolves.toBe(false);
+
+    expect([pages, reloaded, reload.mock.calls.length]).toEqual([2, [true], 1]);
+    reload.mockRestore();
+    release();
     ChatStoreService.release(context);
   });
 

@@ -213,6 +213,38 @@ describe("PageDocumentComponent", () => {
     expect([bars(), opens()]).toEqual([[], [null, null, null]]);
   });
 
+  it("shows no update bar for the person's own Restore that lands while it reads its page again after the runtime started again", async () => {
+    shown = version => PagesWindow.view(3, version, PagesWindow.sol);
+    let restored: (page: JsonValue) => void = () => undefined;
+    context.answerModule("teamrun.pageRestore", () => new Promise<JsonValue>(resolve => {
+      restored = resolve;
+    }));
+    await openAsync();
+    button("more")?.click();
+    await Wait.until(() => expect(menuItem("Versions")).toBeDefined());
+    menuItem("Versions")?.click();
+    await Wait.until(() => expect(menuItem("v1 · Opus")).toBeDefined());
+    menuItem("v1 · Opus")?.click();
+    await Wait.until(() => expect(button("restore")).not.toBeNull());
+    button("restore")?.click();
+    await Wait.until(() => expect(context.requests.some(t => t.method === "teamrun.pageRestore")).toBe(true));
+    let read: (view: JsonValue) => void = () => undefined;
+    context.answerModule("teamrun.pageOpen", () => new Promise<JsonValue>(resolve => {
+      read = resolve;
+    }));
+
+    PageDocuments.resync(context);
+    await Wait.until(() => expect(opens()).toEqual([null, 1, null]));
+    shown = version => PagesWindow.view(4, version, PagesWindow.you);
+    context.answerModule("teamrun.pageOpen", t => shown(PagesWindow.versionOf(t)).toJson());
+    restored(PagesWindow.page(4, PagesWindow.you).toJson());
+    await Wait.until(() => expect(context.updates.at(-1)?.update.title).toBe("Onboarding options"));
+    read(PagesWindow.view(4, null, PagesWindow.you).toJson());
+    await fixture.whenStable();
+
+    expect([bars(), opens()]).toEqual([[], [null, 1, null, null]]);
+  });
+
   it("opens again once the runtime starts again a page it couldn't open or read before, with no update bar", async () => {
     context.pageViews.failure = new Error("No pane.");
     fixture = TestBed.createComponent(PageDocumentComponent);
