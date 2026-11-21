@@ -36,6 +36,7 @@ import { ChatStoreService } from "./services/chat-store.service";
 import { ChatTerminals } from "./services/chat-terminals";
 import { ComputerUseBorder } from "./services/computer-use-border";
 import { ComposerDefaultService } from "./services/composer-default.service";
+import { EngineResync } from "./services/engine-resync";
 import { GitHubReferenceSource } from "./services/github-reference-source";
 import { ImageViewerService } from "./services/image-viewer.service";
 import { InlineTerminals } from "./services/inline-terminals";
@@ -140,6 +141,7 @@ export class TeamRunWindowPart implements IWindowPart {
     PanelRequests.reportAgain(this.activeContext);
     SubAgentsBadge.reload(this.activeContext);
     ComputerUseBorder.reload(this.activeContext);
+    EngineResync.request(this.activeContext);
     return ChatStoreService.resync(this.activeContext);
   }
 

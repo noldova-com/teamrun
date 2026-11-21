@@ -28,6 +28,7 @@ import {
 
 import { ChatStoreService } from "../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../src/app/services/clock.service";
+import { EngineResync } from "../../../src/app/services/engine-resync";
 import { ReplyHistoryService } from "../../../src/app/services/reply-history.service";
 import { Resources } from "../../../src/resources";
 import { FakeClock } from "../../fixtures/fake-clock.fixture";
@@ -105,6 +106,18 @@ describe("ReplyHistoryService", () => {
 
     expect(context.count(MethodName.MessageActivityPage)).toBe(1);
     expect(context.count(MethodName.MessageSummary)).toBe(0);
+  });
+
+  it("reads the open conversation's newest page again when the window reconnects to the engine, and nothing while none is open", async () => {
+    EngineResync.request(context);
+    history.select("c1", ReplyPanel.Activity);
+    await Wait.until(() => expect(ids()).toEqual(["r1", "r2"]));
+    replies = [...replies, reply("r3", 5)];
+
+    EngineResync.request(context);
+
+    await Wait.until(() => expect(ids()).toEqual(["r1", "r2", "r3"]));
+    expect(context.count(MethodName.MessageActivityPage)).toBe(2);
   });
 
   it("drops a page or a failure that arrives after another panel was chosen", async () => {

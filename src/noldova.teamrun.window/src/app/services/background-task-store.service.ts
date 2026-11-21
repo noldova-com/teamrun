@@ -24,6 +24,7 @@ import {
 } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
+import { EngineResync } from "./engine-resync";
 
 export class BackgroundTaskStoreService {
   public static readonly provider: FactoryProvider =
@@ -65,7 +66,8 @@ export class BackgroundTaskStoreService {
       context.onEvent(Resources.formatQualifiedName(EventName.BackgroundTaskOutput), t => this.append(BackgroundTaskOutputPayload.fromJson(t))),
       context.onEvent(Resources.formatQualifiedName(EventName.BackgroundTasksCleared), t => this.remove(BackgroundTasksClearedPayload.fromJson(t))),
       context.onEvent(Resources.formatQualifiedName(EventName.ConversationDeleted), t => this.forget(ConversationIdParams.fromJson(t).conversationId)),
-      ...[EventName.StateInvalidated, EventName.StateResyncRequested].map(t => context.onEvent(Resources.formatQualifiedName(t), () => this.reload()))
+      context.onEvent(Resources.formatQualifiedName(EventName.StateInvalidated), () => this.reload()),
+      EngineResync.on(context, () => this.reload())
     ];
   }
 

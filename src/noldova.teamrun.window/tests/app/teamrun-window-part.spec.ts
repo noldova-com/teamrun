@@ -12,7 +12,7 @@ import type { JsonValue } from "@noldova/context.json";
 import { CommandContribution, ContentPadding, DockSide, DocumentContribution, type IDocumentOptions, SettingsPageContribution, SettingsRow, StatusBarSide, TopBarActionContribution, TopBarActionState, TopBarSide,
   ViewContribution, WindowPartTokens } from "@noldova/desktop.window";
 import { GitFolder, GitFolderProvidedException } from "@noldova/git.window";
-import { Conversation, ConversationListParams, EventName, MessageDelivery, MessageStatus, MethodName } from "@noldova/teamrun.protocol";
+import { BackgroundTask, BackgroundTaskStatus, Conversation, ConversationListParams, EventName, MessageDelivery, MessageStatus, MethodName } from "@noldova/teamrun.protocol";
 import { OwnersProvidedException, TerminalOwners, TerminalStartFolder } from "@noldova/terminal.window";
 import { DefaultTheme, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture } from "@noldova/ui.components.angular/testing";
@@ -45,6 +45,7 @@ import { ComposerDefaultService } from "../../src/app/services/composer-default.
 import { GitHubReferenceSource } from "../../src/app/services/github-reference-source";
 import { PlanUsageStatus } from "../../src/app/services/plan-usage-status";
 import { ChatPages } from "../../src/app/services/pages/chat-pages";
+import { ChatPagesResources } from "../../src/app/services/pages/chat-pages-resources";
 import { OrganizationLayoutService } from "../../src/app/services/organization-layout.service";
 import { ProjectsLayoutService } from "../../src/app/services/projects-layout.service";
 import { SubAgentsBadge } from "../../src/app/services/sub-agents-badge";
@@ -501,6 +502,44 @@ describe("TeamRun's window part", () => {
     expect(context.count(MethodName.ProjectList)).toBe(catalogs + 1);
     context.fail(MethodName.ProjectList, "The runtime part is away.");
     await expect(part.reconnectAsync()).resolves.toBe(false);
+    ChatStoreService.release(context);
+  });
+
+  it("shows in the Tasks panel a command that ended while the runtime was away, once the runtime starts again", async () => {
+    const part = createPart();
+    const task = (status: BackgroundTaskStatus, exitCode: number | null, ended: string | null): BackgroundTask =>
+      new BackgroundTask("t1", SampleData.conversation.id, "r1", "codex", "make", status, exitCode, SampleData.timestamp, ended, null);
+    const context = SampleData.createContext().answer(MethodName.BackgroundTaskList, () => SampleData.tasks([task(BackgroundTaskStatus.Running, null, null)]));
+    await part.activateAsync(context);
+    const tasks = BackgroundTaskStoreService.of(context);
+    tasks.watch(SampleData.conversation.id);
+    await Wait.until(() => expect(tasks.tasksOf(SampleData.conversation.id).map(t => t.status)).toEqual([BackgroundTaskStatus.Running]));
+    context.answer(MethodName.BackgroundTaskList, () => SampleData.tasks([task(BackgroundTaskStatus.Completed, 0, SampleData.timestamp)]));
+
+    await expect(part.reconnectAsync()).resolves.toBe(true);
+
+    await Wait.until(() => expect(tasks.tasksOf(SampleData.conversation.id).map(t => t.status)).toEqual([BackgroundTaskStatus.Completed]));
+    BackgroundTaskStoreService.release(context);
+    ChatStoreService.release(context);
+  });
+
+  it("reads the projects' layout, the composer's default and a watched chat's pages again when the runtime starts again", async () => {
+    const part = createPart();
+    const context = SampleData.createContext().answerModule(ChatPagesResources.listName, () => []);
+    await part.activateAsync(context);
+    ProjectsLayoutService.of(context);
+    ComposerDefaultService.of(context);
+    ChatPages.of(context).watch(SampleData.conversation.id);
+    const reads = (): number[] => [context.count(MethodName.ProjectsLayoutRead), context.count(MethodName.ComposerDefaultRead),
+      context.requests.filter(t => t.method === ChatPagesResources.listName).length];
+    await Wait.until(() => expect(reads()).toEqual([1, 1, 1]));
+
+    await part.reconnectAsync();
+
+    await Wait.until(() => expect(reads()).toEqual([2, 2, 2]));
+    ProjectsLayoutService.release(context);
+    ComposerDefaultService.release(context);
+    ChatPages.release(context);
     ChatStoreService.release(context);
   });
 

@@ -16,6 +16,7 @@ import { ComposerDefaultSaveParams, EventName, MethodName } from "@noldova/teamr
 import { Resources } from "../../resources";
 import { ComposerSettings } from "../models/composer-settings";
 import { ComposerChoicesService } from "./composer-choices.service";
+import { EngineResync } from "./engine-resync";
 
 export class ComposerDefaultService {
   public static readonly provider: FactoryProvider =
@@ -46,7 +47,7 @@ export class ComposerDefaultService {
         if (this.saving === 0)
           this.current.set(this.held ?? this.latest);
       }),
-      context.onEvent(Resources.formatQualifiedName(EventName.StateResyncRequested), () => void this.load())
+      EngineResync.on(context, () => void this.load())
     ];
     void this.open();
   }

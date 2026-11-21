@@ -15,6 +15,7 @@ import { Page, PageKind, PageListRequest, PageRequest, PageView } from "@noldova
 
 import { PagePathCopyException } from "../../exceptions/pages/page-path-copy.exception";
 import { PageSaveException } from "../../exceptions/pages/page-save.exception";
+import { EngineResync } from "../engine-resync";
 import { ChatPagesResources } from "./chat-pages-resources";
 import { PageDocumentResources } from "./page-document-resources";
 import { PageDocuments } from "./page-documents";
@@ -48,6 +49,7 @@ export class ChatPages {
         if (!Object.isNull(this.put(t)))
           void this.readOpen();
       }),
+      EngineResync.on(context, () => this.resync()),
       context.onDocumentClosed(PageDocumentResources.documentName, t => {
         this.openRead++;
         this.openSignal.update(u => ChatPages.without(u, t));
@@ -90,6 +92,12 @@ export class ChatPages {
 
   public retry(chatId: string): void {
     void this.load(chatId);
+  }
+
+  public resync(): void {
+    void this.readOpen();
+    for (const chatId of [...this.loads])
+      void this.load(chatId);
   }
 
   public pagesOf(chatId: string): readonly Page[] {
