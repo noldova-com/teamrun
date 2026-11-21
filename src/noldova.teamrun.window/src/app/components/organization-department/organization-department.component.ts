@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, inject, type InputSignal, input, type Signal } from "@angular/core";
+import { Component, ElementRef, computed, inject, type InputSignal, input, type Signal, viewChild } from "@angular/core";
 
 import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
@@ -35,6 +35,7 @@ export class OrganizationDepartmentComponent {
   private readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   private readonly store: ChatStoreService = inject(ChatStoreService);
   private readonly dialogs: DialogService = inject(DialogService);
+  private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("name", { read: ElementRef });
 
   public readonly node: InputSignal<OrganizationNode> = input.required<OrganizationNode>();
   public readonly editing: InputSignal<boolean> = input(false);
@@ -59,7 +60,8 @@ export class OrganizationDepartmentComponent {
     this.layout.toggleDepartment(this.node().department.id);
   }
 
-  protected rename(field: HTMLInputElement): void {
+  protected rename(): void {
+    const field = this.nameField().nativeElement;
     const department = this.node().department;
     const name = field.value.trim();
     if (name.length === 0 || name === department.name) {

@@ -10,7 +10,7 @@ LICENSE file in the root directory of this source tree.
   @if (editing()) {
     <div class="department-row">
       <input #name nol-text-field class="department-field" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node().department.name"
-        (change)="rename(name)">
+        (change)="rename()">
       <button type="button" nol-icon-button class="delete" [icon]="resources.organizationDeleteIcon"
         [label]="resources.formatOrganizationDeleteNamed(node().department.name)" (click)="confirmDelete()"></button>
     </div>
