@@ -827,6 +827,10 @@ export class Resources {
   public static readonly nativeTurnIdParameterName: string = "nativeTurnId";
   public static readonly lastTurnIdParameterName: string = "lastTurnId";
   public static readonly ellipsis: string = "…";
+  public static readonly runningReplyWork: string = "a teammate's background work";
+  public static readonly chatMoveChange: string = "move to a project";
+  public static readonly chatAttachChange: string = "attach a folder";
+  public static readonly chatDetachChange: string = "detach its folder";
   public static readonly existsErrorCode: string = "EEXIST";
   public static readonly maximumDiffLines: number = ProtocolResources.maximumDiffLines;
   public static readonly checkpointPathSeparator: string = "/";
@@ -1823,6 +1827,21 @@ export class Resources {
 
   public static formatFolderNotAbsolute(path: string): string {
     return `The folder "${path}" is not an absolute path.`;
+  }
+
+  public static formatChatWorkRunning(change: string, running: readonly string[]): string {
+    const names = running.length === 1 ? running.join("") : `${running.slice(0, -1).join(", ")} and ${running.slice(-1).join("")}`;
+    return running.length === 1
+      ? `This chat can't ${change} while ${names} is still running in its folder. Stop it or wait for it to end, then try again.`
+      : `This chat can't ${change} while ${names} are still running in its folder. Stop them or wait for them to end, then try again.`;
+  }
+
+  public static formatRunningCommand(command: string): string {
+    return `the background command "${command}"`;
+  }
+
+  public static formatRunningHelper(description: string): string {
+    return `the helper "${description}"`;
   }
 
   public static formatChatInProject(conversationId: string): string {

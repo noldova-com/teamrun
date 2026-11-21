@@ -2374,6 +2374,15 @@ export interface IConversationEngine {
   releaseFolderAsync(conversationId: string): Promise<void>;
 
   /**
+   * Refuses a change to a conversation's folder while work the conversation started still runs in it: a background task, a TeamRun helper, or
+   * a finished reply whose run stays open for its background work.
+   * @param conversationId The conversation id.
+   * @param change What the refusal says the chat can't do, such as `Resources.chatMoveChange`.
+   * @throws ServiceException `Conflict`, naming what still runs.
+   */
+  requireNothingRunningAsync(conversationId: string, change: string): Promise<void>;
+
+  /**
    * Releases, as `releaseFolderAsync` does, every own folder in the data folder whose conversation is gone or now has a project; the
    * runtime runs it at its start. It releases no further folder once the signal aborts. Never rejects.
    * @param signal Aborts when the sweep should stop, such as when the runtime part deactivates.
@@ -4072,6 +4081,22 @@ export declare class Resources {
   public static readonly lastTurnIdParameterName: string;
   public static readonly ellipsis: string;
   /**
+   * Names a finished reply whose run stays open for background work, for {@link formatChatWorkRunning}.
+   */
+  public static readonly runningReplyWork: string;
+  /**
+   * What a refused move says the chat can't do.
+   */
+  public static readonly chatMoveChange: string;
+  /**
+   * What a refused attach says the chat can't do.
+   */
+  public static readonly chatAttachChange: string;
+  /**
+   * What a refused detach says the chat can't do.
+   */
+  public static readonly chatDetachChange: string;
+  /**
    * Lines kept of an added file's diff.
    */
   public static readonly maximumDiffLines: number;
@@ -5302,6 +5327,21 @@ export declare class Resources {
    * Composes the refusal of a folder to attach whose path isn't absolute.
    */
   public static formatFolderNotAbsolute(path: string): string;
+
+  /**
+   * Composes the refusal to change a chat's folder while work runs in it, naming each piece of work.
+   */
+  public static formatChatWorkRunning(change: string, running: readonly string[]): string;
+
+  /**
+   * Names a running background task by its command, for {@link formatChatWorkRunning}.
+   */
+  public static formatRunningCommand(command: string): string;
+
+  /**
+   * Names a running TeamRun helper by its description, for {@link formatChatWorkRunning}.
+   */
+  public static formatRunningHelper(description: string): string;
 
   /**
    * Composes the refusal to attach a folder to a chat in a project.
@@ -9562,6 +9602,11 @@ export declare class ConversationEngine implements IConversationEngine, IOrganiz
    * See {@link IConversationEngine.releaseFolderAsync}.
    */
   public releaseFolderAsync(conversationId: string): Promise<void>;
+
+  /**
+   * See {@link IConversationEngine.requireNothingRunningAsync}.
+   */
+  public requireNothingRunningAsync(conversationId: string, change: string): Promise<void>;
 
   /**
    * See {@link IConversationEngine.sweepFoldersAsync}.
