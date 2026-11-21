@@ -105,6 +105,8 @@ describe("OrganizationBoardComponent", () => {
       [["Build"], ["2"], ["1 idle · 1 stopped"], 1, ["Offline", "Carol"], [], "Message Build"]
     ]);
     expect(all("nol-teamrun-organization-card").every(t => t.classList.contains("row"))).toBe(true);
+    expect(all("[nolCanvasItem]").map(t => t.classList.contains("lane") ? texts(".lane-name", t).join() : texts(".name", t).join())).toEqual(
+      ["Alice", "Code Reviewer", "Design", "Bob", "UI", "Build", "Offline", "Carol"]);
   });
 
   it("sorts a column by name, and by status again, on its own", async () => {

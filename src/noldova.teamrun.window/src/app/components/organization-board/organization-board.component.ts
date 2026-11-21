@@ -10,7 +10,7 @@ import { Component, computed, inject, type InputSignal, input, output, type Outp
 
 import { WindowPartTokens } from "@noldova/desktop.window";
 import type { Teammate } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
+import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
   SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
@@ -29,7 +29,7 @@ import { TeammateDialogComponent } from "../teammate-dialog/teammate-dialog.comp
 
 @Component({
   selector: "nol-teamrun-organization-board",
-  imports: [ButtonComponent, ChipComponent, ChoicePillsComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
+  imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
     SelectComponent, TeammateAvatarComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   templateUrl: "./organization-board.component.html",

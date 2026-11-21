@@ -11,8 +11,6 @@
   align-items: stretch;
   gap: var(--nol-space-4);
   box-sizing: border-box;
-  height: 100%;
-  min-height: 0;
 }
 
 .outline {
@@ -21,8 +19,6 @@
   flex-direction: column;
   box-sizing: border-box;
   min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
   padding: var(--nol-space-2) var(--nol-space-1);
   border: 1px solid var(--nol-card-border);
   border-radius: var(--nol-radius-large);
@@ -133,16 +129,7 @@
 
 .focus {
   display: flex;
-  flex: 999 1 35rem;
-  flex-direction: column;
-  gap: var(--nol-space-4);
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-}
-
-.focus-plane {
-  display: flex;
+  flex: none;
   flex-direction: column;
   gap: var(--nol-space-4);
   width: 60rem;

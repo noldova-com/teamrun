@@ -10,7 +10,7 @@ import { Component, computed, inject, type InputSignal, input, type Signal } fro
 
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
-import { ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, SelectComponent, type SelectOption,
+import { CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, SelectComponent, type SelectOption,
   TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
@@ -30,7 +30,7 @@ import { OrganizationCardComponent } from "../organization-card/organization-car
 
 @Component({
   selector: "nol-teamrun-organization-focus",
-  imports: [ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent, SelectComponent, TextFieldComponent],
+  imports: [CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent, SelectComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"

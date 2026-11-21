@@ -48,7 +48,7 @@ LICENSE file in the root directory of this source tree.
   </div>
   <div class="leaders">
     @for (leader of leaders(); track leader.id) {
-      <nol-teamrun-organization-card class="leader" [teammate]="leader" [shape]="row" />
+      <nol-teamrun-organization-card class="leader" nolCanvasItem [teammate]="leader" [shape]="row" />
     }
   </div>
 </section>
@@ -59,7 +59,7 @@ LICENSE file in the root directory of this source tree.
   </div>
   <div class="lanes">
     @for (node of departments(); track node.department.id) {
-      <div class="lane">
+      <div class="lane" nolCanvasItem>
         <div class="lane-head">
           @if (editing()) {
             <input nol-text-field class="lane-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="node.department.name"
@@ -80,7 +80,7 @@ LICENSE file in the root directory of this source tree.
             (valueChange)="sort(node, $event)" />
         }
         @for (member of membersOf(node); track member.id) {
-          <nol-teamrun-organization-card [teammate]="member" [shape]="row" />
+          <nol-teamrun-organization-card nolCanvasItem [teammate]="member" [shape]="row" />
           @if (editing()) {
             <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(member.name)" [options]="departmentOptions()" [value]="node.department.id"
               (valueChange)="move(member, $event)" />

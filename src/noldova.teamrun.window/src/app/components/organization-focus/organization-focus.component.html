@@ -59,35 +59,33 @@ LICENSE file in the root directory of this source tree.
   }
 </nav>
 <main class="focus" [attr.aria-label]="resources.organizationFocusUnitLabel">
-  <div class="focus-plane">
-    <div class="crumbs">
-      @for (crumb of crumbs(); track $index) {
-        @if (!$first) {
-          <span class="material-symbols-rounded icon note" aria-hidden="true">{{ resources.organizationFocusCrumbIcon }}</span>
+  <div class="crumbs">
+    @for (crumb of crumbs(); track $index) {
+      @if (!$first) {
+        <span class="material-symbols-rounded icon note" aria-hidden="true">{{ resources.organizationFocusCrumbIcon }}</span>
+      }
+      <button type="button" class="crumb" [class.here]="crumb.isHere" [attr.aria-current]="crumb.isHere" (click)="go(crumb.target)">{{ crumb.label }}</button>
+    }
+  </div>
+  <div class="unit-head">
+    @if (editing() && focus().department !== null && focus().teammate === null) {
+      <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="unitName()" (change)="renameUnit($event)" />
+    } @else {
+      <h2 class="unit-name">{{ unitName() }}</h2>
+    }
+    <span class="note unit-summary">{{ unitSummary() }}</span>
+  </div>
+  <div class="grid" [class.one]="cards().length === 1">
+    @for (card of cards(); track card.id) {
+      <div class="unit-card" nolCanvasItem>
+        <nol-teamrun-organization-card [teammate]="card" [shape]="fluid" />
+        @if (editing() && isMember(card)) {
+          <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(card.name)" [options]="departmentOptions()" [value]="focus().department?.department?.id ?? ''"
+            (valueChange)="move(card, $event)" />
         }
-        <button type="button" class="crumb" [class.here]="crumb.isHere" [attr.aria-current]="crumb.isHere" (click)="go(crumb.target)">{{ crumb.label }}</button>
-      }
-    </div>
-    <div class="unit-head">
-      @if (editing() && focus().department !== null && focus().teammate === null) {
-        <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationBoardDepartmentName" [value]="unitName()" (change)="renameUnit($event)" />
-      } @else {
-        <h2 class="unit-name">{{ unitName() }}</h2>
-      }
-      <span class="note unit-summary">{{ unitSummary() }}</span>
-    </div>
-    <div class="grid" [class.one]="cards().length === 1">
-      @for (card of cards(); track card.id) {
-        <div class="unit-card">
-          <nol-teamrun-organization-card [teammate]="card" [shape]="fluid" />
-          @if (editing() && isMember(card)) {
-            <nol-select class="member-move" [label]="resources.formatOrganizationBoardMove(card.name)" [options]="departmentOptions()" [value]="focus().department?.department?.id ?? ''"
-              (valueChange)="move(card, $event)" />
-          }
-        </div>
-      } @empty {
-        <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
-      }
-    </div>
+      </div>
+    } @empty {
+      <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
+    }
   </div>
 </main>

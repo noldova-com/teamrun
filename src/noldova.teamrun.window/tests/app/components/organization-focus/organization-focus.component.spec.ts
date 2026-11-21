@@ -157,6 +157,7 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(saves.map(t => t.focus)).toEqual(["Department:ui", "Department:build", "Teammate:bob", "Department:design",
       "Leaders"]));
     expect(all(".crumb[aria-current=true]").map(text)).toEqual(["Organization"]);
+    expect(all("[nolCanvasItem]").map(t => t.querySelector(".name")?.textContent?.trim())).toEqual(["Alice", "Code Reviewer"]);
   });
 
   it("hides and shows a department's people from its arrow, and keeps that on the server", async () => {
@@ -234,7 +235,7 @@ describe("OrganizationFocusComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
-    it("sets the outline beside the focus, the unit's cards in columns of at least 18rem, and one card at up to 36rem", async () => {
+    it("sets the outline beside the 60rem focus, the unit's cards in columns of at least 18rem, and one card at up to 36rem", async () => {
       await create();
       element().style.width = "90rem";
       element().style.height = "40rem";
@@ -242,22 +243,21 @@ describe("OrganizationFocusComponent", () => {
       const host = box(element());
       const outline = box(one(".outline"));
       const focus = box(one(".focus"));
-      const plane = box(one(".focus-plane"));
       const cards = all(".grid nol-teamrun-organization-card").map(box);
-      const columns = Math.floor((plane.width + space(3)) / (18 * rem() + space(3)));
-      const width = (plane.width - (columns - 1) * space(3)) / columns;
+      const columns = Math.floor((focus.width + space(3)) / (18 * rem() + space(3)));
+      const width = (focus.width - (columns - 1) * space(3)) / columns;
 
       AppearanceFixture.expectPixels(outline.left, host.left);
       AppearanceFixture.expectPixels(outline.height, host.height);
       AppearanceFixture.expectPixels(focus.left - outline.right, space(4));
       AppearanceFixture.expectPixels(focus.right, host.right);
-      AppearanceFixture.expectPixels(plane.width, 60 * rem());
+      AppearanceFixture.expectPixels(focus.width, 60 * rem());
       expect(getComputedStyle(one(".outline")).borderTopWidth).toBe("1px");
       AppearanceFixture.expectPixels(box(one(".orow.root")).left - outline.left, space(1) + 1);
       AppearanceFixture.expectPixels(box(one(".orow.root")).height, 1.625 * rem());
       for (const [index, card] of cards.entries()) {
         AppearanceFixture.expectPixels(card.width, width);
-        AppearanceFixture.expectPixels(card.left - plane.left, index * (width + space(3)));
+        AppearanceFixture.expectPixels(card.left - focus.left, index * (width + space(3)));
       }
       AppearanceFixture.expectPixels(box(one(".unit-head")).top - box(one(".crumbs")).bottom, space(4));
       AppearanceFixture.expectPixels(box(one(".grid")).top - box(one(".unit-head")).bottom, space(4));
