@@ -140,7 +140,8 @@ export class ConversationComponent {
 
   private followPlace(id: string, conversation: Conversation | null, breadcrumb: readonly string[]): void {
     if (Object.isNull(conversation) || breadcrumb.length === 0) {
-      this.placeMissed = true;
+      if (this.store.loaded())
+        this.placeMissed = true;
       return;
     }
     const shown = this.shownPlace;
