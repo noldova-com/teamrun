@@ -18,6 +18,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **A Pi teammate switched back to Default:** its next reply runs on Pi's current default model and thinking level, not the ones it ran with before, also after its Pi closed, TeamRun restarted or the default changed (#138).
 - **Organization messages:** a message from Organization is now your own message in the teammate's Organization chat, `Organization · <name>`, not one from outside TeamRun, and tells the teammate its department, whether it leads it, and who it reports to; before you send, the thread names who it reaches, and says when a department has no leader (#397).
 - **Model lists after the engine restarts:** the composer's model picker, the Teammates view and a chat's members list ask each provider for its models again, rather than showing the lists they had before the engine went away (#387).
 - **Rewinding to your own message:** its text comes back to the message box once the rewind dialog has closed, with the caret in the box, and a draft already there is asked about only then, rather than in a second dialog over the first (#156).

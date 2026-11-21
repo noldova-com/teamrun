@@ -7,7 +7,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -26,6 +26,7 @@ import { SignInException } from "../../exceptions/sign-in.exception.js";
 import { ToolsUnavailableException } from "../../exceptions/tools-unavailable.exception.js";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import { CommandSource } from "../../models/command-source.js";
+import { PiDefaults } from "../../models/pi-defaults.js";
 import type { ProcessCommand } from "../../models/process-command.js";
 import { ProviderAbilityTable } from "../../models/provider-ability-table.js";
 import type { ProviderTimings } from "../../models/provider-timings.js";
@@ -77,6 +78,7 @@ export class PiAdapter implements IProviderAdapter {
   private readonly kept: Map<PiRpcClient, { readonly key: string; readonly sessionFile: string; readonly sender: string | null; readonly idle: Deadline }> =
     new Map();
   private readonly models: Map<string, readonly ProviderModel[]> = new Map();
+  private readonly defaults: Map<string, PiDefaults> = new Map();
   private readonly tokens: Map<PiRpcClient, { readonly token: string; readonly revoke: () => void }> = new Map();
   private readonly listing: Set<PiRpcClient> = new Set();
   private versionCheck: { readonly stamp: string | null; readonly unsupported: string | null } | null = null;
@@ -139,9 +141,9 @@ export class PiAdapter implements IProviderAdapter {
     const client = this.open(provider, null, null, [Resources.piNoSessionArgument, ...Resources.piSetupOffArguments]);
     try {
       const listed = await client.request(Resources.piGetModelsCommand, {}, this.timings.requestTimeout);
-      const state = await client.request(Resources.piGetStateCommand, {}, this.timings.requestTimeout);
-      const current = state.hasField(Resources.modelField) ? state.readNullableObject(Resources.modelField) : null;
-      const models = listed.readObjectArray(Resources.piModelsField).map(t => PiAdapter.toModel(t, current));
+      const defaults = await this.readDefaults(client, PiAdapter.settingsTimeOf(key));
+      this.defaults.set(key, defaults);
+      const models = listed.readObjectArray(Resources.piModelsField).map(t => PiAdapter.toModel(t, defaults.model));
       if (models.length > 0)
         this.models.set(key, models);
       return this.modelList(models);
@@ -177,11 +179,8 @@ export class PiAdapter implements IProviderAdapter {
     const shared = PiAdapter.sharedVariablesOf(request.sharedServers);
     const key = JSON.stringify([request.provider?.id ?? null, request.requested.mode, await ServedToolNames.listAsync(request.tools, signal),
       Object.entries(request.environment).filter(([name]) => name !== ProtocolResources.senderTokenVariable), request.workingDirectory, shared]);
-    const turn = new PiTurn(listener, stream, message => client!.send(message), request.tools?.approvedTools ?? []);
-    const abort = (): void => {
-      turn.settle(TurnOutcome.Interrupted);
-      client!.request(Resources.piAbortCommand, {}, this.timings.interruptTimeout).catch(() => undefined);
-    };
+    let started: PiTurn | null = null;
+    let abort: (() => void) | null = null;
     try {
       const unsupported = await this.unsupportedVersion(request.provider, signal);
       if (signal.aborted)
@@ -202,11 +201,18 @@ export class PiAdapter implements IProviderAdapter {
         throw error;
       }
       const current = client;
+      const turn = new PiTurn(listener, stream, message => current.send(message), request.tools?.approvedTools ?? []);
+      const stop = (): void => {
+        turn.settle(TurnOutcome.Interrupted);
+        current.request(Resources.piAbortCommand, {}, this.timings.interruptTimeout).catch(() => undefined);
+      };
+      started = turn;
+      abort = stop;
       if (!Object.isNull(served))
         this.tokens.set(client, served);
       client.listen(event => turn.handle(event));
-      signal.addEventListener(Resources.abortEvent, abort, { once: true });
-      observed = await this.configure(client, request.requested);
+      signal.addEventListener(Resources.abortEvent, stop, { once: true });
+      observed = await this.configure(client, request.requested, await this.defaultsFor(request, client, !Object.isNull(resume)));
       const state = await client.request(Resources.piGetStateCommand, {}, this.timings.requestTimeout);
       sessionFile = state.readNonBlankString(request.isolated ? Resources.piSessionIdField : Resources.piSessionFileField);
       const alone = Object.isNull(command) ? null : (await client.request(Resources.piGetCommandsCommand, {}, this.timings.requestTimeout))
@@ -244,7 +250,7 @@ export class PiAdapter implements IProviderAdapter {
       if (turn.hasUsage)
         await listener.onUsageAsync(turn.usage(context));
       const turnId = await this.lastUserEntry(client).catch(() => null);
-      const outcome = signal.aborted ? TurnOutcome.Interrupted : turn.outcome!;
+      const outcome = signal.aborted ? TurnOutcome.Interrupted : turn.settledOutcome;
       const tools = request.tools;
       if (outcome === TurnOutcome.Completed && !Object.isNull(tools))
         await this.noteUnlistedToolsAsync(current, tools, request, listener);
@@ -258,9 +264,10 @@ export class PiAdapter implements IProviderAdapter {
     finally {
       running = false;
       listener.onSteerable?.(null);
-      signal.removeEventListener(Resources.abortEvent, abort);
+      if (!Object.isNull(abort))
+        signal.removeEventListener(Resources.abortEvent, abort);
       try {
-        await turn.finishAsync();
+        await started?.finishAsync();
       }
       finally {
         if (!Object.isNull(client))
@@ -394,8 +401,43 @@ export class PiAdapter implements IProviderAdapter {
     await client.stop();
   }
 
-  private async configure(client: PiRpcClient, requested: RequestedSettings): Promise<ObservedSettings> {
-    const model = requested.model;
+  private async defaultsFor(request: TurnRequest, client: PiRpcClient, resumes: boolean): Promise<PiDefaults> {
+    const key = request.provider?.profileDir ?? this.usualFolder;
+    const time = PiAdapter.settingsTimeOf(key);
+    const known = this.defaults.get(key);
+    const current = Object.isUndefined(known) || known.settingsTime !== time ? null : known;
+    if (!resumes) {
+      if (Object.isNull(current) && !request.isolated)
+        this.defaults.set(key, await this.readDefaults(client, time));
+      return PiDefaults.none;
+    }
+    if (!Object.isNull(request.requested.model) && !Object.isNull(request.requested.effort))
+      return PiDefaults.none;
+    if (!Object.isNull(current))
+      return current;
+    const reader = this.open(request.provider, null, null, [Resources.piNoSessionArgument, ...Resources.piSetupOffArguments]);
+    try {
+      const defaults = await this.readDefaults(reader, time);
+      this.defaults.set(key, defaults);
+      return defaults;
+    }
+    finally {
+      await this.close(reader);
+    }
+  }
+
+  private async readDefaults(client: PiRpcClient, settingsTime: number | null): Promise<PiDefaults> {
+    const state = await client.request(Resources.piGetStateCommand, {}, this.timings.requestTimeout);
+    const current = state.hasField(Resources.modelField) ? state.readNullableObject(Resources.modelField) : null;
+    return new PiDefaults(Object.isNull(current) ? null : PiAdapter.idOf(current), state.readOptionalString(Resources.piThinkingLevelField) ?? null, settingsTime);
+  }
+
+  private static settingsTimeOf(folder: string): number | null {
+    return statSync(join(folder, Resources.piSettingsFile), { throwIfNoEntry: false })?.mtimeMs ?? null;
+  }
+
+  private async configure(client: PiRpcClient, requested: RequestedSettings, defaults: PiDefaults): Promise<ObservedSettings> {
+    const model = requested.model ?? defaults.model;
     if (!Object.isNull(model)) {
       const separator = model.indexOf(Resources.piModelSeparator);
       await client.request(Resources.piSetModelCommand, { provider: model.slice(0, separator), modelId: model.slice(separator + 1) }, this.timings.requestTimeout)
@@ -403,8 +445,9 @@ export class PiAdapter implements IProviderAdapter {
           throw new ModelUnavailableException(Resources.formatModelUnavailable(Resources.piDisplayName, `${model} (${FailureDescriber.describe(error)})`));
         });
     }
-    if (!Object.isNull(requested.effort))
-      await client.request(Resources.piSetThinkingCommand, { level: requested.effort }, this.timings.requestTimeout);
+    const effort = requested.effort ?? (Object.isNull(requested.model) || requested.model === defaults.model ? defaults.thinkingLevel : null);
+    if (!Object.isNull(effort))
+      await client.request(Resources.piSetThinkingCommand, { level: effort }, this.timings.requestTimeout);
     const state = await client.request(Resources.piGetStateCommand, {}, this.timings.requestTimeout);
     const current = state.hasField(Resources.modelField) ? state.readNullableObject(Resources.modelField) : null;
     return new ObservedSettings(Resources.piKindId, Object.isNull(current) ? null : PiAdapter.idOf(current),
@@ -510,12 +553,12 @@ export class PiAdapter implements IProviderAdapter {
     return new ProviderModelList(models, null, models.length === 0, null, false, this.modes, this.defaultMode);
   }
 
-  private static toModel(model: JsonReader, current: JsonReader | null): ProviderModel {
+  private static toModel(model: JsonReader, current: string | null): ProviderModel {
     const id = PiAdapter.idOf(model);
     const input = model.hasField(Resources.inputField) ? model.readValue(Resources.inputField) : null;
     return new ProviderModel(id, model.readOptionalString(Resources.nameField) ?? id, model.readNonBlankString(Resources.providerField),
       model.hasField(Resources.piReasoningField) && model.readValue(Resources.piReasoningField) === true ? PiAdapter.levelsOf(model) : null,
-      !Object.isNull(current) && PiAdapter.idOf(current) === id, null, Array.isArray(input) && input.includes(Resources.piImageType));
+      current === id, null, Array.isArray(input) && input.includes(Resources.piImageType));
   }
 
   private static holdsExtension(path: string): boolean {

@@ -11822,6 +11822,12 @@ export declare class PiTurn {
   /** How the turn ended, or `null` while it runs. */
   public get outcome(): TurnOutcome | null;
 
+  /**
+   * How the turn ended.
+   * @throws InvalidOperationException While the turn runs.
+   */
+  public get settledOutcome(): TurnOutcome;
+
   /** Why a failed turn failed, or `null`. */
   public get error(): string | null;
 
