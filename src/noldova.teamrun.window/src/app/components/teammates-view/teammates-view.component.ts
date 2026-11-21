@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { afterNextRender, Component, effect, ElementRef, inject, Injector, type Signal, signal, untracked, viewChild, type WritableSignal }
+import { afterNextRender, Component, DestroyRef, effect, ElementRef, inject, Injector, type Signal, signal, untracked, viewChild, type WritableSignal }
   from "@angular/core";
 
 import "@noldova/context.core";
@@ -37,6 +37,7 @@ import { ChatStoreService } from "../../services/chat-store.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
 import { ComposerDefaultService } from "../../services/composer-default.service";
 import { ConversationActions } from "../../services/conversation-actions";
+import { EngineResync } from "../../services/engine-resync";
 import { FormatterService } from "../../services/formatter.service";
 import { UsageFormatterService } from "../../services/usage-formatter.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
@@ -77,7 +78,10 @@ export class TeammatesViewComponent {
           this.chooseDefault();
         });
     });
+    const resynced: WritableSignal<number> = signal(0);
+    inject(DestroyRef).onDestroy(EngineResync.on(this.context, () => resynced.update(u => u + 1)));
     effect(() => {
+      resynced();
       const providers = this.store.providers();
       const chosen = new Set(this.store.teammates().filter(t => !Object.isNull(t.model) || !Object.isNull(t.effort)).map(t => t.providerId));
       untracked(() => {

@@ -26,6 +26,7 @@ import { CommandTargetsService } from "../../../../src/app/services/command-targ
 import { ComposerChoicesService } from "../../../../src/app/services/composer-choices.service";
 import { ComposerDefaultService } from "../../../../src/app/services/composer-default.service";
 import { ConversationActions } from "../../../../src/app/services/conversation-actions";
+import { EngineResync } from "../../../../src/app/services/engine-resync";
 import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
@@ -356,6 +357,25 @@ describe("TeammatesViewComponent", () => {
     expect(texts(".nol-teamrun-model-name")).toEqual(["gpt-5", Resources.providerDefaultModel, Resources.providerDefaultModel]);
     expect(texts(".nol-teamrun-model-note")).toEqual(shown === "gpt-5" ? [] : [Resources.notInCatalogNote]);
     expect(row("Alice").querySelector("nol-avatar")?.getAttribute("aria-label")).toBe(`Alice · Codex · Work · ${shown} · High`);
+  });
+
+  it.each([
+    { cause: "the runtime asks for a resync", resync: (): void => context.emit(EventName.StateResyncRequested, null) },
+    { cause: "the window reconnects", resync: (): void => {
+      EngineResync.request(context);
+      void ChatStoreService.resync(context);
+    } }
+  ])("asks a teammate's provider for its models again after $cause, and drops the note once the new list has its model", async ({ resync }) => {
+    let models = [new ProviderModel("gpt-5-mini", "gpt-5-mini", "Fixture", ["high"], true, null, true)];
+    await create(t => t.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog(models)));
+    await Wait.until(() => expect(texts(".nol-teamrun-model-note")).toEqual([Resources.notInCatalogNote]));
+    const asked = context.count(MethodName.ProviderModelCatalog);
+    models = [...models, new ProviderModel("gpt-5", "gpt-5", "Fixture", ["high"], false, null, true)];
+
+    resync();
+
+    await Wait.until(() => expect(texts(".nol-teamrun-model-note")).toEqual([]));
+    expect(context.count(MethodName.ProviderModelCatalog)).toBeGreaterThan(asked);
   });
 
   it("shows a teammate saved with a level's id at that level, not as a model the catalog doesn't list", async () => {

@@ -22,6 +22,7 @@ import { userEvent } from "vitest/browser";
 import { ConversationMembersComponent } from "../../../../src/app/components/conversation-members/conversation-members.component";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ComposerDefaultService } from "../../../../src/app/services/composer-default.service";
+import { EngineResync } from "../../../../src/app/services/engine-resync";
 import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
@@ -195,6 +196,29 @@ describe("ConversationMembersComponent", () => {
     await Wait.until(() => expect(avatars()[0]?.getAttribute("aria-label")).toBe(`${Resources.defaultTeammateLabel} · Codex · Work · gpt-5 · Extra high`));
     await Wait.until(() => expect(document.querySelector(".cdk-overlay-container nol-tooltip")?.textContent?.trim()).toBe("Erin · Codex · Work · gpt-5 · Extra high"));
     PointerEventsFixture.leave(member("Erin"));
+  });
+
+  it.each([
+    { cause: "the runtime asks for a resync", resync: (): void => context.emit(EventName.StateResyncRequested, null) },
+    { cause: "the window reconnects", resync: (): void => {
+      EngineResync.request(context);
+      void ChatStoreService.resync(context);
+    } }
+  ])("asks the provider for its models again after $cause, and names the default teammate's effort as the new list does", async ({ resync }) => {
+    let label = "Extra high";
+    await create(t => {
+      t.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog([
+        new ProviderModel("gpt-5", "gpt-5", "Fixture", ["high", "xhigh"], true, null, true, "high", { xhigh: label })]));
+      t.answer(MethodName.DefaultTeammateRead, () => new DefaultTeammate(new RequestedSettings("codex", "gpt-5", "xhigh"), "a1").toJson());
+    });
+    await Wait.until(() => expect(avatars()[0]?.getAttribute("aria-label")).toBe(`${Resources.defaultTeammateLabel} · Codex · Work · gpt-5 · Extra high`));
+    const asked = context.count(MethodName.ProviderModelCatalog);
+    label = "Deepest";
+
+    resync();
+
+    await Wait.until(() => expect(avatars()[0]?.getAttribute("aria-label")).toBe(`${Resources.defaultTeammateLabel} · Codex · Work · gpt-5 · Deepest`));
+    expect(context.count(MethodName.ProviderModelCatalog)).toBeGreaterThan(asked);
   });
 
   it("names a thread's model and effort only in its own responder's avatar, as the composer's rows do, and the configuration's in the others, for a kind that follows its own configuration", async () => {
