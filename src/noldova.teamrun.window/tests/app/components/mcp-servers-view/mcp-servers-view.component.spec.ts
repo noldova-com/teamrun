@@ -925,6 +925,59 @@ describe("McpServersViewComponent", () => {
       expect(element().querySelector(".nol-teamrun-shared-mcp-row")).toBeNull();
     });
 
+    it("moves the focus to the server before once the last of three is deleted", async () => {
+      shared = [...shared, new SharedMcpServerListing(wiki, [])];
+      await create();
+      await listedShared();
+      await choose("wiki");
+      const remove = part(details(), ".nol-teamrun-delete");
+
+      remove.focus();
+      remove.click();
+      await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
+      inDialog<HTMLButtonElement>(".nol-teamrun-confirm").click();
+
+      await Wait.until(() => expect(document.activeElement).toBe(row("tracker")));
+      expect(texts(".nol-teamrun-shared-mcp-row .nol-teamrun-item-name")).toEqual(["docs", "tracker"]);
+    });
+
+    it("leaves a focus the person moved while a server's delete runs, and focuses Add shared server when the next server went meanwhile", async () => {
+      shared = [...shared, new SharedMcpServerListing(wiki, [])];
+      let deleting = new DeferredResponse();
+      let gone: readonly string[] = [];
+      await create(t => t.answer(MethodName.SharedMcpServerDelete, () => deleting.promise.then(() => {
+        shared = shared.filter(u => !gone.includes(u.server.id));
+        return null;
+      })));
+      await listedShared();
+      const confirmDelete = async (name: string, removed: readonly string[]): Promise<void> => {
+        deleting = new DeferredResponse();
+        gone = removed;
+        await choose(name);
+        const remove = part(details(), ".nol-teamrun-delete");
+        remove.focus();
+        remove.click();
+        await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
+        inDialog<HTMLButtonElement>(".nol-teamrun-confirm").click();
+        await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).toBeNull());
+      };
+
+      await confirmDelete("docs", ["s1", "s2"]);
+      deleting.resolve(null);
+      await Wait.until(() => expect(texts(".nol-teamrun-shared-mcp-row .nol-teamrun-item-name")).toEqual(["wiki"]));
+      await Wait.until(() => expect(document.activeElement).toBe(part(element(), ".nol-teamrun-add-shared-mcp")));
+      await confirmDelete("wiki", ["s3"]);
+      const outside = document.body.appendChild(document.createElement("button"));
+      outside.focus();
+      deleting.resolve(null);
+      await Wait.until(() => expect(element().querySelector(".nol-teamrun-shared-mcp-row")).toBeNull());
+      await settle();
+      const kept = document.activeElement === outside;
+      outside.remove();
+
+      expect(kept).toBe(true);
+    });
+
     it("keeps a server whose delete the runtime part refuses, and shows why in the view's error line", async () => {
       await create(t => t.answer(MethodName.SharedMcpServerDelete, () => {
         throw new Error("The database is busy.");

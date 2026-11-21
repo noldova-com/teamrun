@@ -637,6 +637,21 @@ describe("ProjectsViewComponent", () => {
     expect([Object.isUndefined(next), kept]).toEqual([false, true]);
   });
 
+  it("moves the focus to the row before once the last row of its tree is deleted", async () => {
+    conversations = [SampleData.conversation, second];
+    await create(t => t.answer(MethodName.ConversationFolderCount, () => 0).answer(MethodName.ConversationDelete, () => null));
+    const rows = [...element().querySelectorAll<HTMLElement>(`#${Resources.projectsGroupId} [role="treeitem"]`)];
+    const last = itemAt(rows, rows.length - 1);
+    const before = itemAt(rows, rows.length - 2);
+
+    last.focus();
+    await choose(last, Resources.deleteConversationLabel);
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+
+    await Wait.until(() => expect(document.activeElement).toBe(before));
+    expect(last.isConnected).toBe(false);
+  });
+
   it("attaches the folder the person chooses to a chat without a project, then offers to replace it after a confirm or detach it, and offers neither in a project", async () => {
     const attachedTo = (folder: string): Conversation => scratch.withAttachedFolder(folder, SampleData.timestamp).withFolder(folder);
     conversations = [SampleData.conversation, scratch];

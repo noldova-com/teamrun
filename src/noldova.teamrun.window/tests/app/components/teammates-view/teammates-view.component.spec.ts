@@ -28,6 +28,7 @@ import { ComposerDefaultService } from "../../../../src/app/services/composer-de
 import { ConversationActions } from "../../../../src/app/services/conversation-actions";
 import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
+import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { PointerEventsFixture } from "../../../fixtures/pointer-events.fixture";
@@ -473,6 +474,25 @@ describe("TeammatesViewComponent", () => {
     await Wait.until(() => expect(document.activeElement).toBe(button(".nol-teamrun-add")));
     expect(texts(".nol-teamrun-item-name")).toEqual([]);
   });
+  it("leaves a focus the person moved while a teammate's delete runs", async () => {
+    const deleting = new DeferredResponse();
+    await create(t => t.answer(MethodName.TeammateDelete, () => deleting.promise));
+    const remove = button(".nol-teamrun-delete", row("Bob"));
+    remove.focus();
+    remove.click();
+    await settle();
+    button(".nol-teamrun-confirm", document).click();
+    await Wait.until(() => expect(context.count(MethodName.TeammateDelete)).toBe(1));
+    const add = button(".nol-teamrun-add");
+
+    add.focus();
+    deleting.resolve(null);
+    await Wait.until(() => expect(texts(".nol-teamrun-item-name")).not.toContain("Bob"));
+    await settle();
+
+    expect(document.activeElement).toBe(add);
+  });
+
 
   describe("New chat", () => {
     const created = new Conversation("c7", "p1", "New chat", SampleData.timestamp, SampleData.timestamp);
