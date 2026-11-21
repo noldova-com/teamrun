@@ -2560,6 +2560,42 @@ describe("ComposerComponent", () => {
     });
   });
 
+  it("sets the teammate a mention names after the chat's opening write failed in the window while the runtime kept it", async () => {
+    new TeammateFixture(context);
+    const opening = new DeferredResponse();
+    const reply = new DeferredResponse();
+    let held: ConversationResponder | null = null;
+    context.answer(MethodName.ConversationResponderSet, t => {
+      const params = ConversationResponderParams.fromJson(t);
+      if (params.conversationId !== "c1")
+        return new Conversation("c2", "p1", "Second", SampleData.timestamp, SampleData.timestamp).withResponder(params.responder).toJson();
+      const first = Object.isNull(held);
+      if (!(params.start && !first))
+        held = params.responder;
+      return first ? opening.promise : SampleData.conversation.withResponder(held).toJson();
+    }).answer(MethodName.MessageSend, () => reply.promise)
+      .answer(MethodName.ConversationList, () => [SampleData.conversation.toJson(),
+        new Conversation("c2", "p1", "Second", SampleData.timestamp, SampleData.timestamp).toJson()]);
+    const store = await prepare();
+    remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+    await render();
+    await ready();
+    await Wait.until(() => expect(held?.requested?.kind).toBe("codex"));
+    await type("@Alice, have a look");
+    await send();
+    await Wait.until(() => expect(sent()).toHaveLength(1));
+    fixture.componentRef.setInput("conversationId", "c2");
+    await fixture.whenStable();
+
+    opening.reject(new Error("The answer was lost."));
+    await Wait.until(() => expect(store.conversation("c1")?.responder ?? null).toBeNull());
+    reply.resolve(answered());
+
+    await Wait.until(() => expect(held?.teammateId).toBe("alice"));
+    await Wait.until(() => expect(store.conversation("c1")?.responder?.teammateId).toBe("alice"));
+    expect(keptChoices().filter(t => t.includes("alice"))).toEqual([choiceParams(new ConversationResponder("alice"))]);
+  });
+
   it("never writes a choice the person didn't make over a teammate of the chat, and sets that teammate's mode when the person picks one", async () => {
     new TeammateFixture(context);
     withModes();
