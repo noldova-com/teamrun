@@ -12,8 +12,8 @@ import "@noldova/context.core";
 import { ChangeOperation, type DataRecord } from "@noldova/context.data";
 import { SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
 import { JsonReader } from "@noldova/context.json";
-import { FileChangeReader, Message, MessageAttachment, type MessageListParams, MessagePage, type MessagePageParams, MessageStatus, ReplyPanel, ReplyPage, ReplySummary,
-  ReplyUsage, TeammateDocument, TeammateLastReply, TeammateUsage, TeammateWork } from "@noldova/teamrun.protocol";
+import { FileChangeReader, type FileEdit, Message, MessageAttachment, type MessageListParams, MessagePage, type MessagePageParams, MessageStatus, ReplyPanel, ReplyPage,
+  ReplySummary, ReplyUsage, TeammateDocument, TeammateLastReply, TeammateUsage, TeammateWork } from "@noldova/teamrun.protocol";
 
 import { ChangeEntity } from "../../enums/change-entity.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
@@ -143,17 +143,29 @@ export class MessagesService implements IMessagesService {
     const connection = this.context.database.connection;
     const folders = (await connection.queryAsync(new SqlQuery(Resources.selectTeammateChatFolders, [teammateId]))).map(t => this.folderOf(t));
     const documents = new Map<string, TeammateDocument>();
+    const seen = new Set<string>();
     for (const reply of await connection.queryAsync(new SqlQuery(Resources.selectTeammateDocumentReplies, [teammateId]))) {
       const message = MessagesService.read(reply);
-      const folder = this.folderOf(reply, message.chatId);
-      for (const edit of MessagesService.fileChanges.editsOf(message)) {
-        const file = path.resolve(folder, edit.path);
-        if (edit.kind !== Resources.deletedFileKind && Resources.teammateDocumentPattern.test(file) && !documents.has(file))
+      for (const [file, present] of MessagesService.filesLeftBy(MessagesService.fileChanges.editsOf(message), this.folderOf(reply, message.chatId))) {
+        if (seen.has(file))
+          continue;
+        seen.add(file);
+        if (present && Resources.teammateDocumentPattern.test(file))
           documents.set(file, new TeammateDocument(file, message.chatId, reply.readString(Resources.endedAtColumn)));
       }
     }
     const ordered = [...new Set(folders)];
     return new TeammateWork(teammateId, ordered[0] ?? null, ordered, [...documents.values()].slice(0, Resources.teammateDocumentLimit));
+  }
+
+  private static filesLeftBy(edits: readonly FileEdit[], folder: string): ReadonlyMap<string, boolean> {
+    const files = new Map<string, boolean>();
+    for (const edit of edits) {
+      files.set(path.resolve(folder, edit.path), Object.isNull(edit.movePath) && edit.kind !== Resources.deletedFileKind);
+      if (!Object.isNull(edit.movePath))
+        files.set(path.resolve(folder, edit.movePath), true);
+    }
+    return files;
   }
 
   public async listOpenAsync(transaction?: SqlTransaction): Promise<readonly Message[]> {

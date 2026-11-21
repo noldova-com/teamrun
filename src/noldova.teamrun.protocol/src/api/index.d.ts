@@ -10674,12 +10674,17 @@ export declare class FileEdit {
    */
   public readonly lines: readonly DiffLine[];
   /**
+   * The path a move took the file to, or null for any other change.
+   */
+  public readonly movePath: string | null;
+  /**
    * Creates a file change.
    * @param path The recorded path.
    * @param kind The recorded change kind.
    * @param lines Immutable parsed lines retained by this instance.
+   * @param movePath The path a move took the file to, or null for any other change.
    */
-  public constructor(path: string, kind: string, lines: readonly DiffLine[]);
+  public constructor(path: string, kind: string, lines: readonly DiffLine[], movePath?: string | null);
   /**
    * The count of added lines.
    */

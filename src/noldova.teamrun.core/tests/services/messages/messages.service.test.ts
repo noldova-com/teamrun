@@ -9,7 +9,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-import type { JsonValue } from "@noldova/context.json";
+import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { ChangeOperation } from "@noldova/context.data";
 import { SqlQuery } from "@noldova/context.data.sql";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
@@ -500,6 +500,25 @@ export class MessagesServiceTests {
       ]
     }), JSON.stringify(work.toJson()));
     Assert.areEqual(JSON.stringify({ teammateId: "tm-cyd", folder: null, folders: [], documents: [] }), JSON.stringify(none.toJson()));
+  }
+
+  @TestMethod
+  public async leavesOutADocumentANewerReplyDeletedOrMovedAndListsAMovedDocumentAtItsNewPath(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const chat = await host.createConversationAsync(project);
+    const reply = (sequence: number, endedAt: string, changes: JsonObject[]): Message => new Message(`reply-${sequence}`, chat.id, sequence, MessageAuthor.Provider,
+      "msg-0", MessageStatus.Completed, [new MessageDetail(0, DetailKind.FileChange, "Changed files", { changes }, "t")], MessagesServiceTests.provenance(), "t", "t",
+      endedAt, [], "tm-ada", "Ada");
+    await host.messages.insertAsync(reply(1, "2026-11-20T09:00:00.000Z",
+      [{ path: "PLAN.md", kind: "add", diff: null }, { path: "DRAFT.md", kind: "add", diff: null }, { path: "KEPT.md", kind: "add", diff: null }]));
+    await host.messages.insertAsync(reply(2, "2026-11-20T10:00:00.000Z", [{ path: "PLAN.md", kind: "delete", diff: null },
+      { path: "DRAFT.md", kind: { type: "update", move_path: "docs/DRAFT.md" }, diff: null }]));
+
+    const work = await host.messages.readTeammateWorkAsync("tm-ada");
+
+    Assert.areEqual(`${join(project.rootPath, "docs", "DRAFT.md")} 2026-11-20T10:00:00.000Z|${join(project.rootPath, "KEPT.md")} 2026-11-20T09:00:00.000Z`,
+      work.documents.map(t => `${t.path} ${t.changedAt}`).join("|"));
   }
 
   @TestMethod
