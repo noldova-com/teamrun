@@ -2526,6 +2526,10 @@ export declare class Resources {
    */
   public static readonly mentionsChanged: string;
   /**
+   * Refusal of a waiting message's edit whose mentioned teammates are not exactly the teammates its new text names.
+   */
+  public static readonly editMentionsMismatch: string;
+  /**
    * Participant execution literal.
    */
   public static readonly instructionsParameterName: string;

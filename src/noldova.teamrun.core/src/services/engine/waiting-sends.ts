@@ -24,6 +24,7 @@ import { Resources } from "../../resources.js";
 import type { DatabaseContext } from "../database-context.js";
 import { AttachmentStore } from "./attachment-store.js";
 import type { EngineServices } from "./engine-services.js";
+import { MentionCheck } from "./mention-check.js";
 import type { ReplyRun } from "./reply-run.js";
 import type { TurnState } from "./turn-state.js";
 import { WaitingMessages } from "./waiting-messages.js";
@@ -89,6 +90,9 @@ export class WaitingSends {
   }
 
   public async editWaitingAsync(params: WaitingMessageEditParams, fromOutside: boolean): Promise<WaitingMessage> {
+    const available = (await this.teammates.listAsync()).map(t => new TeammateMention(t.id, t.name));
+    if (!MentionCheck.matches(params.message.text, params.message.mentionedTeammateIds, available, !Object.isNull(params.message.senderToken)))
+      throw new ServiceException(ErrorCode.Conflict, Resources.editMentionsMismatch, []);
     const [current, edited, kept] = await this.context.database.connection.runInTransactionAsync(async (transaction)
       : Promise<readonly [WaitingMessage, WaitingMessage, readonly MessageAttachment[]]> => {
       const found = await this.requireWaitingAsync(params.id, transaction);
