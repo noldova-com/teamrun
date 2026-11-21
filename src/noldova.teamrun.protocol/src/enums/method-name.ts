@@ -146,5 +146,6 @@ export enum MethodName {
   WaitingMessageRemove = "WaitingMessageRemove",
   WaitingMessageSendNow = "WaitingMessageSendNow",
   OutsideConnectionRead = "OutsideConnectionRead",
-  OutsideTokenReset = "OutsideTokenReset"
+  OutsideTokenReset = "OutsideTokenReset",
+  TeammateWorkRead = "TeammateWorkRead"
 }

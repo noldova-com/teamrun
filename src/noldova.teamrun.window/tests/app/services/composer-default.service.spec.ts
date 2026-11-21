@@ -218,6 +218,22 @@ describe("ComposerDefaultService", () => {
     expect(stored()).toEqual({ conversations });
   });
 
+  it("shows the choice another window kept during the stored one's move over the move's answer", async () => {
+    storeEarlier(gemini.toJson());
+    const move = new DeferredResponse();
+    context.answer(MethodName.ComposerDefaultSave, () => move.promise);
+    const store = ComposerDefaultService.of(context);
+    await Wait.until(() => expect(context.count(MethodName.ComposerDefaultSave)).toBe(1));
+
+    context.emit(EventName.ComposerDefaultUpdated, codex.toJson());
+    move.resolve(gemini.toJson());
+    await Wait.until(() => expect(stored()).toEqual({ conversations }));
+    await settle();
+
+    expect(shown(store)).toEqual(codex.toJson());
+    expect(context.count(MethodName.ComposerDefaultSave)).toBe(1);
+  });
+
   it("keeps a choice for this window when the runtime refuses it", async () => {
     context.fail(MethodName.ComposerDefaultSave, "The disk is full.");
     const store = await open();
@@ -247,6 +263,21 @@ describe("ComposerDefaultService", () => {
       context.emit(EventName.ComposerDefaultUpdated, gemini.toJson());
       expect(shown(store)).toEqual(gemini.toJson());
     });
+  });
+
+  it("shows the choice another window kept during its own save once that save settles", async () => {
+    const store = await open();
+    const save = new DeferredResponse();
+    context.answer(MethodName.ComposerDefaultSave, () => save.promise);
+    store.remember(claude);
+    await Wait.until(() => expect(context.count(MethodName.ComposerDefaultSave)).toBe(1));
+    context.emit(EventName.ComposerDefaultUpdated, claude.toJson());
+    context.emit(EventName.ComposerDefaultUpdated, gemini.toJson());
+    expect(shown(store)).toEqual(claude.toJson());
+
+    save.resolve(claude.toJson());
+
+    await Wait.until(() => expect(shown(store)).toEqual(gemini.toJson()));
   });
 
   it("shows a choice another window keeps while its own read waits, over the read's older answer, and removes the stored one", async () => {

@@ -48,6 +48,36 @@ export class PageMethodTests {
   }
 
   @TestMethod
+  public async listsThePagesAndCanvasesATeammateMadeOrLastEditedLatestChangeFirstLeavingOutArtboardsAndRefusesABlankTeammate(): Promise<void> {
+    using harness = new PagesHarness();
+    harness.file("a.html", "<p>one</p>");
+    const first = await harness.showAsync();
+    const taken = await harness.showAsync("a.html", "c2");
+    const other = await harness.showAsync("a.html", "c2", "Sol");
+    const canvas = (await harness.callAsync("teamrun_canvas_create", { title: "Options" })).readObject("canvas").readString("id");
+    await harness.callAsync("teamrun_canvas_add_artboard", { canvas_id: canvas, base_version: 1, path: "a.html", title: "A" });
+    await harness.callAsync(PagesHarness.edit, { page_id: taken, base_version: 1, html: "<p>two</p>" }, "Sol", "c2");
+    await harness.callAsync(PagesHarness.edit, { page_id: first, base_version: 1, html: "<p>two</p>" });
+    const serving = new PagesServing();
+    await harness.pages.serveAsync(serving, new ManualTimer());
+    try {
+      const idsOf = async (teammateId: string): Promise<string> => JsonReader.fromValue({ items: await serving.callAsync("teamrun.pageEditedList", { teammateId }) })
+        .readObjectArray("items").map(t => t.readString("id")).join(",");
+      const edited = [await idsOf("t-opus"), await idsOf("t-sol")];
+      await serving.callAsync("teamrun.pageRestore", { pageId: taken, version: 1 });
+      const listed = [await idsOf("t-opus"), await idsOf("t-sol"), await idsOf("t-nobody")];
+      const refused = await serving.callAsync("teamrun.pageEditedList", { teammateId: " " }).then(() => null, (error: unknown) => error);
+
+      Assert.areEqual(JSON.stringify([`${first},${taken},${canvas}`, `${taken},${other}`]), JSON.stringify(edited));
+      Assert.areEqual(JSON.stringify([`${taken},${first},${canvas}`, other, ""]), JSON.stringify(listed));
+      Assert.isTrue(refused instanceof MethodFailureException);
+    }
+    finally {
+      await harness.pages.closeAsync();
+    }
+  }
+
+  @TestMethod
   public async readsTheCurrentVersionsOrAKeptVersionsHtml(): Promise<void> {
     using harness = new PagesHarness();
     harness.file("a.html", "<p>one</p>");

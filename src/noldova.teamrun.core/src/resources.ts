@@ -577,6 +577,7 @@ export class Resources {
 
   public static readonly conversationIdColumn: string = "chatId";
   public static readonly countColumn: string = "count";
+  public static readonly folderColumn: string = "folder";
   public static readonly endedAtColumn: string = "endedAt";
   public static readonly idColumn: string = "id";
   public static readonly jsonColumn: string = "json";
@@ -669,6 +670,20 @@ export class Resources {
     + "FROM messages WHERE json_extract(json, '$.teammateId') IS NOT NULL AND json_extract(json, '$.provenance.usage') IS NOT NULL) u "
     + "JOIN chatTeammates m ON m.chatId = u.chatId AND m.teammateId = u.teammateId "
     + "WHERE u.position = 1 AND u.nativeSessionId IS json_extract(m.json, '$.nativeSessionId') ORDER BY u.chatId, u.sequence";
+  public static readonly selectTeammateChatFolders: string =
+    "SELECT m.chatId, COALESCE(json_extract(c.json, '$.attachedFolder'), p.rootPath) AS folder "
+    + "FROM messages m CROSS JOIN chats c ON c.id = m.chatId LEFT JOIN projects p ON p.id = c.projectId "
+    + `WHERE ${Resources.formatFinishedReply("m")} AND json_extract(m.json, '$.teammateId') = ? AND json_extract(m.json, '$.endedAt') IS NOT NULL `
+    + "ORDER BY json_extract(m.json, '$.endedAt') DESC, m.rowid DESC";
+  public static readonly selectTeammateDocumentReplies: string =
+    "SELECT m.json, json_extract(m.json, '$.endedAt') AS endedAt, COALESCE(json_extract(c.json, '$.attachedFolder'), p.rootPath) AS folder "
+    + "FROM messages m CROSS JOIN chats c ON c.id = m.chatId LEFT JOIN projects p ON p.id = c.projectId "
+    + `WHERE ${Resources.formatFinishedReply("m")} AND json_extract(m.json, '$.teammateId') = ? AND json_extract(m.json, '$.endedAt') IS NOT NULL `
+    + "AND (instr(lower(m.json), '.md\"') > 0 OR instr(lower(m.json), '.markdown\"') > 0 OR instr(lower(m.json), '.txt\"') > 0) "
+    + "ORDER BY json_extract(m.json, '$.endedAt') DESC, m.rowid DESC";
+  public static readonly teammateDocumentPattern: RegExp = /\.(?:md|markdown|txt)$/i;
+  public static readonly teammateDocumentLimit: number = 20;
+  public static readonly deletedFileKind: string = "delete";
   public static readonly selectOpenReplyByProvider: string =
     "SELECT json FROM messages WHERE json_extract(json, '$.provenance.providerId') = ? "
     + `AND status IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}') LIMIT 1`;

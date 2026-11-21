@@ -138,6 +138,7 @@ import type {
   TeammateUpdateParams,
   TeammateLastReply,
   TeammateUsage,
+  TeammateWork,
   SubAgent,
   SubAgentStartParams,
   SubAgentStopParams,
@@ -1577,6 +1578,11 @@ export interface IMessagesService {
    * Lists each teammate's latest completed reply that has text, in any chat.
    */
   listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
+
+  /**
+   * Reads what a teammate worked on: the working folders of the chats it answered in and the Markdown and text files its replies changed.
+   */
+  readTeammateWorkAsync(teammateId: string): Promise<TeammateWork>;
 
   /**
    * Lists every reply still pending, running, or awaiting an approval, across conversations.
@@ -3777,6 +3783,16 @@ export declare class Resources {
    * Its one parameter is `textBlanks`.
    */
   public static readonly selectTeammateLastReplies: string;
+  /**
+   * The working folder of each chat a teammate answered in, one row for each of its completed replies, the latest ended first: it walks the
+   * last-reply index for the teammate, so it reads no other message and sorts nothing. Its one parameter is the teammate's id.
+   */
+  public static readonly selectTeammateChatFolders: string;
+  /**
+   * A teammate's completed replies whose JSON names a Markdown or text file, with each one's end and working folder, the latest ended first: it walks
+   * the last-reply index for the teammate, so it reads no other message and sorts nothing. Its one parameter is the teammate's id.
+   */
+  public static readonly selectTeammateDocumentReplies: string;
   /**
    * Selects every message with a sub-agent still running, oldest first; the text search only narrows the rows the details are read from.
    */
@@ -7532,6 +7548,15 @@ export declare class MessagesService implements IMessagesService {
    * @remarks One query over `messages`, reading each reply's text from the `messageText` index rather than its JSON.
    */
   public listTeammateLastRepliesAsync(): Promise<readonly TeammateLastReply[]>;
+
+  /**
+   * Reads what a teammate worked on, from the replies it completed.
+   * @param teammateId The teammate's id.
+   * @returns The working folder of each chat it answered in, the latest first, and at most 20 Markdown and text files its replies created or changed,
+   * each once, the latest changed first; a relative path is resolved against the chat's working folder, and a deleted file is left out.
+   * @remarks Two queries through the `IX_messages_teammateId_endedAt` index, the second reading only the replies whose text names such a file.
+   */
+  public readTeammateWorkAsync(teammateId: string): Promise<TeammateWork>;
 
   /**
    * Lists every reply still pending, running, or awaiting an approval, across conversations, oldest first.

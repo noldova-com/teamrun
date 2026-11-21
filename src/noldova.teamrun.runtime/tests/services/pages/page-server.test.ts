@@ -11,7 +11,7 @@ import { ManualTimer } from "@noldova/teamrun.core/testing";
 import "@noldova/context.core";
 import { JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { PageView } from "@noldova/teamrun.protocol";
+import { PageMethodName, PageView } from "@noldova/teamrun.protocol";
 import { Pages } from "@noldova/teamrun.runtime";
 
 import { PagesHarness } from "../../fixtures/pages-harness.fixture.js";
@@ -168,7 +168,7 @@ export class PageServerTests {
       Assert.areEqual(["The page server could not listen, so pages can't be shown (Error).",
         "The page server could not listen, so pages can't be shown (PageException)."].join("\n"), harness.lines.join("\n"));
       Assert.areEqual("Unavailable", failure.failure.code);
-      Assert.areEqual(4, serving.methods.size);
+      Assert.areEqual(Object.values(PageMethodName).length, serving.methods.size);
       Assert.areEqual(0, timer.pending);
     }
     finally {

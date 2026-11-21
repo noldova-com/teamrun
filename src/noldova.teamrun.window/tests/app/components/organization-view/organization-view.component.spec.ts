@@ -6,20 +6,22 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
-  PlanUsage, PlanWindow, PlanWindowName, TeammateLastReply } from "@noldova/teamrun.protocol";
-import { ThemeMode } from "@noldova/ui.components.angular";
+  PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammateWork } from "@noldova/teamrun.protocol";
+import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -104,6 +106,7 @@ describe("OrganizationViewComponent", () => {
     saves = [];
     context = SampleData.createContext()
       .answer(MethodName.OrganizationList, () => organization.toJson())
+      .answer(MethodName.OrganizationMessageList, () => [])
       .answer(MethodName.OrganizationLayoutSave, t => {
         saves.push(OrganizationLayoutSaveParams.fromJson(t).layout);
         return null;
@@ -113,6 +116,8 @@ describe("OrganizationViewComponent", () => {
     configure(context);
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
+    element().style.width = "100rem";
+    element().style.height = "76rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
     await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
@@ -120,8 +125,13 @@ describe("OrganizationViewComponent", () => {
       await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(1));
     await settle();
   };
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
 
-  afterEach(() => {
+  beforeEach(() => page.viewport(1600, 1300));
+
+  afterEach(async () => {
+    await page.viewport(viewport.width, viewport.height);
+    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
@@ -223,7 +233,8 @@ describe("OrganizationViewComponent", () => {
 
     await openMenu(one(".top .cards-show"));
     expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Last message", "false"],
-      ["Model and effort", "false"], ["Clear every card's own choice", null]]);
+      ["Model and effort", "false"], ["Git branch", "false"], ["Pull requests", "false"], ["Documents", "false"], ["Artifacts", "false"],
+      ["Clear every card's own choice", null]]);
     expect(menuItem("Clear every card's own choice").getAttribute("aria-disabled")).toBe("true");
     menuItem("Usage today").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
@@ -236,7 +247,25 @@ describe("OrganizationViewComponent", () => {
 
     expect([shows("Alice"), shows("Bob")]).toEqual([["Idle", "40%", "gpt-5 · high"], ["Idle", "40%"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
-    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
+    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true, Git: false, PullRequests: false, Documents: false,
+      Artifacts: false } }));
+  });
+
+  it("shows a teammate's work on its card only while a work field is on, and reads it only then", async () => {
+    await create();
+
+    expect([all("nol-teamrun-teammate-work"), context.count(MethodName.TeammateWorkRead)]).toEqual([[], 0]);
+
+    context.answer(MethodName.TeammateWorkRead, t => new TeammateWork(TeammateIdParams.fromJson(t).teammateId, null, [], []).toJson());
+    await openMenu(one(".top .cards-show"));
+    menuItem("Git branch").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    await Wait.until(() => expect(texts("[data-field=Git] .work-muted", card("Alice"))).toEqual(["The Git module isn't installed"]));
+    const cards = all("nol-teamrun-organization-card").length;
+    expect([cards, all("nol-teamrun-teammate-work").length, context.count(MethodName.TeammateWorkRead), saves[0]])
+      .toEqual([4, cards, cards, expect.objectContaining({ cardsShow: expect.objectContaining({ Git: true }) })]);
   });
 
   it("shows no usage on a card whose provider's plan has no window with a percent, such as an unlimited one", async () => {
@@ -363,6 +392,160 @@ describe("OrganizationViewComponent", () => {
 
     expect([before, editing, looks(), saves]).toEqual([["account_treeEdit structure", true, "false"], ["account_treeDone editing", false, "true"],
       ["account_treeEdit structure", true, "false"], []]);
+  });
+
+  describe("with its messages beside the tree", () => {
+    const heading = (): string[] => texts("aside.messages .nol-teamrun-organization-thread-title");
+
+    afterEach(() => AppearanceFixture.reset());
+
+    const select = (): HTMLElement => one("aside.messages .to-choice");
+    const optionTexts = (): string[] => [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
+    const pickAsync = async (label: string): Promise<string[]> => {
+      await userEvent.click(one(".nol-select-button", select()));
+      await Wait.until(() => expect(optionTexts().length).toBeGreaterThan(0));
+      const shown = optionTexts();
+      const option = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].find(t => t.textContent?.trim() === label);
+      if (Object.isUndefined(option))
+        throw new Error(`No option reads ${label}.`);
+      await userEvent.click(option);
+      await settle();
+      return shown;
+    };
+    const chosenLabel = (): string => one(".nol-select-value", select()).textContent?.trim() ?? "";
+
+    it("talks to the first department until a teammate's name or a department's Message is chosen, also while editing, but not by the rest of a card, Enter on it or its own buttons", async () => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+      await create();
+      const first = [one("aside.messages").getAttribute("aria-label"), heading()];
+      const names = ["Alice", "Bob"].map(t => [one(".name", card(t)).tagName, one(".name", card(t)).getAttribute("aria-label")]);
+
+      await userEvent.click(one(".name", card("Bob")));
+      await settle();
+      const clicked = heading();
+      one(".status", card("Alice")).click();
+      card("Alice").focus();
+      await userEvent.keyboard("{Enter}");
+      await settle();
+      const rest = heading();
+      one(".name", card("Alice")).focus();
+      await userEvent.keyboard("{Enter}");
+      await settle();
+      const entered = heading();
+      await userEvent.click(one(":scope > .department .message", department("Build")));
+      await settle();
+      const build = [one(":scope > .department .message", department("Build")).getAttribute("aria-label"), heading()];
+      await userEvent.keyboard("{Escape}");
+      one(".tune", card("Bob")).click();
+      await settle();
+      await userEvent.keyboard("{Escape}");
+      await Wait.until(() => expect(menuItems()).toEqual([]));
+      const tuned = heading();
+      one(".top .edit").click();
+      await settle();
+      card("Code Reviewer").click();
+      await settle();
+      const editing = [heading(), all(".message").length, all("button.name").length];
+      await userEvent.click(one(":scope > .department .message", department("UI")));
+      await settle();
+
+      expect([first, names, clicked, rest, entered, build, tuned, editing, heading()]).toEqual([
+        ["Messages", ["Chat with Design"]], [["BUTTON", "Message Alice"], ["BUTTON", "Message Bob"]], ["Chat with Bob"], ["Chat with Bob"], ["Chat with Alice"],
+        ["Message Build", ["Chat with Build"]], ["Chat with Build"], [["Chat with Build"], 3, 0], ["Chat with UI"]]);
+    });
+
+    it("chooses a teammate in a nested department too", async () => {
+      await create();
+
+      one(".name", card("Code Reviewer")).click();
+      await settle();
+
+      expect(heading()).toEqual(["Chat with Code Reviewer"]);
+    });
+
+    it("pans the canvas when a card is dragged", async () => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+      await create();
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const before = box(card("Bob"));
+      const from = box(one(".status", card("Bob")));
+      const to = box(card("Offline"));
+
+      await userEvent.dragAndDrop(one(".status", card("Bob")), card("Offline"));
+      await settle();
+      const after = box(card("Bob"));
+
+      AppearanceFixture.expectPixels(after.left - before.left, to.left + to.width / 2 - (from.left + from.width / 2));
+      AppearanceFixture.expectPixels(after.top - before.top, to.top + to.height / 2 - (from.top + from.height / 2));
+      expect(heading()).toEqual(["Chat with Design"]);
+    });
+
+    it("offers whom to talk to under To: all leaders, everyone, then each department with its leader and members in the tree's order, and follows the choice", async () => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+      await create();
+      const shown = [one("aside.messages .to-label").textContent?.trim(), select().querySelector(".nol-select-button")?.getAttribute("aria-label"), chosenLabel()];
+
+      const offered = await pickAsync("UI (department)");
+      const ui = [heading(), chosenLabel()];
+      await pickAsync("All leaders");
+      const leaders = [heading(), chosenLabel()];
+      await userEvent.click(one(".name", card("Offline")));
+      await settle();
+
+      expect([shown, offered, ui, leaders, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (department)", "Design (department)"],
+        ["All leaders", "Everyone", "Design (department)", "Alice (leads Design)", "Bob", "UI (department)", "Code Reviewer (leads UI)", "Build (department)", "Offline"],
+        [["Chat with UI"], "UI (department)"], [["Chat with all leaders"], "All leaders"], [["Chat with Offline"], "Offline"]]);
+    });
+
+    it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
+      await create();
+      await pickAsync("Bob");
+
+      fixture.debugElement.query(By.directive(SelectComponent)).injector.get(SelectComponent).valueChange.emit("teammate:gone");
+      await settle();
+
+      expect([heading(), chosenLabel()]).toEqual([["Chat with Bob"], "Bob"]);
+    });
+
+    it("asks whom to message while there is no department to talk to", async () => {
+      await create(context => context.answer(MethodName.OrganizationList, () => Organization.empty.toJson()), false);
+
+      expect([heading(), texts("aside.messages .nol-teamrun-organization-empty")]).toEqual([[], ["Choose whom to message."]]);
+    });
+
+    it("sets the messages beside the canvas, a gap apart, as wide as their basis while the canvas takes the rest, and under it in a narrow view", async () => {
+      await create();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      element().style.width = "80rem";
+      element().style.height = "50rem";
+      await settle();
+      const chart = one(".chart");
+      const messages = one("aside.messages");
+      const body = one(".body");
+      const inner = box(body).width - space(6) * 2;
+      const free = inner - space(4) - 57 * rem;
+      const wideChart = box(chart);
+      const wideMessages = box(messages);
+      const wideBody = box(body);
+      element().style.width = "40rem";
+      await settle();
+      const narrowChart = box(chart);
+      const narrowMessages = box(messages);
+
+      AppearanceFixture.expectPixels(wideMessages.left - wideChart.right, space(4));
+      AppearanceFixture.expectPixels(wideMessages.width, 22 * rem + free / 1000);
+      AppearanceFixture.expectPixels(wideMessages.right, wideBody.right - space(6));
+      AppearanceFixture.expectPixels(wideMessages.top, wideChart.top);
+      AppearanceFixture.expectPixels(wideMessages.bottom, wideBody.bottom - space(6));
+      AppearanceFixture.expectPixels(narrowChart.height, 32 * rem);
+      AppearanceFixture.expectPixels(narrowMessages.height, 30 * rem);
+      AppearanceFixture.expectPixels(narrowMessages.top - narrowChart.bottom, space(4));
+      AppearanceFixture.expectPixels(narrowMessages.left, narrowChart.left);
+      AppearanceFixture.expectPixels(narrowMessages.width, narrowChart.width);
+      expect(getComputedStyle(body).overflowY).toBe("auto");
+    });
   });
 
   describe("while its structure is edited", () => {
@@ -601,10 +784,45 @@ describe("OrganizationViewComponent", () => {
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
     });
 
+    it("sets To under the messages' head over a select as wide as their padding allows, above the thread, a department's Message under its summary at its start, and a name as plain text", async () => {
+      await create();
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const aside = one("aside.messages");
+      const border = Number.parseFloat(getComputedStyle(aside).borderTopWidth);
+      const [head, label, choice, thread] = [one(".nol-teamrun-organization-thread-head", aside), one(".to-label", aside), one(".to-choice", aside),
+        one(".nol-teamrun-organization-thread", aside)];
+      const design = one(":scope > .department", department("Design"));
+      const inset = Number.parseFloat(getComputedStyle(design).borderLeftWidth) + space(3);
+      const [summary, message] = [one(".department-summary", design), one(".message", design)];
+      const alice = card("Alice");
+      const [name, role] = [one(".name", alice), one(".role", alice)];
+      const labelStyle = getComputedStyle(label);
+      const nameStyle = getComputedStyle(name);
+
+      AppearanceFixture.expectPixels(box(label).left, box(aside).left + border + space(3));
+      AppearanceFixture.expectPixels(box(head).top, box(aside).top + border + space(3));
+      AppearanceFixture.expectPixels(box(label).top - box(head).bottom, space(3));
+      AppearanceFixture.expectPixels(box(thread).top - box(choice).bottom, space(3));
+      AppearanceFixture.expectPixels(box(choice).left, box(label).left);
+      AppearanceFixture.expectPixels(box(choice).right, box(aside).right - border - space(3));
+      AppearanceFixture.expectPixels(box(choice).top - box(label).bottom, space(3));
+      AppearanceFixture.expectPixels(Number.parseFloat(labelStyle.fontSize), AppearanceFixture.measureLook("text-small"));
+      AppearanceFixture.expectPixels(Number.parseFloat(labelStyle.lineHeight), AppearanceFixture.measureLook("line-label"));
+      expect(labelStyle.fontWeight).toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
+      AppearanceFixture.expectPixels(box(message).left, box(design).left + inset);
+      AppearanceFixture.expectPixels(box(message).top - box(summary).bottom, space(1) + AppearanceFixture.measureLook("space-half"));
+      expect(box(message).right).toBeLessThanOrEqual(box(design).right - inset);
+      AppearanceFixture.expectPixels(box(name).left, box(role).left);
+      AppearanceFixture.expectPixels(box(role).top, box(name).bottom);
+      expect([nameStyle.paddingLeft, nameStyle.paddingTop, nameStyle.borderTopWidth, nameStyle.fontWeight]).toEqual(["0px", "0px", "0px",
+        getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim()]);
+    });
+
     it("sizes the cards, hangs each leader under its department, the members off one line, and joins the departments to you through one bar", async () => {
       await create();
-      element().style.width = "60rem";
-      element().style.height = "60rem";
+      element().style.width = "100rem";
+      element().style.height = "76rem";
       await settle();
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
@@ -645,15 +863,15 @@ describe("OrganizationViewComponent", () => {
 
     it("fills the space under the header with one canvas inside the view's padding, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
-      element().style.width = "60rem";
-      element().style.height = "60rem";
+      element().style.width = "100rem";
+      element().style.height = "76rem";
       await settle();
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
-      const [host, top, canvas] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas")];
+      const [host, top, canvas, messages] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas"), box("aside.messages")];
       const [tools, tree] = [box(".chart .nol-canvas-tools"), box(".chart .tree")];
 
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
-      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.right, host.right - space(6)],
+      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.right, messages.left - space(4)], [messages.right, host.right - space(6)],
         [canvas.bottom, host.bottom - space(6)]] as const)
         AppearanceFixture.expectPixels(actual, expected);
       expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
@@ -757,6 +975,24 @@ describe("OrganizationViewComponent", () => {
     beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, mode));
 
     afterEach(() => AppearanceFixture.reset());
+
+    it("draws the messages on the panel's colour in a rounded card's border, in light and dark", async () => {
+      await create();
+      const messages = one("aside.messages");
+      const probe = document.createElement("span");
+      element().append(probe);
+      const colour = (name: string): string => {
+        probe.style.color = `var(--nol-${name})`;
+        return getComputedStyle(probe).color;
+      };
+      const expected = [colour("panel"), colour("card-border")];
+      probe.remove();
+      const style = getComputedStyle(messages);
+
+      expect([style.backgroundColor, style.borderTopColor, style.borderTopStyle]).toEqual([...expected, "solid"]);
+      AppearanceFixture.expectPixels(Number.parseFloat(style.borderTopWidth), AppearanceFixture.measureLook("border-width"));
+      AppearanceFixture.expectPixels(Number.parseFloat(style.borderTopLeftRadius), AppearanceFixture.measureLook("radius-large"));
+    });
 
     it("draws the cards, departments and you on the panel's colour in light and the raised colour in dark, off the canvas's, a department's count on a filled badge, and a status's word in its colour", async () => {
       await create();

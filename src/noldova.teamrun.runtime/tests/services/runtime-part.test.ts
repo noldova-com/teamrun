@@ -1541,7 +1541,7 @@ export class RuntimePartTests {
     await failed;
     failed = RuntimePartTests.waitingFailed(context);
     const theirs = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageEdit",
-      new WaitingMessageEditParams(added.id, send).toJson(), ShellClients.commandLine));
+      new WaitingMessageEditParams(added.id, new MessageSendParams(chat.id, "To nobody", send.requested, "provider-gone", [], [])).toJson(), ShellClients.commandLine));
     await failed;
     failed = RuntimePartTests.waitingFailed(context);
     const outside = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageAdd",
