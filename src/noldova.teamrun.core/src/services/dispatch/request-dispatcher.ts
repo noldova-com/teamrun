@@ -449,7 +449,9 @@ export class RequestDispatcher {
       case MethodName.ConversationResponderSet:
         return (await this.engine.setResponderAsync(ConversationResponderParams.fromJson(payload))).toJson();
       case MethodName.ConversationMove: {
-        const moved = await this.conversations.moveAsync(ConversationMoveParams.fromJson(payload));
+        const params = ConversationMoveParams.fromJson(payload);
+        await this.engine.requireNothingRunningAsync(params.conversationId, Resources.chatMoveChange);
+        const moved = await this.conversations.moveAsync(params);
         await this.engine.releaseFolderAsync(moved.id);
         return moved.toJson();
       }
@@ -462,10 +464,16 @@ export class RequestDispatcher {
       }
       case MethodName.ConversationFolderCount:
         return await this.conversations.countFolderFilesAsync(ConversationIdParams.fromJson(payload));
-      case MethodName.ChatFolderAttach:
-        return (await this.conversations.attachFolderAsync(ChatFolderAttachParams.fromJson(payload), t => this.projects.checkFolderAsync(t, null))).toJson();
-      case MethodName.ChatFolderDetach:
-        return (await this.conversations.detachFolderAsync(ConversationIdParams.fromJson(payload))).toJson();
+      case MethodName.ChatFolderAttach: {
+        const params = ChatFolderAttachParams.fromJson(payload);
+        await this.engine.requireNothingRunningAsync(params.chatId, Resources.chatAttachChange);
+        return (await this.conversations.attachFolderAsync(params, t => this.projects.checkFolderAsync(t, null))).toJson();
+      }
+      case MethodName.ChatFolderDetach: {
+        const params = ConversationIdParams.fromJson(payload);
+        await this.engine.requireNothingRunningAsync(params.conversationId, Resources.chatDetachChange);
+        return (await this.conversations.detachFolderAsync(params)).toJson();
+      }
       case MethodName.ConversationRewind:
         return (await this.engine.rewindAsync(ConversationRewindParams.fromJson(payload))).toJson();
       case MethodName.ConversationSearch:

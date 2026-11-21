@@ -30,6 +30,8 @@ export class ProjectsLayoutService {
   private readonly subscriptions: readonly (() => void)[];
   private readonly held: ((layout: ProjectsLayout) => ProjectsLayout)[] = [];
   private isOpen: boolean = false;
+  private opening: Promise<void> | null = null;
+  private isAskedAgain: boolean = false;
   private latest: ProjectsLayout | null = null;
   private edits: number = 0;
   private received: number = 0;
@@ -52,9 +54,9 @@ export class ProjectsLayoutService {
         else
           this.missed = this.latest;
       }),
-      EngineResync.on(context, () => void this.load())
+      EngineResync.on(context, () => this.resync())
     ];
-    void this.open();
+    this.openOnce();
   }
 
   public static of(context: IWindowPartContext): ProjectsLayoutService {
@@ -101,18 +103,48 @@ export class ProjectsLayoutService {
     this.current.set(next);
     if (this.isOpen)
       void this.save(next.toJson());
-    else
+    else {
       this.held.push(change);
+      this.openOnce();
+    }
+  }
+
+  private resync(): void {
+    if (this.isOpen)
+      void this.load();
+    else
+      this.openOnce();
+  }
+
+  private openOnce(): void {
+    if (!Object.isNull(this.opening)) {
+      this.isAskedAgain = true;
+      return;
+    }
+    this.isAskedAgain = false;
+    this.opening = this.open().finally(() => {
+      this.opening = null;
+      if (this.isAskedAgain && !this.isOpen)
+        this.openOnce();
+    });
   }
 
   private async open(): Promise<void> {
     let base = this.stored ?? new ProjectsLayout();
-    const kept = await this.request(MethodName.ProjectsLayoutRead, null).catch(() => undefined);
+    let kept: JsonValue = null;
+    try {
+      kept = await this.request(MethodName.ProjectsLayoutRead, null);
+    }
+    catch (error) {
+      this.context.log(Resources.formatProjectsLayoutNotRead(ProjectsLayoutService.failureOf(error)));
+      if (Object.isNull(this.latest))
+        return;
+    }
     if (!Object.isNull(this.latest)) {
       base = this.latest;
       ProjectsLayoutService.removeStored();
     }
-    else if (!Object.isNull(kept) && !Object.isUndefined(kept)) {
+    else if (!Object.isNull(kept)) {
       base = ProjectsLayout.fromJson(kept);
       ProjectsLayoutService.removeStored();
     }
@@ -122,6 +154,8 @@ export class ProjectsLayoutService {
         base = this.latest ?? ProjectsLayout.fromJson(moved);
         ProjectsLayoutService.removeStored();
       }
+      else if (!Object.isNull(this.latest))
+        base = this.latest;
     }
     this.isOpen = true;
     const held = this.held.splice(0);
@@ -137,15 +171,18 @@ export class ProjectsLayoutService {
       if (!Object.isNull(kept) && edits === this.edits && received === this.received && this.saving === 0)
         this.current.set(ProjectsLayout.fromJson(kept));
     }
-    catch {
-      return;
+    catch (error) {
+      this.context.log(Resources.formatProjectsLayoutNotRead(ProjectsLayoutService.failureOf(error)));
     }
   }
 
   private save(layout: JsonObject, onlyIfNone: boolean = false): Promise<JsonValue | undefined> {
     this.saving++;
     const done = this.saved.then(() => this.request(MethodName.ProjectsLayoutSave, new ProjectsLayoutSaveParams(layout, onlyIfNone).toJson()))
-      .catch(() => undefined)
+      .catch((error: unknown) => {
+        this.context.log(Resources.formatProjectsLayoutNotSaved(ProjectsLayoutService.failureOf(error)));
+        return undefined;
+      })
       .finally(() => this.settle());
     this.saved = done.then(() => undefined);
     return done;
@@ -167,6 +204,10 @@ export class ProjectsLayoutService {
   private dispose(): void {
     for (const unsubscribe of this.subscriptions)
       unsubscribe();
+  }
+
+  private static failureOf(error: unknown): string {
+    return error instanceof Error ? error.name : typeof error;
   }
 
   private static readStored(): ProjectsLayout | null {

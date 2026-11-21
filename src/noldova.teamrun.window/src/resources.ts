@@ -2034,6 +2034,14 @@ export class Resources {
     return `TeamRun could not open or close chat ${conversationId}'s Browser page: ${failure}.`;
   }
 
+  public static formatProjectsLayoutNotRead(failure: string): string {
+    return `TeamRun could not read the projects' layout, so it keeps the changes made since and reads it again at the next change or resync: ${failure}.`;
+  }
+
+  public static formatProjectsLayoutNotSaved(failure: string): string {
+    return `TeamRun could not save the projects' layout, so the change stays in this window only: ${failure}.`;
+  }
+
   public static formatNoticeNotPosted(kind: string, failure: string): string {
     return `TeamRun could not post a ${kind} notification: ${failure}.`;
   }
