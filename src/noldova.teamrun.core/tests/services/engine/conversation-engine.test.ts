@@ -559,6 +559,23 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
+  public async failsAReplyWhosePreparationThrowsAValueThatIsNotAnErrorWithThatValuesText(): Promise<void> {
+    const failure = "The command settings are locked.";
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, () => {
+      throw failure;
+    });
+    const conversation = await host.createConversationAsync();
+
+    const result = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "One"));
+    const ended = await host.engine.waitForIdle().then(() => null, (error: unknown) => error);
+    const reply = await host.messages.findAsync(result.replies[0]?.id ?? String.empty);
+
+    Assert.areEqual(failure, ended);
+    Assert.areEqual(MessageStatus.Failed, reply?.status);
+    Assert.areEqual(`${DetailKind.Error} ${failure}`, reply?.details.map(t => `${t.kind} ${t.text}`).join());
+  }
+
+  @TestMethod
   public async closesAReplysToolsWhenNotingItsUsageLimitFails(): Promise<void> {
     const tools = new FakeTurnToolSessions();
     await using host = await CoreHost.createAsync(false, false, undefined, undefined, undefined, tools);
