@@ -97,7 +97,7 @@ export class WaitingSends {
         throw new ServiceException(ErrorCode.InvalidParams, Resources.formatWaitingMessageOtherChat(found.id, params.message.chatId),
           [found.id, params.message.chatId]);
       const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
-      if (!MentionCheck.matches(params.message.text, params.message.mentionedTeammateIds, available, !Object.isNull(params.message.senderToken)))
+      if (!MentionCheck.matches(params.message.text, params.message.mentionedTeammateIds, available, false))
         throw new ServiceException(ErrorCode.Conflict, Resources.editMentionsMismatch, []);
       const [message, files] = this.keepWaitingFiles(found.id, params.message);
       const changed = found.withMessage(message, found.fromOutside || fromOutside);
