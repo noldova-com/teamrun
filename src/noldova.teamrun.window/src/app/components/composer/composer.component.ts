@@ -1275,14 +1275,14 @@ export class ComposerComponent {
     mentioned: readonly string[], delivery: MessageDelivery | null): Promise<boolean> {
     const editing = this.editing();
     if (!Object.isNull(editing))
-      return this.saveEdit(editing, text, conversationId);
+      return this.saveEdit(editing, text, conversationId, mentioned);
     if (Object.isNull(this.runningReply()))
       return this.store.send(text, settings, conversationId, attachments, mentioned, this.activeResponderId());
     return this.store.addWaiting(text, settings, conversationId, delivery ?? this.store.whileReplying(), attachments, mentioned, this.activeResponderId());
   }
 
-  private async saveEdit(editing: WaitingMessage, text: string, conversationId: string): Promise<boolean> {
-    const saved = await this.store.editWaiting(editing, text, editing.message.attachments);
+  private async saveEdit(editing: WaitingMessage, text: string, conversationId: string, mentioned: readonly string[]): Promise<boolean> {
+    const saved = await this.store.editWaiting(editing, text, editing.message.attachments, mentioned);
     if (saved && this.editingSignal() === editing)
       this.editingSignal.set(null);
     if (!saved && conversationId !== this.conversationId())
