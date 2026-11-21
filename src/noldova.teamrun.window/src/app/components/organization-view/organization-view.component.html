@@ -80,10 +80,11 @@ LICENSE file in the root directory of this source tree.
     </nol-canvas>
   </main>
   <aside class="messages" [attr.aria-label]="resources.organizationMessagesLabel">
-    <div class="to">
-      <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
-      <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
-    </div>
-    <nol-teamrun-organization-messages class="thread" [shape]="thread" [target]="target()" (targetChange)="chosen.set($event)" />
+    <nol-teamrun-organization-messages class="thread" [shape]="thread" [target]="target()" (targetChange)="chosen.set($event)">
+      <div class="to" nolTeamrunOrganizationTo>
+        <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
+        <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
+      </div>
+    </nol-teamrun-organization-messages>
   </aside>
 </div>

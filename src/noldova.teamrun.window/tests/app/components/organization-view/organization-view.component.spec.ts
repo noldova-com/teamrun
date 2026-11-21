@@ -784,13 +784,14 @@ describe("OrganizationViewComponent", () => {
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
     });
 
-    it("sets To over a select as wide as the messages' padding allows, a department's Message under its summary at its start, and a name as plain text", async () => {
+    it("sets To under the messages' head over a select as wide as their padding allows, above the thread, a department's Message under its summary at its start, and a name as plain text", async () => {
       await create();
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const aside = one("aside.messages");
       const border = Number.parseFloat(getComputedStyle(aside).borderTopWidth);
-      const [label, choice] = [one(".to-label", aside), one(".to-choice", aside)];
+      const [head, label, choice, thread] = [one(".nol-teamrun-organization-thread-head", aside), one(".to-label", aside), one(".to-choice", aside),
+        one(".nol-teamrun-organization-thread", aside)];
       const design = one(":scope > .department", department("Design"));
       const inset = Number.parseFloat(getComputedStyle(design).borderLeftWidth) + space(3);
       const [summary, message] = [one(".department-summary", design), one(".message", design)];
@@ -800,7 +801,9 @@ describe("OrganizationViewComponent", () => {
       const nameStyle = getComputedStyle(name);
 
       AppearanceFixture.expectPixels(box(label).left, box(aside).left + border + space(3));
-      AppearanceFixture.expectPixels(box(label).top, box(aside).top + border + space(3));
+      AppearanceFixture.expectPixels(box(head).top, box(aside).top + border + space(3));
+      AppearanceFixture.expectPixels(box(label).top - box(head).bottom, space(3));
+      AppearanceFixture.expectPixels(box(thread).top - box(choice).bottom, space(3));
       AppearanceFixture.expectPixels(box(choice).left, box(label).left);
       AppearanceFixture.expectPixels(box(choice).right, box(aside).right - border - space(3));
       AppearanceFixture.expectPixels(box(choice).top - box(label).bottom, space(3));
