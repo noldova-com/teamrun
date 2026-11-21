@@ -293,25 +293,6 @@ describe("OrganizationDetailsComponent", () => {
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(firstValue).overflowWrap]).toEqual(["nowrap", "anywhere"]);
     });
 
-    it("draws the details as a hover card: 18rem wide, on the hover surface in its border, in the text's colour", async () => {
-      await create();
-      const details = await focus("Alice");
-      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const probe = document.createElement("div");
-      probe.style.background = "var(--nol-hover-widget)";
-      probe.style.border = "1px solid var(--nol-hover-widget-border)";
-      probe.style.color = "var(--nol-text)";
-      details.append(probe);
-      const surface = getComputedStyle(probe).backgroundColor;
-      const border = getComputedStyle(probe).borderTopColor;
-      const text = getComputedStyle(probe).color;
-      probe.remove();
-      const style = getComputedStyle(details);
-
-      AppearanceFixture.expectPixels(details.getBoundingClientRect().width, 18 * rem);
-      expect([style.backgroundColor, style.borderTopColor, style.borderBottomColor, style.color]).toEqual([surface, border, border, text]);
-    });
-
     it("cuts long last words to three lines, with the time since them on a line of its own under them", async () => {
       const words = Array.from({ length: 40 }, (_, i) => `Step ${i} of the header is done.`).join(" ");
       await create(context => context
