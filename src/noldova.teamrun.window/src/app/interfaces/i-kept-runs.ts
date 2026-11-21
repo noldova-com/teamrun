@@ -11,5 +11,5 @@ import type { IStoredRun } from "./i-stored-run";
 
 export interface IKeptRuns {
   listAsync(owner: string): Promise<readonly IStoredRun[]>;
-  save(owner: string, run: IStoredRun): void;
+  save(owner: string, run: IStoredRun): Promise<void>;
 }

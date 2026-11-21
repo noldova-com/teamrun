@@ -46,7 +46,6 @@ const PROMPT_WINDOW: { readonly width: number; readonly height: number } = { wid
 const SHORT_WINDOW: { readonly width: number; readonly height: number } = { width: 640, height: 720 };
 const SHOWN_COMMAND: string = "echo shown-$((6*7))";
 const SHOWN_OUTPUT: string = "shown-42";
-const TERMINAL_ECHO_SETTLE_MS: number = 1_000;
 
 interface IBox {
   readonly top: number;
@@ -87,7 +86,6 @@ const shownUnlessAtPromptAsync = async (page: Page, text: string): Promise<reado
 
 const settledAtPromptAsync = async (page: Page, text: string): Promise<void> => {
   await expect.poll(() => shownUnlessAtPromptAsync(page, text), { ...TeamRunApp.pollOf(30_000), message: `the screen shows ${text} above the next prompt` }).toEqual([]);
-  await page.waitForTimeout(TERMINAL_ECHO_SETTLE_MS);
 };
 
 const boxFrom = (box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): IBox =>
