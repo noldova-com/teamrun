@@ -17,6 +17,8 @@ import type { ChatStoreService } from "./chat-store.service";
 
 export class TitleModelOptions {
   private readonly catalogs: Map<string, ModelCatalog> = new Map();
+  private static readonly provided: WeakMap<IWindowPartContext, TitleModelOptions> = new WeakMap();
+
   private readonly loading: Set<string> = new Set();
   private readonly stale: Set<string> = new Set();
   private readonly context: IWindowPartContext;
@@ -30,14 +32,20 @@ export class TitleModelOptions {
 
   public static provide(context: IWindowPartContext, store: ChatStoreService): () => void {
     const options = new TitleModelOptions(context, store);
+    TitleModelOptions.provided.set(context, options);
     const stops = [
       context.provideSettingOptions(Resources.titleModelSetting, () => options.read()),
       ...[EventName.ProviderUpdated, EventName.ProviderSignInsChanged].map(t => context.onEvent(Resources.formatQualifiedName(t), () => options.reload()))
     ];
     return () => {
       options.released = true;
+      TitleModelOptions.provided.delete(context);
       stops.forEach(t => t());
     };
+  }
+
+  public static reload(context: IWindowPartContext): void {
+    TitleModelOptions.provided.get(context)?.reload();
   }
 
   private read(): readonly SettingOption[] | null {

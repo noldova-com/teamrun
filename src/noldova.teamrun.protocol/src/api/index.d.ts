@@ -938,7 +938,8 @@ export declare enum MethodName {
   /**
    * Moves a chat into a project. A chat without a project first has its own folder's files copied into the project,
    * refused whole when the project already holds a file of one of their names, and its folder is then deleted. Refused while a reply
-   * runs in the chat. Parameters: `ChatMoveParams`. Result: the `Chat`.
+   * runs in the chat, and with `Conflict` naming what runs while a background command, a helper or a teammate's background work of the
+   * chat still runs. Parameters: `ChatMoveParams`. Result: the `Chat`.
    */
   ConversationMove = "ConversationMove",
   /**
@@ -954,13 +955,14 @@ export declare enum MethodName {
   /**
    * Attaches an existing folder to a chat without a project, or replaces the one attached: its teammates work in it, in place, from the
    * next turn, and nothing is copied; the chat's own folder stays for a detach. Refused with `Conflict` while a reply runs in the chat or
-   * for a chat in a project, `NotFound` for an unknown chat, and `InvalidParameters` when the folder isn't an absolute path to a folder
+   * its background commands, helpers or a teammate's background work still run, naming them, or for a chat in a project, `NotFound` for an unknown chat, and `InvalidParameters` when the folder isn't an absolute path to a folder
    * TeamRun can read. Parameters: `ChatFolderAttachParams`. Result: the `Chat`.
    */
   ChatFolderAttach = "ChatFolderAttach",
   /**
    * Detaches a chat's attached folder, leaving its files as they are, so that its teammates work in the chat's own folder again from
-   * the next turn. Refused with `Conflict` while a reply runs in the chat, `NotFound` for an unknown chat. Parameters: `ChatIdParams`.
+   * the next turn. Refused with `Conflict` while a reply runs in the chat or its background commands, helpers or a teammate's background
+   * work still run, naming them, `NotFound` for an unknown chat. Parameters: `ChatIdParams`.
    * Result: the `Chat`.
    */
   ChatFolderDetach = "ChatFolderDetach",
@@ -1177,7 +1179,8 @@ export declare enum MethodName {
    * publishes `WaitingMessagesChanged`. Stop and send stops the chat's running replies. The waiting messages go one at a time, each
    * as `MessageSend` sends it, once the chat has no running reply and no answer to a question waits; one added to an idle chat goes
    * at once. Steer waits like Queue until a provider can take it into its running turn. Parameters: `WaitingMessageAddParams`.
-   * Result: `WaitingMessage`; an unknown chat is `NotFound`.
+   * Result: `WaitingMessage`; an unknown chat is `NotFound`, and a send whose `mentionedTeammateIds` aren't the teammates its text
+   * mentions, as `MessageSend` resolves them for a person's text, is `Conflict`, as for `WaitingMessageEdit`.
    */
   WaitingMessageAdd = "WaitingMessageAdd",
   /**

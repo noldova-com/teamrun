@@ -92,6 +92,12 @@ export class ChatPages {
     void this.load(chatId);
   }
 
+  public resync(): void {
+    void this.readOpen();
+    for (const chatId of [...this.loads])
+      void this.load(chatId);
+  }
+
   public pagesOf(chatId: string): readonly Page[] {
     return this.pagesSignal().get(chatId) ?? [];
   }

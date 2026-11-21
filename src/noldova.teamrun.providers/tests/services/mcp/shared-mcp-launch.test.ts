@@ -32,7 +32,7 @@ export class SharedMcpLaunchTests {
     + "setInterval(() => undefined, 1000);\n";
   private static readonly ARGUMENTS: readonly string[] = ["a b", "x&y", "say \"hi\"", "a\"b", "&echo injected", "50%", "%PATH%", "a^b", "(paren)", "<in>|out",
     "back\\"];
-  private static readonly END_DEADLINE: number = 30_000;
+  private static readonly END_DEADLINE: number = 28_000;
   private static readonly POLL: number = 50;
 
   @TestMethod
@@ -97,7 +97,8 @@ export class SharedMcpLaunchTests {
     launcher.stdin?.end("{\"jsonrpc\":\"2.0\"}\n");
     const [code, output] = await SharedMcpLaunchTests.finishAsync(launcher);
 
-    Assert.areEqual(JSON.stringify([7, "echo:{\"jsonrpc\":\"2.0\"}\n", "errors"]), JSON.stringify([code, output, errors]));
+    Assert.areEqual(JSON.stringify([7, "echo:{\"jsonrpc\":\"2.0\"}\n", "errors"]),
+      JSON.stringify([code, output, errors.replace(/TeamRun's MCP watch: [^\n]*\n/gu, "")]));
   }
 
   @TestMethod
@@ -130,6 +131,7 @@ export class SharedMcpLaunchTests {
 
   @TestMethod
   public async endsTheServerAndWhatItStartedWhenTheLauncherIsEndedWithoutWarning(): Promise<void> {
+    const deadline = Date.now() + SharedMcpLaunchTests.END_DEADLINE;
     using directory = new TemporaryDirectory();
     const windows = process.platform === SharedMcpLaunchTests.WINDOWS;
     const probe = SharedMcpLaunchTests.write(directory, "staying.mjs", SharedMcpLaunchTests.STAYING_PROBE);
@@ -137,6 +139,8 @@ export class SharedMcpLaunchTests {
     const command = windows ? [SharedMcpLaunchTests.write(directory, "staying.cmd", `@"${process.execPath}" "${probe}" %*\r\n`), pidFile]
       : [process.execPath, probe, pidFile];
     const launcher = SharedMcpLaunchTests.launch(command, [], {});
+    let errors = "";
+    launcher.stderr?.on("data", (chunk: Buffer) => errors += chunk.toString());
     const ended = new Promise<void>(resolve => launcher.once("exit", () => resolve()));
 
     await Wait.until(() => existsSync(pidFile) && readFileSync(pidFile, "utf8").length > 0, "The server did not write its process id.");
@@ -144,13 +148,14 @@ export class SharedMcpLaunchTests {
     launcher.kill("SIGKILL");
     await ended;
 
-    Assert.isTrue(await SharedMcpLaunchTests.endsAsync(serverId));
+    Assert.isTrue(await SharedMcpLaunchTests.endsAsync(serverId, deadline), `The server still ran; the launcher's errors: "${errors}"`);
   }
 
   @TestMethod
   public async passesSigtermToTheServerAndExitsWithItsSignalOutsideWindows(): Promise<void> {
     if (process.platform === SharedMcpLaunchTests.WINDOWS)
       return;
+    const deadline = Date.now() + SharedMcpLaunchTests.END_DEADLINE;
     using directory = new TemporaryDirectory();
     const probe = SharedMcpLaunchTests.write(directory, "ending.mjs", SharedMcpLaunchTests.ENDING_PROBE);
     const pidFile = directory.resolve("server.pid");
@@ -161,7 +166,7 @@ export class SharedMcpLaunchTests {
     launcher.kill("SIGTERM");
     const [code] = await SharedMcpLaunchTests.finishAsync(launcher);
 
-    Assert.areEqual(JSON.stringify([128 + constants.signals.SIGTERM, true]), JSON.stringify([code, await SharedMcpLaunchTests.endsAsync(serverId)]));
+    Assert.areEqual(JSON.stringify([128 + constants.signals.SIGTERM, true]), JSON.stringify([code, await SharedMcpLaunchTests.endsAsync(serverId, deadline)]));
   }
 
   private static launch(command: readonly string[], variables: readonly string[], values: Readonly<Record<string, string>>): ChildProcess {
@@ -178,8 +183,7 @@ export class SharedMcpLaunchTests {
     return [code, output];
   }
 
-  private static async endsAsync(processId: number): Promise<boolean> {
-    const deadline = Date.now() + SharedMcpLaunchTests.END_DEADLINE;
+  private static async endsAsync(processId: number, deadline: number): Promise<boolean> {
     while (SharedMcpLaunchTests.runs(processId)) {
       if (Date.now() > deadline)
         return false;

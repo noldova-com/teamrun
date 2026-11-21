@@ -1533,8 +1533,7 @@ export class RuntimePartTests {
     await part.activateAsync(context);
     const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
     const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
-    const providerId = await RuntimePartTests.providerIdAsync(context, CommandModeAdapter.id, directory.path);
-    const send = new MessageSendParams(chat.id, "To nobody", new RequestedSettings(CommandModeAdapter.id, null, null), providerId, [], ["teammate-gone"]);
+    const send = new MessageSendParams(chat.id, "To nobody", new RequestedSettings(CommandModeAdapter.id, null, null), "provider-gone", [], []);
 
     let failed = RuntimePartTests.waitingFailed(context);
     const added = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageAdd",

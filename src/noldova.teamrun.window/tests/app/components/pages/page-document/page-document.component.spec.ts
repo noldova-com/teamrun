@@ -18,6 +18,7 @@ import { AppearanceFixture, ClipboardWriterFixture, FixtureTheme } from "@noldov
 import { userEvent } from "vitest/browser";
 
 import { PageDocumentComponent } from "../../../../../src/app/components/pages/page-document/page-document.component";
+import { PageDocuments } from "../../../../../src/app/services/pages/page-documents";
 import { AccessibilityFixture } from "../../../../fixtures/accessibility.fixture";
 import { EmulatedMediaFixture } from "../../../../fixtures/emulated-media.fixture";
 import { PagesWindow, PagesWindowContext } from "../../../../fixtures/pages-window.fixture";
@@ -192,6 +193,80 @@ describe("PageDocumentComponent", () => {
     await Wait.until(() => expect(bars()).toEqual(["Codex updated this page to v3 5 min ago."]));
     await Wait.until(() => expect(opened.calls.filter(t => t === "reload")).toHaveLength(2));
     expect(opened.navigations).toEqual([PagesWindow.addressOf(null)]);
+  });
+
+  it("reads its page again once the runtime starts again, leaving the stopped state, with the bar of an edit made meanwhile and none for an unchanged page", async () => {
+    const opened = await openAsync();
+    context.emitModule("teamrun.pageStopped", PagesWindow.page().toJson());
+    await Wait.until(() => expect(text(".nol-teamrun-page-state-heading")).toBe("This page stopped responding"));
+    shown = () => PagesWindow.view(2, null, PagesWindow.sol);
+
+    PageDocuments.resync(context);
+
+    await Wait.until(() => expect(bars()).toEqual(["Sol updated this page to v2 5 min ago."]));
+    expect([text(".nol-teamrun-page-state-heading"), text(".nol-teamrun-page-authors"), opens()])
+      .toEqual([undefined, "v2 · Made by Opus · Edited by Sol · 5 min ago", [null, null]]);
+    button("dismiss")?.click();
+    await Wait.until(() => expect(bars()).toEqual([]));
+    PageDocuments.resync(context);
+    await Wait.until(() => expect(opened.calls.filter(t => t === "reload")).toHaveLength(2));
+    expect([bars(), opens()]).toEqual([[], [null, null, null]]);
+  });
+
+  it("shows no update bar for the person's own Restore that lands while it reads its page again after the runtime started again", async () => {
+    shown = version => PagesWindow.view(3, version, PagesWindow.sol);
+    let restored: (page: JsonValue) => void = () => undefined;
+    context.answerModule("teamrun.pageRestore", () => new Promise<JsonValue>(resolve => {
+      restored = resolve;
+    }));
+    await openAsync();
+    button("more")?.click();
+    await Wait.until(() => expect(menuItem("Versions")).toBeDefined());
+    menuItem("Versions")?.click();
+    await Wait.until(() => expect(menuItem("v1 · Opus")).toBeDefined());
+    menuItem("v1 · Opus")?.click();
+    await Wait.until(() => expect(button("restore")).not.toBeNull());
+    button("restore")?.click();
+    await Wait.until(() => expect(context.requests.some(t => t.method === "teamrun.pageRestore")).toBe(true));
+    let read: (view: JsonValue) => void = () => undefined;
+    context.answerModule("teamrun.pageOpen", () => new Promise<JsonValue>(resolve => {
+      read = resolve;
+    }));
+
+    PageDocuments.resync(context);
+    await Wait.until(() => expect(opens()).toEqual([null, 1, null]));
+    shown = version => PagesWindow.view(4, version, PagesWindow.you);
+    context.answerModule("teamrun.pageOpen", t => shown(PagesWindow.versionOf(t)).toJson());
+    restored(PagesWindow.page(4, PagesWindow.you).toJson());
+    await Wait.until(() => expect(context.updates.at(-1)?.update.title).toBe("Onboarding options"));
+    read(PagesWindow.view(4, null, PagesWindow.you).toJson());
+    await fixture.whenStable();
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    fixture.detectChanges();
+
+    expect([bars(), opens()]).toEqual([[], [null, 1, null, null]]);
+  });
+
+  it("opens again once the runtime starts again a page it couldn't open or read before, with no update bar", async () => {
+    context.pageViews.failure = new Error("No pane.");
+    fixture = TestBed.createComponent(PageDocumentComponent);
+    fixture.componentRef.setInput("instance", PagesWindow.pageId);
+    fixture.autoDetectChanges();
+    await Wait.until(() => expect(text(".nol-teamrun-page-state-heading")).toBe("This page couldn't be opened"));
+    context.pageViews.failure = null;
+    context.answerModule("teamrun.pageOpen", () => {
+      throw new Error("No page.");
+    });
+
+    PageDocuments.resync(context);
+
+    await Wait.until(() => expect([context.pageViews.opened.length, opens()]).toEqual([1, [null]]));
+    await fixture.whenStable();
+    expect(text(".nol-teamrun-page-state-heading")).toBe("This page couldn't be opened");
+    context.answerModule("teamrun.pageOpen", () => PagesWindow.view(2).toJson());
+    PageDocuments.resync(context);
+    await Wait.until(() => expect([text(".nol-teamrun-page-state-heading"), view()?.navigations]).toEqual([undefined, [PagesWindow.addressOf(null)]]));
+    expect(bars()).toEqual([]);
   });
 
   it("goes to the current version's address on an update while an older version shows, and while the page couldn't be opened", async () => {

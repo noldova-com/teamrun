@@ -39,6 +39,24 @@ describe("ModelCatalogCache", () => {
     expect(fetchModels).toHaveBeenCalledTimes(5);
   });
 
+  it("asks again for each list it holds once they expire, still giving the one it holds until then, and keeps a list read afterwards", async () => {
+    let calls = 0;
+    const fetchModels = vi.fn(async (kind: string) => {
+      calls += 1;
+      return new ProviderModelList([new ProviderModel(`${kind}-${String(calls)}`, "One", "", [], true, null, null)], null);
+    });
+    const cache = new ModelCatalogCache(fetchModels, clock);
+    await cache.load("codex", "a");
+    await cache.load("claude", "a");
+
+    cache.expire();
+    const held = cache.loadedOf("codex", "a")?.models[0]?.id;
+    const read = await Promise.all([cache.load("codex", "a"), cache.load("claude", "a")]);
+    const again = await cache.load("codex", "a");
+
+    expect([held, read.map(t => t.models[0]?.id), again.models[0]?.id, fetchModels.mock.calls.length]).toEqual(["codex-1", ["codex-3", "claude-4"], "codex-3", 4]);
+  });
+
   it("keeps a list for each folder apart, and asks for it with its folder", async () => {
     const fetchModels = vi.fn((_kind: string, _providerId: string | null, _refresh: boolean, _workingDirectory: string | null) => Promise.resolve(new ProviderModelList([], null)));
     const cache = new ModelCatalogCache(fetchModels, () => 0);

@@ -686,6 +686,28 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return this.keptSessions.releaseFolderAsync(conversationId);
   }
 
+  public async requireNothingRunningAsync(conversationId: string, change: string): Promise<void> {
+    const running = await this.runningWorkAsync(conversationId);
+    if (running.length > 0)
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatChatWorkRunning(change, running), [conversationId]);
+  }
+
+  private async runningWorkAsync(conversationId: string): Promise<readonly string[]> {
+    const tasks = await this.runningTasksAsync(conversationId);
+    let kept = false;
+    for (const [messageId, run] of this.state.runs) {
+      const message = run.isOpen && !tasks.some(t => t.messageId === messageId) ? await this.messages.findAsync(messageId) : null;
+      kept ||= message?.conversationId === conversationId && !Object.isNull(message.endedAt);
+    }
+    return [...tasks.map(t => Object.isNull(t.subAgentId) ? Resources.formatRunningCommand(t.command) : Resources.formatRunningHelper(t.command)),
+      ...(kept ? [Resources.runningReplyWork] : [])];
+  }
+
+  private async runningTasksAsync(chatId: string): Promise<readonly BackgroundTask[]> {
+    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(chatId));
+    return listed.filter(t => t.status === BackgroundTaskStatus.Running);
+  }
+
   public sweepFoldersAsync(signal: AbortSignal): Promise<void> {
     return this.keptSessions.sweepFoldersAsync(signal);
   }
@@ -1100,8 +1122,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   private async capEndsTasksAsync(teammate: Teammate, chatId: string): Promise<boolean> {
-    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(chatId));
-    if (!listed.some(t => t.status === BackgroundTaskStatus.Running))
+    if ((await this.runningTasksAsync(chatId)).length === 0)
       return false;
     for (const provider of await this.providers.listAsync())
       if (provider.id === teammate.providerId && this.registry.has(provider.kind)
@@ -1436,110 +1457,133 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   private async executeRepliesAsync(work: ReplyWork[], folder: WorkFolder): Promise<void> {
     const context = new ParticipantContext(this.messages, this.teammates, this.conversations);
     let checked: Promise<FolderState> | null = null;
+    const failures: unknown[] = [];
     try {
       for (let index = 0; index < work.length; index++) {
         const item = work[index]!;
         const reply = item.message;
-        if (!item.run.isCancelled && !item.isEnded && Object.isNull(item.wake)) {
-          const conversation = await this.conversations.findAsync(reply.conversationId);
-          checked ??= this.projects.checkFolderAsync(folder.path, conversation?.projectId ?? null);
-          await this.failIfUnableAsync(item, folder, await checked, !Object.isNullOrUndefined(conversation?.attachedFolder));
-        }
-        if (item.run.isCancelled)
-          await this.stopAsync(item);
-        if (item.isEnded) {
-          this.releaseWake(item);
-          continue;
-        }
-        this.replyHops.set(reply.conversationId, (this.replyHops.get(reply.conversationId) ?? new Map<string, number>()).set(reply.id, item.hop));
-        item.start();
-        if (!Object.isNull(item.wake)) {
-          await (this.followed.get(item) ?? this.followWithToolsAsync(item, item.wake, folder));
-          this.followed.delete(item);
-          this.releaseWake(item);
+        try {
+          if (!item.run.isCancelled && !item.isEnded && Object.isNull(item.wake)) {
+            const conversation = await this.conversations.findAsync(reply.conversationId);
+            checked ??= this.projects.checkFolderAsync(folder.path, conversation?.projectId ?? null);
+            await this.failIfUnableAsync(item, folder, await checked, !Object.isNullOrUndefined(conversation?.attachedFolder));
+          }
+          if (item.run.isCancelled)
+            await this.stopAsync(item);
+          if (item.isEnded) {
+            this.releaseWake(item);
+            continue;
+          }
+          this.replyHops.set(reply.conversationId, (this.replyHops.get(reply.conversationId) ?? new Map<string, number>()).set(reply.id, item.hop));
+          item.start();
+          if (!Object.isNull(item.wake)) {
+            await (this.followed.get(item) ?? this.followWithToolsAsync(item, item.wake, folder));
+            this.followed.delete(item);
+            this.releaseWake(item);
+            await this.handOffAsync(item, work);
+            item.end();
+            continue;
+          }
+          if (await this.handOffUsageAsync(item, work, index))
+            continue;
+          const conversation = (await this.conversations.findAsync(reply.conversationId))!;
+          const member = Object.isNull(reply.teammateId) ? null
+            : await this.conversations.findMemberAsync(new ConversationMemberParams(reply.conversationId, reply.teammateId));
+          const { sustained, requested, handover, posted, kept } = await this.movedOfAsync(item, member, context);
+          const fork = Object.isNull(reply.teammateId) ? conversation.forkedSession : null;
+          const useFork = !Object.isNull(fork) && fork.matches(requested.kind, item.provider?.id ?? null);
+          const resume = Object.isNull(reply.teammateId)
+            ? (conversation.sessionReset ? null : useFork ? fork.nativeSessionId
+              : await this.messages.findResumableSessionAsync(reply.conversationId, requested.kind, item.provider?.id ?? null))
+            : !Object.isNull(kept) ? kept : Object.isNull(item.continued) ? await this.sessionOnAsync(member, item.provider) : null;
+          const freshPrompt = Object.isNull(item.continued) ? await context.createAsync(reply, item.trigger, null, false, item.handOffs)
+            : await context.createAsync(item.continued, item.trigger, null, false, item.handOffs) + Resources.transcriptSeparator
+              + Resources.formatSustainContinued(ConversationEngine.writtenOf(item.continued));
+          const prompt = Object.isNull(resume) ? handover?.text ?? freshPrompt
+            : Object.isNull(item.continued) ? await context.createAsync(reply, item.trigger, resume, useFork, item.handOffs)
+              : Resources.formatSustainContinued(ConversationEngine.writtenOf(item.continued));
+          const command = await this.readCommand();
+          const token = randomBytes(Resources.senderTokenBytes).toString("base64url");
+          const environment = { ...command?.environment, ...SenderEnvironment.of(token) };
+          const compacts = ParticipantContext.asksToCompact(item.trigger);
+          const slashCommand = ParticipantContext.commandOf(item.trigger);
+          const run = this.createRun(item, folder, requested, posted ?? item.message);
+          this.state.turns.set(token, item);
+          this.state.replyRuns.set(item, run);
+          const tools = await this.toolCalls.openToolsAsync(reply, run, token, folder, requested);
+          try {
+            const shared = await this.sharedOfAsync(item.provider, reply.teammateId, folder.path);
+            const descriptor = this.registry.get(requested.kind).descriptor;
+            const refusal = compacts ? descriptor.reasonAgainst(ProviderAbility.Compact) : null;
+            if (!Object.isNull(refusal))
+              await run.answerAsync(Resources.formatCompactRefused(descriptor.displayName, refusal));
+            else if (compacts && Object.isNull(resume))
+              await run.answerAsync(Resources.nothingToCompact);
+            else {
+              const adapter = this.registry.get(requested.kind);
+              const hasTools = !Object.isNull(this.tools) && adapter.takesTeamRunTools === true;
+              const instructionsOf = (tools: boolean): string => Resources.formatTeammateInstructions(item.instructions, command?.words ?? null, tools,
+                adapter.backgroundSubAgentsNote ?? null);
+              const stopped = compacts || !Object.isNull(slashCommand) ? [] : this.stoppedCommands.of(reply.conversationId, reply.teammateId);
+              const awaited = !compacts && await this.isAwaitedAsync(reply);
+              const told = (text: string): string => {
+                const asked = awaited ? `${text}${Resources.transcriptSeparator}${Resources.awaitedReplyNote}` : text;
+                return stopped.length === 0 ? asked : `${Resources.formatStoppedCommands(stopped)}${Resources.transcriptSeparator}${asked}`;
+              };
+              await run.executeAsync(adapter, new TurnRequest(item.provider, folder.path, told(prompt), requested, resume,
+                item.trigger.attachments, instructionsOf(hasTools), told(freshPrompt), environment, compacts, tools, shared.servers,
+                useFork ? fork.resumeAt : null, t => this.adoptSender(t, token), shared.values, hasTools ? instructionsOf(false) : null, false, slashCommand,
+                this.readIdleCompaction()), shared.notes, sustained?.note ?? null, Object.isNull(resume) ? this.handoverNoteOf(told(prompt), handover, item.provider) : null,
+                !Object.isNull(posted));
+              if ((await this.messages.findAsync(reply.id))?.status === MessageStatus.Completed)
+                this.stoppedCommands.told(reply.conversationId, reply.teammateId, stopped);
+            }
+          }
+          finally {
+            this.state.turns.delete(token);
+            try {
+              this.toolCalls.closeTools(tools);
+            }
+            finally {
+              try {
+                this.releaseAdopted(item);
+                await this.noteLimitAsync(item.provider, run);
+                this.keptSessions.noteSession(reply.conversationId, requested.kind, (await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId);
+              }
+              finally {
+                await this.forgetChildrenAsync(item);
+              }
+            }
+          }
+          if (Object.isNull(reply.teammateId) && !Object.isNullOrUndefined((await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId)) {
+            if (conversation.sessionReset)
+              await this.conversations.setSessionResetAsync(conversation.id, false);
+            if (useFork)
+              await this.conversations.setForkedSessionAsync(conversation.id, null);
+          }
+          const continuation = await this.continueAfterLimitAsync(item, run);
+          if (!Object.isNull(continuation))
+            work.splice(index + 1, 0, continuation);
           await this.handOffAsync(item, work);
           item.end();
-          continue;
         }
-        if (await this.handOffUsageAsync(item, work, index))
-          continue;
-        const conversation = (await this.conversations.findAsync(reply.conversationId))!;
-        const member = Object.isNull(reply.teammateId) ? null
-          : await this.conversations.findMemberAsync(new ConversationMemberParams(reply.conversationId, reply.teammateId));
-        const { sustained, requested, handover, posted, kept } = await this.movedOfAsync(item, member, context);
-        const fork = Object.isNull(reply.teammateId) ? conversation.forkedSession : null;
-        const useFork = !Object.isNull(fork) && fork.matches(requested.kind, item.provider?.id ?? null);
-        const resume = Object.isNull(reply.teammateId)
-          ? (conversation.sessionReset ? null : useFork ? fork.nativeSessionId
-            : await this.messages.findResumableSessionAsync(reply.conversationId, requested.kind, item.provider?.id ?? null))
-          : !Object.isNull(kept) ? kept : Object.isNull(item.continued) ? await this.sessionOnAsync(member, item.provider) : null;
-        const freshPrompt = Object.isNull(item.continued) ? await context.createAsync(reply, item.trigger, null, false, item.handOffs)
-          : await context.createAsync(item.continued, item.trigger, null, false, item.handOffs) + Resources.transcriptSeparator
-            + Resources.formatSustainContinued(ConversationEngine.writtenOf(item.continued));
-        const prompt = Object.isNull(resume) ? handover?.text ?? freshPrompt
-          : Object.isNull(item.continued) ? await context.createAsync(reply, item.trigger, resume, useFork, item.handOffs)
-            : Resources.formatSustainContinued(ConversationEngine.writtenOf(item.continued));
-        const command = await this.readCommand();
-        const token = randomBytes(Resources.senderTokenBytes).toString("base64url");
-        const environment = { ...command?.environment, ...SenderEnvironment.of(token) };
-        const compacts = ParticipantContext.asksToCompact(item.trigger);
-        const slashCommand = ParticipantContext.commandOf(item.trigger);
-        const run = this.createRun(item, folder, requested, posted ?? item.message);
-        this.state.turns.set(token, item);
-        this.state.replyRuns.set(item, run);
-        const tools = await this.toolCalls.openToolsAsync(reply, run, token, folder, requested);
-        try {
-          const shared = await this.sharedOfAsync(item.provider, reply.teammateId, folder.path);
-          const descriptor = this.registry.get(requested.kind).descriptor;
-          const refusal = compacts ? descriptor.reasonAgainst(ProviderAbility.Compact) : null;
-          if (!Object.isNull(refusal))
-            await run.answerAsync(Resources.formatCompactRefused(descriptor.displayName, refusal));
-          else if (compacts && Object.isNull(resume))
-            await run.answerAsync(Resources.nothingToCompact);
-          else {
-            const adapter = this.registry.get(requested.kind);
-            const hasTools = !Object.isNull(this.tools) && adapter.takesTeamRunTools === true;
-            const instructionsOf = (tools: boolean): string => Resources.formatTeammateInstructions(item.instructions, command?.words ?? null, tools,
-              adapter.backgroundSubAgentsNote ?? null);
-            const stopped = compacts || !Object.isNull(slashCommand) ? [] : this.stoppedCommands.of(reply.conversationId, reply.teammateId);
-            const awaited = !compacts && await this.isAwaitedAsync(reply);
-            const told = (text: string): string => {
-              const asked = awaited ? `${text}${Resources.transcriptSeparator}${Resources.awaitedReplyNote}` : text;
-              return stopped.length === 0 ? asked : `${Resources.formatStoppedCommands(stopped)}${Resources.transcriptSeparator}${asked}`;
-            };
-            await run.executeAsync(adapter, new TurnRequest(item.provider, folder.path, told(prompt), requested, resume,
-              item.trigger.attachments, instructionsOf(hasTools), told(freshPrompt), environment, compacts, tools, shared.servers,
-              useFork ? fork.resumeAt : null, t => this.adoptSender(t, token), shared.values, hasTools ? instructionsOf(false) : null, false, slashCommand,
-              this.readIdleCompaction()), shared.notes, sustained?.note ?? null, Object.isNull(resume) ? this.handoverNoteOf(told(prompt), handover, item.provider) : null,
-              !Object.isNull(posted));
-            if ((await this.messages.findAsync(reply.id))?.status === MessageStatus.Completed)
-              this.stoppedCommands.told(reply.conversationId, reply.teammateId, stopped);
+        catch (error) {
+          this.followed.delete(item);
+          this.releaseWake(item);
+          failures.push(error);
+          try {
+            await this.failPendingRepliesAsync([item], error);
+          }
+          catch (unwritten) {
+            failures.push(unwritten);
+          }
+          finally {
+            item.end();
           }
         }
-        finally {
-          this.state.turns.delete(token);
-          this.releaseAdopted(item);
-          await this.noteLimitAsync(item.provider, run);
-          this.keptSessions.noteSession(reply.conversationId, requested.kind, (await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId);
-          await this.forgetChildrenAsync(item);
-          this.toolCalls.closeTools(tools);
-        }
-        if (Object.isNull(reply.teammateId) && !Object.isNullOrUndefined((await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId)) {
-          if (conversation.sessionReset)
-            await this.conversations.setSessionResetAsync(conversation.id, false);
-          if (useFork)
-            await this.conversations.setForkedSessionAsync(conversation.id, null);
-        }
-        const continuation = await this.continueAfterLimitAsync(item, run);
-        if (!Object.isNull(continuation))
-          work.splice(index + 1, 0, continuation);
-        await this.handOffAsync(item, work);
-        item.end();
       }
-    }
-    catch (error) {
-      await this.failPendingRepliesAsync(work, error);
-      throw error;
+      if (failures.length > 0)
+        throw failures[0];
     }
     finally {
       this.closeGroup(work);
@@ -1917,8 +1961,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   private async compactsWhenIdleAsync(conversation: Conversation): Promise<boolean> {
     if (!this.readIdleCompaction() || conversation.sessionReset || !await this.isIdleAsync(conversation.id))
       return false;
-    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(conversation.id));
-    return !listed.some(t => t.status === BackgroundTaskStatus.Running);
+    return (await this.runningTasksAsync(conversation.id)).length === 0;
   }
 
   private runGroup(key: string, work: ReplyWork[], folder: WorkFolder, lease: string): void {
@@ -1984,14 +2027,18 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     this.state.replyRuns.set(item, run);
     for (const resume of this.state.runWaits.get(item) ?? [])
       resume();
-    await wake.useToolsAsync(tools);
     try {
+      await wake.useToolsAsync(tools);
       await this.messages.setCheckpointFolderAsync(item.message.id, folder.id);
       await run.followAsync(wake);
     }
     finally {
-      await this.forgetChildrenAsync(item);
-      this.toolCalls.closeTools(tools);
+      try {
+        this.toolCalls.closeTools(tools);
+      }
+      finally {
+        await this.forgetChildrenAsync(item);
+      }
     }
   }
 
@@ -2026,7 +2073,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
           return null;
         const now = new Date().toISOString();
         const note = new MessageDetail(current.details.length, DetailKind.Error, error instanceof Error ? error.message : String(error), null, now);
-        const ended = current.withDetail(note).withStatus(MessageStatus.Failed, now);
+        const ended = current.withDetail(note).withStatus(item.run.isCancelled ? MessageStatus.Cancelled : MessageStatus.Failed, now);
         await this.messages.updateAsync(ended, transaction);
         return ended;
       });

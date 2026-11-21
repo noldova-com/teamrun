@@ -74,6 +74,7 @@ export interface IConversationEngine {
   rewindAsync(params: ConversationRewindParams): Promise<ConversationRewindResult>;
   releaseFolderAsync(conversationId: string): Promise<void>;
   openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation>;
+  requireNothingRunningAsync(conversationId: string, change: string): Promise<void>;
   sweepFoldersAsync(signal: AbortSignal): Promise<void>;
   listMcpToolsAsync(params: McpToolListParams, signal?: AbortSignal): Promise<readonly JsonObject[]>;
   callMcpToolAsync(params: McpToolCallParams, signal?: AbortSignal): Promise<JsonObject>;
