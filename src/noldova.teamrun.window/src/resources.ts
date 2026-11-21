@@ -1175,13 +1175,20 @@ export class Resources {
   public static readonly organizationUseEveryCard: string = "Use what every card shows";
   public static readonly organizationResetIcon: string = "restart_alt";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
-    [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Model];
+    [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Model, OrganizationCardField.Git,
+      OrganizationCardField.PullRequests, OrganizationCardField.Documents, OrganizationCardField.Artifacts];
+  public static readonly organizationWorkFields: readonly OrganizationCardField[] =
+    [OrganizationCardField.Git, OrganizationCardField.PullRequests, OrganizationCardField.Documents, OrganizationCardField.Artifacts];
   public static readonly organizationFieldLabels: Readonly<Record<OrganizationCardField, string>> = {
     [OrganizationCardField.Status]: "Status",
     [OrganizationCardField.Now]: "Current activity",
     [OrganizationCardField.Usage]: "Usage today",
     [OrganizationCardField.Last]: "Last message",
-    [OrganizationCardField.Model]: "Model and effort"
+    [OrganizationCardField.Model]: "Model and effort",
+    [OrganizationCardField.Git]: "Git branch",
+    [OrganizationCardField.PullRequests]: "Pull requests",
+    [OrganizationCardField.Documents]: "Documents",
+    [OrganizationCardField.Artifacts]: "Artifacts"
   };
   public static readonly teammatesHint: string = "Create and configure teammates here. Add them to a chat using its member strip or an @mention.";
   public static readonly defaultTeammateHint: string = "The provider, model and effort a new chat starts with. Chats you already have keep their own.";

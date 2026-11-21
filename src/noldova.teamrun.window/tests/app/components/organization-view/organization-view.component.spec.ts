@@ -10,8 +10,8 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, MethodName, Organization, OrganizationLayoutSaveParams, PlanUsage, PlanWindow, PlanWindowName }
-  from "@noldova/teamrun.protocol";
+import { Department, DepartmentMember, EventName, MethodName, Organization, OrganizationLayoutSaveParams, PlanUsage, PlanWindow, PlanWindowName,
+  TeammateIdParams, TeammateWork } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
@@ -206,7 +206,7 @@ describe("OrganizationViewComponent", () => {
 
     await openMenu(one(".top .cards-show"));
     expect(checks()).toEqual([["Status", "true"], ["Current activity", "true"], ["Usage today", "false"], ["Model and effort", "false"],
-      ["Clear every card's own choice", null]]);
+      ["Git branch", "false"], ["Pull requests", "false"], ["Documents", "false"], ["Artifacts", "false"], ["Clear every card's own choice", null]]);
     expect(menuItem("Clear every card's own choice").getAttribute("aria-disabled")).toBe("true");
     menuItem("Usage today").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
@@ -219,7 +219,25 @@ describe("OrganizationViewComponent", () => {
 
     expect([shows("Alice"), shows("Bob")]).toEqual([["60% left", "gpt-5 · high"], ["60% left"]]);
     expect([one(".usage", card("Alice")).getAttribute("role"), one(".usage", card("Alice")).getAttribute("aria-valuenow")]).toEqual(["meter", "0.4"]);
-    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true } }));
+    expect(saves[1]).toEqual(expect.objectContaining({ cardsShow: { Status: true, Now: true, Usage: true, Last: false, Model: true, Git: false, PullRequests: false, Documents: false,
+      Artifacts: false } }));
+  });
+
+  it("shows a teammate's work on its card only while a work field is on, and reads it only then", async () => {
+    await create();
+
+    expect([all("nol-teamrun-teammate-work"), context.count(MethodName.TeammateWorkRead)]).toEqual([[], 0]);
+
+    context.answer(MethodName.TeammateWorkRead, t => new TeammateWork(TeammateIdParams.fromJson(t).teammateId, null, [], []).toJson());
+    await openMenu(one(".top .cards-show"));
+    menuItem("Git branch").click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await settle();
+
+    await Wait.until(() => expect(texts("[data-field=Git] .work-muted", card("Alice"))).toEqual(["The Git module isn't installed"]));
+    const cards = all("nol-teamrun-organization-card").length;
+    expect([cards, all("nol-teamrun-teammate-work").length, context.count(MethodName.TeammateWorkRead), saves[0]])
+      .toEqual([4, cards, cards, expect.objectContaining({ cardsShow: expect.objectContaining({ Git: true }) })]);
   });
 
   it("lets a card choose its own fields over every card's, until it or every card's choice is cleared", async () => {

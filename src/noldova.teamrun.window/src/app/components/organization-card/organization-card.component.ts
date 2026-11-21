@@ -20,11 +20,12 @@ import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { UsageFormatterService } from "../../services/usage-formatter.service";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
+import { TeammateWorkComponent } from "../teammate-work/teammate-work.component";
 
 @Component({
   selector: "nol-teamrun-organization-card",
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
-    TeammateAvatarComponent],
+    TeammateAvatarComponent, TeammateWorkComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-card" },
   templateUrl: "./organization-card.component.html",
@@ -40,6 +41,7 @@ export class OrganizationCardComponent {
   protected readonly fieldNames: typeof OrganizationCardField = OrganizationCardField;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly fields: Signal<ReadonlySet<OrganizationCardField>> = computed(() => this.layout.layout().fieldsOf(this.teammate().id));
+  protected readonly showsWork: Signal<boolean> = computed(() => Resources.organizationWorkFields.some(t => this.fields().has(t)));
   protected readonly usage: Signal<{ readonly meter: UsageMeter; readonly used: number } | null> = computed(() => {
     const plan = this.store.planUsageOfProvider(this.teammate().providerId);
     for (const meter of Object.isNull(plan) ? [] : this.formatter.limitsOf(plan))
