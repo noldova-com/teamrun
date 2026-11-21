@@ -51,7 +51,8 @@ export class ConversationComponent {
   private readonly referenceSource: GitHubReferenceSource | null = GitHubReferenceSource.of(this.context);
   private readonly folder: Signal<string | null> = computed(() => this.store.folderOf(this.instance()));
   private shownTitle: string | null = null;
-  private shownFolder: string | null = null;
+  private shownPlace: string | null = null;
+  private placeMissed: boolean = false;
   private interactedInTeamRun: boolean = false;
 
   public readonly instance: InputSignal<string> = input.required<string>();
@@ -100,7 +101,8 @@ export class ConversationComponent {
     effect(() => {
       const id = this.instance();
       const conversation = this.store.conversation(id);
-      untracked(() => this.followFolder(id, conversation));
+      const breadcrumb = Object.isNull(conversation) ? [] : ConversationActions.breadcrumbOf(this.store, conversation.projectId, conversation.attachedFolder);
+      untracked(() => this.followPlace(id, conversation, breadcrumb));
     });
   }
 
@@ -136,14 +138,17 @@ export class ConversationComponent {
       this.context.updateDocument(Resources.conversationDocumentName, id, { title });
   }
 
-  private followFolder(id: string, conversation: Conversation | null): void {
-    if (Object.isNull(conversation))
+  private followPlace(id: string, conversation: Conversation | null, breadcrumb: readonly string[]): void {
+    if (Object.isNull(conversation) || breadcrumb.length === 0) {
+      if (this.store.loaded())
+        this.placeMissed = true;
       return;
-    const shown = this.shownFolder;
-    this.shownFolder = conversation.attachedFolder;
-    if (shown !== conversation.attachedFolder)
-      this.context.updateDocument(Resources.conversationDocumentName, id,
-        { breadcrumb: ConversationActions.breadcrumbOf(this.store, conversation.projectId, conversation.attachedFolder) });
+    }
+    const shown = this.shownPlace;
+    const place = JSON.stringify(breadcrumb);
+    this.shownPlace = place;
+    if (Object.isNull(shown) ? this.placeMissed || !Object.isNull(conversation.attachedFolder) : shown !== place)
+      this.context.updateDocument(Resources.conversationDocumentName, id, { breadcrumb });
   }
 
   private static isWithin(target: EventTarget | null, selector: string): boolean {
