@@ -142,6 +142,15 @@
   min-height: 0;
 }
 
+.conversation {
+  box-sizing: border-box;
+  flex: none;
+  height: 17rem;
+  border: 1px solid var(--nol-card-border);
+  border-radius: var(--nol-radius-large);
+  background: var(--nol-panel);
+}
+
 .focus-plane {
   display: flex;
   flex-direction: column;

@@ -6,7 +6,7 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<div class="department" nolCanvasItem>
+<div class="department" nolCanvasItem (click)="choose(department(), $event)">
   @if (editing()) {
     <div class="department-row">
       <input #name nol-text-field class="department-field" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node().department.name"

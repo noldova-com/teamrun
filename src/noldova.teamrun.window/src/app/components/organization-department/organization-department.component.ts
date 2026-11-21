@@ -8,12 +8,13 @@
 
 import { Component, ElementRef, computed, inject, type InputSignal, input, type Signal, viewChild } from "@angular/core";
 
-import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
+import { NameOrder, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
   MenuTriggerDirective, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { OrganizationFocus } from "../../models/organization-focus";
 import type { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
@@ -60,6 +61,16 @@ export class OrganizationDepartmentComponent {
     const members = this.organization.organization().members;
     return NameOrder.sort(this.store.teammates().filter(t => !members.some(u => u.teammateId === t.id && u.departmentId === id)), t => t.name);
   });
+
+  protected department(): OrganizationTarget {
+    return OrganizationTarget.department(this.node().department.id);
+  }
+
+  protected choose(target: OrganizationTarget, event: MouseEvent): void {
+    if (this.editing() || (event.target instanceof Element && !Object.isNull(event.target.closest("button, input, nol-select, a"))))
+      return;
+    this.layout.focusOn(OrganizationFocus.keyOf(target));
+  }
 
   protected toggle(): void {
     this.layout.toggleDepartment(this.node().department.id);

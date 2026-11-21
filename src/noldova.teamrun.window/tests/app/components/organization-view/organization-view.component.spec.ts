@@ -17,9 +17,11 @@ import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/
 import { userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
+import { OrganizationLayout } from "../../../../src/app/models/organization-layout";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -104,6 +106,7 @@ describe("OrganizationViewComponent", () => {
     saves = [];
     context = SampleData.createContext()
       .answer(MethodName.OrganizationList, () => organization.toJson())
+      .answer(MethodName.OrganizationMessageList, () => [])
       .answer(MethodName.OrganizationLayoutSave, t => {
         saves.push(OrganizationLayoutSaveParams.fromJson(t).layout);
         return null;
@@ -122,6 +125,7 @@ describe("OrganizationViewComponent", () => {
   };
 
   afterEach(() => {
+    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
@@ -357,6 +361,43 @@ describe("OrganizationViewComponent", () => {
 
     expect([pills()[2], saves[0], texts(".chart > nol-teamrun-organization-focus .unit-name")])
       .toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null }), ["Organization"]]);
+  });
+
+  it("talks in a thread beside the Tree and in an inbox beside the Board, whose leaders and department buttons open their conversations", async () => {
+    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
+    const panel = (): unknown[] => [one(".chart > nol-teamrun-organization-messages").classList.contains("nol-teamrun-organization-messages-inbox"),
+      texts(".chart > nol-teamrun-organization-messages .nol-teamrun-organization-thread-title")];
+
+    expect(panel()).toEqual([true, []]);
+    one(".message-leaders").click();
+    await settle();
+    expect(panel()).toEqual([true, ["All leaders"]]);
+    one(".lane:nth-child(1) .message-department").click();
+    await settle();
+    expect(panel()).toEqual([true, ["Design"]]);
+
+    one(".top .views [role=radio]:first-of-type").click();
+    await settle();
+    expect([panel(), all(".chart > nol-teamrun-organization-messages").length]).toEqual([[false, ["Chat with Design"]], 1]);
+  });
+
+  it("talks in the Tree's thread with the department clicked, which it focuses, and with everyone from you at the root", async () => {
+    await create();
+    const thread = (): unknown[] => [texts(".chart > nol-teamrun-organization-messages .nol-teamrun-organization-thread-title"),
+      texts(".chart > nol-teamrun-organization-messages .nol-teamrun-organization-thread-note"), texts(".chart > nol-teamrun-organization-messages .nol-teamrun-organization-empty")];
+    const click = async (view: HTMLElement): Promise<void> => {
+      view.click();
+      await settle();
+    };
+
+    expect(thread()).toEqual([[], [], ["Choose whom to message."]]);
+    await click(one(":scope > .department .department-name", department("Design")));
+    expect(thread().slice(0, 2)).toEqual([["Chat with Design"], ["The leader and every member (2)"]]);
+    await click(one(":scope > .department .department-toggle", department("UI")));
+    expect(thread().slice(0, 1)).toEqual([["Chat with Design"]]);
+    await click(one(".owner"));
+    expect(thread().slice(0, 1)).toEqual([["Chat with Everyone"]]);
+    expect(saves.map(t => OrganizationLayout.fromJson(t).focus)).toEqual(["Department:design", "Department:design", null]);
   });
 
   it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
@@ -616,6 +657,12 @@ describe("OrganizationViewComponent", () => {
       element().style.width = "60rem";
       element().style.height = "60rem";
       await settle();
+      await Wait.until(async () => {
+        one(".chart .nol-canvas-actual").click();
+        await settle();
+        await settle();
+        expect(texts(".chart .nol-canvas-zoom")).toEqual(["100%"]);
+      });
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
@@ -653,19 +700,32 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("fills the space under the header with one canvas inside the view's padding, and fits the chart at 100% to its top, under the canvas's tools", async () => {
+    it("fills the space under the header, inside the view's padding, with one canvas and the messages panel beside it, 22rem wider for the Tree's thread and 24rem for the Board's inbox, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
       element().style.width = "60rem";
       element().style.height = "60rem";
       await settle();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
-      const [host, top, canvas] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas")];
+      const [host, top, canvas, panel] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas"), box(".chart > nol-teamrun-organization-messages")];
       const [tools, tree] = [box(".chart .nol-canvas-tools"), box(".chart .tree")];
-
+      const surface = getComputedStyle(one(".chart > nol-teamrun-organization-messages"));
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
-      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.right, host.right - space(6)],
-        [canvas.bottom, host.bottom - space(6)]] as const)
+      const frame = (): number => {
+        const style = getComputedStyle(one(".chart > nol-canvas"));
+        return [style.borderLeftWidth, style.paddingLeft, style.paddingRight, style.borderRightWidth].map(Number.parseFloat).reduce((a, b) => a + b);
+      };
+
+      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.bottom, host.bottom - space(6)],
+        [panel.left - canvas.right, space(4)], [panel.top, top.bottom + space(4)], [panel.right, host.right - space(6)], [panel.bottom, host.bottom - space(6)],
+        [panel.width - canvas.width, 22 * rem - frame()]] as const)
         AppearanceFixture.expectPixels(actual, expected);
+      expect([surface.borderTopWidth, surface.borderTopStyle]).toEqual(["1px", "solid"]);
+      one(".top .views [role=radio]:nth-of-type(2)").click();
+      await settle();
+      AppearanceFixture.expectPixels(box(".chart > nol-teamrun-organization-messages").width - box(".chart > nol-canvas").width, 24 * rem - frame());
+      one(".top .views [role=radio]:first-of-type").click();
+      await settle();
       expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
     });
 

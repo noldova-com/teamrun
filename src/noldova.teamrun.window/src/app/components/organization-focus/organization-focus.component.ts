@@ -15,6 +15,7 @@ import { CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChipComponent
 
 import { Resources } from "../../../resources";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
+import { OrganizationMessagesShape } from "../../enums/organization-messages-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
 import { OrganizationCrumb } from "../../models/organization-crumb";
@@ -29,11 +30,12 @@ import { OrganizationStoreService } from "../../services/organization-store.serv
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
+import { OrganizationMessagesComponent } from "../organization-messages/organization-messages.component";
 
 @Component({
   selector: "nol-teamrun-organization-focus",
   imports: [CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    TextFieldComponent],
+    OrganizationMessagesComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"
@@ -50,6 +52,7 @@ export class OrganizationFocusComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly fluid: OrganizationCardShape = OrganizationCardShape.Fluid;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
+  protected readonly thread: OrganizationMessagesShape = OrganizationMessagesShape.Thread;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly rows: Signal<readonly OrganizationOutlineRow[]> = computed(() => OrganizationFocusComponent.flatten(this.tree(), 0));
@@ -133,6 +136,10 @@ export class OrganizationFocusComponent {
 
   protected go(target: OrganizationTarget): void {
     this.layout.focusOn(OrganizationFocus.keyOf(target));
+  }
+
+  protected talkTo(target: OrganizationTarget | null): void {
+    this.layout.focusOn(Object.isNull(target) ? null : OrganizationFocus.keyOf(target));
   }
 
   protected department(row: OrganizationOutlineRow): OrganizationTarget {

@@ -19,6 +19,7 @@ import { OrganizationLayout } from "../../../../src/app/models/organization-layo
 import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
@@ -73,6 +74,8 @@ describe("OrganizationFocusComponent", () => {
     context = SampleData.createContext()
       .answer(MethodName.MessageListOpen, () => [waiting.toJson()])
       .answer(MethodName.OrganizationLayoutRead, () => ({ focus }))
+      .answer(MethodName.OrganizationList, () => sample.toJson())
+      .answer(MethodName.OrganizationMessageList, () => [])
       .answer(MethodName.OrganizationLayoutSave, t => {
         saves.push(OrganizationLayout.fromJson(OrganizationLayoutSaveParams.fromJson(t).layout));
         return null;
@@ -96,6 +99,7 @@ describe("OrganizationFocusComponent", () => {
   };
 
   afterEach(() => {
+    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationStoreService.release(context);
     OrganizationLayoutService.release(context);
@@ -237,6 +241,17 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { departmentId: "design" }]]));
   });
 
+  it("talks in a thread under the canvas with whoever is focused", async () => {
+    const thread = (): string[] => texts(".focus > nol-teamrun-organization-messages .nol-teamrun-organization-thread-title");
+    await create("Department:design");
+
+    expect([one(".focus > nol-teamrun-organization-messages").classList.contains("nol-teamrun-organization-messages-inbox"), thread()]).toEqual([false, ["Chat with Design"]]);
+    await click(one(".obtn", row("Bob")));
+    expect(thread()).toEqual(["Chat with Bob"]);
+    await click(one(".crumb"));
+    expect(thread()).toEqual(["Chat with all leaders"]);
+  });
+
   it("renames no unit when a teammate or the leaders are focused, and lets a focused member's card move it", async () => {
     await create("Teammate:bob");
     fixture.componentRef.setInput("editing", true);
@@ -259,16 +274,21 @@ describe("OrganizationFocusComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
-    it("sets the 16rem outline beside the focus, whose canvas holds the 60rem unit: its cards in columns of at least 18rem, one card at up to 36rem", async () => {
+    it("sets the 16rem outline beside the focus, whose canvas holds the 60rem unit above the 17rem conversation: its cards in columns of at least 18rem, one card at up to 36rem", async () => {
       await create();
       element().style.width = "90rem";
       element().style.height = "40rem";
       await settle();
-      await click(one(".focus .nol-canvas-actual"));
+      await Wait.until(async () => {
+        await click(one(".focus .nol-canvas-actual"));
+        await settle();
+        expect(texts(".focus .nol-canvas-zoom")).toEqual(["100%"]);
+      });
       const host = box(element());
       const outline = box(one(".outline"));
       const focus = box(one(".focus"));
       const canvas = box(one(".focus > nol-canvas"));
+      const conversation = box(one(".focus > nol-teamrun-organization-messages"));
       const plane = box(one(".focus-plane"));
       const cards = all(".grid nol-teamrun-organization-card").map(box);
       const columns = Math.floor((plane.width + space(3)) / (18 * rem() + space(3)));
@@ -280,8 +300,11 @@ describe("OrganizationFocusComponent", () => {
       AppearanceFixture.expectPixels(outline.width, 16 * rem() + (host.width - 51 * rem() - space(4)) / 1000);
       AppearanceFixture.expectPixels(focus.left - outline.right, space(4));
       AppearanceFixture.expectPixels(focus.right, host.right);
-      for (const edge of ["left", "top", "right", "bottom"] as const)
+      for (const edge of ["left", "top", "right"] as const)
         AppearanceFixture.expectPixels(canvas[edge], focus[edge]);
+      for (const [actual, expected] of [[conversation.top - canvas.bottom, space(4)], [conversation.height, 17 * rem()], [conversation.left, focus.left],
+        [conversation.right, focus.right], [conversation.bottom, focus.bottom]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
       AppearanceFixture.expectPixels(plane.width, 60 * rem());
       expect(getComputedStyle(one(".outline")).borderTopWidth).toBe("1px");
       AppearanceFixture.expectPixels(box(one(".orow.root")).left - outline.left, space(1) + 1);

@@ -57,10 +57,10 @@ LICENSE file in the root directory of this source tree.
   } @else {
     <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
       @if (mode() === modes.Board) {
-        <nol-teamrun-organization-board [tree]="tree()" [editing]="editing()" />
+        <nol-teamrun-organization-board [tree]="tree()" [editing]="editing()" (messageLeaders)="messageLeaders()" (messageDepartment)="messageDepartment($event)" />
       } @else {
         <div class="tree">
-          <div class="owner" nolCanvasItem>
+          <div class="owner" nolCanvasItem (click)="messageEveryone()">
             <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
             <div class="who">
               <span class="name">{{ resources.organizationOwnerName }}</span>
@@ -85,5 +85,7 @@ LICENSE file in the root directory of this source tree.
         </div>
       }
     </nol-canvas>
+    <nol-teamrun-organization-messages class="messages" [class.inbox]="mode() === modes.Board" [shape]="mode() === modes.Board ? shapes.Inbox : shapes.Thread"
+      [(target)]="target" />
   }
 </main>
